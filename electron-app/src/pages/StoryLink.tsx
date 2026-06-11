@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -174,7 +175,8 @@ export default function StoryLink({ user }: { user: User }) {
   const [phones, setPhones]           = useState<GeelarkPhone[]>([])
   const [loadingPhones, setLoading]   = useState(false)
   const [phoneSearch, setPhoneSearch] = useState('')
-  const [groupFilter, setGroupFilter] = useState('Tous')
+  const [groupFilter, _setGroupFilter] = useState(loadLastGroup)
+  const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [groups, setGroups]           = useState<string[]>(['Tous'])
   const [selected, setSelected]       = useState<Set<string>>(new Set())
 
@@ -223,6 +225,8 @@ export default function StoryLink({ user }: { user: User }) {
       setPhones(list)
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
+      if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
       // Hydrate saved links into state for live preview
       setPhoneLinks(prev => {
         const n = { ...prev }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
@@ -113,7 +114,8 @@ export function Warmup({ user }: WarmupProps) {
   const [loadingPhones, setLoadingPhones] = useState(false)
   const [phonesError,   setPhonesError]   = useState<string | null>(null)
   const [phoneSearch,   setPhoneSearch]   = useState('')
-  const [groupFilter,   setGroupFilter]   = useState('Tous')
+  const [groupFilter,   _setGroupFilter]  = useState(loadLastGroup)
+  const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [groups,        setGroups]        = useState<string[]>(['Tous'])
 
   // ── Tab ───────────────────────────────────────────────────────────────────
@@ -151,6 +153,8 @@ export function Warmup({ user }: WarmupProps) {
       setPhones(list)
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
+      if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
     } catch (e) { setPhonesError(e instanceof Error ? e.message : String(e)) }
     setLoadingPhones(false)
   }

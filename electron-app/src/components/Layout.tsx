@@ -81,6 +81,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'phones',      label: 'navPhones',      icon: '📱' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'captionbank', label: 'navCaptionBank',  icon: '💬' },
     ],
   },
   {
@@ -89,14 +90,13 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
-      { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
   },
   {
-    title: 'Montage',
+    title: 'Outils vidéo',
     defaultOpen: true,
     items: [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
@@ -541,7 +541,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
               {beta && (
-                <span style={{
+                <span title="Fonctionnalité en test — comportement susceptible d'évoluer" style={{
                   fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
                   padding: '2px 6px', borderRadius: 4,
                   background: 'rgba(99,102,241,0.15)', color: '#6366F1',
@@ -549,7 +549,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 }}>BETA</span>
               )}
               {isNew && (
-                <span style={{
+                <span title="Nouvelle fonctionnalité" style={{
                   fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
                   padding: '2px 6px', borderRadius: 4,
                   background: 'rgba(16,185,129,0.15)', color: '#34d399',

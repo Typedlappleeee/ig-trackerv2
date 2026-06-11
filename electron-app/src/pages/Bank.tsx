@@ -1030,15 +1030,16 @@ export function Bank({ user }: BankProps) {
                     // More than 5 → bundle into a ZIP
                     const files: Record<string, Uint8Array> = {}
                     const seen = new Set<string>()
+                    let failed = 0
                     await Promise.all(sel.map(async it => {
                       let buf: ArrayBuffer | null = null
                       if (it.storage_path) {
                         const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(it.storage_path)
                         if (data) buf = await data.arrayBuffer()
                       } else if (it.file_url) {
-                        try { buf = await (await fetch(it.file_url)).arrayBuffer() } catch (_) {}
+                        try { buf = await (await fetch(it.file_url)).arrayBuffer() } catch (_) { /* compté ci-dessous */ }
                       }
-                      if (!buf) return
+                      if (!buf) { failed++; return }
                       let name = getDownloadName(it)
                       // Deduplicate filenames
                       if (seen.has(name)) {
@@ -1051,7 +1052,11 @@ export function Bank({ user }: BankProps) {
                       seen.add(name)
                       files[name] = new Uint8Array(buf)
                     }))
-                    if (!Object.keys(files).length) return
+                    if (!Object.keys(files).length) {
+                      alert('Téléchargement impossible — aucune vidéo n\u2019a pu être récupérée.')
+                      return
+                    }
+                    if (failed > 0) alert(`${failed} vidéo${failed > 1 ? 's' : ''} n\u2019a pas pu être incluse dans le ZIP.`)
                     const zipped = zipSync(files, { level: 0 })
                     const blob = new Blob([zipped], { type: 'application/zip' })
                     const url = URL.createObjectURL(blob)

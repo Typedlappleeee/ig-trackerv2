@@ -551,13 +551,13 @@ import { initIgStatsPoller } from '@/lib/igStatsPoller'
 // bundle only carries the shell + Hub (default landing page after login).
 import Hub                   from '@/pages/Hub'
 const Phones         = lazy(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
-const Posting        = lazy(() => import('@/pages/Posting').then(m => ({ default: m.Posting })))
+const Publish        = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
 const BankHub        = lazy(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
 const Montage        = lazy(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
 const Remix          = lazy(() => import('@/pages/Remix').then(m => ({ default: m.Remix })))
 const AiTools        = lazy(() => import('@/pages/AiTools').then(m => ({ default: m.AiTools })))
 const Settings       = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })))
-const MassPosting    = lazy(() => import('@/pages/MassPosting').then(m => ({ default: m.MassPosting })))
+
 const Scheduler      = lazy(() => import('@/pages/Scheduler').then(m => ({ default: m.Scheduler })))
 const Warmup         = lazy(() => import('@/pages/Warmup').then(m => ({ default: m.Warmup })))
 const VideoRepurpose = lazy(() => import('@/pages/VideoRepurpose').then(m => ({ default: m.VideoRepurpose })))
@@ -823,8 +823,8 @@ function AppContent({ user }: { user: User }) {
   const content = (() => {
     switch (page) {
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-      case 'posting':      return <Posting     user={user} />
-      case 'massposting':  return <MassPosting user={user} />
+      case 'posting':      return <Publish     user={user} />
+      case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'storylink':    return <StoryLink   user={user} />
       case 'bank':         return <BankHub     user={user} initialTab="videos" />

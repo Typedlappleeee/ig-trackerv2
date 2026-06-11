@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
@@ -74,7 +75,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [customPrompt, setCustomPrompt]   = useState('')
   const [logs, _setLogs]                  = useState<TaskLog[]>(ms.logs)
   const [taskStatuses, _setTaskStatuses]  = useState<Map<string, TaskStatus>>(ms.taskStatuses)
-  const [groupFilter, setGroupFilter]     = useState('Tous')
+  const [groupFilter, _setGroupFilter]    = useState(loadLastGroup)
+  const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]     = useState('')
   const [phonePickMode, setPhonePickMode] = useState<'phones' | 'groups'>('phones')
@@ -135,6 +137,8 @@ export function MassPosting({ user }: MassPostingProps) {
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
+      if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
     })
   }, [currentOrg?.id, user.id, conns.bearer])
 
@@ -1362,7 +1366,13 @@ export function MassPosting({ user }: MassPostingProps) {
                   {t('stop')}
                 </button>
               )}
-              <button onClick={() => setShowScheduleModal(true)} disabled={!canLaunch} className="cursor-pointer"
+              <button onClick={() => setShowScheduleModal(true)} disabled={!canLaunch}
+                title={canLaunch ? undefined
+                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
+                  : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
+                  : selectedVideos.length === 0 ? 'Sélectionne des vidéos dans la banque'
+                  : 'Publication en cours…'}
+                className="cursor-pointer"
                 style={{
                   padding: '10px 18px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
                   background: 'transparent', color: canLaunch ? MUTED : FAINT, border: `1px solid ${HAIR}`,
@@ -1372,7 +1382,13 @@ export function MassPosting({ user }: MassPostingProps) {
                 onMouseLeave={e => { e.currentTarget.style.color = canLaunch ? MUTED : FAINT; e.currentTarget.style.borderColor = HAIR }}>
                 {t('schedule')}
               </button>
-              <button onClick={post} disabled={!canLaunch} className="cursor-pointer"
+              <button onClick={post} disabled={!canLaunch}
+                title={canLaunch ? undefined
+                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
+                  : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
+                  : selectedVideos.length === 0 ? 'Sélectionne des vidéos dans la banque'
+                  : 'Publication en cours…'}
+                className="cursor-pointer"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   padding: '10px 26px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',

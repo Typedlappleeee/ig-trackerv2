@@ -402,7 +402,13 @@ async function executeScheduledPostInner(
 
 // Format for display (local time)
 export function fmtScheduledTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  const d = new Date(iso)
+  // Décalage local lisible (« UTC+1 ») pour lever toute ambiguïté de fuseau
+  const offMin = -d.getTimezoneOffset()
+  const sign   = offMin >= 0 ? '+' : '−'
+  const hours  = Math.abs(offMin) / 60
+  const tz     = `UTC${sign}${Number.isInteger(hours) ? hours : hours.toFixed(1)}`
+  return `${d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} (${tz})`
 }
 
 // Default value for <input type="datetime-local"> (local time, N min from now)

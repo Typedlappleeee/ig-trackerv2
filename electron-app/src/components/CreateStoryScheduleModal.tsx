@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -98,7 +99,8 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
   const [phones, setPhones]         = useState<GeelarkPhone[]>([])
   const [loadingPhones, setLoading] = useState(false)
   const [phoneSearch, setSearch]    = useState('')
-  const [groupFilter, setGroup]     = useState('Tous')
+  const [groupFilter, _setGroup]    = useState(loadLastGroup)
+  const setGroup = (g: string) => { _setGroup(g); saveLastGroup(g) }
   const [groups, setGroups]         = useState<string[]>(['Tous'])
   const [selected, setSelected]     = useState<Set<string>>(new Set())
 
@@ -143,6 +145,8 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
       setPhones(list)
       const gs = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...gs])
+      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
+      if (!gs.includes(loadLastGroup())) setGroup('Tous')
       setPhoneLinks(prev => {
         const n = { ...prev }
         list.forEach(p => { if (n[p.id] === undefined) { const v = loadLink(p.id); if (v) n[p.id] = v } })

@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
@@ -35,7 +36,8 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
   const [selPhones, setSelPhones]       = useState<Set<string>>(new Set())
   const [phoneSearch, setPhoneSearch]   = useState('')
   const [groups, setGroups]             = useState<string[]>(['Tous'])
-  const [groupFilter, setGroupFilter]   = useState('Tous')
+  const [groupFilter, _setGroupFilter]  = useState(loadLastGroup)
+  const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [videos, setVideos]             = useState<SelVideo[]>([])
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [caption, setCaption]           = useState('')
@@ -55,6 +57,8 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
+      if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
     })
   }, [currentOrg?.id, user.id])
 

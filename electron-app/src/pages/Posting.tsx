@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { supabase, type Phone } from '@/lib/supabase'
 import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
@@ -143,7 +144,8 @@ export function Posting({ user }: PostingProps) {
   const [postingOpts, setPostingOpts]  = useState<PostingOpts>(loadPostingOpts)
   const [bearer, setBearer]            = useState('')
   const [groqKey, setGroqKey]          = useState('')
-  const [groupFilter, setGroup]        = useState('Tous')
+  const [groupFilter, _setGroup]       = useState(loadLastGroup)
+  const setGroup = (g: string) => { _setGroup(g); saveLastGroup(g) }
   const [groups, setGroups]            = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]  = useState('')
   const [posting, _setPosting]         = useState(s.posting)
@@ -194,6 +196,8 @@ export function Posting({ user }: PostingProps) {
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
+      if (!grps.includes(loadLastGroup())) setGroup('Tous')
     })
   }, [currentOrg?.id, user.id, conns.bearer])
 
@@ -979,6 +983,11 @@ export function Posting({ user }: PostingProps) {
               <button
                 onClick={post}
                 disabled={!canPost}
+                title={canPost ? undefined
+                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
+                  : selectedPhones.size === 0 ? 'Sélectionne au moins un téléphone'
+                  : !filePath ? 'Choisis une vidéo à publier'
+                  : 'Publication en cours…'}
                 className="flex-[2] py-3.5 rounded-2xl text-[14px] font-bold text-white transition-all active:scale-[0.99] disabled:cursor-not-allowed relative overflow-hidden"
                 style={canPost ? {
                   background: 'linear-gradient(130deg, #4F46E5, #6366F1, #A855F7)',
@@ -1014,6 +1023,11 @@ export function Posting({ user }: PostingProps) {
               <button
                 onClick={() => setShowScheduleModal(true)}
                 disabled={!canPost}
+                title={canPost ? undefined
+                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
+                  : selectedPhones.size === 0 ? 'Sélectionne au moins un téléphone'
+                  : !filePath ? 'Choisis une vidéo à publier'
+                  : 'Publication en cours…'}
                 className="sf-btn sf-btn-secondary flex-1 gap-2 text-[13px] font-semibold rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ height: 'auto', paddingTop: '0.875rem', paddingBottom: '0.875rem' }}
               >

@@ -38,6 +38,7 @@ async function refillQueue() {
     .from('phones')
     .select('id, org_id, ig_username, ig_sessionid')
     .not('ig_username', 'is', null)
+    .limit(200)
   // Le pseudo IG suffit — le sessionid est optionnel (fetch anonyme sinon)
   _queue = ((data ?? []) as Phone[]).filter(p => p.ig_username?.trim())
 }

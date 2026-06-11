@@ -20,3 +20,4 @@ export const WARN  = '#FBBF24'
 export const ERR   = '#F87171'
 
 export const SANS = "'Inter', system-ui, sans-serif"
+
