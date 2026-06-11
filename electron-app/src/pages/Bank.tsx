@@ -936,7 +936,7 @@ export function Bank({ user }: BankProps) {
               onClick={() => setSelectedFolder(null)}
               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all group cursor-pointer"
               style={selectedFolder === null
-                ? { background: 'rgba(139,92,246,0.1)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
+                ? { background: 'rgba(201,181,132,0.1)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
                 : { borderLeft: '2px solid transparent' }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={selectedFolder === null ? 'var(--accent-lt)' : 'var(--text-3)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -971,9 +971,9 @@ export function Bank({ user }: BankProps) {
           {selectionMode && (
             <div
               className="flex-shrink-0 px-6 py-2.5 flex items-center gap-2.5"
-              style={{ background: 'rgba(139,92,246,0.06)', borderBottom: '1px solid rgba(139,92,246,0.2)' }}
+              style={{ background: 'rgba(201,181,132,0.06)', borderBottom: '1px solid rgba(201,181,132,0.2)' }}
             >
-              <div className="w-2 h-2 rounded-full flex-shrink-0 bg-accent" style={{ boxShadow: '0 0 8px rgba(139,92,246,0.8)' }} />
+              <div className="w-2 h-2 rounded-full flex-shrink-0 bg-accent" style={{ boxShadow: '0 0 8px rgba(201,181,132,0.8)' }} />
               <span className="text-[13px] font-bold text-accent">{selectedIds.size} {t('bankSelected')}</span>
 
               <button
@@ -1097,7 +1097,7 @@ export function Bank({ user }: BankProps) {
           {uploadStatus && (
             <div
               className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3 flex-shrink-0"
-              style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}
+              style={{ background: 'rgba(201,181,132,0.07)', border: '1px solid rgba(201,181,132,0.2)' }}
             >
               <span className="sf-spinner flex-shrink-0" />
               <span className="text-[13px] text-accent">{uploadStatus}</span>
@@ -1175,9 +1175,9 @@ export function Bank({ user }: BankProps) {
                     style={{
                       gridTemplateColumns: '40px 1fr 80px 100px 32px',
                       borderBottom: idx < visible.length - 1 ? '1px solid var(--border)' : 'none',
-                      background: selectedIds.has(item.id) ? 'rgba(139,92,246,0.06)' : undefined,
+                      background: selectedIds.has(item.id) ? 'rgba(201,181,132,0.06)' : undefined,
                     }}
-                    onMouseEnter={e => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = 'rgba(139,92,246,0.04)' }}
+                    onMouseEnter={e => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = 'rgba(201,181,132,0.04)' }}
                     onMouseLeave={e => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = 'transparent' }}
                     onContextMenu={e => !selectionMode && openCtx(e, item)}
                   >
@@ -1190,7 +1190,7 @@ export function Bank({ user }: BankProps) {
                       <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
                       {/* Checkbox overlay when selected */}
                       {isSelected(item) && (
-                        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.7)' }}>
+                        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.7)' }}>
                           <IconCheck size={12} className="text-white" />
                         </div>
                       )}
@@ -1217,7 +1217,7 @@ export function Bank({ user }: BankProps) {
                     {/* Actions */}
                     <button
                       className="w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-accent cursor-pointer"
-                      style={{ background: 'rgba(139,92,246,0.1)' }}
+                      style={{ background: 'rgba(201,181,132,0.1)' }}
                       onClick={e => { e.stopPropagation(); openCtx(e, item) }}
                     >
                       <IconMoreVert size={12} />
@@ -1238,7 +1238,7 @@ export function Bank({ user }: BankProps) {
             left: ctxMenu.x,
             top: ctxMenu.y,
             background: 'var(--surface)',
-            border: '1px solid rgba(139,92,246,0.22)',
+            border: '1px solid rgba(201,181,132,0.22)',
             boxShadow: '0 16px 48px -8px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.5)',
           }}
           onMouseDown={e => e.stopPropagation()}
@@ -1467,9 +1467,9 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
       className="flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-all group"
       style={
         dragOver
-          ? { background: 'rgba(139,92,246,0.15)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
+          ? { background: 'rgba(201,181,132,0.15)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
           : active
-          ? { background: 'rgba(139,92,246,0.08)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
+          ? { background: 'rgba(201,181,132,0.08)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
           : { borderLeft: '2px solid transparent' }
       }
       onClick={onClick}
@@ -1766,7 +1766,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
       style={{
         background: 'var(--surface)',
         border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
-        boxShadow: isSelected ? '0 0 0 2px rgba(139,92,246,0.25)' : undefined,
+        boxShadow: isSelected ? '0 0 0 2px rgba(201,181,132,0.25)' : undefined,
       }}
       onContextMenu={e => !selectionMode && onContextMenu(e, item)}
     >
@@ -1786,7 +1786,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
 
         {/* Hover tint */}
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-          style={{ background: 'rgba(139,92,246,0.06)' }} />
+          style={{ background: 'rgba(201,181,132,0.06)' }} />
 
         {/* Checkbox — top-left */}
         <button
@@ -1815,7 +1815,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             <div
               className="w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(139,92,246,0.75)', backdropFilter: 'blur(8px)', boxShadow: '0 0 20px rgba(139,92,246,0.5)' }}
+              style={{ background: 'rgba(201,181,132,0.75)', backdropFilter: 'blur(8px)', boxShadow: '0 0 20px rgba(201,181,132,0.5)' }}
             >
               <IconPlay size={16} />
             </div>
@@ -1839,7 +1839,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
             style={{ background: 'rgba(0,0,0,0.65)', color: '#fff', backdropFilter: 'blur(4px)' }}
             onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
             title={t('bankCardOptions')}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.6)')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,181,132,0.6)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.65)')}
           >
             <IconMoreVert size={12} />
@@ -1850,7 +1850,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
         {item.used_count > 0 && (
           <div
             className="absolute bottom-8 right-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold pointer-events-none"
-            style={{ background: 'rgba(139,92,246,0.85)', color: '#fff' }}
+            style={{ background: 'rgba(201,181,132,0.85)', color: '#fff' }}
           >
             {item.used_count}×
           </div>
@@ -2023,7 +2023,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
         </div>
 
         {resolving && (
-          <div className="px-5 py-2 border-b border-accent/30 text-accent text-xs flex items-center gap-2" style={{ background: 'rgba(139,92,246,0.08)' }}>
+          <div className="px-5 py-2 border-b border-accent/30 text-accent text-xs flex items-center gap-2" style={{ background: 'rgba(201,181,132,0.08)' }}>
             <span className="sf-spinner flex-shrink-0" />
             <span>{t('bankPickerDownloadingCloud')}: {resolving}</span>
           </div>

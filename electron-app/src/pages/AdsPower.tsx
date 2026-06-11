@@ -114,7 +114,7 @@ function ProfileRow({
       onClick={onToggle}
       className="sf-card p-3 flex items-center gap-2.5 cursor-pointer transition-all"
       style={selected
-        ? { borderColor: 'rgba(124,58,237,0.4)', background: 'rgba(124,58,237,0.08)' }
+        ? { borderColor: 'rgba(201,181,132,0.4)', background: 'rgba(201,181,132,0.08)' }
         : {}}
     >
       {/* Checkbox */}
@@ -122,7 +122,7 @@ function ProfileRow({
         className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
         style={{
           border: selected ? 'none' : '1.5px solid rgba(148,163,184,0.3)',
-          background: selected ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'transparent',
+          background: selected ? 'linear-gradient(130deg,#C9B584,#D4C499)' : 'transparent',
         }}
       >
         {selected && (
@@ -523,11 +523,11 @@ export function AdsPower({ user }: AdsPowerProps) {
             {/* Icon with glow */}
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{
-                background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(236,72,153,0.1))',
-                border: '1px solid rgba(139,92,246,0.3)',
-                boxShadow: '0 0 14px -4px rgba(124,58,237,0.4)',
+                background: 'linear-gradient(135deg,rgba(201,181,132,0.18),rgba(243,241,236,0.1))',
+                border: '1px solid rgba(201,181,132,0.3)',
+                boxShadow: '0 0 14px -4px rgba(201,181,132,0.4)',
               }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4C499" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
                 <path d="M12 18h.01"/>
               </svg>
@@ -568,8 +568,8 @@ export function AdsPower({ user }: AdsPowerProps) {
               {video ? (
                 <div className="sf-card p-3 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)' }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+                    style={{ background: 'rgba(201,181,132,0.12)', border: '1px solid rgba(201,181,132,0.2)' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-semibold text-text truncate">{video.title}</p>
@@ -582,7 +582,7 @@ export function AdsPower({ user }: AdsPowerProps) {
                 <button
                   onClick={() => setShowBank(true)}
                   className="w-full p-4 rounded-xl text-[13px] cursor-pointer font-semibold text-accent hover:text-text transition-colors"
-                  style={{ background: 'rgba(255,255,255,0.02)', border: '1.5px dashed rgba(139,92,246,0.3)' }}
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1.5px dashed rgba(201,181,132,0.3)' }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="inline-block mr-2 -mt-0.5"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
                   {t('adspowerSelectFromBank')}

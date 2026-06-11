@@ -128,8 +128,8 @@ export function VideoImport({ user }: { user: User }) {
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-3 border-b border-border">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          style={{ background: 'linear-gradient(135deg, rgba(201,181,132,0.25), rgba(243,241,236,0.15))', border: '1px solid rgba(201,181,132,0.25)' }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
@@ -200,7 +200,7 @@ export function VideoImport({ user }: { user: User }) {
           {/* Supported platforms info */}
           <div className="sf-card p-5 space-y-3">
             <div className="flex items-center gap-2 mb-1">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
               <p className="text-[12px] font-semibold text-text2 uppercase tracking-wider">Plateformes supportées</p>
@@ -256,7 +256,7 @@ export function VideoImport({ user }: { user: User }) {
                       ? <img src={v.thumbnailUrl} alt={v.title} className="w-14 h-10 rounded-lg object-cover flex-shrink-0" />
                       : (
                         <div className="w-14 h-10 rounded-lg flex-shrink-0 flex items-center justify-center bg-accent/10">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
                           </svg>
                         </div>

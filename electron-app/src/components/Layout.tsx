@@ -26,14 +26,14 @@ function SFLogo({ size = 28 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" overflow="visible">
       <defs>
         <linearGradient id="sfl-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#22d3ee"/>
-          <stop offset="45%"  stopColor="#818cf8"/>
-          <stop offset="100%" stopColor="#a855f7"/>
+          <stop offset="0%"   stopColor="#F3F1EC"/>
+          <stop offset="50%"  stopColor="#C9B584"/>
+          <stop offset="100%" stopColor="#B8A070"/>
         </linearGradient>
         <filter id="sfl-glow" x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="sRGB">
           <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
           <feColorMatrix in="blur" type="matrix"
-            values="0 0 0 0 0.13  0 0 0 0 0.83  0 0 0 0 0.93   0 0 0 1 0" result="colored"/>
+            values="0 0 0 0 0.79  0 0 0 0 0.71  0 0 0 0 0.52   0 0 0 1 0" result="colored"/>
           <feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
@@ -517,10 +517,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             cursor: 'pointer',
             border: 'none',
             background: active
-              ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+              ? 'linear-gradient(90deg, rgba(201,181,132,0.16) 0%, rgba(201,181,132,0.08) 60%, transparent 100%)'
               : hovered ? 'rgba(255,255,255,0.045)' : 'transparent',
-            color: active ? '#ede8ff' : hovered ? 'rgba(241,240,247,0.82)' : 'rgba(148,163,184,0.55)',
-            boxShadow: active ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+            color: active ? '#F3F1EC' : hovered ? 'rgba(241,240,247,0.82)' : 'rgba(148,163,184,0.55)',
+            boxShadow: active ? 'inset 3px 0 0 rgba(201,181,132,0.85)' : 'none',
             transition: 'background 140ms ease, color 140ms ease, box-shadow 140ms ease',
             transform: pressed ? 'scale(0.968)' : 'scale(1)',
             justifyContent: collapsed ? 'center' : 'flex-start',
@@ -532,7 +532,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <span style={{
             flexShrink: 0,
             display: 'flex',
-            color: active ? '#c4b5fd' : hovered ? 'rgba(196,181,253,0.65)' : 'rgba(148,163,184,0.4)',
+            color: active ? '#D4C499' : hovered ? 'rgba(243,241,236,0.65)' : 'rgba(148,163,184,0.4)',
             transition: 'color 140ms ease',
           }}>
             <NavIcon d={ICONS[iconKey]} size={17} />
@@ -544,8 +544,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 <span style={{
                   fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
                   padding: '2px 6px', borderRadius: 4,
-                  background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
-                  border: '1px solid rgba(139,92,246,0.2)', flexShrink: 0,
+                  background: 'rgba(201,181,132,0.15)', color: '#C9B584',
+                  border: '1px solid rgba(201,181,132,0.2)', flexShrink: 0,
                 }}>BETA</span>
               )}
               {isNew && (
@@ -566,15 +566,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             left: 60,
             top: 'auto',
             transform: 'translateY(-50%)',
-            background: '#1A1A2E',
-            border: '1px solid rgba(139,92,246,0.28)',
+            background: '#0D0D0F',
+            border: '1px solid rgba(201,181,132,0.28)',
             borderRadius: 7,
             padding: '5px 11px',
             fontSize: 12,
             fontWeight: 500,
-            color: '#F2F0FF',
+            color: '#F3F1EC',
             whiteSpace: 'nowrap',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.06)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(201,181,132,0.06)',
             zIndex: 9999,
             pointerEvents: 'none',
             animation: 'sf-slide-left 0.16s cubic-bezier(0.22,1,0.36,1) both',
@@ -640,8 +640,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
             <div style={{
               width: 28, height: 28, borderRadius: 8,
-              background: 'linear-gradient(135deg,rgba(124,58,237,0.25),rgba(34,211,238,0.1))',
-              border: '1px solid rgba(124,58,237,0.25)',
+              background: 'linear-gradient(135deg,rgba(201,181,132,0.25),rgba(34,211,238,0.1))',
+              border: '1px solid rgba(201,181,132,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <SFLogo size={18} />
@@ -651,7 +651,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           {!collapsed && (
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
               <span style={{ background: 'linear-gradient(90deg, #e2e8f0, #cbd5e1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scale</span>
-              <span style={{ background: 'linear-gradient(90deg, #22d3ee, #818cf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+              <span style={{ background: 'linear-gradient(90deg, #22d3ee, #818cf8, #C9B584)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
             </span>
           )}
 
@@ -736,8 +736,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                     <span style={{
                       fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
                       padding: '2px 5px', borderRadius: 4,
-                      background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
-                      border: '1px solid rgba(139,92,246,0.2)', flexShrink: 0,
+                      background: 'rgba(201,181,132,0.15)', color: '#C9B584',
+                      border: '1px solid rgba(201,181,132,0.2)', flexShrink: 0,
                     }}>
                       NEW
                     </span>
@@ -921,7 +921,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             {/* Avatar pill */}
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0e7490, #7C3AED)',
+              background: 'linear-gradient(135deg, #0e7490, #C9B584)',
               boxShadow: '0 0 8px rgba(34,211,238,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
@@ -962,8 +962,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
             <span style={{
               width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginRight: 3,
-              background: 'linear-gradient(135deg, #a78bfa, #22d3ee)',
-              boxShadow: '0 0 8px rgba(139,92,246,0.6)',
+              background: 'linear-gradient(135deg, #C9B584, #22d3ee)',
+              boxShadow: '0 0 8px rgba(201,181,132,0.6)',
             }} />
             <span style={{ fontSize: 14.5, fontWeight: 600, color: '#F1F0F7', whiteSpace: 'nowrap' }}>
               {pageLabels[page] ?? page}
@@ -973,7 +973,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 <span style={{ color: 'rgba(148,163,184,0.35)', fontSize: 13 }}>/</span>
                 <span style={{
                   fontSize: 13, fontWeight: 600,
-                  color: i === breadcrumb.length - 1 ? 'rgba(196,181,253,0.85)' : 'rgba(148,163,184,0.55)',
+                  color: i === breadcrumb.length - 1 ? 'rgba(243,241,236,0.85)' : 'rgba(148,163,184,0.55)',
                   maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {seg}
@@ -987,8 +987,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-              background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)',
-              color: '#A78BFA', flexShrink: 0,
+              background: 'rgba(201,181,132,0.15)', border: '1px solid rgba(201,181,132,0.3)',
+              color: '#C9B584', flexShrink: 0,
             }}>
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse flex-shrink-0" />
               {activeTask.kind === 'mass'
@@ -1020,20 +1020,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '5px 10px 5px 12px', borderRadius: '8px 0 0 8px',
-                    background: credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)',
-                    border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(139,92,246,0.18)',
+                    background: credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(201,181,132,0.07)',
+                    border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(201,181,132,0.18)',
                     borderRight: 'none',
                     cursor: 'pointer', transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.13)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(201,181,132,0.13)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(201,181,132,0.07)' }}
                 >
                   {/* Diamond/gem icon */}
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M6 3h12l4 6-10 12L2 9l4-6z" stroke={credits.balance < 10 ? '#F87171' : '#a78bfa'} strokeWidth="2" strokeLinejoin="round" fill={credits.balance < 10 ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.18)'}/>
-                    <path d="M2 9h20M12 3l4 6-4 12-4-12 4-6z" stroke={credits.balance < 10 ? '#F87171' : '#a78bfa'} strokeWidth="1.5" strokeLinejoin="round"/>
+                    <path d="M6 3h12l4 6-10 12L2 9l4-6z" stroke={credits.balance < 10 ? '#F87171' : '#C9B584'} strokeWidth="2" strokeLinejoin="round" fill={credits.balance < 10 ? 'rgba(239,68,68,0.2)' : 'rgba(201,181,132,0.18)'}/>
+                    <path d="M2 9h20M12 3l4 6-4 12-4-12 4-6z" stroke={credits.balance < 10 ? '#F87171' : '#C9B584'} strokeWidth="1.5" strokeLinejoin="round"/>
                   </svg>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#c4b5fd', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#D4C499', fontVariantNumeric: 'tabular-nums' }}>
                     {credits.balance.toLocaleString('fr-FR')}
                   </span>
                 </button>
@@ -1044,15 +1044,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 26, height: 30, borderRadius: '0 8px 8px 0',
-                    background: credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.14)',
-                    border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(139,92,246,0.25)',
+                    background: credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(201,181,132,0.14)',
+                    border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(201,181,132,0.25)',
                     cursor: 'pointer', transition: 'background 0.15s, opacity 0.15s',
                     fontSize: 14, fontWeight: 700,
-                    color: credits.balance < 10 ? '#F87171' : '#a78bfa',
+                    color: credits.balance < 10 ? '#F87171' : '#C9B584',
                     lineHeight: 1,
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.22)' : 'rgba(139,92,246,0.22)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.14)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.22)' : 'rgba(201,181,132,0.22)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(201,181,132,0.14)' }}
                 >
                   +
                 </button>
@@ -1065,7 +1065,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 onClick={() => { setNotifOpen(v => !v); if (!notifOpen) markAllRead() }}
                 style={{
                   width: 32, height: 32, borderRadius: 8,
-                  border: `1px solid ${unread > 0 ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.07)'}`,
+                  border: `1px solid ${unread > 0 ? 'rgba(201,181,132,0.3)' : 'rgba(255,255,255,0.07)'}`,
                   background: 'transparent', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   position: 'relative', transition: 'background 0.15s',
@@ -1073,15 +1073,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
               >
-                <NavIcon d={ICONS.bell} size={15} color={unread > 0 ? '#A78BFA' : 'rgba(148,163,184,0.5)'} />
+                <NavIcon d={ICONS.bell} size={15} color={unread > 0 ? '#C9B584' : 'rgba(148,163,184,0.5)'} />
                 {unread > 0 && (
                   <span style={{
                     position: 'absolute', top: -4, right: -4,
                     minWidth: 16, height: 16, padding: '0 2px', borderRadius: 8,
-                    background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff',
+                    background: 'linear-gradient(130deg,#C9B584,#A855F7)', color: '#fff',
                     fontSize: 9, fontWeight: 800,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 0 8px rgba(139,92,246,0.6)',
+                    boxShadow: '0 0 8px rgba(201,181,132,0.6)',
                   }}>
                     {unread > 9 ? '9+' : unread}
                   </span>
@@ -1091,17 +1091,17 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               {/* Notifications panel */}
               {notifOpen && (
                 <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50"
-                  style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 16px 48px -8px rgba(0,0,0,0.8), 0 0 0 1px rgba(139,92,246,0.08)' }}>
+                  style={{ background: '#0A0A0C', border: '1px solid rgba(201,181,132,0.2)', boxShadow: '0 16px 48px -8px rgba(0,0,0,0.8), 0 0 0 1px rgba(201,181,132,0.08)' }}>
 
                   {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+                  <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(201,181,132,0.1)' }}>
                     <div className="flex items-center gap-2">
-                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#A78BFA" strokeWidth={2}>
+                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#C9B584" strokeWidth={2}>
                         <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                       </svg>
                       <span className="text-[13px] font-bold text-white">{t('notifications')}</span>
                       {notifications.length > 0 && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(201,181,132,0.15)', color: '#C9B584' }}>
                           {notifications.length}
                         </span>
                       )}
@@ -1121,7 +1121,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                     {notifications.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-3">
                         <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                          style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.15)' }}>
+                          style={{ background: 'rgba(201,181,132,0.06)', border: '1px dashed rgba(201,181,132,0.15)' }}>
                           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="rgba(82,82,91,0.6)" strokeWidth={1.5}>
                             <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                           </svg>
@@ -1132,8 +1132,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                         </p>
                       </div>
                     ) : notifications.map(n => {
-                      const iconColor = n.level === 'ok' ? '#22C55E' : n.level === 'error' ? '#EF4444' : n.level === 'warn' ? '#F59E0B' : '#A78BFA'
-                      const iconBg    = n.level === 'ok' ? 'rgba(34,197,94,0.12)' : n.level === 'error' ? 'rgba(239,68,68,0.12)' : n.level === 'warn' ? 'rgba(245,158,11,0.12)' : 'rgba(139,92,246,0.12)'
+                      const iconColor = n.level === 'ok' ? '#22C55E' : n.level === 'error' ? '#EF4444' : n.level === 'warn' ? '#F59E0B' : '#C9B584'
+                      const iconBg    = n.level === 'ok' ? 'rgba(34,197,94,0.12)' : n.level === 'error' ? 'rgba(239,68,68,0.12)' : n.level === 'warn' ? 'rgba(245,158,11,0.12)' : 'rgba(201,181,132,0.12)'
                       const Icon = () => {
                         if (n.level === 'ok')    return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5L4.5 8L9 3" stroke={iconColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         if (n.level === 'error') return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 2L9 9M9 2L2 9" stroke={iconColor} strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -1165,11 +1165,11 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
               style={{
                 width: 28, height: 28, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
+                background: 'linear-gradient(135deg, #C9B584, #D4C499)',
                 border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
-                boxShadow: '0 2px 8px rgba(124,58,237,0.4)',
+                boxShadow: '0 2px 8px rgba(201,181,132,0.4)',
                 transition: 'transform 0.15s',
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)' }}
@@ -1243,14 +1243,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div onClick={() => setOrgMenuOpen(false)} className="fixed inset-0 z-[9998]" style={{ background: 'transparent' }} />
           <div
             className="fixed z-[9999] rounded-xl shadow-2xl overflow-hidden anim-slide-down"
-            style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width, background: '#0c0919', border: '1px solid rgba(139,92,246,0.2)' }}
+            style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width, background: '#0c0919', border: '1px solid rgba(201,181,132,0.2)' }}
           >
             {myOrgs.map(({ org }) => (
               <button
                 key={org.id}
                 onClick={() => handleSwitchOrg(org.id, org.name)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left transition-colors ${currentOrg?.id === org.id ? 'text-accent' : 'text-text hover:bg-white/[0.04]'}`}
-                style={currentOrg?.id === org.id ? { background: 'rgba(139,92,246,0.1)' } : {}}
+                style={currentOrg?.id === org.id ? { background: 'rgba(201,181,132,0.1)' } : {}}
               >
                 <NavIcon d={ICONS.building} size={13} color="currentColor" />
                 <span className="truncate flex-1">{org.name}</span>
@@ -1264,7 +1264,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <button
               onClick={() => { setOrgMenuOpen(false); onNavigate('settings', 'organization') }}
               className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-white/[0.04] border-t text-left transition-colors flex items-center gap-2"
-              style={{ borderColor: 'rgba(139,92,246,0.12)' }}
+              style={{ borderColor: 'rgba(201,181,132,0.12)' }}
             >
               <NavIcon d={ICONS.settings} size={11} color="currentColor" />
               {t('manageOrganizations')}
@@ -1279,24 +1279,24 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           className="fixed bottom-5 right-5 z-[9990] anim-slide-down"
           style={{
             background: 'rgba(6,3,16,0.96)',
-            border: '1px solid rgba(139,92,246,0.3)',
+            border: '1px solid rgba(201,181,132,0.3)',
             backdropFilter: 'blur(22px)',
             borderRadius: 16, padding: '14px 16px', width: 230,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.08), 0 0 40px -8px rgba(124,58,237,0.25), 0 0 60px -12px rgba(124,58,237,0.4)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(201,181,132,0.08), 0 0 40px -8px rgba(201,181,132,0.25), 0 0 60px -12px rgba(201,181,132,0.4)',
           }}
         >
           <div className="flex items-center gap-2.5 mb-3">
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}
+              style={{ background: 'linear-gradient(135deg,#C9B58422,#D4C49922)', border: '1px solid rgba(201,181,132,0.25)' }}
             >
-              <NavIcon d={activeTask.kind === 'mass' ? ICONS.zap : ICONS.send} size={14} color="#a78bfa" />
+              <NavIcon d={activeTask.kind === 'mass' ? ICONS.zap : ICONS.send} size={14} color="#C9B584" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold text-white leading-tight">
                 {activeTask.kind === 'mass' ? 'Mass Posting' : 'Posting'} {t('taskInProgress')}
               </p>
-              <p className="text-[10px] leading-tight" style={{ color: 'rgba(196,181,253,0.45)' }}>
+              <p className="text-[10px] leading-tight" style={{ color: 'rgba(243,241,236,0.45)' }}>
                 {activeTask.kind === 'mass' && activeTask.total > 0
                   ? `${activeTask.done} / ${activeTask.total} ${t('phones')}`
                   : `${t('taskPending')}…`}
@@ -1309,20 +1309,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('progress')}</span>
-              <span className="text-[10px] font-mono" style={{ color: 'rgba(196,181,253,0.6)' }}>{activeTask.progress}%</span>
+              <span className="text-[10px]" style={{ color: 'rgba(243,241,236,0.4)' }}>{t('progress')}</span>
+              <span className="text-[10px] font-mono" style={{ color: 'rgba(243,241,236,0.6)' }}>{activeTask.progress}%</span>
             </div>
-            <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
+            <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(201,181,132,0.12)' }}>
               <div
                 className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${activeTask.progress}%`, background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }}
+                style={{ width: `${activeTask.progress}%`, background: 'linear-gradient(90deg,#C9B584,#D4C499)' }}
               />
             </div>
           </div>
           <button
             onClick={() => { playNav(); onNavigate(activeTask.kind === 'mass' ? 'massposting' : 'posting') }}
             className="mt-3 w-full text-[11px] font-semibold py-1.5 rounded-lg transition-all hover:opacity-90"
-            style={{ background: 'rgba(139,92,246,0.14)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.2)' }}
+            style={{ background: 'rgba(201,181,132,0.14)', color: '#D4C499', border: '1px solid rgba(201,181,132,0.2)' }}
           >
             {t('viewDetails')}
           </button>
@@ -1335,15 +1335,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div onClick={() => setUserMenuOpen(false)} className="fixed inset-0 z-[9998]" style={{ background: 'transparent' }} />
           <div
             className="fixed z-[9999] rounded-xl shadow-2xl overflow-hidden anim-slide-down"
-            style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240), background: '#0c0919', border: '1px solid rgba(139,92,246,0.2)' }}
+            style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240), background: '#0c0919', border: '1px solid rgba(201,181,132,0.2)' }}
           >
-            <div className="px-3 py-3 border-b flex items-center gap-2.5" style={{ borderColor: 'rgba(139,92,246,0.12)', background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.04))' }}>
+            <div className="px-3 py-3 border-b flex items-center gap-2.5" style={{ borderColor: 'rgba(201,181,132,0.12)', background: 'linear-gradient(135deg, rgba(201,181,132,0.08), rgba(243,241,236,0.04))' }}>
               <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[13px] font-black flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)', boxShadow: '0 2px 10px rgba(124,58,237,0.4)', color: '#fff' }}>
+                style={{ background: 'linear-gradient(135deg, #C9B584, #D4C499)', boxShadow: '0 2px 10px rgba(201,181,132,0.4)', color: '#fff' }}>
                 {userInitial}
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider" style={{ color: 'rgba(167,139,250,0.5)' }}>{t('activeAccount')}</p>
+                <p className="text-[10px] uppercase tracking-wider" style={{ color: 'rgba(201,181,132,0.5)' }}>{t('activeAccount')}</p>
                 <p className="text-[12px] font-semibold text-white truncate max-w-[160px]">{user.email}</p>
               </div>
             </div>
@@ -1380,7 +1380,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <button
               onClick={handleAddAccount}
               className="w-full px-3 py-2.5 text-[12px] text-text hover:bg-white/[0.04] border-t text-left transition-colors flex items-center gap-2.5"
-              style={{ borderColor: 'rgba(139,92,246,0.12)' }}
+              style={{ borderColor: 'rgba(201,181,132,0.12)' }}
             >
               <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[10px] opacity-60">+</span>
               <span>{t('addAccount')}</span>
@@ -1388,7 +1388,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <button
               onClick={() => { setUserMenuOpen(false); supabase.auth.signOut() }}
               className="w-full px-3 py-2.5 text-[12px] text-danger hover:bg-danger/10 border-t text-left transition-colors flex items-center gap-2.5"
-              style={{ borderColor: 'rgba(139,92,246,0.12)' }}
+              style={{ borderColor: 'rgba(201,181,132,0.12)' }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/>
@@ -1427,7 +1427,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 style={{
                   flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   gap: 3, border: 'none', background: 'transparent', cursor: 'pointer',
-                  color: active ? '#A78BFA' : 'rgba(148,163,184,0.45)',
+                  color: active ? '#C9B584' : 'rgba(148,163,184,0.45)',
                   position: 'relative',
                   transition: 'color 0.15s',
                 }}
@@ -1435,7 +1435,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 {active && (
                   <span style={{
                     position: 'absolute', top: 0, left: '20%', right: '20%', height: 2,
-                    background: 'linear-gradient(90deg,#7c3aed,#ec4899)',
+                    background: 'linear-gradient(90deg,#C9B584,#D4C499)',
                     borderRadius: '0 0 2px 2px',
                   }} />
                 )}

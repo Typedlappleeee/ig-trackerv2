@@ -37,7 +37,7 @@ export default function ScaleIA() {
       {/* ── Overlay gradient ─────────────────────────────────────────────────── */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse at 50% 38%, rgba(124,58,237,0.22) 0%, rgba(6,6,14,0.75) 65%)',
+        background: 'radial-gradient(ellipse at 50% 38%, rgba(201,181,132,0.22) 0%, rgba(6,6,14,0.75) 65%)',
         pointerEvents: 'none',
       }} />
       {/* Extra mask on top to hide any logo/branding */}
@@ -51,7 +51,7 @@ export default function ScaleIA() {
       <div style={{
         position: 'absolute', top: '36%', left: '50%', transform: 'translate(-50%,-50%)',
         width: 500, height: 220,
-        background: 'radial-gradient(ellipse, rgba(139,92,246,0.38) 0%, transparent 70%)',
+        background: 'radial-gradient(ellipse, rgba(201,181,132,0.38) 0%, transparent 70%)',
         filter: 'blur(35px)',
         pointerEvents: 'none',
       }} />
@@ -65,12 +65,12 @@ export default function ScaleIA() {
         {/* Header icon */}
         <div style={{
           width: 56, height: 56, borderRadius: 16, marginBottom: 20,
-          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(167,139,250,0.1))',
-          border: '1px solid rgba(139,92,246,0.3)',
+          background: 'linear-gradient(135deg, rgba(201,181,132,0.3), rgba(201,181,132,0.1))',
+          border: '1px solid rgba(201,181,132,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 32px rgba(139,92,246,0.3)',
+          boxShadow: '0 0 32px rgba(201,181,132,0.3)',
         }}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M9.94 14.34A2 2 0 0 0 8.66 13l-6.13-1.9a.5.5 0 0 1 0-.95l6.13-1.9a2 2 0 0 0 1.28-1.28l1.9-6.13a.5.5 0 0 1 .95 0l1.9 6.13a2 2 0 0 0 1.28 1.28l6.13 1.9a.5.5 0 0 1 0 .95l-6.13 1.9a2 2 0 0 0-1.28 1.28l-1.9 6.13a.5.5 0 0 1-.95 0z"/>
           </svg>
         </div>
@@ -78,8 +78,8 @@ export default function ScaleIA() {
         {/* BIENTÔT chip */}
         <div style={{
           fontSize: 10, fontWeight: 800, letterSpacing: '0.3em', textTransform: 'uppercase',
-          color: '#a78bfa', border: '1px solid rgba(139,92,246,0.45)',
-          padding: '5px 14px', borderRadius: 100, background: 'rgba(139,92,246,0.1)',
+          color: '#C9B584', border: '1px solid rgba(201,181,132,0.45)',
+          padding: '5px 14px', borderRadius: 100, background: 'rgba(201,181,132,0.1)',
           marginBottom: 20,
         }}>
           BIENTÔT DISPONIBLE
@@ -89,11 +89,11 @@ export default function ScaleIA() {
         <div style={{ marginBottom: 18, textAlign: 'center' }}>
           <span style={{
             fontSize: 68, fontWeight: 900, letterSpacing: '-0.03em',
-            background: 'linear-gradient(135deg, #e2e8f0 0%, #c4b5fd 45%, #67e8f9 100%)',
+            background: 'linear-gradient(135deg, #e2e8f0 0%, #D4C499 45%, #67e8f9 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>Scale</span><span style={{
             fontSize: 68, fontWeight: 900, letterSpacing: '-0.03em',
-            background: 'linear-gradient(135deg,#a78bfa,#f472b6)',
+            background: 'linear-gradient(135deg,#C9B584,#E8DFC8)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>IA</span>
         </div>
@@ -122,7 +122,7 @@ export default function ScaleIA() {
               border: '1px solid rgba(255,255,255,0.09)',
               fontSize: 12, color: 'rgba(226,232,240,0.7)',
             }}>
-              <span style={{ display: 'flex', color: '#a78bfa' }}>{f.icon}</span>
+              <span style={{ display: 'flex', color: '#C9B584' }}>{f.icon}</span>
               <span style={{ fontWeight: 500 }}>{f.label}</span>
             </div>
           ))}
@@ -130,12 +130,12 @@ export default function ScaleIA() {
 
         {/* Progress bar */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 11, color: 'rgba(167,139,250,0.7)', letterSpacing: '0.1em', fontWeight: 600 }}>EN DÉVELOPPEMENT</span>
+          <span style={{ fontSize: 11, color: 'rgba(201,181,132,0.7)', letterSpacing: '0.1em', fontWeight: 600 }}>EN DÉVELOPPEMENT</span>
           <div style={{ width: 240, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{
               width: '10%', height: '100%', borderRadius: 99,
-              background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
-              boxShadow: '0 0 8px rgba(139,92,246,0.8)',
+              background: 'linear-gradient(90deg, #C9B584, #C9B584)',
+              boxShadow: '0 0 8px rgba(201,181,132,0.8)',
             }} />
           </div>
           <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>10% terminé</span>

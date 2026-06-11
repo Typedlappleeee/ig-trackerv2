@@ -25,7 +25,7 @@ function SFLogoMark() {
         <linearGradient id="ob-main" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
           <stop offset="0%"   stopColor="#1d4ed8"/>
           <stop offset="28%"  stopColor="#3b5af0"/>
-          <stop offset="58%"  stopColor="#7c3aed"/>
+          <stop offset="58%"  stopColor="#C9B584"/>
           <stop offset="100%" stopColor="#a855f7"/>
         </linearGradient>
         <linearGradient id="ob-depth" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
@@ -35,7 +35,7 @@ function SFLogoMark() {
         </linearGradient>
         <linearGradient id="ob-arr" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
           <stop offset="0%"   stopColor="#db2777"/>
-          <stop offset="100%" stopColor="#f472b6"/>
+          <stop offset="100%" stopColor="#E8DFC8"/>
         </linearGradient>
       </defs>
       <path
@@ -48,8 +48,8 @@ function SFLogoMark() {
         stroke="url(#ob-main)" strokeWidth="16" strokeLinecap="round" fill="none"
       />
       <line x1="66" y1="22" x2="88" y2="2" stroke="url(#ob-arr)" strokeWidth="11" strokeLinecap="round"/>
-      <line x1="77" y1="1" x2="90" y2="1" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
-      <line x1="90" y1="1" x2="90" y2="15" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
+      <line x1="77" y1="1" x2="90" y2="1" stroke="#E8DFC8" strokeWidth="9" strokeLinecap="round"/>
+      <line x1="90" y1="1" x2="90" y2="15" stroke="#E8DFC8" strokeWidth="9" strokeLinecap="round"/>
     </svg>
   )
 }
@@ -143,14 +143,14 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
   }
 
   function StateIcon({ s }: { s: TestState }) {
-    if (s === 'testing') return <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.22-8.56" /></svg>
+    if (s === 'testing') return <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.22-8.56" /></svg>
     if (s === 'ok')      return <svg className="text-ok" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
     if (s === 'fail')    return <svg className="text-danger" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
     return null
   }
 
-  const sfAccent    = { color: '#a78bfa' }
-  const sfUnderline = { color: '#c4b5fd', textDecoration: 'underline', textUnderlineOffset: '2px' }
+  const sfAccent    = { color: '#C9B584' }
+  const sfUnderline = { color: '#D4C499', textDecoration: 'underline', textUnderlineOffset: '2px' }
 
   return (
     <div
@@ -159,14 +159,14 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
     >
       <div className="sf-aurora absolute" style={{ width: 600, height: 600, top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
       <div className="absolute inset-0 pointer-events-none opacity-[0.025]"
-        style={{ backgroundImage: 'linear-gradient(rgba(139,92,246,1) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,1) 1px, transparent 1px)', backgroundSize: '48px 48px' }}
+        style={{ backgroundImage: 'linear-gradient(rgba(201,181,132,1) 1px, transparent 1px), linear-gradient(90deg, rgba(201,181,132,1) 1px, transparent 1px)', backgroundSize: '48px 48px' }}
       />
 
       <button
         onClick={skip}
         disabled={saving}
         className="absolute top-5 right-6 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:scale-105 disabled:opacity-40"
-        style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.4)' }}
+        style={{ background: 'rgba(201,181,132,0.15)', border: '1px solid rgba(201,181,132,0.4)' }}
       >
         Ignorer pour l'instant →
       </button>
@@ -176,7 +176,7 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
         {/* Logo + title */}
         <div className="text-center space-y-3">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
-            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 0 32px rgba(139,92,246,0.12)' }}>
+            style={{ background: 'rgba(201,181,132,0.08)', border: '1px solid rgba(201,181,132,0.2)', boxShadow: '0 0 32px rgba(201,181,132,0.12)' }}>
             <SFLogoMark />
           </div>
           <div>
@@ -184,7 +184,7 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
               <span className="text-white">Bienvenue sur </span>
               <span className="sf-text-gradient">ScaleFlow</span>
             </h1>
-            <p className="text-sm mt-1" style={{ color: 'rgba(196,181,253,0.5)' }}>Une seule chose pour commencer.</p>
+            <p className="text-sm mt-1" style={{ color: 'rgba(243,241,236,0.5)' }}>Une seule chose pour commencer.</p>
           </div>
         </div>
 
@@ -192,7 +192,7 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
         <div className="flex items-center justify-center gap-2">
           {[1, 2].map(n => (
             <div key={n} className="w-2 h-2 rounded-full transition-all"
-              style={{ background: step >= n ? '#7c3aed' : 'rgba(139,92,246,0.2)', transform: step === n ? 'scale(1.4)' : 'scale(1)' }}
+              style={{ background: step >= n ? '#C9B584' : 'rgba(201,181,132,0.2)', transform: step === n ? 'scale(1.4)' : 'scale(1)' }}
             />
           ))}
         </div>
@@ -202,16 +202,16 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
           <div className="glass-card rounded-2xl p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-text flex items-center gap-2">
-                <span style={{ color: '#a78bfa' }}>
+                <span style={{ color: '#C9B584' }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4zM12 18h.01" /></svg>
                 </span> Token GéeLark
               </h2>
               <p className="text-sm text-text2 mt-1">Requis pour piloter tes cloud phones. Tu pourras configurer les clés IA plus tard dans Paramètres.</p>
             </div>
 
-            <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
-              <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.5)' }}>Comment obtenir ton token :</p>
-              <div className="space-y-1.5 text-xs" style={{ color: 'rgba(196,181,253,0.6)' }}>
+            <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(201,181,132,0.06)', border: '1px solid rgba(201,181,132,0.1)' }}>
+              <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'rgba(243,241,236,0.5)' }}>Comment obtenir ton token :</p>
+              <div className="space-y-1.5 text-xs" style={{ color: 'rgba(243,241,236,0.6)' }}>
                 <div className="flex gap-2"><span style={sfAccent} className="font-bold">1.</span><span>Connecte-toi sur <button onClick={() => openExternal('https://app.geelark.com')} style={sfUnderline}>app.geelark.com</button></span></div>
                 <div className="flex gap-2"><span style={sfAccent} className="font-bold">2.</span><span>En haut à droite → <strong className="text-text">ton avatar</strong> → <strong className="text-text">API</strong></span></div>
                 <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Section <strong className="text-text">API Key</strong> <span style={{ color: '#f59e0b' }}>(⚠ pas l'App ID)</span></span></div>
@@ -254,15 +254,15 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
         {step === 2 && (
           <div className="glass-card rounded-2xl p-6 space-y-5 text-center">
             <div className="space-y-2">
-              <div className="flex justify-center" style={{ color: '#a78bfa' }}>
+              <div className="flex justify-center" style={{ color: '#C9B584' }}>
                 <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></svg>
               </div>
               <h2 className="text-xl font-bold text-text">Prêt à démarrer !</h2>
               <p className="text-sm text-text2">Ton token GéeLark est configuré. Tu peux maintenant accéder à ScaleFlow.</p>
             </div>
 
-            <div className="text-left rounded-xl p-4 space-y-1 text-xs" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.6)' }}>
-              <p className="font-semibold text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(196,181,253,0.5)' }}>Configurer plus tard dans Paramètres :</p>
+            <div className="text-left rounded-xl p-4 space-y-1 text-xs" style={{ background: 'rgba(201,181,132,0.06)', border: '1px solid rgba(201,181,132,0.1)', color: 'rgba(243,241,236,0.6)' }}>
+              <p className="font-semibold text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(243,241,236,0.5)' }}>Configurer plus tard dans Paramètres :</p>
               <div className="flex gap-2"><span style={sfAccent}>✦</span><span><strong className="text-text">Groq API Key</strong> — génération de captions & hashtags IA</span></div>
               <div className="flex gap-2"><span style={sfAccent}>✦</span><span><strong className="text-text">Anthropic API Key</strong> — remix vidéo avec Claude Vision</span></div>
               <div className="flex gap-2"><span style={sfAccent}>✦</span><span><strong className="text-text">Session ID Instagram</strong> — stats & monitoring des comptes</span></div>

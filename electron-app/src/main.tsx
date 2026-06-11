@@ -42,7 +42,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, EBSta
           onClick={() => { this.setState({ error: null }); window.location.reload() }}
           style={{
             marginTop: 8, padding: '10px 24px', borderRadius: 12, border: 'none',
-            background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff',
+            background: 'linear-gradient(135deg,#C9B584,#B8A070)', color: '#fff',
             fontSize: 14, fontWeight: 700, cursor: 'pointer',
           }}
         >

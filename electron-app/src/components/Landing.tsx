@@ -77,8 +77,8 @@ const GLOBAL_CSS = `
     to   { opacity: 1; }
   }
   @keyframes sf-pulse-glow {
-    0%,100% { box-shadow: 0 8px 32px rgba(124,58,237,0.35); }
-    50%     { box-shadow: 0 8px 48px rgba(124,58,237,0.65), 0 0 80px rgba(236,72,153,0.2); }
+    0%,100% { box-shadow: 0 8px 32px rgba(201,181,132,0.35); }
+    50%     { box-shadow: 0 8px 48px rgba(201,181,132,0.65), 0 0 80px rgba(243,241,236,0.2); }
   }
   @keyframes sf-shoot {
     0%   { transform: translateX(0) translateY(0) scaleX(0); opacity: 0; }
@@ -95,8 +95,8 @@ const GLOBAL_CSS = `
     50%     { opacity: 0.75; transform: scale(1.08); }
   }
   @keyframes sf-glow-ring {
-    0%,100% { box-shadow: 0 0 0 0 rgba(124,58,237,0); }
-    50%     { box-shadow: 0 0 0 8px rgba(124,58,237,0.06); }
+    0%,100% { box-shadow: 0 0 0 0 rgba(201,181,132,0); }
+    50%     { box-shadow: 0 0 0 8px rgba(201,181,132,0.06); }
   }
   @keyframes sf-badge-pulse {
     0%,100% { border-color: rgba(239,68,68,0.16); }
@@ -183,16 +183,16 @@ function DrawnPhrase() {
           </filter>
         </defs>
         <text x="210" y="34" textAnchor="middle"
-          style={{ fontSize: 28, fontWeight: 700, fontStyle: 'italic', fill: 'rgba(196,181,253,0.82)', letterSpacing: '0.04em', fontFamily: "'Georgia','Times New Roman',serif" }}
+          style={{ fontSize: 28, fontWeight: 700, fontStyle: 'italic', fill: 'rgba(243,241,236,0.82)', letterSpacing: '0.04em', fontFamily: "'Georgia','Times New Roman',serif" }}
           filter="url(#rough)">
           La révolution commence.
         </text>
         <path d="M 32,44 C 60,41 90,47 120,43 C 150,39 180,46 210,44 C 240,42 270,47 300,43 C 330,39 360,46 388,44"
-          fill="none" stroke="rgba(167,139,250,0.45)" strokeWidth="1.8" strokeLinecap="round" filter="url(#rough)"/>
+          fill="none" stroke="rgba(201,181,132,0.45)" strokeWidth="1.8" strokeLinecap="round" filter="url(#rough)"/>
         <path d="M 14,26 L 16,20 L 18,26 L 24,26 L 19,30 L 21,36 L 16,32 L 11,36 L 13,30 L 8,26 Z"
-          fill="none" stroke="rgba(236,72,153,0.4)" strokeWidth="1.2" strokeLinejoin="round" filter="url(#rough)"/>
+          fill="none" stroke="rgba(243,241,236,0.4)" strokeWidth="1.2" strokeLinejoin="round" filter="url(#rough)"/>
         <path d="M 406,26 L 408,20 L 410,26 L 416,26 L 411,30 L 413,36 L 408,32 L 403,36 L 405,30 L 400,26 Z"
-          fill="none" stroke="rgba(167,139,250,0.4)" strokeWidth="1.2" strokeLinejoin="round" filter="url(#rough)"/>
+          fill="none" stroke="rgba(201,181,132,0.4)" strokeWidth="1.2" strokeLinejoin="round" filter="url(#rough)"/>
       </svg>
     </div>
   )
@@ -258,7 +258,7 @@ function StarField() {
 }
 
 // ── Orbit decoration ──────────────────────────────────────────────────────────
-function OrbitRing({ size, duration, opacity, color = 'rgba(139,92,246,0.12)', offset = 0 }: { size: number; duration: number; opacity: number; color?: string; offset?: number }) {
+function OrbitRing({ size, duration, opacity, color = 'rgba(201,181,132,0.12)', offset = 0 }: { size: number; duration: number; opacity: number; color?: string; offset?: number }) {
   return (
     <div style={{ position: 'absolute', top: '50%', left: '50%', width: size, height: size, marginLeft: -size / 2 + offset, marginTop: -size / 2, borderRadius: '50%', border: `1px solid ${color}`, opacity, animation: `sf-orbit ${duration}s linear infinite`, pointerEvents: 'none' }}>
       <div style={{ position: 'absolute', top: -3, left: '50%', width: 6, height: 6, marginLeft: -3, borderRadius: '50%', background: color.replace('0.12', '0.6') }} />
@@ -301,7 +301,7 @@ function CountdownBlock() {
   const pad = (n: number) => String(n).padStart(2, '0')
   const unit = (v: number, label: string) => (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-      <div style={{ width: 76, height: 76, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.18)', fontSize: 34, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.05em', fontVariantNumeric: 'tabular-nums', animation: 'sf-glow-ring 3s ease-in-out infinite' }}>{pad(v)}</div>
+      <div style={{ width: 76, height: 76, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.18)', fontSize: 34, fontWeight: 900, color: '#F3F1EC', letterSpacing: '-0.05em', fontVariantNumeric: 'tabular-nums', animation: 'sf-glow-ring 3s ease-in-out infinite' }}>{pad(v)}</div>
       <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgba(148,163,184,0.32)' }}>{label}</span>
     </div>
   )
@@ -313,11 +313,11 @@ function CountdownBlock() {
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         {unit(days, 'jours')}
-        <span style={{ fontSize: 26, fontWeight: 900, color: 'rgba(139,92,246,0.25)', marginTop: 20, lineHeight: 1 }}>:</span>
+        <span style={{ fontSize: 26, fontWeight: 900, color: 'rgba(201,181,132,0.25)', marginTop: 20, lineHeight: 1 }}>:</span>
         {unit(hours, 'heures')}
-        <span style={{ fontSize: 26, fontWeight: 900, color: 'rgba(139,92,246,0.25)', marginTop: 20, lineHeight: 1 }}>:</span>
+        <span style={{ fontSize: 26, fontWeight: 900, color: 'rgba(201,181,132,0.25)', marginTop: 20, lineHeight: 1 }}>:</span>
         {unit(minutes, 'min')}
-        <span style={{ fontSize: 26, fontWeight: 900, color: 'rgba(139,92,246,0.25)', marginTop: 20, lineHeight: 1 }}>:</span>
+        <span style={{ fontSize: 26, fontWeight: 900, color: 'rgba(201,181,132,0.25)', marginTop: 20, lineHeight: 1 }}>:</span>
         {unit(seconds, 'sec')}
       </div>
     </div>
@@ -342,7 +342,7 @@ function MockupFallback() {
   const ig = (color: string, label: string) => (
     <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg, ${color}22, #0a0910)`, display: 'flex', flexDirection: 'column', padding: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-        <div style={{ width: 20, height: 20, borderRadius: '50%', background: `linear-gradient(135deg, ${color}, #ec4899)` }} />
+        <div style={{ width: 20, height: 20, borderRadius: '50%', background: `linear-gradient(135deg, ${color}, #D4C499)` }} />
         <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{label}</span>
       </div>
       <div style={{ flex: 1, borderRadius: 8, background: `linear-gradient(160deg, ${color}40, ${color}15)`, marginBottom: 6 }} />
@@ -356,27 +356,27 @@ function MockupFallback() {
     <div style={{ position: 'relative', width: '100%', height: 560, overflow: 'hidden', borderRadius: 20 }}>
       {/* Background */}
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0c0918 0%, #08060f 50%, #100a1e 100%)' }} />
-      <div style={{ position: 'absolute', top: '20%', left: '35%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(124,58,237,0.2), transparent)', filter: 'blur(60px)' }} />
-      <div style={{ position: 'absolute', top: '40%', right: '10%', width: 250, height: 250, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(236,72,153,0.12), transparent)', filter: 'blur(40px)' }} />
+      <div style={{ position: 'absolute', top: '20%', left: '35%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(201,181,132,0.2), transparent)', filter: 'blur(60px)' }} />
+      <div style={{ position: 'absolute', top: '40%', right: '10%', width: 250, height: 250, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(243,241,236,0.12), transparent)', filter: 'blur(40px)' }} />
 
       {/* Phone — left edge */}
       <div style={{ position: 'absolute', left: -20, top: 60, ...phoneScreen, transform: 'rotate(-6deg)' }}>
-        {ig('#a78bfa', 'lifestyle.ig')}
+        {ig('#C9B584', 'lifestyle.ig')}
       </div>
 
       {/* Nouveau post panel — left */}
       <div style={{ position: 'absolute', left: 120, top: 40, width: 230, ...panel, padding: 14, zIndex: 10 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: '#F2F0FF', margin: '0 0 10px' }}>Nouveau post</p>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#F3F1EC', margin: '0 0 10px' }}>Nouveau post</p>
         <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.45)', margin: '0 0 6px' }}>Publier sur</p>
         <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-          {['#7c3aed','#ec4899','#3b82f6','#34d399','#f59e0b'].map((c,i) => (
+          {['#C9B584','#D4C499','#3b82f6','#34d399','#f59e0b'].map((c,i) => (
             <div key={i} style={{ width: 20, height: 20, borderRadius: '50%', background: `linear-gradient(135deg,${c},${c}88)`, border: '2px solid #0a0910' }} />
           ))}
           <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>+</div>
         </div>
         <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.45)', margin: '0 0 6px' }}>Média</p>
         <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-          {['#7c3aed','#ec4899','#3b82f6'].map((c,i) => (
+          {['#C9B584','#D4C499','#3b82f6'].map((c,i) => (
             <div key={i} style={{ width: 52, height: 52, borderRadius: 8, background: `linear-gradient(135deg,${c}30,${c}10)`, border: `1px solid ${c}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🎬</div>
           ))}
         </div>
@@ -387,21 +387,21 @@ function MockupFallback() {
           <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="calendar" size={10} /> Programmer</span>
           <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)' }}>28/05/2024 · 18:45</span>
         </div>
-        <div style={{ marginTop: 8, padding: '9px 0', borderRadius: 9, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>
+        <div style={{ marginTop: 8, padding: '9px 0', borderRadius: 9, background: 'linear-gradient(130deg,#C9B584,#D4C499)', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>
           Ajouter à la file
         </div>
       </div>
 
       {/* Central — brand + feature grid */}
       <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 5, pointerEvents: 'none' }}>
-        <div style={{ fontSize: 'clamp(28px,4vw,52px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#F2F0FF', marginBottom: 4 }}>ScaleFlow</div>
+        <div style={{ fontSize: 'clamp(28px,4vw,52px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#F3F1EC', marginBottom: 4 }}>ScaleFlow</div>
         <p style={{ fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.4)', margin: '0 0 28px' }}>Instagram Automation</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 260, margin: '0 auto' }}>
           {[
-            { iconName: 'zap' as IconName, label: 'MASS POSTING', c: '#a78bfa' },
+            { iconName: 'zap' as IconName, label: 'MASS POSTING', c: '#C9B584' },
             { iconName: 'users' as IconName, label: 'MULTI-COMPTES', c: '#60a5fa' },
             { iconName: 'bot' as IconName, label: 'AUTOMATION', c: '#34d399' },
-            { iconName: 'clapperboard' as IconName, label: 'REELS & STORIES', c: '#f472b6' },
+            { iconName: 'clapperboard' as IconName, label: 'REELS & STORIES', c: '#E8DFC8' },
           ].map(f => (
             <div key={f.label} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${f.c}20`, borderRadius: 10, padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
               <span style={{ color: f.c, display: 'flex' }}><Icon name={f.iconName} size={16} /></span>
@@ -425,21 +425,21 @@ function MockupFallback() {
 
       {/* Stats panel — right */}
       <div style={{ position: 'absolute', right: 120, top: 50, width: 200, ...panel, padding: 14, zIndex: 10 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: '#F2F0FF', margin: '0 0 14px' }}>Statistiques</p>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#F3F1EC', margin: '0 0 14px' }}>Statistiques</p>
         <div style={{ marginBottom: 12 }}>
           <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.4)', margin: '0 0 3px' }}>Vue d'ensemble</p>
-          <p style={{ fontSize: 28, fontWeight: 900, color: '#F2F0FF', margin: 0, letterSpacing: '-0.04em' }}>128,4K</p>
+          <p style={{ fontSize: 28, fontWeight: 900, color: '#F3F1EC', margin: 0, letterSpacing: '-0.04em' }}>128,4K</p>
           <p style={{ fontSize: 9, color: '#34d399', margin: '2px 0 0' }}>+72% ↑</p>
         </div>
         {/* Sparkline */}
         <svg width="100%" height="44" viewBox="0 0 176 44" fill="none">
           <defs>
             <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.3"/>
-              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0"/>
+              <stop offset="0%" stopColor="#C9B584" stopOpacity="0.3"/>
+              <stop offset="100%" stopColor="#C9B584" stopOpacity="0"/>
             </linearGradient>
           </defs>
-          <path d="M0,38 L22,30 L44,34 L66,20 L88,22 L110,10 L132,14 L154,6 L176,2" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" fill="none"/>
+          <path d="M0,38 L22,30 L44,34 L66,20 L88,22 L110,10 L132,14 L154,6 L176,2" stroke="#C9B584" strokeWidth="2" strokeLinecap="round" fill="none"/>
           <path d="M0,38 L22,30 L44,34 L66,20 L88,22 L110,10 L132,14 L154,6 L176,2 L176,44 L0,44Z" fill="url(#sparkGrad)"/>
         </svg>
         <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
@@ -448,19 +448,19 @@ function MockupFallback() {
           ))}
         </div>
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <p style={{ fontSize: 9, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>Audience</p>
+          <p style={{ fontSize: 9, fontWeight: 700, color: '#F3F1EC', margin: '0 0 8px' }}>Audience</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <svg width="40" height="40" viewBox="0 0 40 40">
               <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="6"/>
-              <circle cx="20" cy="20" r="16" fill="none" stroke="#7c3aed" strokeWidth="6" strokeDasharray="78 22" strokeDashoffset="25" strokeLinecap="round"/>
-              <circle cx="20" cy="20" r="16" fill="none" stroke="#ec4899" strokeWidth="6" strokeDasharray="22 78" strokeDashoffset="-53" strokeLinecap="round"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#C9B584" strokeWidth="6" strokeDasharray="78 22" strokeDashoffset="25" strokeLinecap="round"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#D4C499" strokeWidth="6" strokeDasharray="22 78" strokeDashoffset="-53" strokeLinecap="round"/>
             </svg>
             <div style={{ fontSize: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(196,181,253,0.7)', marginBottom: 3 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed' }} /> Non-abonnés 78%
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(243,241,236,0.7)', marginBottom: 3 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#C9B584' }} /> Non-abonnés 78%
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(244,114,182,0.7)' }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ec4899' }} /> Abonnés 22%
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(243,241,236,0.7)' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#D4C499' }} /> Abonnés 22%
               </div>
             </div>
           </div>
@@ -469,9 +469,9 @@ function MockupFallback() {
 
       {/* Queue panel — bottom center */}
       <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', width: 280, ...panel, padding: 12, zIndex: 10 }}>
-        <p style={{ fontSize: 10, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>File de publications</p>
+        <p style={{ fontSize: 10, fontWeight: 700, color: '#F3F1EC', margin: '0 0 8px' }}>File de publications</p>
         {[
-          { label: 'Reel — Outfit of the day', time: '28 Mai 2024 à 18:45', c: '#a78bfa' },
+          { label: 'Reel — Outfit of the day', time: '28 Mai 2024 à 18:45', c: '#C9B584' },
           { label: 'Story — New collection', time: '29 Mai 2024 à 20:30', c: '#60a5fa' },
           { label: 'Reel — Lifestyle', time: '30 Mai 2024 à 12:00', c: '#34d399' },
         ].map(item => (
@@ -500,8 +500,8 @@ function MockupFallback() {
 // ── Site hero (discover page full-screen marketing hero) ──────────────────────
 function SiteHero({ onStudio }: { onStudio: () => void }) {
   const CARDS = [
-    { x: -32, y: -22, rot: -8,  views: '870K', g1: '#c084fc', g2: '#7c3aed', seed: 0 },
-    { x:  -8, y: -28, rot: -2,  views: '680K', g1: '#f472b6', g2: '#db2777', seed: 1 },
+    { x: -32, y: -22, rot: -8,  views: '870K', g1: '#c084fc', g2: '#C9B584', seed: 0 },
+    { x:  -8, y: -28, rot: -2,  views: '680K', g1: '#E8DFC8', g2: '#db2777', seed: 1 },
     { x:  24, y: -20, rot:  6,  views: '1.1M', g1: '#60a5fa', g2: '#2563eb', seed: 2 },
     { x: -26, y:  20, rot: -5,  views: '920K', g1: '#4ade80', g2: '#16a34a', seed: 3 },
     { x:  30, y:  16, rot:  7,  views: '990K', g1: '#fb923c', g2: '#ea580c', seed: 4 },
@@ -511,7 +511,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
   return (
     <section style={{ position: 'relative', height: 'calc(100vh - 60px)', overflow: 'hidden', background: '#06050f' }}>
       {/* Purple glow */}
-      <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(109,40,217,0.16), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(201,181,132,0.16), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
 
       {/* Floating phone cards */}
       {CARDS.map((c, i) => (
@@ -553,28 +553,28 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
       </div>
 
       {/* Rocket — bottom right */}
-      <div style={{ position: 'absolute', bottom: '18%', right: '8%', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(124,58,237,0.3),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 7s ease-in-out 0.5s infinite', zIndex: 3, fontSize: 28 }}>🚀</div>
+      <div style={{ position: 'absolute', bottom: '18%', right: '8%', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg,#C9B584,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(201,181,132,0.3),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 7s ease-in-out 0.5s infinite', zIndex: 3, fontSize: 28 }}>🚀</div>
 
       {/* Center content */}
       <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 10, width: '100%', maxWidth: 700, padding: '0 24px', boxSizing: 'border-box' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 16px', borderRadius: 99, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.22)', marginBottom: 22, animation: 'sf-fade-up 0.6s ease both' }}>
-          <span style={{ color: 'rgba(196,181,253,0.9)', display: 'flex' }}><Icon name="zap" size={13} /></span>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(196,181,253,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 16px', borderRadius: 99, background: 'rgba(201,181,132,0.1)', border: '1px solid rgba(201,181,132,0.22)', marginBottom: 22, animation: 'sf-fade-up 0.6s ease both' }}>
+          <span style={{ color: 'rgba(243,241,236,0.9)', display: 'flex' }}><Icon name="zap" size={13} /></span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(243,241,236,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
         </div>
-        <div style={{ fontSize: 'clamp(58px,9vw,102px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F2F0FF', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", animation: 'sf-fade-up 0.6s ease 0.08s both', filter: 'drop-shadow(0 0 50px rgba(167,139,250,0.22))' }}>ScaleFlow</div>
+        <div style={{ fontSize: 'clamp(58px,9vw,102px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F3F1EC', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", animation: 'sf-fade-up 0.6s ease 0.08s both', filter: 'drop-shadow(0 0 50px rgba(201,181,132,0.22))' }}>ScaleFlow</div>
         <div style={{ marginTop: 18, fontSize: 'clamp(17px,2.2vw,24px)', fontWeight: 800, color: 'rgba(241,240,247,0.88)', lineHeight: 1.2, animation: 'sf-fade-up 0.6s ease 0.15s both' }}>L'automatisation Instagram à grande échelle.</div>
         <p style={{ fontSize: 14, color: 'rgba(148,163,184,0.48)', margin: '12px auto 28px', lineHeight: 1.65, maxWidth: 440, animation: 'sf-fade-up 0.6s ease 0.22s both' }}>
           Mass posting, multi-comptes, planification avancée,<br />reels & stories et bien plus.
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', animation: 'sf-fade-up 0.6s ease 0.3s both' }}>
           <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 22px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#F2F0FF', fontSize: 14, fontWeight: 700, textDecoration: 'none', transition: 'background 0.2s' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 22px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#F3F1EC', fontSize: 14, fontWeight: 700, textDecoration: 'none', transition: 'background 0.2s' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.11)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
             <TGIcon size={14} /> Acheter une clé
           </a>
           <button onClick={onStudio}
-            style={{ padding: '13px 26px', borderRadius: 10, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.2s', boxShadow: '0 6px 24px rgba(124,58,237,0.35)' }}
+            style={{ padding: '13px 26px', borderRadius: 10, background: 'linear-gradient(130deg,#C9B584,#D4C499)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.2s', boxShadow: '0 6px 24px rgba(201,181,132,0.35)' }}
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
             onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
             Se connecter →
@@ -591,8 +591,8 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
           { iconName: 'clapperboard' as IconName, label: 'REELS & STORIES' },
         ].map((f, i, a) => (
           <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 28px', borderRight: i < a.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
-            <span style={{ color: 'rgba(196,181,253,0.6)', display: 'flex' }}><Icon name={f.iconName} size={14} /></span>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.11em', color: 'rgba(196,181,253,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
+            <span style={{ color: 'rgba(243,241,236,0.6)', display: 'flex' }}><Icon name={f.iconName} size={14} /></span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.11em', color: 'rgba(243,241,236,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
           </div>
         ))}
       </div>
@@ -607,7 +607,7 @@ function AppMockup() {
   return (
     <div style={{ maxWidth: 1020, margin: '0 auto', position: 'relative' }}>
       {/* outer nebula glow */}
-      <div style={{ position: 'absolute', inset: '-40px', borderRadius: 40, background: 'radial-gradient(ellipse at 50% 50%, rgba(124,58,237,0.22) 0%, rgba(236,72,153,0.06) 50%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none', animation: 'sf-nebula 6s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', inset: '-40px', borderRadius: 40, background: 'radial-gradient(ellipse at 50% 50%, rgba(201,181,132,0.22) 0%, rgba(243,241,236,0.06) 50%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none', animation: 'sf-nebula 6s ease-in-out infinite' }} />
 
       {/* floating wrapper */}
       <div style={{ position: 'relative', animation: 'sf-float 7s ease-in-out infinite', transformOrigin: 'center bottom' }}>
@@ -616,7 +616,7 @@ function AppMockup() {
             src="/mockup.webp"
             alt="ScaleFlow — Mass Posting UI"
             onError={() => setImgFailed(true)}
-            style={{ width: '100%', height: 'auto', borderRadius: 18, border: '1px solid rgba(139,92,246,0.28)', boxShadow: '0 40px 100px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04), 0 0 80px rgba(124,58,237,0.15)', display: 'block' }}
+            style={{ width: '100%', height: 'auto', borderRadius: 18, border: '1px solid rgba(201,181,132,0.28)', boxShadow: '0 40px 100px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04), 0 0 80px rgba(201,181,132,0.15)', display: 'block' }}
           />
         ) : (
           <MockupFallback />
@@ -629,12 +629,12 @@ function AppMockup() {
       <div style={{ position: 'absolute', bottom: -28, left: 24, display: 'flex', gap: 10, animation: 'sf-float-slow 5s ease-in-out infinite' }}>
         {[
           { label: 'Publiés',             value: '4/6',  color: '#22c55e' },
-          { label: 'En cours',            value: '1',    color: '#a78bfa' },
+          { label: 'En cours',            value: '1',    color: '#C9B584' },
           { label: 'Téléphones en ligne', value: '9/12', color: '#38bdf8' },
         ].map(c => (
           <div key={c.label} style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(8,8,18,0.92)', border: '1px solid rgba(255,255,255,0.09)', backdropFilter: 'blur(12px)', boxShadow: '0 8px 28px rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, flexShrink: 0, boxShadow: `0 0 6px ${c.color}` }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#F2F0FF' }}>{c.value}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#F3F1EC' }}>{c.value}</span>
             <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>{c.label}</span>
           </div>
         ))}
@@ -645,12 +645,12 @@ function AppMockup() {
 
 // ── Features ──────────────────────────────────────────────────────────────────
 const FEATURES: { iconName: IconName; title: string; color: string; text: string }[] = [
-  { iconName: 'zap',            title: 'Mass Posting',      color: '#a78bfa', text: 'Poste sur des dizaines de comptes en parallèle. Sélectionne tes vidéos, lance — chaque téléphone se ferme après sa publication.' },
-  { iconName: 'folder-archive', title: 'Banque de contenu', color: '#ec4899', text: 'Organise et stocke tes vidéos dans le cloud. Import drag & drop, miniatures auto, partage par organisation.' },
+  { iconName: 'zap',            title: 'Mass Posting',      color: '#C9B584', text: 'Poste sur des dizaines de comptes en parallèle. Sélectionne tes vidéos, lance — chaque téléphone se ferme après sa publication.' },
+  { iconName: 'folder-archive', title: 'Banque de contenu', color: '#D4C499', text: 'Organise et stocke tes vidéos dans le cloud. Import drag & drop, miniatures auto, partage par organisation.' },
   { iconName: 'shuffle',        title: 'Remix & CloneVid',  color: '#38bdf8', text: 'Génère des copies uniques via FFmpeg : zoom, couleurs, crop, overlay texte. Anti duplicate content à grande échelle.' },
   { iconName: 'bot',            title: 'Outils IA',         color: '#34d399', text: 'Scripts, hooks, captions virales, analyse thumbnail. Powered by Groq Llama & Claude Vision.' },
   { iconName: 'calendar',       title: 'Programmation',     color: '#fbbf24', text: "Planifie tes posts. Le scheduler s'exécute même app fermée via Supabase Edge Functions." },
-  { iconName: 'smartphone',     title: 'Suivi téléphones',  color: '#f472b6', text: "Status temps réel de chaque GéeLark phone, sync auto, gestion par groupes et sessions Instagram." },
+  { iconName: 'smartphone',     title: 'Suivi téléphones',  color: '#E8DFC8', text: "Status temps réel de chaque GéeLark phone, sync auto, gestion par groupes et sessions Instagram." },
 ]
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
@@ -682,7 +682,7 @@ const PLANS: PlanDef[] = [
   },
   {
     name: 'Pro', tagline: 'Scale ton output', iconName: 'crown',
-    credits: '5 500 crédits / mois', creditsColor: '#a78bfa', accent: '#7c3aed',
+    credits: '5 500 crédits / mois', creditsColor: '#C9B584', accent: '#C9B584',
     monthlyPrice: '99,99$', yearlyPrice: '59,99$',
     originalMonthly: '99,99$', discount: '40% OFF', yearlyBilled: '719,88$ facturé annuellement',
     popular: true,
@@ -732,10 +732,10 @@ function PricingSection() {
         {/* Header */}
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa', margin: '0 0 12px' }}>Tarifs</p>
-            <h2 style={{ fontSize: 'clamp(28px,5vw,50px)', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 28px', color: '#F2F0FF' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#C9B584', margin: '0 0 12px' }}>Tarifs</p>
+            <h2 style={{ fontSize: 'clamp(28px,5vw,50px)', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 28px', color: '#F3F1EC' }}>
               Choisis ton{' '}
-              <span style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>plan.</span>
+              <span style={{ background: 'linear-gradient(120deg,#C9B584,#D4C499)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>plan.</span>
             </h2>
             {/* Billing toggle */}
             <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 99, padding: 4, gap: 2 }}>
@@ -761,26 +761,26 @@ function PricingSection() {
                   position: 'relative',
                   background: p.popular ? '#0d0b1e' : p.bestValue ? '#0c100a' : '#0b0b15',
                   borderRadius: 18,
-                  border: p.popular ? '1.5px solid rgba(124,58,237,0.45)' : p.bestValue ? '1.5px solid rgba(245,158,11,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                  border: p.popular ? '1.5px solid rgba(201,181,132,0.45)' : p.bestValue ? '1.5px solid rgba(245,158,11,0.45)' : '1px solid rgba(255,255,255,0.08)',
                   display: 'flex', flexDirection: 'column',
                   overflow: 'hidden',
-                  boxShadow: p.popular ? '0 0 60px rgba(124,58,237,0.14),0 20px 60px rgba(0,0,0,0.6)' : p.bestValue ? '0 0 60px rgba(245,158,11,0.08),0 20px 60px rgba(0,0,0,0.6)' : '0 20px 60px rgba(0,0,0,0.4)',
+                  boxShadow: p.popular ? '0 0 60px rgba(201,181,132,0.14),0 20px 60px rgba(0,0,0,0.6)' : p.bestValue ? '0 0 60px rgba(245,158,11,0.08),0 20px 60px rgba(0,0,0,0.6)' : '0 20px 60px rgba(0,0,0,0.4)',
                   transition: 'transform 0.2s',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)' }}
                 onMouseLeave={e => { e.currentTarget.style.transform = '' }}
               >
-                {p.popular && <div style={{ background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', padding: '7px 0', textAlign: 'center', fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>MOST POPULAR</div>}
+                {p.popular && <div style={{ background: 'linear-gradient(90deg,#4f46e5,#C9B584)', padding: '7px 0', textAlign: 'center', fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>MOST POPULAR</div>}
                 {p.bestValue && <div style={{ background: 'linear-gradient(90deg,#d97706,#f59e0b)', padding: '7px 0', textAlign: 'center', fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>BEST VALUE</div>}
 
                 <div style={{ padding: '22px 22px 26px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                   {/* Icon + name */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                    <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: p.popular ? 'rgba(124,58,237,0.15)' : p.bestValue ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.1)', border: `1px solid ${p.accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: p.accent }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: p.popular ? 'rgba(201,181,132,0.15)' : p.bestValue ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.1)', border: `1px solid ${p.accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: p.accent }}>
                       <Icon name={p.iconName} size={20} />
                     </div>
                     <div>
-                      <p style={{ fontSize: 17, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.02em' }}>{p.name}</p>
+                      <p style={{ fontSize: 17, fontWeight: 800, color: '#F3F1EC', margin: 0, letterSpacing: '-0.02em' }}>{p.name}</p>
                       <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: 0, marginTop: 1 }}>{p.tagline}</p>
                     </div>
                   </div>
@@ -795,11 +795,11 @@ function PricingSection() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                       {yearly && p.originalMonthly && <span style={{ fontSize: 14, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{p.originalMonthly}</span>}
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-                        <span style={{ fontSize: 40, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1 }}>{yearly ? p.yearlyPrice : p.monthlyPrice}</span>
+                        <span style={{ fontSize: 40, fontWeight: 900, color: '#F3F1EC', letterSpacing: '-0.04em', lineHeight: 1 }}>{yearly ? p.yearlyPrice : p.monthlyPrice}</span>
                         <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)' }}>/mo</span>
                       </div>
                       {yearly && p.discount && (
-                        <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: p.popular ? 'rgba(124,58,237,0.2)' : p.bestValue ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)', color: p.popular ? '#a78bfa' : p.bestValue ? '#f59e0b' : '#60a5fa', border: `1px solid ${p.accent}25` }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: p.popular ? 'rgba(201,181,132,0.2)' : p.bestValue ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)', color: p.popular ? '#C9B584' : p.bestValue ? '#f59e0b' : '#60a5fa', border: `1px solid ${p.accent}25` }}>
                           {p.discount}
                         </span>
                       )}
@@ -831,7 +831,7 @@ function PricingSection() {
                   {/* CTA */}
                   <div style={{ marginTop: 24 }}>
                     <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-                      style={{ display: 'block', textAlign: 'center', padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.15s, transform 0.15s', ...(p.popular ? { background: 'linear-gradient(130deg,#4f46e5,#7c3aed)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' } : p.bestValue ? { background: 'linear-gradient(130deg,#d97706,#f59e0b)', color: '#fff', boxShadow: '0 4px 20px rgba(245,158,11,0.3)' } : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#F2F0FF' }) }}
+                      style={{ display: 'block', textAlign: 'center', padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.15s, transform 0.15s', ...(p.popular ? { background: 'linear-gradient(130deg,#4f46e5,#C9B584)', color: '#fff', boxShadow: '0 4px 20px rgba(201,181,132,0.4)' } : p.bestValue ? { background: 'linear-gradient(130deg,#d97706,#f59e0b)', color: '#fff', boxShadow: '0 4px 20px rgba(245,158,11,0.3)' } : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#F3F1EC' }) }}
                       onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'translateY(-1px)' }}
                       onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = '' }}>
                       {p.btnLabel}
@@ -846,7 +846,7 @@ function PricingSection() {
         {/* ── Credit packs ── */}
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <h3 style={{ fontSize: 'clamp(22px,4vw,36px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#F2F0FF', margin: '0 0 8px' }}>Credit Packs</h3>
+            <h3 style={{ fontSize: 'clamp(22px,4vw,36px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#F3F1EC', margin: '0 0 8px' }}>Credit Packs</h3>
             <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)', margin: 0 }}>Recharge à tout moment · Les crédits n'expirent jamais.</p>
           </div>
         </FadeIn>
@@ -858,27 +858,27 @@ function PricingSection() {
                 style={{
                   position: 'relative', background: pack.popular ? '#0d0b1e' : pack.bestValue ? '#0c100a' : '#0c0c18',
                   borderRadius: 16,
-                  border: pack.popular ? '1.5px solid rgba(124,58,237,0.45)' : pack.bestValue ? '1.5px solid rgba(245,158,11,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                  border: pack.popular ? '1.5px solid rgba(201,181,132,0.45)' : pack.bestValue ? '1.5px solid rgba(245,158,11,0.45)' : '1px solid rgba(255,255,255,0.08)',
                   overflow: 'hidden', display: 'flex', flexDirection: 'column',
                   transition: 'transform 0.2s',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)' }}
                 onMouseLeave={e => { e.currentTarget.style.transform = '' }}
               >
-                {pack.popular && <div style={{ background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', padding: '5px 0', textAlign: 'center', fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>MOST POPULAR</div>}
+                {pack.popular && <div style={{ background: 'linear-gradient(90deg,#4f46e5,#C9B584)', padding: '5px 0', textAlign: 'center', fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>MOST POPULAR</div>}
                 {pack.bestValue && <div style={{ background: 'linear-gradient(90deg,#d97706,#f59e0b)', padding: '5px 0', textAlign: 'center', fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>BEST VALUE</div>}
                 <div style={{ padding: '24px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', flex: 1 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 11, marginBottom: 12, background: pack.popular ? 'rgba(124,58,237,0.15)' : pack.bestValue ? 'rgba(245,158,11,0.12)' : 'rgba(139,92,246,0.08)', border: pack.popular ? '1px solid rgba(124,58,237,0.3)' : pack.bestValue ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(139,92,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 11, marginBottom: 12, background: pack.popular ? 'rgba(201,181,132,0.15)' : pack.bestValue ? 'rgba(245,158,11,0.12)' : 'rgba(201,181,132,0.08)', border: pack.popular ? '1px solid rgba(201,181,132,0.3)' : pack.bestValue ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(201,181,132,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 1.5l1.6 4.9H15l-4.2 3 1.6 4.9L8 11.3l-4.4 3.1 1.6-4.9L1 6.4h5.4z" fill={pack.popular ? '#a78bfa' : pack.bestValue ? '#f59e0b' : 'rgba(139,92,246,0.55)'}/>
+                      <path d="M8 1.5l1.6 4.9H15l-4.2 3 1.6 4.9L8 11.3l-4.4 3.1 1.6-4.9L1 6.4h5.4z" fill={pack.popular ? '#C9B584' : pack.bestValue ? '#f59e0b' : 'rgba(201,181,132,0.55)'}/>
                     </svg>
                   </div>
-                  <p style={{ fontSize: 15, fontWeight: 800, color: '#F2F0FF', margin: '0 0 10px', letterSpacing: '-0.02em' }}>{pack.name}</p>
-                  <p style={{ fontSize: 30, fontWeight: 900, color: '#F2F0FF', margin: '0 0 2px', letterSpacing: '-0.03em', lineHeight: 1 }}>{pack.credits}</p>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: '#F3F1EC', margin: '0 0 10px', letterSpacing: '-0.02em' }}>{pack.name}</p>
+                  <p style={{ fontSize: 30, fontWeight: 900, color: '#F3F1EC', margin: '0 0 2px', letterSpacing: '-0.03em', lineHeight: 1 }}>{pack.credits}</p>
                   <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.38)', margin: '0 0 14px' }}>crédits</p>
-                  <p style={{ fontSize: 26, fontWeight: 900, color: '#F2F0FF', margin: '0 0 auto', letterSpacing: '-0.03em' }}>{pack.price}</p>
+                  <p style={{ fontSize: 26, fontWeight: 900, color: '#F3F1EC', margin: '0 0 auto', letterSpacing: '-0.03em' }}>{pack.price}</p>
                   <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-                    style={{ display: 'block', width: '100%', textAlign: 'center', marginTop: 18, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.15s', ...(pack.popular ? { background: 'linear-gradient(130deg,#4f46e5,#7c3aed)', color: '#fff' } : pack.bestValue ? { background: 'linear-gradient(130deg,#d97706,#f59e0b)', color: '#fff' } : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#F2F0FF' }) }}
+                    style={{ display: 'block', width: '100%', textAlign: 'center', marginTop: 18, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.15s', ...(pack.popular ? { background: 'linear-gradient(130deg,#4f46e5,#C9B584)', color: '#fff' } : pack.bestValue ? { background: 'linear-gradient(130deg,#d97706,#f59e0b)', color: '#fff' } : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#F3F1EC' }) }}
                     onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
                     onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}>
                     Acheter
@@ -908,7 +908,7 @@ const QA = [
 ]
 
 // ── Divider ───────────────────────────────────────────────────────────────────
-const Divider = () => <div style={{ maxWidth: 1100, margin: '0 auto', height: 1, background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.12), transparent)' }} />
+const Divider = () => <div style={{ maxWidth: 1100, margin: '0 auto', height: 1, background: 'linear-gradient(90deg, transparent, rgba(201,181,132,0.12), transparent)' }} />
 
 // ── Telegram icon ─────────────────────────────────────────────────────────────
 const TGIcon = ({ size = 14 }: { size?: number }) => (
@@ -1008,24 +1008,24 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
       {/* ── Perspective grid lines from center ── */}
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} preserveAspectRatio="none">
         {/* Corner lines */}
-        <line x1="50%" y1="50%" x2="0%"   y2="0%"   stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="100%" y2="0%"   stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="0%"   y2="100%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="100%" y2="100%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="0%"   stroke="rgba(201,181,132,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="0%"   stroke="rgba(201,181,132,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="100%" stroke="rgba(201,181,132,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="100%" stroke="rgba(201,181,132,0.12)" strokeWidth="1" />
         {/* Edge midpoint lines */}
-        <line x1="50%" y1="50%" x2="50%"  y2="0%"   stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="50%"  y2="100%" stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="0%"   y2="50%"  stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="100%" y2="50%"  stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="50%"  y2="0%"   stroke="rgba(201,181,132,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="50%"  y2="100%" stroke="rgba(201,181,132,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="50%"  stroke="rgba(201,181,132,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="50%"  stroke="rgba(201,181,132,0.07)" strokeWidth="1" />
         {/* Intermediate lines for denser grid feel */}
-        <line x1="50%" y1="50%" x2="25%"  y2="0%"   stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="75%"  y2="0%"   stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="25%"  y2="100%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="75%"  y2="100%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="0%"   y2="25%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="0%"   y2="75%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="100%" y2="25%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%" y1="50%" x2="100%" y2="75%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="25%"  y2="0%"   stroke="rgba(201,181,132,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="75%"  y2="0%"   stroke="rgba(201,181,132,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="25%"  y2="100%" stroke="rgba(201,181,132,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="75%"  y2="100%" stroke="rgba(201,181,132,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="25%"  stroke="rgba(201,181,132,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="75%"  stroke="rgba(201,181,132,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="25%"  stroke="rgba(201,181,132,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="75%"  stroke="rgba(201,181,132,0.05)" strokeWidth="1" />
       </svg>
 
       {/* ── Purple ambient glow at center ── */}
@@ -1033,7 +1033,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
         position: 'absolute', top: '50%', left: '50%',
         transform: 'translate(-50%,-50%)',
         width: 600, height: 400,
-        background: 'radial-gradient(ellipse closest-side, rgba(109,40,217,0.22), transparent)',
+        background: 'radial-gradient(ellipse closest-side, rgba(201,181,132,0.22), transparent)',
         filter: 'blur(60px)', pointerEvents: 'none', zIndex: 1,
       }} />
 
@@ -1054,8 +1054,8 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
             transform: `perspective(1100px) rotateY(${tile.ry}deg) rotateX(${tile.rx}deg)`,
             borderRadius: 14,
             overflow: 'hidden',
-            border: '1px solid rgba(139,92,246,0.18)',
-            boxShadow: '0 8px 48px rgba(0,0,0,0.7), inset 0 1px 0 rgba(139,92,246,0.1)',
+            border: '1px solid rgba(201,181,132,0.18)',
+            boxShadow: '0 8px 48px rgba(0,0,0,0.7), inset 0 1px 0 rgba(201,181,132,0.1)',
           }}>
             {ENTRY_IMAGES[idx]
               ? <img src={ENTRY_IMAGES[idx]!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -1083,7 +1083,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           fontFamily: "'Inter', 'Arial Black', system-ui, sans-serif",
           display: 'inline-flex', alignItems: 'baseline', gap: '0.06em',
         }}>
-          ScaleFlow<span style={{ color: '#7C3AED', fontSize: '0.85em', lineHeight: 1 }}>.</span>
+          ScaleFlow<span style={{ color: '#C9B584', fontSize: '0.85em', lineHeight: 1 }}>.</span>
         </h1>
         <p style={{
           fontSize: 11, color: 'rgba(255,255,255,0.38)',
@@ -1109,8 +1109,8 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
               transition: 'all 0.2s',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(124,58,237,0.25)'
-              e.currentTarget.style.borderColor = 'rgba(139,92,246,0.6)'
+              e.currentTarget.style.background = 'rgba(201,181,132,0.25)'
+              e.currentTarget.style.borderColor = 'rgba(201,181,132,0.6)'
               e.currentTarget.style.transform = 'translateY(-2px)'
             }}
             onMouseLeave={e => {
@@ -1213,11 +1213,11 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
       background: '#07060e',
     }}>
       {/* Shared background glow */}
-      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(124,58,237,0.1), transparent)', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(201,181,132,0.1), transparent)', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
 
       {/* ScaleFlow label — top-left, shared */}
       <div style={{ position: 'absolute', top: 28, left: 36, zIndex: 20, display: 'flex', alignItems: 'center', gap: 8, opacity: visible ? 1 : 0, transition: 'opacity 0.5s 0.1s' }}>
-        <div style={{ width: 22, height: 22, borderRadius: 6, background: 'linear-gradient(130deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 22, height: 22, borderRadius: 6, background: 'linear-gradient(130deg,#C9B584,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <svg width="13" height="13" viewBox="0 0 200 200" fill="none"><text x="100" y="148" textAnchor="middle" fontFamily="'Arial Black',sans-serif" fontWeight="900" fontSize="148" fill="#fff">S</text></svg>
         </div>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>ScaleFlow</span>
@@ -1230,16 +1230,16 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
         onMouseLeave={() => setHoverTop(false)}
         style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: hoverTop ? 'rgba(124,58,237,0.08)' : 'transparent',
+          background: hoverTop ? 'rgba(201,181,132,0.08)' : 'transparent',
           cursor: 'none', position: 'relative', overflow: 'hidden', zIndex: 1,
           transition: 'background 0.4s',
         }}
       >
         <div style={grid} />
-        {hoverTop && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 70% at 50% 50%, rgba(124,58,237,0.12), transparent)', pointerEvents: 'none' }} />}
+        {hoverTop && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 70% at 50% 50%, rgba(201,181,132,0.12), transparent)', pointerEvents: 'none' }} />}
 
         <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.12s, transform 0.6s 0.12s cubic-bezier(0.16,1,0.3,1)', position: 'relative', zIndex: 2 }}>
-          <div style={{ ...baseText, fontSize: 'clamp(44px,9vw,120px)', color: '#F2F0FF', transform: hoverTop ? 'translateX(8px)' : 'none' }}>
+          <div style={{ ...baseText, fontSize: 'clamp(44px,9vw,120px)', color: '#F3F1EC', transform: hoverTop ? 'translateX(8px)' : 'none' }}>
             DÉCOUVRIR
           </div>
           <div style={{ ...baseText, fontSize: 'clamp(44px,9vw,120px)', color: 'transparent', WebkitTextStroke: '2px rgba(255,255,255,0.35)', transform: hoverTop ? 'translateX(-8px)' : 'none' }}>
@@ -1253,7 +1253,7 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
       </div>
 
       {/* Divider — with gradient line */}
-      <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(124,58,237,0.4) 50%, rgba(255,255,255,0.12) 70%, transparent)', flexShrink: 0, zIndex: 10 }} />
+      <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(201,181,132,0.4) 50%, rgba(255,255,255,0.12) 70%, transparent)', flexShrink: 0, zIndex: 10 }} />
 
       {/* Bottom half — Studio */}
       <div
@@ -1262,16 +1262,16 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
         onMouseLeave={() => setHoverBot(false)}
         style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: hoverBot ? 'rgba(236,72,153,0.05)' : 'transparent',
+          background: hoverBot ? 'rgba(243,241,236,0.05)' : 'transparent',
           cursor: 'none', position: 'relative', overflow: 'hidden', zIndex: 1,
           transition: 'background 0.4s',
         }}
       >
         <div style={grid} />
-        {hoverBot && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 70% at 50% 50%, rgba(236,72,153,0.1), transparent)', pointerEvents: 'none' }} />}
+        {hoverBot && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 70% at 50% 50%, rgba(243,241,236,0.1), transparent)', pointerEvents: 'none' }} />}
 
         <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.22s, transform 0.6s 0.22s cubic-bezier(0.16,1,0.3,1)', position: 'relative', zIndex: 2 }}>
-          <div style={{ ...baseText, fontSize: 'clamp(56px,12vw,155px)', background: 'linear-gradient(130deg,#fff 0%,rgba(196,181,253,0.8) 60%,rgba(236,72,153,0.7) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', transform: hoverBot ? 'translateX(8px)' : 'none' }}>
+          <div style={{ ...baseText, fontSize: 'clamp(56px,12vw,155px)', background: 'linear-gradient(130deg,#fff 0%,rgba(243,241,236,0.8) 60%,rgba(243,241,236,0.7) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', transform: hoverBot ? 'translateX(8px)' : 'none' }}>
             STUDIO
           </div>
           <div style={{ marginTop: 18, fontSize: 11, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)' }}>
@@ -1286,10 +1286,10 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
 
 // ── Orbit ring — Studio auth left panel ───────────────────────────────────────
 const ORBIT_COLORS = [
-  ['#c084fc','#7c3aed'], ['#f472b6','#db2777'], ['#60a5fa','#2563eb'],
-  ['#34d399','#059669'], ['#fb923c','#ea580c'], ['#a78bfa','#7c3aed'],
-  ['#f9a8d4','#ec4899'], ['#93c5fd','#3b82f6'], ['#6ee7b7','#10b981'],
-  ['#fcd34d','#f59e0b'], ['#c4b5fd','#8b5cf6'], ['#fbcfe8','#db2777'],
+  ['#c084fc','#C9B584'], ['#E8DFC8','#db2777'], ['#60a5fa','#2563eb'],
+  ['#34d399','#059669'], ['#fb923c','#ea580c'], ['#C9B584','#C9B584'],
+  ['#f9a8d4','#D4C499'], ['#93c5fd','#3b82f6'], ['#6ee7b7','#10b981'],
+  ['#fcd34d','#f59e0b'], ['#D4C499','#C9B584'], ['#fbcfe8','#db2777'],
   ['#bfdbfe','#3b82f6'], ['#d9f99d','#65a30d'],
 ]
 const ORBIT_RADIUS = 190
@@ -1371,7 +1371,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
     background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.09)',
     borderRadius: 10,
-    color: '#F2F0FF',
+    color: '#F3F1EC',
     fontSize: 14,
     outline: 'none',
     transition: 'border-color 0.2s',
@@ -1387,12 +1387,12 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
       {/* ── Left panel — Marketing ─────────────────────────────────────────── */}
       <div style={{ flex: '0 0 55%', background: '#05030f', position: 'relative', overflow: 'hidden' }}>
         {/* Glow */}
-        <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side,rgba(109,40,217,0.18),transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side,rgba(201,181,132,0.18),transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
 
         {/* Floating phone cards */}
         {[
           { x: -34, y: -22, rot: -8,  views: '870K', g: '#c084fc' },
-          { x:  -6, y: -28, rot: -2,  views: '680K', g: '#f472b6' },
+          { x:  -6, y: -28, rot: -2,  views: '680K', g: '#E8DFC8' },
           { x:  26, y: -20, rot:  6,  views: '1.1M', g: '#60a5fa' },
           { x: -26, y:  20, rot: -5,  views: '920K', g: '#4ade80' },
           { x:  28, y:  16, rot:  7,  views: '990K', g: '#fb923c' },
@@ -1431,15 +1431,15 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Rocket icon */}
-        <div style={{ position: 'absolute', bottom: '20%', right: '7%', width: 50, height: 50, borderRadius: 14, background: 'linear-gradient(135deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(124,58,237,0.3)', animation: 'sf-float-slow 7s ease-in-out 0.5s infinite', zIndex: 3, fontSize: 22 }}>🚀</div>
+        <div style={{ position: 'absolute', bottom: '20%', right: '7%', width: 50, height: 50, borderRadius: 14, background: 'linear-gradient(135deg,#C9B584,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(201,181,132,0.3)', animation: 'sf-float-slow 7s ease-in-out 0.5s infinite', zIndex: 3, fontSize: 22 }}>🚀</div>
 
         {/* Center text */}
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 10, width: '90%', pointerEvents: 'none' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 13px', borderRadius: 99, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.22)', marginBottom: 16 }}>
-            <span style={{ color: 'rgba(196,181,253,0.9)', display: 'flex' }}><Icon name="zap" size={12} /></span>
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(196,181,253,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 13px', borderRadius: 99, background: 'rgba(201,181,132,0.1)', border: '1px solid rgba(201,181,132,0.22)', marginBottom: 16 }}>
+            <span style={{ color: 'rgba(243,241,236,0.9)', display: 'flex' }}><Icon name="zap" size={12} /></span>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(243,241,236,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
           </div>
-          <div style={{ fontSize: 'clamp(36px,4.5vw,62px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F2F0FF', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", filter: 'drop-shadow(0 0 40px rgba(167,139,250,0.22))' }}>ScaleFlow</div>
+          <div style={{ fontSize: 'clamp(36px,4.5vw,62px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F3F1EC', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", filter: 'drop-shadow(0 0 40px rgba(201,181,132,0.22))' }}>ScaleFlow</div>
           <div style={{ marginTop: 14, fontSize: 'clamp(14px,1.6vw,18px)', fontWeight: 800, color: 'rgba(241,240,247,0.85)', lineHeight: 1.25 }}>L'automatisation Instagram</div>
           <div style={{ fontSize: 'clamp(14px,1.6vw,18px)', fontWeight: 800, color: 'rgba(241,240,247,0.85)', lineHeight: 1.25, marginBottom: 10 }}>à grande échelle.</div>
           <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: '0 auto', lineHeight: 1.6, maxWidth: 320 }}>Mass posting, multi-comptes, planification avancée, reels & stories.</p>
@@ -1449,8 +1449,8 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', padding: '10px 0', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.06)', gap: 0, zIndex: 5 }}>
           {[{ iconName: 'send' as IconName, label: 'MASS POSTING' }, { iconName: 'users' as IconName, label: 'MULTI-COMPTES' }, { iconName: 'clapperboard' as IconName, label: 'REELS & STORIES' }].map((f, i, a) => (
             <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 14px', borderRight: i < a.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
-              <span style={{ color: 'rgba(196,181,253,0.6)', display: 'flex' }}><Icon name={f.iconName} size={12} /></span>
-              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(196,181,253,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
+              <span style={{ color: 'rgba(243,241,236,0.6)', display: 'flex' }}><Icon name={f.iconName} size={12} /></span>
+              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(243,241,236,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
             </div>
           ))}
         </div>
@@ -1480,7 +1480,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                 style={{
                   flex: 1, padding: '10px', borderRadius: 7, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all 0.2s',
                   ...(tab === t
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }
+                    ? { background: 'linear-gradient(130deg,#C9B584,#D4C499)', color: '#fff', boxShadow: '0 2px 12px rgba(201,181,132,0.4)' }
                     : { background: 'transparent', color: 'rgba(148,163,184,0.5)' }
                   ),
                 }}>
@@ -1491,7 +1491,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
 
           {/* Heading */}
           <div style={{ marginBottom: 28 }}>
-            <h2 style={{ fontSize: 26, fontWeight: 900, color: '#F2F0FF', margin: '0 0 6px', letterSpacing: '-0.03em' }}>
+            <h2 style={{ fontSize: 26, fontWeight: 900, color: '#F3F1EC', margin: '0 0 6px', letterSpacing: '-0.03em' }}>
               {tab === 'login' ? 'Welcome back' : 'Créer un compte'}
             </h2>
             <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)', margin: 0 }}>
@@ -1505,7 +1505,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
               <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.5)', marginBottom: 7 }}>Email</label>
               <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com" style={inputStyle}
-                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(201,181,132,0.5)')}
                 onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
             </div>
 
@@ -1516,7 +1516,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
               <div style={{ position: 'relative' }}>
                 <input type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" style={{ ...inputStyle, paddingRight: 44 }}
-                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(201,181,132,0.5)')}
                   onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
                 <button type="button" onClick={() => setShowPw(!showPw)}
                   aria-label={showPw ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
@@ -1531,7 +1531,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.5)', marginBottom: 7 }}>Confirmer</label>
                 <input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)}
                   placeholder="••••••••" style={inputStyle}
-                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(201,181,132,0.5)')}
                   onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
               </div>
             )}
@@ -1550,9 +1550,9 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
             <button type="submit" disabled={loading}
               style={{
                 width: '100%', padding: '14px', borderRadius: 10, border: 'none', cursor: loading ? 'wait' : 'pointer',
-                background: loading ? 'rgba(124,58,237,0.5)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                background: loading ? 'rgba(201,181,132,0.5)' : 'linear-gradient(130deg,#C9B584,#D4C499)',
                 color: '#fff', fontSize: 15, fontWeight: 800, letterSpacing: '0.02em',
-                boxShadow: '0 4px 20px rgba(124,58,237,0.35)', marginTop: 4,
+                boxShadow: '0 4px 20px rgba(201,181,132,0.35)', marginTop: 4,
                 transition: 'opacity 0.2s',
               }}
               onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.88' }}
@@ -1564,7 +1564,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
           <p style={{ textAlign: 'center', marginTop: 24, fontSize: 12, color: 'rgba(148,163,184,0.35)' }}>
             {tab === 'login' ? "Pas encore de compte ? " : "Déjà un compte ? "}
             <button onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(null); setPassword(''); setConfirm('') }}
-              style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0 }}>
+              style={{ background: 'none', border: 'none', color: '#C9B584', fontSize: 12, cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0 }}>
               {tab === 'login' ? 'Sign up' : 'Sign in'}
             </button>
           </p>
@@ -1619,14 +1619,14 @@ export function Landing() {
   const onStudio   = () => goTo('studio')
 
   return (
-    <div style={{ minHeight: '100vh', background: '#06060f', color: '#F2F0FF', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif", cursor: stage === 'site' ? 'auto' : 'none' }}>
+    <div style={{ minHeight: '100vh', background: '#06060f', color: '#F3F1EC', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif", cursor: stage === 'site' ? 'auto' : 'none' }}>
       {stage !== 'site' && <CustomCursor />}
       <StarField />
 
       {/* Nebula glows — animated */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: '-15%', left: '30%', width: 1000, height: 1000, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(109,40,217,0.13), transparent)', filter: 'blur(50px)', animation: 'sf-nebula 8s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', top: '40%', right: '-10%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(236,72,153,0.08), transparent)', filter: 'blur(50px)', animation: 'sf-nebula 11s ease-in-out infinite 2s' }} />
+        <div style={{ position: 'absolute', top: '-15%', left: '30%', width: 1000, height: 1000, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(201,181,132,0.13), transparent)', filter: 'blur(50px)', animation: 'sf-nebula 8s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: '40%', right: '-10%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(243,241,236,0.08), transparent)', filter: 'blur(50px)', animation: 'sf-nebula 11s ease-in-out infinite 2s' }} />
         <div style={{ position: 'absolute', bottom: '5%', left: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(56,189,248,0.05), transparent)', filter: 'blur(50px)', animation: 'sf-nebula 14s ease-in-out infinite 4s' }} />
       </div>
 
@@ -1643,24 +1643,24 @@ export function Landing() {
           {/* Logo — clicking returns to tunnel */}
           <button onClick={() => goTo('tunnel')} style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             <SFMark size={28} />
-            <span style={{ fontSize: 15, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.3px' }}>ScaleFlow</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#F3F1EC', letterSpacing: '-0.3px' }}>ScaleFlow</span>
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {[['#features','Fonctionnalités'], ['#pricing','Tarifs'], ['#faq','FAQ']].map(([href, label]) => (
               <a key={href} href={href} style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)', textDecoration: 'none', padding: '6px 12px', borderRadius: 8, transition: 'color 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#F2F0FF')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(148,163,184,0.55)')}>
+                onMouseEnter={e => (e.currentTarget.style.color = '#F3F1EC')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(148,163,184,0.55)')}>
                 {label}
               </a>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#F2F0FF', textDecoration: 'none', transition: 'background 0.15s' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#F3F1EC', textDecoration: 'none', transition: 'background 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.09)')} onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
               <TGIcon /> Acheter une clé
             </a>
             <button onClick={onStudio}
-              style={{ padding: '7px 16px', borderRadius: 9, background: 'linear-gradient(130deg,#7c3aed,#a855f7)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.15s', animation: 'sf-pulse-glow 3s ease-in-out infinite' }}
+              style={{ padding: '7px 16px', borderRadius: 9, background: 'linear-gradient(130deg,#C9B584,#a855f7)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.15s', animation: 'sf-pulse-glow 3s ease-in-out infinite' }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')} onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
               Studio →
             </button>
@@ -1682,10 +1682,10 @@ export function Landing() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <FadeIn>
             <div style={{ textAlign: 'center', marginBottom: 60 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa', margin: '0 0 14px' }}>Tout pour scaler</p>
-              <h2 style={{ fontSize: 'clamp(28px,5vw,50px)', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 16px', color: '#F2F0FF' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#C9B584', margin: '0 0 14px' }}>Tout pour scaler</p>
+              <h2 style={{ fontSize: 'clamp(28px,5vw,50px)', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 16px', color: '#F3F1EC' }}>
                 Une seule app,{' '}
-                <span style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>tout dedans.</span>
+                <span style={{ background: 'linear-gradient(120deg,#C9B584,#D4C499)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>tout dedans.</span>
               </h2>
               <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.5)', maxWidth: 460, margin: '0 auto' }}>Plus besoin de jongler entre 10 outils différents.</p>
             </div>
@@ -1697,7 +1697,7 @@ export function Landing() {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = `${f.color}35`; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 16px 40px rgba(0,0,0,0.3)` }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}>
                   <div style={{ width: 42, height: 42, borderRadius: 11, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', color: f.color, background: `${f.color}10`, border: `1px solid ${f.color}20` }}><Icon name={f.iconName} size={20} /></div>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: '0 0 7px' }}>{f.title}</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: '#F3F1EC', margin: '0 0 7px' }}>{f.title}</p>
                   <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.5)', margin: 0, lineHeight: 1.65 }}>{f.text}</p>
                 </div>
               </FadeIn>
@@ -1712,16 +1712,16 @@ export function Landing() {
       <section style={{ position: 'relative', zIndex: 1, padding: '80px 24px' }}>
         <FadeIn>
           <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
-            <div style={{ borderRadius: 22, padding: '48px 36px', background: 'linear-gradient(135deg,rgba(124,58,237,0.08),rgba(236,72,153,0.05))', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 0 60px rgba(124,58,237,0.07)', transition: 'border-color 0.3s, box-shadow 0.3s' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.35)'; e.currentTarget.style.boxShadow = '0 0 80px rgba(124,58,237,0.14)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.2)'; e.currentTarget.style.boxShadow = '0 0 60px rgba(124,58,237,0.07)' }}>
-              <div style={{ width: 52, height: 52, borderRadius: 16, margin: '0 auto 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(130deg,rgba(124,58,237,0.2),rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.3)' }}>
+            <div style={{ borderRadius: 22, padding: '48px 36px', background: 'linear-gradient(135deg,rgba(201,181,132,0.08),rgba(243,241,236,0.05))', border: '1px solid rgba(201,181,132,0.2)', boxShadow: '0 0 60px rgba(201,181,132,0.07)', transition: 'border-color 0.3s, box-shadow 0.3s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(201,181,132,0.35)'; e.currentTarget.style.boxShadow = '0 0 80px rgba(201,181,132,0.14)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(201,181,132,0.2)'; e.currentTarget.style.boxShadow = '0 0 60px rgba(201,181,132,0.07)' }}>
+              <div style={{ width: 52, height: 52, borderRadius: 16, margin: '0 auto 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(130deg,rgba(201,181,132,0.2),rgba(243,241,236,0.15))', border: '1px solid rgba(201,181,132,0.3)' }}>
                 <TGIcon size={24} />
               </div>
-              <h3 style={{ fontSize: 26, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.03em', margin: '0 0 10px' }}>Acheter une clé ScaleFlow</h3>
+              <h3 style={{ fontSize: 26, fontWeight: 900, color: '#F3F1EC', letterSpacing: '-0.03em', margin: '0 0 10px' }}>Acheter une clé ScaleFlow</h3>
               <p style={{ fontSize: 14, color: 'rgba(148,163,184,0.5)', margin: '0 0 28px', lineHeight: 1.6 }}>Activation immédiate après paiement.<br />Paiement via Telegram — crypto ou virement.</p>
               <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '14px 32px', borderRadius: 12, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', fontSize: 15, fontWeight: 800, textDecoration: 'none', animation: 'sf-pulse-glow 3s ease-in-out infinite', transition: 'opacity 0.15s, transform 0.15s' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '14px 32px', borderRadius: 12, background: 'linear-gradient(130deg,#C9B584,#D4C499)', color: '#fff', fontSize: 15, fontWeight: 800, textDecoration: 'none', animation: 'sf-pulse-glow 3s ease-in-out infinite', transition: 'opacity 0.15s, transform 0.15s' }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-2px)' }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = '' }}>
                 <TGIcon size={16} /> Rejoindre sur Telegram
@@ -1744,10 +1744,10 @@ export function Landing() {
         <div style={{ maxWidth: 660, margin: '0 auto' }}>
           <FadeIn>
             <div style={{ textAlign: 'center', marginBottom: 44 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa', margin: '0 0 14px' }}>FAQ</p>
-              <h2 style={{ fontSize: 'clamp(26px,4vw,44px)', fontWeight: 900, letterSpacing: '-0.04em', margin: 0, color: '#F2F0FF' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#C9B584', margin: '0 0 14px' }}>FAQ</p>
+              <h2 style={{ fontSize: 'clamp(26px,4vw,44px)', fontWeight: 900, letterSpacing: '-0.04em', margin: 0, color: '#F3F1EC' }}>
                 On répond à{' '}
-                <span style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>tout.</span>
+                <span style={{ background: 'linear-gradient(120deg,#C9B584,#D4C499)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>tout.</span>
               </h2>
             </div>
           </FadeIn>
@@ -1755,10 +1755,10 @@ export function Landing() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {QA.map((item, i) => (
                 <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.2s' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.2)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)')}>
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(201,181,132,0.2)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)')}>
                   <button onClick={() => setFaqOpen(faqOpen === i ? null : i)} style={{ width: '100%', padding: '16px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 12 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#F2F0FF' }}>{item.q}</span>
-                    <span style={{ color: 'rgba(167,139,250,0.45)', fontSize: 18, lineHeight: 1, flexShrink: 0, transition: 'transform 0.25s', display: 'inline-block', transform: faqOpen === i ? 'rotate(45deg)' : 'none' }}>+</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#F3F1EC' }}>{item.q}</span>
+                    <span style={{ color: 'rgba(201,181,132,0.45)', fontSize: 18, lineHeight: 1, flexShrink: 0, transition: 'transform 0.25s', display: 'inline-block', transform: faqOpen === i ? 'rotate(45deg)' : 'none' }}>+</span>
                   </button>
                   {faqOpen === i && (
                     <div style={{ padding: '0 18px 16px', fontSize: 13, color: 'rgba(148,163,184,0.55)', lineHeight: 1.7, animation: 'sf-fade-up 0.25s ease both' }}>
@@ -1778,7 +1778,7 @@ export function Landing() {
       <footer style={{ position: 'relative', zIndex: 1, padding: '32px 24px 44px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><SFMark size={26} /><span style={{ fontSize: 15, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.3px' }}>ScaleFlow</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><SFMark size={26} /><span style={{ fontSize: 15, fontWeight: 800, color: '#F3F1EC', letterSpacing: '-0.3px' }}>ScaleFlow</span></div>
             <div style={{ display: 'flex', gap: 20, fontSize: 12 }}>
               {[['#features','Fonctionnalités'], ['#pricing','Tarifs'], ['#faq','FAQ'], [TELEGRAM_URL,'Telegram']].map(([href, label]) => (
                 <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"

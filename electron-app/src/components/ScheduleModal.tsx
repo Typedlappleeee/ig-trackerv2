@@ -86,24 +86,24 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
         style={{ background: '#0c0919', border: '1px solid rgba(37,99,235,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
 
         {/* Header */}
-        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#2563eb,#7c3aed)' }} />
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#2563eb,#C9B584)' }} />
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,rgba(37,99,235,0.2),rgba(124,58,237,0.12))', border: '1px solid rgba(37,99,235,0.25)' }}>
+              style={{ background: 'linear-gradient(135deg,rgba(37,99,235,0.2),rgba(201,181,132,0.12))', border: '1px solid rgba(37,99,235,0.25)' }}>
               <MIcon d={MPATHS.calendar} size={18} color="#93c5fd" />
             </div>
             <div>
               <p className="font-black text-white text-[14px] leading-tight">Programmer ce post</p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
+              <p className="text-[10px] mt-0.5" style={{ color: 'rgba(243,241,236,0.4)' }}>
                 {type === 'mass_posting' ? 'Mass Posting' : 'Posting'} · {phonesCount} tél. · {videosCount} vidéo{videosCount > 1 ? 's' : ''}
               </p>
             </div>
           </div>
           <button onClick={onClose} aria-label="Fermer"
             className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] transition-all cursor-pointer"
-            style={{ color: 'rgba(196,181,253,0.4)' }}><MIcon d={MPATHS.x} size={15} /></button>
+            style={{ color: 'rgba(243,241,236,0.4)' }}><MIcon d={MPATHS.x} size={15} /></button>
         </div>
 
         <div className="p-5 space-y-5">
@@ -112,8 +112,8 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
           {videoTitle && (
             <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <span className="flex-shrink-0" style={{ color: 'rgba(196,181,253,0.7)' }}><MIcon d={MPATHS.video} size={16} /></span>
-              <p className="text-[12px] font-semibold truncate" style={{ color: 'rgba(196,181,253,0.7)' }}>{videoTitle}</p>
+              <span className="flex-shrink-0" style={{ color: 'rgba(243,241,236,0.7)' }}><MIcon d={MPATHS.video} size={16} /></span>
+              <p className="text-[12px] font-semibold truncate" style={{ color: 'rgba(243,241,236,0.7)' }}>{videoTitle}</p>
             </div>
           )}
 
@@ -130,8 +130,8 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
                     onClick={() => { setSelectedDay(q.date); setUseCustom(false) }}
                     className="py-2.5 rounded-xl text-[12px] font-bold transition-all"
                     style={active
-                      ? { background: 'linear-gradient(130deg,#2563eb,#7c3aed)', color: 'white', boxShadow: '0 2px 12px rgba(37,99,235,0.35)' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      ? { background: 'linear-gradient(130deg,#2563eb,#C9B584)', color: 'white', boxShadow: '0 2px 12px rgba(37,99,235,0.35)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(243,241,236,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
                     {q.label}
                   </button>
                 )
@@ -142,8 +142,8 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
               onClick={() => setUseCustom(true)}
               className="w-full py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-2"
               style={useCustom
-                ? { background: 'linear-gradient(130deg,#2563eb,#7c3aed)', color: 'white' }
-                : { background: 'rgba(255,255,255,0.03)', color: 'rgba(196,181,253,0.45)', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                ? { background: 'linear-gradient(130deg,#2563eb,#C9B584)', color: 'white' }
+                : { background: 'rgba(255,255,255,0.03)', color: 'rgba(243,241,236,0.45)', border: '1px dashed rgba(255,255,255,0.1)' }}>
               <MIcon d={MPATHS.calendar} size={14} /> Choisir une date précise
             </button>
             {useCustom && (
@@ -164,32 +164,32 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
               <div className="flex flex-col items-center gap-1.5">
                 <button onClick={() => adjustHour(1)}
                   className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
-                  style={{ color: 'rgba(196,181,253,0.5)', background: 'rgba(255,255,255,0.04)' }}>▲</button>
+                  style={{ color: 'rgba(243,241,236,0.5)', background: 'rgba(255,255,255,0.04)' }}>▲</button>
                 <div className="w-16 h-12 rounded-xl flex items-center justify-center font-black text-2xl text-white"
                   style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.2)' }}>
                   {pad(hour)}
                 </div>
                 <button onClick={() => adjustHour(-1)}
                   className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
-                  style={{ color: 'rgba(196,181,253,0.5)', background: 'rgba(255,255,255,0.04)' }}>▼</button>
-                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(196,181,253,0.3)' }}>heure</span>
+                  style={{ color: 'rgba(243,241,236,0.5)', background: 'rgba(255,255,255,0.04)' }}>▼</button>
+                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(243,241,236,0.3)' }}>heure</span>
               </div>
 
-              <span className="text-3xl font-black pb-6" style={{ color: 'rgba(196,181,253,0.3)' }}>:</span>
+              <span className="text-3xl font-black pb-6" style={{ color: 'rgba(243,241,236,0.3)' }}>:</span>
 
               {/* Minute */}
               <div className="flex flex-col items-center gap-1.5">
                 <button onClick={() => adjustMinute(5)}
                   className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
-                  style={{ color: 'rgba(196,181,253,0.5)', background: 'rgba(255,255,255,0.04)' }}>▲</button>
+                  style={{ color: 'rgba(243,241,236,0.5)', background: 'rgba(255,255,255,0.04)' }}>▲</button>
                 <div className="w-16 h-12 rounded-xl flex items-center justify-center font-black text-2xl text-white"
                   style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.2)' }}>
                   {pad(minute)}
                 </div>
                 <button onClick={() => adjustMinute(-5)}
                   className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
-                  style={{ color: 'rgba(196,181,253,0.5)', background: 'rgba(255,255,255,0.04)' }}>▼</button>
-                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(196,181,253,0.3)' }}>min</span>
+                  style={{ color: 'rgba(243,241,236,0.5)', background: 'rgba(255,255,255,0.04)' }}>▼</button>
+                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(243,241,236,0.3)' }}>min</span>
               </div>
             </div>
 
@@ -236,14 +236,14 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose}
             className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
-            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(243,241,236,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
             Annuler
           </button>
           <button
             onClick={() => !isInPast && onConfirm(scheduled)}
             disabled={isInPast || (useCustom && !customDate)}
             className="flex-[2] py-2.5 rounded-xl text-[12px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center gap-1.5"
-            style={{ background: 'linear-gradient(130deg,#2563eb,#7c3aed)', boxShadow: '0 4px 20px -4px rgba(37,99,235,0.5)' }}>
+            style={{ background: 'linear-gradient(130deg,#2563eb,#C9B584)', boxShadow: '0 4px 20px -4px rgba(37,99,235,0.5)' }}>
             <MIcon d={MPATHS.calendar} size={15} color="#fff" /> Confirmer — {pad(hour)}h{pad(minute)}
           </button>
         </div>

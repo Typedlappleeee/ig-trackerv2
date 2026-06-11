@@ -723,7 +723,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
       {osDragging && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-4 flex flex-col items-center text-accent">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.15)', border: '1px solid rgba(201,181,132,0.3)' }}>
               <IconClapperboard size={32} />
             </div>
             <p className="text-xl font-semibold">{t('montageDropVideoHere')}</p>
@@ -736,8 +736,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         <div className="flex items-center">
           {/* Project name + icon */}
           <div className="w-56 flex-shrink-0 px-4 py-2.5 border-r border-border flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.15)' }}>
-              <IconClapperboard size={12} style={{ color: '#a78bfa' }} />
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(201,181,132,0.15)' }}>
+              <IconClapperboard size={12} style={{ color: '#C9B584' }} />
             </div>
             <input value={projectName} onChange={e => setProjName(e.target.value)}
               className="text-[13px] font-semibold text-text bg-transparent focus:outline-none w-full truncate"
@@ -764,7 +764,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
             {(['9:16','1:1','16:9'] as Preset[]).map(p => (
               <button key={p} onClick={() => setPreset(p)}
                 className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all cursor-pointer ${preset === p ? 'text-white' : 'text-text2 hover:text-text'}`}
-                style={preset === p ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)' }}>
+                style={preset === p ? { background: 'linear-gradient(130deg,#C9B584,#D4C499)' } : { background: 'rgba(255,255,255,0.05)' }}>
                 {p}
               </button>
             ))}
@@ -1071,8 +1071,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
             />
           ) : (
             <div className="text-center text-text2 space-y-3 flex flex-col items-center">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.08)', border: '1px solid rgba(201,181,132,0.12)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>
               </div>

@@ -33,25 +33,25 @@ type ToolDef = {
 }
 
 const TOOLS: ToolDef[] = [
-  { id: 'phones',      labelKey: 'navPhones',      descKey: 'hubDescPhones',      icon: 'phone',    accent: '139,92,246',  accent2: '99,102,241',  category: 'instagram' },
-  { id: 'storylink',   labelKey: 'navStoryLink',   descKey: 'hubDescStoryLink',   icon: 'link',     accent: '236,72,153',  accent2: '168,85,247',  category: 'instagram', badge: 'NEW', featured: true },
-  { id: 'posting',     labelKey: 'navPosting',     descKey: 'hubDescPosting',     icon: 'send',     accent: '139,92,246',  accent2: '34,211,238',  category: 'instagram' },
-  { id: 'massposting', labelKey: 'navMassPosting', descKey: 'hubDescMassPosting', icon: 'zap',      accent: '236,72,153',  accent2: '245,158,11',  category: 'instagram' },
-  { id: 'scheduler',   labelKey: 'navScheduler',   descKey: 'hubDescScheduler',   icon: 'calendar', accent: '34,211,238',  accent2: '129,140,248', category: 'instagram' },
-  { id: 'warmup',      labelKey: 'navWarmup',      descKey: 'hubDescWarmup',      icon: 'flame',    accent: '245,158,11',  accent2: '236,72,153',  category: 'instagram', badge: 'BETA' },
-  { id: 'bank',        labelKey: 'navBank',        descKey: 'hubDescBank',        icon: 'video',    accent: '34,211,238',  accent2: '139,92,246',  category: 'creation' },
-  { id: 'repurpose',   labelKey: 'navRepurpose',   descKey: 'hubDescRepurpose',   icon: 'zap',      accent: '168,85,247',  accent2: '34,211,238',  category: 'creation', badge: 'NEW', featured: true },
-  { id: 'remix',       labelKey: 'navRemix',       descKey: 'hubDescRemix',       icon: 'refresh',  accent: '129,140,248', accent2: '34,211,238',  category: 'creation' },
-  { id: 'mixer',       labelKey: 'navMixer',       descKey: 'hubDescMixer',       icon: 'edit',     accent: '236,72,153',  accent2: '139,92,246',  category: 'creation', badge: 'NEW' },
-  { id: 'aitools',     labelKey: 'navAiTools',     descKey: 'hubDescAiTools',     icon: 'sparkles', accent: '168,85,247',  accent2: '236,72,153',  category: 'ai' },
-  { id: 'community',   labelKey: 'navCommunity',   descKey: 'hubDescCommunity',   icon: 'chat',     accent: '34,211,238',  accent2: '129,140,248', category: 'social' },
+  { id: 'phones',      labelKey: 'navPhones',      descKey: 'hubDescPhones',      icon: 'phone',    accent: '201,181,132', accent2: '212,196,153', category: 'instagram' },
+  { id: 'storylink',   labelKey: 'navStoryLink',   descKey: 'hubDescStoryLink',   icon: 'link',     accent: '243,241,236', accent2: '201,181,132', category: 'instagram', badge: 'NEW', featured: true },
+  { id: 'posting',     labelKey: 'navPosting',     descKey: 'hubDescPosting',     icon: 'send',     accent: '201,181,132', accent2: '212,196,153', category: 'instagram' },
+  { id: 'massposting', labelKey: 'navMassPosting', descKey: 'hubDescMassPosting', icon: 'zap',      accent: '212,196,153', accent2: '201,181,132', category: 'instagram' },
+  { id: 'scheduler',   labelKey: 'navScheduler',   descKey: 'hubDescScheduler',   icon: 'calendar', accent: '201,181,132', accent2: '184,160,112', category: 'instagram' },
+  { id: 'warmup',      labelKey: 'navWarmup',      descKey: 'hubDescWarmup',      icon: 'flame',    accent: '245,158,11',  accent2: '201,181,132', category: 'instagram', badge: 'BETA' },
+  { id: 'bank',        labelKey: 'navBank',        descKey: 'hubDescBank',        icon: 'video',    accent: '201,181,132', accent2: '243,241,236', category: 'creation' },
+  { id: 'repurpose',   labelKey: 'navRepurpose',   descKey: 'hubDescRepurpose',   icon: 'zap',      accent: '243,241,236', accent2: '201,181,132', category: 'creation', badge: 'NEW', featured: true },
+  { id: 'remix',       labelKey: 'navRemix',       descKey: 'hubDescRemix',       icon: 'refresh',  accent: '201,181,132', accent2: '212,196,153', category: 'creation' },
+  { id: 'mixer',       labelKey: 'navMixer',       descKey: 'hubDescMixer',       icon: 'edit',     accent: '212,196,153', accent2: '201,181,132', category: 'creation', badge: 'NEW' },
+  { id: 'aitools',     labelKey: 'navAiTools',     descKey: 'hubDescAiTools',     icon: 'sparkles', accent: '243,241,236', accent2: '201,181,132', category: 'ai' },
+  { id: 'community',   labelKey: 'navCommunity',   descKey: 'hubDescCommunity',   icon: 'chat',     accent: '201,181,132', accent2: '212,196,153', category: 'social' },
 ]
 
 const CATEGORIES: { id: ToolDef['category']; labelKey: string; icon: keyof typeof ICONS; accent: string }[] = [
-  { id: 'instagram', labelKey: 'hubCatInstagram', icon: 'send',     accent: '139,92,246' },
-  { id: 'creation',  labelKey: 'hubCatCreation',  icon: 'video',    accent: '34,211,238' },
-  { id: 'ai',        labelKey: 'hubCatAI',        icon: 'sparkles', accent: '168,85,247' },
-  { id: 'social',    labelKey: 'hubCatSocial',    icon: 'chat',     accent: '236,72,153' },
+  { id: 'instagram', labelKey: 'hubCatInstagram', icon: 'send',     accent: '201,181,132' },
+  { id: 'creation',  labelKey: 'hubCatCreation',  icon: 'video',    accent: '212,196,153' },
+  { id: 'ai',        labelKey: 'hubCatAI',        icon: 'sparkles', accent: '243,241,236' },
+  { id: 'social',    labelKey: 'hubCatSocial',    icon: 'chat',     accent: '201,181,132' },
 ]
 
 function IconGlyph({ icon, size = 24, color }: { icon: keyof typeof ICONS; size?: number; color: string }) {
@@ -86,15 +86,15 @@ function DecoSphere() {
       {/* Outer glow */}
       <div style={{
         position: 'absolute', inset: -40,
-        background: 'radial-gradient(circle at 45% 40%, rgba(99,102,241,0.35) 0%, rgba(124,58,237,0.2) 40%, transparent 70%)',
+        background: 'radial-gradient(circle at 45% 40%, rgba(201,181,132,0.25) 0%, rgba(201,181,132,0.2) 40%, transparent 70%)',
         filter: 'blur(24px)',
       }} />
       {/* Sphere body */}
       <div style={{
         position: 'absolute', inset: 20,
         borderRadius: '50%',
-        background: 'radial-gradient(circle at 35% 30%, #4c3a8a 0%, #2d1f5e 35%, #18103a 65%, #0c0820 100%)',
-        boxShadow: '0 0 60px -10px rgba(99,102,241,0.6), inset 0 2px 20px rgba(255,255,255,0.06), inset -10px -10px 30px rgba(0,0,0,0.5)',
+        background: 'radial-gradient(circle at 35% 30%, #2a2318 0%, #1a1509 35%, #0f0c06 65%, #060608 100%)',
+        boxShadow: '0 0 60px -10px rgba(201,181,132,0.35), inset 0 2px 20px rgba(201,181,132,0.08), inset -10px -10px 30px rgba(0,0,0,0.5)',
       }} />
       {/* Highlight */}
       <div style={{
@@ -108,8 +108,8 @@ function DecoSphere() {
         position: 'absolute', top: '50%', left: '50%',
         transform: 'translate(-50%, -50%) rotateX(72deg)',
         width: 280, height: 280, borderRadius: '50%',
-        border: '1.5px solid rgba(139,92,246,0.35)',
-        boxShadow: '0 0 20px rgba(139,92,246,0.2)',
+        border: '1.5px solid rgba(201,181,132,0.35)',
+        boxShadow: '0 0 20px rgba(201,181,132,0.2)',
       }} />
       {/* Sparkle stars */}
       {[
@@ -118,7 +118,7 @@ function DecoSphere() {
         { top: 220, left: 260, size: 8,  opacity: 0.6 },
         { top: 10,  left: 50,  size: 7,  opacity: 0.5 },
       ].map((s, i) => (
-        <svg key={i} width={s.size} height={s.size} viewBox="0 0 24 24" fill="rgba(196,181,253,0.8)"
+        <svg key={i} width={s.size} height={s.size} viewBox="0 0 24 24" fill="rgba(243,241,236,0.8)"
           style={{ position: 'absolute', top: s.top, left: s.left, opacity: s.opacity }} aria-hidden="true">
           <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
         </svg>
@@ -142,7 +142,7 @@ function SpotlightBanner({ tool, onOpen }: { tool: ToolDef; onOpen: () => void }
         position: 'relative', overflow: 'hidden', textAlign: 'left', cursor: 'pointer',
         borderRadius: 20, padding: '28px 28px', minHeight: 160, width: '100%',
         display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        background: `linear-gradient(130deg, rgba(${a},0.18) 0%, rgba(${a2},0.08) 60%, rgba(10,8,22,0.6) 100%)`,
+        background: `linear-gradient(130deg, rgba(${a},0.18) 0%, rgba(${a2},0.08) 60%, rgba(6,6,8,0.7) 100%)`,
         border: `1px solid ${hover ? `rgba(${a},0.45)` : `rgba(${a},0.2)`}`,
         boxShadow: hover
           ? `0 24px 64px -16px rgba(${a},0.45), 0 0 0 1px rgba(${a},0.15)`
@@ -185,7 +185,7 @@ function SpotlightBanner({ tool, onOpen }: { tool: ToolDef; onOpen: () => void }
         <p style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff', marginBottom: 6, lineHeight: 1.15 }}>
           {t(tool.labelKey as any)}
         </p>
-        <p style={{ fontSize: 13, lineHeight: 1.55, color: 'rgba(203,213,225,0.65)', maxWidth: 380 }}>
+        <p style={{ fontSize: 13, lineHeight: 1.55, color: 'rgba(243,241,236,0.55)', maxWidth: 380 }}>
           {t(tool.descKey as any)}
         </p>
 
@@ -223,8 +223,8 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
         padding: '16px 18px',
         borderRadius: 16, cursor: 'pointer', overflow: 'hidden',
         background: hover
-          ? `linear-gradient(135deg, rgba(${a},0.1) 0%, rgba(10,8,22,0.7) 100%)`
-          : 'rgba(14,12,26,0.6)',
+          ? `linear-gradient(135deg, rgba(${a},0.1) 0%, rgba(6,6,8,0.8) 100%)`
+          : 'rgba(10,10,12,0.85)',
         border: `1px solid ${hover ? `rgba(${a},0.4)` : 'rgba(255,255,255,0.06)'}`,
         boxShadow: hover
           ? `0 16px 40px -12px rgba(${a},0.35), 0 0 0 1px rgba(${a},0.12)`
@@ -260,7 +260,7 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
           <p style={{
-            fontSize: 14, fontWeight: 700, color: hover ? '#fff' : '#ddd6fe',
+            fontSize: 14, fontWeight: 700, color: hover ? '#F3F1EC' : 'rgba(243,241,236,0.75)',
             transition: 'color 0.2s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {t(tool.labelKey as any)}
@@ -268,7 +268,7 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
           {tool.badge && <BadgeChip badge={tool.badge} />}
         </div>
         <p style={{
-          fontSize: 11.5, lineHeight: 1.5, color: 'rgba(148,163,184,0.55)',
+          fontSize: 11.5, lineHeight: 1.5, color: 'rgba(243,241,236,0.38)',
           overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
         }}>
           {t(tool.descKey as any)}
@@ -278,7 +278,7 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
       {/* Arrow */}
       <div style={{
         flexShrink: 0,
-        color: hover ? `rgb(${a})` : 'rgba(148,163,184,0.25)',
+        color: hover ? `rgb(${a})` : 'rgba(243,241,236,0.22)',
         transform: hover ? 'translateX(3px)' : 'translateX(0)',
         transition: 'all 0.25s',
       }}>
@@ -320,11 +320,11 @@ function CategorySection({ cat, tools, baseIndex, onNavigate }: {
           <IconGlyph icon={cat.icon} size={15} color="#fff" />
         </span>
 
-        <h2 style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em', color: '#e2dff7' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em', color: '#F3F1EC' }}>
           {t(cat.labelKey as any)}
         </h2>
 
-        <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(255,255,255,0.07), transparent)' }} />
+        <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(243,241,236,0.07), transparent)' }} />
 
         {/* "Voir tout" button */}
         {tools.length > 4 && (
@@ -349,7 +349,7 @@ function CategorySection({ cat, tools, baseIndex, onNavigate }: {
           </button>
         )}
         {tools.length <= 4 && (
-          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.35)', fontWeight: 600 }}>{tools.length}</span>
+          <span style={{ fontSize: 11, color: 'rgba(243,241,236,0.28)', fontWeight: 600 }}>{tools.length}</span>
         )}
       </div>
 
@@ -384,9 +384,9 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const featured = TOOLS.filter(tl => tl.featured)
 
   const quickActions: { id: Page; label: string; icon: keyof typeof ICONS; a: string }[] = [
-    { id: 'massposting', label: t('navMassPosting'), icon: 'zap',   a: '236,72,153' },
-    { id: 'storylink',   label: t('navStoryLink'),   icon: 'link',  a: '168,85,247' },
-    { id: 'bank',        label: t('navBank'),        icon: 'video', a: '34,211,238' },
+    { id: 'massposting', label: t('navMassPosting'), icon: 'zap',   a: '201,181,132' },
+    { id: 'storylink',   label: t('navStoryLink'),   icon: 'link',  a: '212,196,153' },
+    { id: 'bank',        label: t('navBank'),        icon: 'video', a: '243,241,236' },
   ]
 
   return (
@@ -396,9 +396,9 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
       <div style={{ position: 'relative', overflow: 'hidden', padding: '44px 40px 36px' }}>
         {/* Background mesh */}
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          <div style={{ position: 'absolute', top: -100, left: '5%',  width: 480, height: 300, background: 'radial-gradient(ellipse, rgba(124,58,237,0.3), transparent 65%)',  filter: 'blur(55px)' }} />
-          <div style={{ position: 'absolute', top: -60,  right: '8%', width: 380, height: 260, background: 'radial-gradient(ellipse, rgba(99,102,241,0.22), transparent 65%)', filter: 'blur(55px)' }} />
-          <div style={{ position: 'absolute', bottom: -120, left: '35%', width: 360, height: 240, background: 'radial-gradient(ellipse, rgba(236,72,153,0.14), transparent 65%)', filter: 'blur(55px)' }} />
+          <div style={{ position: 'absolute', top: -100, left: '5%',  width: 480, height: 300, background: 'radial-gradient(ellipse, rgba(201,181,132,0.18), transparent 65%)',  filter: 'blur(55px)' }} />
+          <div style={{ position: 'absolute', top: -60,  right: '8%', width: 380, height: 260, background: 'radial-gradient(ellipse, rgba(201,181,132,0.12), transparent 65%)', filter: 'blur(55px)' }} />
+          <div style={{ position: 'absolute', bottom: -120, left: '35%', width: 360, height: 240, background: 'radial-gradient(ellipse, rgba(243,241,236,0.06), transparent 65%)', filter: 'blur(55px)' }} />
           {/* dot grid */}
           <div style={{
             position: 'absolute', inset: 0, opacity: 0.45,
@@ -416,23 +416,23 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               padding: '4px 12px 4px 8px', borderRadius: 100, marginBottom: 16,
-              background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.22)',
+              background: 'rgba(201,181,132,0.1)', border: '1px solid rgba(201,181,132,0.22)',
             }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'linear-gradient(135deg,#a78bfa,#22d3ee)', boxShadow: '0 0 8px rgba(139,92,246,0.8)' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(196,181,253,0.9)' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'linear-gradient(135deg,#C9B584,#22d3ee)', boxShadow: '0 0 8px rgba(201,181,132,0.8)' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(243,241,236,0.9)' }}>
                 {greeting.replace(/,\s*$/, '')}
               </span>
             </div>
 
             {/* Name */}
             <h1 style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, marginBottom: 14, textTransform: 'capitalize' }}>
-              <span style={{ background: 'linear-gradient(115deg, #f0ecff 0%, #c4b5fd 45%, #67e8f9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              <span style={{ background: 'linear-gradient(115deg, #F3F1EC 0%, #C9B584 45%, #F3F1EC 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 {firstName}
               </span>
             </h1>
 
             {/* Subtitle */}
-            <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.6)', maxWidth: 480, lineHeight: 1.6, marginBottom: 28 }}>
+            <p style={{ fontSize: 15, color: 'rgba(243,241,236,0.42)', maxWidth: 480, lineHeight: 1.6, marginBottom: 28 }}>
               {t('hubSubtitle')}
             </p>
 
@@ -447,7 +447,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                     display: 'inline-flex', alignItems: 'center', gap: 8,
                     height: 40, padding: '0 16px 0 12px', borderRadius: 11,
                     cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                    color: '#e2dff7',
+                    color: '#F3F1EC',
                     background: `linear-gradient(135deg, rgba(${qa.a},0.14), rgba(255,255,255,0.02))`,
                     border: `1px solid rgba(${qa.a},0.28)`,
                     transition: 'all 0.22s ease',
@@ -484,7 +484,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
         {/* Search bar — full width */}
         <div style={{ position: 'relative', marginBottom: 32 }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.45)" strokeWidth="2"
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(243,241,236,0.38)" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
             style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
@@ -496,17 +496,17 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             style={{
               width: '100%', height: 46, paddingLeft: 44, paddingRight: 16,
               borderRadius: 13, fontSize: 14,
-              background: 'rgba(12,10,24,0.75)', border: '1px solid rgba(255,255,255,0.07)',
-              color: '#e2dff7', outline: 'none',
+              background: 'rgba(8,8,10,0.85)', border: '1px solid rgba(243,241,236,0.07)',
+              color: '#F3F1EC', outline: 'none',
               transition: 'border-color 0.2s, box-shadow 0.2s',
               boxSizing: 'border-box',
             }}
             onFocus={e => {
-              e.currentTarget.style.borderColor = 'rgba(139,92,246,0.45)'
-              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.1)'
+              e.currentTarget.style.borderColor = 'rgba(201,181,132,0.45)'
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(201,181,132,0.1)'
             }}
             onBlur={e => {
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
+              e.currentTarget.style.borderColor = 'rgba(243,241,236,0.07)'
               e.currentTarget.style.boxShadow = 'none'
             }}
           />
@@ -538,14 +538,14 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
               <span style={{
                 width: 52, height: 52, borderRadius: 16, marginBottom: 14,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)',
+                background: 'rgba(201,181,132,0.07)', border: '1px solid rgba(201,181,132,0.18)',
               }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.7)" strokeWidth="1.8"
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(201,181,132,0.7)" strokeWidth="1.8"
                   strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                 </svg>
               </span>
-              <p style={{ fontSize: 14, color: 'rgba(148,163,184,0.45)' }}>{t('hubNoResults')}</p>
+              <p style={{ fontSize: 14, color: 'rgba(243,241,236,0.38)' }}>{t('hubNoResults')}</p>
             </div>
           )
         ) : (

@@ -163,8 +163,8 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
           )}
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              style={{ background: 'linear-gradient(135deg, rgba(201,181,132,0.25), rgba(243,241,236,0.15))', border: '1px solid rgba(201,181,132,0.25)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M17 12H3M3 12l4-4M3 12l4 4M7 5l10-2v14L7 19"/>
               </svg>
             </div>
@@ -208,7 +208,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
           <div className="sf-card p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="m15 10 5 5-5 5"/><rect x="2" y="7" width="13" height="10" rx="2"/>
                 </svg>
                 <span className="text-[14px] font-bold text-text">Videos ({videos.length})</span>
@@ -272,7 +272,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
           {/* Text config */}
           <div className="sf-card p-6 flex flex-col gap-5">
             <div className="flex items-center gap-2 mb-1">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
               </svg>
               <span className="text-[14px] font-bold text-text">Text</span>
@@ -312,14 +312,14 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                 <button
                   onClick={() => setBold(b => !b)}
                   className={`sf-btn cursor-pointer font-bold transition-all ${bold ? 'text-accent' : 'text-text2'}`}
-                  style={bold ? { background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  style={bold ? { background: 'rgba(201,181,132,0.2)', border: '1px solid rgba(201,181,132,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
                   B Bold
                 </button>
                 <button
                   onClick={() => setShadow(s => !s)}
                   className={`sf-btn cursor-pointer transition-all ${shadow ? 'text-accent' : 'text-text2'}`}
-                  style={shadow ? { background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  style={shadow ? { background: 'rgba(201,181,132,0.2)', border: '1px solid rgba(201,181,132,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
                   Shadow
                 </button>
@@ -343,7 +343,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
           <div className="sf-card p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
                 </svg>
                 <span className="text-[14px] font-bold text-text">Number of copies</span>
@@ -371,7 +371,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
           {/* Export destination */}
           <div className="sf-card p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2 mb-1">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
               <span className="text-[14px] font-bold text-text">Destination of generated videos</span>
@@ -383,8 +383,8 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                   onClick={() => setExportMode(m)}
                   className={`flex-1 py-3 rounded-xl text-[13px] font-semibold transition-all inline-flex items-center justify-center gap-2 cursor-pointer ${exportMode === m ? 'text-accent' : 'text-text2 hover:text-text'}`}
                   style={{
-                    background: exportMode === m ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${exportMode === m ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                    background: exportMode === m ? 'rgba(201,181,132,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${exportMode === m ? 'rgba(201,181,132,0.35)' : 'rgba(255,255,255,0.07)'}`,
                   }}
                 >
                   {m === 'download' ? (
@@ -408,7 +408,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             <div className="sf-card p-6 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                   </svg>
                   <span className="text-[14px] font-bold text-text">{done}/{total} done</span>
@@ -418,7 +418,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
               <div className="h-2 rounded-full overflow-hidden bg-surface2">
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${pct}%`, background: errors > 0 ? 'var(--danger)' : 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+                  style={{ width: `${pct}%`, background: errors > 0 ? 'var(--danger)' : 'linear-gradient(130deg,#C9B584,#D4C499)' }}
                 />
               </div>
               <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
