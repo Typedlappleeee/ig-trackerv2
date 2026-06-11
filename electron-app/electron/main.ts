@@ -650,7 +650,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
     }
     const uploadRes = await net.fetch(uploadUrl, {
       method: 'PUT',
-      body: fileBytes,
+      body: new Uint8Array(fileBytes),
     })
     if (uploadRes.status < 200 || uploadRes.status >= 300) {
       return { ok: false, error: `Upload échoué (HTTP ${uploadRes.status})` }
