@@ -33,7 +33,6 @@ export const EN = {
   navCommunity: 'Community',
   navHub: 'Hub',
   navPhones: 'Phones',
-  navStats: 'Stats',
   navMonitor: 'Monitor Live',
   // ── Hub page ──
   hubGreetingMorning: 'Good morning,',
@@ -1571,7 +1570,6 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   navCommunity: 'Communauté',
   navHub: 'Accueil',
   navPhones: 'Téléphones',
-  navStats: 'Stats',
   navMonitor: 'Monitor Live',
   // ── Hub page ──
   hubGreetingMorning: 'Bonjour,',

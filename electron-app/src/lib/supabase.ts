@@ -36,7 +36,7 @@ export interface UserItem {
 export type OrgRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 export type PageKey =
-  | 'phones' | 'stats'
+  | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'captionbank' | 'warmup' | 'aitools' | 'storylink'
   | 'remix' | 'repurpose' | 'montage' | 'mixer'
   | 'settings'

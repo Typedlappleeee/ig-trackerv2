@@ -567,7 +567,6 @@ const Support        = lazy(() => import('@/pages/Support').then(m => ({ default
 const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazy(() => import('@/pages/StoryLink'))
-const Stats          = lazy(() => import('@/pages/Stats'))
 const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { AppTour }           from '@/components/AppTour'
@@ -824,7 +823,6 @@ function AppContent({ user }: { user: User }) {
   const content = (() => {
     switch (page) {
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-      case 'stats':        return <Stats       user={user} />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
