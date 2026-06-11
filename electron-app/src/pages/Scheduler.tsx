@@ -542,7 +542,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             {/* Icon */}
             <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 2, flexShrink: 0,
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'rgba(99,102,241,0.08)',
               border: '1px solid rgba(99,102,241,0.28)',
