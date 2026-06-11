@@ -205,22 +205,27 @@ export function Licences({ user: _user }: Props) {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-y-auto anim-page">
+    <div className="sf-page anim-page">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d100"
-            style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(99,102,241,0.15))', border: '1px solid rgba(99,102,241,0.25)', boxShadow: '0 0 18px -6px rgba(99,102,241,0.45)' }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <div className="sf-page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+          <div className="sf-anim-scale-spring" style={{
+            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.28)',
+            color: '#6366F1',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
             </svg>
           </div>
-          <div>
-            <h1 className="text-[20px] font-black text-text leading-none">
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
               Admin — {t('licencesTitle')}
             </h1>
-            <p className="text-[13px] text-text2 mt-0.5">{t('licencesSub')}</p>
+            <p className="sf-page-sub">{t('licencesSub')}</p>
           </div>
         </div>
       </div>

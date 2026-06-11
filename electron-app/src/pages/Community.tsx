@@ -1264,23 +1264,21 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 sf-topbar">
-        <div className="flex items-center gap-3.5 sf-anim-slide-up sf-d50">
-          <div className="relative flex-shrink-0" style={{ width: 38, height: 38 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 9, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.1)',
-              border: '1px solid rgba(99,102,241,0.22)', color: '#818CF8',
-            }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-            </div>
+        <div className="flex items-center gap-3.5" style={{ minWidth: 0 }}>
+          <div className="sf-anim-scale-spring" style={{
+            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.28)',
+            color: '#6366F1',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
           </div>
-          <div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-[19px] font-extrabold leading-tight tracking-tight"
-                style={{ color: '#E9EAF0' }}>{t('communityTitle')}</h1>
+              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('communityTitle')}</h1>
               {uniqueUserCount > 0 && (
                 <span className="sf-badge sf-badge-accent flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
@@ -1288,7 +1286,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 </span>
               )}
             </div>
-            <p className="text-[11px] mt-0.5 text-text3">
+            <p className="sf-page-sub">
               {t('communitySub')}
             </p>
           </div>

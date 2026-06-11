@@ -549,18 +549,23 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       {/* Loading header — mirrors real header */}
       <div className="flex items-center gap-4 px-8 py-5 border-b border-border flex-shrink-0"
         style={{ background: 'linear-gradient(90deg,rgba(99,102,241,0.06) 0%,transparent 55%)' }}>
-        <div className="flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.24),rgba(99,102,241,0.07))', border: '1px solid rgba(99,102,241,0.3)', boxShadow: '0 0 22px -6px rgba(99,102,241,0.5)' }}>
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <div className="sf-anim-scale-spring" style={{
+          width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(99,102,241,0.08)',
+          border: '1px solid rgba(99,102,241,0.28)',
+          color: '#6366F1',
+        }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
             <circle cx="12" cy="12" r="3"/>
           </svg>
         </div>
-        <div>
-          <h1 className="text-[22px] font-black m-0" style={{ letterSpacing: '-0.025em', background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(233,234,240,0.85) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+        <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+          <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
             {t('settingsTitle')}
           </h1>
-          <p className="text-[12px] m-0 mt-0.5" style={{ color: S.text3 }}>{user.email}</p>
+          <p className="sf-page-sub">{user.email}</p>
         </div>
       </div>
       <div className="flex-1 flex items-center justify-center gap-3">
@@ -585,36 +590,31 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
         {/* Subtle top-edge glow line */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg,transparent,rgba(99,102,241,0.35),transparent)', pointerEvents: 'none' }} />
 
-        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          {/* Gear icon with glow */}
-          <div className="sf-anim-scale-spring sf-d100" style={{
-            width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+          {/* Gear icon */}
+          <div className="sf-anim-scale-spring" style={{
+            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg,rgba(99,102,241,0.24),rgba(99,102,241,0.07))',
-            border: '1px solid rgba(99,102,241,0.3)', color: '#818CF8',
-            boxShadow: '0 0 22px -6px rgba(99,102,241,0.5)',
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.28)',
+            color: '#6366F1',
           }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
           </div>
 
-          <div>
-            <h1 style={{
-              fontSize: 22, fontWeight: 900, margin: 0, lineHeight: 1.15, letterSpacing: '-0.025em',
-              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(233,234,240,0.9) 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>{t('settingsTitle')}</h1>
-            <p style={{ fontSize: 12, color: S.text3, margin: '3px 0 0', lineHeight: 1.3 }}>{user.email}</p>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('settingsTitle')}</h1>
+            <p className="sf-page-sub">{user.email}</p>
           </div>
         </div>
 
         {/* Right — saved indicator + save button */}
         <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {saved && (
-            <span className="anim-scale-in" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22C55E', fontWeight: 600,
-              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.22)', borderRadius: 8, padding: '4px 10px' }}>
+            <span className="sf-badge sf-badge-ok anim-scale-in" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               {t('settingsSaved')}
             </span>
