@@ -253,6 +253,7 @@ function TypeBadge({ type }: { type: string }) {
   const TYPE_LABELS: Record<string, string> = {
     posting:      t('schedulerTypePosting'),
     mass_posting: t('schedulerTypeMassPosting'),
+    story:        'Story',
   }
   return (
     <span style={{
@@ -856,10 +857,12 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           icon={<IconPhone size={11} color="rgba(233,234,240,0.72)" />}
           label={`${post.phones.length} ${post.phones.length !== 1 ? t('schedulerPhonePlural') : t('schedulerPhone')}`}
         />
-        <StatChip
-          icon={<IconVideo size={11} color="rgba(233,234,240,0.72)" />}
-          label={`${post.videos.length} ${post.videos.length !== 1 ? t('schedulerVideoPlural') : t('schedulerVideo')}`}
-        />
+        {post.type !== 'story' && (
+          <StatChip
+            icon={<IconVideo size={11} color="rgba(233,234,240,0.72)" />}
+            label={`${post.videos.length} ${post.videos.length !== 1 ? t('schedulerVideoPlural') : t('schedulerVideo')}`}
+          />
+        )}
         {post.delay_minutes > 0 && (
           <StatChip
             icon={<IconTime size={11} color="rgba(233,234,240,0.72)" />}

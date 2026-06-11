@@ -4,8 +4,10 @@ import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, postInstagramStory, stopPhone, type GeelarkPhone } from '@/lib/geelark'
+import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { BankPicker } from '@/pages/Bank'
 import { playSuccess, playError } from '@/lib/sounds'
+import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type JobStatus = 'idle' | 'running' | 'ok' | 'error'
@@ -164,7 +166,7 @@ const IconNoConnection = () => (
 export default function StoryLink({ user }: { user: User }) {
   const conns  = useConnections(user)
   const bearer = conns.bearer
-  const { role, perms } = useOrg()
+  const { role, perms, currentOrg } = useOrg()
 
   // ── Phones ────────────────────────────────────────────────────────────────
   const [phones, setPhones]           = useState<GeelarkPhone[]>([])
@@ -187,6 +189,12 @@ export default function StoryLink({ user }: { user: User }) {
   const [running, setRunning]               = useState(false)
   const [jobs, setJobs]                     = useState<Job[]>([])
   const [openLog, setOpenLog]               = useState<string | null>(null)
+  const [showSchedule, setShowSchedule]     = useState(false)
+  const [schedAt, setSchedAt]               = useState(() => defaultSchedValue(60))
+  const [schedDelay, setSchedDelay]         = useState(2)
+  const [scheduling, setScheduling]         = useState(false)
+  const [schedDone, setSchedDone]           = useState('')
+  const [schedErr, setSchedErr]             = useState('')
   const abortRef = useRef(false)
 
   useEffect(() => () => { abortRef.current = true }, [])
@@ -306,6 +314,57 @@ export default function StoryLink({ user }: { user: User }) {
     setRunning(false)
   }
 
+  // ── Schedule (programmer les stories) ─────────────────────────────────────
+  const canSchedule = !!bearer && selectedIds.length > 0 && photoPool.length > 0 && missingLinkIds.length === 0 && !running
+
+  async function scheduleRun() {
+    if (!canSchedule || scheduling) return
+    setSchedErr(''); setScheduling(true)
+    try {
+      const when = new Date(schedAt)
+      if (isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
+        setSchedErr('Choisis une date au moins 1 minute dans le futur.')
+        setScheduling(false)
+        return
+      }
+      // Freeze assignments now — each phone carries its photo/link/text
+      const assignments = buildAssignments(selectedIds)
+      await createScheduledPost({
+        userId:        user.id,
+        orgId:         currentOrg?.id ?? null,
+        createdByName: user.email?.split('@')[0] ?? 'Moi',
+        type:          'story',
+        scheduledAt:   when,
+        phones: assignments.map(a => {
+          const p = phoneById(a.phoneId)
+          return {
+            id:               a.phoneId,
+            geelark_id:       a.phoneId,
+            phone_name:       p ? phoneName(p) : a.phoneId.slice(-6),
+            ig_username:      null,
+            story_photo:      a.photo.url,
+            story_photo_name: a.photo.name,
+            story_link:       a.link,
+            story_text:       a.text || undefined,
+          }
+        }),
+        videos:       [],
+        caption:      '',
+        delayMinutes: schedDelay,
+        mode:         'seq',
+        bearerToken:  '',
+        reelsTrial:   false,
+      })
+      playSuccess()
+      setSchedDone(`${assignments.length} story(s) programmée(s) pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
+      setTimeout(() => { setShowSchedule(false); setSchedDone('') }, 2200)
+    } catch (e) {
+      setSchedErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setScheduling(false)
+    }
+  }
+
   // ── Job status helpers ────────────────────────────────────────────────────
   const jobFor = (id: string) => jobs.find(j => j.phoneId === id)
   const statusColor = (s?: JobStatus) =>
@@ -344,56 +403,60 @@ export default function StoryLink({ user }: { user: User }) {
         />
       )}
 
-      {/* ── Premium Header ───────────────────────────────────────────────────── */}
+      {/* ── Header ───────────────────────────────────────────────────────────── */}
       <header className="sf-page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          {/* Icon with pink glow */}
-          <div className="sf-anim-scale-spring" style={{
-            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 9, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(99,102,241,0.06))',
-            border: '1px solid rgba(99,102,241,0.3)',
-            color: '#818CF8',
-            boxShadow: '0 0 20px -6px rgba(99,102,241,0.55)',
+            background: 'rgba(99,102,241,0.1)',
+            border: '1px solid rgba(99,102,241,0.22)',
+            color: ACCENT_L,
           }}>
             <IconLink />
           </div>
-
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <h1 className="sf-page-title sf-anim-slide-up sf-d50" style={{
-                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(129,140,248,0.9) 100%)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              }}>
-                StoryLink
-              </h1>
-              <span className="sf-badge sf-badge-new sf-anim-scale-spring sf-d150" style={{ fontSize: 9, letterSpacing: '0.1em' }}>NEW</span>
-            </div>
-            <p className="sf-page-sub sf-anim-slide-up sf-d100">Configure les pools une fois, publie en 1 clic.</p>
+            <h1 className="sf-page-title" style={{ color: TEXT_1 }}>Story</h1>
+            <p className="sf-page-sub">Publie ou programme des stories avec lien sur tous tes comptes.</p>
           </div>
         </div>
 
-        {/* Launch button */}
-        <button
-          onClick={run}
-          disabled={!canRun}
-          className={`sf-btn sf-btn-lg ${canRun ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
-          style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9,
-            ...(canRun ? { background: 'linear-gradient(135deg, #6366F1, #6366F1)', boxShadow: '0 6px 24px -6px rgba(99,102,241,0.5)' } : {})
-          }}
-        >
-          {running ? (
-            <>
-              <span className="sf-spinner" style={{ width: 14, height: 14 }} />
-              En cours…
-            </>
-          ) : (
-            <>
-              <IconSend />
-              {`Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`}
-            </>
-          )}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          {/* Schedule button */}
+          <button
+            onClick={() => { setSchedAt(defaultSchedValue(60)); setSchedErr(''); setShowSchedule(true) }}
+            disabled={!canSchedule}
+            className="sf-btn sf-btn-lg sf-btn-secondary"
+            style={{ cursor: canSchedule ? 'pointer' : 'not-allowed', opacity: canSchedule ? 1 : 0.45, gap: 8 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/>
+            </svg>
+            Programmer
+          </button>
+
+          {/* Launch button */}
+          <button
+            onClick={run}
+            disabled={!canRun}
+            className={`sf-btn sf-btn-lg ${canRun ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
+            style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9,
+              ...(canRun ? { background: ACCENT, color: '#fff' } : {})
+            }}
+          >
+            {running ? (
+              <>
+                <span className="sf-spinner" style={{ width: 14, height: 14 }} />
+                En cours…
+              </>
+            ) : (
+              <>
+                <IconSend />
+                {`Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`}
+              </>
+            )}
+          </button>
+        </div>
       </header>
 
       {/* ── Body: 3-column split ─────────────────────────────────────────────── */}
@@ -881,6 +944,137 @@ export default function StoryLink({ user }: { user: User }) {
           )}
         </div>
       </div>
+
+      {/* ── Schedule modal ───────────────────────────────────────────────────── */}
+      {showSchedule && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9980,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(8px)',
+          }}
+          onClick={e => { if (e.target === e.currentTarget && !scheduling) setShowSchedule(false) }}
+        >
+          <div style={{
+            width: '100%', maxWidth: 420, margin: '0 16px',
+            background: BG_2, border: `1px solid ${HAIR}`, borderRadius: 12,
+            overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '16px 20px', borderBottom: `1px solid ${HAIR}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <p style={{ fontSize: 14.5, fontWeight: 700, color: TEXT_1, margin: 0 }}>Programmer les stories</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0' }}>
+                  {selectedIds.length} compte{selectedIds.length > 1 ? 's' : ''} · {photoPool.length} photo{photoPool.length > 1 ? 's' : ''} · assignations figées au moment de la programmation
+                </p>
+              </div>
+              <button
+                onClick={() => !scheduling && setShowSchedule(false)}
+                aria-label="Fermer"
+                style={{
+                  width: 28, height: 28, borderRadius: 7, cursor: 'pointer',
+                  background: 'transparent', border: 'none', color: 'var(--text-3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              ><IconX /></button>
+            </div>
+
+            {schedDone ? (
+              <div style={{ padding: '34px 20px', textAlign: 'center' }}>
+                <p style={{ fontSize: 26, margin: '0 0 10px' }}>✅</p>
+                <p style={{ fontSize: 13.5, fontWeight: 600, color: TEXT_1, margin: 0 }}>{schedDone}</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '6px 0 0' }}>
+                  Retrouve-la dans l'onglet Programmation.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Date / time */}
+                  <div>
+                    <label style={{
+                      display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
+                      textTransform: 'uppercase', color: ACCENT, marginBottom: 7,
+                    }}>Date et heure</label>
+                    <input
+                      type="datetime-local"
+                      value={schedAt}
+                      onChange={e => setSchedAt(e.target.value)}
+                      className="sf-input"
+                      style={{ height: 38, width: '100%', colorScheme: 'dark' }}
+                    />
+                  </div>
+
+                  {/* Delay between accounts */}
+                  <div>
+                    <label style={{
+                      display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
+                      textTransform: 'uppercase', color: ACCENT, marginBottom: 7,
+                    }}>Délai entre comptes</label>
+                    <div style={{ display: 'flex', gap: 7 }}>
+                      {[0, 2, 5, 10, 15].map(m => (
+                        <button
+                          key={m}
+                          onClick={() => setSchedDelay(m)}
+                          style={{
+                            flex: 1, height: 34, borderRadius: 8, cursor: 'pointer',
+                            fontSize: 12.5, fontWeight: 600,
+                            background: schedDelay === m ? 'rgba(99,102,241,0.15)' : 'transparent',
+                            border: `1px solid ${schedDelay === m ? 'rgba(99,102,241,0.4)' : HAIR}`,
+                            color: schedDelay === m ? ACCENT_L : 'var(--text-3)',
+                            transition: 'all 0.15s',
+                          }}
+                        >{m === 0 ? 'Aucun' : `${m} min`}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {schedErr && (
+                    <p style={{
+                      fontSize: 12, color: '#f87171', margin: 0, padding: '9px 12px',
+                      background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
+                      borderRadius: 8,
+                    }}>{schedErr}</p>
+                  )}
+
+                  <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0, lineHeight: 1.55 }}>
+                    ⚠ Les stories utilisent l'automation du téléphone — l'application doit être
+                    ouverte à l'heure programmée pour qu'elles partent.
+                  </p>
+                </div>
+
+                {/* Footer */}
+                <div style={{ padding: '0 20px 18px', display: 'flex', gap: 9 }}>
+                  <button
+                    onClick={() => setShowSchedule(false)}
+                    disabled={scheduling}
+                    className="sf-btn sf-btn-secondary"
+                    style={{ flex: 1, cursor: 'pointer', justifyContent: 'center' }}
+                  >Annuler</button>
+                  <button
+                    onClick={scheduleRun}
+                    disabled={scheduling}
+                    className="sf-btn"
+                    style={{
+                      flex: 2, cursor: scheduling ? 'wait' : 'pointer', justifyContent: 'center',
+                      background: scheduling ? ACCENT_D : ACCENT, color: '#fff', border: 'none', gap: 8,
+                    }}
+                  >
+                    {scheduling ? (
+                      <><span className="sf-spinner" style={{ width: 13, height: 13 }} /> Programmation…</>
+                    ) : (
+                      <>Programmer {selectedIds.length} story{selectedIds.length > 1 ? 's' : ''}</>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

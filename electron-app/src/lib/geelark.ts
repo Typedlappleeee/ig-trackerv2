@@ -888,6 +888,26 @@ export async function postInstagramStory(
     await sleep(5000)
   }
 
+  // Android/IG permission prompts ("Allow access to photos") silently block the
+  // flow if not dismissed — accept them whenever they appear.
+  async function dismissPermissionDialog() {
+    const permXml = await dumpXml(bearer, phoneId)
+    const allowPt =
+      findByText(permXml, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser',
+        'While using the app', 'Lorsque l\'application est utilisée', 'Continue', 'Continuer') ??
+      findByResourceId(permXml, 'permission_allow_button', 'permission_allow_all_button',
+        'permission_allow_foreground_only_button')
+    if (allowPt) {
+      log('   ✓ Popup de permission détectée — acceptation…')
+      await shellExec(bearer, phoneId, `input tap ${allowPt[0]} ${allowPt[1]}`)
+      await sleep(2000)
+      return true
+    }
+    return false
+  }
+
+  await dismissPermissionDialog()
+
   // ── 3. Pick the uploaded image from the gallery ────────────────────────────
   log('🖼 Sélection de l\'image dans la galerie…')
   xml = await dumpXml(bearer, phoneId)
@@ -901,6 +921,7 @@ export async function postInstagramStory(
     await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.13)} ${Math.floor(sh * 0.88)}`)
   }
   await sleep(2500)
+  await dismissPermissionDialog()
 
   // Tap the first (most-recent) gallery image — the one we just downloaded.
   xml = await dumpXml(bearer, phoneId)
@@ -1014,8 +1035,12 @@ export async function postInstagramStory(
   await sleep(5000)
 
   // ── Verify we left the editor (best-effort) ────────────────────────────────
+  // Only check editor-specific elements. "Your story" must NOT be in this list:
+  // after a successful publish IG returns to the home feed, whose story tray
+  // contains "Your story" — matching it produced false "failed" results on
+  // stories that were actually published.
   const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
-  const stillEditing = /sticker_button|done_button|link_url|your story|votre story/.test(finalXml)
+  const stillEditing = /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text/.test(finalXml)
   if (stillEditing) {
     log('   ⚠️ L\'éditeur semble encore ouvert — vérifie manuellement.')
     return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }

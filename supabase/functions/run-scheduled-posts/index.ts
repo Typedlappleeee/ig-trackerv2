@@ -52,16 +52,27 @@ Deno.serve(async (req) => {
   const summary: Record<string, string> = {}
 
   // 1. Auto-heal : posts "running" trop vieux (> 30 min) → failed
-  const cutoff = new Date(Date.now() - 30 * 60_000).toISOString()
+  // Les stories ont une fenêtre de 6 h (automation séquentielle avec délais).
+  const cutoff      = new Date(Date.now() - 30 * 60_000).toISOString()
+  const storyCutoff = new Date(Date.now() - 6 * 60 * 60_000).toISOString()
   await db.from('scheduled_posts')
     .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
     .eq('status', 'running')
+    .neq('type', 'story')
     .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
+  await db.from('scheduled_posts')
+    .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
+    .eq('status', 'running')
+    .eq('type', 'story')
+    .or(`executed_at.lt.${storyCutoff},and(executed_at.is.null,created_at.lt.${storyCutoff})`)
 
   // 2. Posts dus (limite 2 par invocation pour rester sous la limite de temps)
+  // type='story' exclu : les stories passent par de l'automation UI (~2 min par
+  // téléphone) qui dépasse les limites serverless — elles s'exécutent côté app.
   const { data: due } = await db.from('scheduled_posts')
     .select('*')
     .eq('status', 'pending')
+    .neq('type', 'story')
     .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(2)

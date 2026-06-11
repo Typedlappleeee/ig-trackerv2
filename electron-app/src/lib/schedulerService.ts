@@ -7,6 +7,11 @@ export interface ScheduledPhoneRecord {
   geelark_id:  string
   phone_name:  string
   ig_username: string | null
+  // Story scheduling (type === 'story') — per-phone assignment frozen at creation
+  story_photo?:      string   // signed URL of the image (6-month TTL)
+  story_photo_name?: string
+  story_link?:       string
+  story_text?:       string
 }
 
 export interface ScheduledVideoRecord {
@@ -15,7 +20,7 @@ export interface ScheduledVideoRecord {
 }
 
 export type ScheduleStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
-export type PostingType    = 'posting' | 'mass_posting'
+export type PostingType    = 'posting' | 'mass_posting' | 'story'
 
 export interface ScheduledPost {
   id:              string
@@ -102,17 +107,27 @@ export async function cancelScheduledPost(id: string): Promise<void> {
 // Self-healing: a post claimed as 'running' whose execution started more than
 // maxAgeMin ago can't still be alive (executions cap at ~11 min) — the app was
 // closed mid-run. Mark those as failed so they stop showing as "en cours".
+// Stories get a much wider window (6 h): sequential UI automation with
+// delay_minutes between accounts can legitimately run for hours.
 export async function failStaleRunningPosts(maxAgeMin = 30): Promise<number> {
-  const cutoff = new Date(Date.now() - maxAgeMin * 60_000).toISOString()
-  const { data } = await supabase.from('scheduled_posts')
-    .update({
-      status:    'failed',
-      error_msg: "Interrompu — l'application a été fermée pendant l'exécution",
-    })
-    .eq('status', 'running')
-    .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
-    .select('id')
-  return data?.length ?? 0
+  const cutoff      = new Date(Date.now() - maxAgeMin * 60_000).toISOString()
+  const storyCutoff = new Date(Date.now() - 6 * 60 * 60_000).toISOString()
+  const errorMsg = "Interrompu — l'application a été fermée pendant l'exécution"
+  const [a, b] = await Promise.all([
+    supabase.from('scheduled_posts')
+      .update({ status: 'failed', error_msg: errorMsg })
+      .eq('status', 'running')
+      .neq('type', 'story')
+      .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
+      .select('id'),
+    supabase.from('scheduled_posts')
+      .update({ status: 'failed', error_msg: errorMsg })
+      .eq('status', 'running')
+      .eq('type', 'story')
+      .or(`executed_at.lt.${storyCutoff},and(executed_at.is.null,created_at.lt.${storyCutoff})`)
+      .select('id'),
+  ])
+  return (a.data?.length ?? 0) + (b.data?.length ?? 0)
 }
 
 // Loads all posts visible to the user (RLS handles org filtering)
@@ -158,6 +173,52 @@ async function gPost(bearer: string, path: string, body: unknown) {
 
 function sleep(ms: number) { return new Promise<void>(r => setTimeout(r, ms)) }
 
+// Story execution: drives Instagram via UI automation, one phone at a time.
+// Runs only app-side (the edge function skips type='story' — ADB automation
+// takes ~2 min per phone, far beyond serverless time limits).
+async function executeScheduledStory(
+  post: ScheduledPost,
+  bearer: string,
+  onLog: (msg: string) => void,
+): Promise<boolean> {
+  const { postInstagramStory, stopPhone } = await import('./geelark')
+  const phones = (typeof post.phones === 'string'
+    ? JSON.parse(post.phones as unknown as string)
+    : post.phones) as ScheduledPhoneRecord[]
+
+  let okCount = 0
+  for (let i = 0; i < phones.length; i++) {
+    const phone = phones[i]
+    const name = phone.ig_username ?? phone.phone_name
+    if (!phone.story_photo || !phone.story_link) {
+      onLog(`⚠ ${name} : assignation incomplète (photo ou lien manquant) — ignoré`)
+      continue
+    }
+    if (i > 0 && post.delay_minutes > 0) {
+      onLog(`⏳ Délai ${post.delay_minutes} min avant le compte suivant…`)
+      await sleep(post.delay_minutes * 60_000)
+    }
+    onLog(`▶ Story sur ${name}…`)
+    try {
+      const res = await postInstagramStory(
+        bearer, phone.geelark_id,
+        { imageUrl: phone.story_photo, linkUrl: phone.story_link, linkText: phone.story_text || undefined },
+        m => onLog(`   ${m}`),
+      )
+      if (res.ok) { okCount++; onLog(`✅ Story publiée : ${name}`) }
+      else onLog(`❌ Échec (${name}) : ${res.error ?? 'inconnu'}`)
+    } catch (err) {
+      onLog(`❌ Erreur (${name}) : ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      await stopPhone(bearer, phone.geelark_id).catch(() => {})
+    }
+  }
+  onLog(okCount > 0
+    ? `✅ Terminé : ${okCount}/${phones.length} story(s) publiée(s)`
+    : '❌ Aucune story publiée')
+  return okCount > 0
+}
+
 export async function executeScheduledPost(
   post: ScheduledPost,
   onLog: (msg: string) => void,
@@ -168,6 +229,8 @@ export async function executeScheduledPost(
     onLog('❌ Aucun token GéeLark configuré — ajoute-le dans Paramètres → Connexions')
     return false
   }
+
+  if (post.type === 'story') return executeScheduledStory(post, bearer, onLog)
 
   // Supabase Realtime can deliver jsonb columns as strings — parse defensively
   const phones = (typeof post.phones === 'string'
