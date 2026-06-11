@@ -20,6 +20,38 @@ const IG_HDRS = {
   'X-ASBD-ID':      '129477',
 }
 
+// ── og:description fallback ──────────────────────────────────────────────────
+// Les pages profil embarquent les compteurs dans la meta description MÊME
+// derrière le mur de connexion : "1,234 Followers, 56 Following, 78 Posts - …"
+// (ou en français : "12,3 k abonnés, 56 abonnements, 78 publications").
+function parseOgDescription(html: string): { followers: number; following: number; posts: number } | null {
+  const m = html.match(/content="([^"]*?(?:Followers|abonn)[^"]*?)"/i)
+  if (!m) return null
+  const txt = m[1]
+
+  const numFrom = (raw: string): number => {
+    let s = raw.replace(/[\u00A0\u202F\s]/g, '')
+    let mult = 1
+    const suf = s.slice(-1).toLowerCase()
+    if (suf === 'k') { mult = 1e3; s = s.slice(0, -1) }
+    else if (suf === 'm') { mult = 1e6; s = s.slice(0, -1) }
+    if (mult > 1) s = s.replace(',', '.')   // suffixe → virgule décimale fr
+    else s = s.replace(/[.,]/g, '')          // sinon → séparateurs de milliers
+    const v = parseFloat(s)
+    return isNaN(v) ? 0 : Math.round(v * mult)
+  }
+  const grab = (re: RegExp): number => {
+    const mm = txt.match(re)
+    return mm ? numFrom(mm[1]) : 0
+  }
+
+  const followers = grab(/([\d.,\u00A0\u202F\s]+[KkMm]?)\s*(?:Followers|abonnés)/i)
+  const following = grab(/([\d.,\u00A0\u202F\s]+[KkMm]?)\s*(?:Following|abonnements?)/i)
+  const posts     = grab(/([\d.,\u00A0\u202F\s]+[KkMm]?)\s*(?:Posts|publications)/i)
+  if (followers === 0 && following === 0 && posts === 0) return null
+  return { followers, following, posts }
+}
+
 // ── HTML parser (shared by all methods that return raw HTML) ─────────────────
 function parseHtml(html: string, fallbackUsername: string): IgStats | null {
   function num(pats: RegExp[]): number {
@@ -34,7 +66,6 @@ function parseHtml(html: string, fallbackUsername: string): IgStats | null {
     /"edge_followed_by":\{"count":(\d+)\}/,
     /"follower_count":(\d+)/,
     /"userInteractionCount":(\d+)/,         // schema.org embed
-    /(\d+)\s*(?:followers|abonnés)/i,       // visible text fallback
   ])
   const following = num([
     /"edge_follow":\{"count":(\d+)\}/,
@@ -62,8 +93,13 @@ function parseHtml(html: string, fallbackUsername: string): IgStats | null {
   const picMatch = html.match(/"profile_pic_url(?:_hd)?":"(https:[^"]+)"/)
   const profile_pic_url = picMatch ? picMatch[1].replace(/\\u002F/g, '/').replace(/\\\//g, '/') : ''
 
-  // If we got zero on everything the page was probably a consent/login wall
-  if (followers === 0 && following === 0 && posts === 0) return null
+  // Tout à zéro → probablement un mur de connexion/consentement. Dernier
+  // recours : la meta og:description, présente même derrière le mur.
+  if (followers === 0 && following === 0 && posts === 0) {
+    const og = parseOgDescription(html)
+    if (!og) return null
+    return { username: unameM?.[1] ?? fallbackUsername, ...og, bio, total_views, profile_pic_url }
+  }
   return { username: unameM?.[1] ?? fallbackUsername, followers, following, posts, bio, total_views, profile_pic_url }
 }
 

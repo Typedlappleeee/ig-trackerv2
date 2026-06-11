@@ -105,8 +105,11 @@ function Kpi({ label, value, delta, accent }: { label: string; value: string; de
 function StatusDot({ status }: { status: string | null }) {
   const color = status === 'active' ? OK : status === 'expired' ? '#FBBF24' : status === 'error' ? ERR : 'rgba(233,234,240,0.18)'
   const label = status === 'active' ? 'Actif' : status === 'expired' ? 'Session expirée' : status === 'error' ? 'Erreur' : 'Inconnu'
+  const hint  = status === 'error'
+    ? 'Fetch impossible — vérifie que le pseudo existe (sans @, sans faute), ou extrais la session depuis le téléphone (page Téléphones) pour un fetch fiable.'
+    : label
   return (
-    <span title={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+    <span title={hint} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
       <span style={{ fontSize: 11, color: TEXT_2 }}>{label}</span>
     </span>

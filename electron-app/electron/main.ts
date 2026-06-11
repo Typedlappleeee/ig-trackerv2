@@ -174,6 +174,29 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
     if (json) return { ok: true, apiJson: json }
   }
 
+  // ── Attempt 3.5: API mobile (i.instagram.com) avec UA d'app Android ───────
+  // Souvent accessible sans cookies là où www.instagram.com renvoie 401.
+  // net.fetch (et non session.fetch) pour ne PAS attacher les cookies web.
+  try {
+    const res = await net.fetch(
+      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
+      {
+        headers: {
+          'User-Agent':      'Instagram 269.0.0.18.75 Android (33/13; 420dpi; 1080x2400; samsung; SM-S901B; r0s; exynos2200; fr_FR; 314665256)',
+          'X-IG-App-ID':     IG_APP_ID,
+          'Accept':          '*/*',
+          'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+        },
+      },
+    )
+    console.log(`[IG] mobile API ${username}: ${res.status}`)
+    if (res.ok) {
+      const json = await res.json() as Record<string, unknown>
+      const user = (json?.['data'] as Record<string, unknown> | undefined)?.['user']
+      if (user) return { ok: true, apiJson: json }
+    }
+  } catch (e) { console.log('[IG] mobile API error:', String(e)) }
+
   // ── Attempt 4: hidden browser fallback (handles consent walls) ────────────
   console.log('[IG] All fetch attempts failed — falling back to hidden browser')
   const browser = getIgBrowser()
