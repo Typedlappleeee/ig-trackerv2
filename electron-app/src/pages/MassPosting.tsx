@@ -89,6 +89,7 @@ export function MassPosting({ user }: MassPostingProps) {
   const [folderLoading, setFolderLoading]   = useState(false)
   const [addingFolder, setAddingFolder]     = useState<string | null>(null)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [randomSeed, setRandomSeed]               = useState(0)
   const stopRef                           = useRef(false)
   const activePhonesRef                   = useRef<string[]>([])
   const activeTasksRef                    = useRef<string[]>([])
@@ -251,29 +252,37 @@ export function MassPosting({ user }: MassPostingProps) {
     setSelVideos(prev => [...prev, { item: fake, localPath: path }])
   }
 
-  // Auto-assignment: round-robin (seq) or unique-random (random).
-  // In random mode we Fisher-Yates shuffle the video indices first so no two
-  // phones ever get the same video before the full list has been cycled once.
   const phoneList = phones.filter(p => selectedPhones.has(p.id))
   const assignments = useMemo(() => {
     if (selectedVideos.length === 0) return phoneList.map(phone => ({ phone, video: null, videoIndex: -1 }))
     if (mode === 'random') {
-      const indices = selectedVideos.map((_, i) => i)
-      for (let i = indices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [indices[i], indices[j]] = [indices[j], indices[i]]
+      // Re-shuffle at the start of each cycle so that phones N+1…2N get a
+      // different order than phones 1…N (avoids the repeating-pattern problem
+      // when there are more phones than videos).
+      function shuffle(arr: number[]): number[] {
+        const a = [...arr]
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]]
+        }
+        return a
       }
-      return phoneList.map((phone, i) => {
-        const idx = indices[i % indices.length]
-        return { phone, video: selectedVideos[idx], videoIndex: idx }
-      })
+      const base = selectedVideos.map((_, i) => i)
+      const result: { phone: Phone; video: SelectedVideo; videoIndex: number }[] = []
+      let cycle: number[] = []
+      for (let i = 0; i < phoneList.length; i++) {
+        if (i % selectedVideos.length === 0) cycle = shuffle(base)
+        const idx = cycle[i % selectedVideos.length]
+        result.push({ phone: phoneList[i], video: selectedVideos[idx], videoIndex: idx })
+      }
+      return result
     }
     return phoneList.map((phone, i) => {
       const idx = i % selectedVideos.length
       return { phone, video: selectedVideos[idx], videoIndex: idx }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phoneList.map(p => p.id).join(','), selectedVideos.length, mode])
+  }, [phoneList.map(p => p.id).join(','), selectedVideos.map(v => v.item.id).join(','), mode, randomSeed])
 
   async function stop() {
     stopRef.current = true
@@ -793,6 +802,23 @@ export function MassPosting({ user }: MassPostingProps) {
                 </button>
               ))}
             </div>
+
+            {/* Reshuffle button — only in random mode */}
+            {mode === 'random' && (
+              <button
+                title="Regénérer l'assignation aléatoire"
+                onClick={() => setRandomSeed(s => s + 1)}
+                className="sf-btn sf-btn-ghost"
+                style={{ padding: '7px 10px', borderRadius: 8 }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="17 1 21 5 17 9"/>
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                  <polyline points="7 23 3 19 7 15"/>
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+              </button>
+            )}
 
             {/* Status chip */}
             <div style={{
