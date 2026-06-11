@@ -245,6 +245,24 @@ export function buildWebAPI() {
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       try {
+        // Preferred path: server-side proxy (/api/geelark-upload) does
+        // download + getUrl + PUT entirely côté serveur — pas de CORS.
+        // Works whenever the source is an https URL (Supabase signed/public URL).
+        if (/^https?:\/\//.test(opts.filePath)) {
+          try {
+            const r = await fetch('/api/geelark-upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer }),
+            })
+            const j = await r.json() as { ok: boolean; token?: string; error?: string }
+            if (j.ok && j.token) return { ok: true, token: j.token }
+            // Server reachable but upload failed — report its error directly
+            if (j.error) return { ok: false, error: j.error }
+          } catch { /* serveur indisponible — bascule sur le flux client ci-dessous */ }
+        }
+
+        // Fallback client-side (blob: URLs, ou proxy serveur indisponible)
         // Step 1: get video bytes — try multiple strategies in order
         let bytes: Uint8Array | null = null
 
@@ -283,12 +301,16 @@ export function buildWebAPI() {
         const token       = resourceUrl ?? apiResp?.['token'] as string | undefined
         if (!uploadUrl || !token) return { ok: false, error: 'Réponse GéeLark invalide (pas de uploadUrl/resourceUrl)' }
 
-        // Step 3: PUT bytes to GéeLark S3
-        let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
-        if (!putRes.ok) {
-          putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
+        // Step 3: PUT bytes to GéeLark S3 (peut être bloqué par CORS dans le navigateur)
+        try {
+          let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
+          if (!putRes.ok) {
+            putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
+          }
+          if (!putRes.ok) return { ok: false, error: `S3 PUT échoué: ${putRes.status}` }
+        } catch {
+          return { ok: false, error: 'Upload S3 bloqué par le navigateur (CORS) — utilisez une vidéo depuis la Banque (Supabase)' }
         }
-        if (!putRes.ok) return { ok: false, error: `S3 PUT échoué: ${putRes.status}` }
 
         return { ok: true, token }
       } catch (err) {
