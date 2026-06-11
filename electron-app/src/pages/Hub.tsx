@@ -5,13 +5,13 @@ import { playNav, playTick } from '@/lib/sounds'
 import type { Page } from '@/components/Layout'
 
 // ── Design tokens — "ScaleFlow Noir" ─────────────────────────────────────────
-const SERIF = "'Instrument Serif', 'Times New Roman', Georgia, serif"
+const SERIF = "'Inter', 'Times New Roman', Georgia, serif"
 const SANS  = "'Inter', system-ui, sans-serif"
-const IVORY = '#F3F1EC'
-const MUTED = 'rgba(243,241,236,0.42)'
-const FAINT = 'rgba(243,241,236,0.22)'
-const HAIR  = 'rgba(243,241,236,0.08)'
-const GOLD  = '#C9B584'
+const IVORY = '#E9EAF0'
+const MUTED = 'rgba(233,234,240,0.42)'
+const FAINT = 'rgba(233,234,240,0.22)'
+const HAIR  = 'rgba(233,234,240,0.08)'
+const GOLD  = '#6366F1'
 
 // ── SVG icon paths ─────────────────────────────────────────────────────────────
 const ICONS: Record<string, string> = {
@@ -79,7 +79,7 @@ function BadgeChip({ badge }: { badge: NonNullable<ToolDef['badge']> }) {
       fontFamily: SANS, fontSize: 8, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
       padding: '3px 8px 2px',
       color: badge === 'NEW' ? GOLD : MUTED,
-      border: `1px solid ${badge === 'NEW' ? 'rgba(201,181,132,0.4)' : 'rgba(243,241,236,0.18)'}`,
+      border: `1px solid ${badge === 'NEW' ? 'rgba(99,102,241,0.4)' : 'rgba(233,234,240,0.18)'}`,
     }}>
       {badge}
     </span>
@@ -126,7 +126,7 @@ function FeaturedCard({ tool, num, onOpen }: { tool: ToolDef; num: string; onOpe
         position: 'relative', overflow: 'hidden', textAlign: 'left', cursor: 'pointer',
         padding: '34px 32px', minHeight: 190, width: '100%',
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-        background: hover ? IVORY : 'rgba(243,241,236,0.02)',
+        background: hover ? IVORY : 'rgba(233,234,240,0.02)',
         border: `1px solid ${hover ? IVORY : HAIR}`,
         transition: 'all 0.5s cubic-bezier(0.16,1,0.3,1)',
       }}
@@ -139,15 +139,15 @@ function FeaturedCard({ tool, num, onOpen }: { tool: ToolDef; num: string; onOpe
         transition: 'all 0.55s cubic-bezier(0.16,1,0.3,1)',
         pointerEvents: 'none',
       }}>
-        <IconGlyph icon={tool.icon} size={150} color={hover ? '#0A0A0C' : IVORY} />
+        <IconGlyph icon={tool.icon} size={150} color={hover ? '#0F1014' : IVORY} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 15, color: hover ? 'rgba(10,10,12,0.45)' : 'rgba(201,181,132,0.65)', transition: 'color 0.4s' }}>{num}</span>
+        <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: hover ? 'rgba(10,10,12,0.45)' : 'rgba(99,102,241,0.65)', transition: 'color 0.4s' }}>{num}</span>
         <span style={{
           fontFamily: SANS, fontSize: 8.5, fontWeight: 700, letterSpacing: '0.3em', textTransform: 'uppercase',
-          color: hover ? '#0A0A0C' : GOLD,
-          borderBottom: `1px solid ${hover ? 'rgba(10,10,12,0.5)' : 'rgba(201,181,132,0.4)'}`,
+          color: hover ? '#0F1014' : GOLD,
+          borderBottom: `1px solid ${hover ? 'rgba(10,10,12,0.5)' : 'rgba(99,102,241,0.4)'}`,
           paddingBottom: 3, transition: 'all 0.4s',
         }}>
           À la une
@@ -157,7 +157,7 @@ function FeaturedCard({ tool, num, onOpen }: { tool: ToolDef; num: string; onOpe
       <div style={{ position: 'relative' }}>
         <p style={{
           fontFamily: SANS, fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em',
-          color: hover ? '#0A0A0C' : IVORY, margin: '0 0 8px', lineHeight: 1.05,
+          color: hover ? '#0F1014' : IVORY, margin: '0 0 8px', lineHeight: 1.05,
           transition: 'color 0.4s',
         }}>
           {t(tool.labelKey as any)}
@@ -172,7 +172,7 @@ function FeaturedCard({ tool, num, onOpen }: { tool: ToolDef; num: string; onOpe
         <div style={{
           marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 10,
           fontFamily: SANS, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.28em', textTransform: 'uppercase',
-          color: hover ? '#0A0A0C' : FAINT, transition: 'color 0.4s',
+          color: hover ? '#0F1014' : FAINT, transition: 'color 0.4s',
         }}>
           <span>{t('hubOpen')}</span>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -202,7 +202,7 @@ function ToolRow({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpen
         display: 'flex', alignItems: 'center', gap: 18,
         padding: '20px 22px',
         cursor: 'pointer', overflow: 'hidden',
-        background: hover ? 'rgba(243,241,236,0.035)' : '#060608',
+        background: hover ? 'rgba(233,234,240,0.035)' : '#0A0B0E',
         border: 'none',
         transition: 'background 0.35s',
         animation: 'hub-fade-up 0.6s cubic-bezier(0.16,1,0.3,1) both',
@@ -221,7 +221,7 @@ function ToolRow({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpen
       <div style={{
         width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: `1px solid ${hover ? 'rgba(201,181,132,0.5)' : HAIR}`,
+        border: `1px solid ${hover ? 'rgba(99,102,241,0.5)' : HAIR}`,
         color: hover ? GOLD : MUTED,
         transform: hover ? 'rotate(0deg)' : 'rotate(-6deg)',
         transition: 'all 0.4s cubic-bezier(0.16,1,0.3,1)',
@@ -253,7 +253,7 @@ function ToolRow({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpen
       {/* Arrow */}
       <div style={{
         flexShrink: 0,
-        color: hover ? GOLD : 'rgba(243,241,236,0.12)',
+        color: hover ? GOLD : 'rgba(233,234,240,0.12)',
         transform: hover ? 'translate(2px,-2px)' : 'translate(0,0)',
         transition: 'all 0.3s',
       }}>
@@ -280,7 +280,7 @@ function CategorySection({ cat, tools, baseIndex, onNavigate }: {
     <section style={{ marginBottom: 56 }}>
       {/* Header — numéro serif + titre + filet */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, marginBottom: 18 }}>
-        <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 19, color: 'rgba(201,181,132,0.65)' }}>{cat.num}</span>
+        <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 19, color: 'rgba(99,102,241,0.65)' }}>{cat.num}</span>
         <h2 style={{
           fontFamily: SANS, fontSize: 12, fontWeight: 700, letterSpacing: '0.3em', textTransform: 'uppercase',
           color: IVORY, margin: 0,
@@ -288,7 +288,7 @@ function CategorySection({ cat, tools, baseIndex, onNavigate }: {
           {t(cat.labelKey as any)}
         </h2>
         <div style={{ flex: 1, height: 1, background: HAIR, alignSelf: 'center' }} />
-        <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 14, color: FAINT }}>{tools.length} outil{tools.length > 1 ? 's' : ''}</span>
+        <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: FAINT }}>{tools.length} outil{tools.length > 1 ? 's' : ''}</span>
       </div>
 
       {/* Grid hairline */}
@@ -328,24 +328,24 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const featured = TOOLS.filter(tl => tl.featured)
 
   return (
-    <div style={{ minHeight: '100%', paddingBottom: 100, background: '#060608' }}>
+    <div style={{ minHeight: '100%', paddingBottom: 100, background: '#0A0B0E' }}>
 
       {/* ── Hero éditorial ─────────────────────────────────────────────────── */}
       <div style={{ position: 'relative', overflow: 'hidden', padding: '64px 48px 0' }}>
         {/* glow discret */}
-        <div style={{ position: 'absolute', top: -140, left: '30%', width: 600, height: 320, background: 'radial-gradient(ellipse, rgba(201,181,132,0.05), transparent 65%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: -100, right: '10%', width: 420, height: 280, background: 'radial-gradient(ellipse, rgba(201,181,132,0.04), transparent 65%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -140, left: '30%', width: 600, height: 320, background: 'radial-gradient(ellipse, rgba(99,102,241,0.05), transparent 65%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -100, right: '10%', width: 420, height: 280, background: 'radial-gradient(ellipse, rgba(99,102,241,0.04), transparent 65%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', maxWidth: 1140, margin: '0 auto' }}>
           {/* Ligne méta */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 38, animation: 'hub-fade-up 0.7s cubic-bezier(0.16,1,0.3,1) both' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 14 }}>
-              <span style={{ display: 'block', width: 32, height: 1, background: 'rgba(201,181,132,0.5)' }} />
-              <span style={{ fontFamily: SANS, fontSize: 9.5, fontWeight: 600, letterSpacing: '0.32em', textTransform: 'uppercase', color: 'rgba(201,181,132,0.65)' }}>
+              <span style={{ display: 'block', width: 32, height: 1, background: 'rgba(99,102,241,0.5)' }} />
+              <span style={{ fontFamily: SANS, fontSize: 9.5, fontWeight: 600, letterSpacing: '0.32em', textTransform: 'uppercase', color: 'rgba(99,102,241,0.65)' }}>
                 Le Studio — {dateLabel}
               </span>
             </div>
-            <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 14, color: FAINT }}>
+            <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: FAINT }}>
               {TOOLS.length} outils actifs
             </span>
           </div>
@@ -357,7 +357,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                 {greeting.replace(/,\s*$/, '')},
               </span>
               <span style={{
-                fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400,
+                fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400,
                 fontSize: 'clamp(42px, 5.7vw, 78px)', color: GOLD,
                 marginLeft: '0.22em', textTransform: 'capitalize',
               }}>
@@ -385,14 +385,14 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                 width: '100%', height: 46, paddingLeft: 30, paddingRight: 8,
                 fontSize: 14, fontFamily: SANS,
                 background: 'transparent',
-                border: 'none', borderBottom: `1px solid rgba(243,241,236,0.16)`,
+                border: 'none', borderBottom: `1px solid rgba(233,234,240,0.16)`,
                 borderRadius: 0,
                 color: IVORY, outline: 'none',
                 transition: 'border-color 0.3s',
                 boxSizing: 'border-box',
               }}
               onFocus={e => { e.currentTarget.style.borderBottomColor = GOLD }}
-              onBlur={e => { e.currentTarget.style.borderBottomColor = 'rgba(243,241,236,0.16)' }}
+              onBlur={e => { e.currentTarget.style.borderBottomColor = 'rgba(233,234,240,0.16)' }}
             />
           </div>
 
@@ -432,7 +432,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '90px 0', borderTop: `1px solid ${HAIR}`, borderBottom: `1px solid ${HAIR}` }}>
-              <p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 22, color: MUTED, margin: '0 0 8px' }}>Aucun résultat.</p>
+              <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 22, color: MUTED, margin: '0 0 8px' }}>Aucun résultat.</p>
               <p style={{ fontFamily: SANS, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: FAINT, margin: 0 }}>{t('hubNoResults')}</p>
             </div>
           )

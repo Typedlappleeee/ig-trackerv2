@@ -85,11 +85,11 @@ function ToolShell({ title, subtitle, headerIcon, children, onBack }: {
           <div className="relative flex-shrink-0">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center sf-anim-scale-spring sf-d150"
               style={{
-                background: 'linear-gradient(135deg, rgba(201,181,132,0.2), rgba(243,241,236,0.12))',
-                border: '1px solid rgba(201,181,132,0.3)',
-                boxShadow: '0 0 20px -4px rgba(201,181,132,0.4)',
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(233,234,240,0.12))',
+                border: '1px solid rgba(99,102,241,0.3)',
+                boxShadow: '0 0 20px -4px rgba(99,102,241,0.4)',
               }}>
-              <span style={{ color: '#D4C499' }}>{headerIcon}</span>
+              <span style={{ color: '#818CF8' }}>{headerIcon}</span>
             </div>
           </div>
           <div>
@@ -182,7 +182,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
         <div className="sf-card p-5 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(201,181,132,0.1)', border: '1px solid rgba(201,181,132,0.2)' }}>
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <Icon name="film" size={16} className="text-accent" />
             </div>
             <div className="flex-1 min-w-0">
@@ -272,7 +272,7 @@ function ViralStructure({ anthropicKey, onBack }: { anthropicKey: string; onBack
   }>(null)
 
   const TYPE_COLOR: Record<string, string> = {
-    hook:       '#D4C499', context:    '#C9B584', value:      '#34d399',
+    hook:       '#818CF8', context:    '#6366F1', value:      '#34d399',
     proof:      '#fbbf24', cta:        '#f87171', transition: '#06b6d4',
   }
   const TYPE_LABEL: Record<string, string> = {
@@ -326,7 +326,7 @@ Return ONLY valid JSON:
         <div className="sf-card p-5 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(201,181,132,0.1)', border: '1px solid rgba(201,181,132,0.2)' }}>
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <Icon name="film" size={16} className="text-accent" />
             </div>
             <div className="flex-1 min-w-0">
@@ -375,7 +375,7 @@ Return ONLY valid JSON:
             <div className="sf-card p-5 space-y-4">
               <p className="text-[14px] font-bold text-text">Timeline</p>
               {result.segments.map((seg, i) => {
-                const color = TYPE_COLOR[seg.type] ?? '#C9B584'
+                const color = TYPE_COLOR[seg.type] ?? '#6366F1'
                 return (
                   <div key={i} className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-14 text-right">
@@ -528,7 +528,7 @@ Rate each category 1-10. Return ONLY valid JSON:
               onClick={() => { setIsVideo(v); setFilePath(null); setResult(null) }}
               className={`sf-tab flex-1 cursor-pointer inline-flex items-center justify-center gap-2${isVideo === v ? ' sf-tab-active' : ''}`}
               style={isVideo === v
-                ? { background: 'rgba(201,181,132,0.15)', color: 'var(--accent-glow)', border: '1px solid rgba(201,181,132,0.3)' }
+                ? { background: 'rgba(99,102,241,0.15)', color: 'var(--accent-glow)', border: '1px solid rgba(99,102,241,0.3)' }
                 : {}}
             >
               <Icon name={icon} size={14} />
@@ -541,7 +541,7 @@ Rate each category 1-10. Return ONLY valid JSON:
         <div className="sf-card p-5 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(201,181,132,0.1)', border: '1px solid rgba(201,181,132,0.2)' }}>
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <Icon name={isVideo ? 'video' : 'image'} size={16} className="text-accent" />
             </div>
             <div className="flex-1 min-w-0">

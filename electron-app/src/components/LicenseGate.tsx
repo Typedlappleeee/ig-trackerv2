@@ -51,19 +51,19 @@ const Logo = ({ gradId }: { gradId: string }) => (
     <defs>
       <linearGradient id={`lg-main-${gradId}`} x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
         <stop offset="0%"   stopColor="#1d4ed8"/>
-        <stop offset="58%"  stopColor="#C9B584"/>
+        <stop offset="58%"  stopColor="#6366F1"/>
         <stop offset="100%" stopColor="#a855f7"/>
       </linearGradient>
       <linearGradient id={`lg-arr-${gradId}`} x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
         <stop offset="0%"   stopColor="#db2777"/>
-        <stop offset="100%" stopColor="#E8DFC8"/>
+        <stop offset="100%" stopColor="#A5B4FC"/>
       </linearGradient>
     </defs>
     <path d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
       stroke={`url(#lg-main-${gradId})`} strokeWidth="16" strokeLinecap="round" fill="none"/>
     <line x1="66" y1="22" x2="88" y2="2" stroke={`url(#lg-arr-${gradId})`} strokeWidth="11" strokeLinecap="round"/>
-    <line x1="77" y1="1"  x2="90" y2="1"  stroke="#E8DFC8" strokeWidth="9" strokeLinecap="round"/>
-    <line x1="90" y1="1"  x2="90" y2="15" stroke="#E8DFC8" strokeWidth="9" strokeLinecap="round"/>
+    <line x1="77" y1="1"  x2="90" y2="1"  stroke="#A5B4FC" strokeWidth="9" strokeLinecap="round"/>
+    <line x1="90" y1="1"  x2="90" y2="15" stroke="#A5B4FC" strokeWidth="9" strokeLinecap="round"/>
   </svg>
 )
 
@@ -158,7 +158,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
     <button
       onClick={signOut}
       className="fixed bottom-5 right-6 z-[10000] px-3 py-1.5 rounded-lg text-xs text-[#a89bd4] hover:text-white transition-colors"
-      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,181,132,0.2)' }}
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)' }}
     >
       Se déconnecter →
     </button>
@@ -174,11 +174,11 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
           <div className="flex flex-col items-center mb-8">
             <Logo gradId="co" />
             <h1 className="text-2xl font-black text-white tracking-tight">
-              Scale<span style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+              Scale<span style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
             </h1>
             <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">Créer mon organisation</p>
           </div>
-          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.15)' }}>
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
             <div className="p-6 space-y-4">
               <p className="text-xs text-[#6b5fa0] text-center">
                 Ton abonnement est activé ! 🎉<br/>
@@ -190,7 +190,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   value={orgName}
                   onChange={e => setOrgName(e.target.value)}
                   placeholder="Nom de l'organisation"
-                  className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm placeholder:text-[#3a2f58] focus:outline-none focus:border-[#C9B584] transition-colors"
+                  className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm placeholder:text-[#3a2f58] focus:outline-none focus:border-[#6366F1] transition-colors"
                   spellCheck={false}
                   autoComplete="off"
                   autoFocus
@@ -200,7 +200,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   type="submit"
                   disabled={orgCreateLoading || !orgName.trim()}
                   className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
-                  style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)' }}
+                  style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}
                 >
                   {orgCreateLoading ? 'Création…' : 'Créer mon organisation →'}
                 </button>
@@ -225,14 +225,14 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
         <div className="flex flex-col items-center mb-6">
           <Logo gradId="gate" />
           <h1 className="text-2xl font-black text-white tracking-tight">
-            Scale<span style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+            Scale<span style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
           </h1>
           <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">Accès requis</p>
         </div>
 
         {/* Home: 2 options */}
         {view === 'home' && (
-          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.15)' }}>
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
             <div className="p-6 space-y-3">
               <p className="text-xs text-[#6b5fa0] text-center mb-5">
                 Bienvenue sur ScaleFlow. Comment veux-tu accéder ?
@@ -253,8 +253,8 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
               <button
                 onClick={() => setView('create')}
                 className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.02] flex items-center gap-4 relative overflow-hidden"
-                style={{ background: 'linear-gradient(130deg,rgba(201,181,132,0.18),rgba(243,241,236,0.18))', border: '1px solid rgba(168,85,247,0.40)' }}>
-                <div className="absolute top-2 right-2 text-[9px] font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)' }}>NOUVEAU</div>
+                style={{ background: 'linear-gradient(130deg,rgba(99,102,241,0.18),rgba(233,234,240,0.18))', border: '1px solid rgba(168,85,247,0.40)' }}>
+                <div className="absolute top-2 right-2 text-[9px] font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>NOUVEAU</div>
                 <div style={{ color: '#a855f7' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
                 </div>
@@ -270,9 +270,9 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
 
         {/* Join org */}
         {view === 'join' && (
-          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.15)' }}>
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
             <div className="p-6 space-y-4">
-              <button onClick={() => setView('home')} className="flex items-center gap-1 text-[11px] text-[#4a3f7a] hover:text-[#C9B584] transition-colors mb-2">
+              <button onClick={() => setView('home')} className="flex items-center gap-1 text-[11px] text-[#4a3f7a] hover:text-[#6366F1] transition-colors mb-2">
                 ← Retour
               </button>
               {myOrgs.length > 0 && (
@@ -314,7 +314,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     value={code}
                     onChange={e => setCode(e.target.value)}
                     placeholder="Code d'invitation"
-                    className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono placeholder:text-[#3a2f58] focus:outline-none focus:border-[#C9B584] transition-colors text-center"
+                    className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono placeholder:text-[#3a2f58] focus:outline-none focus:border-[#6366F1] transition-colors text-center"
                     spellCheck={false}
                     autoComplete="off"
                     autoFocus
@@ -324,7 +324,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     type="submit"
                     disabled={orgLoading || !code.trim()}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
-                    style={{ background: 'linear-gradient(130deg,#1d4ed8,#C9B584)' }}>
+                    style={{ background: 'linear-gradient(130deg,#1d4ed8,#6366F1)' }}>
                     {orgLoading ? 'Vérification…' : 'Rejoindre →'}
                   </button>
                 </form>
@@ -336,9 +336,9 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
         {/* Create / subscribe */}
         {view === 'create' && (
           <div className="space-y-4">
-            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.15)' }}>
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
               <div className="p-6 space-y-4">
-                <button onClick={() => setView('home')} className="flex items-center gap-1 text-[11px] text-[#4a3f7a] hover:text-[#C9B584] transition-colors">
+                <button onClick={() => setView('home')} className="flex items-center gap-1 text-[11px] text-[#4a3f7a] hover:text-[#6366F1] transition-colors">
                   ← Retour
                 </button>
 
@@ -351,9 +351,9 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   {PLANS.map(p => (
                     <div key={p.name}
                       className="rounded-xl p-3.5 relative"
-                      style={{ background: p.popular ? 'linear-gradient(130deg,rgba(201,181,132,0.15),rgba(243,241,236,0.15))' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.popular ? 'rgba(168,85,247,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
+                      style={{ background: p.popular ? 'linear-gradient(130deg,rgba(99,102,241,0.15),rgba(233,234,240,0.15))' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.popular ? 'rgba(168,85,247,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
                       {p.popular && (
-                        <div className="absolute -top-2.5 right-4 text-[9px] font-black text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)' }}>POPULAIRE</div>
+                        <div className="absolute -top-2.5 right-4 text-[9px] font-black text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>POPULAIRE</div>
                       )}
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-black" style={{ color: p.accent }}>{p.name}</span>
@@ -391,9 +391,9 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 </a>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px" style={{ background: 'rgba(201,181,132,0.15)' }} />
+                  <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.15)' }} />
                   <span className="text-[10px] text-[#4a3f7a]">déjà une clé ?</span>
-                  <div className="flex-1 h-px" style={{ background: 'rgba(201,181,132,0.15)' }} />
+                  <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.15)' }} />
                 </div>
 
                 {/* Key activation */}
@@ -403,7 +403,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     value={key}
                     onChange={e => setKey(e.target.value)}
                     placeholder="XXXX-XXXX-XXXX-XXXX"
-                    className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono tracking-widest placeholder:text-[#3a2f58] focus:outline-none focus:border-[#C9B584] transition-colors text-center uppercase"
+                    className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono tracking-widest placeholder:text-[#3a2f58] focus:outline-none focus:border-[#6366F1] transition-colors text-center uppercase"
                     spellCheck={false}
                     autoComplete="off"
                   />
@@ -412,7 +412,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     type="submit"
                     disabled={keyLoading || !key.trim()}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
-                    style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)' }}>
+                    style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>
                     {keyLoading ? 'Vérification…' : 'Activer la clé →'}
                   </button>
                 </form>

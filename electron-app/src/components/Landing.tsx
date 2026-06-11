@@ -12,14 +12,14 @@ const REEL_PHOTOS = [
 ]
 
 // ── Design tokens — "ScaleFlow Noir" ─────────────────────────────────────────
-const SERIF = "'Instrument Serif', 'Times New Roman', Georgia, serif"
+const SERIF = "'Inter', 'Times New Roman', Georgia, serif"
 const SANS  = "'Inter', system-ui, sans-serif"
-const BG    = '#060608'
-const IVORY = '#F3F1EC'
-const MUTED = 'rgba(243,241,236,0.42)'
-const FAINT = 'rgba(243,241,236,0.22)'
-const HAIR  = 'rgba(243,241,236,0.09)'
-const GOLD  = '#C9B584'
+const BG    = '#0A0B0E'
+const IVORY = '#E9EAF0'
+const MUTED = 'rgba(233,234,240,0.42)'
+const FAINT = 'rgba(233,234,240,0.22)'
+const HAIR  = 'rgba(233,234,240,0.09)'
+const GOLD  = '#6366F1'
 const VIOLET = '#8B5CF6'
 
 // ── Lucide-style inline icon set ──────────────────────────────────────────────
@@ -166,7 +166,7 @@ function Wordmark({ size = 17, onClick }: { size?: number; onClick?: () => void 
   const inner = (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', whiteSpace: 'nowrap' }}>
       <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: size, letterSpacing: '-0.02em', color: IVORY }}>SCALE</span>
-      <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: size * 1.12, color: GOLD, marginLeft: 1 }}>Flow</span>
+      <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: size * 1.12, color: GOLD, marginLeft: 1 }}>Flow</span>
     </span>
   )
   if (!onClick) return inner
@@ -236,7 +236,7 @@ function CustomCursor() {
       <div ref={ringRef} style={{
         position: 'fixed', top: 0, left: 0, zIndex: 99998, pointerEvents: 'none',
         width: 34, height: 34, borderRadius: '50%',
-        border: `1px solid rgba(243,241,236,0.65)`,
+        border: `1px solid rgba(233,234,240,0.65)`,
         mixBlendMode: 'difference', willChange: 'transform',
         transition: 'transform 0.07s ease',
       }} />
@@ -293,7 +293,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           ['25%','0%'], ['75%','0%'], ['25%','100%'], ['75%','100%'],
           ['0%','25%'], ['0%','75%'], ['100%','25%'], ['100%','75%'],
         ].map(([x, y], i) => (
-          <line key={i} x1="50%" y1="50%" x2={x} y2={y} stroke={`rgba(243,241,236,${i < 4 ? 0.07 : 0.035})`} strokeWidth="1" />
+          <line key={i} x1="50%" y1="50%" x2={x} y2={y} stroke={`rgba(233,234,240,${i < 4 ? 0.07 : 0.035})`} strokeWidth="1" />
         ))}
       </svg>
 
@@ -302,7 +302,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
         position: 'absolute', top: '50%', left: '50%',
         transform: 'translate(-50%,-50%)',
         width: 700, height: 440,
-        background: 'radial-gradient(ellipse closest-side, rgba(201,181,132,0.07), transparent)',
+        background: 'radial-gradient(ellipse closest-side, rgba(99,102,241,0.07), transparent)',
         filter: 'blur(60px)', pointerEvents: 'none', zIndex: 1,
       }} />
 
@@ -324,7 +324,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
             borderRadius: 4,
             overflow: 'hidden',
             border: `1px solid ${HAIR}`,
-            background: 'linear-gradient(160deg, #0B0B0E 0%, #08080A 100%)',
+            background: 'linear-gradient(160deg, #0B0B0E 0%, #0C0D11 100%)',
             boxShadow: '0 8px 48px rgba(0,0,0,0.7)',
           }}>
             {ENTRY_IMAGES[idx] && <img src={ENTRY_IMAGES[idx]!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'grayscale(0.7) brightness(0.6)' }} />}
@@ -351,18 +351,18 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           position: 'relative', overflow: 'hidden', padding: '0 0.1em',
         }}>
           <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(64px, 11vw, 150px)', letterSpacing: '-0.05em', color: IVORY }}>SCALE</span>
-          <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(66px, 11.5vw, 158px)', letterSpacing: '-0.02em', color: GOLD, marginLeft: '0.02em' }}>Flow</span>
+          <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(66px, 11.5vw, 158px)', letterSpacing: '-0.02em', color: GOLD, marginLeft: '0.02em' }}>Flow</span>
           {/* light sweep */}
           <span aria-hidden style={{
             position: 'absolute', top: 0, bottom: 0, left: 0, width: '34%',
-            background: 'linear-gradient(90deg, transparent, rgba(243,241,236,0.07), transparent)',
+            background: 'linear-gradient(90deg, transparent, rgba(233,234,240,0.07), transparent)',
             animation: 'sf-beam 4.5s ease-in-out 1.8s infinite',
             pointerEvents: 'none',
           }} />
         </h1>
 
         <p style={{
-          fontFamily: SERIF, fontStyle: 'italic', fontSize: 'clamp(15px, 1.6vw, 19px)',
+          fontFamily: SERIF, fontStyle: 'normal', fontSize: 'clamp(15px, 1.6vw, 19px)',
           color: MUTED, margin: '14px 0 52px', letterSpacing: '0.01em',
           animation: 'sf-fade-in 1.4s ease 1s both',
         }}>
@@ -378,10 +378,10 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
               position: 'relative', overflow: 'hidden',
               padding: '17px 66px', borderRadius: 0,
               background: hover ? IVORY : 'transparent',
-              color: hover ? '#0A0A0C' : IVORY,
+              color: hover ? '#0F1014' : IVORY,
               fontFamily: SANS, fontSize: 11, fontWeight: 700,
               letterSpacing: '0.34em', textTransform: 'uppercase',
-              border: `1px solid ${hover ? IVORY : 'rgba(243,241,236,0.35)'}`,
+              border: `1px solid ${hover ? IVORY : 'rgba(233,234,240,0.35)'}`,
               cursor: 'pointer',
               transition: 'all 0.45s cubic-bezier(0.16,1,0.3,1)',
             }}
@@ -439,7 +439,7 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
       {/* Number — corner */}
       <span style={{
         position: 'absolute', top: 26, left: 38,
-        fontFamily: SERIF, fontStyle: 'italic', fontSize: 17,
+        fontFamily: SERIF, fontStyle: 'normal', fontSize: 17,
         color: hovered ? 'rgba(10,10,12,0.4)' : FAINT,
         transition: 'color 0.4s',
         opacity: visible ? 1 : 0,
@@ -456,13 +456,13 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
           <span style={{
             fontFamily: SANS, fontWeight: 900, letterSpacing: '-0.04em',
             fontSize: 'clamp(40px, 7.5vw, 104px)',
-            color: hovered ? '#0A0A0C' : IVORY,
+            color: hovered ? '#0F1014' : IVORY,
             transition: 'color 0.45s',
           }}>{word}</span>
           <span style={{
-            fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400,
+            fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400,
             fontSize: 'clamp(42px, 7.9vw, 112px)', letterSpacing: '-0.01em',
-            color: hovered ? '#0A0A0C' : GOLD,
+            color: hovered ? '#0F1014' : GOLD,
             transition: 'color 0.45s',
             marginLeft: '0.13em',
           }}>{serifWord}</span>
@@ -480,7 +480,7 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
       {/* Arrow */}
       <div style={{
         position: 'absolute', right: 54,
-        color: hovered ? '#0A0A0C' : FAINT,
+        color: hovered ? '#0F1014' : FAINT,
         opacity: hovered ? 1 : 0,
         transform: hovered ? 'translateX(0)' : 'translateX(-14px)',
         transition: 'opacity 0.35s, transform 0.35s, color 0.35s', zIndex: 2,
@@ -505,7 +505,7 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
 
       {half(hoverTop, setHoverTop, onDiscover, '— 01', 'DÉCOUVRIR', 'ScaleFlow', 'Manifeste · Fonctionnalités · Tarifs', '0.15s')}
 
-      <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${HAIR} 20%, rgba(201,181,132,0.35) 50%, ${HAIR} 80%, transparent)`, flexShrink: 0, zIndex: 10 }} />
+      <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${HAIR} 20%, rgba(99,102,241,0.35) 50%, ${HAIR} 80%, transparent)`, flexShrink: 0, zIndex: 10 }} />
 
       {half(hoverBot, setHoverBot, onStudio, '— 02', 'LE', 'Studio', 'Connexion · Mass Posting · Cloud Phones', '0.28s')}
     </div>
@@ -527,10 +527,10 @@ function Marquee({ items, dark = false }: { items: string[]; dark?: boolean }) {
               fontSize: i % 2 === 0 ? 13 : 15,
               letterSpacing: i % 2 === 0 ? '0.22em' : '0.02em',
               textTransform: i % 2 === 0 ? 'uppercase' : 'none',
-              color: i % 2 === 0 ? FAINT : 'rgba(201,181,132,0.5)',
+              color: i % 2 === 0 ? FAINT : 'rgba(99,102,241,0.5)',
               whiteSpace: 'nowrap',
             }}>{it}</span>
-            <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(201,181,132,0.35)', flexShrink: 0 }} />
+            <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(99,102,241,0.35)', flexShrink: 0 }} />
           </span>
         ))}
       </div>
@@ -553,8 +553,8 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
   return (
     <section style={{ position: 'relative', minHeight: 'calc(100vh - 64px)', overflow: 'hidden', background: BG, display: 'flex', flexDirection: 'column' }}>
       {/* glow */}
-      <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', width: 900, height: 700, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(201,181,132,0.04), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', top: '46%', left: '50%', transform: 'translate(-50%,-50%)', width: 560, height: 420, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(201,181,132,0.05), transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', width: 900, height: 700, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(99,102,241,0.04), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '46%', left: '50%', transform: 'translate(-50%,-50%)', width: 560, height: 420, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(99,102,241,0.05), transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
 
       {/* Floating reels — refined monochrome frames */}
       {CARDS.map((c, i) => (
@@ -565,7 +565,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
           width: cW, height: cH,
           transform: `rotate(${c.rot}deg)`,
           borderRadius: 6, overflow: 'hidden',
-          border: `1px solid rgba(243,241,236,0.14)`,
+          border: `1px solid rgba(233,234,240,0.14)`,
           boxShadow: '0 32px 80px rgba(0,0,0,0.85)',
           animation: `sf-float ${5 + i * 0.7}s ease-in-out ${i * 0.8}s infinite`,
           zIndex: 2, opacity: 0.85,
@@ -586,7 +586,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
       {/* Center content */}
       <div style={{ position: 'relative', zIndex: 10, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '64px 24px 40px' }}>
         <FadeIn>
-          <MicroLabel color="rgba(201,181,132,0.55)" style={{ marginBottom: 34 }}>Le studio nouvelle génération</MicroLabel>
+          <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 34 }}>Le studio nouvelle génération</MicroLabel>
         </FadeIn>
 
         <FadeIn delay={0.08}>
@@ -595,7 +595,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
               L'automatisation
             </span>
             <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(42px, 7vw, 96px)', color: IVORY }}>
-              Instagram, <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, color: GOLD, letterSpacing: '-0.01em' }}>élevée au rang d'art.</span>
+              Instagram, <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, color: GOLD, letterSpacing: '-0.01em' }}>élevée au rang d'art.</span>
             </span>
           </h1>
         </FadeIn>
@@ -617,7 +617,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
                 padding: '17px 38px',
                 background: ctaHover ? GOLD : IVORY,
                 border: `1px solid ${ctaHover ? GOLD : IVORY}`,
-                color: '#0A0A0C',
+                color: '#0F1014',
                 fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
                 cursor: 'pointer',
                 transition: 'all 0.4s cubic-bezier(0.16,1,0.3,1)',
@@ -629,14 +629,14 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
                 display: 'inline-flex', alignItems: 'center', gap: 12,
                 padding: '17px 38px',
                 background: 'transparent',
-                border: `1px solid rgba(243,241,236,0.25)`,
+                border: `1px solid rgba(233,234,240,0.25)`,
                 color: IVORY,
                 fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
                 textDecoration: 'none',
                 transition: 'all 0.35s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(243,241,236,0.6)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(243,241,236,0.25)' }}>
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(233,234,240,0.6)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(233,234,240,0.25)' }}>
               Acheter une clé
             </a>
           </div>
@@ -651,7 +651,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
               { n: '24/7', l: 'Scheduler autonome dans le cloud' },
             ].map((s, i, a) => (
               <div key={s.n} style={{ padding: '0 44px', textAlign: 'center', borderRight: i < a.length - 1 ? `1px solid ${HAIR}` : 'none' }}>
-                <div style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 'clamp(30px, 3.4vw, 44px)', color: IVORY, lineHeight: 1 }}>{s.n}</div>
+                <div style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 'clamp(30px, 3.4vw, 44px)', color: IVORY, lineHeight: 1 }}>{s.n}</div>
                 <div style={{ fontFamily: SANS, fontSize: 9.5, fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: FAINT, marginTop: 10, maxWidth: 170 }}>{s.l}</div>
               </div>
             ))}
@@ -691,7 +691,7 @@ function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number })
           gap: 28,
           padding: hover ? '38px 28px' : '32px 28px',
           borderBottom: `1px solid ${HAIR}`,
-          background: hover ? 'rgba(243,241,236,0.025)' : 'transparent',
+          background: hover ? 'rgba(233,234,240,0.025)' : 'transparent',
           transition: 'all 0.45s cubic-bezier(0.16,1,0.3,1)',
           cursor: 'default',
           position: 'relative',
@@ -701,12 +701,12 @@ function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number })
         {/* gold line indicator */}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: GOLD, transform: hover ? 'scaleY(1)' : 'scaleY(0)', transformOrigin: 'top', transition: 'transform 0.4s cubic-bezier(0.16,1,0.3,1)' }} />
 
-        <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 19, color: hover ? GOLD : FAINT, transition: 'color 0.3s' }}>{f.num}</span>
+        <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 19, color: hover ? GOLD : FAINT, transition: 'color 0.3s' }}>{f.num}</span>
 
         <div>
           <h3 style={{ margin: '0 0 8px', lineHeight: 1, whiteSpace: 'nowrap' }}>
             <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 'clamp(22px, 2.6vw, 34px)', letterSpacing: '-0.03em', color: IVORY }}>{f.title}</span>
-            <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(24px, 2.8vw, 37px)', color: hover ? GOLD : 'rgba(201,181,132,0.75)', marginLeft: '0.18em', transition: 'color 0.3s' }}>{f.serif}</span>
+            <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(24px, 2.8vw, 37px)', color: hover ? GOLD : 'rgba(99,102,241,0.75)', marginLeft: '0.18em', transition: 'color 0.3s' }}>{f.serif}</span>
           </h3>
           <p style={{
             fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.75, margin: 0, maxWidth: 560,
@@ -717,7 +717,7 @@ function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number })
         <div style={{
           justifySelf: 'end',
           width: 54, height: 54, borderRadius: '50%',
-          border: `1px solid ${hover ? 'rgba(201,181,132,0.5)' : HAIR}`,
+          border: `1px solid ${hover ? 'rgba(99,102,241,0.5)' : HAIR}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: hover ? GOLD : FAINT,
           transform: hover ? 'rotate(0deg) scale(1.06)' : 'rotate(-8deg) scale(1)',
@@ -808,10 +808,10 @@ function PricingSection() {
 
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <MicroLabel color="rgba(201,181,132,0.55)" style={{ marginBottom: 26 }}>Investissement</MicroLabel>
+            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>Investissement</MicroLabel>
             <h2 style={{ margin: '0 0 34px', lineHeight: 1, letterSpacing: '-0.04em' }}>
               <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 5vw, 62px)', color: IVORY }}>Trois plans. </span>
-              <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(36px, 5.3vw, 66px)', color: GOLD }}>Zéro limite.</span>
+              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 5.3vw, 66px)', color: GOLD }}>Zéro limite.</span>
             </h2>
             {/* Billing toggle */}
             <div style={{ display: 'inline-flex', border: `1px solid ${HAIR}`, padding: 3, gap: 0 }}>
@@ -823,7 +823,7 @@ function PricingSection() {
                   padding: '9px 26px', fontSize: 11, fontWeight: 700,
                   fontFamily: SANS, letterSpacing: '0.18em', textTransform: 'uppercase',
                   background: yearly === opt.v ? IVORY : 'transparent',
-                  color: yearly === opt.v ? '#0A0A0C' : MUTED,
+                  color: yearly === opt.v ? '#0F1014' : MUTED,
                   border: 'none', cursor: 'pointer', transition: 'all 0.3s',
                 }}>
                   {opt.label}
@@ -851,12 +851,12 @@ function PricingSection() {
                 >
                   {/* Tag */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 30 }}>
-                    <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT }}>0{i + 1}</span>
+                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT }}>0{i + 1}</span>
                     {(p.popular || p.bestValue) && (
                       <span style={{
                         fontFamily: SANS, fontSize: 9, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
-                        color: inverted ? '#0A0A0C' : GOLD,
-                        borderBottom: `1px solid ${inverted ? '#0A0A0C' : 'rgba(201,181,132,0.5)'}`,
+                        color: inverted ? '#0F1014' : GOLD,
+                        borderBottom: `1px solid ${inverted ? '#0F1014' : 'rgba(99,102,241,0.5)'}`,
                         paddingBottom: 3,
                       }}>
                         {p.popular ? 'Le plus choisi' : 'Meilleure valeur'}
@@ -864,26 +864,26 @@ function PricingSection() {
                     )}
                   </div>
 
-                  <h3 style={{ margin: '0 0 4px', fontFamily: SANS, fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: inverted ? '#0A0A0C' : IVORY }}>{p.name}</h3>
-                  <p style={{ margin: '0 0 30px', fontFamily: SERIF, fontStyle: 'italic', fontSize: 15, color: inverted ? 'rgba(10,10,12,0.55)' : MUTED }}>{p.tagline}</p>
+                  <h3 style={{ margin: '0 0 4px', fontFamily: SANS, fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: inverted ? '#0F1014' : IVORY }}>{p.name}</h3>
+                  <p style={{ margin: '0 0 30px', fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: inverted ? 'rgba(10,10,12,0.55)' : MUTED }}>{p.tagline}</p>
 
                   {/* Price */}
                   <div style={{ marginBottom: 8, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                     {yearly && p.originalMonthly && (
-                      <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.35)' : FAINT, textDecoration: 'line-through' }}>{p.originalMonthly}</span>
+                      <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.35)' : FAINT, textDecoration: 'line-through' }}>{p.originalMonthly}</span>
                     )}
-                    <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 52, letterSpacing: '-0.05em', lineHeight: 1, color: inverted ? '#0A0A0C' : IVORY }}>
+                    <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 52, letterSpacing: '-0.05em', lineHeight: 1, color: inverted ? '#0F1014' : IVORY }}>
                       {yearly ? p.yearlyPrice : p.monthlyPrice}
                     </span>
-                    <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 16, color: inverted ? 'rgba(10,10,12,0.5)' : MUTED }}>/mois</span>
+                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 16, color: inverted ? 'rgba(10,10,12,0.5)' : MUTED }}>/mois</span>
                     {yearly && p.discount && (
-                      <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: inverted ? '#0A0A0C' : GOLD }}>{p.discount}</span>
+                      <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: inverted ? '#0F1014' : GOLD }}>{p.discount}</span>
                     )}
                   </div>
                   <p style={{ margin: '0 0 6px', fontFamily: SANS, fontSize: 11, color: inverted ? 'rgba(10,10,12,0.45)' : FAINT, minHeight: 14 }}>
                     {yearly && p.yearlyBilled ? p.yearlyBilled : ' '}
                   </p>
-                  <p style={{ margin: '0 0 28px', fontFamily: SANS, fontSize: 11.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: inverted ? 'rgba(10,10,12,0.6)' : 'rgba(201,181,132,0.7)' }}>
+                  <p style={{ margin: '0 0 28px', fontFamily: SANS, fontSize: 11.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: inverted ? 'rgba(10,10,12,0.6)' : 'rgba(99,102,241,0.7)' }}>
                     {p.credits}
                   </p>
 
@@ -893,14 +893,14 @@ function PricingSection() {
                   <ul style={{ listStyle: 'none', margin: '0 0 auto', padding: 0, display: 'flex', flexDirection: 'column', gap: 13 }}>
                     {p.features.map(f => (
                       <li key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ flexShrink: 0, color: f.included ? (inverted ? '#0A0A0C' : GOLD) : (inverted ? 'rgba(10,10,12,0.25)' : 'rgba(243,241,236,0.15)'), display: 'flex' }}>
+                        <span style={{ flexShrink: 0, color: f.included ? (inverted ? '#0F1014' : GOLD) : (inverted ? 'rgba(10,10,12,0.25)' : 'rgba(233,234,240,0.15)'), display: 'flex' }}>
                           {f.included
                             ? <Icon name="check" size={13} />
                             : <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.5"><path d="M5 12h14" /></svg>}
                         </span>
                         <span style={{
                           fontFamily: SANS, fontSize: 13,
-                          color: f.included ? (inverted ? 'rgba(10,10,12,0.85)' : 'rgba(243,241,236,0.78)') : (inverted ? 'rgba(10,10,12,0.3)' : FAINT),
+                          color: f.included ? (inverted ? 'rgba(10,10,12,0.85)' : 'rgba(233,234,240,0.78)') : (inverted ? 'rgba(10,10,12,0.3)' : FAINT),
                         }}>{f.text}</span>
                       </li>
                     ))}
@@ -913,18 +913,18 @@ function PricingSection() {
                       padding: '15px',
                       fontFamily: SANS, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
                       textDecoration: 'none',
-                      background: inverted ? '#0A0A0C' : 'transparent',
+                      background: inverted ? '#0F1014' : 'transparent',
                       color: inverted ? IVORY : IVORY,
-                      border: `1px solid ${inverted ? '#0A0A0C' : 'rgba(243,241,236,0.3)'}`,
+                      border: `1px solid ${inverted ? '#0F1014' : 'rgba(233,234,240,0.3)'}`,
                       transition: 'all 0.3s',
                     }}
                     onMouseEnter={e => {
-                      if (inverted) { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.color = '#0A0A0C' }
-                      else { e.currentTarget.style.background = IVORY; e.currentTarget.style.color = '#0A0A0C'; e.currentTarget.style.borderColor = IVORY }
+                      if (inverted) { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.color = '#0F1014' }
+                      else { e.currentTarget.style.background = IVORY; e.currentTarget.style.color = '#0F1014'; e.currentTarget.style.borderColor = IVORY }
                     }}
                     onMouseLeave={e => {
-                      if (inverted) { e.currentTarget.style.background = '#0A0A0C'; e.currentTarget.style.borderColor = '#0A0A0C'; e.currentTarget.style.color = IVORY }
-                      else { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = IVORY; e.currentTarget.style.borderColor = 'rgba(243,241,236,0.3)' }
+                      if (inverted) { e.currentTarget.style.background = '#0F1014'; e.currentTarget.style.borderColor = '#0F1014'; e.currentTarget.style.color = IVORY }
+                      else { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = IVORY; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.3)' }
                     }}>
                     {p.btnLabel}
                   </a>
@@ -939,7 +939,7 @@ function PricingSection() {
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
             <h3 style={{ margin: '0 0 10px', lineHeight: 1 }}>
               <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(24px, 3.4vw, 40px)', letterSpacing: '-0.03em', color: IVORY }}>Packs de </span>
-              <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(26px, 3.6vw, 43px)', color: GOLD }}>crédits</span>
+              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(26px, 3.6vw, 43px)', color: GOLD }}>crédits</span>
             </h3>
             <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: 0 }}>Recharge à tout moment — les crédits n'expirent jamais.</p>
           </div>
@@ -950,24 +950,24 @@ function PricingSection() {
             <FadeIn key={pack.name} delay={i * 0.06} style={{ display: 'flex' }}>
               <div
                 style={{ background: BG, padding: '34px 26px', textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'background 0.3s' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(243,241,236,0.03)')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(233,234,240,0.03)')}
                 onMouseLeave={e => (e.currentTarget.style.background = BG)}
               >
                 <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.3em', textTransform: 'uppercase', color: pack.note ? GOLD : FAINT, margin: '0 0 18px', minHeight: 12 }}>
                   {pack.note || pack.name}
                 </p>
-                <p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 42, color: IVORY, margin: '0 0 2px', lineHeight: 1 }}>{pack.credits}</p>
+                <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 42, color: IVORY, margin: '0 0 2px', lineHeight: 1 }}>{pack.credits}</p>
                 <p style={{ fontFamily: SANS, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: FAINT, margin: '0 0 22px' }}>crédits</p>
                 <p style={{ fontFamily: SANS, fontWeight: 900, fontSize: 26, letterSpacing: '-0.03em', color: IVORY, margin: '0 0 24px' }}>{pack.price}</p>
                 <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
                   style={{
                     marginTop: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8,
                     fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase',
-                    color: IVORY, textDecoration: 'none', borderBottom: `1px solid rgba(243,241,236,0.3)`, paddingBottom: 4,
+                    color: IVORY, textDecoration: 'none', borderBottom: `1px solid rgba(233,234,240,0.3)`, paddingBottom: 4,
                     transition: 'color 0.25s, border-color 0.25s',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.color = GOLD; e.currentTarget.style.borderColor = GOLD }}
-                  onMouseLeave={e => { e.currentTarget.style.color = IVORY; e.currentTarget.style.borderColor = 'rgba(243,241,236,0.3)' }}>
+                  onMouseLeave={e => { e.currentTarget.style.color = IVORY; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.3)' }}>
                   Acheter <Icon name="arrow-up-right" size={11} />
                 </a>
               </div>
@@ -1051,7 +1051,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
     padding: '13px 2px',
     background: 'transparent',
     border: 'none',
-    borderBottom: `1px solid rgba(243,241,236,0.18)`,
+    borderBottom: `1px solid rgba(233,234,240,0.18)`,
     borderRadius: 0,
     color: IVORY,
     fontSize: 15,
@@ -1081,7 +1081,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
             width: 150, height: 210,
             transform: `rotate(${c.rot}deg)`,
             overflow: 'hidden',
-            border: `1px solid rgba(243,241,236,0.1)`,
+            border: `1px solid rgba(233,234,240,0.1)`,
             opacity: 0.3,
             animation: `sf-float ${6 + i}s ease-in-out ${i * 0.7}s infinite`,
           }}>
@@ -1110,7 +1110,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
             <MicroLabel style={{ marginBottom: 28 }}>Le Studio</MicroLabel>
             <h2 style={{ margin: 0, lineHeight: 1.04, letterSpacing: '-0.04em' }}>
               <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 3.8vw, 58px)', color: IVORY }}>Là où les marques</span>
-              <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(36px, 4vw, 62px)', color: GOLD }}>passent à l'échelle.</span>
+              <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 4vw, 62px)', color: GOLD }}>passent à l'échelle.</span>
             </h2>
             <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.8, maxWidth: 380, margin: '24px 0 0' }}>
               Mass posting, cloud phones, banque de contenu, IA — l'arsenal complet, derrière une seule porte.
@@ -1147,7 +1147,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
 
         <div style={{ width: '100%', maxWidth: 380 }}>
           <div style={{ marginBottom: 44 }}>
-            <p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 16, color: GOLD, margin: '0 0 14px' }}>
+            <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 16, color: GOLD, margin: '0 0 14px' }}>
               {tab === 'login' ? '— 01 / Connexion' : '— 02 / Inscription'}
             </p>
             <h2 style={{ margin: '0 0 10px', fontFamily: SANS, fontWeight: 900, fontSize: 34, letterSpacing: '-0.04em', color: IVORY, lineHeight: 1.05 }}>
@@ -1164,7 +1164,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
               <input id="sf-email" type="email" required value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="vous@exemple.com" style={inputStyle}
                 onFocus={e => (e.currentTarget.style.borderBottomColor = GOLD)}
-                onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(243,241,236,0.18)')} />
+                onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(233,234,240,0.18)')} />
             </div>
 
             <div>
@@ -1173,7 +1173,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                 <input id="sf-pass" type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }}
                   onFocus={e => (e.currentTarget.style.borderBottomColor = GOLD)}
-                  onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(243,241,236,0.18)')} />
+                  onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(233,234,240,0.18)')} />
                 <button type="button" onClick={() => setShowPw(!showPw)}
                   aria-label={showPw ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: FAINT, padding: 4, display: 'flex', alignItems: 'center' }}>
@@ -1188,7 +1188,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                 <input id="sf-confirm" type="password" required value={confirm} onChange={e => setConfirm(e.target.value)}
                   placeholder="••••••••" style={inputStyle}
                   onFocus={e => (e.currentTarget.style.borderBottomColor = GOLD)}
-                  onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(243,241,236,0.18)')} />
+                  onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(233,234,240,0.18)')} />
               </div>
             )}
 
@@ -1207,7 +1207,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
               style={{
                 width: '100%', padding: '17px', marginTop: 6,
                 border: `1px solid ${IVORY}`, cursor: loading ? 'wait' : 'pointer',
-                background: IVORY, color: '#0A0A0C',
+                background: IVORY, color: '#0F1014',
                 fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.3em', textTransform: 'uppercase',
                 transition: 'all 0.35s cubic-bezier(0.16,1,0.3,1)',
                 opacity: loading ? 0.55 : 1,
@@ -1225,8 +1225,8 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
             <button onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(null); setSuccess(null); setPassword(''); setConfirm('') }}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginLeft: 10,
-                fontFamily: SERIF, fontStyle: 'italic', fontSize: 15, color: GOLD,
-                borderBottom: '1px solid rgba(201,181,132,0.4)',
+                fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: GOLD,
+                borderBottom: '1px solid rgba(99,102,241,0.4)',
               }}>
               {tab === 'login' ? "S'inscrire" : 'Se connecter'}
             </button>
@@ -1301,12 +1301,12 @@ export function Landing() {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', background: 'transparent', border: `1px solid rgba(243,241,236,0.2)`, color: IVORY, textDecoration: 'none', transition: 'border-color 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(243,241,236,0.55)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(243,241,236,0.2)')}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', background: 'transparent', border: `1px solid rgba(233,234,240,0.2)`, color: IVORY, textDecoration: 'none', transition: 'border-color 0.2s' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(233,234,240,0.55)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(233,234,240,0.2)')}>
               <TGIcon size={12} /> Clé
             </a>
             <button onClick={onStudio}
-              style={{ padding: '9px 22px', background: IVORY, border: `1px solid ${IVORY}`, color: '#0A0A0C', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.3s' }}
+              style={{ padding: '9px 22px', background: IVORY, border: `1px solid ${IVORY}`, color: '#0F1014', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.3s' }}
               onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD }}
               onMouseLeave={e => { e.currentTarget.style.background = IVORY; e.currentTarget.style.borderColor = IVORY }}>
               Studio
@@ -1325,12 +1325,12 @@ export function Landing() {
       <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px' }}>
         <div style={{ maxWidth: 880, margin: '0 auto', textAlign: 'center' }}>
           <FadeIn>
-            <MicroLabel color="rgba(201,181,132,0.55)" style={{ marginBottom: 38 }}>Manifeste</MicroLabel>
+            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 38 }}>Manifeste</MicroLabel>
           </FadeIn>
           <FadeIn delay={0.1}>
-            <p style={{ fontFamily: SERIF, fontSize: 'clamp(24px, 3.4vw, 40px)', lineHeight: 1.45, color: 'rgba(243,241,236,0.85)', margin: 0, fontWeight: 400 }}>
+            <p style={{ fontFamily: SERIF, fontSize: 'clamp(24px, 3.4vw, 40px)', lineHeight: 1.45, color: 'rgba(233,234,240,0.85)', margin: 0, fontWeight: 400 }}>
               Pendant que d'autres publient un post par jour,
-              <span style={{ fontStyle: 'italic', color: GOLD }}> nos studios en orchestrent des centaines</span> —
+              <span style={{ fontStyle: 'normal', color: GOLD }}> nos studios en orchestrent des centaines</span> —
               sur des dizaines de comptes, sans lever le petit doigt.
             </p>
           </FadeIn>
@@ -1349,7 +1349,7 @@ export function Landing() {
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 30, flexWrap: 'wrap', gap: 16 }}>
               <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
                 <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(36px, 5.4vw, 66px)', color: IVORY }}>L'arsenal</span>
-                <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(38px, 5.7vw, 70px)', color: GOLD }}>complet.</span>
+                <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(38px, 5.7vw, 70px)', color: GOLD }}>complet.</span>
               </h2>
               <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, maxWidth: 300, lineHeight: 1.7, margin: 0, paddingBottom: 8 }}>
                 Six pôles d'outils. Une interface. Plus besoin de jongler entre dix applications.
@@ -1371,12 +1371,12 @@ export function Landing() {
       <section style={{ position: 'relative', zIndex: 1, padding: '40px 24px 140px' }}>
         <FadeIn>
           <div style={{ maxWidth: 1080, margin: '0 auto', border: `1px solid ${HAIR}`, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 300, background: 'radial-gradient(ellipse closest-side, rgba(201,181,132,0.06), transparent)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 300, background: 'radial-gradient(ellipse closest-side, rgba(99,102,241,0.06), transparent)', filter: 'blur(50px)', pointerEvents: 'none' }} />
             <div style={{ padding: '90px 40px', textAlign: 'center', position: 'relative' }}>
-              <MicroLabel color="rgba(201,181,132,0.55)" style={{ marginBottom: 30 }}>Accès</MicroLabel>
+              <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 30 }}>Accès</MicroLabel>
               <h3 style={{ margin: '0 0 18px', lineHeight: 1.04, letterSpacing: '-0.04em' }}>
                 <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.6vw, 56px)', color: IVORY }}>Ta clé. </span>
-                <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(32px, 4.9vw, 60px)', color: GOLD }}>Ton empire.</span>
+                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.9vw, 60px)', color: GOLD }}>Ton empire.</span>
               </h3>
               <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, margin: '0 0 44px', lineHeight: 1.8 }}>
                 Activation immédiate après paiement — crypto ou virement.<br />Réponse en moins d'une heure.
@@ -1384,7 +1384,7 @@ export function Landing() {
               <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 14, padding: '18px 46px',
-                  background: IVORY, color: '#0A0A0C', textDecoration: 'none',
+                  background: IVORY, color: '#0F1014', textDecoration: 'none',
                   fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.28em', textTransform: 'uppercase',
                   border: `1px solid ${IVORY}`,
                   transition: 'all 0.35s cubic-bezier(0.16,1,0.3,1)',
@@ -1403,10 +1403,10 @@ export function Landing() {
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
           <FadeIn>
             <div style={{ textAlign: 'center', marginBottom: 54 }}>
-              <MicroLabel color="rgba(201,181,132,0.55)" style={{ marginBottom: 26 }}>Questions</MicroLabel>
+              <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>Questions</MicroLabel>
               <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
                 <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.4vw, 52px)', color: IVORY }}>On répond à </span>
-                <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(32px, 4.7vw, 56px)', color: GOLD }}>tout.</span>
+                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.7vw, 56px)', color: GOLD }}>tout.</span>
               </h2>
             </div>
           </FadeIn>
@@ -1418,7 +1418,7 @@ export function Landing() {
                     aria-expanded={faqOpen === i}
                     style={{ width: '100%', padding: '26px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 16 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 18 }}>
-                      <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 14, color: faqOpen === i ? GOLD : FAINT, transition: 'color 0.25s', flexShrink: 0 }}>0{i + 1}</span>
+                      <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: faqOpen === i ? GOLD : FAINT, transition: 'color 0.25s', flexShrink: 0 }}>0{i + 1}</span>
                       <span style={{ fontFamily: SANS, fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.01em', color: IVORY }}>{item.q}</span>
                     </span>
                     <span aria-hidden style={{ color: faqOpen === i ? GOLD : FAINT, fontSize: 22, lineHeight: 1, flexShrink: 0, transition: 'transform 0.3s, color 0.3s', display: 'inline-block', transform: faqOpen === i ? 'rotate(45deg)' : 'none', fontWeight: 300 }}>+</span>
@@ -1441,7 +1441,7 @@ export function Landing() {
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 60 }}>
             <div>
               <Wordmark size={18} />
-              <p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 14, color: MUTED, margin: '14px 0 0', maxWidth: 260, lineHeight: 1.6 }}>
+              <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: MUTED, margin: '14px 0 0', maxWidth: 260, lineHeight: 1.6 }}>
                 L'usine de contenu des marques qui dominent Instagram.
               </p>
             </div>
@@ -1457,14 +1457,14 @@ export function Landing() {
           </div>
           <div style={{ borderTop: `1px solid ${HAIR}`, paddingTop: 24, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>
             <p style={{ fontFamily: SANS, fontSize: 10.5, letterSpacing: '0.14em', color: FAINT, margin: 0 }}>© {new Date().getFullYear()} SCALEFLOW — TOUS DROITS RÉSERVÉS</p>
-            <p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 13, color: 'rgba(201,181,132,0.5)', margin: 0 }}>La révolution commence.</p>
+            <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 13, color: 'rgba(99,102,241,0.5)', margin: 0 }}>La révolution commence.</p>
           </div>
         </div>
         {/* Giant ghost wordmark */}
         <div aria-hidden style={{ textAlign: 'center', lineHeight: 0.72, userSelect: 'none', pointerEvents: 'none', marginBottom: -30 }}>
           <span style={{
             fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(80px, 14.5vw, 230px)', letterSpacing: '-0.05em',
-            color: 'transparent', WebkitTextStroke: '1px rgba(243,241,236,0.07)',
+            color: 'transparent', WebkitTextStroke: '1px rgba(233,234,240,0.07)',
           }}>SCALEFLOW</span>
         </div>
       </footer>

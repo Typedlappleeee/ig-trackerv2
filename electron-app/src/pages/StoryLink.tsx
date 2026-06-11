@@ -808,7 +808,7 @@ export default function StoryLink({ user }: { user: User }) {
                     {a.text && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-3)', marginBottom: 3 }}>
                         <span style={{ flexShrink: 0 }}><IconTextSm /></span>
-                        <span style={{ fontStyle: 'italic' }}>"{a.text}"</span>
+                        <span style={{ fontStyle: 'normal' }}>"{a.text}"</span>
                       </div>
                     )}
 

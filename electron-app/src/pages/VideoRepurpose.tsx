@@ -529,7 +529,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             />
             <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
               {sources.length > 1
-                ? <span><span style={{ color: '#22d3ee', fontWeight: 700 }}>{count}</span> /vidéo · <span style={{ color: '#C9B584', fontWeight: 700 }}>{totalJobs}</span> total</span>
+                ? <span><span style={{ color: '#22d3ee', fontWeight: 700 }}>{count}</span> /vidéo · <span style={{ color: '#6366F1', fontWeight: 700 }}>{totalJobs}</span> total</span>
                 : `${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
             </div>
           </div>
@@ -619,9 +619,9 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 7, padding: '7px 10px',
                     borderRadius: 9, fontSize: 11.5, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer',
-                    background: bankFolder ? 'rgba(201,181,132,0.1)' : 'var(--surface-2)',
-                    border: `1px solid ${bankFolder ? 'rgba(201,181,132,0.35)' : 'var(--border)'}`,
-                    color: bankFolder ? '#D4C499' : 'var(--text-3)', textAlign: 'left',
+                    background: bankFolder ? 'rgba(99,102,241,0.1)' : 'var(--surface-2)',
+                    border: `1px solid ${bankFolder ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                    color: bankFolder ? '#818CF8' : 'var(--text-3)', textAlign: 'left',
                   }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -682,7 +682,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               {/* Animated icon */}
               <div style={{ position: 'relative', width: 76, height: 76, margin: '0 auto 8px' }}>
                 <div style={{ position: 'absolute', inset: -14, borderRadius: '50%', border: '1px dashed rgba(34,211,238,0.18)', animation: 'spin 14s linear infinite' }} />
-                <div style={{ position: 'absolute', inset: -6, borderRadius: '50%', border: '1px dashed rgba(201,181,132,0.12)', animation: 'spin 20s linear infinite reverse' }} />
+                <div style={{ position: 'absolute', inset: -6, borderRadius: '50%', border: '1px dashed rgba(99,102,241,0.12)', animation: 'spin 20s linear infinite reverse' }} />
                 <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, rgba(34,211,238,0.1), rgba(129,140,248,0.06))', border: '1px solid rgba(34,211,238,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(34,211,238,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -743,8 +743,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             {/* Header */}
             <div className="sf-modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(201,181,132,0.12)', border: '1px solid rgba(201,181,132,0.2)' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 </div>
                 <span className="sf-modal-title">Dossier de destination</span>
               </div>
@@ -795,10 +795,10 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   <button key={f}
                     onClick={() => { setBankFolder(f); setShowFolderModal(false) }}
                     className="cursor-pointer"
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', textAlign: 'left', background: f === bankFolder ? 'rgba(201,181,132,0.1)' : 'transparent', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.15s' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: f === bankFolder ? '#D4C499' : 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
-                    {f === bankFolder && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', textAlign: 'left', background: f === bankFolder ? 'rgba(99,102,241,0.1)' : 'transparent', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.15s' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: f === bankFolder ? '#818CF8' : 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
+                    {f === bankFolder && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
                   </button>
                 ))}
               </div>

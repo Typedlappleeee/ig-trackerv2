@@ -326,8 +326,8 @@ export function Warmup({ user }: WarmupProps) {
           <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div className="sf-anim-scale-spring" style={{
               width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(201,181,132,0.2), rgba(168,85,247,0.1))',
-              border: '1px solid rgba(201,181,132,0.25)', color: '#C9B584',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.1))',
+              border: '1px solid rgba(99,102,241,0.25)', color: '#6366F1',
             }}>
               <IconBolt size={18} />
             </div>
@@ -371,14 +371,14 @@ export function Warmup({ user }: WarmupProps) {
         <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div className="sf-anim-scale-spring" style={{
             width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(201,181,132,0.25), rgba(168,85,247,0.1))',
-            border: '1px solid rgba(201,181,132,0.3)', color: '#C9B584', position: 'relative', overflow: 'hidden',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.1))',
+            border: '1px solid rgba(99,102,241,0.3)', color: '#6366F1', position: 'relative', overflow: 'hidden',
           }}>
             <IconBolt size={18} />
             {running && (
               <div style={{
                 position: 'absolute', inset: 0, borderRadius: 12,
-                background: 'linear-gradient(135deg, #C9B584, #D4C499)',
+                background: 'linear-gradient(135deg, #6366F1, #818CF8)',
                 opacity: 0.2, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
               }} />
             )}
@@ -407,7 +407,7 @@ export function Warmup({ user }: WarmupProps) {
           {running && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', borderRadius: 10,
-              background: 'rgba(201,181,132,0.08)', border: '1px solid rgba(201,181,132,0.2)',
+              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
             }}>
               <div className="sf-spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} />
               <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--accent-glow)', fontWeight: 600 }}>
@@ -520,7 +520,7 @@ export function Warmup({ user }: WarmupProps) {
                         width: '100%', padding: '12px 18px',
                         display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
                         borderBottom: '1px solid var(--border)', background: sel
-                          ? 'linear-gradient(90deg, rgba(201,181,132,0.08), transparent)'
+                          ? 'linear-gradient(90deg, rgba(99,102,241,0.08), transparent)'
                           : 'transparent',
                         transition: 'background 140ms',
                         border: 'none', borderBottomColor: 'var(--border)', cursor: 'pointer',
@@ -531,8 +531,8 @@ export function Warmup({ user }: WarmupProps) {
                       <div style={{
                         width: 17, height: 17, borderRadius: 4, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: `1.5px solid ${sel ? '#C9B584' : 'rgba(201,181,132,0.25)'}`,
-                        background: sel ? '#C9B584' : 'transparent',
+                        border: `1.5px solid ${sel ? '#6366F1' : 'rgba(99,102,241,0.25)'}`,
+                        background: sel ? '#6366F1' : 'transparent',
                         transition: 'all 140ms',
                       }}>
                         {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>}
@@ -584,19 +584,19 @@ export function Warmup({ user }: WarmupProps) {
                 <div style={{
                   padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   borderBottom: '1px solid var(--border)',
-                  background: running ? 'rgba(201,181,132,0.04)' : 'transparent',
+                  background: running ? 'rgba(99,102,241,0.04)' : 'transparent',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {running && (
                       <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
                         <div style={{
                           position: 'absolute', inset: 0, borderRadius: '50%',
-                          background: 'linear-gradient(135deg,#C9B584,#D4C499)',
+                          background: 'linear-gradient(135deg,#6366F1,#818CF8)',
                           opacity: 0.22, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
                         }} />
                         <div style={{
                           width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'rgba(201,181,132,0.14)', border: '1px solid rgba(201,181,132,0.35)', color: 'var(--accent-glow)',
+                          background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.35)', color: 'var(--accent-glow)',
                         }}>
                           <IconSettings size={13} />
                         </div>
@@ -644,7 +644,7 @@ export function Warmup({ user }: WarmupProps) {
                   {jobs.map(job => {
                     const borderColor = job.status === 'done' ? 'rgba(34,197,94,0.5)'
                       : job.status === 'error' ? 'rgba(239,68,68,0.5)'
-                      : job.status === 'running' ? 'rgba(201,181,132,0.6)'
+                      : job.status === 'running' ? 'rgba(99,102,241,0.6)'
                       : 'rgba(255,255,255,0.06)'
                     const statusIcon = job.status === 'done'
                       ? <span style={{ color: 'var(--ok)' }}><IconCheckCircle size={14} /></span>
@@ -658,7 +658,7 @@ export function Warmup({ user }: WarmupProps) {
                         borderRadius: 10, overflow: 'hidden', fontFamily: 'monospace',
                         border: '1px solid var(--border)',
                         borderLeft: `3px solid ${borderColor}`,
-                        background: job.status === 'running' ? 'rgba(201,181,132,0.04)' : 'transparent',
+                        background: job.status === 'running' ? 'rgba(99,102,241,0.04)' : 'transparent',
                       }}>
                         <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
                           <span style={{ display: 'flex', flexShrink: 0 }}>{statusIcon}</span>
@@ -692,7 +692,7 @@ export function Warmup({ user }: WarmupProps) {
                           }}>
                             {job.logs.slice(-4).map((l, i) => (
                               <p key={i} style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--text-4)', lineHeight: 1.5 }}>
-                                <span style={{ color: 'rgba(201,181,132,0.4)', marginRight: 4 }}>›</span>{l}
+                                <span style={{ color: 'rgba(99,102,241,0.4)', marginRight: 4 }}>›</span>{l}
                               </p>
                             ))}
                           </div>
@@ -735,7 +735,7 @@ export function Warmup({ user }: WarmupProps) {
                   <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
                     <div style={{
                       width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(201,181,132,0.12)', border: '1px solid rgba(201,181,132,0.22)', color: 'var(--accent-glow)',
+                      background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-glow)',
                     }}>
                       <IconKey size={14} />
                     </div>
@@ -788,13 +788,13 @@ export function Warmup({ user }: WarmupProps) {
                                 className="sf-input"
                                 style={{
                                   fontSize: 12, fontFamily: 'monospace',
-                                  borderColor: cred.totpSecret ? 'rgba(201,181,132,0.45)' : undefined,
-                                  background: cred.totpSecret ? 'rgba(201,181,132,0.07)' : undefined,
-                                  color: cred.totpSecret ? '#D4C499' : undefined,
+                                  borderColor: cred.totpSecret ? 'rgba(99,102,241,0.45)' : undefined,
+                                  background: cred.totpSecret ? 'rgba(99,102,241,0.07)' : undefined,
+                                  color: cred.totpSecret ? '#818CF8' : undefined,
                                 }}
                               />
                               {cred.totpSecret && (
-                                <p style={{ fontSize: 10, fontFamily: 'monospace', marginTop: 4, paddingLeft: 2, display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(201,181,132,0.7)' }}>
+                                <p style={{ fontSize: 10, fontFamily: 'monospace', marginTop: 4, paddingLeft: 2, display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(99,102,241,0.7)' }}>
                                   <IconSparkles size={11} /> {t('warmupTotp2fa')}
                                 </p>
                               )}
@@ -928,7 +928,7 @@ export function Warmup({ user }: WarmupProps) {
                         )}
                       </div>
                       {editPicFile && (
-                        <p style={{ fontSize: 10, marginTop: 4, fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(201,181,132,0.7)' }}>
+                        <p style={{ fontSize: 10, marginTop: 4, fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(99,102,241,0.7)' }}>
                           <IconPaperclip size={11} /> {fileName(editPicFile)}
                         </p>
                       )}
@@ -974,7 +974,7 @@ export function Warmup({ user }: WarmupProps) {
                   <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
                     <div style={{
                       width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(243,241,236,0.12)', border: '1px solid rgba(243,241,236,0.22)', color: '#D4C499',
+                      background: 'rgba(233,234,240,0.12)', border: '1px solid rgba(233,234,240,0.22)', color: '#818CF8',
                     }}>
                       <IconFlame size={14} />
                     </div>
@@ -999,7 +999,7 @@ export function Warmup({ user }: WarmupProps) {
                               padding: '9px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: 'monospace',
                               cursor: 'pointer', border: 'none', transition: 'all 140ms',
                               ...(browseMinutes === m
-                                ? { background: 'linear-gradient(140deg, #C9B584, #B8A070)', color: '#fff', boxShadow: '0 0 18px -4px rgba(201,181,132,0.55)' }
+                                ? { background: 'linear-gradient(140deg, #6366F1, #4F46E5)', color: '#fff', boxShadow: '0 0 18px -4px rgba(99,102,241,0.55)' }
                                 : { background: 'var(--surface-2)', color: 'var(--text-3)', border: '1px solid var(--border)' }),
                             }}>
                             {m === 0 ? '—' : `${m}m`}
@@ -1024,8 +1024,8 @@ export function Warmup({ user }: WarmupProps) {
                             <div key={key} style={{
                               display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 8,
                               opacity: disabled ? 0.35 : 1, transition: 'all 140ms',
-                              background: value && !disabled ? 'rgba(201,181,132,0.06)' : 'rgba(255,255,255,0.02)',
-                              border: `1px solid ${value && !disabled ? 'rgba(201,181,132,0.2)' : 'var(--border)'}`,
+                              background: value && !disabled ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.02)',
+                              border: `1px solid ${value && !disabled ? 'rgba(99,102,241,0.2)' : 'var(--border)'}`,
                             }}>
                               <span style={{ display: 'flex', flexShrink: 0, color: value && !disabled ? 'var(--accent-glow)' : 'var(--text-4)' }}>{icon}</span>
                               <span style={{ flex: 1, fontSize: 13, color: 'var(--text-2)', fontFamily: 'monospace' }}>{t(labelKey)}</span>
