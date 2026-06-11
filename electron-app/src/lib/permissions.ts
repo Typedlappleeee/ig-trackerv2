@@ -6,25 +6,25 @@ import type { OrgRole, PermOverrides, PageKey, ActionKey } from './supabase'
 // can edit their profile / see organisation info.
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
-    phones: true,
+    phones: true, stats: true,
     posting: true, massposting: true, scheduler: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true,
     settings: true,
   },
   admin: {
-    phones: true,
+    phones: true, stats: true,
     posting: true, massposting: true, scheduler: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true,
     settings: true,
   },
   member: {
-    phones: true,
+    phones: true, stats: true,
     posting: true, massposting: true, scheduler: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true,
     settings: false,
   },
   viewer: {
-    phones: true,
+    phones: true, stats: true,
     posting: false, massposting: false, scheduler: false, storylink: false, bank: true, captionbank: true, warmup: false, aitools: false,
     remix: false, repurpose: false, montage: false, mixer: false,
     settings: false,
@@ -96,6 +96,7 @@ export function canDoAction(role: OrgRole, overrides: PermOverrides | undefined,
 // `settings` represents the *Connexions sub-panel* (API keys), not the whole page.
 export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
   { key: 'phones',      label: 'Téléphones',                          icon: '📱' },
+  { key: 'stats',       label: 'Stats',                               icon: '📊' },
   { key: 'posting',     label: 'Posting',                             icon: '🚀' },
   { key: 'massposting', label: 'Mass Posting',                        icon: '⚡' },
   { key: 'scheduler',   label: 'Programmation',                       icon: '📅' },
