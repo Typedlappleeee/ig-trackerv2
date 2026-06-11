@@ -387,6 +387,7 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [search, setSearch]       = useState('')
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showTypeChoice, setShowTypeChoice] = useState(false)
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]     = useState<{ id: string; msgs: string[] } | null>(null)
   const timersRef                 = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -581,7 +582,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               <IconRefresh size={14} color="rgba(233,234,240,0.72)" spinning={loading} />
             </button>
             <button
-              onClick={() => setShowCreate(true)}
+              onClick={() => setShowTypeChoice(true)}
               className="cursor-pointer"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -712,7 +713,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               <button
                 className="sf-btn sf-btn-primary cursor-pointer"
                 style={{ marginTop: 4 }}
-                onClick={() => setShowCreate(true)}
+                onClick={() => setShowTypeChoice(true)}
               >
                 {t('schedulerSchedulePost')}
               </button>
@@ -760,6 +761,86 @@ export function Scheduler({ user, onNavigate }: Props) {
           onCreated={() => { setShowCreate(false); reload() }}
           onClose={() => setShowCreate(false)}
         />
+      )}
+
+      {/* ── Type chooser : Reel ou Story ─────────────────────────────────── */}
+      {showTypeChoice && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9000,
+            background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(10px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowTypeChoice(false) }}
+        >
+          <div className="anim-scale-in" style={{
+            width: '100%', maxWidth: 460,
+            background: '#13141A', border: '1px solid rgba(233,234,240,0.08)',
+            borderRadius: 12, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+          }}>
+            <div style={{ padding: '18px 22px 14px', borderBottom: '1px solid rgba(233,234,240,0.08)' }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#E9EAF0' }}>
+                Que veux-tu programmer ?
+              </p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 18 }}>
+              {/* Reel */}
+              <button
+                onClick={() => { setShowTypeChoice(false); setShowCreate(true) }}
+                className="cursor-pointer"
+                style={{
+                  padding: '22px 16px', borderRadius: 10, textAlign: 'left',
+                  background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.25)',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.13)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.45)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.07)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)' }}
+              >
+                <div style={{ marginBottom: 10, color: '#818CF8' }}>
+                  <IconVideo size={22} color="currentColor" />
+                </div>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#E9EAF0' }}>Reel</p>
+                <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'rgba(233,234,240,0.42)' }}>
+                  Vidéos de la banque, légende, mode séquentiel ou aléatoire. Part même app fermée.
+                </p>
+              </button>
+              {/* Story */}
+              <button
+                onClick={() => { setShowTypeChoice(false); onNavigate?.('storylink') }}
+                className="cursor-pointer"
+                style={{
+                  padding: '22px 16px', borderRadius: 10, textAlign: 'left',
+                  background: 'rgba(233,234,240,0.025)', border: '1px solid rgba(233,234,240,0.1)',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.07)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(233,234,240,0.025)'; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.1)' }}
+              >
+                <div style={{ marginBottom: 10, color: '#818CF8' }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                  </svg>
+                </div>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#E9EAF0' }}>Story avec lien</p>
+                <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'rgba(233,234,240,0.42)' }}>
+                  Photos + sticker lien par compte. Tu configures sur la page Story puis « Programmer ».
+                </p>
+              </button>
+            </div>
+            <div style={{ padding: '0 18px 16px' }}>
+              <button
+                onClick={() => setShowTypeChoice(false)}
+                className="cursor-pointer"
+                style={{
+                  width: '100%', padding: '9px 0', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  background: 'transparent', border: '1px solid rgba(233,234,240,0.08)',
+                  color: 'rgba(233,234,240,0.42)',
+                }}
+              >Annuler</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -1069,10 +1069,42 @@ async function runWarmupActions(
   let likeCount = 0
   let followCount = 0
 
-  // Go to home feed
+  // ── Wake + unlock — sans ça, tous les taps/swipes partent dans le vide ─────
+  log('📱 Réveil de l\'écran…')
+  await shellExec(bearer, phoneId, 'input keyevent 224')
+  await sleep(800)
+  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400')
+  await sleep(1000)
+
+  // Dismiss permission / "Not now" popups that block all interaction
+  async function dismissPopups(xml: string): Promise<boolean> {
+    const pt =
+      findByText(xml, 'Not now', 'Plus tard', 'Not Now', 'Pas maintenant',
+        'Allow', 'Autoriser', 'Continue', 'Continuer', 'OK', 'Skip', 'Ignorer') ??
+      findByResourceId(xml, 'permission_allow_button', 'negative_button', 'primary_button_row')
+    if (pt) {
+      await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`)
+      await sleep(1500)
+      return true
+    }
+    return false
+  }
+
+  // ── Open Instagram and VERIFY it's actually in the foreground ──────────────
   log('📱 Ouverture du fil d\'actualité…')
-  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
-  await sleep(4000)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
+    await sleep(5000)
+    const xml = await dumpXml(bearer, phoneId)
+    if (await dismissPopups(xml)) continue   // popup éjectée → re-vérifier
+    if (/com\.instagram\.android/.test(xml)) { log('   ✅ Instagram ouvert'); break }
+    if (attempt === 2) { log('   ⚠️ Instagram ne semble pas au premier plan — on continue quand même') }
+    else {
+      log('   ↻ Instagram pas encore visible — nouvel essai…')
+      await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+      await sleep(2000)
+    }
+  }
 
   while (Date.now() < endTime && !abortSignal.abort) {
     // Scroll the feed
@@ -1087,14 +1119,24 @@ async function runWarmupActions(
     // Randomly like posts
     if (config.likePosts && Math.random() < 0.35) {
       const xml = await dumpXml(bearer, phoneId)
-      const likeBtn = findByResourceId(xml, 'row_feed_button_like') ??
-                      findByText(xml, 'Like', "J'aime")
+      // Une popup peut être apparue en plein scroll — l'éjecter d'abord
+      if (await dismissPopups(xml)) continue
+      // Resource-id uniquement : matcher le TEXTE « Like » tape sur les
+      // compteurs de likes (ouvre la liste des likers) — c'était le bug.
+      const likeBtn = findByResourceId(xml, 'row_feed_button_like', 'like_button')
       if (likeBtn) {
         await shellExec(bearer, phoneId, `input tap ${likeBtn[0]} ${likeBtn[1]}`)
         likeCount++
         log(`❤️ Like (${likeCount})`)
-        await sleep(800 + Math.floor(Math.random() * 500))
+      } else {
+        // Fallback humain : double-tap au centre du média = like Instagram.
+        // Les deux taps dans UNE commande shell (un aller-retour HTTP entre
+        // deux taps serait trop lent pour compter comme double-tap).
+        await shellExec(bearer, phoneId, 'input tap 540 760 && input tap 540 760')
+        likeCount++
+        log(`❤️ Like (double-tap) (${likeCount})`)
       }
+      await sleep(800 + Math.floor(Math.random() * 500))
     }
 
     // Randomly follow suggested accounts

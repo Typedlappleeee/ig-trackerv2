@@ -12,6 +12,7 @@
  *  - account_stats_history (snapshot max 1×/h par compte) → courbes 7/30 j
  */
 import { supabase } from './supabase'
+import { fetchIgStats } from './instagram'
 import type { User } from '@supabase/supabase-js'
 
 type Phone = {
@@ -35,11 +36,46 @@ async function refillQueue() {
     .from('phones')
     .select('id, org_id, ig_username, ig_sessionid')
     .eq('user_id', _userId)
-  _queue = ((data ?? []) as Phone[]).filter(p => p.ig_username && p.ig_sessionid)
+  // Le pseudo IG suffit — le sessionid est optionnel (fetch anonyme sinon)
+  _queue = ((data ?? []) as Phone[]).filter(p => p.ig_username)
+}
+
+async function writeStats(
+  phone: Phone,
+  stats: { followers: number; following: number; total_views?: number; posts: number },
+  bio: string | null,
+) {
+  await supabase.from('phones').update({
+    followers:   stats.followers,
+    following:   stats.following,
+    posts:       stats.posts,
+    video_count: stats.posts,   // la page Stats lit video_count
+    // total_views omis quand indisponible (mode anonyme) — ne pas écraser
+    // une valeur session plus complète par un zéro
+    ...(stats.total_views !== undefined ? { total_views: stats.total_views } : {}),
+    bio,
+    ig_status:   'active',
+  }).eq('id', phone.id)
+
+  // Snapshot d'historique (throttle 1 h par compte). Silencieux si la
+  // table n'est pas encore migrée.
+  const last = _lastSnapshot.get(phone.id) ?? 0
+  if (Date.now() - last > SNAPSHOT_MIN_MS) {
+    _lastSnapshot.set(phone.id, Date.now())
+    await supabase.from('account_stats_history').insert({
+      user_id:     _userId,
+      org_id:      phone.org_id,
+      phone_id:    phone.id,
+      followers:   stats.followers,
+      following:   stats.following,
+      posts:       stats.posts,
+      total_views: stats.total_views ?? 0,
+    }).then(() => {}, () => {})
+  }
 }
 
 async function processOne() {
-  if (!_userId || !window.electronAPI?.fetchInstagramBySession) return
+  if (!_userId || !window.electronAPI) return
   if (_queue.length === 0) {
     await refillQueue()
     if (_queue.length === 0) return
@@ -47,39 +83,43 @@ async function processOne() {
   const phone = _queue.shift()!
 
   try {
-    const r = await window.electronAPI.fetchInstagramBySession({
-      username:  phone.ig_username!,
-      sessionid: phone.ig_sessionid!,
-    })
-    if (r.ok) {
-      const stats = {
-        followers:   r.followers   ?? 0,
-        following:   r.following   ?? 0,
-        total_views: r.total_views ?? 0,
-        posts:       r.posts       ?? 0,
+    if (phone.ig_sessionid && window.electronAPI.fetchInstagramBySession) {
+      // Mode session : données complètes (vues incluses)
+      const r = await window.electronAPI.fetchInstagramBySession({
+        username:  phone.ig_username!,
+        sessionid: phone.ig_sessionid!,
+      })
+      if (r.ok) {
+        await writeStats(phone, {
+          followers:   r.followers   ?? 0,
+          following:   r.following   ?? 0,
+          total_views: r.total_views ?? 0,
+          posts:       r.posts       ?? 0,
+        }, r.bio ?? null)
+        return
       }
-      await supabase.from('phones').update({
-        ...stats,
-        video_count: stats.posts,   // la page Stats lit video_count
-        bio:         r.bio ?? null,
-        ig_status:   'active',
-      }).eq('id', phone.id)
+      if (r.error === 'session_expired') {
+        await supabase.from('phones').update({ ig_status: 'expired' }).eq('id', phone.id)
+        // Session morte → tenter quand même le mode anonyme ci-dessous
+      } else {
+        await supabase.from('phones').update({ ig_status: 'error' }).eq('id', phone.id)
+        return
+      }
+    }
 
-      // Snapshot d'historique (throttle 1 h par compte). Silencieux si la
-      // table n'est pas encore migrée.
-      const last = _lastSnapshot.get(phone.id) ?? 0
-      if (Date.now() - last > SNAPSHOT_MIN_MS) {
-        _lastSnapshot.set(phone.id, Date.now())
-        await supabase.from('account_stats_history').insert({
-          user_id:  _userId,
-          org_id:   phone.org_id,
-          phone_id: phone.id,
-          ...stats,
-        }).then(() => {}, () => {})
-      }
-    } else if (r.error === 'session_expired') {
-      await supabase.from('phones').update({ ig_status: 'expired' }).eq('id', phone.id)
-    } else {
+    // Mode anonyme : le pseudo suffit. fetchIgStats enchaîne navigateur caché →
+    // API publique → parsing HTML, avec cache 8 min intégré.
+    const anon = await fetchIgStats(phone.ig_username!, { force: true })
+    if (anon) {
+      await writeStats(phone, {
+        followers:   anon.followers,
+        following:   anon.following,
+        // total_views anonyme = somme des ~12 derniers posts seulement —
+        // undefined quand vide pour ne pas écraser une valeur session
+        total_views: anon.total_views > 0 ? anon.total_views : undefined,
+        posts:       anon.posts,
+      }, anon.bio || null)
+    } else if (!phone.ig_sessionid) {
       await supabase.from('phones').update({ ig_status: 'error' }).eq('id', phone.id)
     }
   } catch { /* silent */ }

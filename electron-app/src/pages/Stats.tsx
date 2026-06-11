@@ -311,7 +311,7 @@ export default function Stats({ user }: { user: User }) {
             <p style={{ padding: '28px 16px', fontSize: 12, color: TEXT_3, textAlign: 'center' }}>Chargement…</p>
           ) : visible.length === 0 ? (
             <p style={{ padding: '28px 16px', fontSize: 12.5, color: TEXT_3, textAlign: 'center' }}>
-              Aucun compte. Synchronise tes téléphones GéeLark et lie tes sessions Instagram.
+              Aucun compte. Synchronise tes téléphones GéeLark et renseigne le pseudo Instagram de chaque compte — pas besoin de session.
             </p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
