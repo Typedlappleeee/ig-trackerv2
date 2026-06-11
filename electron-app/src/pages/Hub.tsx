@@ -1,24 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { useT } from '@/lib/i18n'
+import { useT, useLang } from '@/lib/i18n'
 import { playNav, playTick } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { useCredits } from '@/lib/credits'
 import { timeUntil, fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import type { Page } from '@/components/Layout'
-
-// ── Design tokens ──────────────────────────────────────────────────────────────
-const IVORY  = '#E9EAF0'
-const MUTED  = 'rgba(233,234,240,0.42)'
-const FAINT  = 'rgba(233,234,240,0.22)'
-const HAIR   = 'rgba(233,234,240,0.08)'
-const GOLD   = '#6366F1'
-const GOLD_L = '#818CF8'
-const GOLD_D = '#4F46E5'
-const BG     = '#0A0B0E'
-const BG2    = '#0F1014'
-const SANS   = "'Inter', system-ui, sans-serif"
+import {
+  ACCENT as GOLD, ACCENT_L as GOLD_L, ACCENT_D as GOLD_D,
+  TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR,
+  BG_0 as BG, BG_1 as BG2, OK, ERR, SANS,
+} from '@/lib/theme'
 
 // ── SVG paths ──────────────────────────────────────────────────────────────────
 const ICONS: Record<string, string> = {
@@ -140,12 +133,13 @@ function QuickBtn({ label, icon, primary, onClick }: {
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
+  const t = useT()
   const cfg: Record<string, { color: string; bg: string; label: string }> = {
-    done:      { color: '#34D399', bg: 'rgba(52,211,153,0.1)',   label: 'Publié' },
-    failed:    { color: '#F87171', bg: 'rgba(248,113,113,0.1)',  label: 'Échec' },
-    pending:   { color: GOLD_L,   bg: 'rgba(99,102,241,0.12)',  label: 'Programmé' },
-    running:   { color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',  label: 'En cours' },
-    cancelled: { color: MUTED,    bg: 'rgba(233,234,240,0.05)', label: 'Annulé' },
+    done:      { color: OK,        bg: 'rgba(52,211,153,0.1)',   label: t('hubStatusDone') },
+    failed:    { color: ERR,       bg: 'rgba(248,113,113,0.1)',  label: t('hubStatusFailed') },
+    pending:   { color: GOLD_L,    bg: 'rgba(99,102,241,0.12)',  label: t('hubStatusPending') },
+    running:   { color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   label: t('hubStatusRunning') },
+    cancelled: { color: MUTED,     bg: 'rgba(233,234,240,0.05)', label: t('hubStatusCancelled') },
   }
   const c = cfg[status] ?? cfg.cancelled
   return (
@@ -247,15 +241,26 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
   useEffect(() => { load() }, [load])
 
+  // Live refresh: any change to scheduled_posts (post done, new schedule…)
+  // reloads the dashboard so KPIs and lists stay current.
+  useEffect(() => {
+    const ch = supabase.channel('hub-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts' }, () => { load() })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [load])
+
+  const { lang } = useLang()
+  const locale = lang === 'en' ? 'en-US' : 'fr-FR'
   const firstName = (user.email?.split('@')[0] ?? 'créateur').replace(/[._]/g, ' ')
   const greeting = (() => {
     const h = new Date().getHours()
-    if (h < 6)  return 'Bonne nuit'
-    if (h < 12) return 'Bonjour'
-    if (h < 18) return 'Bon après-midi'
-    return 'Bonsoir'
-  })()
-  const dateLabel = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+    if (h < 6)  return t('hubGreetingNight')
+    if (h < 12) return t('hubGreetingMorning')
+    if (h < 18) return t('hubGreetingAfternoon')
+    return t('hubGreetingEvening')
+  })().replace(/,\s*$/, '')
+  const dateLabel = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
 
   const TOOL_SHORTCUTS: { id: Page; label: string; icon: string }[] = [
     { id: 'phones',      label: t('navPhones'),      icon: 'phone' },
@@ -324,16 +329,16 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             }}
           >
             <SvgIcon d={ICONS.refresh} size={13} color="currentColor" />
-            Actualiser
+            {t('hubRefresh')}
           </button>
         </div>
 
         {/* ── KPI row ──────────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 14, marginBottom: 24, flexWrap: 'wrap' }}>
-          <KpiCard label="Téléphones"        value={loading ? '…' : phoneCount} icon="phone"    delay={0.05} />
-          <KpiCard label="Vidéos banque"     value={loading ? '…' : videoCount} icon="video"    delay={0.10} />
-          <KpiCard label="Posts cette semaine" value={loading ? '…' : weekPosts} icon="send"    delay={0.15} />
-          <KpiCard label="Crédits"           value={credLoading ? '…' : balance.toLocaleString('fr-FR')}
+          <KpiCard label={t('hubKpiPhones')}    value={loading ? '…' : phoneCount} icon="phone"    delay={0.05} />
+          <KpiCard label={t('hubKpiVideos')}    value={loading ? '…' : videoCount} icon="video"    delay={0.10} />
+          <KpiCard label={t('hubKpiWeekPosts')} value={loading ? '…' : weekPosts} icon="send"    delay={0.15} />
+          <KpiCard label={t('hubKpiCredits')}   value={credLoading ? '…' : balance.toLocaleString(locale)}
                    icon="sparkles" accent delay={0.20} />
         </div>
 
@@ -343,25 +348,25 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both',
         }}>
           <QuickBtn label="Mass Posting"  icon="zap"      primary onClick={() => { playNav(); onNavigate('massposting') }} />
-          <QuickBtn label="Programmer"    icon="calendar"         onClick={() => { playNav(); onNavigate('scheduler') }} />
-          <QuickBtn label="Banque vidéo"  icon="video"            onClick={() => { playNav(); onNavigate('bank') }} />
-          <QuickBtn label="Téléphones"    icon="phone"            onClick={() => { playNav(); onNavigate('phones') }} />
+          <QuickBtn label={t('hubQuickSchedule')} icon="calendar" onClick={() => { playNav(); onNavigate('scheduler') }} />
+          <QuickBtn label={t('hubQuickBank')}     icon="video"    onClick={() => { playNav(); onNavigate('bank') }} />
+          <QuickBtn label={t('hubKpiPhones')}     icon="phone"    onClick={() => { playNav(); onNavigate('phones') }} />
         </div>
 
         {/* ── Two-column: Upcoming + Recent ─────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 24 }}>
 
           {/* Upcoming posts */}
           <div style={{
             background: BG2, border: `1px solid ${HAIR}`, borderRadius: 10, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.30s both',
           }}>
-            <SectionHead title="Prochains posts" action="Voir tout" onAction={() => { playNav(); onNavigate('scheduler') }} />
+            <SectionHead title={t('hubUpcoming')} action={t('hubSeeAll')} onAction={() => { playNav(); onNavigate('scheduler') }} />
             {loading ? (
-              <div style={{ padding: '24px 22px', color: FAINT, fontSize: 12, fontFamily: SANS }}>Chargement…</div>
+              <div style={{ padding: '24px 22px', color: FAINT, fontSize: 12, fontFamily: SANS }}>{t('hubLoading')}</div>
             ) : upcoming.length === 0 ? (
               <div style={{ padding: '32px 22px', textAlign: 'center' }}>
-                <p style={{ color: FAINT, fontSize: 12.5, margin: '0 0 14px', fontFamily: SANS }}>Aucun post programmé</p>
+                <p style={{ color: FAINT, fontSize: 12.5, margin: '0 0 14px', fontFamily: SANS }}>{t('hubNoUpcoming')}</p>
                 <button
                   onClick={() => { playNav(); onNavigate('scheduler') }}
                   style={{
@@ -370,7 +375,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                     background: 'rgba(99,102,241,0.08)', color: GOLD_L,
                     fontWeight: 600, fontFamily: SANS,
                   }}
-                >Programmer un post</button>
+                >{t('hubSchedulePost')}</button>
               </div>
             ) : (
               upcoming.map((post, i) => {
@@ -394,7 +399,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         fontFamily: SANS,
                       }}>
-                        {phones.length} compte{phones.length !== 1 ? 's' : ''}
+                        {phones.length} {t('hubAccounts')}
                         {post.caption ? ` · ${post.caption.slice(0, 38)}${post.caption.length > 38 ? '…' : ''}` : ''}
                       </p>
                       <p style={{ margin: 0, fontSize: 11.5, color: FAINT, fontFamily: SANS }}>
@@ -412,12 +417,12 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             background: BG2, border: `1px solid ${HAIR}`, borderRadius: 10, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.35s both',
           }}>
-            <SectionHead title="Activité récente" action="Historique" onAction={() => { playNav(); onNavigate('scheduler') }} />
+            <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('scheduler') }} />
             {loading ? (
-              <div style={{ padding: '24px 22px', color: FAINT, fontSize: 12, fontFamily: SANS }}>Chargement…</div>
+              <div style={{ padding: '24px 22px', color: FAINT, fontSize: 12, fontFamily: SANS }}>{t('hubLoading')}</div>
             ) : recent.length === 0 ? (
               <div style={{ padding: '32px 22px', textAlign: 'center' }}>
-                <p style={{ color: FAINT, fontSize: 12.5, margin: 0, fontFamily: SANS }}>Aucune activité récente</p>
+                <p style={{ color: FAINT, fontSize: 12.5, margin: 0, fontFamily: SANS }}>{t('hubNoActivity')}</p>
               </div>
             ) : (
               recent.map((post, i) => {
@@ -443,7 +448,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         fontFamily: SANS,
                       }}>
-                        {phones.length} compte{phones.length !== 1 ? 's' : ''}
+                        {phones.length} {t('hubAccounts')}
                         {post.caption ? ` · ${post.caption.slice(0, 38)}${post.caption.length > 38 ? '…' : ''}` : ''}
                       </p>
                       <p style={{ margin: 0, fontSize: 11.5, color: FAINT, fontFamily: SANS }}>
@@ -464,7 +469,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             <span style={{
               fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
               textTransform: 'uppercase', color: FAINT, fontFamily: SANS,
-            }}>Tous les outils</span>
+            }}>{t('hubAllTools')}</span>
             <div style={{ flex: 1, height: 1, background: HAIR }} />
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>

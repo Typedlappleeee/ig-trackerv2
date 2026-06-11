@@ -68,11 +68,28 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
     caption:          input.caption,
     delay_minutes:    input.delayMinutes,
     mode:             input.mode,
-    bearer_token:     input.bearerToken,
+    // Never persist the GeeLark token in the row — anyone with read access to
+    // scheduled_posts (org members) would see it. It is resolved at execution
+    // time from org_config / app_config instead.
+    bearer_token:     '',
     reels_trial:      input.reelsTrial,
   }).select().single()
   if (error) throw new Error(error.message)
   return data as ScheduledPost
+}
+
+// Resolves the GeeLark bearer at execution time. Falls back to the token
+// stored in the row for posts created before this change.
+export async function resolveBearerToken(post: ScheduledPost): Promise<string> {
+  if (post.org_id) {
+    const { data } = await supabase.from('org_config')
+      .select('bearer_token').eq('org_id', post.org_id).maybeSingle()
+    if (data?.bearer_token) return data.bearer_token
+  }
+  const { data } = await supabase.from('app_config')
+    .select('bearer_token').eq('user_id', post.user_id).maybeSingle()
+  if (data?.bearer_token) return data.bearer_token
+  return post.bearer_token || ''
 }
 
 export async function cancelScheduledPost(id: string): Promise<void> {
@@ -145,7 +162,12 @@ export async function executeScheduledPost(
   post: ScheduledPost,
   onLog: (msg: string) => void,
 ): Promise<boolean> {
-  const { bearer_token: bearer, caption, delay_minutes, mode, reels_trial } = post
+  const { caption, delay_minutes, mode, reels_trial } = post
+  const bearer = await resolveBearerToken(post)
+  if (!bearer) {
+    onLog('❌ Aucun token GéeLark configuré — ajoute-le dans Paramètres → Connexions')
+    return false
+  }
 
   // Supabase Realtime can deliver jsonb columns as strings — parse defensively
   const phones = (typeof post.phones === 'string'

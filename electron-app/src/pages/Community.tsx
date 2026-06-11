@@ -854,14 +854,16 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
   const loadMessages = useCallback(async () => {
     setLoading(true)
+    // Fetch the LATEST 300 (descending) then reverse for display — ascending
+    // + limit would return the oldest 300 and hide all recent messages.
     const { data, error } = await supabase
       .from('community_messages')
       .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, thread_user_id, video_url, created_at')
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(300)
     if (error) { if (error.code === '42P01') setNeedsSetup(true); setLoading(false); return }
     setNeedsSetup(false)
-    setMessages(data ?? [])
+    setMessages((data ?? []).reverse())
     setLoading(false)
   }, [])
 
@@ -1052,20 +1054,29 @@ export function Community({ user, onNavigate }: CommunityProps) {
   }, [user.id])
 
   const loadTopicMessages = useCallback(async (topicId: string) => {
-    const { data } = await supabase.from('topic_messages').select('*').eq('topic_id', topicId).order('created_at', { ascending: true }).limit(300)
-    if (data) setTopicMessages(data as TopicMessage[])
+    // Latest 300, then reverse — same fix as loadMessages
+    const { data } = await supabase.from('topic_messages').select('*').eq('topic_id', topicId).order('created_at', { ascending: false }).limit(300)
+    if (data) setTopicMessages((data as TopicMessage[]).reverse())
   }, [])
 
   async function joinTopic(topicId: string) {
     setJoinedTopicIds(prev => new Set([...prev, topicId]))
     setMemberCounts(prev => { const m = new Map(prev); m.set(topicId, (m.get(topicId) ?? 0) + 1); return m })
-    await supabase.from('community_topic_members').insert({ topic_id: topicId, user_id: user.id })
+    const { error } = await supabase.from('community_topic_members').insert({ topic_id: topicId, user_id: user.id })
+    if (error) {
+      setJoinedTopicIds(prev => { const s = new Set(prev); s.delete(topicId); return s })
+      setMemberCounts(prev => { const m = new Map(prev); m.set(topicId, Math.max(0, (m.get(topicId) ?? 1) - 1)); return m })
+    }
   }
 
   async function leaveTopic(topicId: string) {
     setJoinedTopicIds(prev => { const s = new Set(prev); s.delete(topicId); return s })
     setMemberCounts(prev => { const m = new Map(prev); m.set(topicId, Math.max(0, (m.get(topicId) ?? 1) - 1)); return m })
-    await supabase.from('community_topic_members').delete().eq('topic_id', topicId).eq('user_id', user.id)
+    const { error } = await supabase.from('community_topic_members').delete().eq('topic_id', topicId).eq('user_id', user.id)
+    if (error) {
+      setJoinedTopicIds(prev => new Set([...prev, topicId]))
+      setMemberCounts(prev => { const m = new Map(prev); m.set(topicId, (m.get(topicId) ?? 0) + 1); return m })
+    }
   }
 
   async function createTopic({ name, description, emoji }: { name: string; description: string; emoji: string }) {
@@ -1081,11 +1092,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
   }
 
   async function deleteTopic(topicId: string) {
+    const removed = topics.find(t => t.id === topicId)
     setTopics(prev => prev.filter(t => t.id !== topicId))
     if (selectedTopic?.id === topicId) { setTopicsView('list'); setSelectedTopic(null) }
     await supabase.from('topic_messages').delete().eq('topic_id', topicId)
     await supabase.from('community_topic_members').delete().eq('topic_id', topicId)
-    await supabase.from('community_topics').delete().eq('id', topicId)
+    const { error } = await supabase.from('community_topics').delete().eq('id', topicId)
+    // Rollback: RLS denied or network failure — restore the topic in the UI
+    if (error && removed) setTopics(prev => [...prev, removed])
   }
 
   async function sendTopicMessage() {
@@ -1110,8 +1124,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
   }
 
   async function deleteTopicMessage(id: string) {
+    const removed = topicMessages.find(m => m.id === id)
     setTopicMessages(prev => prev.filter(m => m.id !== id))
-    await supabase.from('topic_messages').delete().eq('id', id)
+    const { error } = await supabase.from('topic_messages').delete().eq('id', id)
+    if (error && removed) setTopicMessages(prev => [...prev, removed].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()))
   }
 
   useEffect(() => { loadTopics() }, [loadTopics])
@@ -1166,8 +1183,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
   // ── Messages ───────────────────────────────────────────────────────────────
 
   async function deleteMessage(id: string) {
+    const removed = messages.find(m => m.id === id)
     setMessages(prev => prev.filter(m => m.id !== id))
-    await supabase.from('community_messages').delete().eq('id', id)
+    const { error } = await supabase.from('community_messages').delete().eq('id', id)
+    if (error && removed) setMessages(prev => [...prev, removed].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()))
   }
 
   async function muteUser(userId: string, minutes: number) {
