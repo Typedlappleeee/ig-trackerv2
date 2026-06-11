@@ -588,9 +588,8 @@ export function Scheduler({ user, onNavigate }: Props) {
               className="cursor-pointer"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '9px 20px', fontSize: 10.5, fontWeight: 800,
-                letterSpacing: '0.05em', textTransform: 'uppercase',
-                background: '#6366F1', color: '#fff', border: 'none',
+                padding: '9px 20px', fontSize: 12, fontWeight: 700,
+                background: '#6366F1', color: '#fff', border: 'none', borderRadius: 8,
                 transition: 'background 0.18s',
               }}
               onMouseEnter={e => { e.currentTarget.style.background = '#818CF8' }}
@@ -663,7 +662,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             className="sf-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search posts…"
+            placeholder="Rechercher un post…"
             style={{ paddingLeft: 32, height: 32, fontSize: 12.5 }}
           />
         </div>
@@ -777,8 +776,11 @@ export function Scheduler({ user, onNavigate }: Props) {
       {/* ── Type chooser : Reel ou Story ─────────────────────────────────── */}
       {showTypeChoice && (
         <div
+          tabIndex={-1}
+          ref={el => el?.focus()}
+          onKeyDown={e => { if (e.key === 'Escape') setShowTypeChoice(false) }}
           style={{
-            position: 'fixed', inset: 0, zIndex: 9000,
+            position: 'fixed', inset: 0, zIndex: 9000, outline: 'none',
             background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(10px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
           }}

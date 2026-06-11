@@ -338,7 +338,7 @@ Format le script comme si c’était prêt à lire face caméra. Inclus les indi
     <ToolShell title="Script Reel Complet" icon={<Icon name="clapperboard" />} onBack={onBack} error={error}>
       <FormSection label="Reel Settings">
         <p className="text-[12px] text-text2 font-mono">Camera-ready script — hook, body, CTA with precise timings.</p>
-        <FieldInput placeholder="Video topic" value={subject} onChange={setSubject} />
+        <FieldInput placeholder="Sujet de la vidéo" value={subject} onChange={setSubject} />
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Target Duration</p>
@@ -406,7 +406,7 @@ Chaque hook doit faire maximum 2 lignes. Format :
     <ToolShell title="3 Hooks A/B/C" icon={<Icon name="anchor" />} onBack={onBack} error={error}>
       <FormSection label="Video Topic">
         <p className="text-[12px] text-text2 font-mono">3 radically different hooks to test the best one.</p>
-        <FieldInput placeholder="Video topic" value={subject} onChange={setSubject} />
+        <FieldInput placeholder="Sujet de la vidéo" value={subject} onChange={setSubject} />
         <div className="flex gap-2.5">
           <Button onClick={run} loading={loading} disabled={!subject.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="anchor" size={15} />Générer les hooks</span></Button>
           {result && <CopyButton text={result} />}
@@ -548,7 +548,7 @@ Pour chaque langue, format :
     <ToolShell title="Multi-Market Translator" icon={<Icon name="globe" />} onBack={onBack} error={error}>
       <FormSection label="Caption and target markets">
         <p className="text-[12px] text-text2 font-mono">Adaptation culturelle + hashtags locaux — pas juste une traduction.</p>
-        <FieldInput placeholder="Paste your caption here…" value={caption} onChange={setCaption} textarea rows={4} />
+        <FieldInput placeholder="Colle ta caption ici…" value={caption} onChange={setCaption} textarea rows={4} />
         <div>
           <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Langues cibles</p>
           <div className="flex flex-wrap gap-2">

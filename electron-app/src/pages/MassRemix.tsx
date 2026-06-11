@@ -967,12 +967,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.max(0, v.currentTime - 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Frame back">
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Image précédente">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" strokeWidth="2"/></svg>
                       </button>
                       {/* Play/pause */}
                       <button onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
-                        className="sf-btn sf-btn-secondary cursor-pointer" style={{ width: 36, height: 36, padding: 0 }} aria-label="Play/pause">
+                        className="sf-btn sf-btn-secondary cursor-pointer" style={{ width: 36, height: 36, padding: 0 }} aria-label="Lecture/pause">
                         {isPlaying
                           ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                           : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -983,7 +983,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.min(vidDuration, v.currentTime + 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Frame forward">
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Image suivante">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" strokeWidth="2"/></svg>
                       </button>
 

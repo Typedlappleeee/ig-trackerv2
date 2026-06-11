@@ -1395,9 +1395,9 @@ export function MassPosting({ user }: MassPostingProps) {
 
       {/* ── Folder picker modal ───────────────────────────────────────────────── */}
       {showFolderPick && (
-        <div style={{
+        <div tabIndex={-1} ref={el => el?.focus()} onKeyDown={e => { if (e.key === 'Escape') setShowFolderPick(false) }} style={{
           position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(6,6,8,0.88)', backdropFilter: 'blur(12px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, outline: 'none',
         }} onClick={() => setShowFolderPick(false)}>
           <div className="anim-scale-in" onClick={e => e.stopPropagation()}
             style={{ width: 340, background: '#0F1014', border: `1px solid ${HAIR}` }}>

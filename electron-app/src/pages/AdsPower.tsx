@@ -25,9 +25,9 @@ const LABEL_STYLE: React.CSSProperties = {
 
 // Bouton primaire — ivoire → or
 const PRIMARY_BTN: React.CSSProperties = {
-  fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em',
+  fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
   textTransform: 'uppercase',
-  background: IVORY, color: '#0F1014', border: 'none', borderRadius: 0,
+  background: IVORY, color: '#0F1014', border: 'none', borderRadius: 8,
   boxShadow: 'none', transition: 'background 0.25s',
 }
 const primaryHover = {
@@ -182,7 +182,7 @@ function ProfileRow({
         onClick={e => { e.stopPropagation(); onDelete() }}
         className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer flex-shrink-0 text-danger opacity-40 hover:opacity-100"
         title="Supprimer"
-        aria-label="Delete profile"
+        aria-label="Supprimer le profil"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M18 6 6 18M6 6l12 12"/>
@@ -213,7 +213,7 @@ function AddProfileModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: O
       <div className="sf-modal sf-anim-scale-spring" style={{ borderRadius: 0, background: '#0F1014', border: `1px solid ${HAIR}` }}>
         <div className="sf-modal-header">
           <h3 className="sf-modal-title">{t('adspowerAddProfile')}</h3>
-          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label="Close">
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label="Fermer">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>

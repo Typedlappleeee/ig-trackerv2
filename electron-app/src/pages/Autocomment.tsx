@@ -302,7 +302,7 @@ export function Autocomment({ user }: AutocommentProps) {
                 onClick={() => loadPosts(selectedPhone)}
                 className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer text-text2"
                 title="Reload"
-                aria-label="Reload posts"
+                aria-label="Recharger les posts"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
               </button>
@@ -394,7 +394,7 @@ export function Autocomment({ user }: AutocommentProps) {
                   onClick={() => loadComments(selectedPost)}
                   className="ml-auto sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer text-text2"
                   title="Reload comments"
-                  aria-label="Reload comments"
+                  aria-label="Recharger les commentaires"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
                 </button>
@@ -436,7 +436,7 @@ export function Autocomment({ user }: AutocommentProps) {
                           value={manualReplies[c.pk] ?? ''}
                           onChange={e => setManualReplies(prev => ({ ...prev, [c.pk]: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') sendManualReply(c) }}
-                          placeholder="Write a reply…"
+                          placeholder="Écris une réponse…"
                           className="sf-input flex-1"
                         />
                         <button

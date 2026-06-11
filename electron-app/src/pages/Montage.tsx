@@ -959,7 +959,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                     <div key={ov.uid} className="flex items-center gap-2 bg-surface2 rounded-lg px-2 py-1.5">
                       <input value={ov.text} onChange={e => setTexts(prev => prev.map(t => t.uid === ov.uid ? { ...t, text: e.target.value } : t))}
                         className="flex-1 bg-transparent text-[11px] text-text focus:outline-none" />
-                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label="Delete" className="text-text2 hover:text-danger inline-flex items-center sf-press"><IconX size={13} /></button>
+                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label="Supprimer" className="text-text2 hover:text-danger inline-flex items-center sf-press"><IconX size={13} /></button>
                     </div>
                   ))}
                 </div>

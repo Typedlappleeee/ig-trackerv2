@@ -272,6 +272,9 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
         }}
         onClick={e => { if (e.target === e.currentTarget && !submitting) onClose() }}
+        tabIndex={-1}
+        ref={el => el?.focus()}
+        onKeyDown={e => { if (e.key === 'Escape' && !submitting) onClose() }}
       >
         <div
           className="anim-scale-in"

@@ -266,7 +266,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             {isAdmin && !isOwn && onMute && (
               <button onClick={() => onMute(msg.user_id, msg.display_name)}
                 className="w-5 h-5 flex items-center justify-center rounded sf-press"
-                style={{ color: 'rgba(251,191,36,0.6)' }} title="Mute" aria-label="Mute">
+                style={{ color: 'rgba(251,191,36,0.6)' }} title="Masquer" aria-label="Masquer">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
                 </svg>
@@ -275,7 +275,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
                 className="w-5 h-5 flex items-center justify-center rounded sf-press"
-                style={{ color: 'rgba(239,68,68,0.6)' }} title="Delete" aria-label="Delete">
+                style={{ color: 'rgba(239,68,68,0.6)' }} title="Supprimer" aria-label="Supprimer">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                 </svg>
@@ -317,7 +317,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
                 className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center sf-press"
-                style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Delete">
+                style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Supprimer">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                 </svg>
@@ -1450,7 +1450,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); deleteMessage(featuredMsg.id) }}
                                 className="transition-opacity hover:opacity-80 flex items-center sf-press"
-                                style={{ color: 'rgba(239,68,68,0.5)' }} title="Delete" aria-label="Delete">
+                                style={{ color: 'rgba(239,68,68,0.5)' }} title="Supprimer" aria-label="Supprimer">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                                 </svg>
@@ -1581,7 +1581,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); deleteMessage(msg.id) }}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1 flex items-center sf-press"
-                                style={{ color: 'rgba(239,68,68,0.5)' }} aria-label="Delete">
+                                style={{ color: 'rgba(239,68,68,0.5)' }} aria-label="Supprimer">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                                 </svg>
@@ -1781,7 +1781,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           {canDelete && (
                             <button onClick={e => { e.stopPropagation(); deleteTopic(topic.id) }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg sf-press"
-                              style={{ color: 'rgba(239,68,68,0.6)' }} title="Delete" aria-label="Delete">
+                              style={{ color: 'rgba(239,68,68,0.6)' }} title="Supprimer" aria-label="Supprimer">
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                               </svg>
@@ -1933,7 +1933,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                   {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(233,234,240,0.35)' }}>{timeAgo(msg.created_at)}</span>}
                                   <button onClick={() => deleteTopicMessage(msg.id)}
                                     className="w-5 h-5 flex items-center justify-center rounded sf-press"
-                                    style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Delete">
+                                    style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Supprimer">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                       <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                                     </svg>
@@ -2263,7 +2263,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 {isAdmin && (
                   <button onClick={() => { deleteMessage(selectedPost.id); setSelectedPost(null) }}
                     className="opacity-50 hover:opacity-80 transition-opacity flex items-center sf-press"
-                    style={{ color: '#f87171' }} aria-label="Delete">
+                    style={{ color: '#f87171' }} aria-label="Supprimer">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
                     </svg>
