@@ -239,11 +239,11 @@ export function Autocomment({ user }: AutocommentProps) {
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
             style={{
-              background: 'linear-gradient(135deg,rgba(201,181,132,0.2),rgba(243,241,236,0.12))',
-              border: '1px solid rgba(201,181,132,0.3)',
-              boxShadow: '0 0 20px -4px rgba(201,181,132,0.4)',
+              background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(233,234,240,0.12))',
+              border: '1px solid rgba(99,102,241,0.3)',
+              boxShadow: '0 0 20px -4px rgba(99,102,241,0.4)',
             }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4C499" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
           </div>
@@ -259,7 +259,7 @@ export function Autocomment({ user }: AutocommentProps) {
         {phones.length === 0 ? (
           <p className="text-[13px] text-text3">No Instagram account linked — go to Phones first.</p>
         ) : phones.map((p, i) => {
-          const palette = ['#4f8ef7','#22c55e','#f59e0b','#e0245e','#C9B584','#06b6d4','#f97316','#D4C499']
+          const palette = ['#4f8ef7','#22c55e','#f59e0b','#e0245e','#6366F1','#06b6d4','#f97316','#818CF8']
           const color  = palette[i % palette.length]
           const active = selectedPhone?.id === p.id
           return (
@@ -268,7 +268,7 @@ export function Autocomment({ user }: AutocommentProps) {
               onClick={() => loadPosts(p)}
               className="flex items-center gap-2.5 px-4 py-2 rounded-xl transition-all flex-shrink-0 cursor-pointer"
               style={active
-                ? { background: 'rgba(201,181,132,0.15)', border: '1px solid rgba(201,181,132,0.4)' }
+                ? { background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)' }
                 : { background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-md)' }}
             >
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0"
@@ -325,7 +325,7 @@ export function Autocomment({ user }: AutocommentProps) {
                     ? { background: 'rgba(34,197,94,0.12)', color: 'var(--ok)',     border: '1px solid rgba(34,197,94,0.25)' }
                     : f.k === 'new'
                     ? { background: 'rgba(239,68,68,0.12)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.25)' }
-                    : { background: 'rgba(201,181,132,0.12)', color: 'var(--accent-glow)', border: '1px solid rgba(201,181,132,0.25)' }
+                    : { background: 'rgba(99,102,241,0.12)', color: 'var(--accent-glow)', border: '1px solid rgba(99,102,241,0.25)' }
                   : { background: 'transparent', color: 'var(--text-3)', border: '1px solid transparent' }}
               >{f.l}</button>
             ))}
@@ -349,7 +349,7 @@ export function Autocomment({ user }: AutocommentProps) {
                 onClick={() => selectPost(p)}
                 className="w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors cursor-pointer hover:bg-white/[0.025]"
                 style={selectedPost?.id === p.id
-                  ? { background: 'rgba(201,181,132,0.08)', borderBottom: '1px solid var(--border)' }
+                  ? { background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid var(--border)' }
                   : { borderBottom: '1px solid var(--border)' }}
               >
                 <IgThumbnail src={p.thumbnail} sessionid={selectedPhone?.ig_sessionid} />
@@ -468,7 +468,7 @@ export function Autocomment({ user }: AutocommentProps) {
                   onClick={() => setReplyMode('ai')}
                   className={`sf-tab cursor-pointer inline-flex items-center gap-2${replyMode === 'ai' ? ' sf-tab-active' : ''}`}
                   style={replyMode === 'ai'
-                    ? { background: 'rgba(201,181,132,0.15)', color: 'var(--accent-glow)', border: '1px solid rgba(201,181,132,0.3)' }
+                    ? { background: 'rgba(99,102,241,0.15)', color: 'var(--accent-glow)', border: '1px solid rgba(99,102,241,0.3)' }
                     : {}}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 8V4H8M4 8h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM2 14h2M20 14h2M15 13v2M9 13v2"/></svg>
@@ -478,7 +478,7 @@ export function Autocomment({ user }: AutocommentProps) {
                   onClick={() => setReplyMode('manual')}
                   className={`sf-tab cursor-pointer inline-flex items-center gap-2${replyMode === 'manual' ? ' sf-tab-active' : ''}`}
                   style={replyMode === 'manual'
-                    ? { background: 'rgba(201,181,132,0.15)', color: 'var(--accent-glow)', border: '1px solid rgba(201,181,132,0.3)' }
+                    ? { background: 'rgba(99,102,241,0.15)', color: 'var(--accent-glow)', border: '1px solid rgba(99,102,241,0.3)' }
                     : {}}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
@@ -548,11 +548,11 @@ export function Autocomment({ user }: AutocommentProps) {
 
             {replyMode === 'manual' && (
               <div className="space-y-3">
-                <div className="sf-card p-3 flex items-center gap-3" style={{ borderColor: 'rgba(201,181,132,0.2)' }}>
+                <div className="sf-card p-3 flex items-center gap-3" style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--text-2)', flexShrink: 0 }}><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
                   <p className="text-[13px] text-text2">Manual mode — write your reply under each comment then click Send.</p>
                 </div>
-                <label className="sf-card p-3 flex items-center gap-3 cursor-pointer" style={{ borderColor: useGeelark ? 'rgba(201,181,132,0.3)' : undefined }}>
+                <label className="sf-card p-3 flex items-center gap-3 cursor-pointer" style={{ borderColor: useGeelark ? 'rgba(99,102,241,0.3)' : undefined }}>
                   <input
                     type="checkbox"
                     checked={useGeelark}

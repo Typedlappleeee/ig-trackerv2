@@ -232,7 +232,7 @@ function StatusPill({ status }: { status: ScheduleStatus }) {
   }
   const cfg: Record<ScheduleStatus, { cls: string; icon: JSX.Element }> = {
     pending:   { cls: 'sf-badge sf-badge-warn',   icon: <IconClock   size={11} color="#F59E0B" /> },
-    running:   { cls: 'sf-badge sf-badge-accent',  icon: <IconSpinner size={11} color="#C9B584" /> },
+    running:   { cls: 'sf-badge sf-badge-accent',  icon: <IconSpinner size={11} color="#6366F1" /> },
     done:      { cls: 'sf-badge sf-badge-ok',      icon: <IconCheck   size={11} color="#22C55E" /> },
     failed:    { cls: 'sf-badge sf-badge-danger',  icon: <IconX       size={11} color="#EF4444" /> },
     cancelled: { cls: 'sf-badge sf-badge-muted',   icon: <IconBan     size={11} color="rgba(148,163,184,0.52)" /> },
@@ -257,8 +257,8 @@ function TypeBadge({ type }: { type: string }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
-      background: 'rgba(201,181,132,0.10)', color: '#C9B584',
-      border: '1px solid rgba(201,181,132,0.22)', borderRadius: 6,
+      background: 'rgba(99,102,241,0.10)', color: '#6366F1',
+      border: '1px solid rgba(99,102,241,0.22)', borderRadius: 6,
       padding: '3px 9px', fontSize: 11, fontWeight: 600,
     }}>
       {TYPE_LABELS[type] ?? type}
@@ -272,7 +272,7 @@ function StatChip({ icon, label }: { icon: JSX.Element; label: string }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
-      background: 'rgba(255,255,255,0.04)', color: 'rgba(243,241,236,0.72)',
+      background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.72)',
       border: '1px solid rgba(255,255,255,0.055)', borderRadius: 6,
       padding: '3px 9px', fontSize: 11,
     }}>
@@ -350,7 +350,7 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
         ref={scrollRef}
         style={{
           maxHeight: 260, overflowY: 'auto', scrollbarWidth: 'thin',
-          scrollbarColor: 'rgba(201,181,132,0.3) transparent',
+          scrollbarColor: 'rgba(99,102,241,0.3) transparent',
         }}
       >
         {logs.map((msg, i) => (
@@ -520,11 +520,11 @@ export function Scheduler({ user, onNavigate }: Props) {
             <div className="sf-anim-scale-spring" style={{
               width: 46, height: 46, borderRadius: 2, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(201,181,132,0.08)',
-              border: '1px solid rgba(201,181,132,0.28)',
-              color: '#C9B584',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.28)',
+              color: '#6366F1',
             }}>
-              <IconCalendarSm size={22} color="#C9B584" />
+              <IconCalendarSm size={22} color="#6366F1" />
             </div>
 
             {/* Text */}
@@ -557,7 +557,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer"
               title="Actualiser"
             >
-              <IconRefresh size={14} color="rgba(243,241,236,0.72)" spinning={loading} />
+              <IconRefresh size={14} color="rgba(233,234,240,0.72)" spinning={loading} />
             </button>
             <button
               onClick={() => setShowCreate(true)}
@@ -565,12 +565,12 @@ export function Scheduler({ user, onNavigate }: Props) {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 padding: '9px 20px', fontSize: 10.5, fontWeight: 800,
-                letterSpacing: '0.16em', textTransform: 'uppercase',
-                background: '#F3F1EC', color: '#060608', border: 'none',
+                letterSpacing: '0.05em', textTransform: 'uppercase',
+                background: '#6366F1', color: '#fff', border: 'none',
                 transition: 'background 0.18s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#C9B584' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#F3F1EC' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#818CF8' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#6366F1' }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
               Programmer
@@ -596,16 +596,16 @@ export function Scheduler({ user, onNavigate }: Props) {
                 padding: '10px 18px',
                 background: 'transparent',
                 border: 'none',
-                borderBottom: tab === tabItem.id ? '2px solid #C9B584' : '2px solid transparent',
+                borderBottom: tab === tabItem.id ? '2px solid #6366F1' : '2px solid transparent',
                 cursor: 'pointer',
-                color: tab === tabItem.id ? '#F3F1EC' : 'rgba(148,163,184,0.45)',
+                color: tab === tabItem.id ? '#E9EAF0' : 'rgba(148,163,184,0.45)',
                 fontSize: 13, fontWeight: tab === tabItem.id ? 600 : 500,
                 transition: 'color 0.15s, border-color 0.15s',
                 marginBottom: -1,
                 outline: 'none',
               }}
               onMouseEnter={e => {
-                if (tab !== tabItem.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(243,241,236,0.7)'
+                if (tab !== tabItem.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(233,234,240,0.7)'
               }}
               onMouseLeave={e => {
                 if (tab !== tabItem.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(148,163,184,0.45)'
@@ -614,8 +614,8 @@ export function Scheduler({ user, onNavigate }: Props) {
               {tabItem.label}
               {tabItem.count > 0 && (
                 <span style={{
-                  background: tab === tabItem.id ? 'rgba(201,181,132,0.22)' : 'rgba(255,255,255,0.05)',
-                  color: tab === tabItem.id ? '#C9B584' : 'rgba(148,163,184,0.4)',
+                  background: tab === tabItem.id ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)',
+                  color: tab === tabItem.id ? '#6366F1' : 'rgba(148,163,184,0.4)',
                   borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
                   transition: 'background 0.15s, color 0.15s',
                 }}>
@@ -653,7 +653,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, opacity: loading ? 0.6 : 1 }}
         >
-          <IconRefresh size={13} color="rgba(243,241,236,0.72)" spinning={loading} />
+          <IconRefresh size={13} color="rgba(233,234,240,0.72)" spinning={loading} />
           {t('refresh') || 'Refresh'}
         </button>
       </div>
@@ -679,7 +679,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           /* ── Empty state ──────────────────────────────────────────────────────── */
           <div className="sf-empty anim-scale-in sf-card" style={{ marginTop: 8 }}>
             <div className="sf-empty-icon">
-              <IconCalendar size={26} color="rgba(201,181,132,0.6)" />
+              <IconCalendar size={26} color="rgba(99,102,241,0.6)" />
             </div>
             <p className="sf-empty-title">
               {tab === 'pending' ? t('schedulerEmptyPending') : t('schedulerEmptyHistory')}
@@ -720,13 +720,13 @@ export function Scheduler({ user, onNavigate }: Props) {
           marginTop: 28,
           display: 'flex', alignItems: 'flex-start', gap: 10,
           padding: '12px 16px',
-          background: 'rgba(201,181,132,0.05)', border: '1px solid rgba(201,181,132,0.12)',
+          background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)',
           borderRadius: 11,
         }}>
           <span style={{ flexShrink: 0, marginTop: 1 }}>
-            <IconInfo size={14} color="rgba(201,181,132,0.7)" />
+            <IconInfo size={14} color="rgba(99,102,241,0.7)" />
           </span>
-          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(243,241,236,0.72)', margin: 0 }}>
+          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(233,234,240,0.72)', margin: 0 }}>
             {t('schedulerAutoBanner')}
           </p>
         </div>
@@ -767,7 +767,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
   const statusColor =
     post.status === 'done'        ? '#22C55E'
     : post.status === 'failed'   ? '#EF4444'
-    : post.status === 'running'  ? '#C9B584'
+    : post.status === 'running'  ? '#6366F1'
     : post.status === 'cancelled'? 'rgba(148,163,184,0.2)'
     : '#F59E0B'  // pending → amber
 
@@ -776,8 +776,8 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? 'rgba(201,181,132,0.032)' : 'var(--surface)',
-        border: `1px solid ${hovered ? 'rgba(201,181,132,0.2)' : 'rgba(255,255,255,0.055)'}`,
+        background: hovered ? 'rgba(99,102,241,0.032)' : 'var(--surface)',
+        border: `1px solid ${hovered ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.055)'}`,
         borderLeft: `3px solid ${statusColor}`,
         borderRadius: 14,
         padding: '16px 20px',
@@ -794,12 +794,12 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           {post.created_by_name && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              background: isOwn ? 'rgba(201,181,132,0.1)' : 'rgba(255,255,255,0.04)',
-              color: isOwn ? '#C9B584' : 'rgba(243,241,236,0.5)',
-              border: `1px solid ${isOwn ? 'rgba(201,181,132,0.2)' : 'rgba(255,255,255,0.055)'}`,
+              background: isOwn ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)',
+              color: isOwn ? '#6366F1' : 'rgba(233,234,240,0.5)',
+              border: `1px solid ${isOwn ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.055)'}`,
               borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 500,
             }}>
-              <IconUser size={11} color={isOwn ? '#C9B584' : 'rgba(243,241,236,0.5)'} />
+              <IconUser size={11} color={isOwn ? '#6366F1' : 'rgba(233,234,240,0.5)'} />
               {isOwn ? t('schedulerMe') : post.created_by_name}
             </span>
           )}
@@ -834,9 +834,9 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 11, flexWrap: 'wrap' }}>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
-          color: '#C9B584', fontSize: 12, fontWeight: 600,
+          color: '#6366F1', fontSize: 12, fontWeight: 600,
         }}>
-          <IconClock size={12} color="#C9B584" />
+          <IconClock size={12} color="#6366F1" />
           {fmtScheduledTime(post.scheduled_at)}
         </span>
         {isPending && (
@@ -853,24 +853,24 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
       {/* ── Row 3: stat chips ─────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
         <StatChip
-          icon={<IconPhone size={11} color="rgba(243,241,236,0.72)" />}
+          icon={<IconPhone size={11} color="rgba(233,234,240,0.72)" />}
           label={`${post.phones.length} ${post.phones.length !== 1 ? t('schedulerPhonePlural') : t('schedulerPhone')}`}
         />
         <StatChip
-          icon={<IconVideo size={11} color="rgba(243,241,236,0.72)" />}
+          icon={<IconVideo size={11} color="rgba(233,234,240,0.72)" />}
           label={`${post.videos.length} ${post.videos.length !== 1 ? t('schedulerVideoPlural') : t('schedulerVideo')}`}
         />
         {post.delay_minutes > 0 && (
           <StatChip
-            icon={<IconTime size={11} color="rgba(243,241,236,0.72)" />}
+            icon={<IconTime size={11} color="rgba(233,234,240,0.72)" />}
             label={`${post.delay_minutes} ${t('schedulerMinBetween')}`}
           />
         )}
         {post.type === 'mass_posting' && (
           <StatChip
             icon={post.mode === 'random'
-              ? <IconShuffle size={11} color="rgba(243,241,236,0.72)" />
-              : <IconArrowRight size={11} color="rgba(243,241,236,0.72)" />}
+              ? <IconShuffle size={11} color="rgba(233,234,240,0.72)" />
+              : <IconArrowRight size={11} color="rgba(233,234,240,0.72)" />}
             label={post.mode === 'random' ? t('schedulerRandom') : t('schedulerSequential')}
           />
         )}
@@ -882,7 +882,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           marginTop: 10, marginBottom: 0,
           fontSize: 12, lineHeight: 1.6,
           color: 'rgba(148,163,184,0.52)',
-          fontStyle: 'italic',
+          fontStyle: 'normal',
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
@@ -897,7 +897,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
           {post.phones.slice(0, 6).map(p => (
             <span key={p.id} style={{
-              background: 'rgba(255,255,255,0.03)', color: 'rgba(243,241,236,0.6)',
+              background: 'rgba(255,255,255,0.03)', color: 'rgba(233,234,240,0.6)',
               border: '1px solid rgba(255,255,255,0.055)', borderRadius: 5,
               padding: '2px 8px', fontSize: 11,
             }}>
@@ -906,7 +906,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           ))}
           {post.phones.length > 6 && (
             <span style={{
-              background: 'rgba(201,181,132,0.1)', color: '#C9B584',
+              background: 'rgba(99,102,241,0.1)', color: '#6366F1',
               borderRadius: 5, padding: '2px 8px', fontSize: 11,
             }}>
               +{post.phones.length - 6} {t('schedulerMoreItems')}
@@ -925,11 +925,11 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 background: 'none', border: 'none', cursor: 'pointer',
-                color: 'rgba(201,181,132,0.8)', fontSize: 12, fontWeight: 600, padding: 0,
+                color: 'rgba(99,102,241,0.8)', fontSize: 12, fontWeight: 600, padding: 0,
                 transition: 'color 0.12s',
               }}
             >
-              <IconChevron size={11} color="rgba(201,181,132,0.8)" rotated={false} />
+              <IconChevron size={11} color="rgba(99,102,241,0.8)" rotated={false} />
               {t('schedulerShowLogs')} ({allLogs.length})
             </button>
           ) : (

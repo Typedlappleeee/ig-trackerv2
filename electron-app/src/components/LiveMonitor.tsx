@@ -33,7 +33,7 @@ function PhoneLiveCard({ phone, bearer, onStopped }: {
 
   return (
     <div className="flex flex-col rounded-2xl overflow-hidden"
-      style={{ background: 'rgba(10,6,24,0.95)', border: '1px solid rgba(201,181,132,0.2)' }}>
+      style={{ background: 'rgba(10,6,24,0.95)', border: '1px solid rgba(99,102,241,0.2)' }}>
       {/* 9:16 screen */}
       <div className="relative w-full" style={{ paddingBottom: '177.78%' }}>
         <div className="absolute inset-0 bg-black flex items-center justify-center">
@@ -41,7 +41,7 @@ function PhoneLiveCard({ phone, bearer, onStopped }: {
             <img src={imgSrc} alt={name} className="w-full h-full object-contain" />
           ) : (
             <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'rgba(201,181,132,0.5)', borderTopColor: 'transparent' }} />
+              style={{ borderColor: 'rgba(99,102,241,0.5)', borderTopColor: 'transparent' }} />
           )}
           {imgSrc && (
             <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full"
@@ -118,13 +118,13 @@ export default function LiveMonitorOverlay({ bearer }: { bearer: string }) {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-8 py-5 flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(201,181,132,0.15)' }}>
+        style={{ borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
         <div className="flex items-center gap-3">
           <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
           <h2 className="text-xl font-bold text-white">Monitor Live</h2>
           {!fetching && (
             <span className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-              style={{ background: 'rgba(201,181,132,0.12)', color: '#C9B584', border: '1px solid rgba(201,181,132,0.22)' }}>
+              style={{ background: 'rgba(99,102,241,0.12)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.22)' }}>
               {phones.length} allumé{phones.length !== 1 ? 's' : ''}
             </span>
           )}
@@ -134,11 +134,11 @@ export default function LiveMonitorOverlay({ bearer }: { bearer: string }) {
             onClick={loadPhones}
             disabled={fetching}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs transition-all"
-            style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(243,241,236,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(233,234,240,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             {fetching ? (
               <div className="w-3 h-3 rounded-full border border-t-transparent animate-spin"
-                style={{ borderColor: '#C9B584', borderTopColor: 'transparent' }} />
+                style={{ borderColor: '#6366F1', borderTopColor: 'transparent' }} />
             ) : (
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M10 6a4 4 0 11-1.17-2.83"/><path d="M10 2v2.5H7.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -161,7 +161,7 @@ export default function LiveMonitorOverlay({ bearer }: { bearer: string }) {
         {fetching && phones.length === 0 ? (
           <div className="flex items-center justify-center h-40 gap-3" style={{ color: 'rgba(148,163,184,0.4)' }}>
             <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'rgba(201,181,132,0.5)', borderTopColor: 'transparent' }} />
+              style={{ borderColor: 'rgba(99,102,241,0.5)', borderTopColor: 'transparent' }} />
             <span className="text-sm">Chargement des téléphones…</span>
           </div>
         ) : phones.length === 0 ? (
@@ -173,7 +173,7 @@ export default function LiveMonitorOverlay({ bearer }: { bearer: string }) {
             </p>
             <button onClick={loadPhones}
               className="mt-1 text-xs px-3 py-1.5 rounded-lg"
-              style={{ background: 'rgba(201,181,132,0.15)', color: '#C9B584', border: '1px solid rgba(201,181,132,0.3)' }}>
+              style={{ background: 'rgba(99,102,241,0.15)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.3)' }}>
               Réessayer
             </button>
           </div>

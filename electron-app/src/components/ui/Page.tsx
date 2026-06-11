@@ -51,7 +51,7 @@ export function PageHeader({
                 {eyebrow}
               </p>
             )}
-            <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.1, color: '#F3F1EC' }}>
+            <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.1, color: '#E9EAF0' }}>
               {title}
             </h1>
             {subtitle && (
