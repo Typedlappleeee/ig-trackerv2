@@ -537,7 +537,7 @@ export function MassPosting({ user }: MassPostingProps) {
             const needsAttention = keyword != null
             const msg = needsAttention
               ? `🔐 ${phoneName} : fenêtre "${keyword}" détectée — intervention requise`
-              : `📸 ${phoneName} : posting long — vérifiez l'écran`
+              : `📸 ${phoneName} : posting long — vérifiez l’écran`
             log(msg + ` [screenshot]::${dataUrl}`, needsAttention ? 'warn' : 'warn')
             notifiedRef.current.add(geelarkId)
             // Desktop notification (works in Electron + browser with permission)
@@ -641,10 +641,10 @@ export function MassPosting({ user }: MassPostingProps) {
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
-      // Always stop phones on unexpected crash — so they don't stay on indefinitely
+      // Always stop phones on unexpected crash — so they don’t stay on indefinitely
       const stuck = activePhonesRef.current
       if (stuck.length > 0) {
-        log(`🛑 Arrêt d'urgence de ${stuck.length} téléphone(s)…`, 'warn')
+        log(`🛑 Arrêt d’urgence de ${stuck.length} téléphone(s)…`, 'warn')
         geelark(bearer, '/phone/stop', { ids: stuck }).catch(() => {})
       }
     }
@@ -685,9 +685,9 @@ export function MassPosting({ user }: MassPostingProps) {
     uploading: '#7FB8D9', posting: '#D9B97F', done: '#7FD9B8', error: '#F0A0AB',
   }
 
-  // Readiness checklist — tells the user exactly what's missing
+  // Readiness checklist — tells the user exactly what’s missing
   const checklist = [
-    { ok: !!bearer,                  label: 'Token GéeLark connecté',  hint: 'Ajoute ton token dans Réglages → Connexions' },
+    { ok: !!bearer,                  label: 'Token GéeLark connecté',  hint: 'Ajoute ton token dans Paramètres → Connexions' },
     { ok: phoneList.length > 0,      label: `Téléphones ciblés${phoneList.length > 0 ? ` — ${phoneList.length}` : ''}`, hint: 'Coche des téléphones dans le panneau de gauche' },
     { ok: selectedVideos.length > 0, label: `Vidéos sélectionnées${selectedVideos.length > 0 ? ` — ${selectedVideos.length}` : ''}`, hint: 'Ajoute des vidéos depuis la banque ou un dossier' },
   ]

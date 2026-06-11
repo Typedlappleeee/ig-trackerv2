@@ -607,7 +607,7 @@ export function MassRemix({ user }: MassRemixProps) {
             180_000, 'extraction frames'
           )
           if (fr.ok && fr.frames?.length) {
-            addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu'à ${analyzeEnd.toFixed(1)}s)`)
+            addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu’à ${analyzeEnd.toFixed(1)}s)`)
             const interval = analyzeEnd / fr.frames.length
             const imageBlocks = fr.frames.flatMap((f, fi) => [
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
@@ -674,8 +674,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   const coversAll = (ef - sf + 1) >= frameCount * 0.8
                   const maxEnd    = splitTime ?? detDuration ?? 9999
                   const startTime = coversAll ? 0 : Math.round(sf * interval * 10) / 10
-                  // Use endFrame to compute real endTime per paragraph — don't force all items
-                  // to show until the video end (that's what caused simultaneous overlay overlap).
+                  // Use endFrame to compute real endTime per paragraph — don’t force all items
+                  // to show until the video end (that’s what caused simultaneous overlay overlap).
                   const endTime   = coversAll ? maxEnd : Math.min(Math.round((ef + 1) * interval * 10) / 10, maxEnd)
                   return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
                 })
@@ -763,9 +763,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           outputPath = tmp.path
         }
 
-        // Trim output to original video duration so secondary doesn't run long.
+        // Trim output to original video duration so secondary doesn’t run long.
         // Guard against 0 / NaN from failed detection — pass undefined so the
-        // video element's own .duration is used instead (avoids immediate stop).
+        // video element’s own .duration is used instead (avoids immediate stop).
         const targetDuration = (detDuration != null && detDuration > 1) ? detDuration : undefined
 
         const gen = await withTimeout(

@@ -320,7 +320,7 @@ export default function StoryLink({ user }: { user: User }) {
         </div>
         <p className="sf-empty-title">GéeLark non connecté</p>
         <p className="sf-empty-desc">
-          Ajoute ta clé GéeLark dans les Réglages pour automatiser des stories.
+          Ajoute ta clé GéeLark dans les Paramètres pour automatiser tes stories.
         </p>
       </div>
     </div>
@@ -602,7 +602,7 @@ export default function StoryLink({ user }: { user: User }) {
                 <span className="sf-section-label" style={{ margin: 0 }}>Pool de textes sticker</span>
               </div>
               <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.
+                Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l’URL.
               </p>
             </div>
 
@@ -669,7 +669,7 @@ export default function StoryLink({ user }: { user: User }) {
                   <span className="sf-section-label" style={{ margin: 0 }}>Liens — 1 lien par compte</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  Chaque compte a son propre lien, éditable dans l'aperçu et sauvegardé automatiquement.
+                  Chaque compte a son propre lien, éditable dans l’aperçu et sauvegardé automatiquement.
                 </p>
               </div>
               {selectedIds.length > 0 && (
@@ -692,7 +692,7 @@ export default function StoryLink({ user }: { user: User }) {
               }}>
                 <span style={{ flexShrink: 0, marginTop: 1, color: '#fbbf24' }}><IconWarn /></span>
                 <span>
-                  {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} dans l'aperçu avant de publier.
+                  {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} dans l’aperçu avant de publier.
                 </span>
               </div>
             )}

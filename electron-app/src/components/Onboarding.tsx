@@ -79,7 +79,7 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
         setBMsg(`✓ Token valide — ${total} téléphone${total !== 1 ? 's' : ''} trouvé${total !== 1 ? 's' : ''} dans ton compte GéeLark.`)
       } else {
         setBState('fail')
-        setBMsg(`✗ Token invalide : ${(d?.['msg'] as string) ?? 'vérification échouée'}. Vérifie que tu copies bien la valeur "API Key" (pas l'App ID).`)
+        setBMsg(`✗ Token invalide : ${(d?.['msg'] as string) ?? 'vérification échouée'}. Vérifie que tu copies bien la valeur "API Key" (pas l’App ID).`)
       }
     } catch (e) {
       setBState('fail')
@@ -168,7 +168,7 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
         className="absolute top-5 right-6 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:scale-105 disabled:opacity-40"
         style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)' }}
       >
-        Ignorer pour l'instant →
+        Ignorer pour l’instant →
       </button>
 
       <div className="w-full max-w-lg space-y-6 relative z-10">
@@ -214,7 +214,7 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
               <div className="space-y-1.5 text-xs" style={{ color: 'rgba(233,234,240,0.6)' }}>
                 <div className="flex gap-2"><span style={sfAccent} className="font-bold">1.</span><span>Connecte-toi sur <button onClick={() => openExternal('https://app.geelark.com')} style={sfUnderline}>app.geelark.com</button></span></div>
                 <div className="flex gap-2"><span style={sfAccent} className="font-bold">2.</span><span>En haut à droite → <strong className="text-text">ton avatar</strong> → <strong className="text-text">API</strong></span></div>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Section <strong className="text-text">API Key</strong> <span style={{ color: '#f59e0b' }}>(⚠ pas l'App ID)</span></span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Section <strong className="text-text">API Key</strong> <span style={{ color: '#f59e0b' }}>(⚠ pas l’App ID)</span></span></div>
                 <div className="flex gap-2"><span style={sfAccent} className="font-bold">4.</span><span>Copie ou crée un token</span></div>
               </div>
             </div>

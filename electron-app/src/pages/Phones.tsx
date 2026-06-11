@@ -219,7 +219,7 @@ function SessionDialog({
     let username = detectedUser ?? undefined
     if (testResult !== 'ok') {
       const r = await runTest(value)
-      if (!r.ok) { setSaving(false); return }  // don't save invalid session
+      if (!r.ok) { setSaving(false); return }  // don’t save invalid session
       username = r.username
     }
     const { error } = await supabase
@@ -674,7 +674,7 @@ export function Phones({ user }: PhonesProps) {
       setPhones(data ?? [])
     }
     setLoading(false)
-    // Trigger an immediate poll if one hasn't happened recently
+    // Trigger an immediate poll if one hasn’t happened recently
     poller.pollNow()
   }
 

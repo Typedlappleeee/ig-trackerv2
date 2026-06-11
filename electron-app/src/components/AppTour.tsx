@@ -68,7 +68,7 @@ const STEPS: TourStep[] = [
   },
   {
     iconName: 'rocket',
-    title: 'C\'est parti !',
+    title: 'C’est parti !',
     desc: 'Tu es prêt à utiliser ScaleFlow. Si tu as des questions, ouvre un ticket dans la section Support.',
     color: '#6366F1',
   },

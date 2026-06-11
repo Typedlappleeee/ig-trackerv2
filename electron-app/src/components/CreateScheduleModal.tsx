@@ -152,7 +152,7 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
 
           {!bearer && (
             <div style={{ padding: '10px 14px', border: '1px solid rgba(217,185,127,0.35)', fontSize: 12, color: '#D9B97F' }}>
-              Token GéeLark manquant — ajoute-le dans Réglages → Connexions avant de programmer.
+              Token GéeLark manquant — ajoute-le dans Paramètres → Connexions avant de programmer.
             </div>
           )}
 

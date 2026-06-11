@@ -366,7 +366,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           color: MUTED, margin: '14px 0 52px', letterSpacing: '0.01em',
           animation: 'sf-fade-in 1.4s ease 1s both',
         }}>
-          L'usine de contenu des marques qui dominent Instagram.
+          L’usine de contenu des marques qui dominent Instagram.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', animation: 'sf-fade-up 0.9s cubic-bezier(0.16,1,0.3,1) 1.25s both' }}>
@@ -592,10 +592,10 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
         <FadeIn delay={0.08}>
           <h1 style={{ margin: 0, lineHeight: 1.02, letterSpacing: '-0.04em', maxWidth: 980 }}>
             <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(42px, 7vw, 96px)', color: IVORY }}>
-              L'automatisation
+              L’automatisation
             </span>
             <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(42px, 7vw, 96px)', color: IVORY }}>
-              Instagram, <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, color: GOLD, letterSpacing: '-0.01em' }}>élevée au rang d'art.</span>
+              Instagram, <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, color: GOLD, letterSpacing: '-0.01em' }}>élevée au rang d’art.</span>
             </span>
           </h1>
         </FadeIn>
@@ -669,11 +669,11 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
 
 // ── Features — liste éditoriale numérotée ────────────────────────────────────
 const FEATURES: { num: string; title: string; serif: string; text: string; icon: IconName }[] = [
-  { num: '01', title: 'Mass',      serif: 'Posting',   icon: 'send',            text: "Des dizaines de comptes publient en parallèle. Sélectionne, lance — chaque téléphone s'éteint après sa publication. Sans surveillance." },
+  { num: '01', title: 'Mass',      serif: 'Posting',   icon: 'send',            text: "Des dizaines de comptes publient en parallèle. Sélectionne, lance — chaque téléphone s’éteint après sa publication. Sans surveillance." },
   { num: '02', title: 'Banque de', serif: 'contenu',   icon: 'folder-archive',  text: 'Ta vidéothèque cloud, organisée par dossiers et partagée avec ton organisation. Import drag & drop, miniatures automatiques.' },
   { num: '03', title: 'Remix &',   serif: 'CloneVid',  icon: 'shuffle',         text: 'Des copies uniques générées par FFmpeg : zoom, colorimétrie, crop, overlay. Le duplicate content ne te concerne plus.' },
   { num: '04', title: 'Outils',    serif: 'IA',        icon: 'bot',             text: 'Scripts, hooks, captions virales, analyse de miniatures. Llama et Claude Vision intégrés directement dans ton flux de travail.' },
-  { num: '05', title: 'Program',   serif: 'mation',    icon: 'calendar',        text: "Planifie tes publications à l'avance. Le scheduler s'exécute dans le cloud, même application fermée." },
+  { num: '05', title: 'Program',   serif: 'mation',    icon: 'calendar',        text: "Planifie tes publications à l’avance. Le scheduler s’exécute dans le cloud, même application fermée." },
   { num: '06', title: 'Suivi',     serif: 'temps réel',icon: 'smartphone',      text: 'Le statut de chaque cloud phone, en direct. Sessions Instagram, groupes, batteries — tout sous contrôle.' },
 ]
 
@@ -941,7 +941,7 @@ function PricingSection() {
               <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(24px, 3.4vw, 40px)', letterSpacing: '-0.03em', color: IVORY }}>Packs de </span>
               <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(26px, 3.6vw, 43px)', color: GOLD }}>crédits</span>
             </h3>
-            <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: 0 }}>Recharge à tout moment — les crédits n'expirent jamais.</p>
+            <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: 0 }}>Recharge à tout moment — les crédits n’expirent jamais.</p>
           </div>
         </FadeIn>
 
@@ -985,12 +985,12 @@ function PricingSection() {
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
 const QA = [
-  { q: "C'est quoi ScaleFlow ?",          a: "Une app pour gérer en masse tes comptes Instagram : poster sur des dizaines de téléphones en parallèle, organiser ta banque de vidéos, voir les stats en temps réel, et automatiser les tâches répétitives." },
-  { q: "J'ai besoin de quoi ?",           a: "Un abonnement GéeLark (cloud phones) + ton bearer token. ScaleFlow se connecte à GéeLark pour piloter tes téléphones virtuels." },
+  { q: "C’est quoi ScaleFlow ?",          a: "Une app pour gérer en masse tes comptes Instagram : poster sur des dizaines de téléphones en parallèle, organiser ta banque de vidéos, voir les stats en temps réel, et automatiser les tâches répétitives." },
+  { q: "J’ai besoin de quoi ?",           a: "Un abonnement GéeLark (cloud phones) + ton bearer token. ScaleFlow se connecte à GéeLark pour piloter tes téléphones virtuels." },
   { q: "Différence Standard vs Pro ?",   a: "Standard = 2 500 crédits/mois + outils de base. Pro = 5 500 crédits + Mass Posting illimité + organisations multi-membres + support prioritaire." },
-  { q: "C'est risqué pour mes comptes ?", a: "ScaleFlow utilise GéeLark qui simule de vrais devices avec leurs propres IPs/sessions. Warmup intégré pour respecter les rythmes humains." },
-  { q: "Version web ou téléchargement ?", a: "Les deux. L'Electron (.exe/.dmg) est plus rapide. La version web est accessible depuis n'importe où." },
-  { q: "Comment contacter le support ?",  a: "Via Telegram (@justquentin), réponse en moins d'1h. Ou via les tickets dans l'app." },
+  { q: "C’est risqué pour mes comptes ?", a: "ScaleFlow utilise GéeLark qui simule de vrais devices avec leurs propres IPs/sessions. Warmup intégré pour respecter les rythmes humains." },
+  { q: "Version web ou téléchargement ?", a: "Les deux. L’Electron (.exe/.dmg) est plus rapide. La version web est accessible depuis n’importe où." },
+  { q: "Comment contacter le support ?",  a: "Via Telegram (@justquentin), réponse en moins d'1h. Ou via les tickets dans l’app." },
 ]
 
 // ── Telegram icon ─────────────────────────────────────────────────────────────
@@ -1110,10 +1110,10 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
             <MicroLabel style={{ marginBottom: 28 }}>Le Studio</MicroLabel>
             <h2 style={{ margin: 0, lineHeight: 1.04, letterSpacing: '-0.04em' }}>
               <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 3.8vw, 58px)', color: IVORY }}>Là où les marques</span>
-              <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 4vw, 62px)', color: GOLD }}>passent à l'échelle.</span>
+              <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 4vw, 62px)', color: GOLD }}>passent à l’échelle.</span>
             </h2>
             <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.8, maxWidth: 380, margin: '24px 0 0' }}>
-              Mass posting, cloud phones, banque de contenu, IA — l'arsenal complet, derrière une seule porte.
+              Mass posting, cloud phones, banque de contenu, IA — l’arsenal complet, derrière une seule porte.
             </p>
           </div>
 
@@ -1228,7 +1228,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                 fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: GOLD,
                 borderBottom: '1px solid rgba(99,102,241,0.4)',
               }}>
-              {tab === 'login' ? "S'inscrire" : 'Se connecter'}
+              {tab === 'login' ? "S’inscrire" : 'Se connecter'}
             </button>
           </div>
         </div>
@@ -1329,14 +1329,14 @@ export function Landing() {
           </FadeIn>
           <FadeIn delay={0.1}>
             <p style={{ fontFamily: SERIF, fontSize: 'clamp(24px, 3.4vw, 40px)', lineHeight: 1.45, color: 'rgba(233,234,240,0.85)', margin: 0, fontWeight: 400 }}>
-              Pendant que d'autres publient un post par jour,
+              Pendant que d’autres publient un post par jour,
               <span style={{ fontStyle: 'normal', color: GOLD }}> nos studios en orchestrent des centaines</span> —
               sur des dizaines de comptes, sans lever le petit doigt.
             </p>
           </FadeIn>
           <FadeIn delay={0.2}>
             <p style={{ fontFamily: SANS, fontSize: 13, letterSpacing: '0.24em', textTransform: 'uppercase', color: FAINT, marginTop: 44 }}>
-              Le volume est une stratégie. ScaleFlow est l'outil.
+              Le volume est une stratégie. ScaleFlow est l’outil.
             </p>
           </FadeIn>
         </div>
@@ -1348,11 +1348,11 @@ export function Landing() {
           <FadeIn>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 30, flexWrap: 'wrap', gap: 16 }}>
               <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
-                <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(36px, 5.4vw, 66px)', color: IVORY }}>L'arsenal</span>
+                <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(36px, 5.4vw, 66px)', color: IVORY }}>L’arsenal</span>
                 <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(38px, 5.7vw, 70px)', color: GOLD }}>complet.</span>
               </h2>
               <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, maxWidth: 300, lineHeight: 1.7, margin: 0, paddingBottom: 8 }}>
-                Six pôles d'outils. Une interface. Plus besoin de jongler entre dix applications.
+                Six pôles d’outils. Une interface. Plus besoin de jongler entre dix applications.
               </p>
             </div>
           </FadeIn>
@@ -1379,7 +1379,7 @@ export function Landing() {
                 <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.9vw, 60px)', color: GOLD }}>Ton empire.</span>
               </h3>
               <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, margin: '0 0 44px', lineHeight: 1.8 }}>
-                Activation immédiate après paiement — crypto ou virement.<br />Réponse en moins d'une heure.
+                Activation immédiate après paiement — crypto ou virement.<br />Réponse en moins d’une heure.
               </p>
               <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
                 style={{
@@ -1442,7 +1442,7 @@ export function Landing() {
             <div>
               <Wordmark size={18} />
               <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: MUTED, margin: '14px 0 0', maxWidth: 260, lineHeight: 1.6 }}>
-                L'usine de contenu des marques qui dominent Instagram.
+                L’usine de contenu des marques qui dominent Instagram.
               </p>
             </div>
             <div style={{ display: 'flex', gap: 36 }}>

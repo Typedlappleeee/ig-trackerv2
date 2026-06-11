@@ -42,7 +42,7 @@ const PLANS = [
     phones:        'Téléphones illimités',
     posting:       'Mass posting illimité',
     accent:        '#34d399',
-    extra:         'Support 24/7 prioritaire · Proposition d\'ajouts',
+    extra:         'Support 24/7 prioritaire · Proposition d’ajouts',
   },
 ]
 
@@ -140,7 +140,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
           .eq('user_id', org?.owner_id ?? '').eq('is_active', true).maybeSingle()
         const expired = ownerKey?.expires_at ? new Date(ownerKey.expires_at) < new Date() : false
         if (!ownerKey || expired) {
-          setOrgErr("Cette organisation n'a pas d'abonnement actif.")
+          setOrgErr("Cette organisation n’a pas d’abonnement actif.")
           return
         }
         localStorage.setItem('ig-tracker-current-org', orgId)
@@ -189,7 +189,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   name="org-name"
                   value={orgName}
                   onChange={e => setOrgName(e.target.value)}
-                  placeholder="Nom de l'organisation"
+                  placeholder="Nom de l’organisation"
                   className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm placeholder:text-[#3a2f58] focus:outline-none focus:border-[#6366F1] transition-colors"
                   spellCheck={false}
                   autoComplete="off"
@@ -246,7 +246,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 </div>
                 <div>
                   <div className="text-white text-sm font-bold">Rejoindre une orga</div>
-                  <div className="text-[11px] text-[#6b5fa0] mt-0.5">Tu as un code d'invitation</div>
+                  <div className="text-[11px] text-[#6b5fa0] mt-0.5">Tu as un code d’invitation</div>
                 </div>
                 <div className="ml-auto text-[#3b82f6] text-lg">→</div>
               </button>
@@ -293,14 +293,14 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   ))}
                   <div className="flex items-center gap-2 py-1">
                     <div className="flex-1 h-px" style={{ background: 'rgba(74,63,122,0.4)' }} />
-                    <span className="text-[10px] text-[#3a2f58]">ou code d'invitation</span>
+                    <span className="text-[10px] text-[#3a2f58]">ou code d’invitation</span>
                     <div className="flex-1 h-px" style={{ background: 'rgba(74,63,122,0.4)' }} />
                   </div>
                 </div>
               )}
               <p className="text-xs text-[#6b5fa0] text-center">
-                Entre ton code d'invitation.<br/>
-                Tant que l'owner de l'orga a un abonnement actif, tu as accès.
+                Entre ton code d’invitation.<br/>
+                Tant que l’owner de l’orga a un abonnement actif, tu as accès.
               </p>
               {orgSuccess ? (
                 <div className="text-center py-4">
@@ -313,7 +313,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     name="invite-code"
                     value={code}
                     onChange={e => setCode(e.target.value)}
-                    placeholder="Code d'invitation"
+                    placeholder="Code d’invitation"
                     className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono placeholder:text-[#3a2f58] focus:outline-none focus:border-[#6366F1] transition-colors text-center"
                     spellCheck={false}
                     autoComplete="off"
@@ -345,7 +345,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 {/* Plans */}
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] text-[#4a3f7a] uppercase tracking-widest">Choisir un plan</p>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40% jusqu'au 1er juillet</span>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40% jusqu’au 1er juillet</span>
                 </div>
                 <div className="space-y-2">
                   {PLANS.map(p => (

@@ -474,7 +474,7 @@ export function Bank({ user }: BankProps) {
     }
     let res = await supabase.from('content_bank').insert({ ...baseRow, folder }).select().single()
 
-    // Fallback if the storage_path columns or folder column don't exist yet
+    // Fallback if the storage_path columns or folder column don’t exist yet
     if (res.error && /storage_path|thumbnail_path|folder/i.test(res.error.message) && /column|cache/i.test(res.error.message)) {
       setNeedsMigration(true)
       res = await supabase.from('content_bank').insert({
@@ -484,7 +484,7 @@ export function Bank({ user }: BankProps) {
     }
 
     if (res.error) {
-      setError("Erreur lors de l'ajout : " + res.error.message)
+      setError("Erreur lors de l’ajout : " + res.error.message)
       await deleteStorageObjects([opts.storagePath, opts.thumbnailPath])
       return
     }
