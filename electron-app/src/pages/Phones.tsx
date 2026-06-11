@@ -884,6 +884,7 @@ export function Phones({ user }: PhonesProps) {
       <button
         onClick={onClick}
         title={title}
+        className="sf-press"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
@@ -924,7 +925,7 @@ export function Phones({ user }: PhonesProps) {
 
       <div
         className="anim-page"
-        style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg, #07070C)' }}
+        style={{ height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg, #07070C)' }}
         onClick={() => setContextMenu(null)}
       >
 
@@ -937,7 +938,7 @@ export function Phones({ user }: PhonesProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
         }}>
           {/* Left: icon + title + subtitle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+          <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
             <div style={{
               width: 48, height: 48, borderRadius: 14, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -961,7 +962,7 @@ export function Phones({ user }: PhonesProps) {
           </div>
 
           {/* Right: auto-refresh control + sync button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Auto-refresh pill */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
@@ -1120,8 +1121,8 @@ export function Phones({ user }: PhonesProps) {
           )
         })()}
 
-        {/* ── Scrollable content area ────────────────────────────────────────── */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {/* ── Content area (scrolls with the page) ───────────────────────────── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
           {/* ── Main area (cards + detail panel) ──────────────────────────── */}
           <div style={{ flex: 1, display: 'flex' }}>
@@ -1207,7 +1208,7 @@ export function Phones({ user }: PhonesProps) {
               {(!bearer || error || pollError) && (
                 <div style={{ padding: '12px 28px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {!bearer && (
-                    <div style={{
+                    <div className="sf-anim-slide-up" style={{
                       padding: '10px 14px', borderRadius: 10,
                       background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)',
                       color: '#F59E0B', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
@@ -1221,25 +1222,25 @@ export function Phones({ user }: PhonesProps) {
                     </div>
                   )}
                   {error && (
-                    <div style={{
+                    <div className="sf-anim-slide-up" style={{
                       padding: '10px 14px', borderRadius: 10,
                       background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
                       color: '#EF4444', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                     }}>
                       <span>{error}</span>
-                      <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
+                      <button onClick={() => setError(null)} className="sf-press" style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                       </button>
                     </div>
                   )}
                   {pollError && (
-                    <div style={{
+                    <div className="sf-anim-slide-up" style={{
                       padding: '10px 14px', borderRadius: 10,
                       background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)',
                       color: '#F59E0B', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                     }}>
                       <span>{pollError}</span>
-                      <button onClick={() => setPollError(null)} style={{ background: 'none', border: 'none', color: '#F59E0B', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
+                      <button onClick={() => setPollError(null)} className="sf-press" style={{ background: 'none', border: 'none', color: '#F59E0B', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                       </button>
                     </div>
@@ -1291,7 +1292,7 @@ export function Phones({ user }: PhonesProps) {
 
                 ) : phones.length === 0 ? (
                   /* ── Empty state ────────────────────────────────────────── */
-                  <div className="sf-empty">
+                  <div className="sf-empty sf-reveal">
                     <div className="sf-empty-icon" style={{ width: 64, height: 64, borderRadius: 18 }}>
                       <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="6" y="1" width="16" height="26" rx="3.5"/>
@@ -1321,7 +1322,7 @@ export function Phones({ user }: PhonesProps) {
 
                 ) : visible.length === 0 ? (
                   /* ── No search results ──────────────────────────────────── */
-                  <div className="sf-empty">
+                  <div className="sf-empty sf-reveal">
                     <div className="sf-empty-icon">
                       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#a78bfa" strokeWidth="1.6" strokeLinecap="round">
                         <circle cx="9.5" cy="9.5" r="7"/>
@@ -1392,7 +1393,7 @@ export function Phones({ user }: PhonesProps) {
               const p = selectedPhone
               const col = phoneColor(p.phone_name)
               return (
-                <div style={{
+                <div className="sf-reveal" style={{
                   width: 300, flexShrink: 0,
                   borderLeft: '1px solid rgba(139,92,246,0.12)',
                   background: 'rgba(12,12,21,0.95)', overflowY: 'auto',
@@ -1459,6 +1460,7 @@ export function Phones({ user }: PhonesProps) {
                       ))}
                       <button
                         onClick={e => { e.stopPropagation(); setContextMenu({ phone: p, x: e.clientX, y: e.clientY }) }}
+                        className="sf-press"
                         style={{
                           width: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
                           borderRadius: 8, background: 'rgba(255,255,255,0.04)',
@@ -1891,6 +1893,7 @@ function PhoneRow({
             </svg>
           </ActionBtn>
           <button
+            className="sf-press"
             style={{
               width: 26, height: 26, borderRadius: 6,
               display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -237,7 +237,7 @@ export function Autocomment({ user }: AutocommentProps) {
       {/* ── Premium page header ────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 pt-7 pb-6" style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
             style={{
               background: 'linear-gradient(135deg,rgba(124,58,237,0.2),rgba(236,72,153,0.12))',
               border: '1px solid rgba(139,92,246,0.3)',
@@ -247,7 +247,7 @@ export function Autocomment({ user }: AutocommentProps) {
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
           </div>
-          <div>
+          <div className="sf-anim-slide-up sf-d50">
             <h1 className="text-[20px] font-black leading-none sf-text-gradient">Auto-Comments</h1>
             <p className="text-[13px] text-text3 mt-1">AI or manual replies to Instagram comments via GéeLark phones</p>
           </div>
@@ -255,7 +255,7 @@ export function Autocomment({ user }: AutocommentProps) {
       </div>
 
       {/* ── Account chips bar ─────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-6 py-3 flex items-center gap-2 overflow-x-auto" style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="flex-shrink-0 px-6 py-3 flex items-center gap-2 overflow-x-auto sf-anim-slide-up sf-d100" style={{ borderBottom: '1px solid var(--border)' }}>
         {phones.length === 0 ? (
           <p className="text-[13px] text-text3">No Instagram account linked — go to Phones first.</p>
         ) : phones.map((p, i) => {
@@ -290,7 +290,7 @@ export function Autocomment({ user }: AutocommentProps) {
       <div className="flex-1 flex overflow-hidden">
 
         {/* ── Left: post list ──────────────────────────────────────────────── */}
-        <aside className="w-[300px] flex-shrink-0 flex flex-col overflow-hidden" style={{ borderRight: '1px solid var(--border)' }}>
+        <aside className="w-[300px] flex-shrink-0 flex flex-col overflow-hidden sf-anim-slide-up sf-d150" style={{ borderRight: '1px solid var(--border)' }}>
 
           {/* Aside header */}
           <div className="px-4 py-3.5 flex items-center gap-2" style={{ borderBottom: '1px solid var(--border)' }}>
@@ -370,7 +370,7 @@ export function Autocomment({ user }: AutocommentProps) {
         </aside>
 
         {/* ── Right: comments + config ─────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden sf-anim-slide-up sf-d200">
           {!selectedPost ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="sf-empty">

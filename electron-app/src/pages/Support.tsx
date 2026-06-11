@@ -211,7 +211,7 @@ function CreateTicketForm({
   return (
     <div className="anim-page space-y-6 max-w-2xl">
       {/* Sub-header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
         <button
           onClick={onCancel}
           className="sf-btn sf-btn-ghost cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-1.5"
@@ -222,7 +222,7 @@ function CreateTicketForm({
         <h2 className="text-[20px] font-black text-text">{t('supportNewTicket')}</h2>
       </div>
 
-      <div className="sf-card p-6 space-y-5">
+      <div className="sf-card p-6 space-y-5 sf-anim-slide-up sf-d100">
         <div className="grid grid-cols-2 gap-5">
           {/* Subject */}
           <div className="col-span-2 space-y-2">
@@ -369,7 +369,7 @@ function ThreadView({
   return (
     <div className="anim-page space-y-5 max-w-3xl">
       {/* Header */}
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-4 sf-anim-slide-up sf-d50">
         <button
           onClick={onBack}
           className="sf-btn sf-btn-ghost cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 mt-0.5 flex items-center gap-1.5 shrink-0"
@@ -413,13 +413,13 @@ function ThreadView({
       </div>
 
       {/* Description card */}
-      <div className="sf-card p-5">
+      <div className="sf-card p-5 sf-anim-slide-up sf-d100">
         <p className="text-[11px] font-semibold text-text3 uppercase tracking-widest mb-3">{t('supportInitialDesc')}</p>
         <p className="text-[13px] text-text whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
       </div>
 
       {/* Messages */}
-      <div className="sf-card overflow-hidden">
+      <div className="sf-card overflow-hidden sf-anim-slide-up sf-d150">
         <div className="max-h-80 overflow-y-auto p-5 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-6 text-text3">
@@ -533,7 +533,7 @@ function UserSupport({ user }: { user: User }) {
     return (
       <div className="sf-page anim-page">
         <div className="sf-page-header">
-          <div>
+          <div className="sf-anim-slide-up sf-d50">
             <h1 className="sf-page-title">{t('supportTitle')}</h1>
             <p className="sf-page-subtitle">{t('supportHelp')}</p>
           </div>
@@ -555,7 +555,7 @@ function UserSupport({ user }: { user: User }) {
     return (
       <div className="sf-page anim-page">
         <div className="sf-page-header">
-          <div>
+          <div className="sf-anim-slide-up sf-d50">
             <h1 className="sf-page-title">{t('supportTitle')}</h1>
             <p className="sf-page-subtitle">{t('supportHelp')}</p>
           </div>
@@ -584,13 +584,13 @@ function UserSupport({ user }: { user: User }) {
     <div className="sf-page anim-page">
       {/* Page header */}
       <div className="sf-page-header">
-        <div>
+        <div className="sf-anim-slide-up sf-d50">
           <h1 className="sf-page-title">{t('supportTitle')}</h1>
           <p className="sf-page-subtitle">{t('supportHelp')}</p>
         </div>
         <button
           onClick={() => setView('create')}
-          className="sf-btn sf-btn-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
+          className="sf-btn sf-btn-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2 sf-anim-slide-up sf-d100"
         >
           <IconPlus />
           {t('supportNewTicketBtn')}
@@ -599,7 +599,7 @@ function UserSupport({ user }: { user: User }) {
 
       {/* Scrollable content */}
       <div className="sf-page-body">
-        <div className="space-y-3">
+        <div className="space-y-3 anim-stagger">
           {loading ? (
             <div className="sf-card p-10 flex items-center justify-center gap-3 text-text3">
               <span className="sf-spinner" />
@@ -607,7 +607,7 @@ function UserSupport({ user }: { user: User }) {
             </div>
           ) : tickets.length === 0 ? (
             <div className="sf-empty">
-              <div className="text-accent/60">
+              <div className="text-accent/60 sf-anim-scale-spring">
                 <IconTicket />
               </div>
               <p className="text-base font-bold text-text mt-2">{t('supportNoTicketsYet')}</p>
@@ -625,7 +625,7 @@ function UserSupport({ user }: { user: User }) {
               <button
                 key={tk.id}
                 onClick={() => openTicket(tk)}
-                className="sf-card w-full text-left cursor-pointer hover:bg-surface2 transition-colors group focus-visible:ring-2 focus-visible:ring-accent/60 overflow-hidden flex"
+                className="sf-card sf-card-lift w-full text-left cursor-pointer hover:bg-surface2 transition-colors group focus-visible:ring-2 focus-visible:ring-accent/60 overflow-hidden flex"
               >
                 {/* Left priority bar */}
                 <div className={`w-1 shrink-0 self-stretch ${PRIORITY_BAR[tk.priority]} opacity-70`} />
@@ -710,7 +710,7 @@ function AdminSupport({ user }: { user: User }) {
     return (
       <div className="sf-page anim-page">
         <div className="sf-page-header">
-          <div>
+          <div className="sf-anim-slide-up sf-d50">
             <h1 className="sf-page-title">{t('supportAdminPanel')}</h1>
             <p className="sf-page-subtitle">{tickets.length} {t('supportAdminTotal')}</p>
           </div>
@@ -732,13 +732,13 @@ function AdminSupport({ user }: { user: User }) {
     <div className="sf-page anim-page">
       {/* Page header */}
       <div className="sf-page-header">
-        <div>
+        <div className="sf-anim-slide-up sf-d50">
           <h1 className="sf-page-title">{t('supportAdminTickets')}</h1>
           <p className="sf-page-subtitle">{tickets.length} {t('supportAdminTotal')}</p>
         </div>
         <button
           onClick={load}
-          className="sf-btn sf-btn-secondary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
+          className="sf-btn sf-btn-secondary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2 sf-anim-slide-up sf-d100"
         >
           <IconRefresh />
           {t('supportAdminRefresh')}
@@ -749,7 +749,7 @@ function AdminSupport({ user }: { user: User }) {
       <div className="sf-page-body space-y-5">
 
         {/* Filters row */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap sf-anim-slide-up sf-d150">
           <input
             name="search"
             value={search}
@@ -781,11 +781,11 @@ function AdminSupport({ user }: { user: User }) {
           </div>
         ) : shown.length === 0 ? (
           <div className="sf-empty">
-            <div className="text-accent/60"><IconTicket /></div>
+            <div className="text-accent/60 sf-anim-scale-spring"><IconTicket /></div>
             <p className="text-[13px] text-text3 mt-2">{t('supportAdminNoTickets')}</p>
           </div>
         ) : (
-          <div className="sf-card overflow-hidden">
+          <div className="sf-card overflow-hidden sf-anim-slide-up sf-d200">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border bg-surface2/50">

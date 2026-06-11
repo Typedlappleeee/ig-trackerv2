@@ -639,11 +639,18 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
     const resourceUrl = data['resourceUrl'] as string | undefined
     if (!uploadUrl || !resourceUrl) return { ok: false, error: 'Réponse upload GéeLark invalide' }
 
-    // Step 2: read file and PUT to presigned URL — no extra headers (GéeLark doc requires this)
-    const fileBytes = readFileSync(opts.filePath)
+    // Step 2: read file bytes — local path or Supabase signed URL
+    let fileBytes: Buffer
+    if (opts.filePath.startsWith('https://') || opts.filePath.startsWith('http://')) {
+      const dlRes = await net.fetch(opts.filePath)
+      if (!dlRes.ok) return { ok: false, error: `Téléchargement vidéo échoué: ${dlRes.status}` }
+      fileBytes = Buffer.from(await dlRes.arrayBuffer())
+    } else {
+      fileBytes = readFileSync(opts.filePath)
+    }
     const uploadRes = await net.fetch(uploadUrl, {
       method: 'PUT',
-      body: fileBytes,
+      body: new Uint8Array(fileBytes),
     })
     if (uploadRes.status < 200 || uploadRes.status >= 300) {
       return { ok: false, error: `Upload échoué (HTTP ${uploadRes.status})` }

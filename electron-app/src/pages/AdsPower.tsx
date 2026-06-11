@@ -112,7 +112,7 @@ function ProfileRow({
   return (
     <div
       onClick={onToggle}
-      className="sf-card p-3 flex items-center gap-2.5 cursor-pointer transition-all"
+      className="sf-card sf-card-lift p-3 flex items-center gap-2.5 cursor-pointer transition-all"
       style={selected
         ? { borderColor: 'rgba(124,58,237,0.4)', background: 'rgba(124,58,237,0.08)' }
         : {}}
@@ -179,7 +179,7 @@ function AddProfileModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: O
       className="sf-modal-bg anim-scale-in"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="sf-modal">
+      <div className="sf-modal sf-anim-scale-spring">
         <div className="sf-modal-header">
           <h3 className="sf-modal-title">{t('adspowerAddProfile')}</h3>
           <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label="Close">
@@ -417,7 +417,7 @@ export function AdsPower({ user }: AdsPowerProps) {
       <div className="w-72 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid var(--border)' }}>
 
         {/* Panel header */}
-        <div className="px-4 pt-5 pb-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="px-4 pt-5 pb-4 flex-shrink-0 sf-anim-slide-up sf-d50" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-[13px] font-bold text-text">{t('adspowerProfiles')}</p>
@@ -448,7 +448,7 @@ export function AdsPower({ user }: AdsPowerProps) {
               <button
                 onClick={() => setShowKey(v => !v)}
                 aria-label={showKey ? 'Hide API key' : 'Show API key'}
-                className="absolute right-2 cursor-pointer text-text3 hover:text-text2 transition-colors"
+                className="absolute right-2 cursor-pointer text-text3 hover:text-text2 transition-colors sf-press"
               >
                 {showKey ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61M14.12 14.12A3 3 0 1 1 9.88 9.88M1 1l22 22"/></svg>
@@ -493,7 +493,7 @@ export function AdsPower({ user }: AdsPowerProps) {
         {/* Profile list */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           {profiles.length === 0 ? (
-            <div className="sf-empty">
+            <div className="sf-empty sf-reveal">
               <div className="sf-empty-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--accent-glow)' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </div>
@@ -519,7 +519,7 @@ export function AdsPower({ user }: AdsPowerProps) {
 
         {/* sf-toolbar (page header) */}
         <div className="sf-toolbar justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
             {/* Icon with glow */}
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{
@@ -544,7 +544,7 @@ export function AdsPower({ user }: AdsPowerProps) {
           <button
             onClick={handleLaunch}
             disabled={!canLaunch}
-            className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer disabled:opacity-40"
+            className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer disabled:opacity-40 sf-anim-slide-up sf-d100"
           >
             {running ? (
               <><span className="sf-spinner" />{t('adspowerRunning')}</>
@@ -563,7 +563,7 @@ export function AdsPower({ user }: AdsPowerProps) {
           <div className="w-80 flex-shrink-0 flex flex-col overflow-y-auto" style={{ borderRight: '1px solid var(--border)' }}>
 
             {/* Video picker */}
-            <div className="p-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <div className="p-4 sf-anim-slide-up sf-d150" style={{ borderBottom: '1px solid var(--border)' }}>
               <p className="sf-section-label mb-3">{t('adspowerVideo')}</p>
               {video ? (
                 <div className="sf-card p-3 flex items-center gap-3">
@@ -581,7 +581,7 @@ export function AdsPower({ user }: AdsPowerProps) {
               ) : (
                 <button
                   onClick={() => setShowBank(true)}
-                  className="w-full p-4 rounded-xl text-[13px] cursor-pointer font-semibold text-accent hover:text-text transition-colors"
+                  className="w-full p-4 rounded-xl text-[13px] cursor-pointer font-semibold text-accent hover:text-text transition-colors sf-hover-lift"
                   style={{ background: 'rgba(255,255,255,0.02)', border: '1.5px dashed rgba(139,92,246,0.3)' }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="inline-block mr-2 -mt-0.5"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
@@ -591,7 +591,7 @@ export function AdsPower({ user }: AdsPowerProps) {
             </div>
 
             {/* Caption */}
-            <div className="p-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <div className="p-4 sf-anim-slide-up sf-d200" style={{ borderBottom: '1px solid var(--border)' }}>
               <p className="sf-section-label mb-3">{t('adspowerCaption')}</p>
               <textarea
                 value={caption}
@@ -604,7 +604,7 @@ export function AdsPower({ user }: AdsPowerProps) {
             </div>
 
             {/* Options */}
-            <div className="p-4">
+            <div className="p-4 sf-anim-slide-up sf-d250">
               <p className="sf-section-label mb-3">{t('adspowerOptions')}</p>
               <div className="sf-card p-3 flex items-center justify-between">
                 <div>
@@ -640,7 +640,7 @@ export function AdsPower({ user }: AdsPowerProps) {
 
             <div className="flex-1 overflow-y-auto p-4 space-y-0.5 font-mono">
               {logs.length === 0 ? (
-                <div className="sf-empty">
+                <div className="sf-empty sf-reveal">
                   <div className="sf-empty-icon">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--accent-glow)' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
                   </div>
@@ -666,7 +666,7 @@ export function AdsPower({ user }: AdsPowerProps) {
                   { label: t('adspowerSuccess'), count: logs.filter(l => l.status === 'done').length,  color: 'var(--ok)'     },
                   { label: t('adspowerError'),   count: logs.filter(l => l.status === 'error').length, color: 'var(--danger)' },
                 ].map(s => (
-                  <div key={s.label} className="flex items-center gap-2">
+                  <div key={s.label} className="flex items-center gap-2 sf-anim-scale-in">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
                     <span className="text-[11px] text-text3">{s.label}:</span>
                     <span className="text-[12px] font-bold" style={{ color: s.color }}>{s.count}</span>
