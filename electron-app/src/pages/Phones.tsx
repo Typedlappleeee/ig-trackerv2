@@ -34,8 +34,8 @@ const TH_STYLE: React.CSSProperties = {
 const PRIMARY_BTN: React.CSSProperties = {
   fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em',
   textTransform: 'uppercase', padding: '11px 18px',
-  background: IVORY, color: '#0F1014', border: 'none', borderRadius: 0,
-  transition: 'background 0.25s',
+  background: IVORY, color: '#0F1014', border: 'none', borderRadius: 8,
+  transition: 'background 0.25s, transform 0.12s',
 }
 const primaryHover = {
   onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = GOLD },
@@ -56,7 +56,7 @@ function StatusDot({ status }: { status: string }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '3px 9px 2px', borderRadius: 0,
+      padding: '3px 9px 2px', borderRadius: 99,
       background: online ? 'rgba(127,217,184,0.07)' : 'rgba(240,160,171,0.07)',
       border: online ? '1px solid rgba(127,217,184,0.35)' : '1px solid rgba(240,160,171,0.35)',
       fontFamily: SANS, fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
@@ -260,7 +260,7 @@ function SessionDialog({
               )}
             </div>
           </div>
-          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ width: 28, height: 28, borderRadius: 0 }}>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ width: 28, height: 28, borderRadius: 8 }}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
             </svg>
@@ -272,7 +272,7 @@ function SessionDialog({
           {phone.geelark_id && bearer && (
             <div style={{
               background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.15)',
-              borderRadius: 0, padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
+              borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
@@ -292,7 +292,7 @@ function SessionDialog({
               </div>
               {extractLogs.length > 0 && (
                 <div style={{
-                  background: 'rgba(0,0,0,0.35)', borderRadius: 0, padding: '8px 10px',
+                  background: 'rgba(0,0,0,0.35)', borderRadius: 8, padding: '8px 10px',
                   maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
                   border: '1px solid rgba(233,234,240,0.06)',
                 }}>
@@ -321,7 +321,7 @@ function SessionDialog({
           {/* Manual instructions */}
           <div style={{
             background: 'rgba(233,234,240,0.025)', border: '1px solid rgba(233,234,240,0.07)',
-            borderRadius: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4,
+            borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4,
           }}>
             <p style={{ fontSize: 11, fontWeight: 600, color: '#E9EAF0', margin: '0 0 4px' }}>{t('phoneManualInstructions')}</p>
             {[
@@ -428,7 +428,7 @@ function ContextMenu({
       onClick={() => { onClick(); onClose() }}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-        padding: '7px 12px', fontSize: 13, textAlign: 'left', borderRadius: 0,
+        padding: '7px 12px', fontSize: 13, textAlign: 'left', borderRadius: 6,
         background: 'none', border: 'none', cursor: 'pointer',
         color: danger ? '#F0A0AB' : '#E9EAF0', transition: 'background 0.12s',
       }}
@@ -446,7 +446,7 @@ function ContextMenu({
       style={{
         position: 'fixed', zIndex: 50,
         background: '#0F1014', border: '1px solid rgba(233,234,240,0.09)',
-        borderRadius: 0, boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+        borderRadius: 12, boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
         padding: '4px 0', width: 208,
         left, top,
       }}
@@ -924,7 +924,7 @@ export function Phones({ user }: PhonesProps) {
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
-          width: 28, height: 28, borderRadius: 0,
+          width: 28, height: 28, borderRadius: 7,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: hovered ? (danger ? 'rgba(240,160,171,0.15)' : 'rgba(99,102,241,0.15)') : 'rgba(233,234,240,0.06)',
           border: '1px solid rgba(233,234,240,0.1)',
@@ -998,14 +998,14 @@ export function Phones({ user }: PhonesProps) {
             {/* Auto-refresh pill */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '7px 12px', borderRadius: 0,
+              padding: '7px 12px', borderRadius: 8,
               background: 'rgba(233,234,240,0.02)', border: `1px solid ${HAIR}`,
               flexShrink: 0,
             }}>
               <button
                 onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
                 style={{
-                  position: 'relative', width: 28, height: 15, borderRadius: 0,
+                  position: 'relative', width: 28, height: 15, borderRadius: 99,
                   background: autoRefresh ? '#7FD9B8' : 'rgba(233,234,240,0.2)',
                   flexShrink: 0, border: 'none', cursor: 'pointer', padding: 0,
                   transition: 'background 0.2s',
@@ -1013,17 +1013,17 @@ export function Phones({ user }: PhonesProps) {
               >
                 <span style={{
                   position: 'absolute', top: 2.5, width: 10, height: 10,
-                  background: IVORY, borderRadius: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                  background: IVORY, borderRadius: 99, boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
                   transition: 'left 0.2s', left: autoRefresh ? 15 : 2.5,
                 }} />
               </button>
               <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(233,234,240,0.52)', whiteSpace: 'nowrap' }}>{t('phonesAutoLabel')}</span>
               {autoRefresh && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 0, padding: '2px 3px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '2px 3px', flexShrink: 0 }}>
                   {INTERVALS.map(({ label, value }) => (
                     <button key={value} onClick={() => changeInterval(value)}
                       style={{
-                        padding: '3px 7px', borderRadius: 0, fontSize: 10, border: 'none', cursor: 'pointer',
+                        padding: '3px 7px', borderRadius: 5, fontSize: 10, border: 'none', cursor: 'pointer',
                         background: intervalSec === value ? IVORY : 'transparent',
                         color: intervalSec === value ? '#0F1014' : 'rgba(233,234,240,0.52)',
                         fontWeight: intervalSec === value ? 700 : 400,
@@ -1056,7 +1056,7 @@ export function Phones({ user }: PhonesProps) {
             {/* Plan limit badge */}
             {phoneLimit !== Infinity && (
               <span style={{
-                fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 0,
+                fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 99,
                 background: phones.length >= phoneLimit ? 'rgba(240,160,171,0.07)' : 'rgba(99,102,241,0.07)',
                 border: `1px solid ${phones.length >= phoneLimit ? 'rgba(240,160,171,0.35)' : 'rgba(99,102,241,0.35)'}`,
                 color: phones.length >= phoneLimit ? '#F0A0AB' : '#6366F1',
@@ -1121,7 +1121,7 @@ export function Phones({ user }: PhonesProps) {
                   className={`anim-scale-in sf-d${(ci + 1) * 50}`}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 7,
-                    padding: '6px 12px', borderRadius: 0,
+                    padding: '6px 12px', borderRadius: 8,
                     background: chip.filter && filter === chip.filter
                       ? 'rgba(99,102,241,0.12)'
                       : 'rgba(233,234,240,0.04)',
@@ -1196,7 +1196,7 @@ export function Phones({ user }: PhonesProps) {
                     style={{
                       appearance: 'none', paddingRight: 28, paddingLeft: 12,
                       fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                      background: 'transparent', border: `1px solid ${HAIR}`, borderRadius: 0,
+                      background: 'transparent', border: `1px solid ${HAIR}`, borderRadius: 8,
                     }}
                   >
                     <option value="all">{t('phonesAllGroups')}</option>
@@ -1209,14 +1209,14 @@ export function Phones({ user }: PhonesProps) {
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 2,
                   background: 'rgba(10,10,12,0.8)', border: '1px solid rgba(233,234,240,0.08)',
-                  borderRadius: 0, padding: '3px 4px', flexShrink: 0,
+                  borderRadius: 8, padding: '3px 4px', flexShrink: 0,
                 }}>
                   {(['all', 'online', 'offline'] as const).map(v => (
                     <button
                       key={v}
                       onClick={() => setFilter(v)}
                       style={{
-                        padding: '4px 12px', borderRadius: 0, fontSize: 11, fontWeight: 600,
+                        padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
                         border: 'none', cursor: 'pointer', transition: 'all 0.15s',
                         background: filter === v ? IVORY : 'transparent',
                         color: filter === v ? '#0F1014' : 'rgba(233,234,240,0.52)',
@@ -1248,7 +1248,7 @@ export function Phones({ user }: PhonesProps) {
                 <div style={{ padding: '12px 28px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {!bearer && (
                     <div className="sf-anim-slide-up" style={{
-                      padding: '10px 14px', borderRadius: 0,
+                      padding: '10px 14px', borderRadius: 10,
                       background: 'rgba(229,192,123,0.07)', border: '1px solid rgba(229,192,123,0.18)',
                       color: '#E5C07B', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
                     }}>
@@ -1262,7 +1262,7 @@ export function Phones({ user }: PhonesProps) {
                   )}
                   {error && (
                     <div className="sf-anim-slide-up" style={{
-                      padding: '10px 14px', borderRadius: 0,
+                      padding: '10px 14px', borderRadius: 10,
                       background: 'rgba(240,160,171,0.07)', border: '1px solid rgba(240,160,171,0.18)',
                       color: '#F0A0AB', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                     }}>
@@ -1274,7 +1274,7 @@ export function Phones({ user }: PhonesProps) {
                   )}
                   {pollError && (
                     <div className="sf-anim-slide-up" style={{
-                      padding: '10px 14px', borderRadius: 0,
+                      padding: '10px 14px', borderRadius: 10,
                       background: 'rgba(229,192,123,0.07)', border: '1px solid rgba(229,192,123,0.18)',
                       color: '#E5C07B', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                     }}>
@@ -1292,7 +1292,7 @@ export function Phones({ user }: PhonesProps) {
 
                 {loading ? (
                   /* ── Loading skeleton rows ─────────────────────────────── */
-                  <div className="sf-table-wrap" style={{ borderRadius: 0, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
+                  <div className="sf-table-wrap" style={{ borderRadius: 12, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
                     <table className="sf-table">
                       <thead>
                         <tr>
@@ -1311,17 +1311,17 @@ export function Phones({ user }: PhonesProps) {
                             <td style={{ textAlign: 'center' }}><div className="sf-skeleton" style={{ width: 8, height: 8, borderRadius: '50%', margin: '0 auto' }} /></td>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div className="sf-skeleton" style={{ width: 30, height: 30, borderRadius: 0, flexShrink: 0 }} />
+                                <div className="sf-skeleton" style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0 }} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                  <div className="sf-skeleton" style={{ height: 11, width: 110, borderRadius: 0 }} />
-                                  <div className="sf-skeleton" style={{ height: 8, width: 70, borderRadius: 0 }} />
+                                  <div className="sf-skeleton" style={{ height: 11, width: 110, borderRadius: 4 }} />
+                                  <div className="sf-skeleton" style={{ height: 8, width: 70, borderRadius: 4 }} />
                                 </div>
                               </div>
                             </td>
-                            <td><div className="sf-skeleton" style={{ height: 20, width: 65, borderRadius: 0 }} /></td>
-                            <td><div className="sf-skeleton" style={{ height: 20, width: 100, borderRadius: 0 }} /></td>
-                            <td><div className="sf-skeleton" style={{ height: 20, width: 75, borderRadius: 0 }} /></td>
-                            <td><div className="sf-skeleton" style={{ height: 11, width: 90, borderRadius: 0 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 65, borderRadius: 6 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 100, borderRadius: 6 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 75, borderRadius: 6 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 11, width: 90, borderRadius: 4 }} /></td>
                             <td></td>
                           </tr>
                         ))}
@@ -1332,7 +1332,7 @@ export function Phones({ user }: PhonesProps) {
                 ) : phones.length === 0 ? (
                   /* ── Empty state ────────────────────────────────────────── */
                   <div className="sf-empty sf-reveal">
-                    <div className="sf-empty-icon" style={{ width: 64, height: 64, borderRadius: 0 }}>
+                    <div className="sf-empty-icon" style={{ width: 64, height: 64, borderRadius: 20 }}>
                       <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#6366F1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="6" y="1" width="16" height="26" rx="3.5"/>
                         <circle cx="14" cy="22" r="1.5" fill="#6366F1" stroke="none"/>
@@ -1376,7 +1376,7 @@ export function Phones({ user }: PhonesProps) {
 
                 ) : (
                   /* ── Phone table list ───────────────────────────────────── */
-                  <div className="sf-table-wrap" style={{ borderRadius: 0, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
+                  <div className="sf-table-wrap" style={{ borderRadius: 12, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
                     <table className="sf-table">
                       <thead>
                         <tr>
@@ -1443,7 +1443,7 @@ export function Phones({ user }: PhonesProps) {
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{
-                          width: 42, height: 42, borderRadius: 0, flexShrink: 0,
+                          width: 42, height: 42, borderRadius: 10, flexShrink: 0,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           background: `${col}14`,
                           border: `1px solid ${col}33`, color: col,
@@ -1459,7 +1459,7 @@ export function Phones({ user }: PhonesProps) {
                             <StatusDot status={p.status ?? 'offline'} />
                             {p.group_name && (
                               <span style={{
-                                fontSize: 10, padding: '2px 7px', borderRadius: 0, fontWeight: 600,
+                                fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 600,
                                 background: 'rgba(99,102,241,0.12)', color: '#6366F1',
                                 border: '1px solid rgba(99,102,241,0.22)',
                               }}>
@@ -1472,7 +1472,7 @@ export function Phones({ user }: PhonesProps) {
                       <button
                         onClick={() => setSelectedPhone(null)}
                         className="sf-btn sf-btn-ghost sf-btn-icon"
-                        style={{ width: 26, height: 26, borderRadius: 0, flexShrink: 0, cursor: 'pointer' }}
+                        style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, cursor: 'pointer' }}
                       >
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                           <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
@@ -1488,7 +1488,7 @@ export function Phones({ user }: PhonesProps) {
                         <button key={a.label} onClick={a.action}
                           style={{
                             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                            padding: '7px 0', borderRadius: 0, fontSize: 11, fontWeight: 500,
+                            padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 500,
                             background: 'rgba(233,234,240,0.04)', border: '1px solid rgba(233,234,240,0.09)',
                             color: 'rgba(99,102,241,0.72)', cursor: 'pointer', transition: 'all 0.15s',
                           }}
@@ -1503,7 +1503,7 @@ export function Phones({ user }: PhonesProps) {
                         className="sf-press"
                         style={{
                           width: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          borderRadius: 0, background: 'rgba(233,234,240,0.04)',
+                          borderRadius: 8, background: 'rgba(233,234,240,0.04)',
                           border: '1px solid rgba(233,234,240,0.09)',
                           color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
                         }}
@@ -1586,7 +1586,7 @@ export function Phones({ user }: PhonesProps) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <button onClick={() => setSessionDialog({ phone: p })} className="sf-btn sf-btn-ghost" style={{
                         width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                        borderRadius: 0, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                        borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
                         color: 'rgba(99,102,241,0.72)', cursor: 'pointer',
                         justifyContent: 'flex-start',
                       }}>
@@ -1596,7 +1596,7 @@ export function Phones({ user }: PhonesProps) {
                       {p.ig_username && (
                         <button onClick={() => { unlinkIg(p.id); setSelectedPhone(null) }} className="sf-btn sf-btn-ghost" style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                          borderRadius: 0, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                          borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
                           color: 'rgba(99,102,241,0.72)', cursor: 'pointer',
                           justifyContent: 'flex-start',
                         }}>
@@ -1607,7 +1607,7 @@ export function Phones({ user }: PhonesProps) {
                       {canDelete && (
                         <button onClick={() => { deletePhone(p.id); setSelectedPhone(null) }} className="sf-btn sf-btn-ghost" style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                          borderRadius: 0, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                          borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
                           color: '#F0A0AB', cursor: 'pointer',
                           justifyContent: 'flex-start',
                         }}>
@@ -1675,7 +1675,7 @@ function PhoneCard({
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         {/* Phone icon with gradient */}
         <div style={{
-          width: 40, height: 40, borderRadius: 0, flexShrink: 0,
+          width: 40, height: 40, borderRadius: 10, flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: `${col}14`,
           border: `1px solid ${col}2e`, color: col,
@@ -1711,7 +1711,7 @@ function PhoneCard({
         {phone.ig_username ? (
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '3px 8px 3px 5px', borderRadius: 0,
+            padding: '3px 8px 3px 5px', borderRadius: 99,
             background: 'rgba(99,102,241,0.06)',
             border: '1px solid rgba(99,102,241,0.2)',
           }}>
@@ -1731,7 +1731,7 @@ function PhoneCard({
 
         {phone.group_name && (
           <span style={{
-            fontSize: 10, padding: '2px 7px', borderRadius: 0, fontWeight: 600,
+            fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 600,
             background: 'rgba(99,102,241,0.1)', color: '#6366F1',
             border: '1px solid rgba(99,102,241,0.18)',
           }}>
@@ -1869,7 +1869,7 @@ function PhoneRow({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {/* Colored avatar */}
           <div style={{
-            width: 30, height: 30, borderRadius: 0, flexShrink: 0,
+            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: `${col}14`,
             border: `1px solid ${col}30`, color: col,
@@ -1895,7 +1895,7 @@ function PhoneRow({
         {phone.group_name
           ? <span style={{
               display: 'inline-block',
-              fontSize: 10, padding: '2px 8px', borderRadius: 0, fontWeight: 600,
+              fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
               background: 'rgba(99,102,241,0.1)', color: '#6366F1',
               border: '1px solid rgba(99,102,241,0.18)',
               whiteSpace: 'nowrap',
@@ -1935,7 +1935,7 @@ function PhoneRow({
           <button
             className="sf-press"
             style={{
-              width: 26, height: 26, borderRadius: 0,
+              width: 26, height: 26, borderRadius: 7,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'rgba(233,234,240,0.06)', border: '1px solid rgba(233,234,240,0.1)',
               color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
