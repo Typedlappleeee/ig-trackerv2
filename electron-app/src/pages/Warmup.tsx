@@ -327,16 +327,18 @@ export function Warmup({ user }: WarmupProps) {
     return (
       <div className="sf-page anim-page">
         <div className="sf-page-header">
-          <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             <div className="sf-anim-scale-spring" style={{
-              width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.1))',
-              border: '1px solid rgba(99,102,241,0.25)', color: '#6366F1',
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.28)',
+              color: '#6366F1',
             }}>
-              <IconBolt size={18} />
+              <IconBolt size={22} />
             </div>
-            <div>
-              <h1 className="sf-page-title">{t('warmupPageTitle')}</h1>
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('warmupPageTitle')}</h1>
               <p className="sf-page-sub">{t('warmupPageSub')}</p>
             </div>
           </div>
@@ -372,13 +374,15 @@ export function Warmup({ user }: WarmupProps) {
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="sf-page-header">
-        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
           <div className="sf-anim-scale-spring" style={{
-            width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.1))',
-            border: '1px solid rgba(99,102,241,0.3)', color: '#6366F1', position: 'relative', overflow: 'hidden',
+            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.28)',
+            color: '#6366F1', position: 'relative', overflow: 'hidden',
           }}>
-            <IconBolt size={18} />
+            <IconBolt size={22} />
             {running && (
               <div style={{
                 position: 'absolute', inset: 0, borderRadius: 12,
@@ -387,8 +391,8 @@ export function Warmup({ user }: WarmupProps) {
               }} />
             )}
           </div>
-          <div>
-            <h1 className="sf-page-title">{t('warmupPageTitle')}</h1>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('warmupPageTitle')}</h1>
             <p className="sf-page-sub">{t('warmupPageSub')}</p>
           </div>
         </div>

@@ -4,7 +4,6 @@ import { supabase, type ContentItem } from '@/lib/supabase'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
-import { Button }  from '@/components/ui/Button'
 import { useOrg } from '@/lib/orgContext'
 import { uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
 import { logActivity } from '@/lib/activityLog'
@@ -739,13 +738,25 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
       <div className="flex-shrink-0 border-b border-border bg-surface">
         <div className="flex items-center">
           {/* Project name + icon */}
-          <div className="w-56 flex-shrink-0 px-4 py-2.5 border-r border-border flex items-center gap-2 sf-anim-slide-up sf-d50">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(99,102,241,0.15)' }}>
-              <IconClapperboard size={12} style={{ color: '#818CF8' }} />
+          <div className="w-60 flex-shrink-0 px-3.5 py-2 border-r border-border flex items-center gap-2.5">
+            <div className="sf-anim-scale-spring" style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.28)',
+              color: '#6366F1',
+            }}>
+              <IconClapperboard size={18} />
             </div>
-            <input value={projectName} onChange={e => setProjName(e.target.value)}
-              className="text-[13px] font-semibold text-text bg-transparent focus:outline-none w-full truncate"
-              placeholder={t('montageProjectName')} />
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0, flex: 1 }}>
+              <h1 className="sf-page-title" style={{ fontSize: 13, letterSpacing: '-0.02em' }}>
+                <input value={projectName} onChange={e => setProjName(e.target.value)}
+                  className="bg-transparent focus:outline-none w-full truncate"
+                  style={{ font: 'inherit', color: 'inherit' }}
+                  placeholder={t('montageProjectName')} />
+              </h1>
+              <p className="sf-page-sub" style={{ fontSize: 10, marginTop: 1 }}>{preset} · {PRESET_DIMS[preset]}</p>
+            </div>
           </div>
 
           {/* Tab bar */}
@@ -774,9 +785,12 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
             ))}
             <span className="text-[10px] text-text2 ml-1">{PRESET_DIMS[preset]}</span>
             <div className="w-px h-5 mx-1 bg-border" />
-            <Button size="sm" onClick={handleExport} loading={exporting} disabled={!clips.length}>
+            <button onClick={handleExport} disabled={!clips.length || exporting}
+              className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer"
+              style={(!clips.length || exporting) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+              {exporting && <Spinner size="sm" />}
               {t('montageExport')}
-            </Button>
+            </button>
           </div>
         </div>
       </div>
