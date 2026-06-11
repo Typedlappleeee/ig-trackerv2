@@ -17,6 +17,7 @@ import {
 import { playSuccess } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { useToast } from '@/components/Toast'
 import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
 import { loadPostingOpts, savePostingOpts, buildScheduleTimes, type PostingOpts } from '@/lib/postingOpts'
@@ -665,6 +666,10 @@ export function MassPosting({ user }: MassPostingProps) {
       // Mark every phone as done
       for (const p of phoneList) setPhoneStatus(p.id, { status: 'done' })
 
+      const okN = [...taskStatuses.values()].filter(s => s.status === 'done').length
+      const errN = [...taskStatuses.values()].filter(s => s.status === 'error').length
+      setLastRun({ ok: okN, err: errN, total: assignments.length })
+      toast.show({ title: errN === 0 ? 'Mass posting terminé ✓' : 'Mass posting terminé avec erreurs', body: `${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`, kind: errN === 0 ? 'ok' : 'error' })
       log('🎉 Done! Resetting in 5s…', 'ok')
       await new Promise(r => setTimeout(r, 5000))
       resetMassPosting()
@@ -703,6 +708,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const errorTasks = [...taskStatuses.values()].filter(s => s.status === 'error').length
   const activeTasks = [...taskStatuses.values()].filter(s => s.status === 'uploading' || s.status === 'posting').length
   const progressPct = totalTasks > 0 ? Math.round(((doneTasks + errorTasks) / totalTasks) * 100) : 0
+  const toast = useToast()
+  const [lastRun, setLastRun] = useState<{ ok: number; err: number; total: number } | null>(null)
   const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0
 
   // ── ScaleFlow Noir tokens ──────────────────────────────────────────────────
@@ -788,6 +795,24 @@ export function MassPosting({ user }: MassPostingProps) {
             </div>
           </div>
         </div>
+
+        {/* Récap final — persiste après la fin du run */}
+        {!posting && lastRun && (
+          <div style={{
+            marginBottom: 14, padding: '10px 16px', borderRadius: 9,
+            display: 'flex', alignItems: 'center', gap: 12,
+            background: lastRun.err === 0 ? 'rgba(34,197,94,0.07)' : 'rgba(245,158,11,0.07)',
+            border: `1px solid ${lastRun.err === 0 ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.25)'}`,
+          }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: lastRun.err === 0 ? '#4ade80' : '#fbbf24' }}>
+              {lastRun.err === 0 ? '✓' : '⚠'} Dernier run : {lastRun.ok}/{lastRun.total} réussi{lastRun.ok > 1 ? 's' : ''}{lastRun.err > 0 ? ` · ${lastRun.err} échec${lastRun.err > 1 ? 's' : ''}` : ''}
+            </span>
+            <button onClick={() => setLastRun(null)} className="cursor-pointer"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(233,234,240,0.35)', fontSize: 11 }}>
+              Masquer
+            </button>
+          </div>
+        )}
 
         {/* Live progress strip (only while posting) */}
         {posting && totalTasks > 0 && (
@@ -1405,6 +1430,12 @@ export function MassPosting({ user }: MassPostingProps) {
                 )}
               </button>
             </div>
+            {/* Coût en crédits — visible AVANT de lancer */}
+            {phoneList.length > 0 && !posting && (
+              <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'rgba(233,234,240,0.42)', textAlign: 'right' }}>
+                💎 Coût : <strong style={{ color: '#818CF8' }}>{phoneList.length * CREDIT_COSTS.mass_posting} crédits</strong> · solde : {credits.balance}
+              </p>
+            )}
           </div>
         </div>
       </div>

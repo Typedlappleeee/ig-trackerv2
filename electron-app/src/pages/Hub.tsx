@@ -244,10 +244,16 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   // Live refresh: any change to scheduled_posts (post done, new schedule…)
   // reloads the dashboard so KPIs and lists stay current.
   useEffect(() => {
+    // Debounce 1,5 s : des updates Realtime rapprochés (run en cours) ne
+    // déclenchent qu'un seul reload — évite le re-jeu des animations KPI.
+    let t: ReturnType<typeof setTimeout> | null = null
     const ch = supabase.channel('hub-dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts' }, () => { load() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts' }, () => {
+        if (t) clearTimeout(t)
+        t = setTimeout(load, 1_500)
+      })
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { if (t) clearTimeout(t); supabase.removeChannel(ch) }
   }, [load])
 
   const { lang } = useLang()

@@ -266,7 +266,6 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   const [timezone, setTimezone]     = useState('Europe/Paris')
 
   // ── Sécurité ──────────────────────────────────────────────────────────────
-  const [twoFA, setTwoFA]           = useState(false)
   const [sessionTimeout, setSessionTimeout] = useState('jamais')
   const [pwChangeOpen, setPwChangeOpen] = useState(false)
   const [newPw, setNewPw]               = useState('')
@@ -973,9 +972,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                     {/* Security options */}
                     <div className="sf-card" style={{ padding: '6px 0' }}>
-                      <SettingToggle first label={t('twoFA')} sub={t('twoFASub')}
-                        checked={twoFA} onChange={v => setTwoFA(v)} />
-                      <SelectRow label={t('autoLogout')} sub={t('autoLogoutSub')}
+                      <SelectRow first label={t('autoLogout')} sub={t('autoLogoutSub')}
                         value={sessionTimeout} onChange={v => setSessionTimeout(v)}
                         options={[
                           { value: 'jamais', label: t('never') },

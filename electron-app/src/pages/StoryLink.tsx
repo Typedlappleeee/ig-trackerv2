@@ -459,7 +459,7 @@ export default function StoryLink({ user }: { user: User }) {
           <button
             onClick={() => setDryRun(v => !v)}
             disabled={running}
-            title="Déroule toute l'automation (image, caméra, sticker, lien) mais s'arrête avant de publier. Gratuit — idéal pour vérifier que le flux marche sur tes téléphones."
+            title={running ? 'Indisponible pendant une exécution' : "Déroule toute l'automation (image, caméra, sticker, lien) mais s'arrête avant de publier. Gratuit — idéal pour vérifier que le flux marche sur tes téléphones."}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               padding: '8px 13px', borderRadius: 8, cursor: 'pointer',
@@ -773,7 +773,8 @@ export default function StoryLink({ user }: { user: User }) {
             className="sf-card"
             style={{
               padding: 18,
-              borderColor: missingLinkIds.length > 0 ? 'rgba(245,158,11,0.25)' : undefined,
+              borderColor: missingLinkIds.length > 0 ? 'rgba(245,158,11,0.5)' : undefined,
+              boxShadow: missingLinkIds.length > 0 ? '0 0 18px rgba(245,158,11,0.12)' : undefined,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>

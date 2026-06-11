@@ -81,7 +81,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'phones',      label: 'navPhones',      icon: '📱' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
-      { id: 'captionbank', label: 'navCaptionBank',  icon: '💬' },
     ],
   },
   {

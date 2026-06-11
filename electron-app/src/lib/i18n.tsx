@@ -1300,7 +1300,7 @@ export const EN = {
 
   // ── MassRemix page ──────────────────────────────────────────────────────────
   massRemixTitle: 'Mass Remix',
-  massRemixSub: 'Generate remixes in bulk · FFmpeg + AI',
+  massRemixSub: 'Merge two videos at an automatic cut point — in bulk',
   massRemixNoVideo: 'No video',
   massRemixBankSource: 'Bank',
   massRemixFolderSource: 'Folder',
@@ -2700,7 +2700,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
 
   // ── MassRemix page ──────────────────────────────────────────────────────────
   massRemixTitle: 'Mass Remix',
-  massRemixSub: 'Générer des remixes en masse · FFmpeg + IA',
+  massRemixSub: 'Fusionne deux vidéos à un point de coupe automatique — en masse',
   massRemixNoVideo: 'Aucune vidéo',
   massRemixBankSource: 'Banque',
   massRemixFolderSource: 'Dossier',

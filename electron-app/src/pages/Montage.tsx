@@ -497,7 +497,10 @@ export function Montage({ user }: MontageProps) {
     const raw = clip.item.duration ?? 30
     const cutPoint = clip.trimStart + (playhead - offset) * clip.speed
     const clipEnd  = clip.trimEnd > 0 ? clip.trimEnd : raw
-    if (cutPoint <= clip.trimStart + 0.5 || cutPoint >= clipEnd - 0.5) return
+    if (cutPoint <= clip.trimStart + 0.5 || cutPoint >= clipEnd - 0.5) {
+      alert('Impossible de couper ici — place le curseur à au moins 0,5 s des bords du clip.')
+      return
+    }
     const a: TimelineClip = { ...clip, uid: `${clip.uid}-a`, trimEnd: cutPoint }
     // Start the second half 0.3s after the cut to avoid showing the uncut frame on transition
     const b: TimelineClip = { ...clip, uid: `${clip.uid}-b`, trimStart: Math.min(cutPoint + 0.3, clipEnd - 0.1), trimEnd: clip.trimEnd }

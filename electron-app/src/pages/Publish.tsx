@@ -3,7 +3,7 @@
  * Fusionne Posting (simple) et MassPosting (masse) sous un seul onglet de nav,
  * avec un sélecteur de mode persistant. La Programmation reste une page à part.
  */
-import { useState, Suspense, lazy } from 'react'
+import { useState, useRef, Suspense, lazy } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Spinner } from '@/components/ui/Spinner'
 import { ACCENT, ACCENT_L, HAIR } from '@/lib/theme'
@@ -17,8 +17,11 @@ const LS_MODE = 'sf-publish-mode'
 export function Publish({ user }: { user: User }) {
   const [mode, setMode] = useState<Mode>(() =>
     (localStorage.getItem(LS_MODE) as Mode | null) ?? 'simple')
+  // Garde trace des modes déjà ouverts pour les laisser montés ensuite
+  const mounted = useRef({ mass: mode === 'mass' })
 
   function pick(m: Mode) {
+    if (m === 'mass') mounted.current.mass = true
     setMode(m)
     localStorage.setItem(LS_MODE, m)
   }
@@ -58,13 +61,23 @@ export function Publish({ user }: { user: User }) {
       </div>
 
       {/* ── Page du mode choisi ───────────────────────────────────────────── */}
+      {/* Les deux modes restent montés (display:none pour l'inactif) : changer
+          de mode ne perd plus le formulaire en cours (caption, sélection…). */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Suspense fallback={
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Spinner />
           </div>
         }>
-          {mode === 'simple' ? <Posting user={user} /> : <MassPosting user={user} />}
+          <div style={{ flex: 1, minHeight: 0, display: mode === 'simple' ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
+            <Posting user={user} />
+          </div>
+          {/* Le mode masse n'est monté qu'après sa première ouverture (lazy) */}
+          {(mode === 'mass' || mounted.current.mass) && (
+            <div style={{ flex: 1, minHeight: 0, display: mode === 'mass' ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
+              <MassPosting user={user} />
+            </div>
+          )}
         </Suspense>
       </div>
     </div>

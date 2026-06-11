@@ -406,7 +406,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <p className="sf-page-sub">
               {sources.length > 1
                 ? `${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`
-                : `1 video → N variantes uniques · transformations invisibles`}
+                : `Crée des copies d'une vidéo avec des modifications imperceptibles (zoom, couleur, grain) pour reposter sans détection`}
             </p>
           </div>
         </div>

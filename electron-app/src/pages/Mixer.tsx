@@ -393,7 +393,7 @@ export function Mixer({ user }: MixerProps) {
               )}
             </div>
             <p className="sf-page-sub">
-              {selVideos.length} vidéo{selVideos.length !== 1 ? 's' : ''} · {selCaptions.length} caption{selCaptions.length !== 1 ? 's' : ''} · Superposition de texte sur vidéo
+              Superpose tes captions sur tes vidéos de la banque, en lot. · {selVideos.length} vidéo{selVideos.length !== 1 ? 's' : ''} · {selCaptions.length} caption{selCaptions.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>

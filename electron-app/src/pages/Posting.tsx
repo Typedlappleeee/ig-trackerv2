@@ -17,6 +17,7 @@ import { PostingOptions } from '@/components/PostingOptions'
 import { playSuccess } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { useToast } from '@/components/Toast'
 
 interface PostingProps { user: User }
 
@@ -143,6 +144,7 @@ export function Posting({ user }: PostingProps) {
   const [customPrompt, setCustomPrompt]= useState('')
   const [postingOpts, setPostingOpts]  = useState<PostingOpts>(loadPostingOpts)
   const [bearer, setBearer]            = useState('')
+  const toast = useToast()
   const [groqKey, setGroqKey]          = useState('')
   const [groupFilter, _setGroup]       = useState(loadLastGroup)
   const setGroup = (g: string) => { _setGroup(g); saveLastGroup(g) }
@@ -403,6 +405,7 @@ export function Posting({ user }: PostingProps) {
       await geelark(bearer, '/phone/stop', { ids: geelarkIds })
       setProgress(100)
       log('🎉 Done!', 'ok')
+      toast.show({ title: 'Publication terminée ✓', body: `${selectedPhones.size} compte${selectedPhones.size > 1 ? 's' : ''}`, kind: 'ok' })
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
@@ -1035,6 +1038,14 @@ export function Posting({ user }: PostingProps) {
                 {t('scheduleBtn')}
               </button>
             </div>
+
+            {/* Coût en crédits — visible AVANT de lancer */}
+            {selectedPhones.size > 0 && (
+              <p style={{ margin: '-12px 0 18px', fontSize: 11.5, color: 'rgba(233,234,240,0.42)', textAlign: 'center' }}>
+                💎 Coût : <strong style={{ color: '#818CF8' }}>{selectedPhones.size * CREDIT_COSTS.posting} crédit{selectedPhones.size * CREDIT_COSTS.posting > 1 ? 's' : ''}</strong>
+                {' '}· solde : {credits.balance}
+              </p>
+            )}
 
           </div>
         </div>

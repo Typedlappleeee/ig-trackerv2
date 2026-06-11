@@ -208,7 +208,7 @@ function SessionDialog({
     setDetectedUser(null)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (v.trim().length > 10) {
-      debounceRef.current = setTimeout(() => runTest(v), 800)
+      debounceRef.current = setTimeout(() => runTest(v), 400)
     }
   }
 

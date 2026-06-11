@@ -672,7 +672,7 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
           {locked && (
             <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0"
               style={{ background: 'rgba(245,158,11,0.08)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.18)' }}>
-              Anthropic Key
+              🔒 Clé Anthropic requise
             </span>
           )}
         </div>
