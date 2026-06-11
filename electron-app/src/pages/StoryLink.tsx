@@ -57,7 +57,7 @@ function shuffleIndices(n: number): number[] {
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
 const IconLink = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
   </svg>
@@ -438,23 +438,23 @@ export default function StoryLink({ user }: { user: User }) {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <header className="sf-page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: 9, flexShrink: 0,
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="sf-anim-scale-spring" style={{
+            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.1)',
-            border: '1px solid rgba(99,102,241,0.22)',
-            color: ACCENT_L,
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.28)',
+            color: '#6366F1',
           }}>
             <IconLink />
           </div>
-          <div>
-            <h1 className="sf-page-title" style={{ color: TEXT_1 }}>Story</h1>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>Story</h1>
             <p className="sf-page-sub">Publie ou programme des stories avec lien sur tous tes comptes.</p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           {/* Dry-run toggle — runs the full automation but stops before publishing */}
           <button
             onClick={() => setDryRun(v => !v)}
@@ -491,9 +491,7 @@ export default function StoryLink({ user }: { user: User }) {
             onClick={run}
             disabled={!canRun}
             className={`sf-btn sf-btn-lg ${canRun ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
-            style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9,
-              ...(canRun ? { background: ACCENT, color: '#fff' } : {})
-            }}
+            style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9 }}
           >
             {running ? (
               <>

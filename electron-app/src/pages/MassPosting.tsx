@@ -749,20 +749,35 @@ export function MassPosting({ user }: MassPostingProps) {
   return (
     <div className="anim-page h-full flex flex-col overflow-hidden" style={{ background: '#0A0B0E' }}>
 
-      {/* ── Editorial header ─────────────────────────────────────────────────── */}
+      {/* ── Page header ──────────────────────────────────────────────────────── */}
       <header style={{ flexShrink: 0, padding: '20px 28px 0', borderBottom: `1px solid ${HAIR}` }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, paddingBottom: 16 }}>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: GOLD, marginBottom: 6 }}>
-              Instagram · Publication
-            </p>
-            <h1 style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.03em', color: IVORY, lineHeight: 1 }}>
-              Mass <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, color: GOLD }}>Posting</span>
-            </h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            {/* Icon */}
+            <div className="sf-anim-scale-spring" style={{
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.28)',
+              color: '#6366F1',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 2 11 13"/>
+                <path d="M22 2 15 22l-4-9-9-4 22-7z"/>
+              </svg>
+            </div>
+
+            {/* Text */}
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
+                Mass Posting
+              </h1>
+              <p className="sf-page-sub">Instagram · Publication</p>
+            </div>
           </div>
 
           {/* Right: live state + mode */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             {/* Mode seq/random */}
             <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 8, overflow: 'hidden' }}>
               {([{ k: 'seq', label: t('schedulerSequential') }, { k: 'random', label: t('schedulerRandom') }] as const).map(m => (

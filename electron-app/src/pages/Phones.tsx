@@ -15,10 +15,8 @@ import { PLAN_MAX_PHONES } from '@/lib/credits'
 interface PhonesProps { user: User }
 
 // ── Design tokens — "ScaleFlow Noir" ─────────────────────────────────────────
-const SERIF = "'Inter', 'Times New Roman', Georgia, serif"
 const SANS  = "'Inter', system-ui, sans-serif"
 const IVORY = '#E9EAF0'
-const MUTED = 'rgba(233,234,240,0.42)'
 const FAINT = 'rgba(233,234,240,0.22)'
 const HAIR  = 'rgba(233,234,240,0.08)'
 const GOLD  = '#6366F1'
@@ -906,11 +904,6 @@ export function Phones({ user }: PhonesProps) {
 
   const COLS = '40px 1fr 160px 130px 120px'
 
-  // Découpe éditoriale du titre : mot principal SANS + mot accent SERIF italique
-  const headingWords  = t('phonesHeading').split(' ')
-  const headingMain   = headingWords.length > 1 ? headingWords.slice(0, -1).join(' ') : headingWords[0]
-  const headingAccent = headingWords.length > 1 ? headingWords[headingWords.length - 1] : ''
-
   // ── small icon action button ──────────────────────────────────────────────
   const ActionBtn = ({
     onClick, title, children, danger,
@@ -965,32 +958,36 @@ export function Phones({ user }: PhonesProps) {
         onClick={() => setContextMenu(null)}
       >
 
-        {/* ── Premium Page Header ──────────────────────────────────────────── */}
-        <div style={{
+        {/* ── Page header ──────────────────────────────────────────────────── */}
+        <div className="sf-page-header" style={{
           flexShrink: 0,
-          padding: '28px 32px 22px',
+          padding: '24px 32px 18px',
           borderBottom: `1px solid ${HAIR}`,
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
         }}>
-          {/* Left: micro-label or + titre éditorial */}
-          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <span style={{ display: 'block', width: 28, height: 1, background: 'rgba(99,102,241,0.5)' }} />
-              <span style={{ fontFamily: SANS, fontSize: 9, fontWeight: 600, letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(99,102,241,0.65)' }}>
-                GéeLark
-              </span>
+          {/* Left: icon tile + title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            {/* Icon */}
+            <div className="sf-anim-scale-spring" style={{
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.28)',
+              color: '#6366F1',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="6" y="2" width="12" height="20" rx="3"/>
+                <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>
+              </svg>
             </div>
-            <h1 style={{ margin: 0, lineHeight: 1.05, letterSpacing: '-0.04em' }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 26, color: IVORY }}>
-                {headingMain}
-              </span>
-              {headingAccent && (
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 29, color: GOLD, marginLeft: '0.25em' }}>
-                  {headingAccent}
-                </span>
-              )}
-            </h1>
-            <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: '7px 0 0', lineHeight: 1.5 }}>{t('phonesSubtitle')}</p>
+
+            {/* Text */}
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
+                {t('phonesHeading')}
+              </h1>
+              <p className="sf-page-sub">{t('phonesSubtitle')}</p>
+            </div>
           </div>
 
           {/* Right: auto-refresh control + sync button */}
@@ -1038,13 +1035,12 @@ export function Phones({ user }: PhonesProps) {
             {/* Sync / Add button */}
             <button
               onClick={syncFromGeelark} disabled={!bearer || syncing}
+              className="sf-btn sf-btn-primary"
               style={{
-                ...PRIMARY_BTN,
                 display: 'flex', alignItems: 'center', gap: 8,
                 cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
                 opacity: (!bearer || syncing) ? 0.5 : 1,
               }}
-              {...primaryHover}
             >
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0, animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
                 <path d="M13 7.5A5.5 5.5 0 1 1 10 2.7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
