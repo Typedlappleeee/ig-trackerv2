@@ -268,20 +268,16 @@ export function buildWebAPI() {
 
         if (!bytes) return { ok: false, error: 'Impossible de lire la vidéo (CORS ou source introuvable)' }
 
-        // Step 2: get GéeLark presigned upload URL
-        const urlRes = await fetch('/api/gx', {
+        // Step 2: get GéeLark presigned upload URL — reuse geelarkRequest so network
+        // errors are caught cleanly instead of bubbling up as uncaught "Failed to fetch"
+        const urlData = await this.geelarkRequest({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            method: 'POST',
-            url: 'https://openapi.geelark.com/open/v1/upload/getUrl',
-            headers: { Authorization: `Bearer ${opts.bearer}` },
-            body: { fileType: 'mp4' },
-          }),
-        })
-        const urlData = await urlRes.json() as Record<string, unknown>
-        if (!urlData.ok) return { ok: false, error: String((urlData as any).error ?? 'GéeLark URL error') }
-        const apiResp = ((urlData.data as Record<string, unknown>)?.['data'] ?? urlData.data) as Record<string, unknown>
+          url: 'https://openapi.geelark.com/open/v1/upload/getUrl',
+          headers: { Authorization: `Bearer ${opts.bearer}` },
+          body: { fileType: 'mp4' },
+        }) as Record<string, unknown>
+        if (!urlData['ok']) return { ok: false, error: String(urlData['error'] ?? 'GéeLark URL error') }
+        const apiResp = ((urlData['data'] as Record<string, unknown>)?.['data'] ?? urlData['data']) as Record<string, unknown>
         const uploadUrl   = apiResp?.['uploadUrl']   as string | undefined
         const resourceUrl = apiResp?.['resourceUrl'] as string | undefined
         const token       = resourceUrl ?? apiResp?.['token'] as string | undefined
@@ -296,7 +292,7 @@ export function buildWebAPI() {
 
         return { ok: true, token }
       } catch (err) {
-        return { ok: false, error: `[E000] ${err instanceof Error ? err.message : String(err)}` }
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
       }
     },
 
