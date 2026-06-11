@@ -309,7 +309,7 @@ export default function StoryLink({ user }: { user: User }) {
   // ── Job status helpers ────────────────────────────────────────────────────
   const jobFor = (id: string) => jobs.find(j => j.phoneId === id)
   const statusColor = (s?: JobStatus) =>
-    s === 'ok' ? '#22c55e' : s === 'error' ? '#ef4444' : s === 'running' ? '#C9B584' : 'rgba(148,163,184,0.28)'
+    s === 'ok' ? '#22c55e' : s === 'error' ? '#ef4444' : s === 'running' ? '#a78bfa' : 'rgba(148,163,184,0.28)'
 
   // ── No connection guard ───────────────────────────────────────────────────
   if (!conns.loading && !bearer) return (
@@ -348,28 +348,28 @@ export default function StoryLink({ user }: { user: User }) {
       <header className="sf-page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {/* Icon with pink glow */}
-          <div style={{
+          <div className="sf-anim-scale-spring" style={{
             width: 44, height: 44, borderRadius: 13, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(243,241,236,0.22), rgba(243,241,236,0.06))',
-            border: '1px solid rgba(243,241,236,0.3)',
-            color: '#E8DFC8',
-            boxShadow: '0 0 20px -6px rgba(243,241,236,0.55)',
+            background: 'linear-gradient(135deg, rgba(236,72,153,0.22), rgba(236,72,153,0.06))',
+            border: '1px solid rgba(236,72,153,0.3)',
+            color: '#f472b6',
+            boxShadow: '0 0 20px -6px rgba(236,72,153,0.55)',
           }}>
             <IconLink />
           </div>
 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <h1 className="sf-page-title" style={{
-                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(243,241,236,0.9) 100%)',
+              <h1 className="sf-page-title sf-anim-slide-up sf-d50" style={{
+                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(244,114,182,0.9) 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               }}>
                 StoryLink
               </h1>
-              <span className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.1em' }}>NEW</span>
+              <span className="sf-badge sf-badge-new sf-anim-scale-spring sf-d150" style={{ fontSize: 9, letterSpacing: '0.1em' }}>NEW</span>
             </div>
-            <p className="sf-page-sub">Configure les pools une fois, publie en 1 clic.</p>
+            <p className="sf-page-sub sf-anim-slide-up sf-d100">Configure les pools une fois, publie en 1 clic.</p>
           </div>
         </div>
 
@@ -379,7 +379,7 @@ export default function StoryLink({ user }: { user: User }) {
           disabled={!canRun}
           className={`sf-btn sf-btn-lg ${canRun ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
           style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9,
-            ...(canRun ? { background: 'linear-gradient(135deg, #C9B584, #D4C499)', boxShadow: '0 6px 24px -6px rgba(243,241,236,0.5)' } : {})
+            ...(canRun ? { background: 'linear-gradient(135deg, #7c3aed, #ec4899)', boxShadow: '0 6px 24px -6px rgba(236,72,153,0.5)' } : {})
           }}
         >
           {running ? (
@@ -397,7 +397,7 @@ export default function StoryLink({ user }: { user: User }) {
       </header>
 
       {/* ── Body: 3-column split ─────────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'grid', gridTemplateColumns: '272px 1fr 304px', minHeight: 0 }}>
+      <div className="anim-stagger" style={{ flex: 1, overflow: 'hidden', display: 'grid', gridTemplateColumns: '272px 1fr 304px', minHeight: 0 }}>
 
         {/* ══ COL 1 — Phone selector ══════════════════════════════════════════ */}
         <div style={{ borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
@@ -470,8 +470,8 @@ export default function StoryLink({ user }: { user: User }) {
                     width: '100%', display: 'flex', alignItems: 'center', gap: 9,
                     padding: '8px 10px', borderRadius: 9, cursor: 'pointer',
                     textAlign: 'left', marginBottom: 2,
-                    background: sel ? 'rgba(243,241,236,0.1)' : 'transparent',
-                    border: `1px solid ${sel ? 'rgba(243,241,236,0.32)' : 'transparent'}`,
+                    background: sel ? 'rgba(236,72,153,0.1)' : 'transparent',
+                    border: `1px solid ${sel ? 'rgba(236,72,153,0.32)' : 'transparent'}`,
                     transition: 'all 0.14s',
                   }}
                 >
@@ -479,7 +479,7 @@ export default function StoryLink({ user }: { user: User }) {
                   <span style={{
                     width: 16, height: 16, borderRadius: 5, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: sel ? 'linear-gradient(135deg,#C9B584,#D4C499)' : 'rgba(255,255,255,0.05)',
+                    background: sel ? 'linear-gradient(135deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
                     border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)',
                     transition: 'all 0.14s',
                   }}>
@@ -505,7 +505,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <span style={{
                       width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                       background: statusColor(j.status),
-                      boxShadow: j.status === 'running' ? '0 0 6px #C9B584' : 'none',
+                      boxShadow: j.status === 'running' ? '0 0 6px #a78bfa' : 'none',
                     }} />
                   )}
                 </button>
@@ -515,7 +515,7 @@ export default function StoryLink({ user }: { user: User }) {
         </div>
 
         {/* ══ COL 2 — Pool config (centre) ════════════════════════════════════ */}
-        <div className="sf-scroll" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="sf-scroll anim-stagger" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* ── Photo pool ─────────────────────────────────────────────────── */}
           <div className="sf-card" style={{ padding: 18 }}>
@@ -545,8 +545,8 @@ export default function StoryLink({ user }: { user: User }) {
                 className="sf-empty"
                 style={{
                   width: '100%', padding: '28px 0', borderRadius: 10, cursor: 'pointer',
-                  border: '2px dashed rgba(201,181,132,0.18)',
-                  background: 'rgba(201,181,132,0.03)',
+                  border: '2px dashed rgba(139,92,246,0.18)',
+                  background: 'rgba(139,92,246,0.03)',
                   color: 'var(--text-3)', fontSize: 13,
                   gap: 8,
                 }}
@@ -560,18 +560,18 @@ export default function StoryLink({ user }: { user: User }) {
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 7,
                     padding: '6px 10px', borderRadius: 8,
-                    background: 'rgba(201,181,132,0.08)',
-                    border: '1px solid rgba(201,181,132,0.18)',
+                    background: 'rgba(139,92,246,0.08)',
+                    border: '1px solid rgba(139,92,246,0.18)',
                     maxWidth: 220,
                   }}>
-                    <span style={{ color: '#C9B584', flexShrink: 0 }}><IconPhotoSm /></span>
-                    <span style={{ fontSize: 12, color: '#D4C499', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: '#a78bfa', flexShrink: 0 }}><IconPhotoSm /></span>
+                    <span style={{ fontSize: 12, color: '#c4b5fd', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {ph.name}
                     </span>
                     <button
                       onClick={() => setPhotoPool(prev => prev.filter((_, j) => j !== i))}
                       aria-label="Retirer la photo"
-                      className="sf-btn-icon"
+                      className="sf-btn-icon sf-press"
                       style={{
                         flexShrink: 0, width: 18, height: 18, borderRadius: 5, cursor: 'pointer',
                         background: 'rgba(239,68,68,0.12)', border: 'none', color: '#f87171',
@@ -585,7 +585,7 @@ export default function StoryLink({ user }: { user: User }) {
                 <button
                   onClick={() => setShowBankPicker(true)}
                   className="sf-btn sf-btn-ghost sf-btn-sm"
-                  style={{ cursor: 'pointer', border: '1px dashed rgba(201,181,132,0.22)', color: 'var(--accent-glow)' }}
+                  style={{ cursor: 'pointer', border: '1px dashed rgba(139,92,246,0.22)', color: 'var(--accent-glow)' }}
                 >
                   <IconPlus />
                   Ajouter
@@ -619,6 +619,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <button
                       onClick={() => setTextPool(prev => prev.filter((_, j) => j !== i))}
                       aria-label="Retirer le texte"
+                      className="sf-press"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center' }}
                     >
                       <IconX />
@@ -714,15 +715,16 @@ export default function StoryLink({ user }: { user: User }) {
                   <button
                     key={m.k}
                     onClick={() => setDistrib(m.k)}
+                    className="sf-hover-lift sf-press"
                     style={{
                       flex: 1, padding: '13px 14px', borderRadius: 11, textAlign: 'left', cursor: 'pointer',
-                      background: active ? 'rgba(201,181,132,0.15)' : 'rgba(255,255,255,0.025)',
-                      border: `1px solid ${active ? 'rgba(201,181,132,0.35)' : 'var(--border)'}`,
+                      background: active ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.025)',
+                      border: `1px solid ${active ? 'rgba(139,92,246,0.35)' : 'var(--border)'}`,
                       transition: 'all 0.15s',
                     }}
                   >
-                    <div style={{ marginBottom: 7, color: active ? '#D4C499' : 'var(--text-3)' }}>{m.icon}</div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: active ? '#D4C499' : 'var(--text-2)', marginBottom: 2 }}>{m.label}</p>
+                    <div style={{ marginBottom: 7, color: active ? '#c4b5fd' : 'var(--text-3)' }}>{m.icon}</div>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: active ? '#c4b5fd' : 'var(--text-2)', marginBottom: 2 }}>{m.label}</p>
                     <p style={{ fontSize: 10.5, color: 'var(--text-4)' }}>{m.desc}</p>
                   </button>
                 )
@@ -773,7 +775,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <span style={{
                       width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                       background: statusColor(j?.status),
-                      boxShadow: j?.status === 'running' ? '0 0 6px #C9B584' : 'none',
+                      boxShadow: j?.status === 'running' ? '0 0 6px #a78bfa' : 'none',
                       transition: 'all 0.2s',
                     }} />
                     <span style={{
@@ -797,7 +799,7 @@ export default function StoryLink({ user }: { user: User }) {
                   {/* Details */}
                   <div style={{ padding: '7px 11px 10px', fontSize: 11, lineHeight: 1.65 }}>
                     {/* Photo */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(201,181,132,0.75)', marginBottom: 3 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(167,139,250,0.75)', marginBottom: 3 }}>
                       <span style={{ flexShrink: 0 }}><IconPhotoSm /></span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.photo.name}</span>
                     </div>

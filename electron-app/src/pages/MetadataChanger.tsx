@@ -200,12 +200,12 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
           onClose={() => setShowBank(false)} />
       )}
 
-      <div className="h-full flex flex-col overflow-hidden anim-page">
+      <div className="h-full flex flex-col overflow-y-auto anim-page">
         {/* ── Header ────────────────────────────────────────────────────────── */}
         <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4 border-b border-border">
           <button
             onClick={onBack}
-            className="sf-btn sf-btn-ghost cursor-pointer flex items-center gap-1.5 text-[13px]"
+            className="sf-btn sf-btn-ghost cursor-pointer flex items-center gap-1.5 text-[13px] sf-anim-slide-up sf-d50"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m15 18-6-6 6-6"/>
@@ -213,10 +213,10 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
             Retour
           </button>
           <div className="w-px h-6 bg-border" />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 sf-anim-slide-up sf-d100">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(201,181,132,0.25), rgba(6,182,212,0.1))', border: '1px solid rgba(201,181,132,0.25)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(6,182,212,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>
               </svg>
             </div>
@@ -229,13 +229,13 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 pb-10">
-          <div className="space-y-5 max-w-3xl mx-auto pt-6">
+        <div className="flex-1 px-8 pb-10">
+          <div className="space-y-5 max-w-3xl mx-auto pt-6 anim-stagger">
 
             {/* Video selection */}
-            <div className="sf-card p-6 space-y-4">
+            <div className="sf-card sf-spotlight p-6 space-y-4">
               <div className="flex items-center gap-2 mb-1">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="m15 10 5 5-5 5"/><rect x="2" y="7" width="13" height="10" rx="2"/>
                 </svg>
                 <p className="text-[14px] font-bold text-text">Vidéo source</p>
@@ -358,8 +358,8 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
             {phase === 'processing' && (
               <div className="sf-card p-10 text-center space-y-4">
                 <div className="relative mx-auto w-16 h-16">
-                  <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'linear-gradient(135deg,#C9B584,#D4C499)' }} />
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.15)', border: '1px solid rgba(201,181,132,0.3)' }}>
+                  <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
                     <Spinner size="lg" />
                   </div>
                 </div>
@@ -373,7 +373,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={process}
-                  className="sf-card p-5 flex flex-col items-center gap-3 text-[13px] font-semibold text-text hover:border-border transition-all cursor-pointer group"
+                  className="sf-card sf-card-lift p-5 flex flex-col items-center gap-3 text-[13px] font-semibold text-text hover:border-border transition-all cursor-pointer group"
                 >
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-surface2 group-hover:bg-accent/10 transition-colors">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-text2 group-hover:text-accent transition-colors">
@@ -385,7 +385,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                 <button
                   onClick={processToBank}
                   className="sf-btn sf-btn-primary cursor-pointer flex flex-col items-center gap-3 p-5 h-auto rounded-xl"
-                  style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)' }}
+                  style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
                 >
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 13v8m-4-4l4 4 4-4M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/>
@@ -400,7 +400,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
               <div className="space-y-4">
                 <div className="sf-card p-6 space-y-4 border-ok/20 bg-ok/5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-ok/10 border border-ok/20">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-ok/10 border border-ok/20 sf-anim-scale-spring">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
@@ -435,7 +435,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                 {!uploadDone ? (
                   <div className="sf-card p-6 space-y-4">
                     <div className="flex items-center gap-2 mb-1">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M12 13v8m-4-4l4 4 4-4M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/>
                       </svg>
                       <p className="text-[14px] font-bold text-text">Ajouter à la banque</p>
@@ -495,8 +495,8 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
             {/* Empty state */}
             {phase === 'idle' && (
               <div className="sf-empty flex-col gap-4 py-16">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.08)', border: '1px solid rgba(201,181,132,0.15)' }}>
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center sf-anim-scale-spring" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>
                   </svg>
                 </div>

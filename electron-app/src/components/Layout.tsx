@@ -634,6 +634,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           position: 'relative',
         }}
       >
+        {/* Ambient glow behind logo area */}
+        <div style={{
+          position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)',
+          width: 220, height: 180, borderRadius: '50%',
+          background: 'radial-gradient(ellipse at center, rgba(124,58,237,0.13) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
         {/* ── Logo area ─────────────────────────────────────────────────── */}
         <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
           {/* Logo box */}
@@ -688,16 +696,19 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
               fontSize: 14, fontWeight: page === 'hub' ? 600 : 400, textAlign: 'left',
               cursor: 'pointer', border: 'none',
-              background: page === 'hub' ? 'rgba(255,255,255,0.09)' : 'transparent',
-              color: page === 'hub' ? '#ffffff' : 'rgba(148,163,184,0.58)',
-              transition: 'background 0.15s, color 0.15s',
+              background: page === 'hub'
+                ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+                : 'transparent',
+              color: page === 'hub' ? '#ede8ff' : 'rgba(148,163,184,0.58)',
+              boxShadow: page === 'hub' ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+              transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
               justifyContent: collapsed ? 'center' : 'flex-start',
               marginBottom: 2,
             }}
             onMouseEnter={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
             onMouseLeave={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
           >
-            <span style={{ flexShrink: 0, color: page === 'hub' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+            <span style={{ flexShrink: 0, color: page === 'hub' ? '#c4b5fd' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
               <NavIcon d={ICONS.grid} size={17} />
             </span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
@@ -713,9 +724,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
                 fontSize: 14, fontWeight: page === 'community' ? 600 : 400, textAlign: 'left',
                 cursor: 'pointer', border: 'none',
-                background: page === 'community' ? 'rgba(255,255,255,0.09)' : 'transparent',
-                color: page === 'community' ? '#ffffff' : 'rgba(148,163,184,0.58)',
-                transition: 'background 0.15s, color 0.15s',
+                background: page === 'community'
+                  ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+                  : 'transparent',
+                color: page === 'community' ? '#ede8ff' : 'rgba(148,163,184,0.58)',
+                boxShadow: page === 'community' ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+                transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
                 justifyContent: collapsed ? 'center' : 'flex-start',
                 marginBottom: 2,
               }}
@@ -726,7 +740,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
               }}
             >
-              <span style={{ flexShrink: 0, color: page === 'community' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+              <span style={{ flexShrink: 0, color: page === 'community' ? '#c4b5fd' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
                 <NavIcon d={ICONS.chat} size={17} />
               </span>
               {!collapsed && (
@@ -830,9 +844,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
               fontSize: 14, fontWeight: page === 'settings' ? 600 : 400, textAlign: 'left',
               cursor: 'pointer', border: 'none',
-              background: page === 'settings' ? 'rgba(255,255,255,0.09)' : 'transparent',
-              color: page === 'settings' ? '#ffffff' : 'rgba(148,163,184,0.58)',
-              transition: 'background 0.15s',
+              background: page === 'settings'
+                ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+                : 'transparent',
+              color: page === 'settings' ? '#ede8ff' : 'rgba(148,163,184,0.58)',
+              boxShadow: page === 'settings' ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+              transition: 'background 0.15s, box-shadow 0.15s',
               justifyContent: collapsed ? 'center' : 'flex-start',
             }}
             onMouseEnter={e => {
@@ -842,7 +859,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
             }}
           >
-            <span style={{ flexShrink: 0, color: page === 'settings' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+            <span style={{ flexShrink: 0, color: page === 'settings' ? '#c4b5fd' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
               <NavIcon d={ICONS.settings} size={17} />
             </span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navSettings')}</span>}
@@ -857,9 +874,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
                 fontSize: 14, fontWeight: page === 'licences' ? 600 : 400, textAlign: 'left',
                 cursor: 'pointer', border: 'none',
-                background: page === 'licences' ? 'rgba(255,255,255,0.09)' : 'transparent',
-                color: page === 'licences' ? '#ffffff' : 'rgba(148,163,184,0.58)',
-                transition: 'background 0.15s',
+                background: page === 'licences'
+                  ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+                  : 'transparent',
+                color: page === 'licences' ? '#ede8ff' : 'rgba(148,163,184,0.58)',
+                boxShadow: page === 'licences' ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+                transition: 'background 0.15s, box-shadow 0.15s',
                 justifyContent: collapsed ? 'center' : 'flex-start',
               }}
               onMouseEnter={e => {
@@ -869,7 +889,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
               }}
             >
-              <span style={{ flexShrink: 0, color: page === 'licences' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+              <span style={{ flexShrink: 0, color: page === 'licences' ? '#c4b5fd' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
                 <NavIcon d={ICONS.shield} size={17} />
               </span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
@@ -1229,7 +1249,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <div
               key={page}
               className="h-full"
-              style={{ animation: 'sf-slide-up 0.26s cubic-bezier(0.22,1,0.36,1) both' }}
+              style={{ animation: 'sf-page-cine 0.40s cubic-bezier(0.22,1,0.36,1) both' }}
             >
               {children}
             </div>

@@ -344,16 +344,8 @@ export function Bank({ user }: BankProps) {
   const [sqlCopied, setSqlCopied]           = useState(false)
   // Type filter (Python: Tous/Vidéo/Photo/GIF/Audio)
   const [typeFilter, setTypeFilter] = useState<'all' | 'video' | 'photo' | 'gif' | 'audio'>('all')
-  // Empty folders — scoped per user so accounts don't bleed into each other
-  const folderKey = `bank-empty-folders-${user.id}`
-  const [emptyFolders, setEmptyFolders] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(`bank-empty-folders-${user.id}`) ?? '[]') } catch { return [] }
-  })
-
-  function persistEmptyFolders(next: string[]) {
-    setEmptyFolders(next)
-    localStorage.setItem(folderKey, JSON.stringify(next))
-  }
+  // Empty folders — now stored in Supabase (sentinel rows) so all org members see them
+  const [emptyFolders, setEmptyFolders] = useState<string[]>([])
 
   // Context menu
   const [ctxMenu, setCtxMenu]       = useState<CtxMenu | null>(null)
@@ -417,7 +409,6 @@ export function Bank({ user }: BankProps) {
 
   async function loadItems() {
     setLoading(true)
-    // Fetch all pages — Supabase default page size is 1000, so paginate to get every row.
     const PAGE = 1000
     let allRows: ContentItem[] = []
     let from = 0
@@ -430,14 +421,41 @@ export function Bank({ user }: BankProps) {
       const rows = (data ?? []) as ContentItem[]
       if (rows.length > 0 && !hasMigrationIssue && !('folder' in rows[0])) hasMigrationIssue = true
       allRows = allRows.concat(rows)
-      if (rows.length < PAGE) break   // last page
+      if (rows.length < PAGE) break
       from += PAGE
     }
     {
-      let rows = allRows
+      // Sentinel rows mark empty folders so all org members can see them.
+      // They are identified by notes === '__sf_folder__' and no storage_path.
+      const isSentinel = (i: ContentItem) => i.notes === '__sf_folder__' && !i.storage_path && !i.file_url
+      const sentinelFolders = allRows.filter(isSentinel).map(i => i.title).filter(Boolean)
+      let rows = allRows.filter(i => !isSentinel(i))
+
+      // Migrate legacy localStorage folders to Supabase (one-time, per org)
+      const lsKey = `bank-empty-folders-${user.id}`
+      const lsFolders: string[] = (() => { try { return JSON.parse(localStorage.getItem(lsKey) ?? '[]') } catch { return [] } })()
+      const existingFolderNames = new Set([
+        ...rows.map(i => (i as any).folder).filter(Boolean),
+        ...sentinelFolders,
+      ])
+      const toMigrate = lsFolders.filter(f => !existingFolderNames.has(f))
+      if (toMigrate.length > 0) {
+        await Promise.all(toMigrate.map(name =>
+          supabase.from('content_bank').insert({
+            user_id: user.id, org_id: isPersonal ? null : (currentOrg?.id ?? null),
+            title: name, file_url: null, storage_path: null, thumbnail_path: null,
+            folder: name, duration: null, tags: [], notes: '__sf_folder__',
+          })
+        ))
+        localStorage.removeItem(lsKey)
+      } else if (lsFolders.length > 0) {
+        localStorage.removeItem(lsKey)
+      }
+
       // In org mode, filter out folders the member is not allowed to see
       if (role) rows = rows.filter(i => canAccessBankFolder(role, perms, i.folder ?? null))
       setItems(rows)
+      setEmptyFolders(sentinelFolders)
       if (hasMigrationIssue) setNeedsMigration(true)
     }
     setLoading(false)
@@ -619,9 +637,14 @@ export function Bank({ user }: BankProps) {
   async function createFolder() {
     const name = newFolderName.trim()
     if (!name) return
-    // Folders persist as: 1) folder text on content items, 2) localStorage list for empty folders
     if (!emptyFolders.includes(name)) {
-      persistEmptyFolders([...emptyFolders, name])
+      // Store in Supabase so all org members can see the empty folder
+      await supabase.from('content_bank').insert({
+        user_id: user.id, org_id: isPersonal ? null : (currentOrg?.id ?? null),
+        title: name, file_url: null, storage_path: null, thumbnail_path: null,
+        folder: name, duration: null, tags: [], notes: '__sf_folder__',
+      })
+      setEmptyFolders(prev => [...prev, name])
     }
     setNewFolderName('')
     setShowNewFolder(false)
@@ -630,11 +653,14 @@ export function Bank({ user }: BankProps) {
 
   async function renameFolder(oldName: string, newName: string) {
     if (!newName || newName === oldName) return
-    let q = scopeQ(supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName))
-    await q
+    // Rename all items in the folder
+    await scopeQ(supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName))
+    // Also rename the sentinel row (title = folder name, folder = folder name)
+    await scopeQ(supabase.from('content_bank')
+      .update({ title: newName, folder: newName })
+      .eq('notes', '__sf_folder__').eq('folder', oldName))
     setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === oldName ? { ...i, folder: newName as unknown as string } : i))
-    // Update localStorage empty folders
-    persistEmptyFolders(emptyFolders.map(f => f === oldName ? newName : f))
+    setEmptyFolders(prev => prev.map(f => f === oldName ? newName : f))
     if (selectedFolder === oldName) setSelectedFolder(newName)
   }
 
@@ -653,16 +679,19 @@ export function Bank({ user }: BankProps) {
       await qu
       setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
     }
-    persistEmptyFolders(emptyFolders.filter(f => f !== name))
+    // Delete the sentinel row for this folder from Supabase
+    await scopeQ(supabase.from('content_bank').delete().eq('notes', '__sf_folder__').eq('folder', name))
+    setEmptyFolders(prev => prev.filter(f => f !== name))
     if (selectedFolder === name) setSelectedFolder(null)
     setFolderModal(null)
   }
 
   async function mergeFolderTo(fromFolder: string, toFolder: string | null) {
-    let qm = scopeQ(supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder))
-    await qm
+    await scopeQ(supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder))
+    // Delete sentinel of the merged folder
+    await scopeQ(supabase.from('content_bank').delete().eq('notes', '__sf_folder__').eq('folder', fromFolder))
     setItems(prev => prev.map(i => (i as unknown as {folder?:string}).folder === fromFolder ? { ...i, folder: toFolder as unknown as string } : i))
-    persistEmptyFolders(emptyFolders.filter(f => f !== fromFolder))
+    setEmptyFolders(prev => prev.filter(f => f !== fromFolder))
     if (selectedFolder === fromFolder) setSelectedFolder(toFolder)
     setFolderModal(null)
   }
@@ -703,7 +732,7 @@ export function Bank({ user }: BankProps) {
   return (
     <div
       ref={dropRef}
-      className={`h-full flex flex-col overflow-hidden anim-page transition-colors ${dragging ? 'ring-2 ring-inset ring-accent/40' : ''}`}
+      className={`h-full flex flex-col overflow-y-auto overflow-x-hidden anim-page transition-colors ${dragging ? 'ring-2 ring-inset ring-accent/40' : ''}`}
       style={{ background: '#07070B' }}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
@@ -736,7 +765,7 @@ export function Bank({ user }: BankProps) {
         {/* Icon + title */}
         <div className="flex items-center gap-3.5 min-w-0">
           <div
-            className="w-11 h-11 rounded-[13px] flex items-center justify-center flex-shrink-0"
+            className="w-11 h-11 rounded-[13px] flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
             style={{
               background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
               border: '1px solid rgba(34,211,238,0.3)',
@@ -748,7 +777,7 @@ export function Bank({ user }: BankProps) {
               <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
             </svg>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 sf-anim-slide-up sf-d50">
             <div className="flex items-center gap-2.5">
               <h1 className="text-[22px] font-black text-text leading-none tracking-tight" style={{ letterSpacing: '-0.025em' }}>{t('bankTitle')}</h1>
               <span className="sf-badge sf-badge-accent text-[11px]">{items.length}</span>
@@ -758,7 +787,7 @@ export function Bank({ user }: BankProps) {
         </div>
 
         {/* Right controls */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 sf-anim-slide-up sf-d100">
           {/* Personal / Org toggle — only when in an org */}
           {currentOrg && (
             <div className="sf-tabs">
@@ -783,14 +812,14 @@ export function Bank({ user }: BankProps) {
           <div className="sf-tabs">
             <button
               onClick={() => setViewMode('grid')}
-              className={`sf-tab cursor-pointer ${viewMode === 'grid' ? 'active' : ''}`}
+              className={`sf-tab sf-press cursor-pointer ${viewMode === 'grid' ? 'active' : ''}`}
               title={t('bankGridView')}
             >
               <IconGrid size={13} />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`sf-tab cursor-pointer ${viewMode === 'list' ? 'active' : ''}`}
+              className={`sf-tab sf-press cursor-pointer ${viewMode === 'list' ? 'active' : ''}`}
               title={t('bankListView')}
             >
               <IconList size={13} />
@@ -816,7 +845,7 @@ export function Bank({ user }: BankProps) {
       </header>
 
       {/* ── Toolbar ── */}
-      <div className="sf-toolbar px-8">
+      <div className="sf-toolbar px-8 sf-anim-slide-up sf-d150">
         {/* Search */}
         <div className="relative flex-1 max-w-xs">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-text3">
@@ -888,20 +917,20 @@ export function Bank({ user }: BankProps) {
         )}
       </div>
 
-      {/* ── Body: sidebar + main ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* ── Body: sidebar + main (page scrolls, sidebar stays sticky) ── */}
+      <div className="flex flex-1">
 
-        {/* ── Folder sidebar ── */}
+        {/* ── Folder sidebar — sticky while the page scrolls ── */}
         <aside
           className="w-52 flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ borderRight: '1px solid var(--border)' }}
+          style={{ borderRight: '1px solid var(--border)', position: 'sticky', top: 0, alignSelf: 'flex-start', maxHeight: 'calc(100vh - 54px)' }}
         >
           {/* Sidebar header */}
           <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
             <span className="text-[10px] font-bold uppercase tracking-widest text-text3">{t('bankFolders')}</span>
             <button
               onClick={() => setShowNewFolder(v => !v)}
-              className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
+              className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer sf-press"
               title={t('bankNewFolderTitle')}
             >
               <IconPlus size={12} />
@@ -930,7 +959,7 @@ export function Bank({ user }: BankProps) {
           )}
 
           {/* Folder list */}
-          <div className="flex-1 overflow-y-auto py-1">
+          <div className="flex-1 overflow-y-auto py-1 anim-stagger">
             {/* All items */}
             <button
               onClick={() => setSelectedFolder(null)}
@@ -1105,14 +1134,14 @@ export function Bank({ user }: BankProps) {
           )}
 
           {/* ── Scrollable content ── */}
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex-1 px-6 py-5">
             {loading ? (
               <div className="flex justify-center py-20"><Spinner size="lg" /></div>
 
             ) : items.length === 0 ? (
               /* Empty state — no items at all */
               <div className="sf-empty py-24">
-                <div className="sf-empty-icon">
+                <div className="sf-empty-icon sf-anim-scale-spring">
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                   </svg>
@@ -1131,7 +1160,7 @@ export function Bank({ user }: BankProps) {
             ) : visible.length === 0 ? (
               /* Empty state — no search results */
               <div className="sf-empty py-20">
-                <div className="sf-empty-icon">
+                <div className="sf-empty-icon sf-anim-scale-spring">
                   <IconSearch size={28} />
                 </div>
                 <p className="sf-empty-title">{t('bankNoResults')}</p>
@@ -1496,21 +1525,21 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
         <div className="flex gap-0.5 flex-shrink-0">
           <button
             onClick={e => { e.stopPropagation(); setEditing(true) }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer sf-press"
             title={t('bankFolderRename')}
           >
             <IconPencil size={10} />
           </button>
           <button
             onClick={e => { e.stopPropagation(); onMerge() }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer sf-press"
             title={t('bankFolderMergeTo')}
           >
             <IconMove size={10} />
           </button>
           <button
             onClick={e => { e.stopPropagation(); onDelete() }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-danger cursor-pointer"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-danger cursor-pointer sf-press"
             title={t('bankFolderDelete')}
           >
             <IconTrash size={10} />
@@ -1705,7 +1734,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
         <button
           onClick={onClose}
           aria-label={t('cancel')}
-          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer"
+          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer sf-press"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
         ><IconX size={16} /></button>
 

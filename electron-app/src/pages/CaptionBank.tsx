@@ -51,13 +51,13 @@ function CaptionModal({
       onClick={onClose}
     >
       <div
-        className="sf-card p-6 w-full max-w-lg"
+        className="sf-card p-6 w-full max-w-lg sf-anim-scale-in"
         style={{ boxShadow: '0 24px 64px -16px rgba(0,0,0,0.8)' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(201,181,132,0.15)', border: '1px solid rgba(201,181,132,0.2)' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.2)' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
           </div>
@@ -106,8 +106,8 @@ function CaptionModal({
               onClick={() => { setFolder(null); setShowCustom(false) }}
               className={`px-3 py-1 rounded-full text-[12px] font-medium cursor-pointer transition-all ${folder === null && !showCustom ? 'text-accent' : 'text-text2 hover:text-text'}`}
               style={{
-                background: folder === null && !showCustom ? 'rgba(201,181,132,0.2)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${folder === null && !showCustom ? 'rgba(201,181,132,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                background: folder === null && !showCustom ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${folder === null && !showCustom ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
               }}
             >Sans dossier</button>
 
@@ -118,8 +118,8 @@ function CaptionModal({
                 onClick={() => { setFolder(f); setShowCustom(false) }}
                 className={`px-3 py-1 rounded-full text-[12px] font-medium cursor-pointer transition-all inline-flex items-center gap-1.5 ${folder === f && !showCustom ? 'text-accent' : 'text-text2 hover:text-text'}`}
                 style={{
-                  background: folder === f && !showCustom ? 'rgba(201,181,132,0.2)' : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${folder === f && !showCustom ? 'rgba(201,181,132,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                  background: folder === f && !showCustom ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${folder === f && !showCustom ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
                 }}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></svg>
@@ -132,8 +132,8 @@ function CaptionModal({
               onClick={() => { setShowCustom(true); setFolder(null) }}
               className="px-3 py-1 rounded-full text-[12px] font-medium cursor-pointer transition-all text-accent/60 hover:text-accent"
               style={{
-                background: showCustom ? 'rgba(201,181,132,0.1)' : 'transparent',
-                border: `1px dashed ${showCustom ? 'rgba(201,181,132,0.5)' : 'rgba(201,181,132,0.25)'}`,
+                background: showCustom ? 'rgba(139,92,246,0.1)' : 'transparent',
+                border: `1px dashed ${showCustom ? 'rgba(139,92,246,0.5)' : 'rgba(139,92,246,0.25)'}`,
               }}
             >+ Nouveau</button>
           </div>
@@ -298,9 +298,9 @@ export function CaptionBank({ user }: CaptionBankProps) {
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <aside className="w-52 flex-shrink-0 border-r border-border flex flex-col bg-surface overflow-hidden">
         {/* Sidebar header */}
-        <div className="px-4 pt-5 pb-3 flex-shrink-0 border-b border-border">
+        <div className="px-4 pt-5 pb-3 flex-shrink-0 border-b border-border sf-anim-slide-up sf-d50">
           <div className="flex items-center gap-2">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
             <p className="text-[11px] font-bold uppercase tracking-wider text-text2">Dossiers</p>
@@ -308,7 +308,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
         </div>
 
         {/* Folder list */}
-        <div className="flex-1 overflow-y-auto py-2 px-2">
+        <div className="flex-1 overflow-y-auto py-2 px-2 anim-stagger">
           {/* All items */}
           <button
             onClick={() => setActiveFolder(null)}
@@ -386,7 +386,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
               <button
                 onClick={() => { setShowNewFolder(true); setTimeout(() => newFolderRef.current?.focus(), 50) }}
                 className="w-full px-3 py-1.5 rounded-lg text-[11px] text-accent/60 hover:text-accent transition-all cursor-pointer flex items-center gap-1.5"
-                style={{ border: '1px dashed rgba(201,181,132,0.2)' }}
+                style={{ border: '1px dashed rgba(139,92,246,0.2)' }}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14"/>
@@ -403,19 +403,19 @@ export function CaptionBank({ user }: CaptionBankProps) {
 
         {/* Header */}
         <div className="flex-shrink-0 px-7 py-4 border-b border-border flex items-center gap-3">
-          <div className="flex items-center gap-3 flex-1">
+          <div className="flex items-center gap-3 flex-1 sf-anim-slide-up sf-d50">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(201,181,132,0.2), rgba(243,241,236,0.1))', border: '1px solid rgba(201,181,132,0.2)' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.2)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>
             </div>
             <h1 className="text-[20px] font-black text-text leading-none">Banque de Captions</h1>
-            <span className="sf-badge sf-badge-accent">{items.length}</span>
+            <span className="sf-badge sf-badge-accent sf-anim-scale-spring sf-d200">{items.length}</span>
           </div>
 
           {/* Search */}
-          <div className="relative">
+          <div className="relative sf-anim-slide-up sf-d100">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-text2" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
@@ -431,7 +431,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
             <button
               onClick={() => handleDelete([...selected])}
               disabled={deleting}
-              className="sf-btn sf-btn-danger cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 text-[12px]"
+              className="sf-btn sf-btn-danger cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 text-[12px] sf-anim-scale-in"
             >
               {deleting ? <Spinner size="sm" /> : (
                 <>
@@ -446,7 +446,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
 
           <button
             onClick={() => { setEditItem(undefined); setShowModal(true) }}
-            className="sf-btn sf-btn-primary cursor-pointer inline-flex items-center gap-1.5"
+            className="sf-btn sf-btn-primary cursor-pointer inline-flex items-center gap-1.5 sf-anim-slide-up sf-d150"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14"/>
@@ -469,8 +469,8 @@ export function CaptionBank({ user }: CaptionBankProps) {
             </div>
           ) : activeFolder !== null && emptyFolders.includes(activeFolder) && filtered.length === 0 ? (
             <div className="sf-empty flex-col gap-4 h-full">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.08)', border: '1px solid rgba(201,181,132,0.15)' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/>
                 </svg>
               </div>
@@ -485,8 +485,8 @@ export function CaptionBank({ user }: CaptionBankProps) {
             </div>
           ) : filtered.length === 0 ? (
             <div className="sf-empty flex-col gap-4 h-full">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.08)', border: '1px solid rgba(201,181,132,0.15)' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                 </svg>
               </div>
@@ -511,18 +511,18 @@ export function CaptionBank({ user }: CaptionBankProps) {
                     onClick={() => toggleSelect(item.id)}
                     onMouseEnter={() => setHoveredCard(item.id)}
                     onMouseLeave={() => setHoveredCard(null)}
-                    className="sf-card cursor-pointer flex flex-col transition-all anim-scale-in"
+                    className="sf-card sf-card-lift relative cursor-pointer flex flex-col transition-all anim-scale-in"
                     style={{
-                      border: `1px solid ${isSelected ? 'rgba(201,181,132,0.5)' : 'rgba(201,181,132,0.12)'}`,
-                      boxShadow: isSelected ? '0 0 0 2px rgba(201,181,132,0.2)' : 'none',
+                      border: `1px solid ${isSelected ? 'rgba(139,92,246,0.5)' : 'rgba(139,92,246,0.12)'}`,
+                      ...(isSelected ? { boxShadow: '0 0 0 2px rgba(139,92,246,0.2)' } : {}),
                     }}
                   >
                     {/* Checkbox */}
                     <div
                       className="absolute top-2.5 right-2.5 w-5 h-5 rounded-md flex items-center justify-center transition-all"
                       style={{
-                        background: isSelected ? '#C9B584' : isHovered ? 'rgba(0,0,0,0.55)' : 'transparent',
-                        border: isSelected ? '1px solid #C9B584' : '1px solid rgba(255,255,255,0.2)',
+                        background: isSelected ? '#8B5CF6' : isHovered ? 'rgba(0,0,0,0.55)' : 'transparent',
+                        border: isSelected ? '1px solid #8B5CF6' : '1px solid rgba(255,255,255,0.2)',
                         opacity: isSelected || isHovered ? 1 : 0,
                       }}
                     >

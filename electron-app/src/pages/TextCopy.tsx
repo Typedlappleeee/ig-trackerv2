@@ -142,11 +142,11 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
   const pct    = total > 0 ? Math.round((done + errors) / total * 100) : 0
 
   return (
-    <div className="h-full flex flex-col overflow-hidden anim-page">
+    <div className="h-full flex flex-col overflow-y-auto anim-page">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 sf-anim-slide-up sf-d50">
           {onBack && (
             <>
               <button
@@ -162,9 +162,9 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             </>
           )}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(201,181,132,0.25), rgba(243,241,236,0.15))', border: '1px solid rgba(201,181,132,0.25)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d100"
+              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M17 12H3M3 12l4-4M3 12l4 4M7 5l10-2v14L7 19"/>
               </svg>
             </div>
@@ -174,7 +174,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             </div>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 sf-anim-slide-up sf-d150">
           {!running ? (
             <button
               onClick={generate}
@@ -200,15 +200,15 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
         </div>
       </div>
 
-      {/* ── Scrollable content ──────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-8 pb-10">
-        <div className="max-w-3xl mx-auto space-y-5 pt-6">
+      {/* ── Content (scrolls with the page) ─────────────────────────────────── */}
+      <div className="flex-1 px-8 pb-10">
+        <div className="max-w-3xl mx-auto space-y-5 pt-6 anim-stagger">
 
           {/* Videos */}
           <div className="sf-card p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="m15 10 5 5-5 5"/><rect x="2" y="7" width="13" height="10" rx="2"/>
                 </svg>
                 <span className="text-[14px] font-bold text-text">Videos ({videos.length})</span>
@@ -257,7 +257,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                     </div>
                     <button
                       onClick={() => setVideos(prev => prev.filter((_, j) => j !== i))}
-                      className="text-text2 hover:text-danger ml-2 cursor-pointer flex-shrink-0 transition-colors"
+                      className="text-text2 hover:text-danger ml-2 cursor-pointer flex-shrink-0 transition-colors sf-press"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -272,7 +272,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
           {/* Text config */}
           <div className="sf-card p-6 flex flex-col gap-5">
             <div className="flex items-center gap-2 mb-1">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
               </svg>
               <span className="text-[14px] font-bold text-text">Text</span>
@@ -312,14 +312,14 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                 <button
                   onClick={() => setBold(b => !b)}
                   className={`sf-btn cursor-pointer font-bold transition-all ${bold ? 'text-accent' : 'text-text2'}`}
-                  style={bold ? { background: 'rgba(201,181,132,0.2)', border: '1px solid rgba(201,181,132,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  style={bold ? { background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
                   B Bold
                 </button>
                 <button
                   onClick={() => setShadow(s => !s)}
                   className={`sf-btn cursor-pointer transition-all ${shadow ? 'text-accent' : 'text-text2'}`}
-                  style={shadow ? { background: 'rgba(201,181,132,0.2)', border: '1px solid rgba(201,181,132,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  style={shadow ? { background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
                   Shadow
                 </button>
@@ -343,7 +343,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
           <div className="sf-card p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
                 </svg>
                 <span className="text-[14px] font-bold text-text">Number of copies</span>
@@ -357,7 +357,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             />
             <div className="flex gap-2 flex-wrap">
               {POSITIONS.slice(0, copies).map((p, i) => (
-                <span key={i} className="sf-badge sf-badge-muted">
+                <span key={i} className="sf-badge sf-badge-muted sf-anim-scale-in">
                   {p.label} ({Math.round(p.yFrac * 100)}%)
                 </span>
               ))}
@@ -371,7 +371,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
           {/* Export destination */}
           <div className="sf-card p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2 mb-1">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
               <span className="text-[14px] font-bold text-text">Destination of generated videos</span>
@@ -383,8 +383,8 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                   onClick={() => setExportMode(m)}
                   className={`flex-1 py-3 rounded-xl text-[13px] font-semibold transition-all inline-flex items-center justify-center gap-2 cursor-pointer ${exportMode === m ? 'text-accent' : 'text-text2 hover:text-text'}`}
                   style={{
-                    background: exportMode === m ? 'rgba(201,181,132,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${exportMode === m ? 'rgba(201,181,132,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                    background: exportMode === m ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${exportMode === m ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`,
                   }}
                 >
                   {m === 'download' ? (
@@ -408,7 +408,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             <div className="sf-card p-6 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                   </svg>
                   <span className="text-[14px] font-bold text-text">{done}/{total} done</span>
@@ -418,7 +418,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
               <div className="h-2 rounded-full overflow-hidden bg-surface2">
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${pct}%`, background: errors > 0 ? 'var(--danger)' : 'linear-gradient(130deg,#C9B584,#D4C499)' }}
+                  style={{ width: `${pct}%`, background: errors > 0 ? 'var(--danger)' : 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
                 />
               </div>
               <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
@@ -441,19 +441,19 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                       </span>
                     )}
                     {job.status === 'error' && (
-                      <span className="sf-badge sf-badge-danger" title={job.error}>Error</span>
+                      <span className="sf-badge sf-badge-danger sf-anim-scale-in" title={job.error}>Error</span>
                     )}
                     {job.status === 'done' && exportMode === 'download' && job.outputPath && (
                       <a
                         href={job.outputPath}
                         download={`textcopy_${String(job.id + 1).padStart(3, '0')}.mp4`}
-                        className="sf-badge sf-badge-ok hover:opacity-80 transition-opacity"
+                        className="sf-badge sf-badge-ok hover:opacity-80 transition-opacity sf-anim-scale-in"
                       >
                         Download
                       </a>
                     )}
                     {job.status === 'done' && exportMode === 'bank' && (
-                      <span className="sf-badge sf-badge-ok">Bank</span>
+                      <span className="sf-badge sf-badge-ok sf-anim-scale-in">Bank</span>
                     )}
                   </div>
                 ))}

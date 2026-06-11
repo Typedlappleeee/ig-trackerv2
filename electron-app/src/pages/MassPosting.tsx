@@ -38,8 +38,8 @@ const STATUS_COLOR: Record<TaskStatus['status'], string> = {
 // STATUS labels are now built inside the component using t()
 
 const AVATAR_COLORS = [
-  ['#C9B584','#A855F7'], ['#2563EB','#60A5FA'], ['#059669','#34D399'],
-  ['#D97706','#FBBF24'], ['#DC2626','#F87171'], ['#C9B584','#D4C499'],
+  ['#7C3AED','#A855F7'], ['#2563EB','#60A5FA'], ['#059669','#34D399'],
+  ['#D97706','#FBBF24'], ['#DC2626','#F87171'], ['#7C3AED','#EC4899'],
 ]
 function avatarGradient(name: string) {
   const i = (name?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length
@@ -346,6 +346,18 @@ export function MassPosting({ user }: MassPostingProps) {
     setGenerating(false)
   }
 
+  // Resolve the upload path for a selected video.
+  // Priority: localPath → file_url (signed URL from BankPicker) → fresh signed URL from storage_path
+  async function resolveVideoPath(sv: SelectedVideo): Promise<string | null> {
+    if (sv.localPath) return sv.localPath
+    if (sv.item.file_url) return sv.item.file_url
+    if (sv.item.storage_path) {
+      const { getSignedUrl } = await import('@/lib/storage')
+      return getSignedUrl(sv.item.storage_path).catch(() => null)
+    }
+    return null
+  }
+
   async function scheduleMassPost(scheduledAt: Date) {
     if (!bearer)                    { log('Missing GéeLark token — Settings', 'error'); return }
     if (phoneList.length === 0)     { log('Select at least one phone', 'warn'); return }
@@ -370,7 +382,7 @@ export function MassPosting({ user }: MassPostingProps) {
       const tokenMap = new Map<number, string>()
       for (let i = 0; i < videosToSchedule.length; i++) {
         const sv = videosToSchedule[i]
-        const filePath = sv.localPath ?? sv.item.file_url
+        const filePath = await resolveVideoPath(sv)
         if (!filePath) { log(`❌ Chemin manquant pour ${sv.item.title}`, 'error'); return }
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
         if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.item.title}: ${up.error}`, 'error'); return }
@@ -434,7 +446,7 @@ export function MassPosting({ user }: MassPostingProps) {
           if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'uploading' })
         })
 
-        const fileSource = sv.localPath ?? sv.item.file_url
+        const fileSource = await resolveVideoPath(sv)
         if (!fileSource) {
           log(`⚠️ Vidéo ${vi + 1} sans source — ignorée`, 'warn')
           continue
@@ -690,15 +702,15 @@ export function MassPosting({ user }: MassPostingProps) {
         {/* Left: icon + title */}
         <div className="flex items-center gap-4 min-w-0">
           {/* Zap icon with gradient glow */}
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0 sf-anim-scale-spring">
             <div className="absolute inset-0 rounded-[14px] blur-xl opacity-60"
-              style={{ background: 'linear-gradient(135deg, #D4C499, #f59e0b)' }} />
+              style={{ background: 'linear-gradient(135deg, #ec4899, #f59e0b)' }} />
             <div className="relative w-11 h-11 rounded-[14px] flex items-center justify-center border border-white/10"
-              style={{ background: 'linear-gradient(135deg, rgba(243,241,236,0.2), rgba(245,158,11,0.15))' }}>
+              style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.2), rgba(245,158,11,0.15))' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="url(#zapGrad)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <defs>
                   <linearGradient id="zapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#E8DFC8" />
+                    <stop offset="0%" stopColor="#f472b6" />
                     <stop offset="100%" stopColor="#fbbf24" />
                   </linearGradient>
                 </defs>
@@ -707,7 +719,7 @@ export function MassPosting({ user }: MassPostingProps) {
             </div>
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 sf-anim-slide-up sf-d50">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl font-black tracking-tight text-text" style={{ letterSpacing: '-0.03em' }}>
                 Mass Posting
@@ -743,7 +755,7 @@ export function MassPosting({ user }: MassPostingProps) {
         </div>
 
         {/* Right: controls */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 sf-anim-slide-up sf-d100">
           {/* Assignment mode toggle */}
           <div className="sf-tabs">
             {([{ k: 'seq', label: t('schedulerSequential') }, { k: 'random', label: t('schedulerRandom') }] as const).map(m => (
@@ -772,7 +784,7 @@ export function MassPosting({ user }: MassPostingProps) {
           {/* Launch button */}
           <button onClick={post} disabled={!canLaunch}
             className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed relative overflow-hidden"
-            style={canLaunch ? { background: 'linear-gradient(130deg,#B8A070,#C9B584,#A855F7)', boxShadow: '0 4px 24px -4px rgba(201,181,132,0.65), inset 0 1px 0 rgba(255,255,255,0.12)' } : {}}>
+            style={canLaunch ? { background: 'linear-gradient(130deg,#6D28D9,#7C3AED,#A855F7)', boxShadow: '0 4px 24px -4px rgba(124,58,237,0.65), inset 0 1px 0 rgba(255,255,255,0.12)' } : {}}>
             {canLaunch && (
               <div className="absolute inset-0 pointer-events-none"
                 style={{ background: 'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.08) 50%,transparent 60%)', backgroundSize: '200% 100%', animation: 'progressShimmer 3s linear infinite' }} />
@@ -788,7 +800,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
       {/* Warning: no bearer */}
       {!bearer && (
-        <div className="flex-shrink-0 mx-6 mt-4 flex items-center gap-3 px-4 py-3 rounded-xl sf-card border-warn/20 bg-warn/5">
+        <div className="flex-shrink-0 mx-6 mt-4 flex items-center gap-3 px-4 py-3 rounded-xl sf-card border-warn/20 bg-warn/5 sf-anim-slide-up">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-warn/10">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5L11.5 10.5H1.5L6.5 1.5Z" stroke="#F59E0B" strokeWidth="1.4" strokeLinejoin="round"/><path d="M6.5 5v3" stroke="#F59E0B" strokeWidth="1.4" strokeLinecap="round"/><circle cx="6.5" cy="9" r="0.6" fill="#F59E0B"/></svg>
           </div>
@@ -798,8 +810,8 @@ export function MassPosting({ user }: MassPostingProps) {
 
       {/* Live progress banner */}
       {posting && totalTasks > 0 && (
-        <div className="flex-shrink-0 mx-6 mt-4 sf-card rounded-xl p-4 border-accent/25"
-          style={{ boxShadow: '0 0 28px -6px rgba(201,181,132,0.3)' }}>
+        <div className="flex-shrink-0 mx-6 mt-4 sf-card rounded-xl p-4 border-accent/25 sf-anim-slide-up"
+          style={{ boxShadow: '0 0 28px -6px rgba(124,58,237,0.3)' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3 flex-wrap">
               <span className="w-2 h-2 rounded-full bg-accent animate-pulse flex-shrink-0" />
@@ -819,7 +831,7 @@ export function MassPosting({ user }: MassPostingProps) {
               </div>
             </div>
             <span className="text-sm font-black font-mono tabular-nums"
-              style={{ color: progressPct >= 100 ? 'var(--ok, #22c55e)' : '#C9B584' }}>
+              style={{ color: progressPct >= 100 ? 'var(--ok, #22c55e)' : '#a78bfa' }}>
               {progressPct}%
             </span>
           </div>
@@ -841,7 +853,7 @@ export function MassPosting({ user }: MassPostingProps) {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="2.5" y="1" width="8" height="11" rx="1.5" stroke="#C9B584" strokeWidth="1.2"/><circle cx="6.5" cy="9.5" r="0.8" fill="#C9B584"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="2.5" y="1" width="8" height="11" rx="1.5" stroke="#A78BFA" strokeWidth="1.2"/><circle cx="6.5" cy="9.5" r="0.8" fill="#A78BFA"/></svg>
                 </div>
                 <span className="text-[13px] font-bold text-text">{t('massPostingTargets')}</span>
               </div>
@@ -869,11 +881,11 @@ export function MassPosting({ user }: MassPostingProps) {
                       className="sf-input appearance-none pr-7 cursor-pointer text-xs h-8">
                       {groups.map(g => <option key={g} value={g} style={{ background: '#0C0C15', color: '#fff' }}>{g}</option>)}
                     </select>
-                    <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="#C9B584" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </div>
                 )}
                 <div className="relative">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5" cy="5" r="3.5" stroke="rgba(201,181,132,0.4)" strokeWidth="1.2"/><path d="M7.5 7.5L10 10" stroke="rgba(201,181,132,0.4)" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5" cy="5" r="3.5" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2"/><path d="M7.5 7.5L10 10" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   <input type="text" placeholder={t('massPostingSearchPhone')} value={phoneSearch}
                     onChange={e => setPhoneSearch(e.target.value)}
                     className="sf-input pl-8 text-xs h-8"
@@ -930,14 +942,14 @@ export function MassPosting({ user }: MassPostingProps) {
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all cursor-pointer relative hover:bg-surface2"
                   style={{
                     borderBottom: '1px solid var(--border, rgba(255,255,255,0.055))',
-                    background: checked ? 'rgba(201,181,132,0.07)' : undefined,
+                    background: checked ? 'rgba(124,58,237,0.07)' : undefined,
                   }}>
                   {/* Active indicator */}
                   {checked && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-accent" />}
 
                   {/* Avatar */}
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-black flex-shrink-0 text-white"
-                    style={{ background: checked ? avatarGradient(phone.phone_name ?? '') : 'rgba(255,255,255,0.05)', boxShadow: checked ? '0 2px 8px -2px rgba(201,181,132,0.4)' : undefined }}>
+                    style={{ background: checked ? avatarGradient(phone.phone_name ?? '') : 'rgba(255,255,255,0.05)', boxShadow: checked ? '0 2px 8px -2px rgba(124,58,237,0.4)' : undefined }}>
                     {initials}
                   </div>
 
@@ -945,7 +957,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   <div className="min-w-0 flex-1">
                     <p className={`text-xs font-semibold truncate ${checked ? 'text-text' : 'text-text2'}`}>{phone.phone_name}</p>
                     {phone.ig_username && (
-                      <p className="text-[10px] truncate" style={{ color: checked ? '#C9B584' : 'rgba(201,181,132,0.4)' }}>@{phone.ig_username}</p>
+                      <p className="text-[10px] truncate" style={{ color: checked ? '#A78BFA' : 'rgba(139,92,246,0.4)' }}>@{phone.ig_username}</p>
                     )}
                     {ts && ts.status !== 'idle' && ts.status !== 'pending' && (
                       <p className="text-[10px] font-semibold flex items-center gap-1 mt-0.5"
@@ -964,7 +976,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   {/* Checkbox */}
                   <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
                     style={checked
-                      ? { background: 'linear-gradient(135deg,#C9B584,#A855F7)', boxShadow: '0 0 8px rgba(201,181,132,0.4)' }
+                      ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', boxShadow: '0 0 8px rgba(139,92,246,0.4)' }
                       : { border: '1px solid rgba(255,255,255,0.12)' }}>
                     {checked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   </div>
@@ -978,7 +990,7 @@ export function MassPosting({ user }: MassPostingProps) {
               if (realGroups.length === 0) return (
                 <div className="sf-empty py-12">
                   <div className="sf-empty-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(201,181,132,0.5)" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   </div>
                   <p className="sf-empty-title text-sm">{t('massPostingNoGroup')}</p>
                   <p className="sf-empty-desc text-xs">{t('massPostingNoGroupHint')}</p>
@@ -998,24 +1010,24 @@ export function MassPosting({ user }: MassPostingProps) {
                         className="w-full flex items-center gap-3 px-3 py-3 text-left transition-all cursor-pointer relative hover:bg-surface2"
                         style={{
                           borderBottom: '1px solid var(--border, rgba(255,255,255,0.055))',
-                          background: checked ? 'rgba(201,181,132,0.07)' : undefined,
+                          background: checked ? 'rgba(124,58,237,0.07)' : undefined,
                         }}>
                         {checked && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-accent" />}
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
                           style={checked
-                            ? { background: 'linear-gradient(135deg,#C9B584,#A855F7)', boxShadow: '0 2px 8px -2px rgba(201,181,132,0.5)' }
+                            ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', boxShadow: '0 2px 8px -2px rgba(124,58,237,0.5)' }
                             : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={checked ? 'white' : '#52525b'} strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className={`text-sm font-bold truncate ${checked ? 'text-text' : 'text-text2'}`}>{g}</p>
-                          <p className="text-[11px]" style={{ color: checked ? '#C9B584' : 'rgba(82,82,91,0.7)' }}>
+                          <p className="text-[11px]" style={{ color: checked ? '#a78bfa' : 'rgba(82,82,91,0.7)' }}>
                             {checked ? `${selCount}/${inGroup.length} ${t('massPostingSelCount')}` : `${inGroup.length} ${t('massPostingPhoneCount')}`}
                           </p>
                         </div>
                         <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0"
                           style={checked
-                            ? { background: 'linear-gradient(135deg,#C9B584,#A855F7)' }
+                            ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)' }
                             : { border: '1px solid rgba(255,255,255,0.1)' }}>
                           {checked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </div>
@@ -1038,14 +1050,14 @@ export function MassPosting({ user }: MassPostingProps) {
 
         {/* ── RIGHT MAIN AREA ───────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto bg-bg" style={{ scrollbarWidth: 'thin' }}>
-          <div className="px-6 py-5 space-y-4 max-w-4xl">
+          <div className="px-6 py-5 space-y-4 max-w-4xl anim-stagger">
 
             {/* ── Video selection section ─────────────────────────────────── */}
             <div className="sf-card overflow-hidden">
               <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
                 <div className="flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
-                    <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="9" height="7" rx="1.5" stroke="#C9B584" strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke="#C9B584" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="9" height="7" rx="1.5" stroke="#A78BFA" strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke="#A78BFA" strokeWidth="1.2" strokeLinejoin="round"/></svg>
                   </div>
                   <span className="text-[13px] font-bold text-text">{t('massPostingContent')}</span>
                 </div>
@@ -1083,7 +1095,7 @@ export function MassPosting({ user }: MassPostingProps) {
               {selectedVideos.length === 0 ? (
                 <div className="sf-empty py-10">
                   <div className="sf-empty-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(201,181,132,0.4)" strokeWidth="1.4"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.4"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
                   </div>
                   <p className="sf-empty-title">{t('massPostingNoContent')}</p>
                   <p className="sf-empty-desc">{t('massPostingNoContentHint')}</p>
@@ -1109,7 +1121,8 @@ export function MassPosting({ user }: MassPostingProps) {
                         </div>
                         {/* Remove button */}
                         <button onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
-                          className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer bg-danger/20 hover:bg-danger/40 border border-danger/30 text-danger">
+                          className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer bg-danger/20 hover:bg-danger/40 border border-danger/30 text-danger sf-press"
+                          style={{ transition: 'opacity 150ms ease, background-color 150ms ease, transform 90ms cubic-bezier(0.4, 0, 0.2, 1)' }}>
                           <svg width="7" height="7" viewBox="0 0 8 8" fill="none"><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                         </button>
                         {/* Index badge */}
@@ -1121,8 +1134,8 @@ export function MassPosting({ user }: MassPostingProps) {
                   })}
                   {/* Add more card */}
                   <button onClick={() => setShowBankPicker(true)}
-                    className="rounded-xl border border-dashed border-border hover:border-accent/40 bg-surface/50 hover:bg-accent/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 text-text3 hover:text-accent"
-                    style={{ aspectRatio: '9/16', maxHeight: 180 }}>
+                    className="rounded-xl border border-dashed border-border hover:border-accent/40 bg-surface/50 hover:bg-accent/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 text-text3 hover:text-accent sf-hover-lift"
+                    style={{ aspectRatio: '9/16', maxHeight: 180, transition: 'all 200ms cubic-bezier(0.22, 1, 0.36, 1)' }}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                     <span className="text-[10px] font-semibold">Ajouter</span>
                   </button>
@@ -1134,7 +1147,7 @@ export function MassPosting({ user }: MassPostingProps) {
             <div className="sf-card overflow-hidden">
               <div className="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-border">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" stroke="#C9B584" strokeWidth="1.2"/><path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11" stroke="#C9B584" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" stroke="#A78BFA" strokeWidth="1.2"/><path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                 </div>
                 <span className="text-[13px] font-bold text-text">{t('massPostingPublishOptions')}</span>
               </div>
@@ -1148,7 +1161,7 @@ export function MassPosting({ user }: MassPostingProps) {
               <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
                 <div className="flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 2h10M1 5h7M1 8h8M1 11h5" stroke="#C9B584" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 2h10M1 5h7M1 8h8M1 11h5" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   </div>
                   <span className="text-[13px] font-bold text-text">{t('massPostingDescription')}</span>
                 </div>
@@ -1167,7 +1180,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer disabled:opacity-40">
                     {generating
                       ? <div className="sf-spinner w-3 h-3" />
-                      : <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#C9B584"/></svg>
+                      : <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#A78BFA"/></svg>
                     }
                     {generating ? t('massPostingGeneratingAI') : t('massPostingGenerateAI')}
                   </button>
@@ -1178,7 +1191,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   <button onClick={() => setWithHashtags(v => !v)}
                     className={`sf-btn sf-btn-sm cursor-pointer font-black text-base px-3 ${withHashtags ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
                     title="Inclure les hashtags"
-                    style={withHashtags ? { boxShadow: '0 0 10px rgba(201,181,132,0.3)' } : {}}>
+                    style={withHashtags ? { boxShadow: '0 0 10px rgba(139,92,246,0.3)' } : {}}>
                     #
                   </button>
                 </div>
@@ -1190,7 +1203,7 @@ export function MassPosting({ user }: MassPostingProps) {
               <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
                 <div className="flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M1 6h10M1 9h10" stroke="#C9B584" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M1 6h10M1 9h10" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   </div>
                   <span className="text-[13px] font-bold text-text">{t('massPostingAssignments')}</span>
                 </div>
@@ -1204,7 +1217,7 @@ export function MassPosting({ user }: MassPostingProps) {
               {assignments.length === 0 ? (
                 <div className="sf-empty">
                   <div className="sf-empty-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(201,181,132,0.4)" strokeWidth="1.4"><path d="M9 17H5a2 2 0 0 0-2 2"/><path d="M11 17h8a2 2 0 0 1 2 2"/><rect x="1" y="3" width="22" height="12" rx="2"/></svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.4"><path d="M9 17H5a2 2 0 0 0-2 2"/><path d="M11 17h8a2 2 0 0 1 2 2"/><rect x="1" y="3" width="22" height="12" rx="2"/></svg>
                   </div>
                   <p className="sf-empty-title">{t('massPostingAssignments')}</p>
                   <p className="sf-empty-desc">{t('massPostingNoAssignment')}</p>
@@ -1287,9 +1300,9 @@ export function MassPosting({ user }: MassPostingProps) {
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all"
                   style={phoneList.length > 0
-                    ? { background: 'rgba(201,181,132,0.12)', border: '1px solid rgba(201,181,132,0.25)' }
+                    ? { background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)' }
                     : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="2.5" y="1" width="8" height="11" rx="1.5" stroke={phoneList.length > 0 ? '#C9B584' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="2.5" y="1" width="8" height="11" rx="1.5" stroke={phoneList.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2"/></svg>
                 </div>
                 <div>
                   <p className="text-lg font-black leading-none" style={{ color: phoneList.length > 0 ? '#fff' : 'rgba(82,82,91,0.7)' }}>{phoneList.length}</p>
@@ -1303,9 +1316,9 @@ export function MassPosting({ user }: MassPostingProps) {
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all"
                   style={selectedVideos.length > 0
-                    ? { background: 'rgba(201,181,132,0.12)', border: '1px solid rgba(201,181,132,0.25)' }
+                    ? { background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)' }
                     : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="3" width="9" height="7" rx="1.5" stroke={selectedVideos.length > 0 ? '#C9B584' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke={selectedVideos.length > 0 ? '#C9B584' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="3" width="9" height="7" rx="1.5" stroke={selectedVideos.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke={selectedVideos.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2" strokeLinejoin="round"/></svg>
                 </div>
                 <div>
                   <p className="text-lg font-black leading-none" style={{ color: selectedVideos.length > 0 ? '#fff' : 'rgba(82,82,91,0.7)' }}>{selectedVideos.length}</p>
@@ -1331,7 +1344,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 <div className="flex items-center justify-between px-5 pt-3.5 pb-3 border-b border-border">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
-                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 2h9M1 5h6M1 8h7" stroke="#C9B584" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 2h9M1 5h6M1 8h7" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                     </div>
                     <span className="text-[12px] font-bold text-text">Journal</span>
                     <span className="sf-badge sf-badge-accent text-[10px]">{logs.length}</span>
@@ -1379,7 +1392,7 @@ export function MassPosting({ user }: MassPostingProps) {
           <div className="sf-modal w-80 anim-scale-in" onClick={e => e.stopPropagation()}>
             <div className="sf-modal-header">
               <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 <p className="sf-modal-title">Choisir un dossier</p>
               </div>
               <button onClick={() => setShowFolderPick(false)}
@@ -1399,7 +1412,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 {bankFolders.map(f => (
                   <button key={f.name} onClick={() => addFolderVideos(f.name)}
                     className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-surface2 cursor-pointer border-b border-border last:border-b-0">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     <span className="flex-1 text-sm font-semibold text-text truncate">{f.name}</span>
                     <span className="sf-badge sf-badge-accent text-[10px]">{f.count}</span>
                   </button>

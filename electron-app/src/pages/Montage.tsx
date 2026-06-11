@@ -214,7 +214,8 @@ function TransitionBadge({ type, onClick }: { type: Transition['type']; onClick:
   return (
     <button
       onClick={onClick}
-      className="flex-shrink-0 w-8 h-8 rounded-full bg-surface border-2 border-border hover:border-accent flex items-center justify-center text-xs text-text2 hover:text-accent transition-all z-10 self-center"
+      className="flex-shrink-0 w-8 h-8 rounded-full bg-surface border-2 border-border hover:border-accent flex items-center justify-center text-xs text-text2 hover:text-accent transition-all z-10 self-center sf-press"
+      style={{ transition: 'transform 0.09s cubic-bezier(0.4,0,0.2,1), border-color 0.18s ease, color 0.18s ease' }}
       title={info.label}
     >
       {info.icon}
@@ -232,7 +233,7 @@ function PropertiesPanel({
   const t = useT()
   if (!clip) return (
     <div className="flex items-center justify-center h-full text-xs text-text2 p-4 text-center">
-      <div className="space-y-2 flex flex-col items-center">
+      <div className="space-y-2 flex flex-col items-center sf-anim-scale-in">
         <IconClapperboard size={24} />
         <p>{t('montageSelectClipProps')}</p>
       </div>
@@ -722,8 +723,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
       {/* OS drop overlay */}
       {osDragging && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-4 flex flex-col items-center text-accent">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.15)', border: '1px solid rgba(201,181,132,0.3)' }}>
+          <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-4 flex flex-col items-center text-accent sf-anim-scale-in">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
               <IconClapperboard size={32} />
             </div>
             <p className="text-xl font-semibold">{t('montageDropVideoHere')}</p>
@@ -735,9 +736,9 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
       <div className="flex-shrink-0 border-b border-border bg-surface">
         <div className="flex items-center">
           {/* Project name + icon */}
-          <div className="w-56 flex-shrink-0 px-4 py-2.5 border-r border-border flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(201,181,132,0.15)' }}>
-              <IconClapperboard size={12} style={{ color: '#C9B584' }} />
+          <div className="w-56 flex-shrink-0 px-4 py-2.5 border-r border-border flex items-center gap-2 sf-anim-slide-up sf-d50">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.15)' }}>
+              <IconClapperboard size={12} style={{ color: '#a78bfa' }} />
             </div>
             <input value={projectName} onChange={e => setProjName(e.target.value)}
               className="text-[13px] font-semibold text-text bg-transparent focus:outline-none w-full truncate"
@@ -745,7 +746,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           </div>
 
           {/* Tab bar */}
-          <div className="flex flex-1 overflow-x-auto">
+          <div className="flex flex-1 overflow-x-auto sf-anim-slide-up sf-d100">
             {TABS.map(t => (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
                 className={`flex items-center gap-1.5 px-5 py-2.5 text-[12px] font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
@@ -759,12 +760,12 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           </div>
 
           {/* Right controls */}
-          <div className="flex items-center gap-2 px-4 flex-shrink-0 border-l border-border">
+          <div className="flex items-center gap-2 px-4 flex-shrink-0 border-l border-border sf-anim-slide-up sf-d150">
             <span className="text-[11px] text-text2">{t('montageFormat')}</span>
             {(['9:16','1:1','16:9'] as Preset[]).map(p => (
               <button key={p} onClick={() => setPreset(p)}
                 className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all cursor-pointer ${preset === p ? 'text-white' : 'text-text2 hover:text-text'}`}
-                style={preset === p ? { background: 'linear-gradient(130deg,#C9B584,#D4C499)' } : { background: 'rgba(255,255,255,0.05)' }}>
+                style={preset === p ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)' }}>
                 {p}
               </button>
             ))}
@@ -778,7 +779,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
       </div>
 
       {/* ── MIDDLE: left panel + preview + properties ───────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden anim-stagger">
 
         {/* Left panel — content changes per tab */}
         <aside className="w-56 flex-shrink-0 border-r border-border bg-surface flex flex-col">
@@ -958,7 +959,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                     <div key={ov.uid} className="flex items-center gap-2 bg-surface2 rounded-lg px-2 py-1.5">
                       <input value={ov.text} onChange={e => setTexts(prev => prev.map(t => t.uid === ov.uid ? { ...t, text: e.target.value } : t))}
                         className="flex-1 bg-transparent text-[11px] text-text focus:outline-none" />
-                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label="Delete" className="text-text2 hover:text-danger inline-flex items-center"><IconX size={13} /></button>
+                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label="Delete" className="text-text2 hover:text-danger inline-flex items-center sf-press"><IconX size={13} /></button>
                     </div>
                   ))}
                 </div>
@@ -1019,8 +1020,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] text-text2">Total: <span className="text-accent font-medium">{fmtTime(total)}</span></p>
-                  <div className="h-1.5 bg-surface2 rounded-full overflow-hidden">
-                    <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${Math.min(100, (total / 90) * 100)}%` }} />
+                  <div className="sf-progress">
+                    <div className="sf-progress-bar" style={{ width: `${Math.min(100, (total / 90) * 100)}%` }} />
                   </div>
                   <p className="text-[9px] text-text2 flex items-center gap-1">{total > 90 ? <><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-warn"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>{t('montageReelsLimit')}</> : `${Math.round((total / 90) * 100)}% of 90s`}</p>
                 </div>
@@ -1071,8 +1072,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
             />
           ) : (
             <div className="text-center text-text2 space-y-3 flex flex-col items-center">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,181,132,0.08)', border: '1px solid rgba(201,181,132,0.12)' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center sf-anim-scale-spring" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>
               </div>
@@ -1103,7 +1104,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
       </div>
 
       {/* ── BOTTOM: Timeline ─────────────────────────────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-t border-border bg-surface" style={{ height: 200 }}>
+      <div className="flex-shrink-0 border-t border-border bg-surface sf-anim-slide-up sf-d200" style={{ height: 200 }}>
         {/* Timeline toolbar */}
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-surface2">
           {/* Edit tools */}
@@ -1129,12 +1130,12 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
           {/* Zoom */}
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setScale(s => Math.max(10, s - 10))} className="text-text2 hover:text-text text-base w-5 text-center">−</button>
+            <button onClick={() => setScale(s => Math.max(10, s - 10))} className="text-text2 hover:text-text text-base w-5 text-center sf-press">−</button>
             <div className="w-16 h-1.5 bg-surface rounded-full relative cursor-pointer"
               onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setScale(Math.round(10 + ((e.clientX - r.left) / r.width) * 190)) }}>
               <div className="h-full bg-accent rounded-full" style={{ width: `${((scale - 10) / 190) * 100}%` }} />
             </div>
-            <button onClick={() => setScale(s => Math.min(200, s + 10))} className="text-text2 hover:text-text text-base w-5 text-center">+</button>
+            <button onClick={() => setScale(s => Math.min(200, s + 10))} className="text-text2 hover:text-text text-base w-5 text-center sf-press">+</button>
             <span className="text-[10px] text-text2 w-10">{scale}px/s</span>
           </div>
         </div>
@@ -1221,7 +1222,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
               </code>
             )}
           </div>
-          <button onClick={() => setExpResult(null)} aria-label="Fermer" className="opacity-60 hover:opacity-100 inline-flex items-center"><IconX size={14} /></button>
+          <button onClick={() => setExpResult(null)} aria-label="Fermer" className="opacity-60 hover:opacity-100 inline-flex items-center sf-press"><IconX size={14} /></button>
         </div>
       )}
     </div>

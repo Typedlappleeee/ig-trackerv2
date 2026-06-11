@@ -76,8 +76,8 @@ function NavItem({ active, icon, label, onClick, S }: {
         height: 36, padding: '0 12px',
         borderRadius: 8, fontSize: 13, fontWeight: active ? 500 : 400,
         textAlign: 'left', border: 'none', cursor: 'pointer',
-        background: active ? 'rgba(201,181,132,0.1)' : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
-        color: active ? '#F3F1EC' : hovered ? 'rgba(241,240,247,0.85)' : S.text3,
+        background: active ? 'rgba(139,92,246,0.1)' : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+        color: active ? '#F2F0FF' : hovered ? 'rgba(241,240,247,0.85)' : S.text3,
         transition: 'background 140ms ease, color 140ms ease',
         transform: pressed ? 'scale(0.97)' : 'scale(1)',
         width: '100%',
@@ -86,12 +86,12 @@ function NavItem({ active, icon, label, onClick, S }: {
       {active && (
         <span style={{
           position: 'absolute', left: 0, top: 7, bottom: 7, width: 2,
-          background: 'linear-gradient(180deg,#C9B584,#C9B584)',
-          boxShadow: '0 0 8px rgba(201,181,132,0.7)',
+          background: 'linear-gradient(180deg,#A78BFA,#7C3AED)',
+          boxShadow: '0 0 8px rgba(139,92,246,0.7)',
           borderRadius: 2,
         }} />
       )}
-      <span style={{ color: active ? S.accent3 : hovered ? 'rgba(201,181,132,0.8)' : 'currentColor', display: 'flex', alignItems: 'center', transition: 'color 140ms ease' }}>
+      <span style={{ color: active ? S.accent3 : hovered ? 'rgba(167,139,250,0.8)' : 'currentColor', display: 'flex', alignItems: 'center', transition: 'color 140ms ease' }}>
         {icon}
       </span>
       {label}
@@ -115,15 +115,15 @@ function SubTabBtn({ active, icon, label, onClick, S }: {
         display: 'flex', alignItems: 'center', gap: 7,
         padding: '0 14px', height: 40, fontSize: 13,
         fontWeight: active ? 600 : 400,
-        color: active ? '#F3F1EC' : hovered ? 'rgba(243,241,236,0.7)' : 'rgba(148,163,184,0.45)',
+        color: active ? '#F2F0FF' : hovered ? 'rgba(196,181,253,0.7)' : 'rgba(148,163,184,0.45)',
         background: 'transparent', border: 'none',
-        borderBottom: active ? '2px solid #C9B584' : '2px solid transparent',
+        borderBottom: active ? '2px solid #7C3AED' : '2px solid transparent',
         marginBottom: -1, cursor: 'pointer',
         transition: 'color 120ms ease, border-color 120ms ease',
         flexShrink: 0,
       }}
     >
-      <span style={{ color: active ? S.accent3 : hovered ? 'rgba(201,181,132,0.7)' : 'currentColor', display: 'flex', alignItems: 'center', transition: 'color 120ms ease' }}>
+      <span style={{ color: active ? S.accent3 : hovered ? 'rgba(167,139,250,0.7)' : 'currentColor', display: 'flex', alignItems: 'center', transition: 'color 120ms ease' }}>
         {icon}
       </span>
       {label}
@@ -509,12 +509,12 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     surface3: '#17172A',
     border: 'rgba(255,255,255,0.055)',
     border2: 'rgba(255,255,255,0.09)',
-    borderAccent: 'rgba(201,181,132,0.22)',
-    accent: '#C9B584',
-    accent2: '#C9B584',
-    accent3: '#C9B584',
-    text: '#F3F1EC',
-    text2: 'rgba(243,241,236,0.72)',
+    borderAccent: 'rgba(139,92,246,0.22)',
+    accent: '#7C3AED',
+    accent2: '#8B5CF6',
+    accent3: '#A78BFA',
+    text: '#F2F0FF',
+    text2: 'rgba(196,181,253,0.72)',
     text3: 'rgba(148,163,184,0.52)',
   }
 
@@ -549,16 +549,16 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     <div className="flex flex-col h-full anim-page" style={{ background: S.base }}>
       {/* Loading header — mirrors real header */}
       <div className="flex items-center gap-4 px-8 py-5 border-b border-border flex-shrink-0"
-        style={{ background: 'linear-gradient(90deg,rgba(201,181,132,0.06) 0%,transparent 55%)' }}>
+        style={{ background: 'linear-gradient(90deg,rgba(139,92,246,0.06) 0%,transparent 55%)' }}>
         <div className="flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg,rgba(201,181,132,0.24),rgba(201,181,132,0.07))', border: '1px solid rgba(201,181,132,0.3)', boxShadow: '0 0 22px -6px rgba(201,181,132,0.5)' }}>
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#C9B584" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.24),rgba(139,92,246,0.07))', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 0 22px -6px rgba(139,92,246,0.5)' }}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
             <circle cx="12" cy="12" r="3"/>
           </svg>
         </div>
         <div>
-          <h1 className="text-[22px] font-black m-0" style={{ letterSpacing: '-0.025em', background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(243,241,236,0.85) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 className="text-[22px] font-black m-0" style={{ letterSpacing: '-0.025em', background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             {t('settingsTitle')}
           </h1>
           <p className="text-[12px] m-0 mt-0.5" style={{ color: S.text3 }}>{user.email}</p>
@@ -580,20 +580,20 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
         flexShrink: 0, padding: '18px 28px 16px',
         borderBottom: `1px solid ${S.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'linear-gradient(90deg,rgba(201,181,132,0.06) 0%,transparent 55%)',
+        background: 'linear-gradient(90deg,rgba(139,92,246,0.06) 0%,transparent 55%)',
         position: 'relative',
       }}>
         {/* Subtle top-edge glow line */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg,transparent,rgba(201,181,132,0.35),transparent)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg,transparent,rgba(139,92,246,0.35),transparent)', pointerEvents: 'none' }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {/* Gear icon with glow */}
-          <div style={{
+          <div className="sf-anim-scale-spring sf-d100" style={{
             width: 42, height: 42, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg,rgba(201,181,132,0.24),rgba(201,181,132,0.07))',
-            border: '1px solid rgba(201,181,132,0.3)', color: '#C9B584',
-            boxShadow: '0 0 22px -6px rgba(201,181,132,0.5)',
+            background: 'linear-gradient(135deg,rgba(139,92,246,0.24),rgba(139,92,246,0.07))',
+            border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa',
+            boxShadow: '0 0 22px -6px rgba(139,92,246,0.5)',
           }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
@@ -604,7 +604,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
           <div>
             <h1 style={{
               fontSize: 22, fontWeight: 900, margin: 0, lineHeight: 1.15, letterSpacing: '-0.025em',
-              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(243,241,236,0.9) 100%)',
+              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.9) 100%)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             }}>{t('settingsTitle')}</h1>
             <p style={{ fontSize: 12, color: S.text3, margin: '3px 0 0', lineHeight: 1.3 }}>{user.email}</p>
@@ -612,7 +612,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
         </div>
 
         {/* Right — saved indicator + save button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {saved && (
             <span className="anim-scale-in" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22C55E', fontWeight: 600,
               background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.22)', borderRadius: 8, padding: '4px 10px' }}>
@@ -637,7 +637,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* ── Left sidebar — main nav ───────────────────────────────────── */}
-        <div className="sf-sidebar-nav" style={{
+        <div className="sf-sidebar-nav sf-anim-slide-up sf-d150" style={{
           width: 204, flexShrink: 0, overflowY: 'auto',
           background: 'rgba(7,7,12,0.95)',
           borderRight: `1px solid ${S.border}`,
@@ -661,8 +661,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
             <button onClick={() => onNavigate?.('support')} style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '7px 10px', borderRadius: 8, fontSize: 12,
-              color: S.accent3, background: 'rgba(201,181,132,0.06)',
-              border: '1px solid rgba(201,181,132,0.12)',
+              color: S.accent3, background: 'rgba(139,92,246,0.06)',
+              border: '1px solid rgba(139,92,246,0.12)',
               cursor: 'pointer', fontWeight: 500, width: '100%', textAlign: 'left',
               transition: 'background 140ms ease, border-color 140ms ease',
             }}>
@@ -681,7 +681,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
           {panel === 'general' && (
             <>
               {/* ── Sub-tab bar ─────────────────────────────────────────── */}
-              <div style={{
+              <div className="anim-stagger" style={{
                 flexShrink: 0, display: 'flex', gap: 0, alignItems: 'center',
                 borderBottom: `1px solid ${S.border}`,
                 padding: '0 24px',
@@ -697,7 +697,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                 {/* ── APPARENCE ─────────────────────────────────────────── */}
                 {genTab === 'apparence' && (
-                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     {/* Section header */}
                     <div style={{ paddingBottom: 4 }}>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('appearanceTitle')}</h2>
@@ -709,7 +709,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('colorTheme')}</h3>
                       <p style={{ fontSize: 12, color: S.text3, margin: '0 0 16px', lineHeight: 1.4 }}>{t('colorThemeSub')}</p>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                      <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                         {THEMES.map(th => (
                           <button key={th} onClick={() => { handleTheme(th); handleSwatchClick() }} style={{
                             position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -719,7 +719,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             boxShadow: theme === th ? `0 0 16px -4px ${THEME_COLORS[th]}50` : 'none',
                           }}>
                             {theme === th && (
-                              <span style={{
+                              <span className="sf-anim-scale-spring" style={{
                                 position: 'absolute', top: 5, right: 5, width: 14, height: 14, borderRadius: '50%',
                                 background: THEME_COLORS[th], display: 'flex', alignItems: 'center', justifyContent: 'center',
                               }}>
@@ -793,7 +793,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                 {/* ── SONS ──────────────────────────────────────────────── */}
                 {genTab === 'sons' && (
-                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('soundsTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('soundsSub')}</p>
@@ -818,7 +818,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                               padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer',
                               transition: 'all 140ms ease',
                               ...(musicTrack === i
-                                ? { background: 'rgba(201,181,132,0.18)', border: `1px solid ${S.borderAccent}`, color: S.accent3, boxShadow: `0 0 14px -4px rgba(201,181,132,0.4)` }
+                                ? { background: 'rgba(139,92,246,0.18)', border: `1px solid ${S.borderAccent}`, color: S.accent3, boxShadow: `0 0 14px -4px rgba(139,92,246,0.4)` }
                                 : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
                             }}>
                               <svg width="11" height="11" viewBox="0 0 24 24" fill={musicTrack === i ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -839,7 +839,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                               </svg>
                               <p style={{ fontSize: 13, fontWeight: 500, color: S.text, margin: 0 }}>{t('volume')}</p>
                             </div>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: S.accent3, background: 'rgba(201,181,132,0.1)', border: `1px solid ${S.borderAccent}`, borderRadius: 6, padding: '2px 8px' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: S.accent3, background: 'rgba(139,92,246,0.1)', border: `1px solid ${S.borderAccent}`, borderRadius: 6, padding: '2px 8px' }}>
                               {Math.round(musicVol * 100)}%
                             </span>
                           </div>
@@ -854,7 +854,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                 {/* ── NOTIFICATIONS ─────────────────────────────────────── */}
                 {genTab === 'notifications' && (
-                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('notificationsTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('notificationsSub')}</p>
@@ -905,7 +905,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                 {/* ── LANGUE & RÉGION ────────────────────────────────────── */}
                 {genTab === 'langue' && (
-                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('languageTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('languageSub')}</p>
@@ -921,15 +921,15 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             display: 'flex', alignItems: 'center', gap: 10, flex: 1,
                             padding: '14px 20px', borderRadius: 12, cursor: 'pointer',
                             fontSize: 14, fontWeight: 600, transition: 'all 0.15s ease',
-                            background: lang === l ? 'rgba(201,181,132,0.15)' : 'rgba(255,255,255,0.03)',
-                            border: lang === l ? '1px solid rgba(201,181,132,0.45)' : `1px solid ${S.border}`,
+                            background: lang === l ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
+                            border: lang === l ? '1px solid rgba(139,92,246,0.45)' : `1px solid ${S.border}`,
                             color: lang === l ? S.accent3 : S.text3,
-                            boxShadow: lang === l ? '0 0 16px -6px rgba(201,181,132,0.4)' : 'none',
+                            boxShadow: lang === l ? '0 0 16px -6px rgba(139,92,246,0.4)' : 'none',
                           }}>
                             {/* Globe SVG instead of emoji flag */}
                             <div style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              background: lang === l ? 'rgba(201,181,132,0.2)' : 'rgba(255,255,255,0.06)',
-                              border: `1px solid ${lang === l ? 'rgba(201,181,132,0.3)' : S.border}`, fontSize: 16 }}>
+                              background: lang === l ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)',
+                              border: `1px solid ${lang === l ? 'rgba(139,92,246,0.3)' : S.border}`, fontSize: 16 }}>
                               {l === 'fr' ? 'FR' : 'EN'}
                             </div>
                             <span style={{ fontSize: 13 }}>{l === 'fr' ? t('langFr') : t('langEn')}</span>
@@ -947,7 +947,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                 {/* ── SÉCURITÉ ──────────────────────────────────────────── */}
                 {genTab === 'securite' && (
-                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('securityTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('securitySub')}</p>
@@ -1006,7 +1006,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             {t('changePassword')}
                           </button>
                         ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px', borderRadius: 10, background: 'rgba(201,181,132,0.05)', border: '1px solid rgba(201,181,132,0.15)' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px', borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
                             <input type="password" className="sf-input" placeholder={t('newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
                             <input type="password" className="sf-input" placeholder={t('confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
                             {pwError && <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>{pwError}</p>}
@@ -1032,7 +1032,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                 {/* ── AVANCÉ ────────────────────────────────────────────── */}
                 {genTab === 'avance' && (
-                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('advancedTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('advancedSub')}</p>
@@ -1045,7 +1045,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                     {devMode && (
                       <div style={{ borderRadius: 10, padding: '14px 16px', fontFamily: 'ui-monospace, monospace', fontSize: 11, lineHeight: 1.85,
-                        background: 'rgba(0,0,0,0.45)', border: `1px solid rgba(201,181,132,0.18)`, color: S.text3,
+                        background: 'rgba(0,0,0,0.45)', border: `1px solid rgba(139,92,246,0.18)`, color: S.text3,
                         boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)' }}>
                         {[
                           ['user_id', user.id],
@@ -1136,7 +1136,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
               {/* ── Profil ───────────────────────────────────────────────── */}
               {panel === 'profile' && (
-                <div className="sf-anim-slide-up" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div style={{ paddingBottom: 4 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('profileTitle')}</h2>
                     <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('profileSub')}</p>
@@ -1148,9 +1148,9 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     <div style={{
                       width: 58, height: 58, borderRadius: '50%', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'linear-gradient(135deg,#C9B584 0%,#D4C499 100%)',
+                      background: 'linear-gradient(135deg,#7C3AED 0%,#EC4899 100%)',
                       fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em',
-                      boxShadow: '0 0 0 3px rgba(201,181,132,0.2), 0 0 24px -8px rgba(201,181,132,0.6)',
+                      boxShadow: '0 0 0 3px rgba(139,92,246,0.2), 0 0 24px -8px rgba(139,92,246,0.6)',
                     }}>
                       {(displayName || profileName || user.email || '?').charAt(0).toUpperCase()}
                     </div>
@@ -1201,7 +1201,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
               {/* ── Connexions ───────────────────────────────────────────── */}
               {panel === 'connexions' && canSeeConnexions && (
-                <div className="sf-anim-slide-up" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div style={{ paddingBottom: 4 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('connexionsTitle')}</h2>
                     <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('connexionsSub')}</p>
@@ -1211,7 +1211,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, fontSize: 12,
                     ...(currentOrg
-                      ? { background: 'rgba(201,181,132,0.09)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
+                      ? { background: 'rgba(139,92,246,0.09)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
                       : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
                   }}>
                     {currentOrg ? (
@@ -1319,7 +1319,7 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
   const { lang } = useLang()
   const isElectron = !!(window as any).electronAPI
   return (
-    <div className="sf-anim-slide-up" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20, padding: '28px 28px 0' }}>
+    <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20, padding: '28px 28px 0' }}>
       <div>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('desktopTitle')}</h2>
         <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>
@@ -1328,7 +1328,7 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
       </div>
 
       {/* Feature list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
           { icon: (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1359,11 +1359,11 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
       </div>
 
       {/* Coming soon banner */}
-      <div style={{
+      <div className="sf-spotlight" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
         padding: '24px 20px', borderRadius: 14,
-        background: 'linear-gradient(135deg, rgba(201,181,132,0.12), rgba(168,85,247,0.08))',
-        border: '1px solid rgba(201,181,132,0.25)',
+        background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(168,85,247,0.08))',
+        border: '1px solid rgba(124,58,237,0.25)',
         textAlign: 'center',
       }}>
         <span style={{ display: 'flex', alignItems: 'center', color: S.accent3 }}>
@@ -1482,16 +1482,16 @@ function AdminPanel({ user: _user }: { user: User }) {
   })
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl anim-stagger">
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-6">
+      <div className="grid grid-cols-4 gap-6 anim-stagger">
         {[
           [t('totalKeys'),   stats.total,    'text-text'],
           [t('availableKeys'), stats.dispo,  'text-green-400'],
           [t('activeKeys'),  stats.actives,  'text-blue-400'],
           [t('expiredKeys'), stats.expirées, 'text-red-400'],
         ].map(([l, v, c]) => (
-          <div key={l as string} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.12)' }}>
+          <div key={l as string} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
             <p className={`text-2xl font-black ${c}`}>{v}</p>
             <p className="text-[12px] text-text2 mt-1">{l}</p>
           </div>
@@ -1499,7 +1499,7 @@ function AdminPanel({ user: _user }: { user: User }) {
       </div>
 
       {/* Create key */}
-      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.15)' }}>
+      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
         <p className="text-[15px] font-bold text-white mb-4">{t('createKey')}</p>
         <div className="flex gap-2">
           <input
@@ -1508,13 +1508,13 @@ function AdminPanel({ user: _user }: { user: User }) {
             className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest focus:outline-none"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           />
-          <button onClick={() => setNewKey(genKey())} className="px-4 py-2.5 rounded-xl text-[13px] text-text2 hover:text-text" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>↺</button>
+          <button onClick={() => setNewKey(genKey())} className="px-4 py-2.5 rounded-xl text-[13px] text-text2 hover:text-text sf-press cursor-pointer" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>↺</button>
         </div>
         <div className="flex flex-wrap gap-2">
           {DURATIONS.map(d => (
             <button key={d.label} onClick={() => setDuration(d.days)}
               className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
-              style={duration === d.days ? { background: 'linear-gradient(130deg,#C9B584,#D4C499)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              style={duration === d.days ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
               {d.label}
             </button>
           ))}
@@ -1523,7 +1523,7 @@ function AdminPanel({ user: _user }: { user: User }) {
           {['standard', 'pro', 'organisation'].map(p => (
             <button key={p} onClick={() => setPlan(p)}
               className={`px-4 py-2 rounded-xl text-[13px] capitalize transition-all ${plan === p ? 'text-white' : 'text-text2'}`}
-              style={plan === p ? { background: 'rgba(201,181,132,0.3)', border: '1px solid rgba(201,181,132,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
               {p}
             </button>
           ))}
@@ -1540,14 +1540,14 @@ function AdminPanel({ user: _user }: { user: User }) {
           <p className="text-[13px] text-text2 text-center py-8">{t('noKeys')}</p>
         ) : filtered.map(k => (
           <div key={k.id} className={`rounded-xl px-5 py-4 flex flex-wrap items-center gap-2 ${!k.is_active ? 'opacity-50' : ''}`}
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.1)' }}>
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)' }}>
             <button onClick={() => copy(k.key)} className="font-mono text-[13px] text-text tracking-widest hover:text-accent transition-colors">
               {k.key} {copied === k.key
                 ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:'inline',verticalAlign:'middle',color:'#22c55e'}}><path d="M20 6 9 17l-5-5"/></svg>
                 : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:'inline',verticalAlign:'middle',opacity:.5}}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
               }
             </button>
-            <span className="text-[12px] px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(201,181,132,0.15)', color: '#C9B584' }}>{k.plan}</span>
+            <span className="text-[12px] px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>{k.plan}</span>
             {!k.is_active
               ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{t('keyRevoked')}</span>
               : k.user_id
@@ -1664,9 +1664,9 @@ function SubscriptionPanel() {
   const locale = lang === 'en' ? 'en-US' : 'fr-FR'
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl anim-stagger">
       {/* Current status */}
-      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(201,181,132,0.18)' }}>
+      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
         <p className="text-[15px] font-bold text-white mb-4">{t('mySubscription')}</p>
 
         <div className="flex items-center justify-between">
@@ -1677,7 +1677,7 @@ function SubscriptionPanel() {
         {license.plan && (
           <div className="flex items-center justify-between">
             <span className="text-[13px] text-text2">{t('plan')}</span>
-            <span className="text-[13px] font-bold" style={{ color: '#C9B584' }}>{planLabel}</span>
+            <span className="text-[13px] font-bold" style={{ color: '#a78bfa' }}>{planLabel}</span>
           </div>
         )}
 
@@ -1700,7 +1700,7 @@ function SubscriptionPanel() {
               <button
                 onClick={copy}
                 className="px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all flex-shrink-0"
-                style={{ background: copied ? 'rgba(34,197,94,0.12)' : 'rgba(201,181,132,0.1)', color: copied ? '#22C55E' : '#C9B584', border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(201,181,132,0.2)'}` }}
+                style={{ background: copied ? 'rgba(34,197,94,0.12)' : 'rgba(139,92,246,0.1)', color: copied ? '#22C55E' : '#a78bfa', border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.2)'}` }}
               >
                 {copied ? t('copied') : t('copy')}
               </button>
@@ -1710,7 +1710,7 @@ function SubscriptionPanel() {
       </div>
 
       {/* Activate a license key */}
-      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(201,181,132,0.18)' }}>
+      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
         <p className="text-[15px] font-bold text-white mb-4">{t('activateLicense')}</p>
         <form onSubmit={handleActivateKey} className="flex gap-2">
           <input
@@ -1726,7 +1726,7 @@ function SubscriptionPanel() {
             type="submit"
             disabled={keyLoading || !newKey.trim()}
             className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-40 transition-all"
-            style={{ background: 'linear-gradient(135deg,#C9B584,#B8A070)' }}
+            style={{ background: 'linear-gradient(135deg,#7C3AED,#6D28D9)' }}
           >{keyLoading ? '…' : t('activate')}</button>
         </form>
         {keyResult && (
@@ -1735,12 +1735,12 @@ function SubscriptionPanel() {
       </div>
 
       {/* Credits */}
-      <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(201,181,132,0.04)', border: '1px solid rgba(201,181,132,0.2)' }}>
+      <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.2)' }}>
         <p className="text-[15px] font-bold text-white mb-4">{t('credits')}</p>
 
         <div className="flex items-center justify-between">
           <span className="text-[13px] text-text2">{t('currentBalance')}</span>
-          <span className="text-3xl font-black" style={{ color: creditBalance < 10 ? '#EF4444' : '#C9B584' }}>
+          <span className="text-3xl font-black" style={{ color: creditBalance < 10 ? '#EF4444' : '#a78bfa' }}>
             {creditBalance.toLocaleString(locale)}
           </span>
         </div>
@@ -1771,7 +1771,7 @@ function SubscriptionPanel() {
           <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">{t('geelarkPhones')}</p>
           <div className="flex justify-between">
             <span className="text-[13px] text-text2">{t('maxAllowed')}</span>
-            <span className="text-[13px] font-semibold" style={{ color: maxPhones === '∞' ? '#22C55E' : '#C9B584' }}>{maxPhones}</span>
+            <span className="text-[13px] font-semibold" style={{ color: maxPhones === '∞' ? '#22C55E' : '#a78bfa' }}>{maxPhones}</span>
           </div>
         </div>
 
@@ -1807,7 +1807,7 @@ function SubscriptionPanel() {
               type="submit"
               disabled={codeLoading || !creditCode.trim()}
               className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-40"
-              style={{ background: 'linear-gradient(135deg,#C9B584,#B8A070)' }}
+              style={{ background: 'linear-gradient(135deg,#7C3AED,#6D28D9)' }}
             >
               {codeLoading ? '…' : t('activate')}
             </button>
@@ -1821,10 +1821,10 @@ function SubscriptionPanel() {
       {/* Plan pricing */}
       <div>
         <p className="text-[15px] font-bold text-white mb-6">{t('subscriptions')}</p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 anim-stagger">
 
           {/* Standard */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.2)' }}>
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col sf-hover-lift" style={{ background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.2)' }}>
             <div>
               <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#60a5fa' }}>Standard</p>
               <div className="flex items-baseline gap-1 mt-1.5">
@@ -1853,13 +1853,13 @@ function SubscriptionPanel() {
           </div>
 
           {/* Pro */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(145deg,rgba(243,241,236,0.08),rgba(201,181,132,0.08))', border: '1px solid rgba(243,241,236,0.4)' }}>
-            <div className="absolute top-2.5 right-2.5 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(135deg,#C9B584,#D4C499)', color: '#fff' }}>
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col relative overflow-hidden sf-hover-lift sf-spotlight" style={{ background: 'linear-gradient(145deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))', border: '1px solid rgba(236,72,153,0.4)', boxShadow: '0 0 28px -10px rgba(124,58,237,0.35)' }}>
+            <div className="absolute top-2.5 right-2.5 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff' }}>
               {t('popular')}
             </div>
             <div>
               <div className="flex items-center justify-between">
-                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#E8DFC8' }}>Pro</p>
+                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
                 <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40%</span>
               </div>
               <div className="flex items-baseline gap-1 mt-1.5">
@@ -1878,19 +1878,19 @@ function SubscriptionPanel() {
                 'Support 24/7',
               ].map(f => (
                 <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#E8DFC8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}
                 </li>
               ))}
             </ul>
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
               className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all"
-              style={{ background: 'linear-gradient(135deg,#C9B584,#D4C499)', boxShadow: '0 2px 16px -4px rgba(243,241,236,0.4)' }}>
+              style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 16px -4px rgba(236,72,153,0.4)' }}>
               {t('getBtn')}
             </a>
           </div>
 
           {/* Organisation */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)' }}>
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col sf-hover-lift" style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)' }}>
             <div>
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#22C55E' }}>Organisation</p>
@@ -1928,7 +1928,7 @@ function SubscriptionPanel() {
         {/* Credit packs */}
         <div className="mt-6">
           <p className="text-[13px] font-bold text-white mb-3">{t('creditPacks')}</p>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-3 anim-stagger">
             {[
               { cr: '1 000',  price: '19$',  label: 'Mini Pack'  },
               { cr: '5 000',  price: '79$',  label: 'Mega Pack'  },
@@ -1936,12 +1936,12 @@ function SubscriptionPanel() {
               { cr: '50 000', price: '499$', label: 'Ultra Pack' },
             ].map(pk => (
               <a key={pk.cr} href="https://t.me/justquentin" target="_blank" rel="noreferrer"
-                className="rounded-xl p-3.5 text-center transition-all hover:brightness-110 no-underline"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,181,132,0.15)', textDecoration: 'none' }}>
-                <div className="text-[11px] font-semibold mb-1" style={{ color: '#C9B584' }}>{pk.label}</div>
+                className="rounded-xl p-3.5 text-center transition-all hover:brightness-110 no-underline sf-hover-lift"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)', textDecoration: 'none' }}>
+                <div className="text-[11px] font-semibold mb-1" style={{ color: '#a78bfa' }}>{pk.label}</div>
                 <div className="text-[15px] font-black text-white">{pk.cr}</div>
                 <div className="text-[10px] text-text2 mb-1.5">{t('creditsCosts')}</div>
-                <div className="text-[13px] font-bold" style={{ color: '#D4C499' }}>{pk.price}</div>
+                <div className="text-[13px] font-bold" style={{ color: '#c4b5fd' }}>{pk.price}</div>
               </a>
             ))}
           </div>

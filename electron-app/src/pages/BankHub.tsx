@@ -45,7 +45,7 @@ export function BankHub({ user, initialTab = 'videos' }: { user: User; initialTa
         <div className="flex items-center gap-4 mb-5">
           {/* Icon with glow */}
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+            className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
             style={{
               background: `linear-gradient(135deg, rgba(${activeTab.accentRgb},0.18), rgba(${activeTab.accentRgb},0.06))`,
               border: `1px solid rgba(${activeTab.accentRgb},0.3)`,
@@ -59,13 +59,13 @@ export function BankHub({ user, initialTab = 'videos' }: { user: User; initialTa
             </svg>
           </div>
           <div>
-            <h1 className="text-[20px] font-black leading-none sf-text-gradient">Content Bank</h1>
-            <p className="text-[13px] text-text3 mt-1">Manage your videos, media and caption templates</p>
+            <h1 className="text-[20px] font-black leading-none sf-text-gradient sf-anim-slide-up sf-d50">Content Bank</h1>
+            <p className="text-[13px] text-text3 mt-1 sf-anim-slide-up sf-d100">Manage your videos, media and caption templates</p>
           </div>
         </div>
 
         {/* Segmented tab bar */}
-        <div className="sf-tabs">
+        <div className="sf-tabs sf-anim-slide-up sf-d150">
           {TABS.map(tb => {
             const active = tab === tb.id
             return (
