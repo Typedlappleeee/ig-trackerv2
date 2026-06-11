@@ -40,7 +40,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
       {/* Glow halo */}
       <path
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="#0e7490" strokeWidth="22" strokeLinecap="round" fill="none" opacity="0.3"
+        stroke="#6B5D3F" strokeWidth="22" strokeLinecap="round" fill="none" opacity="0.3"
       />
       {/* Main S */}
       <path
@@ -161,26 +161,26 @@ const PAGE_ICON: Record<string, IconKey> = {
   scaleia:     'sparkles',
 }
 
-// Section label component
+// Section label — editorial eyebrow (gold, wide letter-spacing)
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      padding: '14px 12px 6px',
-      fontSize: 11,
+      padding: '16px 12px 7px',
+      fontSize: 9,
       fontWeight: 700,
       textTransform: 'uppercase',
-      letterSpacing: '0.12em',
-      color: 'rgba(148,163,184,0.4)',
+      letterSpacing: '0.28em',
+      color: 'rgba(201,181,132,0.55)',
     }}>
       {children}
     </div>
   )
 }
 
-// Sidebar divider — subtle cosmic gradient
+// Sidebar divider — hairline
 function SidebarDivider() {
   return (
-    <div style={{ height: 1, margin: '6px 10px', background: 'rgba(255,255,255,0.05)' }} />
+    <div style={{ height: 1, margin: '8px 10px', background: 'rgba(243,241,236,0.06)' }} />
   )
 }
 
@@ -508,10 +508,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             alignItems: 'center',
             gap: collapsed ? 0 : 10,
             width: '100%',
-            height: 39,
+            height: 36,
             padding: '0 11px',
-            borderRadius: 10,
-            fontSize: 14,
+            borderRadius: 5,
+            fontSize: 13.5,
             fontWeight: active ? 600 : 450,
             textAlign: 'left',
             cursor: 'pointer',
@@ -519,7 +519,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             background: active
               ? 'linear-gradient(90deg, rgba(201,181,132,0.16) 0%, rgba(201,181,132,0.08) 60%, transparent 100%)'
               : hovered ? 'rgba(255,255,255,0.045)' : 'transparent',
-            color: active ? '#F3F1EC' : hovered ? 'rgba(241,240,247,0.82)' : 'rgba(148,163,184,0.55)',
+            color: active ? '#F3F1EC' : hovered ? 'rgba(241,240,247,0.82)' : 'rgba(243,241,236,0.48)',
             boxShadow: active ? 'inset 3px 0 0 rgba(201,181,132,0.85)' : 'none',
             transition: 'background 140ms ease, color 140ms ease, box-shadow 140ms ease',
             transform: pressed ? 'scale(0.968)' : 'scale(1)',
@@ -532,7 +532,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <span style={{
             flexShrink: 0,
             display: 'flex',
-            color: active ? '#D4C499' : hovered ? 'rgba(243,241,236,0.65)' : 'rgba(148,163,184,0.4)',
+            color: active ? '#D4C499' : hovered ? 'rgba(243,241,236,0.65)' : 'rgba(243,241,236,0.32)',
             transition: 'color 140ms ease',
           }}>
             <NavIcon d={ICONS[iconKey]} size={17} />
@@ -618,7 +618,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   void now
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', background: '#08080E' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', background: '#060608' }}>
 
       {/* ── Sidebar (desktop only) ───────────────────────────────────────── */}
       <aside
@@ -627,8 +627,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           flexShrink: 0,
           display: isMobile ? 'none' : 'flex',
           flexDirection: 'column',
-          background: '#0d0d14',
-          borderRight: '1px solid rgba(255,255,255,0.06)',
+          background: '#0A0A0C',
+          borderRight: '1px solid rgba(243,241,236,0.07)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
           position: 'relative',
@@ -638,7 +638,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         <div style={{
           position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)',
           width: 220, height: 180, borderRadius: '50%',
-          background: 'radial-gradient(ellipse at center, rgba(124,58,237,0.13) 0%, transparent 70%)',
+          background: 'radial-gradient(ellipse at center, rgba(201,181,132,0.10) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 
@@ -648,7 +648,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
             <div style={{
               width: 28, height: 28, borderRadius: 8,
-              background: 'linear-gradient(135deg,rgba(201,181,132,0.25),rgba(34,211,238,0.1))',
+              background: 'linear-gradient(135deg,rgba(201,181,132,0.22),rgba(201,181,132,0.06))',
               border: '1px solid rgba(201,181,132,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
@@ -658,8 +658,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
           {!collapsed && (
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              <span style={{ background: 'linear-gradient(90deg, #e2e8f0, #cbd5e1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scale</span>
-              <span style={{ background: 'linear-gradient(90deg, #22d3ee, #818cf8, #C9B584)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+              <span style={{ background: 'linear-gradient(90deg, #F3F1EC, #D8D5CD)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scale</span>
+              <span style={{ background: 'linear-gradient(90deg, #C9B584, #D4C499)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
             </span>
           )}
 
@@ -670,14 +670,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               width: 26, height: 26, borderRadius: 7,
               border: 'none',
               background: 'transparent',
-              color: 'rgba(148,163,184,0.38)',
+              color: 'rgba(243,241,236,0.3)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', flexShrink: 0,
               marginLeft: collapsed ? 'auto' : 0,
               transition: 'color 0.15s, background 0.15s',
             }}
             onMouseEnter={e => { e.currentTarget.style.color = 'rgba(241,240,247,0.7)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(148,163,184,0.38)'; e.currentTarget.style.background = 'transparent' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(243,241,236,0.3)'; e.currentTarget.style.background = 'transparent' }}
             title={collapsed ? t('expandSidebar') : t('collapseSidebar')}
           >
             <NavIcon d={ICONS.menu} size={14} />
@@ -693,14 +693,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title={collapsed ? t('navHub') : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
-              fontSize: 14, fontWeight: page === 'hub' ? 600 : 400, textAlign: 'left',
+              width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
+              fontSize: 13.5, fontWeight: page === 'hub' ? 600 : 400, textAlign: 'left',
               cursor: 'pointer', border: 'none',
               background: page === 'hub'
-                ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+                ? 'linear-gradient(90deg, rgba(201,181,132,0.14) 0%, rgba(201,181,132,0.06) 60%, transparent 100%)'
                 : 'transparent',
-              color: page === 'hub' ? '#ede8ff' : 'rgba(148,163,184,0.58)',
-              boxShadow: page === 'hub' ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+              color: page === 'hub' ? '#F3F1EC' : 'rgba(243,241,236,0.5)',
+              boxShadow: page === 'hub' ? 'inset 2px 0 0 rgba(201,181,132,0.9)' : 'none',
               transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
               justifyContent: collapsed ? 'center' : 'flex-start',
               marginBottom: 2,
@@ -708,7 +708,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             onMouseEnter={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
             onMouseLeave={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
           >
-            <span style={{ flexShrink: 0, color: page === 'hub' ? '#c4b5fd' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+            <span style={{ flexShrink: 0, color: page === 'hub' ? '#D4C499' : 'rgba(243,241,236,0.35)', display: 'flex' }}>
               <NavIcon d={ICONS.grid} size={17} />
             </span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
@@ -721,14 +721,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               title={collapsed ? t('navCommunity') : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-                width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
-                fontSize: 14, fontWeight: page === 'community' ? 600 : 400, textAlign: 'left',
+                width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
+                fontSize: 13.5, fontWeight: page === 'community' ? 600 : 400, textAlign: 'left',
                 cursor: 'pointer', border: 'none',
                 background: page === 'community'
-                  ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+                  ? 'linear-gradient(90deg, rgba(201,181,132,0.14) 0%, rgba(201,181,132,0.06) 60%, transparent 100%)'
                   : 'transparent',
-                color: page === 'community' ? '#ede8ff' : 'rgba(148,163,184,0.58)',
-                boxShadow: page === 'community' ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+                color: page === 'community' ? '#F3F1EC' : 'rgba(243,241,236,0.5)',
+                boxShadow: page === 'community' ? 'inset 2px 0 0 rgba(201,181,132,0.9)' : 'none',
                 transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
                 justifyContent: collapsed ? 'center' : 'flex-start',
                 marginBottom: 2,
@@ -740,24 +740,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
               }}
             >
-              <span style={{ flexShrink: 0, color: page === 'community' ? '#c4b5fd' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+              <span style={{ flexShrink: 0, color: page === 'community' ? '#D4C499' : 'rgba(243,241,236,0.35)', display: 'flex' }}>
                 <NavIcon d={ICONS.chat} size={17} />
               </span>
-              {!collapsed && (
-                <>
-                  <span style={{ flex: 1 }}>{t('navCommunity')}</span>
-                  {page !== 'community' && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
-                      padding: '2px 5px', borderRadius: 4,
-                      background: 'rgba(201,181,132,0.15)', color: '#C9B584',
-                      border: '1px solid rgba(201,181,132,0.2)', flexShrink: 0,
-                    }}>
-                      NEW
-                    </span>
-                  )}
-                </>
-              )}
+              {!collapsed && <span style={{ flex: 1 }}>{t('navCommunity')}</span>}
             </button>
           )}
 
@@ -841,14 +827,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title={collapsed ? t('navSettings') : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
-              fontSize: 14, fontWeight: page === 'settings' ? 600 : 400, textAlign: 'left',
+              width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
+              fontSize: 13.5, fontWeight: page === 'settings' ? 600 : 400, textAlign: 'left',
               cursor: 'pointer', border: 'none',
               background: page === 'settings'
-                ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+                ? 'linear-gradient(90deg, rgba(201,181,132,0.14) 0%, rgba(201,181,132,0.06) 60%, transparent 100%)'
                 : 'transparent',
-              color: page === 'settings' ? '#ede8ff' : 'rgba(148,163,184,0.58)',
-              boxShadow: page === 'settings' ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+              color: page === 'settings' ? '#F3F1EC' : 'rgba(243,241,236,0.5)',
+              boxShadow: page === 'settings' ? 'inset 2px 0 0 rgba(201,181,132,0.9)' : 'none',
               transition: 'background 0.15s, box-shadow 0.15s',
               justifyContent: collapsed ? 'center' : 'flex-start',
             }}
@@ -859,7 +845,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
             }}
           >
-            <span style={{ flexShrink: 0, color: page === 'settings' ? '#c4b5fd' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+            <span style={{ flexShrink: 0, color: page === 'settings' ? '#D4C499' : 'rgba(243,241,236,0.35)', display: 'flex' }}>
               <NavIcon d={ICONS.settings} size={17} />
             </span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navSettings')}</span>}
@@ -871,14 +857,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               title={collapsed ? t('navAdmin') : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-                width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
-                fontSize: 14, fontWeight: page === 'licences' ? 600 : 400, textAlign: 'left',
+                width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
+                fontSize: 13.5, fontWeight: page === 'licences' ? 600 : 400, textAlign: 'left',
                 cursor: 'pointer', border: 'none',
                 background: page === 'licences'
-                  ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+                  ? 'linear-gradient(90deg, rgba(201,181,132,0.14) 0%, rgba(201,181,132,0.06) 60%, transparent 100%)'
                   : 'transparent',
-                color: page === 'licences' ? '#ede8ff' : 'rgba(148,163,184,0.58)',
-                boxShadow: page === 'licences' ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+                color: page === 'licences' ? '#F3F1EC' : 'rgba(243,241,236,0.5)',
+                boxShadow: page === 'licences' ? 'inset 2px 0 0 rgba(201,181,132,0.9)' : 'none',
                 transition: 'background 0.15s, box-shadow 0.15s',
                 justifyContent: collapsed ? 'center' : 'flex-start',
               }}
@@ -889,7 +875,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
               }}
             >
-              <span style={{ flexShrink: 0, color: page === 'licences' ? '#c4b5fd' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+              <span style={{ flexShrink: 0, color: page === 'licences' ? '#D4C499' : 'rgba(243,241,236,0.35)', display: 'flex' }}>
                 <NavIcon d={ICONS.shield} size={17} />
               </span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
@@ -912,13 +898,13 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.025)' }}
             >
-              <span style={{ color: 'rgba(148,163,184,0.5)', flexShrink: 0, display: 'flex' }}>
+              <span style={{ color: 'rgba(243,241,236,0.42)', flexShrink: 0, display: 'flex' }}>
                 <NavIcon d={ICONS.building} size={14} />
               </span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(241,240,247,0.8)', fontSize: 12 }}>
                 {currentOrg?.name ?? 'Organisation'}
               </span>
-              <span style={{ color: 'rgba(148,163,184,0.4)', flexShrink: 0, display: 'flex' }}>
+              <span style={{ color: 'rgba(243,241,236,0.32)', flexShrink: 0, display: 'flex' }}>
                 <NavIcon d={ICONS.chevronDown} size={12} />
               </span>
             </button>
@@ -941,8 +927,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             {/* Avatar pill */}
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0e7490, #C9B584)',
-              boxShadow: '0 0 8px rgba(34,211,238,0.2)',
+              background: 'linear-gradient(135deg, #B8A070, #D4C499)',
+              boxShadow: '0 0 8px rgba(201,181,132,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
             }}>
@@ -953,7 +939,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 <div style={{ fontSize: 12, fontWeight: 500, color: '#F1F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {userName}
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.42)', marginTop: 1 }}>
+                <div style={{ fontSize: 10, color: 'rgba(243,241,236,0.35)', marginTop: 1 }}>
                   {planLabel}
                 </div>
               </div>
@@ -969,20 +955,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         {/* ── Topbar ──────────────────────────────────────────────────────── */}
         <header style={{
           height: 54, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 22px',
-          background: 'rgba(6,6,14,0.94)',
+          background: 'rgba(6,6,8,0.94)',
           backdropFilter: 'blur(20px) saturate(1.3)',
           WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
           borderBottom: '1px solid transparent',
-          borderImage: 'linear-gradient(90deg, rgba(99,57,196,0.2), rgba(34,211,238,0.15), rgba(99,57,196,0.2)) 1',
+          borderImage: 'linear-gradient(90deg, rgba(201,181,132,0.18), rgba(243,241,236,0.08), rgba(201,181,132,0.18)) 1',
           position: 'relative', zIndex: 10,
-          boxShadow: '0 1px 24px rgba(34,211,238,0.03)',
+          boxShadow: '0 1px 24px rgba(201,181,132,0.03)',
         }}>
 
           {/* Left: page title + breadcrumb */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
             <span style={{
               width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginRight: 3,
-              background: 'linear-gradient(135deg, #C9B584, #22d3ee)',
+              background: 'linear-gradient(135deg, #C9B584, #F3F1EC)',
               boxShadow: '0 0 8px rgba(201,181,132,0.6)',
             }} />
             <span style={{ fontSize: 14.5, fontWeight: 600, color: '#F1F0F7', whiteSpace: 'nowrap' }}>
@@ -990,10 +976,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </span>
             {breadcrumb && breadcrumb.map((seg, i) => (
               <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: 'rgba(148,163,184,0.35)', fontSize: 13 }}>/</span>
+                <span style={{ color: 'rgba(243,241,236,0.28)', fontSize: 13 }}>/</span>
                 <span style={{
                   fontSize: 13, fontWeight: 600,
-                  color: i === breadcrumb.length - 1 ? 'rgba(243,241,236,0.85)' : 'rgba(148,163,184,0.55)',
+                  color: i === breadcrumb.length - 1 ? 'rgba(243,241,236,0.85)' : 'rgba(243,241,236,0.48)',
                   maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {seg}
@@ -1093,7 +1079,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
               >
-                <NavIcon d={ICONS.bell} size={15} color={unread > 0 ? '#C9B584' : 'rgba(148,163,184,0.5)'} />
+                <NavIcon d={ICONS.bell} size={15} color={unread > 0 ? '#C9B584' : 'rgba(243,241,236,0.42)'} />
                 {unread > 0 && (
                   <span style={{
                     position: 'absolute', top: -4, right: -4,
@@ -1129,7 +1115,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                     {notifications.length > 0 && (
                       <button onClick={clearNotifications}
                         className="text-[11px] transition-colors hover:text-white flex items-center gap-1"
-                        style={{ color: 'rgba(148,163,184,0.4)' }}>
+                        style={{ color: 'rgba(243,241,236,0.32)' }}>
                         <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1 2h7M3.5 2V1.5h2V2M2.5 2l.5 6h3l.5-6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         {t('clearNotifications')}
                       </button>
@@ -1169,7 +1155,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-[12px] font-bold text-white leading-snug">{n.title}</p>
-                            {n.body && <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'rgba(148,163,184,0.55)' }}>{n.body}</p>}
+                            {n.body && <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'rgba(243,241,236,0.48)' }}>{n.body}</p>}
                           </div>
                           <span className="text-[10px] flex-shrink-0 mt-0.5 tabular-nums" style={{ color: 'rgba(82,82,91,0.7)' }}>{n.time}</span>
                         </div>
@@ -1203,7 +1189,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         </header>
 
         {/* ── Scrollable content ────────────────────────────────────────── */}
-        <main style={{ flex: 1, overflow: 'auto', position: 'relative', background: '#08080E', zIndex: 0 }}>
+        <main style={{ flex: 1, overflow: 'auto', position: 'relative', background: '#060608', zIndex: 0 }}>
           {/* Org-switch loading overlay */}
           {orgLoading && (
             <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm flex items-center justify-center">
