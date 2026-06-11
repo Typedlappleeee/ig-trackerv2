@@ -31,8 +31,8 @@ async function geelark(bearer: string, path: string, body: unknown) {
 
 // Avatar color palette — deterministic by name
 const AVATAR_COLORS = [
-  ['#7C3AED','#A855F7'], ['#2563EB','#60A5FA'], ['#059669','#34D399'],
-  ['#D97706','#FBBF24'], ['#DC2626','#F87171'], ['#7C3AED','#EC4899'],
+  ['#C9B584','#A855F7'], ['#2563EB','#60A5FA'], ['#059669','#34D399'],
+  ['#D97706','#FBBF24'], ['#DC2626','#F87171'], ['#C9B584','#D4C499'],
 ]
 function avatarGradient(name: string) {
   const i = (name?.charCodeAt(0) || 0) % AVATAR_COLORS.length
@@ -118,7 +118,7 @@ const IconWarning = () => (
 )
 const IconSparkle = () => (
   <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-    <path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#A78BFA"/>
+    <path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#C9B584"/>
   </svg>
 )
 const IconSettings2 = () => (
@@ -524,7 +524,7 @@ export function Posting({ user }: PostingProps) {
                     onClick={() => togglePhone(phone.id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 text-left relative transition-all"
                     style={{
-                      background: checked ? 'rgba(124,58,237,0.10)' : 'transparent',
+                      background: checked ? 'rgba(201,181,132,0.10)' : 'transparent',
                       borderLeft: checked ? '2px solid var(--accent-lt)' : '2px solid transparent',
                     }}
                   >
@@ -532,7 +532,7 @@ export function Posting({ user }: PostingProps) {
                     <div
                       className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-black flex-shrink-0"
                       style={checked
-                        ? { background: avatarGradient(phone.phone_name ?? ''), color: '#fff', boxShadow: '0 2px 10px -3px rgba(124,58,237,0.6)' }
+                        ? { background: avatarGradient(phone.phone_name ?? ''), color: '#fff', boxShadow: '0 2px 10px -3px rgba(201,181,132,0.6)' }
                         : { background: 'var(--surface-2)', color: 'var(--text-3)' }
                       }
                     >
@@ -555,7 +555,7 @@ export function Posting({ user }: PostingProps) {
                     <div
                       className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
                       style={checked
-                        ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-lt))', boxShadow: '0 0 8px rgba(139,92,246,0.4)' }
+                        ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-lt))', boxShadow: '0 0 8px rgba(201,181,132,0.4)' }
                         : { border: '1px solid var(--border-md)' }
                       }
                     >
@@ -602,7 +602,7 @@ export function Posting({ user }: PostingProps) {
           <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{
-                background: 'linear-gradient(135deg, rgba(124,58,237,0.22) 0%, rgba(124,58,237,0.08) 100%)',
+                background: 'linear-gradient(135deg, rgba(201,181,132,0.22) 0%, rgba(201,181,132,0.08) 100%)',
                 border: '1px solid var(--border-accent)',
                 color: 'var(--accent-glow)',
               }}>
@@ -672,7 +672,7 @@ export function Posting({ user }: PostingProps) {
                   <div className="flex items-center gap-4">
                     {/* Thumbnail */}
                     <div className="relative flex-shrink-0 rounded-xl overflow-hidden"
-                      style={{ width: 80, height: 142, background: '#000', border: '1.5px solid var(--border-accent)', boxShadow: '0 0 20px -5px rgba(124,58,237,0.4)' }}>
+                      style={{ width: 80, height: 142, background: '#000', border: '1.5px solid var(--border-accent)', boxShadow: '0 0 20px -5px rgba(201,181,132,0.4)' }}>
                       <VideoThumbnail filePath={filePath} />
                       {/* notch */}
                       <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-6 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }} />
@@ -714,7 +714,7 @@ export function Posting({ user }: PostingProps) {
                 ) : (
                   /* Empty dropzone */
                   <div className="flex flex-col items-center justify-center py-10 px-6 rounded-xl text-center"
-                    style={{ border: '1.5px dashed rgba(124,58,237,0.25)', background: 'rgba(124,58,237,0.03)' }}>
+                    style={{ border: '1.5px dashed rgba(201,181,132,0.25)', background: 'rgba(201,181,132,0.03)' }}>
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                       style={{ background: 'var(--accent-dim)', border: '1px solid var(--border-accent)', color: 'var(--accent-glow)' }}>
                       <IconVideo />
@@ -778,8 +778,8 @@ export function Posting({ user }: PostingProps) {
                 <div
                   className="rounded-xl overflow-hidden"
                   style={{
-                    border: `1px solid ${aiExpanded ? 'rgba(124,58,237,0.35)' : 'var(--border-md)'}`,
-                    background: aiExpanded ? 'rgba(124,58,237,0.05)' : 'var(--surface-2)',
+                    border: `1px solid ${aiExpanded ? 'rgba(201,181,132,0.35)' : 'var(--border-md)'}`,
+                    background: aiExpanded ? 'rgba(201,181,132,0.05)' : 'var(--surface-2)',
                     transition: 'all 0.2s ease',
                   }}
                 >
@@ -790,8 +790,8 @@ export function Posting({ user }: PostingProps) {
                     <div className="flex items-center gap-2.5">
                       <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                         style={{
-                          background: aiExpanded ? 'rgba(124,58,237,0.25)' : 'var(--accent-dim)',
-                          boxShadow: aiExpanded ? '0 0 10px rgba(124,58,237,0.3)' : 'none',
+                          background: aiExpanded ? 'rgba(201,181,132,0.25)' : 'var(--accent-dim)',
+                          boxShadow: aiExpanded ? '0 0 10px rgba(201,181,132,0.3)' : 'none',
                         }}>
                         <IconSparkle />
                       </div>
@@ -888,7 +888,7 @@ export function Posting({ user }: PostingProps) {
                     style={{
                       background: withHashtags ? 'linear-gradient(130deg, var(--accent), var(--accent-lt))' : 'var(--surface-3)',
                       border: `1px solid ${withHashtags ? 'var(--border-accent)' : 'var(--border-md)'}`,
-                      boxShadow: withHashtags ? '0 0 12px rgba(124,58,237,0.4)' : 'none',
+                      boxShadow: withHashtags ? '0 0 12px rgba(201,181,132,0.4)' : 'none',
                     }}
                   >
                     <span
@@ -903,7 +903,7 @@ export function Posting({ user }: PostingProps) {
             {(posting || progress > 0) && (
               <div
                 className="sf-card overflow-hidden anim-scale-in"
-                style={{ borderColor: posting ? 'rgba(124,58,237,0.35)' : 'var(--border)', boxShadow: posting ? '0 0 30px -8px rgba(124,58,237,0.25)' : 'none' }}
+                style={{ borderColor: posting ? 'rgba(201,181,132,0.35)' : 'var(--border)', boxShadow: posting ? '0 0 30px -8px rgba(201,181,132,0.25)' : 'none' }}
               >
                 <div className="p-5 space-y-3">
                   <div className="flex items-center justify-between">
@@ -981,8 +981,8 @@ export function Posting({ user }: PostingProps) {
                 disabled={!canPost}
                 className="flex-[2] py-3.5 rounded-2xl text-[14px] font-bold text-white transition-all active:scale-[0.99] disabled:cursor-not-allowed relative overflow-hidden"
                 style={canPost ? {
-                  background: 'linear-gradient(130deg, #6D28D9, #7C3AED, #A855F7)',
-                  boxShadow: '0 6px 28px -6px rgba(124,58,237,0.65), 0 0 0 1px rgba(168,85,247,0.3)',
+                  background: 'linear-gradient(130deg, #B8A070, #C9B584, #A855F7)',
+                  boxShadow: '0 6px 28px -6px rgba(201,181,132,0.65), 0 0 0 1px rgba(168,85,247,0.3)',
                 } : {
                   background: 'var(--surface-2)',
                   border: '1px solid var(--border)',

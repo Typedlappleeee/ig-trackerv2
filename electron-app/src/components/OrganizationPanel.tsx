@@ -591,7 +591,7 @@ export function OrganizationPanel({ user }: Props) {
                       )}
                     </div>
                     {isOwner && !canRename && (
-                      <p className="px-3 pb-2 text-[11px] inline-flex items-center gap-1.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                      <p className="px-3 pb-2 text-[11px] inline-flex items-center gap-1.5" style={{ color: 'rgba(243,241,236,0.4)' }}>
                         <Icon name="lock" size={12} /><span>Renommage disponible dans <strong>{daysLeft}</strong> jour{daysLeft > 1 ? 's' : ''}</span>
                       </p>
                     )}
@@ -1189,7 +1189,7 @@ function InvitePermModal({
             <button
               onClick={copyToken}
               className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-              style={{ background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(139,92,246,0.15)', color: copied ? '#4ade80' : '#a78bfa' }}
+              style={{ background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(201,181,132,0.15)', color: copied ? '#4ade80' : '#C9B584' }}
             >
               {copied ? '✓ Copié' : 'Copier'}
             </button>
@@ -1337,7 +1337,7 @@ function InvitePermModal({
 
 // ── Role template creator / editor ──────────────────────────────────────────
 const TEMPLATE_COLORS = [
-  '#7c3aed','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2','#65a30d',
+  '#C9B584','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2','#65a30d',
 ]
 function RoleTemplateEditor({
   initial, availableFolders, availableGroups, onSave, onCancel,

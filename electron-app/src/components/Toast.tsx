@@ -58,12 +58,12 @@ const KIND: Record<ToastKind, {
     barColor:  '#fbbf24',
   },
   info: {
-    border:    'rgba(139,92,246,0.35)',
-    glow:      '0 0 24px -6px rgba(139,92,246,0.4)',
+    border:    'rgba(201,181,132,0.35)',
+    glow:      '0 0 24px -6px rgba(201,181,132,0.4)',
     icon:      ti('M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01'),
-    iconBg:    'rgba(139,92,246,0.12)',
-    iconColor: '#a78bfa',
-    barColor:  'linear-gradient(90deg, #7c3aed, #ec4899)',
+    iconBg:    'rgba(201,181,132,0.12)',
+    iconColor: '#C9B584',
+    barColor:  'linear-gradient(90deg, #C9B584, #D4C499)',
   },
 }
 
@@ -122,7 +122,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
             {toast.title}
           </p>
           {toast.body && (
-            <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'rgba(196,181,253,0.5)' }}>
+            <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'rgba(243,241,236,0.5)' }}>
               {toast.body}
             </p>
           )}
@@ -133,9 +133,9 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
           onClick={e => { e.stopPropagation(); dismiss() }}
           aria-label="Fermer"
           className="mt-0.5 flex-shrink-0 transition-colors cursor-pointer"
-          style={{ color: 'rgba(196,181,253,0.3)' }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(196,181,253,0.7)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(196,181,253,0.3)')}
+          style={{ color: 'rgba(243,241,236,0.3)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(243,241,236,0.7)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(243,241,236,0.3)')}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>

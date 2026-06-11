@@ -38,7 +38,7 @@ function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: b
       {/* Outer glow halo */}
       <path
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="#7c3aed" strokeWidth="24" strokeLinecap="round" fill="none" opacity="0.3"
+        stroke="#C9B584" strokeWidth="24" strokeLinecap="round" fill="none" opacity="0.3"
       />
       {/* Main S */}
       <path
@@ -257,7 +257,7 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
       {/* Deep centered glow — the only atmospheric element */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(109,40,217,0.22) 0%, rgba(76,29,149,0.09) 45%, transparent 75%)',
+        background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(201,181,132,0.22) 0%, rgba(201,181,132,0.09) 45%, transparent 75%)',
         animation: 'sf-bg-breathe 4s ease-in-out 0.8s infinite',
       }} />
 
@@ -276,17 +276,17 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
           {/* Outer glow halo */}
           <div style={{
             position: 'absolute', inset: -20, borderRadius: '50%', pointerEvents: 'none',
-            background: 'radial-gradient(circle, rgba(124,58,237,0.4) 0%, transparent 65%)',
+            background: 'radial-gradient(circle, rgba(201,181,132,0.4) 0%, transparent 65%)',
             filter: 'blur(16px)',
           }} />
           {/* Rotating arc 1 */}
           <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 6s linear infinite' }} width="0" height="0">
-            <circle cx="0" cy="0" r="62" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5" fill="none"
+            <circle cx="0" cy="0" r="62" stroke="rgba(201,181,132,0.5)" strokeWidth="1.5" fill="none"
               strokeDasharray="80 310" strokeLinecap="round"/>
           </svg>
           {/* Rotating arc 2 */}
           <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-ccw 10s linear infinite' }} width="0" height="0">
-            <circle cx="0" cy="0" r="72" stroke="rgba(167,139,250,0.28)" strokeWidth="1" fill="none"
+            <circle cx="0" cy="0" r="72" stroke="rgba(201,181,132,0.28)" strokeWidth="1" fill="none"
               strokeDasharray="55 400" strokeLinecap="round"/>
           </svg>
 
@@ -294,7 +294,7 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
           <div style={{
             width: 96, height: 96, borderRadius: 26,
             background: 'linear-gradient(145deg, #0d0820 0%, #12082e 50%, #190d3a 100%)',
-            boxShadow: '0 0 0 1px rgba(139,92,246,0.3), 0 0 0 4px rgba(139,92,246,0.06), 0 20px 48px rgba(0,0,0,0.75)',
+            boxShadow: '0 0 0 1px rgba(201,181,132,0.3), 0 0 0 4px rgba(201,181,132,0.06), 0 20px 48px rgba(0,0,0,0.75)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             position: 'relative', zIndex: 1,
           }}>
@@ -306,24 +306,24 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
             <span style={{
-              fontSize: 46, fontWeight: 900, color: '#f2f0ff',
+              fontSize: 46, fontWeight: 900, color: '#F3F1EC',
               letterSpacing: '-2px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1,
             }}>Scale</span>
             <span style={{
               fontSize: 46, fontWeight: 900, letterSpacing: '-2px',
               fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1,
-              background: 'linear-gradient(130deg, #a78bfa 20%, #ec4899 100%)',
+              background: 'linear-gradient(130deg, #C9B584 20%, #D4C499 100%)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             }}>Flow</span>
           </div>
 
           {/* Divider */}
-          <div style={{ width: 48, height: 1, background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.45), transparent)' }} />
+          <div style={{ width: 48, height: 1, background: 'linear-gradient(90deg, transparent, rgba(201,181,132,0.45), transparent)' }} />
 
           {/* Tagline */}
           <span style={{
             fontSize: 11, fontWeight: 500,
-            color: 'rgba(167,139,250,0.38)',
+            color: 'rgba(201,181,132,0.38)',
             letterSpacing: '0.22em', textTransform: 'uppercase',
             fontFamily: 'Inter,system-ui,sans-serif',
           }}>
@@ -334,7 +334,7 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
 
       {/* Bottom progress line */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'rgba(255,255,255,0.025)' }}>
-        <div className="sf-bar" style={{ height: '100%', background: 'linear-gradient(90deg, transparent, #7c3aed, #a855f7, #ec4899, transparent)', borderRadius: 2 }} />
+        <div className="sf-bar" style={{ height: '100%', background: 'linear-gradient(90deg, transparent, #C9B584, #a855f7, #D4C499, transparent)', borderRadius: 2 }} />
       </div>
 
 
@@ -371,13 +371,13 @@ function BugScreen() {
 function BetaPopup({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
-      <div className="bg-[#080610] border border-[#8b5cf6]/20 rounded-2xl p-8 w-full max-w-md shadow-2xl shadow-[#8b5cf6]/10 text-center space-y-5 anim-scale-in">
+      <div className="bg-[#080610] border border-[#C9B584]/20 rounded-2xl p-8 w-full max-w-md shadow-2xl shadow-[#C9B584]/10 text-center space-y-5 anim-scale-in">
         {/* Logo + title */}
         <div className="flex flex-col items-center gap-3">
           <ScaleFlowLogoSVG size={56} />
           <div>
             <h2 className="text-2xl font-black text-white tracking-tight">
-              Scale<span style={{ background: 'linear-gradient(130deg,#8b5cf6,#ec4899)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Flow</span>
+              Scale<span style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Flow</span>
             </h2>
             <p className="text-[#4a3f7a] text-xs uppercase tracking-widest mt-0.5">Automatise ta croissance</p>
           </div>
@@ -391,7 +391,7 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
             { icon: '🎬', text: 'MassRemix & CloneVid pour du contenu unique' },
           ].map(({ icon, text }) => (
             <div key={text} className="flex items-center gap-3 rounded-xl px-4 py-2.5"
-              style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
+              style={{ background: 'rgba(201,181,132,0.06)', border: '1px solid rgba(201,181,132,0.1)' }}>
               <span className="text-base flex-shrink-0">{icon}</span>
               <span className="text-sm text-text2">{text}</span>
             </div>
@@ -400,8 +400,8 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
 
         <button
           onClick={onClose}
-          style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none' }}
-          className="w-full text-white font-bold py-3 rounded-xl text-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-[#7c3aed]/30"
+          style={{ background: 'linear-gradient(130deg,#C9B584,#D4C499)', border: 'none' }}
+          className="w-full text-white font-bold py-3 rounded-xl text-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-[#C9B584]/30"
         >
           Entrer dans ScaleFlow →
         </button>
@@ -411,12 +411,12 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
 }
 function AiModelPopup({ onClose }: { onClose: () => void }) {
   const CATS = [
-    { name: 'COSPLAY',        bg: 'linear-gradient(160deg,#1a0a2e 0%,#2d1155 60%,#0d0118 100%)', accent: '#7c3aed' },
+    { name: 'COSPLAY',        bg: 'linear-gradient(160deg,#1a0a2e 0%,#2d1155 60%,#0d0118 100%)', accent: '#C9B584' },
     { name: 'E-GIRL',         bg: 'linear-gradient(160deg,#2d0a1e 0%,#5a1040 60%,#0f0110 100%)', accent: '#db2777' },
     { name: 'FITNESS',        bg: 'linear-gradient(160deg,#0a1a2e 0%,#0e3560 60%,#010d18 100%)', accent: '#0ea5e9' },
     { name: 'GIRL NEXT DOOR', bg: 'linear-gradient(160deg,#1a2210 0%,#2e4a15 60%,#080f02 100%)', accent: '#65a30d' },
     { name: 'INDOORS',        bg: 'linear-gradient(160deg,#1a1210 0%,#3d2010 60%,#100802 100%)', accent: '#d97706' },
-    { name: 'LIFESTYLE',      bg: 'linear-gradient(160deg,#0f0f1a 0%,#1e1440 60%,#060610 100%)', accent: '#8b5cf6' },
+    { name: 'LIFESTYLE',      bg: 'linear-gradient(160deg,#0f0f1a 0%,#1e1440 60%,#060610 100%)', accent: '#C9B584' },
   ]
   const PLATFORMS = ['Instagram', 'TikTok', 'OnlyFans', 'Reddit', 'X', 'Snapchat', 'YouTube']
 
@@ -428,7 +428,7 @@ function AiModelPopup({ onClose }: { onClose: () => void }) {
     }}>
       <div style={{
         background: 'linear-gradient(160deg, #07060f 0%, #0c0a1c 100%)',
-        border: '1px solid rgba(139,92,246,0.18)',
+        border: '1px solid rgba(201,181,132,0.18)',
         borderRadius: 20, padding: '28px 28px 24px',
         width: '100%', maxWidth: 700, margin: '0 16px',
         boxShadow: '0 48px 96px rgba(0,0,0,0.7)',
@@ -440,11 +440,11 @@ function AiModelPopup({ onClose }: { onClose: () => void }) {
           <div>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)',
+              background: 'rgba(201,181,132,0.15)', border: '1px solid rgba(201,181,132,0.3)',
               borderRadius: 20, padding: '3px 12px', marginBottom: 10,
             }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block', boxShadow: '0 0 6px #a78bfa' }} />
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa' }}>Bientôt</span>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#C9B584', display: 'inline-block', boxShadow: '0 0 6px #C9B584' }} />
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#C9B584' }}>Bientôt</span>
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', color: '#f1f5f9', lineHeight: 1.1 }}>
@@ -452,7 +452,7 @@ function AiModelPopup({ onClose }: { onClose: () => void }) {
               </h2>
               <h3 style={{
                 margin: '2px 0 0', fontSize: 20, fontWeight: 900, letterSpacing: '-0.01em', lineHeight: 1.1,
-                background: 'linear-gradient(120deg, #818cf8, #a78bfa, #ec4899)',
+                background: 'linear-gradient(120deg, #818cf8, #C9B584, #D4C499)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               }}>
                 CRÉE TA MODÈLE IA
@@ -527,11 +527,11 @@ function AiModelPopup({ onClose }: { onClose: () => void }) {
           onClick={onClose}
           style={{
             width: '100%', padding: '13px',
-            background: 'linear-gradient(130deg, #6d28d9, #db2777)',
+            background: 'linear-gradient(130deg, #B8A070, #db2777)',
             border: 'none', borderRadius: 12,
             color: '#fff', fontWeight: 700, fontSize: 14,
             cursor: 'pointer', letterSpacing: '0.01em',
-            boxShadow: '0 8px 28px rgba(109,40,217,0.4)',
+            boxShadow: '0 8px 28px rgba(201,181,132,0.4)',
             transition: 'opacity 0.15s',
           }}
           onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.88')}

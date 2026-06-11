@@ -36,14 +36,14 @@ const STEPS: TourStep[] = [
     iconName: 'welcome',
     title: 'Bienvenue sur ScaleFlow',
     desc: 'ScaleFlow automatise ta présence sur Instagram — posting, remix, stats et plus. Ce tour rapide te montre les fonctionnalités clés.',
-    color: '#7C3AED',
+    color: '#C9B584',
   },
   {
     iconName: 'send',
     title: 'Mass Posting',
     desc: 'Poste automatiquement une vidéo sur plusieurs comptes Instagram en même temps. Sélectionne tes téléphones, ta vidéo, et lance.',
     page: 'massposting',
-    color: '#7C3AED',
+    color: '#C9B584',
   },
   {
     iconName: 'video',
@@ -70,7 +70,7 @@ const STEPS: TourStep[] = [
     iconName: 'rocket',
     title: 'C\'est parti !',
     desc: 'Tu es prêt à utiliser ScaleFlow. Si tu as des questions, ouvre un ticket dans la section Support.',
-    color: '#7C3AED',
+    color: '#C9B584',
   },
 ]
 
@@ -100,8 +100,8 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
       <div style={{
         width: 380, borderRadius: 20, pointerEvents: 'auto',
         background: 'linear-gradient(145deg, #16112a 0%, #1a1035 100%)',
-        border: '1px solid rgba(124,58,237,0.25)',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,58,237,0.1)',
+        border: '1px solid rgba(201,181,132,0.25)',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(201,181,132,0.1)',
         overflow: 'hidden',
         animation: 'tour-in 0.22s cubic-bezier(0.34,1.56,0.64,1)',
       }}>
@@ -128,14 +128,14 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
           </div>
 
           {/* Step counter */}
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'rgba(167,139,250,0.6)', marginBottom: 6, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'rgba(201,181,132,0.6)', marginBottom: 6, textTransform: 'uppercase' }}>
             Étape {step + 1} / {STEPS.length}
           </div>
 
           <h2 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 10px', lineHeight: 1.2 }}>
             {current.title}
           </h2>
-          <p style={{ fontSize: 14, color: 'rgba(196,181,253,0.75)', margin: 0, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 14, color: 'rgba(243,241,236,0.75)', margin: 0, lineHeight: 1.6 }}>
             {current.desc}
           </p>
 
@@ -166,7 +166,7 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
               onClick={back}
               style={{
                 flex: 1, height: 40, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.8)',
+                background: 'rgba(255,255,255,0.04)', color: 'rgba(243,241,236,0.8)',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
               }}
               onMouseEnter={e => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.08)' }}

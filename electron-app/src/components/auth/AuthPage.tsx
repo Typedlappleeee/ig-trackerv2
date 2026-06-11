@@ -96,7 +96,7 @@ export function AuthPage() {
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.03]"
         style={{
-          backgroundImage: 'linear-gradient(rgba(139,92,246,1) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,1) 1px, transparent 1px)',
+          backgroundImage: 'linear-gradient(rgba(201,181,132,1) 1px, transparent 1px), linear-gradient(90deg, rgba(201,181,132,1) 1px, transparent 1px)',
           backgroundSize: '48px 48px',
         }}
       />
@@ -108,9 +108,9 @@ export function AuthPage() {
           <div
             className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-5 relative"
             style={{
-              background: 'rgba(139,92,246,0.08)',
-              border: '1px solid rgba(139,92,246,0.2)',
-              boxShadow: '0 0 40px rgba(139,92,246,0.15), inset 0 1px 0 rgba(255,255,255,0.06)',
+              background: 'rgba(201,181,132,0.08)',
+              border: '1px solid rgba(201,181,132,0.2)',
+              boxShadow: '0 0 40px rgba(201,181,132,0.15), inset 0 1px 0 rgba(255,255,255,0.06)',
             }}
           >
             <SFLogoMark />
@@ -119,7 +119,7 @@ export function AuthPage() {
             <span className="text-white">Scale</span>
             <span className="sf-text-gradient">Flow</span>
           </h1>
-          <p className="text-sm" style={{ color: 'rgba(196,181,253,0.55)' }}>
+          <p className="text-sm" style={{ color: 'rgba(243,241,236,0.55)' }}>
             Automation & Analytics Platform
           </p>
         </div>
@@ -132,7 +132,7 @@ export function AuthPage() {
           {/* Tabs */}
           <div
             className="flex rounded-xl p-1 mb-6"
-            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}
+            style={{ background: 'rgba(201,181,132,0.06)', border: '1px solid rgba(201,181,132,0.12)' }}
           >
             {(['login', 'register'] as Tab[]).map(t => (
               <button
@@ -142,11 +142,11 @@ export function AuthPage() {
                 style={
                   tab === t
                     ? {
-                        background: 'linear-gradient(130deg, #7c3aed, #ec4899)',
+                        background: 'linear-gradient(130deg, #C9B584, #D4C499)',
                         color: '#fff',
-                        boxShadow: '0 2px 12px -2px rgba(124,58,237,0.5)',
+                        boxShadow: '0 2px 12px -2px rgba(201,181,132,0.5)',
                       }
-                    : { color: 'rgba(196,181,253,0.6)' }
+                    : { color: 'rgba(243,241,236,0.6)' }
                 }
               >
                 {t === 'login' ? 'Se connecter' : 'Créer un compte'}
@@ -236,7 +236,7 @@ export function AuthPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs mt-6 anim-page" style={{ animationDelay: '0.35s', color: 'rgba(139,92,246,0.45)' }}>
+        <p className="text-center text-xs mt-6 anim-page" style={{ animationDelay: '0.35s', color: 'rgba(201,181,132,0.45)' }}>
           Tes données sont synchronisées et sécurisées.
         </p>
       </div>

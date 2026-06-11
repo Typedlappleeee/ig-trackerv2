@@ -28,7 +28,7 @@ export function PostingOptions({ opts, onChange }: Props) {
         <button
           onClick={() => onChange({ ...opts, intervalMode: on ? 'none' : 'fixed' })}
           className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-          style={{ background: on ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
+          style={{ background: on ? 'linear-gradient(130deg,#C9B584,#D4C499)' : 'rgba(255,255,255,0.08)' }}
         >
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
@@ -44,7 +44,7 @@ export function PostingOptions({ opts, onChange }: Props) {
         <button
           onClick={() => set({ reelsTrial: !opts.reelsTrial })}
           className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-          style={{ background: opts.reelsTrial ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
+          style={{ background: opts.reelsTrial ? 'linear-gradient(130deg,#C9B584,#D4C499)' : 'rgba(255,255,255,0.08)' }}
         >
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.reelsTrial ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
@@ -61,7 +61,7 @@ export function PostingOptions({ opts, onChange }: Props) {
                 onClick={() => set({ intervalMode: m })}
                 className="px-2.5 py-1.5 text-[11px] font-semibold transition-all"
                 style={opts.intervalMode === m
-                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                  ? { background: 'linear-gradient(130deg,#C9B584,#D4C499)', color: '#fff' }
                   : { color: 'rgba(148,163,184,0.5)' }}>
                 {m === 'fixed' ? 'Fixe' : 'Aléatoire'}
               </button>
