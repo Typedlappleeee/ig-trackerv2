@@ -38,10 +38,12 @@ import { useT, useLang } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import {
   loadScheduledPosts, cancelScheduledPost, claimScheduledPost,
-  executeScheduledPost, finishScheduledPost, fmtScheduledTime, timeUntil,
+  executeScheduledPost, finishScheduledPost, failStaleRunningPosts,
+  fmtScheduledTime, timeUntil,
   type ScheduledPost, type ScheduleStatus,
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
+import { CreateScheduleModal } from '@/components/CreateScheduleModal'
 
 interface Props { user: User; onNavigate?: (page: string, tab?: string) => void }
 
@@ -379,6 +381,7 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [tab, setTab]             = useState<TabFilter>('pending')
   const [search, setSearch]       = useState('')
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]     = useState<{ id: string; msgs: string[] } | null>(null)
   const timersRef                 = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -392,6 +395,8 @@ export function Scheduler({ user, onNavigate }: Props) {
 
   const reload = useCallback(async () => {
     setLoading(true)
+    // Self-heal: posts stuck in 'running' (app closed mid-execution) → failed
+    await failStaleRunningPosts().catch(() => {})
     const all = await loadScheduledPosts()
     setPosts(all)
     setLoading(false)
@@ -513,14 +518,13 @@ export function Scheduler({ user, onNavigate }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             {/* Icon */}
             <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 14, flexShrink: 0,
+              width: 46, height: 46, borderRadius: 2, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(34,211,238,0.18) 0%, rgba(34,211,238,0.05) 100%)',
-              border: '1px solid rgba(34,211,238,0.22)',
-              boxShadow: '0 0 22px -6px rgba(34,211,238,0.3)',
-              color: '#22d3ee',
+              background: 'rgba(201,181,132,0.08)',
+              border: '1px solid rgba(201,181,132,0.28)',
+              color: '#C9B584',
             }}>
-              <IconCalendarSm size={22} color="#22d3ee" />
+              <IconCalendarSm size={22} color="#C9B584" />
             </div>
 
             {/* Text */}
@@ -554,6 +558,22 @@ export function Scheduler({ user, onNavigate }: Props) {
               title="Actualiser"
             >
               <IconRefresh size={14} color="rgba(243,241,236,0.72)" spinning={loading} />
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="cursor-pointer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '9px 20px', fontSize: 10.5, fontWeight: 800,
+                letterSpacing: '0.16em', textTransform: 'uppercase',
+                background: '#F3F1EC', color: '#060608', border: 'none',
+                transition: 'background 0.18s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#C9B584' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#F3F1EC' }}
+            >
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              Programmer
             </button>
           </div>
         </div>
@@ -671,7 +691,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               <button
                 className="sf-btn sf-btn-primary cursor-pointer"
                 style={{ marginTop: 4 }}
-                onClick={() => onNavigate?.('massposting')}
+                onClick={() => setShowCreate(true)}
               >
                 {t('schedulerSchedulePost')}
               </button>
@@ -711,6 +731,15 @@ export function Scheduler({ user, onNavigate }: Props) {
           </p>
         </div>
       </div>
+
+      {/* ── Create modal — schedule directly from this page ───────────────────── */}
+      {showCreate && (
+        <CreateScheduleModal
+          user={user}
+          onCreated={() => { setShowCreate(false); reload() }}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
     </div>
   )
 }
@@ -731,6 +760,8 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
   const [showLogs, setShowLogs] = useState(false)
   const [hovered, setHovered]   = useState(false)
   const isPending   = post.status === 'pending'
+  // A 'running' post not executing in THIS session is stuck (app closed mid-run) — allow stopping it
+  const isStuckRunning = post.status === 'running' && !isRunning
   const allLogs = runLogs ?? (post.result?.logs ?? [])
 
   const statusColor =
@@ -780,8 +811,8 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           )}
         </div>
 
-        {/* Cancel button */}
-        {isPending && canCancel && (
+        {/* Cancel / Stop-stuck button */}
+        {(isPending || isStuckRunning) && canCancel && (
           <button
             onClick={onCancel}
             disabled={cancelling}
@@ -794,7 +825,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             }}
           >
             <IconX size={11} color="#EF4444" />
-            {cancelling ? t('schedulerCancelling') : t('cancel')}
+            {cancelling ? t('schedulerCancelling') : isStuckRunning ? 'Arrêter' : t('cancel')}
           </button>
         )}
       </div>

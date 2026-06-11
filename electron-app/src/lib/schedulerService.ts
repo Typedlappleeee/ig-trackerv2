@@ -76,9 +76,26 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
 }
 
 export async function cancelScheduledPost(id: string): Promise<void> {
+  // 'running' included: a post stuck in running (app closed mid-execution) must be stoppable
   await supabase.from('scheduled_posts')
     .update({ status: 'cancelled' })
-    .eq('id', id).eq('status', 'pending')
+    .eq('id', id).in('status', ['pending', 'running'])
+}
+
+// Self-healing: a post claimed as 'running' whose execution started more than
+// maxAgeMin ago can't still be alive (executions cap at ~11 min) — the app was
+// closed mid-run. Mark those as failed so they stop showing as "en cours".
+export async function failStaleRunningPosts(maxAgeMin = 30): Promise<number> {
+  const cutoff = new Date(Date.now() - maxAgeMin * 60_000).toISOString()
+  const { data } = await supabase.from('scheduled_posts')
+    .update({
+      status:    'failed',
+      error_msg: "Interrompu — l'application a été fermée pendant l'exécution",
+    })
+    .eq('status', 'running')
+    .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
+    .select('id')
+  return data?.length ?? 0
 }
 
 // Loads all posts visible to the user (RLS handles org filtering)
