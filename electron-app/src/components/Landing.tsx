@@ -20,7 +20,7 @@ const MUTED = 'rgba(233,234,240,0.42)'
 const FAINT = 'rgba(233,234,240,0.22)'
 const HAIR  = 'rgba(233,234,240,0.09)'
 const GOLD  = '#6366F1'
-const VIOLET = '#8B5CF6'
+const VIOLET = '#6366F1'
 
 // ── Lucide-style inline icon set ──────────────────────────────────────────────
 type IconName =

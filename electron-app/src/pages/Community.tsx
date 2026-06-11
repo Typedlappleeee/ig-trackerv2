@@ -152,9 +152,9 @@ function MediaBlock({ url, maxHeight = 280 }: { url: string; maxHeight?: number 
 }
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#7c3aed', '#ec4899'], ['#2563eb', '#7c3aed'], ['#059669', '#0ea5e9'],
-  ['#ea580c', '#f59e0b'], ['#dc2626', '#f43f5e'], ['#0891b2', '#6366f1'],
-  ['#7c3aed', '#0ea5e9'], ['#d97706', '#ec4899'],
+  ['#6366F1', '#818CF8'], ['#4F46E5', '#6366F1'], ['#059669', '#0EA5E9'],
+  ['#EA580C', '#F59E0B'], ['#DC2626', '#F43F5E'], ['#0891B2', '#6366F1'],
+  ['#7C8CF8', '#0EA5E9'], ['#D97706', '#F59E0B'],
 ]
 
 function gradientForId(id: string): [string, string] {
@@ -222,45 +222,45 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
       <div className="flex-1 min-w-0">
         {!compact && (
           <div className="flex items-center gap-2 mb-[3px] flex-wrap">
-            <span className="text-[13px] font-bold leading-none" style={{ color: isOwn ? '#c4b5fd' : '#e8e0ff' }}>
+            <span className="text-[13px] font-bold leading-none" style={{ color: isOwn ? '#818CF8' : '#E9EAF0' }}>
               {msg.display_name || t('communityAnonymous')}
             </span>
             {msg.is_admin && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
-                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
+                style={{ background: 'linear-gradient(130deg,rgba(99,102,241,0.35),rgba(99,102,241,0.25))', color: '#818CF8', border: '1px solid rgba(99,102,241,0.25)' }}>
                 {t('communityAdminLabel')}
               </span>
             )}
             {isOwn && !msg.is_admin && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
-                style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>{t('communityMeLabel')}</span>
+                style={{ background: 'rgba(99,102,241,0.2)', color: '#818CF8' }}>{t('communityMeLabel')}</span>
             )}
             {msg.org_name && !msg.is_admin && (
               <span className="text-[10px] font-semibold px-2 py-[2px] rounded-full"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.65)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(233,234,240,0.65)', border: '1px solid rgba(99,102,241,0.15)' }}>
                 {msg.org_name}
               </span>
             )}
             <span className="ml-auto text-[10px] opacity-0 group-hover:opacity-60 transition-opacity tabular-nums"
-              style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
+              style={{ color: 'rgba(233,234,240,0.5)' }}>{timeAgo(msg.created_at)}</span>
           </div>
         )}
         <div className="flex items-end gap-1.5">
           <div className="flex-1 min-w-0">
-            <p className="text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(212,220,240,0.9)' }}>
+            <p className="text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(233,234,240,0.9)' }}>
               {msg.content}
             </p>
             {msg.video_url && <MediaBlock url={msg.video_url} maxHeight={260} />}
           </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pb-0.5">
             {compact && (
-              <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(196,181,253,0.35)' }}>
+              <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(233,234,240,0.35)' }}>
                 {timeAgo(msg.created_at)}
               </span>
             )}
             <button onClick={() => onLike(msg.id)}
               className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-[11px] transition-all sf-press"
-              style={{ color: liked ? '#f472b6' : 'rgba(196,181,253,0.4)', background: liked ? 'rgba(236,72,153,0.12)' : 'transparent' }}>
+              style={{ color: liked ? '#818CF8' : 'rgba(233,234,240,0.4)', background: liked ? 'rgba(99,102,241,0.12)' : 'transparent' }}>
               ❤️ {likeCount > 0 && <span className="text-[10px] tabular-nums">{likeCount}</span>}
             </button>
             {isAdmin && !isOwn && onMute && (
@@ -303,17 +303,17 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
       <div className={`flex-1 min-w-0 ${isAdminMsg ? 'flex flex-col items-end' : ''}`}>
         {!compact && (
           <div className={`flex items-center gap-2 mb-[3px] flex-wrap ${isAdminMsg ? 'justify-end' : ''}`}>
-            <span className="text-[13px] font-bold" style={{ color: isAdminMsg ? '#93c5fd' : '#e8e0ff' }}>
+            <span className="text-[13px] font-bold" style={{ color: isAdminMsg ? '#818CF8' : '#E9EAF0' }}>
               {msg.display_name || t('communityAnonymous')}
             </span>
             {isAdminMsg && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
-                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
+                style={{ background: 'linear-gradient(130deg,rgba(99,102,241,0.35),rgba(99,102,241,0.25))', color: '#818CF8', border: '1px solid rgba(99,102,241,0.25)' }}>
                 {t('communityAdminLabel')}
               </span>
             )}
             <span className="text-[10px] opacity-0 group-hover:opacity-60 transition-opacity ml-auto tabular-nums"
-              style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
+              style={{ color: 'rgba(233,234,240,0.5)' }}>{timeAgo(msg.created_at)}</span>
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
                 className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center sf-press"
@@ -327,10 +327,10 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
         )}
         <div className="inline-block px-3 py-2 rounded-xl max-w-[85%]"
           style={isAdminMsg
-            ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.22)' }
+            ? { background: 'linear-gradient(135deg,rgba(99,102,241,0.18),rgba(99,102,241,0.1))', border: '1px solid rgba(99,102,241,0.22)' }
             : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-[13.5px] leading-relaxed break-words"
-            style={{ color: isAdminMsg ? 'rgba(230,220,255,0.95)' : 'rgba(212,220,240,0.9)' }}>
+            style={{ color: isAdminMsg ? 'rgba(230,220,255,0.95)' : 'rgba(233,234,240,0.9)' }}>
             {msg.content}
           </p>
           {msg.video_url && <MediaBlock url={msg.video_url} maxHeight={240} />}
@@ -359,7 +359,7 @@ function MuteModal({ targetName, onMute, onClose }: {
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-[300px] mx-4 rounded-2xl overflow-hidden anim-scale-in"
-        style={{ background: '#0c0919', border: '1px solid rgba(251,191,36,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        style={{ background: '#13141A', border: '1px solid rgba(251,191,36,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(251,191,36,0.1)', background: 'rgba(251,191,36,0.04)' }}>
           <div>
@@ -367,7 +367,7 @@ function MuteModal({ targetName, onMute, onClose }: {
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>{t('communityMuteDuration')}</p>
           </div>
           <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
-            style={{ color: 'rgba(196,181,253,0.5)' }}>
+            style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
@@ -450,15 +450,15 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-[340px] mx-4 rounded-2xl overflow-hidden anim-scale-in"
-        style={{ background: '#0c0919', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        style={{ background: '#13141A', border: '1px solid rgba(99,102,241,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
         <div className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.09),rgba(236,72,153,0.04))' }}>
+          style={{ borderBottom: '1px solid rgba(99,102,241,0.12)', background: 'linear-gradient(135deg,rgba(99,102,241,0.09),rgba(99,102,241,0.04))' }}>
           <div>
             <p className="font-black text-white text-[15px]">{t('communityProfileTitle')}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{t('communityProfileVisible')}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(233,234,240,0.45)' }}>{t('communityProfileVisible')}</p>
           </div>
           <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
-            style={{ color: 'rgba(196,181,253,0.5)' }}>
+            style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
@@ -474,12 +474,12 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
             </div>
             {uploadErr
               ? <p className="text-[10px] text-center max-w-[220px]" style={{ color: '#f87171' }}>{uploadErr}</p>
-              : <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>{t('communityProfileClickToChange')}</p>
+              : <p className="text-[10px]" style={{ color: 'rgba(233,234,240,0.35)' }}>{t('communityProfileClickToChange')}</p>
             }
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-[10px] uppercase tracking-[0.15em] font-black" style={{ color: 'rgba(139,92,246,0.6)' }}>
+              <label className="text-[10px] uppercase tracking-[0.15em] font-black" style={{ color: 'rgba(99,102,241,0.6)' }}>
                 {t('communityProfileUsername')}
               </label>
               {!canChangeName && !isAdmin && (
@@ -494,22 +494,22 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input disabled:opacity-50 disabled:cursor-not-allowed" />
             {canChangeName && (
               <div className="flex justify-end mt-1">
-                <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{name.length}/32</span>
+                <span className="text-[9px]" style={{ color: 'rgba(233,234,240,0.25)' }}>{name.length}/32</span>
               </div>
             )}
           </div>
           <div className="rounded-xl p-3 flex items-center gap-3"
-            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}>
             <Avatar url={avatarUrl} name={displayedName || '?'} userId={userId} size={36} />
             <div>
               <p className="text-[12px] font-bold text-white">{displayedName || t('communityCreateNameLabel')}</p>
-              <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityProfilePreview')}</p>
+              <p className="text-[10px]" style={{ color: 'rgba(233,234,240,0.4)' }}>{t('communityProfilePreview')}</p>
             </div>
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
-            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
             {t('cancel')}
           </button>
           <button onClick={save} disabled={saving || uploading}
@@ -550,28 +550,28 @@ function CreateTopicModal({ onClose, onCreate }: {
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-[360px] mx-4 rounded-2xl overflow-hidden anim-scale-in"
-        style={{ background: '#0c0919', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        style={{ background: '#13141A', border: '1px solid rgba(99,102,241,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
         <div className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.09),rgba(236,72,153,0.04))' }}>
+          style={{ borderBottom: '1px solid rgba(99,102,241,0.12)', background: 'linear-gradient(135deg,rgba(99,102,241,0.09),rgba(99,102,241,0.04))' }}>
           <div>
             <p className="font-black text-white text-[15px]">{t('communityCreateTitle')}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{t('communityCreateVisible')}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(233,234,240,0.45)' }}>{t('communityCreateVisible')}</p>
           </div>
           <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
-            style={{ color: 'rgba(196,181,253,0.5)' }}>
+            style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
         <div className="p-5 space-y-4">
           {/* Emoji picker */}
           <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-2" style={{ color: 'rgba(139,92,246,0.6)' }}>{t('communityCreateIcon')}</label>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-2" style={{ color: 'rgba(99,102,241,0.6)' }}>{t('communityCreateIcon')}</label>
             <div className="flex flex-wrap gap-1.5">
               {TOPIC_EMOJIS.map(e => (
                 <button key={e} onClick={() => setEmoji(e)}
                   className="w-8 h-8 rounded-lg text-[17px] flex items-center justify-center transition-all sf-press"
                   style={emoji === e
-                    ? { background: 'rgba(139,92,246,0.35)', border: '1.5px solid rgba(139,92,246,0.7)' }
+                    ? { background: 'rgba(99,102,241,0.35)', border: '1.5px solid rgba(99,102,241,0.7)' }
                     : { background: 'rgba(255,255,255,0.04)', border: '1.5px solid transparent' }}>
                   {e}
                 </button>
@@ -580,38 +580,38 @@ function CreateTopicModal({ onClose, onCreate }: {
           </div>
           {/* Name */}
           <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>{t('communityCreateName')}</label>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(99,102,241,0.6)' }}>{t('communityCreateName')}</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
               placeholder={t('communityCreateNamePlaceholder')} maxLength={40}
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input" />
             <div className="flex justify-end mt-1">
-              <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{name.length}/40</span>
+              <span className="text-[9px]" style={{ color: 'rgba(233,234,240,0.25)' }}>{name.length}/40</span>
             </div>
           </div>
           {/* Description */}
           <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>{t('communityCreateDescription')}</label>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(99,102,241,0.6)' }}>{t('communityCreateDescription')}</label>
             <textarea value={desc} onChange={e => setDesc(e.target.value)}
               placeholder={t('communityCreateDescPlaceholder')} maxLength={140} rows={2}
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
             <div className="flex justify-end mt-1">
-              <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{desc.length}/140</span>
+              <span className="text-[9px]" style={{ color: 'rgba(233,234,240,0.25)' }}>{desc.length}/140</span>
             </div>
           </div>
           {/* Preview */}
           <div className="rounded-xl p-3 flex items-center gap-3"
-            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-              style={{ background: 'rgba(139,92,246,0.15)' }}>{emoji}</div>
+              style={{ background: 'rgba(99,102,241,0.15)' }}>{emoji}</div>
             <div className="min-w-0">
               <p className="text-[13px] font-black text-white truncate">{name || t('communityCreateNameLabel')}</p>
-              <p className="text-[10px] truncate" style={{ color: 'rgba(196,181,253,0.4)' }}>{desc || t('communityCreateDescLabel')}</p>
+              <p className="text-[10px] truncate" style={{ color: 'rgba(233,234,240,0.4)' }}>{desc || t('communityCreateDescLabel')}</p>
             </div>
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
-            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
             {t('cancel')}
           </button>
           <button onClick={submit} disabled={!name.trim() || saving}
@@ -758,25 +758,25 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="h-full flex flex-col items-center justify-center gap-6 p-6">
       <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-        style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>💬</div>
+        style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>💬</div>
       <div className="text-center space-y-2">
         <p className="text-lg font-black text-white">{t('communitySetupTitle')}</p>
-        <p className="text-sm max-w-sm" style={{ color: 'rgba(196,181,253,0.5)' }}>
+        <p className="text-sm max-w-sm" style={{ color: 'rgba(233,234,240,0.5)' }}>
           {t('communitySetupDesc')} <strong className="text-accent">Supabase → SQL Editor</strong> to enable the community.
         </p>
       </div>
       <div className="w-full max-w-2xl rounded-xl overflow-hidden"
-        style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(139,92,246,0.15)' }}>
+        style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(99,102,241,0.15)' }}>
         <div className="flex items-center justify-between px-4 py-2.5"
-          style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.08)' }}>
-          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: '#a78bfa' }}>SQL</span>
+          style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.08)' }}>
+          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: '#818CF8' }}>SQL</span>
           <button onClick={copy} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all"
-            style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(139,92,246,0.15)', color: copied ? '#34d399' : '#a78bfa' }}>
+            style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.15)', color: copied ? '#34d399' : '#818CF8' }}>
             {copied ? t('communitySetupCopied') : t('communitySetupCopy')}
           </button>
         </div>
         <pre className="p-4 text-[11px] leading-relaxed overflow-auto max-h-56"
-          style={{ color: 'rgba(196,181,253,0.65)', fontFamily: 'JetBrains Mono, monospace' }}>
+          style={{ color: 'rgba(233,234,240,0.65)', fontFamily: 'JetBrains Mono, monospace' }}>
           {SETUP_SQL}
         </pre>
       </div>
@@ -1220,30 +1220,27 @@ export function Community({ user, onNavigate }: CommunityProps) {
   const [g1, g2] = gradientForId(user.id)
 
   return (
-    <div className="h-full flex flex-col overflow-hidden anim-page" style={{ background: '#06040f' }}>
+    <div className="h-full flex flex-col overflow-hidden anim-page" style={{ background: '#0A0B0E' }}>
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 sf-topbar">
         <div className="flex items-center gap-3.5 sf-anim-slide-up sf-d50">
-          <div className="relative flex-shrink-0" style={{ width: 42, height: 42 }}>
+          <div className="relative flex-shrink-0" style={{ width: 38, height: 38 }}>
             <div style={{
-              width: 42, height: 42, borderRadius: 13, flexShrink: 0,
+              width: 38, height: 38, borderRadius: 9, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(34,211,238,0.18), rgba(139,92,246,0.22))',
-              border: '1px solid rgba(34,211,238,0.28)', color: '#22d3ee',
-              boxShadow: '0 0 18px rgba(34,211,238,0.18), inset 0 1px 0 rgba(255,255,255,0.08)',
+              background: 'rgba(99,102,241,0.1)',
+              border: '1px solid rgba(99,102,241,0.22)', color: '#818CF8',
             }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
             </div>
           </div>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-[20px] font-black leading-tight tracking-tight" style={{
-                background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(34,211,238,0.9) 55%,rgba(139,92,246,0.85) 100%)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              }}>{t('communityTitle')}</h1>
+              <h1 className="text-[19px] font-extrabold leading-tight tracking-tight"
+                style={{ color: '#E9EAF0' }}>{t('communityTitle')}</h1>
               {uniqueUserCount > 0 && (
                 <span className="sf-badge sf-badge-accent flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
@@ -1262,12 +1259,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
           <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
           <div className="text-left">
             <p className="text-[11.5px] font-semibold leading-tight"
-              style={{ color: profile.display_name ? 'white' : 'rgba(196,181,253,0.4)' }}>
+              style={{ color: profile.display_name ? 'white' : 'rgba(233,234,240,0.4)' }}>
               {profile.display_name || t('communitySetPseudo')}
             </p>
             {currentOrg && <p className="text-[9.5px] leading-tight text-accent opacity-70">{currentOrg.name}</p>}
           </div>
-          <span className="ml-1 flex items-center opacity-40" style={{ color: '#a78bfa' }} aria-hidden="true">
+          <span className="ml-1 flex items-center opacity-40" style={{ color: '#818CF8' }} aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/>
             </svg>
@@ -1292,7 +1289,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
       {/* ── Tabs ─────────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center px-5 py-2.5"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.7)' }}>
+        style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(15,16,20,0.7)' }}>
         <div className="sf-tabs sf-anim-slide-up sf-d150">
           {([
             { id: 'news'    as Tab, label: t('communityTabNews'),    icon: (
@@ -1321,7 +1318,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               {tab_.id === 'support' && !isAdmin && tab !== 'support' &&
                 myThreadMessages.some(m => m.is_admin && new Date(m.created_at) > new Date(lastSeenSupportAt)) && (
                 <span className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899' }} />
+                  style={{ background: '#6366F1', boxShadow: '0 0 6px #6366F1' }} />
               )}
             </button>
           ))}
@@ -1344,17 +1341,17 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   {/* Featured / pinned card */}
                   {featuredMsg && (
                     <div className="sf-card sf-card-lift sf-spotlight overflow-hidden cursor-pointer"
-                      style={{ background: 'linear-gradient(135deg,#120840 0%,#07102c 60%,#0a0626 100%)', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
+                      style={{ background: '#13141A', border: '1px solid rgba(99,102,241,0.4)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
                       onClick={() => setSelectedPost(featuredMsg)}>
-                      <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#7c3aed,#ec4899,#3b82f6)' }} />
+                      <div className="h-[3px]" style={{ background: '#6366F1' }} />
                       <div className="p-6">
                         <div className="flex items-center gap-2 mb-4">
                           <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
-                            style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.45),rgba(236,72,153,0.3))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.3)' }}>
+                            style={{ background: 'linear-gradient(130deg,rgba(99,102,241,0.45),rgba(99,102,241,0.3))', color: '#818CF8', border: '1px solid rgba(99,102,241,0.3)' }}>
                             {t('communityNewsPinned')}
                           </span>
                           <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
-                            style={{ background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.25)' }}>
+                            style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.25)' }}>
                             {t('communityNewsScaleFlow')}
                           </span>
                         </div>
@@ -1364,7 +1361,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           </h2>
                         )}
                         <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap mb-5"
-                          style={{ color: 'rgba(212,220,240,0.8)' }}>
+                          style={{ color: 'rgba(233,234,240,0.8)' }}>
                           {featuredMsg.content.length > 240
                             ? featuredMsg.content.slice(0, 240) + '…'
                             : featuredMsg.content}
@@ -1373,14 +1370,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           <div className="mb-5"><MediaBlock url={featuredMsg.video_url} maxHeight={260} /></div>
                         )}
                         <div className="flex items-center justify-between pt-4"
-                          style={{ borderTop: '1px solid rgba(139,92,246,0.12)' }}>
+                          style={{ borderTop: '1px solid rgba(99,102,241,0.12)' }}>
                           <div className="flex items-center gap-2.5">
                             <Avatar url={featuredMsg.avatar_url} name={featuredMsg.display_name} userId={featuredMsg.user_id} size={24} />
                             <div>
-                              <span className="text-[11.5px] font-semibold" style={{ color: '#c4b5fd' }}>
+                              <span className="text-[11.5px] font-semibold" style={{ color: '#818CF8' }}>
                                 {featuredMsg.display_name}
                               </span>
-                              <span className="text-[10px] ml-2" style={{ color: 'rgba(196,181,253,0.35)' }}
+                              <span className="text-[10px] ml-2" style={{ color: 'rgba(233,234,240,0.35)' }}
                                 title={fullDate(featuredMsg.created_at)}>
                                 {timeAgo(featuredMsg.created_at)}
                               </span>
@@ -1390,8 +1387,8 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             <button onClick={e => { e.stopPropagation(); toggleLike(featuredMsg.id) }}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all sf-press"
                               style={myLikes.has(featuredMsg.id)
-                                ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
-                                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                                ? { background: 'rgba(99,102,241,0.15)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.25)' }
+                                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(233,234,240,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
                               ❤️ {reactions.get(featuredMsg.id) ?? 0}
                             </button>
                             {isAdmin && (
@@ -1413,14 +1410,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   {isAdmin && !showNewsForm && (
                     <button onClick={() => setShowNewsForm(true)}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all cursor-pointer hover:border-purple-500/40"
-                      style={{ background: 'rgba(139,92,246,0.05)', border: '1px dashed rgba(139,92,246,0.3)' }}>
+                      style={{ background: 'rgba(99,102,241,0.05)', border: '1px dashed rgba(99,102,241,0.3)' }}>
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(139,92,246,0.18)', color: '#c4b5fd' }}>
+                        style={{ background: 'rgba(99,102,241,0.18)', color: '#818CF8' }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/>
                         </svg>
                       </div>
-                      <span className="text-[12.5px] font-semibold" style={{ color: 'rgba(196,181,253,0.65)' }}>
+                      <span className="text-[12.5px] font-semibold" style={{ color: 'rgba(233,234,240,0.65)' }}>
                         {t('communityNewsNewPost')}
                       </span>
                       <span className="ml-auto sf-badge sf-badge-accent text-[9px] font-black">ADMIN</span>
@@ -1429,18 +1426,18 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
                   {isAdmin && showNewsForm && (
                     <div className="sf-card overflow-hidden anim-scale-in"
-                      style={{ background: 'rgba(8,5,20,0.95)' }}>
+                      style={{ background: 'rgba(15,16,20,0.95)' }}>
                       <div className="px-4 py-3 flex items-center justify-between"
-                        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
+                        style={{ borderBottom: '1px solid rgba(99,102,241,0.12)', background: 'linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.05))' }}>
                         <div className="flex items-center gap-2">
-                          <span className="flex items-center" style={{ color: '#c4b5fd' }} aria-hidden="true">
+                          <span className="flex items-center" style={{ color: '#818CF8' }} aria-hidden="true">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                               <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
                             </svg>
                           </span>
                           <p className="text-[12px] font-black text-white">{t('communityNewsNewPost').replace('+ ', '')}</p>
                         </div>
-                        <button onClick={() => setShowNewsForm(false)} className="cursor-pointer sf-press" style={{ color: 'rgba(196,181,253,0.4)' }}>✕</button>
+                        <button onClick={() => setShowNewsForm(false)} className="cursor-pointer sf-press" style={{ color: 'rgba(233,234,240,0.4)' }}>✕</button>
                       </div>
                       <div className="p-4 space-y-3">
                         <input type="text" value={newsTitle} onChange={e => setNewsTitle(e.target.value)}
@@ -1451,17 +1448,17 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
                         {newsVideo ? (
                           <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                            <span className="flex items-center" style={{ color: '#c4b5fd' }} aria-hidden="true">
+                            style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                            <span className="flex items-center" style={{ color: '#818CF8' }} aria-hidden="true">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                             </span>
-                            <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{newsVideo.name}</span>
+                            <span className="text-[11px] flex-1 truncate" style={{ color: '#818CF8' }}>{newsVideo.name}</span>
                             <button onClick={() => setNewsVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
                           </div>
                         ) : (
                           <button onClick={() => newsVideoRef.current?.click()}
                             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all"
-                            style={{ background: 'rgba(139,92,246,0.04)', border: '1px dashed rgba(139,92,246,0.2)', color: 'rgba(196,181,253,0.5)' }}>
+                            style={{ background: 'rgba(99,102,241,0.04)', border: '1px dashed rgba(99,102,241,0.2)', color: 'rgba(233,234,240,0.5)' }}>
                             <span className="flex items-center" aria-hidden="true">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                             </span>
@@ -1471,11 +1468,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         <input ref={newsVideoRef} type="file" accept="image/*,video/*" className="hidden"
                           onChange={e => { if (e.target.files?.[0]) { setNewsVideo(e.target.files[0]); e.target.value = '' } }} />
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{newsContent.length}/2000</span>
+                          <span className="text-[10px]" style={{ color: 'rgba(233,234,240,0.3)' }}>{newsContent.length}/2000</span>
                           <div className="flex gap-2">
                             <button onClick={() => { setShowNewsForm(false); setNewsVideo(null) }}
                               className="px-4 py-2 rounded-xl text-[12px] font-semibold"
-                              style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
                               {t('cancel')}
                             </button>
                             <button onClick={sendNews} disabled={(!newsContent.trim() && !newsVideo) || newsSending}
@@ -1503,7 +1500,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-[2px] rounded-full flex-shrink-0"
-                                  style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.3),rgba(236,72,153,0.2))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.2)' }}>
+                                  style={{ background: 'linear-gradient(130deg,rgba(99,102,241,0.3),rgba(99,102,241,0.2))', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
                                   {t('communityNewsFeaturedBadge')}
                                 </span>
                                 {msg.title && (
@@ -1511,16 +1508,16 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                 )}
                               </div>
                               <p className="text-[12px] mb-2 line-clamp-2 leading-relaxed"
-                                style={{ color: 'rgba(196,181,253,0.5)' }}>
+                                style={{ color: 'rgba(233,234,240,0.5)' }}>
                                 {msg.content}
                               </p>
-                              <div className="flex items-center gap-3 text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                              <div className="flex items-center gap-3 text-[10px]" style={{ color: 'rgba(233,234,240,0.35)' }}>
                                 <span className="font-semibold">{msg.display_name}</span>
                                 <span>·</span>
                                 <span>{timeAgo(msg.created_at)}</span>
                                 <button onClick={e => { e.stopPropagation(); toggleLike(msg.id) }}
                                   className="flex items-center gap-1 transition-colors sf-press"
-                                  style={{ color: myLikes.has(msg.id) ? '#f472b6' : 'rgba(196,181,253,0.35)' }}>
+                                  style={{ color: myLikes.has(msg.id) ? '#818CF8' : 'rgba(233,234,240,0.35)' }}>
                                   ❤️ {reactions.get(msg.id) ?? 0}
                                 </button>
                               </div>
@@ -1542,7 +1539,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
                   {newsMessages.length === 0 && !isAdmin && (
                     <div className="sf-empty py-20">
-                      <div className="sf-empty-icon" style={{ color: '#a78bfa', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                      <div className="sf-empty-icon" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
                         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
                         </svg>
@@ -1558,12 +1555,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
           {/* ── Right sidebar ─────────────────────────────────────────────────── */}
           <div className="w-[240px] flex-shrink-0 overflow-y-auto p-4 space-y-3 anim-stagger"
-            style={{ borderLeft: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.5)' }}>
+            style={{ borderLeft: '1px solid rgba(99,102,241,0.1)', background: 'rgba(15,16,20,0.5)' }}>
 
             {/* About */}
             <div className="sf-card overflow-hidden">
               <div className="px-4 py-2.5"
-                style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.06)' }}>
+                style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.06)' }}>
                 <p className="text-[10px] font-black uppercase tracking-widest text-accent">
                   {t('communityAbout')}
                 </p>
@@ -1579,7 +1576,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     { label: t('communityAboutPosts'), value: newsMessages.length },
                   ].map(s => (
                     <div key={s.label} className="rounded-lg p-2 text-center"
-                      style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.1)' }}>
                       <p className="text-[14px] font-black text-text">{s.value}</p>
                       <p className="text-[9px] mt-0.5 text-text3">{s.label}</p>
                     </div>
@@ -1587,7 +1584,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 </div>
                 <a href="https://t.me/+drqJbwraMag5M2I0" target="_blank" rel="noreferrer"
                   className="w-full py-2 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer"
-                  style={{ background: 'rgba(34,150,243,0.12)', color: '#60b8f5', border: '1px solid rgba(34,150,243,0.2)' }}>
+                  style={{ background: 'rgba(34,150,243,0.12)', color: '#818CF8', border: '1px solid rgba(34,150,243,0.2)' }}>
                   {t('communityTelegram')}
                 </a>
               </div>
@@ -1597,7 +1594,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
             {topMembers.length > 0 && (
               <div className="sf-card overflow-hidden">
                 <div className="px-4 py-2.5"
-                  style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.06)' }}>
+                  style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.06)' }}>
                   <p className="text-[10px] font-black uppercase tracking-widest text-accent">
                     {t('communityTopMembers')}
                   </p>
@@ -1606,7 +1603,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   {topMembers.map((m, i) => (
                     <div key={m.user_id} className="flex items-center gap-2 py-1">
                       <span className="text-[11px] font-black w-5 text-center flex-shrink-0"
-                        style={{ color: i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : 'rgba(196,181,253,0.25)' }}>
+                        style={{ color: i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : 'rgba(233,234,240,0.25)' }}>
                         {i + 1}
                       </span>
                       <Avatar url={m.avatar_url} name={m.display_name} userId={m.user_id} size={24} />
@@ -1619,7 +1616,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     </div>
                   ))}
                   <button className="w-full mt-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer"
-                    style={{ background: 'transparent', color: 'rgba(196,181,253,0.35)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                    style={{ background: 'transparent', color: 'rgba(233,234,240,0.35)', border: '1px solid rgba(99,102,241,0.1)' }}>
                     {t('communityViewLeaderboard')}
                   </button>
                 </div>
@@ -1629,7 +1626,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
             {/* Help section */}
             <div className="sf-card overflow-hidden">
               <div className="px-4 py-2.5"
-                style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.06)' }}>
+                style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.06)' }}>
                 <p className="text-[10px] font-black uppercase tracking-widest text-accent">
                   {t('communityHelpTitle')}
                 </p>
@@ -1637,7 +1634,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div className="p-3 space-y-2">
                 <button onClick={() => onNavigate?.('support')}
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-purple-500/10 cursor-pointer"
-                  style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                  style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
                   <span className="flex-shrink-0 flex items-center text-accent" aria-hidden="true">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
@@ -1684,7 +1681,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
                 {topics.length === 0 ? (
                   <div className="sf-empty py-20">
-                    <div className="sf-empty-icon" style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.15)', color: '#c4b5fd', width: 64, height: 64, borderRadius: 20 }}>
+                    <div className="sf-empty-icon" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.15)', color: '#818CF8', width: 64, height: 64, borderRadius: 20 }}>
                       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                       </svg>
@@ -1710,19 +1707,19 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     const canDelete = isAdmin || topic.created_by === user.id
                     return (
                       <div className="sf-card sf-card-lift relative group flex flex-col gap-3 p-4 cursor-pointer"
-                        style={isJoined ? { background: 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.28)' } : {}}
+                        style={isJoined ? { background: 'rgba(99,102,241,0.08)', borderColor: 'rgba(99,102,241,0.28)' } : {}}
                         onClick={() => { setSelectedTopic(topic); setTopicsView('chat') }}>
                         <div className="flex items-start gap-3">
                           <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                            style={{ background: isJoined ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.08)' }}>{topic.emoji}</div>
+                            style={{ background: isJoined ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)' }}>{topic.emoji}</div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <p className="text-[13.5px] font-black text-white truncate">{topic.name}</p>
                               {isJoined && <span className="text-[8px] font-black px-1.5 py-[2px] rounded-full flex-shrink-0"
-                                style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>{t('communityTopicsJoinedBadge')}</span>}
+                                style={{ background: 'rgba(99,102,241,0.2)', color: '#818CF8' }}>{t('communityTopicsJoinedBadge')}</span>}
                             </div>
                             {topic.description && (
-                              <p className="text-[11.5px] leading-relaxed line-clamp-2" style={{ color: 'rgba(196,181,253,0.5)' }}>{topic.description}</p>
+                              <p className="text-[11.5px] leading-relaxed line-clamp-2" style={{ color: 'rgba(233,234,240,0.5)' }}>{topic.description}</p>
                             )}
                           </div>
                           {canDelete && (
@@ -1736,7 +1733,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           )}
                         </div>
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                          <div className="flex items-center gap-3 text-[10px]" style={{ color: 'rgba(233,234,240,0.35)' }}>
                             <span>👥 {members} {members !== 1 ? t('communityMemberPlural') : t('communityMemberSingular')}</span>
                             {last && <><span>·</span><span className="truncate max-w-[140px]">{last.content.slice(0, 35)}{last.content.length > 35 ? '…' : ''}</span><span>·</span><span>{timeAgo(last.at)}</span></>}
                           </div>
@@ -1758,7 +1755,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     <div className="space-y-5 sf-reveal">
                       {joined.length > 0 && (
                         <div>
-                          <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>{t('communityTopicsMyCommunities')}</p>
+                          <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(99,102,241,0.5)' }}>{t('communityTopicsMyCommunities')}</p>
                           <div className="space-y-2">
                             {joined.map(topic => <TopicCard key={topic.id} t={topic} />)}
                           </div>
@@ -1766,7 +1763,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       )}
                       {others.length > 0 && (
                         <div>
-                          <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>
+                          <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(99,102,241,0.5)' }}>
                             {joined.length > 0 ? t('communityTopicsDiscover') : t('communityTopicsAll')}
                           </p>
                           <div className="space-y-2">
@@ -1793,14 +1790,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
             <>
               {/* Topic header */}
               <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2.5 sf-anim-slide-up sf-d50"
-                style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.7)' }}>
+                style={{ borderBottom: '1px solid rgba(99,102,241,0.12)', background: 'rgba(15,16,20,0.7)' }}>
                 <button onClick={() => { setTopicsView('list'); setSelectedTopic(null) }}
                   className="sf-btn sf-btn-ghost w-8 h-8 flex items-center justify-center cursor-pointer"
-                  style={{ padding: 0, borderColor: 'rgba(139,92,246,0.2)' }}>
+                  style={{ padding: 0, borderColor: 'rgba(99,102,241,0.2)' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                  style={{ background: 'rgba(139,92,246,0.15)' }}>{selectedTopic?.emoji}</div>
+                  style={{ background: 'rgba(99,102,241,0.15)' }}>{selectedTopic?.emoji}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-black text-text leading-tight">{selectedTopic?.name}</p>
                   <p className="text-[9px] text-text3">
@@ -1828,7 +1825,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div ref={topicListRef} className="flex-1 overflow-y-auto px-5 py-4">
                 {topicMessages.length === 0 ? (
                   <div className="sf-empty h-full">
-                    <div className="sf-empty-icon text-3xl" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)', fontSize: 28, width: 60, height: 60, borderRadius: 16 }}>
+                    <div className="sf-empty-icon text-3xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)', fontSize: 28, width: 60, height: 60, borderRadius: 16 }}>
                       {selectedTopic?.emoji}
                     </div>
                     <p className="sf-empty-title">{selectedTopic?.name}</p>
@@ -1837,9 +1834,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 ) : (
                   <>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
-                      <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(196,181,253,0.3)' }}>{t('communityTopicsStart')}</span>
-                      <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
+                      <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.1)' }} />
+                      <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(233,234,240,0.3)' }}>{t('communityTopicsStart')}</span>
+                      <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.1)' }} />
                     </div>
                     {topicMessages.map((msg, i) => {
                       const prev    = topicMessages[i - 1]
@@ -1853,31 +1850,31 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           <div className="flex-1 min-w-0">
                             {!compact && (
                               <div className="flex items-center gap-2 mb-[3px] flex-wrap">
-                                <span className="text-[13px] font-bold" style={{ color: msg.user_id === user.id ? '#c4b5fd' : '#e8e0ff' }}>
+                                <span className="text-[13px] font-bold" style={{ color: msg.user_id === user.id ? '#818CF8' : '#E9EAF0' }}>
                                   {msg.display_name || t('communityAnonymous')}
                                 </span>
                                 {msg.is_admin && (
                                   <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
-                                    style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
+                                    style={{ background: 'linear-gradient(130deg,rgba(99,102,241,0.35),rgba(99,102,241,0.25))', color: '#818CF8', border: '1px solid rgba(99,102,241,0.25)' }}>
                                     {t('communityAdminLabel')}
                                   </span>
                                 )}
                                 {msg.user_id === user.id && !msg.is_admin && (
                                   <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
-                                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>{t('communityMeLabel')}</span>
+                                    style={{ background: 'rgba(99,102,241,0.2)', color: '#818CF8' }}>{t('communityMeLabel')}</span>
                                 )}
                                 <span className="ml-auto text-[10px] opacity-0 group-hover:opacity-60 transition-opacity tabular-nums"
-                                  style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
+                                  style={{ color: 'rgba(233,234,240,0.5)' }}>{timeAgo(msg.created_at)}</span>
                               </div>
                             )}
                             <div className="flex items-end gap-1.5">
                               <div className="flex-1 min-w-0">
-                                <p className="text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(212,220,240,0.9)' }}>{msg.content}</p>
+                                <p className="text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(233,234,240,0.9)' }}>{msg.content}</p>
                                 {msg.video_url && <MediaBlock url={msg.video_url} maxHeight={260} />}
                               </div>
                               {(isAdmin || msg.user_id === user.id) && (
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pb-0.5">
-                                  {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(196,181,253,0.35)' }}>{timeAgo(msg.created_at)}</span>}
+                                  {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(233,234,240,0.35)' }}>{timeAgo(msg.created_at)}</span>}
                                   <button onClick={() => deleteTopicMessage(msg.id)}
                                     className="w-5 h-5 flex items-center justify-center rounded sf-press"
                                     style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Delete">
@@ -1899,7 +1896,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
               {/* Input */}
               <div className="flex-shrink-0 px-4 py-3 sf-anim-slide-up sf-d100"
-                style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.95)' }}>
+                style={{ borderTop: '1px solid rgba(99,102,241,0.1)', background: 'rgba(10,11,14,0.95)' }}>
                 {isMuted ? (
                   <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
                     style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
@@ -1912,18 +1909,18 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   <>
                     {topicVideo && (
                       <div className="flex items-center gap-2 mb-2 px-1 py-1.5 rounded-lg"
-                        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                        <span className="flex items-center" style={{ color: '#c4b5fd' }} aria-hidden="true">
+                        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                        <span className="flex items-center" style={{ color: '#818CF8' }} aria-hidden="true">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                         </span>
-                        <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{topicVideo.name}</span>
+                        <span className="text-[11px] flex-1 truncate" style={{ color: '#818CF8' }}>{topicVideo.name}</span>
                         <button onClick={() => setTopicVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
                       </div>
                     )}
                     <div className="flex items-end gap-3">
                       <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
                       <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
-                        style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)' }}>
                         <textarea ref={topicRef} value={topicDraft} onChange={e => setTopicDraft(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTopicMessage() } }}
                           onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
@@ -1933,12 +1930,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           style={{ minHeight: 22, maxHeight: 120 }} />
                         <button onClick={() => topicVideoRef.current?.click()} title={t('communityAttachVideo')} aria-label={t('communityAttachVideo')}
                           className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all sf-press"
-                          style={{ color: topicVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: topicVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
+                          style={{ color: topicVideo ? '#818CF8' : 'rgba(233,234,240,0.35)', background: topicVideo ? 'rgba(99,102,241,0.15)' : 'transparent' }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                         </button>
                         <button onClick={sendTopicMessage} disabled={(!topicDraft.trim() && !topicVideo) || topicSending}
                           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
-                          style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
+                          style={{ background: '#6366F1', boxShadow: '0 2px 12px rgba(99,102,241,0.4)' }}>
                           {topicSending ? <Spinner size="sm" /> : <span className="text-sm leading-none">↑</span>}
                         </button>
                       </div>
@@ -1960,21 +1957,21 @@ export function Community({ user, onNavigate }: CommunityProps) {
             <>
               {/* Thread list */}
               <div className="w-56 flex-shrink-0 overflow-y-auto sf-reveal"
-                style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.4)' }}>
+                style={{ borderRight: '1px solid rgba(99,102,241,0.1)', background: 'rgba(15,16,20,0.4)' }}>
                 <div className="px-3 pt-3 pb-2">
                   <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-1"
-                    style={{ color: 'rgba(139,92,246,0.5)' }}>
+                    style={{ color: 'rgba(99,102,241,0.5)' }}>
                     {t('communityAdminTickets')} ({threadList.length})
                   </p>
                   {loading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
                   : threadList.length === 0 ? (
                     <div className="flex flex-col items-center py-8 gap-2 text-center">
-                      <span className="flex items-center" style={{ color: '#a78bfa' }} aria-hidden="true">
+                      <span className="flex items-center" style={{ color: '#818CF8' }} aria-hidden="true">
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
                         </svg>
                       </span>
-                      <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{t('communityAdminNoTickets')}</p>
+                      <p className="text-[11px]" style={{ color: 'rgba(233,234,240,0.3)' }}>{t('communityAdminNoTickets')}</p>
                     </div>
                   ) : threadList.map(th => {
                     const hasUnread = !th.lastMsg.is_admin && selectedThread !== th.user_id
@@ -1982,32 +1979,32 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       <button key={th.user_id} onClick={() => setSelectedThread(th.user_id)}
                         className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl mb-1 text-left transition-all"
                         style={selectedThread === th.user_id
-                          ? { background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.3)' }
+                          ? { background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.3)' }
                           : hasUnread
-                          ? { background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.22)' }
+                          ? { background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.22)' }
                           : { background: 'transparent', border: '1px solid transparent' }}>
                         <div className="relative flex-shrink-0">
                           <Avatar url={th.avatar_url} name={th.display_name} userId={th.user_id} size={28} />
                           {hasUnread && (
                             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
-                              style={{ background: '#ec4899', borderColor: '#080614' }} />
+                              style={{ background: '#6366F1', borderColor: '#0F1014' }} />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-[11px] truncate ${hasUnread ? 'font-black text-white' : 'font-bold text-white'}`}>
                             {th.display_name || t('communityAnonymous')}
                           </p>
-                          <p className="text-[9px] truncate" style={{ color: hasUnread ? 'rgba(236,72,153,0.7)' : 'rgba(196,181,253,0.4)' }}>
+                          <p className="text-[9px] truncate" style={{ color: hasUnread ? 'rgba(99,102,241,0.7)' : 'rgba(233,234,240,0.4)' }}>
                             {hasUnread && '● '}{th.lastMsg.content.slice(0, 24)}{th.lastMsg.content.length > 24 ? '…' : ''}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          <span className="text-[8px] tabular-nums" style={{ color: hasUnread ? 'rgba(236,72,153,0.6)' : 'rgba(196,181,253,0.3)' }}>
+                          <span className="text-[8px] tabular-nums" style={{ color: hasUnread ? 'rgba(99,102,241,0.6)' : 'rgba(233,234,240,0.3)' }}>
                             {timeAgo(th.lastMsg.created_at)}
                           </span>
                           {hasUnread && (
                             <span className="text-[7px] font-black px-1 py-0.5 rounded"
-                              style={{ background: 'rgba(236,72,153,0.2)', color: '#f472b6' }}>NEW</span>
+                              style={{ background: 'rgba(99,102,241,0.2)', color: '#818CF8' }}>NEW</span>
                           )}
                         </div>
                       </button>
@@ -2020,7 +2017,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div className="flex-1 flex flex-col overflow-hidden">
                 {!selectedThread ? (
                   <div className="sf-empty flex-1">
-                    <div className="sf-empty-icon" style={{ color: '#a78bfa', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                    <div className="sf-empty-icon" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
                       </svg>
@@ -2031,13 +2028,13 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 ) : (
                   <>
                     <div className="flex-shrink-0 px-4 py-2.5 flex items-center gap-2.5"
-                      style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.6)' }}>
+                      style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(15,16,20,0.6)' }}>
                       {(() => { const th2 = threadList.find(th2 => th2.user_id === selectedThread); return th2 ? (
                         <>
                           <Avatar url={th2.avatar_url} name={th2.display_name} userId={th2.user_id} size={26} />
                           <div>
                             <p className="text-[12px] font-black text-white">{th2.display_name || t('communityAnonymous')}</p>
-                            <p className="text-[9px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                            <p className="text-[9px]" style={{ color: 'rgba(233,234,240,0.35)' }}>
                               {threadMessages.length} message{threadMessages.length > 1 ? 's' : ''}
                             </p>
                           </div>
@@ -2054,21 +2051,21 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       <div ref={bottomRef} className="h-2" />
                     </div>
                     <div className="flex-shrink-0 px-4 py-3"
-                      style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.95)' }}>
+                      style={{ borderTop: '1px solid rgba(99,102,241,0.1)', background: 'rgba(10,11,14,0.95)' }}>
                       {chatVideo && (
                         <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg"
-                          style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                          <span className="flex items-center" style={{ color: '#c4b5fd' }} aria-hidden="true">
+                          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                          <span className="flex items-center" style={{ color: '#818CF8' }} aria-hidden="true">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                           </span>
-                          <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{chatVideo.name}</span>
+                          <span className="text-[11px] flex-1 truncate" style={{ color: '#818CF8' }}>{chatVideo.name}</span>
                           <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
                         </div>
                       )}
                       <div className="flex items-end gap-3">
                         <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
                         <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
-                          style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.08),rgba(236,72,153,0.04))', border: '1px solid rgba(139,92,246,0.25)' }}>
+                          style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.08),rgba(99,102,241,0.04))', border: '1px solid rgba(99,102,241,0.25)' }}>
                           <textarea value={chatDraft} onChange={e => setChatDraft(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSupport() } }}
                             onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
@@ -2078,12 +2075,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             style={{ minHeight: 22, maxHeight: 120 }} />
                           <button onClick={() => chatVideoRef.current?.click()} title={t('communityAttachVideo')} aria-label={t('communityAttachVideo')}
                             className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all sf-press"
-                            style={{ color: chatVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: chatVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
+                            style={{ color: chatVideo ? '#818CF8' : 'rgba(233,234,240,0.35)', background: chatVideo ? 'rgba(99,102,241,0.15)' : 'transparent' }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                           </button>
                           <button onClick={sendSupport} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
                             className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
-                            style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
+                            style={{ background: '#6366F1', boxShadow: '0 2px 12px rgba(99,102,241,0.4)' }}>
                             {chatSending ? <Spinner size="sm" /> : <span className="text-sm">↑</span>}
                           </button>
                         </div>
@@ -2100,7 +2097,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 {loading ? <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
                 : myThreadMessages.length === 0 ? (
                   <div className="sf-empty h-full">
-                    <div className="sf-empty-icon" style={{ color: '#93c5fd', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.15)', width: 64, height: 64, borderRadius: 20 }}>
+                    <div className="sf-empty-icon" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.15)', width: 64, height: 64, borderRadius: 20 }}>
                       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
                       </svg>
@@ -2111,9 +2108,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 ) : (
                   <>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="flex-1 h-px" style={{ background: 'rgba(96,165,250,0.1)' }} />
+                      <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.1)' }} />
                       <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(147,197,253,0.35)' }}>{t('communitySupportMyTicket')}</span>
-                      <div className="flex-1 h-px" style={{ background: 'rgba(96,165,250,0.1)' }} />
+                      <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.1)' }} />
                     </div>
                     {myThreadMessages.map((msg, i) => {
                       const prev    = myThreadMessages[i - 1]
@@ -2126,7 +2123,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 )}
               </div>
               <div className="flex-shrink-0 px-4 py-3 sf-anim-slide-up sf-d100"
-                style={{ borderTop: '1px solid rgba(96,165,250,0.1)', background: 'rgba(6,4,15,0.95)' }}>
+                style={{ borderTop: '1px solid rgba(99,102,241,0.1)', background: 'rgba(10,11,14,0.95)' }}>
                 {isMuted ? (
                   <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
                     style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
@@ -2139,24 +2136,24 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   <>
                     <div className="flex items-center gap-2 mb-2 px-1">
                       <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-blue-400/60" />
-                      <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                      <span className="text-[10px]" style={{ color: 'rgba(233,234,240,0.35)' }}>
                         {t('communitySupportAskTeam')} <strong style={{ color: 'rgba(147,197,253,0.6)' }}>ScaleFlow</strong>
                       </span>
                     </div>
                     {chatVideo && (
                       <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg"
-                        style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
-                        <span className="flex items-center" style={{ color: '#93c5fd' }} aria-hidden="true">
+                        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                        <span className="flex items-center" style={{ color: '#818CF8' }} aria-hidden="true">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                         </span>
-                        <span className="text-[11px] flex-1 truncate" style={{ color: '#93c5fd' }}>{chatVideo.name}</span>
+                        <span className="text-[11px] flex-1 truncate" style={{ color: '#818CF8' }}>{chatVideo.name}</span>
                         <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
                       </div>
                     )}
                     <div className="flex items-end gap-3">
                       <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
                       <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
-                        style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                        style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
                         <textarea value={chatDraft} onChange={e => setChatDraft(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSupport() } }}
                           onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
@@ -2166,12 +2163,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           style={{ minHeight: 22, maxHeight: 120 }} />
                         <button onClick={() => chatVideoRef.current?.click()} title={t('communityAttachVideo')} aria-label={t('communityAttachVideo')}
                           className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all sf-press"
-                          style={{ color: chatVideo ? '#93c5fd' : 'rgba(147,197,253,0.35)', background: chatVideo ? 'rgba(96,165,250,0.15)' : 'transparent' }}>
+                          style={{ color: chatVideo ? '#818CF8' : 'rgba(147,197,253,0.35)', background: chatVideo ? 'rgba(99,102,241,0.15)' : 'transparent' }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                         </button>
                         <button onClick={sendSupport} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
                           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
-                          style={{ background: 'linear-gradient(135deg,#2563eb,#7c3aed)', boxShadow: '0 2px 12px rgba(37,99,235,0.3)' }}>
+                          style={{ background: '#6366F1', boxShadow: '0 2px 12px rgba(79,70,229,0.3)' }}>
                           {chatSending ? <Spinner size="sm" /> : <span className="text-sm">↑</span>}
                         </button>
                       </div>
@@ -2192,15 +2189,15 @@ export function Community({ user, onNavigate }: CommunityProps) {
           style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)' }}
           onClick={e => e.target === e.currentTarget && setSelectedPost(null)}>
           <div className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden anim-scale-in"
-            style={{ background: '#0c0919', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+            style={{ background: '#13141A', border: '1px solid rgba(99,102,241,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
             {/* Modal header */}
             <div className="flex-shrink-0 flex items-center justify-between px-5 py-4"
-              style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
+              style={{ borderBottom: '1px solid rgba(99,102,241,0.12)', background: 'linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.05))' }}>
               <div className="flex items-center gap-2.5">
                 <Avatar url={selectedPost.avatar_url} name={selectedPost.display_name} userId={selectedPost.user_id} size={28} />
                 <div>
                   <p className="text-[12px] font-bold text-white leading-tight">{selectedPost.display_name}</p>
-                  <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(196,181,253,0.4)' }}
+                  <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(233,234,240,0.4)' }}
                     title={fullDate(selectedPost.created_at)}>
                     {timeAgo(selectedPost.created_at)} · {fullDate(selectedPost.created_at)}
                   </p>
@@ -2218,7 +2215,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 )}
                 <button onClick={() => setSelectedPost(null)}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06] sf-press"
-                  style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
+                  style={{ color: 'rgba(233,234,240,0.5)' }}>✕</button>
               </div>
             </div>
             {/* Modal body */}
@@ -2227,19 +2224,19 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <h2 className="text-[18px] font-black text-white leading-tight">{selectedPost.title}</h2>
               )}
               <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap"
-                style={{ color: 'rgba(212,220,240,0.85)' }}>
+                style={{ color: 'rgba(233,234,240,0.85)' }}>
                 {selectedPost.content}
               </p>
               {selectedPost.video_url && <MediaBlock url={selectedPost.video_url} maxHeight={320} />}
             </div>
             {/* Modal footer */}
             <div className="flex-shrink-0 flex items-center justify-between px-5 py-3"
-              style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.6)' }}>
+              style={{ borderTop: '1px solid rgba(99,102,241,0.1)', background: 'rgba(10,11,14,0.6)' }}>
               <button onClick={() => toggleLike(selectedPost.id)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all sf-press"
                 style={myLikes.has(selectedPost.id)
-                  ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
-                  : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  ? { background: 'rgba(99,102,241,0.15)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.25)' }
+                  : { background: 'rgba(255,255,255,0.05)', color: 'rgba(233,234,240,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 ❤️ {reactions.get(selectedPost.id) ?? 0} {myLikes.has(selectedPost.id) ? t('communityPostLiked') : t('communityPostLike')}
               </button>
             </div>

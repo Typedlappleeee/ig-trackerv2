@@ -1337,7 +1337,7 @@ function InvitePermModal({
 
 // ── Role template creator / editor ──────────────────────────────────────────
 const TEMPLATE_COLORS = [
-  '#6366F1','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2','#65a30d',
+  '#6366F1','#4F46E5','#059669','#d97706','#dc2626','#db2777','#0891b2','#65a30d',
 ]
 function RoleTemplateEditor({
   initial, availableFolders, availableGroups, onSave, onCancel,

@@ -81,9 +81,9 @@ function CopyButton({ text }: { text: string }) {
       onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
       className="cursor-pointer inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider transition-all"
       style={{
-        background: copied ? 'rgba(34,197,94,0.1)' : 'rgba(139,92,246,0.08)',
-        color: copied ? '#22C55E' : '#a78bfa',
-        border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.2)'}`,
+        background: copied ? 'rgba(34,197,94,0.1)' : 'rgba(99,102,241,0.08)',
+        color: copied ? '#22C55E' : '#818CF8',
+        border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(99,102,241,0.2)'}`,
       }}>
       <Icon name={copied ? 'check' : 'copy'} size={13} />
       <span>{copied ? t('copied').toUpperCase() : t('copy').toUpperCase()}</span>
@@ -96,10 +96,10 @@ function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
   const charCount = value.length
   return (
     <div className="relative rounded-2xl overflow-hidden anim-scale-in"
-      style={{ background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(139,92,246,0.18)' }}>
+      style={{ background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(99,102,241,0.18)' }}>
       {/* Terminal header */}
       <div className="flex items-center gap-3 px-4 py-2.5"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.04)' }}>
+        style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.04)' }}>
         <div className="flex gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(239,68,68,0.45)' }} />
           <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(245,158,11,0.45)' }} />
@@ -116,7 +116,7 @@ function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
         value={value}
         readOnly
         className="w-full px-5 py-4 text-[12px] font-mono resize-none focus:outline-none leading-relaxed"
-        style={{ background: 'transparent', color: '#c4b5fd' }}
+        style={{ background: 'transparent', color: '#818CF8' }}
       />
     </div>
   )
@@ -153,13 +153,13 @@ function ToolShell({ title, icon, children, onBack, error }: {
       <div className="flex-shrink-0 px-8 pt-7 pb-5 sf-topbar">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="cursor-pointer inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-bold font-mono uppercase tracking-wider transition-all flex-shrink-0"
-            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', color: '#a78bfa' }}>
+            style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', color: '#818CF8' }}>
             <Icon name="arrow-left" size={13} />
             {t('back')}
           </button>
 
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d50"
-            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.28)', color: '#c4b5fd' }}>
+            style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(99,102,241,0.1))', border: '1px solid rgba(99,102,241,0.28)', color: '#818CF8' }}>
             {icon}
           </div>
 
@@ -347,8 +347,8 @@ Format le script comme si c’était prêt à lire face caméra. Inclus les indi
                 <button key={d} onClick={() => setDuration(d)}
                   className="cursor-pointer flex-1 py-2.5 rounded-xl text-[12px] font-bold font-mono transition-all"
                   style={duration === d
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 14px -4px rgba(124,58,237,0.5)' }
-                    : { background: 'rgba(139,92,246,0.06)', color: 'rgba(139,92,246,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+                    ? { background: 'linear-gradient(130deg,#6366F1,#6366F1)', color: '#fff', boxShadow: '0 2px 14px -4px rgba(99,102,241,0.5)' }
+                    : { background: 'rgba(99,102,241,0.06)', color: 'rgba(99,102,241,0.5)', border: '1px solid rgba(99,102,241,0.12)' }
                   }>{d}</button>
               ))}
             </div>
@@ -556,8 +556,8 @@ Pour chaque langue, format :
               <button key={l} onClick={() => toggleLang(l)}
                 className="cursor-pointer px-3.5 py-2 rounded-xl text-[12px] font-semibold font-mono transition-all"
                 style={langs.includes(l)
-                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 12px -4px rgba(124,58,237,0.5)' }
-                  : { background: 'rgba(139,92,246,0.06)', color: 'rgba(139,92,246,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+                  ? { background: 'linear-gradient(130deg,#6366F1,#6366F1)', color: '#fff', boxShadow: '0 2px 12px -4px rgba(99,102,241,0.5)' }
+                  : { background: 'rgba(99,102,241,0.06)', color: 'rgba(99,102,241,0.5)', border: '1px solid rgba(99,102,241,0.12)' }
                 }>{l}</button>
             ))}
           </div>
@@ -655,18 +655,18 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
     <button onClick={onClick} className="cursor-pointer text-left w-full group relative rounded-2xl p-4 transition-all card-lift sf-card-lift sf-spotlight overflow-hidden"
       style={{
         background: '#0E0E16',
-        border: '1px solid rgba(139,92,246,0.12)',
+        border: '1px solid rgba(99,102,241,0.12)',
         opacity: locked ? 0.6 : 1,
       }}>
       {/* Hover glow overlay */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-        style={{ background: 'radial-gradient(ellipse 160px 100px at 20% 30%, rgba(124,58,237,0.08), transparent)' }} />
+        style={{ background: 'radial-gradient(ellipse 160px 100px at 20% 30%, rgba(99,102,241,0.08), transparent)' }} />
 
       <div className="relative space-y-3">
         {/* Icon row */}
         <div className="flex items-start justify-between gap-2">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
-            style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(139,92,246,0.22)', color: '#c4b5fd' }}>
+            style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(99,102,241,0.22)', color: '#818CF8' }}>
             {icon}
           </div>
           {locked && (
@@ -709,7 +709,7 @@ function SectionHeader({ label, badge, icon }: { label: string; badge?: string; 
           {badge}
         </span>
       )}
-      <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(139,92,246,0.2), transparent)' }} />
+      <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(99,102,241,0.2), transparent)' }} />
     </div>
   )
 }
@@ -728,10 +728,10 @@ export function AiTools({ user }: AiToolsProps) {
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-5">
             <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.08))', border: '1px solid rgba(139,92,246,0.2)' }}>
+              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.08))', border: '1px solid rgba(99,102,241,0.2)' }}>
               <span className="relative z-10 text-accent"><Icon name="sparkles" size={24} /></span>
               <div className="absolute inset-0 animate-pulse rounded-2xl"
-                style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(236,72,153,0.06))' }} />
+                style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.06))' }} />
             </div>
             <div className="text-center">
               <p className="text-[13px] font-bold text-text2">{t('loading')}</p>
@@ -751,7 +751,7 @@ export function AiTools({ user }: AiToolsProps) {
         <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
           <div className="flex items-center gap-4">
             <div className="relative w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0 sf-anim-scale-spring"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.12))', border: '1px solid rgba(139,92,246,0.28)' }}>
+              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(99,102,241,0.12))', border: '1px solid rgba(99,102,241,0.28)' }}>
               <span className="text-accent relative z-10"><Icon name="sparkles" size={22} /></span>
               <div className="absolute inset-0 anim-glow rounded-2xl" />
             </div>
@@ -774,7 +774,7 @@ export function AiTools({ user }: AiToolsProps) {
                 <p className="text-[14px] font-bold text-warn">{t('noGroqKey')}</p>
               </div>
               <p className="text-[13px] text-text2 mb-2">{t('configureGroq')}</p>
-              <p className="text-[11px] font-mono" style={{ color: 'rgba(139,92,246,0.6)' }}>
+              <p className="text-[11px] font-mono" style={{ color: 'rgba(99,102,241,0.6)' }}>
                 Free on groq.com → API Keys → Create
               </p>
             </div>
@@ -817,7 +817,7 @@ export function AiTools({ user }: AiToolsProps) {
           <div className="flex items-center gap-4">
             {/* Icon with glow */}
             <div className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden sf-anim-scale-spring"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(236,72,153,0.13))', border: '1px solid rgba(139,92,246,0.3)' }}>
+              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(99,102,241,0.13))', border: '1px solid rgba(99,102,241,0.3)' }}>
               <span className="relative z-10 text-accent"><Icon name="sparkles" size={22} /></span>
               <div className="absolute inset-0 anim-glow rounded-2xl" />
             </div>

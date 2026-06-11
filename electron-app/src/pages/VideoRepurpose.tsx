@@ -72,8 +72,8 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
   return (
     <div className="sf-card anim-scale-in" style={{
       borderRadius: 14, overflow: 'hidden', position: 'relative',
-      borderColor: isDone ? 'rgba(34,211,238,0.3)' : isErr ? 'rgba(239,68,68,0.25)' : 'var(--border)',
-      boxShadow: isDone ? '0 0 24px -6px rgba(34,211,238,0.15)' : 'none',
+      borderColor: isDone ? 'rgba(99,102,241,0.3)' : isErr ? 'rgba(239,68,68,0.25)' : 'var(--border)',
+      boxShadow: isDone ? '0 0 24px -6px rgba(99,102,241,0.15)' : 'none',
       transition: 'border-color 0.3s, box-shadow 0.3s',
     }}>
       {/* Thumbnail */}
@@ -84,8 +84,8 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isProc && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(34,211,238,0.2)', borderTopColor: '#22d3ee', animation: 'spin 0.9s linear infinite', margin: '0 auto 6px' }} />
-                <div style={{ fontSize: 10, color: 'rgba(34,211,238,0.6)' }}>{job.progress}%</div>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1', animation: 'spin 0.9s linear infinite', margin: '0 auto 6px' }} />
+                <div style={{ fontSize: 10, color: 'rgba(99,102,241,0.6)' }}>{job.progress}%</div>
               </div>
             )}
             {isQ && (
@@ -102,11 +102,11 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
         )}
         {isProc && (
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'rgba(0,0,0,0.4)' }}>
-            <div style={{ height: '100%', background: 'linear-gradient(90deg,#22d3ee,#818cf8)', width: `${job.progress}%`, transition: 'width 0.4s ease' }} />
+            <div style={{ height: '100%', background: 'linear-gradient(90deg,#6366F1,#818cf8)', width: `${job.progress}%`, transition: 'width 0.4s ease' }} />
           </div>
         )}
         {isDone && (
-          <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(10,10,20,0.82)', backdropFilter: 'blur(4px)', borderRadius: 5, padding: '2px 6px', fontSize: 9, fontWeight: 700, color: '#22d3ee', border: '1px solid rgba(34,211,238,0.22)' }}>
+          <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(10,10,20,0.82)', backdropFilter: 'blur(4px)', borderRadius: 5, padding: '2px 6px', fontSize: 9, fontWeight: 700, color: '#6366F1', border: '1px solid rgba(99,102,241,0.22)' }}>
             #{String(index + 1).padStart(2, '0')}
           </div>
         )}
@@ -127,7 +127,7 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={() => job.outputPath && downloadBlob(job.outputPath, `variant_${index + 1}.mp4`)}
               className="sf-btn cursor-pointer"
-              style={{ flex: 1, height: 28, fontSize: 9, background: 'rgba(34,211,238,0.1)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)', borderRadius: 6 }}
+              style={{ flex: 1, height: 28, fontSize: 9, background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 6 }}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               Télécharger
@@ -144,7 +144,7 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
         )}
         {isErr && <div style={{ fontSize: 9, color: '#f87171' }}>{job.error?.slice(0, 45)}</div>}
         {isQ   && <div style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center' }}>En attente…</div>}
-        {isProc && <div style={{ fontSize: 9, color: 'rgba(34,211,238,0.6)', textAlign: 'center' }}>Traitement {job.progress}%</div>}
+        {isProc && <div style={{ fontSize: 9, color: 'rgba(99,102,241,0.6)', textAlign: 'center' }}>Traitement {job.progress}%</div>}
       </div>
     </div>
   )
@@ -379,11 +379,11 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           <div style={{
             width: 44, height: 44, borderRadius: 13, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(34,211,238,0.22), rgba(34,211,238,0.06))',
-            border: '1px solid rgba(34,211,238,0.28)',
-            boxShadow: '0 0 24px -6px rgba(34,211,238,0.4)',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(99,102,241,0.06))',
+            border: '1px solid rgba(99,102,241,0.28)',
+            boxShadow: '0 0 24px -6px rgba(99,102,241,0.4)',
           }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
             </svg>
           </div>
@@ -391,12 +391,12 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h1 style={{
                 fontSize: 22, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1, margin: 0,
-                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(34,211,238,0.9) 100%)',
+                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(99,102,241,0.9) 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               }}>CloneVid</h1>
               {running ? (
-                <span className="sf-badge" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.25)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block' }} />
+                <span className="sf-badge" style={{ background: 'rgba(99,102,241,0.12)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.25)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1', display: 'inline-block' }} />
                   Génération…
                 </span>
               ) : (
@@ -420,7 +420,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               { label: t('repurposeTimeHeader'), value: elapsedStr },
             ].map(s => (
               <div key={s.label} className="sf-card" style={{ padding: '8px 16px', textAlign: 'center', minWidth: 72 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#22d3ee', lineHeight: 1, letterSpacing: '-0.03em' }}>{s.value}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#6366F1', lineHeight: 1, letterSpacing: '-0.03em' }}>{s.value}</div>
                 <div style={{ fontSize: 9, color: 'var(--text-4)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
               </div>
             ))}
@@ -431,7 +431,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       {/* Global progress bar */}
       {running && (
         <div className="sf-progress" style={{ borderRadius: 0, height: 2, flexShrink: 0 }}>
-          <div className="sf-progress-bar" style={{ width: `${donePct}%`, boxShadow: '0 0 8px rgba(34,211,238,0.5)' }} />
+          <div className="sf-progress-bar" style={{ width: `${donePct}%`, boxShadow: '0 0 8px rgba(99,102,241,0.5)' }} />
         </div>
       )}
 
@@ -450,8 +450,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               onClick={() => fileInputRef.current?.click()}
               className="cursor-pointer sf-hover-lift"
               style={{
-                borderRadius: 14, border: `2px dashed ${dragging ? '#22d3ee' : sources.length ? 'rgba(34,211,238,0.35)' : 'var(--border-md)'}`,
-                background: dragging ? 'rgba(34,211,238,0.06)' : sources.length ? 'rgba(34,211,238,0.03)' : 'rgba(255,255,255,0.02)',
+                borderRadius: 14, border: `2px dashed ${dragging ? '#6366F1' : sources.length ? 'rgba(99,102,241,0.35)' : 'var(--border-md)'}`,
+                background: dragging ? 'rgba(99,102,241,0.06)' : sources.length ? 'rgba(99,102,241,0.03)' : 'rgba(255,255,255,0.02)',
                 padding: '20px 14px', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
               }}
             >
@@ -459,7 +459,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = '' }} />
               {/* Upload icon */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: sources.length ? 'rgba(34,211,238,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${sources.length ? 'rgba(34,211,238,0.25)' : 'var(--border)'}`, color: sources.length ? '#22d3ee' : 'var(--text-3)' }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: sources.length ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${sources.length ? 'rgba(99,102,241,0.25)' : 'var(--border)'}`, color: sources.length ? '#6366F1' : 'var(--text-3)' }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
@@ -467,7 +467,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   </svg>
                 </div>
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: sources.length ? '#22d3ee' : 'var(--text-2)', marginBottom: 3 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: sources.length ? '#6366F1' : 'var(--text-2)', marginBottom: 3 }}>
                 {sources.length ? `${sources.length} vidéo${sources.length > 1 ? 's' : ''} sélectionnée${sources.length > 1 ? 's' : ''}` : t('repurposeDropVideo')}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-4)' }}>
@@ -480,7 +480,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {sources.map((src, i) => (
                   <div key={i} className="sf-card" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 9 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(34,211,238,0.7)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(99,102,241,0.7)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
                     <span style={{ flex: 1, fontSize: 11, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {src.name.slice(0, 22)}{src.name.length > 22 ? '…' : ''}
                     </span>
@@ -514,22 +514,22 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           <div style={{ padding: '0 14px' }}>
             <div className="sf-section-label" style={{ marginBottom: 8 }}>
               {t('repurposeVariantsSection')}
-              {sources.length > 1 && <span style={{ marginLeft: 6, color: 'rgba(34,211,238,0.6)', fontWeight: 600, fontSize: 9 }}>par vidéo</span>}
+              {sources.length > 1 && <span style={{ marginLeft: 6, color: 'rgba(99,102,241,0.6)', fontWeight: 600, fontSize: 9 }}>par vidéo</span>}
             </div>
             <div style={{ display: 'flex', gap: 5 }}>
               {[3, 5, 10, 25].map(n => (
                 <button key={n} onClick={() => setCount(n)} disabled={running} className="cursor-pointer"
-                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: count === n ? 'rgba(34,211,238,0.15)' : 'var(--surface-2)', color: count === n ? '#22d3ee' : 'var(--text-3)', outline: count === n ? '1px solid rgba(34,211,238,0.3)' : '1px solid transparent' }}
+                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: count === n ? 'rgba(99,102,241,0.15)' : 'var(--surface-2)', color: count === n ? '#6366F1' : 'var(--text-3)', outline: count === n ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent' }}
                 >{n}</button>
               ))}
             </div>
             <input type="range" min={1} max={50} value={count} disabled={running}
               onChange={e => setCount(Number(e.target.value))}
-              style={{ width: '100%', marginTop: 8, accentColor: '#22d3ee', cursor: 'pointer' }}
+              style={{ width: '100%', marginTop: 8, accentColor: '#6366F1', cursor: 'pointer' }}
             />
             <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
               {sources.length > 1
-                ? <span><span style={{ color: '#22d3ee', fontWeight: 700 }}>{count}</span> /vidéo · <span style={{ color: '#6366F1', fontWeight: 700 }}>{totalJobs}</span> total</span>
+                ? <span><span style={{ color: '#6366F1', fontWeight: 700 }}>{count}</span> /vidéo · <span style={{ color: '#6366F1', fontWeight: 700 }}>{totalJobs}</span> total</span>
                 : `${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
             </div>
           </div>
@@ -542,7 +542,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div className="sf-section-label" style={{ marginBottom: 8 }}>{t('repurposeIntensitySection')}</div>
             {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(lv => {
               const meta = {
-                subtle:     { label: t('repurposeSubtle'),     desc: '~75-90% · couleur + zoom léger',    color: '#22d3ee', bars: 1 },
+                subtle:     { label: t('repurposeSubtle'),     desc: '~75-90% · couleur + zoom léger',    color: '#6366F1', bars: 1 },
                 medium:     { label: t('repurposeMedium'),     desc: '~60-80% · temp. couleur + teinte',  color: '#fbbf24', bars: 2 },
                 aggressive: { label: t('repurposeAggressive'), desc: '~42-65% · fort changement visuel',  color: '#f87171', bars: 3 },
               }[lv]
@@ -584,7 +584,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
               {([[`9:16`, t('repurposeTikTok')], [`1:1`, t('repurposeSquare')], [`16:9`, t('repurposeYouTube')], [`keep`, t('repurposeOriginal')]] as [Format, string][]).map(([f, lbl]) => (
                 <button key={f} onClick={() => setFormat(f)} disabled={running} className="cursor-pointer"
-                  style={{ padding: '8px 4px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: format === f ? 'rgba(34,211,238,0.12)' : 'var(--surface-2)', color: format === f ? '#22d3ee' : 'var(--text-3)', outline: format === f ? '1px solid rgba(34,211,238,0.25)' : '1px solid var(--border)' }}
+                  style={{ padding: '8px 4px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: format === f ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)', color: format === f ? '#6366F1' : 'var(--text-3)', outline: format === f ? '1px solid rgba(99,102,241,0.25)' : '1px solid var(--border)' }}
                 >{lbl}</button>
               ))}
             </div>
@@ -603,12 +603,12 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 </span>
                 {!isWeb && (
                   <button onClick={() => setSaveToBank(v => !v)} disabled={running} className="cursor-pointer"
-                    style={{ position: 'relative', width: 36, height: 20, borderRadius: 99, background: saveToBank ? 'linear-gradient(130deg,#22d3ee,#818cf8)' : 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s' }}
+                    style={{ position: 'relative', width: 36, height: 20, borderRadius: 99, background: saveToBank ? 'linear-gradient(130deg,#6366F1,#818cf8)' : 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s' }}
                   >
                     <span style={{ position: 'absolute', top: 2, left: saveToBank ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', display: 'block' }} />
                   </button>
                 )}
-                {isWeb && <span className="sf-badge" style={{ fontSize: 9, color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', padding: '1px 6px' }}>ON</span>}
+                {isWeb && <span className="sf-badge" style={{ fontSize: 9, color: '#6366F1', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '1px 6px' }}>ON</span>}
               </div>
 
               {(isWeb || saveToBank) && (
@@ -650,10 +650,10 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               className="sf-btn sf-btn-lg cursor-pointer"
               style={{
                 width: '100%',
-                background: !sources.length ? 'var(--surface-2)' : running ? 'rgba(239,68,68,0.12)' : 'linear-gradient(135deg,rgba(34,211,238,0.22),rgba(129,140,248,0.22))',
-                color: !sources.length ? 'var(--text-4)' : running ? '#f87171' : '#22d3ee',
-                border: sources.length ? `1px solid ${running ? 'rgba(239,68,68,0.28)' : 'rgba(34,211,238,0.32)'}` : '1px solid var(--border)',
-                boxShadow: sources.length && !running ? '0 0 24px rgba(34,211,238,0.14)' : 'none',
+                background: !sources.length ? 'var(--surface-2)' : running ? 'rgba(239,68,68,0.12)' : 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
+                color: !sources.length ? 'var(--text-4)' : running ? '#f87171' : '#6366F1',
+                border: sources.length ? `1px solid ${running ? 'rgba(239,68,68,0.28)' : 'rgba(99,102,241,0.32)'}` : '1px solid var(--border)',
+                boxShadow: sources.length && !running ? '0 0 24px rgba(99,102,241,0.14)' : 'none',
                 cursor: sources.length ? 'pointer' : 'not-allowed',
                 justifyContent: 'center',
               }}
@@ -681,10 +681,10 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div className="sf-empty anim-stagger" style={{ height: '100%' }}>
               {/* Animated icon */}
               <div style={{ position: 'relative', width: 76, height: 76, margin: '0 auto 8px' }}>
-                <div style={{ position: 'absolute', inset: -14, borderRadius: '50%', border: '1px dashed rgba(34,211,238,0.18)', animation: 'spin 14s linear infinite' }} />
+                <div style={{ position: 'absolute', inset: -14, borderRadius: '50%', border: '1px dashed rgba(99,102,241,0.18)', animation: 'spin 14s linear infinite' }} />
                 <div style={{ position: 'absolute', inset: -6, borderRadius: '50%', border: '1px dashed rgba(99,102,241,0.12)', animation: 'spin 20s linear infinite reverse' }} />
-                <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, rgba(34,211,238,0.1), rgba(129,140,248,0.06))', border: '1px solid rgba(34,211,238,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(34,211,238,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, rgba(99,102,241,0.1), rgba(129,140,248,0.06))', border: '1px solid rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(99,102,241,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                   </svg>
                 </div>
@@ -702,7 +702,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   { label: 'Encoding', icon: 'M2 12h2m16 0h2M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41' },
                   { label: 'Hash unique', icon: 'M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18' },
                 ].map(pill => (
-                  <span key={pill.label} className="sf-badge" style={{ padding: '4px 10px', background: 'rgba(34,211,238,0.05)', color: 'rgba(34,211,238,0.65)', border: '1px solid rgba(34,211,238,0.12)', fontSize: 10, gap: 5 }}>
+                  <span key={pill.label} className="sf-badge" style={{ padding: '4px 10px', background: 'rgba(99,102,241,0.05)', color: 'rgba(99,102,241,0.65)', border: '1px solid rgba(99,102,241,0.12)', fontSize: 10, gap: 5 }}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d={pill.icon}/></svg>
                     {pill.label}
                   </span>
@@ -716,9 +716,9 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   <div key={si}>
                     {sources.length > 1 && (
                       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(34,211,238,0.6)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(99,102,241,0.6)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.name}</span>
-                        <span className="sf-badge" style={{ fontSize: 9, color: 'rgba(34,211,238,0.5)', background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.12)', flexShrink: 0 }}>
+                        <span className="sf-badge" style={{ fontSize: 9, color: 'rgba(99,102,241,0.5)', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)', flexShrink: 0 }}>
                           {srcJobs.filter(j => j.status === 'done').length}/{srcJobs.length}
                         </span>
                       </div>

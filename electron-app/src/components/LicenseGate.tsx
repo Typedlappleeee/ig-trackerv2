@@ -22,7 +22,7 @@ const PLANS = [
     credits: '2 500',
     phones:  '50 téléphones',
     posting: 'Mass posting 10 comptes',
-    accent:  '#60a5fa',
+    accent:  '#818CF8',
   },
   {
     name:          'Pro',

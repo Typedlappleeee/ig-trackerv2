@@ -15,7 +15,7 @@ export function BankHub({ user, initialTab = 'videos' }: { user: User; initialTa
       id:        'videos',
       label:     'Vidéos & médias',
       accentRgb: '34,211,238',
-      accent:    '#22d3ee',
+      accent:    '#6366F1',
       icon: (
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>

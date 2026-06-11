@@ -1249,7 +1249,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div onClick={() => setOrgMenuOpen(false)} className="fixed inset-0 z-[9998]" style={{ background: 'transparent' }} />
           <div
             className="fixed z-[9999] rounded-xl shadow-2xl overflow-hidden anim-slide-down"
-            style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width, background: '#0c0919', border: '1px solid rgba(99,102,241,0.2)' }}
+            style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width, background: '#13141A', border: '1px solid rgba(99,102,241,0.2)' }}
           >
             {myOrgs.map(({ org }) => (
               <button
@@ -1341,7 +1341,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div onClick={() => setUserMenuOpen(false)} className="fixed inset-0 z-[9998]" style={{ background: 'transparent' }} />
           <div
             className="fixed z-[9999] rounded-xl shadow-2xl overflow-hidden anim-slide-down"
-            style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240), background: '#0c0919', border: '1px solid rgba(99,102,241,0.2)' }}
+            style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240), background: '#13141A', border: '1px solid rgba(99,102,241,0.2)' }}
           >
             <div className="px-3 py-3 border-b flex items-center gap-2.5" style={{ borderColor: 'rgba(99,102,241,0.12)', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(233,234,240,0.04))' }}>
               <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[13px] font-black flex-shrink-0"

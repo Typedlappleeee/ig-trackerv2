@@ -211,8 +211,8 @@ export function Licences({ user: _user }: Props) {
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d100"
-            style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 0 18px -6px rgba(139,92,246,0.45)' }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(99,102,241,0.15))', border: '1px solid rgba(99,102,241,0.25)', boxShadow: '0 0 18px -6px rgba(99,102,241,0.45)' }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
             </svg>
           </div>
@@ -251,7 +251,7 @@ export function Licences({ user: _user }: Props) {
         {/* Create key */}
         <div className="sf-card p-6 space-y-5 mt-6 sf-anim-slide-up sf-d150">
           <div className="flex items-center gap-2 mb-1">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14"/>
             </svg>
             <p className="text-[15px] font-bold text-text">{t('createKey')}</p>
@@ -284,7 +284,7 @@ export function Licences({ user: _user }: Props) {
                     key={d.label}
                     onClick={() => setDuration(d.days)}
                     className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
-                    style={duration === d.days ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={duration === d.days ? { background: 'linear-gradient(130deg,#6366F1,#6366F1)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     {d.label}
                   </button>
@@ -299,7 +299,7 @@ export function Licences({ user: _user }: Props) {
                     key={p}
                     onClick={() => setPlan(p)}
                     className={`px-3 py-1.5 rounded-lg text-[13px] font-medium capitalize transition-all cursor-pointer ${plan === p ? 'text-white' : 'text-text2 hover:text-text'}`}
-                    style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={plan === p ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     {p}
                   </button>
@@ -330,7 +330,7 @@ export function Licences({ user: _user }: Props) {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg text-[13px] font-medium capitalize transition-all cursor-pointer ${filter === f ? 'text-white' : 'text-text2 hover:text-text'}`}
-                style={filter === f ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.4)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={filter === f ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.4)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
               >
                 {f === 'all' ? (lang === 'en' ? 'All' : 'Toutes') : f === 'active' ? t('keyAvailable') : f === 'used' ? t('keyActivated') : t('keyExpired')}
               </button>
@@ -424,8 +424,8 @@ export function Licences({ user: _user }: Props) {
         <div className="mt-10 space-y-5 sf-reveal">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.1))', border: '1px solid rgba(139,92,246,0.2)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(6,182,212,0.1))', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>
               </svg>
             </div>

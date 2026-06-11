@@ -252,7 +252,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
       <div className="sf-modal w-96 anim-scale-in" onClick={e => e.stopPropagation()}>
         <div className="sf-modal-header">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)', color: '#6366F1' }}>
               <IconUpload size={16} />
             </div>
             <h3 className="sf-modal-title">{t('bankAddMedia')}</h3>
@@ -746,8 +746,8 @@ export function Bank({ user }: BankProps) {
             className="flex flex-col items-center gap-4 px-20 py-14 rounded-3xl"
             style={{
               background: 'rgba(7,7,11,0.92)',
-              border: '2px dashed rgba(34,211,238,0.6)',
-              boxShadow: '0 0 60px -10px rgba(34,211,238,0.4)',
+              border: '2px dashed rgba(99,102,241,0.6)',
+              boxShadow: '0 0 60px -10px rgba(99,102,241,0.4)',
               backdropFilter: 'blur(24px)',
             }}
           >
@@ -761,16 +761,16 @@ export function Bank({ user }: BankProps) {
       )}
 
       {/* ── Premium page header ── */}
-      <header className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between gap-4" style={{ borderBottom: '1px solid rgba(34,211,238,0.1)' }}>
+      <header className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between gap-4" style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
         {/* Icon + title */}
         <div className="flex items-center gap-3.5 min-w-0">
           <div
             className="w-11 h-11 rounded-[13px] flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
             style={{
-              background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
-              border: '1px solid rgba(34,211,238,0.3)',
-              boxShadow: '0 0 20px -6px rgba(34,211,238,0.4)',
-              color: '#22d3ee',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.05))',
+              border: '1px solid rgba(99,102,241,0.3)',
+              boxShadow: '0 0 20px -6px rgba(99,102,241,0.4)',
+              color: '#6366F1',
             }}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">

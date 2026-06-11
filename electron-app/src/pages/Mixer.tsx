@@ -65,10 +65,10 @@ function PickerSidebar({
   }
   const active0 = active === null
   return (
-    <div style={{ width: 160, flexShrink: 0, borderRight: '1px solid rgba(139,92,246,0.08)', overflowY: 'auto', padding: '4px 0' }}>
+    <div style={{ width: 160, flexShrink: 0, borderRight: '1px solid rgba(99,102,241,0.08)', overflowY: 'auto', padding: '4px 0' }}>
       <button
         onClick={() => onSelect(null)}
-        style={{ ...btnBase, background: active0 ? 'rgba(139,92,246,0.12)' : 'transparent', borderLeft: `2px solid ${active0 ? '#8B5CF6' : 'transparent'}`, color: active0 ? '#c4b5fd' : '#52525b', paddingLeft: active0 ? 10 : 12 }}
+        style={{ ...btnBase, background: active0 ? 'rgba(99,102,241,0.12)' : 'transparent', borderLeft: `2px solid ${active0 ? '#6366F1' : 'transparent'}`, color: active0 ? '#818CF8' : '#52525b', paddingLeft: active0 ? 10 : 12 }}
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span style={{ flex: 1 }}>{allLabel}</span>
@@ -80,7 +80,7 @@ function PickerSidebar({
           <button
             key={f}
             onClick={() => onSelect(f)}
-            style={{ ...btnBase, background: isA ? 'rgba(139,92,246,0.12)' : 'transparent', borderLeft: `2px solid ${isA ? '#8B5CF6' : 'transparent'}`, color: isA ? '#c4b5fd' : '#52525b', paddingLeft: isA ? 10 : 12 }}
+            style={{ ...btnBase, background: isA ? 'rgba(99,102,241,0.12)' : 'transparent', borderLeft: `2px solid ${isA ? '#6366F1' : 'transparent'}`, color: isA ? '#818CF8' : '#52525b', paddingLeft: isA ? 10 : 12 }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
@@ -128,11 +128,11 @@ function VideoPicker({
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }} onClick={onClose}>
-      <div style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 20, width: 900, maxWidth: '95vw', height: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: '#0E0E16', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 20, width: 900, maxWidth: '95vw', height: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)', flexShrink: 0 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', flexShrink: 0 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
           </div>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: '#fff', flex: 1 }}>Banque vidéo</h2>
           <input
@@ -160,11 +160,11 @@ function VideoPicker({
                   return (
                     <div key={item.id} onClick={() => toggle(item.id)}
                       className="sf-hover-lift"
-                      style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', border: `2px solid ${sel ? '#8B5CF6' : 'rgba(139,92,246,0.08)'}`, background: '#07070B', transition: 'border-color 0.12s, transform 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease', position: 'relative' }}>
+                      style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', border: `2px solid ${sel ? '#6366F1' : 'rgba(99,102,241,0.08)'}`, background: '#07070B', transition: 'border-color 0.12s, transform 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease', position: 'relative' }}>
                       <VideoThumb item={item} size="md" />
                       <p style={{ fontSize: 10, color: '#94a3b8', padding: '5px 6px 5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</p>
                       {sel && (
-                        <div style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 6, background: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 6, background: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="1.5 5 4 7.5 8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </div>
                       )}
@@ -214,11 +214,11 @@ function CaptionPicker({
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }} onClick={onClose}>
-      <div style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 20, width: 720, maxWidth: '95vw', height: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: '#0E0E16', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 20, width: 720, maxWidth: '95vw', height: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)', flexShrink: 0 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', flexShrink: 0 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </div>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: '#fff', flex: 1 }}>Banque de captions</h2>
           <input
@@ -246,8 +246,8 @@ function CaptionPicker({
                   return (
                     <div key={item.id} onClick={() => toggle(item.id)}
                       className="sf-hover-lift"
-                      style={{ padding: '12px 14px', borderRadius: 12, background: sel ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.025)', border: `1px solid ${sel ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`, cursor: 'pointer', transition: 'all 0.12s', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? '#8B5CF6' : 'rgba(255,255,255,0.15)'}`, background: sel ? '#8B5CF6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                      style={{ padding: '12px 14px', borderRadius: 12, background: sel ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.025)', border: `1px solid ${sel ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`, cursor: 'pointer', transition: 'all 0.12s', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? '#6366F1' : 'rgba(255,255,255,0.15)'}`, background: sel ? '#6366F1' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                         {sel && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="1.5 5 4 7.5 8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -362,12 +362,12 @@ export function Mixer({ user }: MixerProps) {
           <div style={{
             width: 44, height: 44, borderRadius: 13, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(139,92,246,0.12))',
-            border: '1px solid rgba(139,92,246,0.3)',
-            boxShadow: '0 0 24px -6px rgba(139,92,246,0.5)',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(99,102,241,0.12))',
+            border: '1px solid rgba(99,102,241,0.3)',
+            boxShadow: '0 0 24px -6px rgba(99,102,241,0.5)',
           }}>
             {/* Edit + merge icon */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
@@ -375,7 +375,7 @@ export function Mixer({ user }: MixerProps) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h1 className="sf-page-title" style={{
-                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(196,181,253,0.9) 100%)',
+                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(233,234,240,0.9) 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 fontSize: 22, fontWeight: 900,
               }}>
@@ -383,7 +383,7 @@ export function Mixer({ user }: MixerProps) {
               </h1>
               {running ? (
                 <span className="sf-badge sf-badge-accent" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block' }} />
+                  <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#818CF8', display: 'inline-block' }} />
                   En cours
                 </span>
               ) : (
@@ -428,8 +428,8 @@ export function Mixer({ user }: MixerProps) {
           {/* Panel header */}
           <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
+              <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
               </div>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Vidéos source</span>
             </div>
@@ -479,8 +479,8 @@ export function Mixer({ user }: MixerProps) {
           {/* Panel header */}
           <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               </div>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Captions</span>
             </div>
@@ -538,7 +538,7 @@ export function Mixer({ user }: MixerProps) {
               <div style={{ display: 'flex', gap: 8 }}>
                 {(['top', 'center', 'bottom'] as MixPosition[]).map(p => (
                   <button key={p} onClick={() => setPosition(p)} className="cursor-pointer"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, transition: 'all 0.12s', border: position === p ? '1px solid rgba(139,92,246,0.4)' : '1px solid var(--border)', background: position === p ? 'rgba(139,92,246,0.18)' : 'var(--surface)', color: position === p ? '#c4b5fd' : 'var(--text-3)', cursor: 'pointer' }}>
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, transition: 'all 0.12s', border: position === p ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', background: position === p ? 'rgba(99,102,241,0.18)' : 'var(--surface)', color: position === p ? '#818CF8' : 'var(--text-3)', cursor: 'pointer' }}>
                     {p === 'top' ? <><IconChevronUp size={14} /> Haut</> : p === 'center' ? <><IconAlignCenter size={14} /> Centre</> : <><IconChevronDown size={14} /> Bas</>}
                   </button>
                 ))}
@@ -552,7 +552,7 @@ export function Mixer({ user }: MixerProps) {
                 <span className="sf-badge sf-badge-accent">{fontSize}px</span>
               </div>
               <input type="range" min={18} max={72} step={2} value={fontSize} onChange={e => setFontSize(Number(e.target.value))}
-                style={{ width: '100%', accentColor: '#8B5CF6', cursor: 'pointer' }} />
+                style={{ width: '100%', accentColor: '#6366F1', cursor: 'pointer' }} />
             </div>
 
             {/* Font color */}
@@ -563,7 +563,7 @@ export function Mixer({ user }: MixerProps) {
                   style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border-md)', background: 'transparent', cursor: 'pointer', padding: 2 }} />
                 {['#ffffff', '#000000', '#ffff00', '#ff4444', '#44aaff'].map(c => (
                   <button key={c} onClick={() => setFontColor(c)} className="cursor-pointer"
-                    style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: `2px solid ${fontColor === c ? '#8B5CF6' : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', transform: fontColor === c ? 'scale(1.15)' : 'scale(1)', transition: 'all 0.1s' }} />
+                    style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: `2px solid ${fontColor === c ? '#6366F1' : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', transform: fontColor === c ? 'scale(1.15)' : 'scale(1)', transition: 'all 0.1s' }} />
                 ))}
               </div>
             </div>
@@ -571,13 +571,13 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Summary card */}
           {canStart && (
-            <div className="sf-card anim-scale-in" style={{ padding: '16px 20px', borderColor: 'rgba(139,92,246,0.25)', background: 'rgba(139,92,246,0.06)' }}>
+            <div className="sf-card anim-scale-in" style={{ padding: '16px 20px', borderColor: 'rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.06)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.15)', flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <div style={{ width: 32, height: 32, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', flexShrink: 0 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 </div>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: '#c4b5fd' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#818CF8' }}>
                     {mode === 'random'
                       ? `${selVideos.length} vidéo${selVideos.length > 1 ? 's' : ''} × 1 caption = ${selVideos.length} résultat${selVideos.length > 1 ? 's' : ''}`
                       : `${selVideos.length} × ${selCaptions.length} = ${selVideos.length * selCaptions.length} résultat${selVideos.length * selCaptions.length > 1 ? 's' : ''}`
