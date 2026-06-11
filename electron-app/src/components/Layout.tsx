@@ -98,6 +98,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Outils vidéo',
     defaultOpen: true,
     items: [
+      { id: 'montage',     label: 'pageMontage',    icon: '✂️' },
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
       { id: 'mixer',       label: 'navMixer',       icon: '🎞️', isNew: true },
@@ -158,22 +159,11 @@ const PAGE_ICON: Record<string, IconKey> = {
   mixer:       'edit',
   textcopy:    'edit',
   scaleia:     'sparkles',
-}
-
-// Section label — editorial eyebrow (gold, wide letter-spacing)
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      padding: '16px 12px 7px',
-      fontSize: 10.5,
-      fontWeight: 600,
-      textTransform: 'uppercase',
-      letterSpacing: '0.07em',
-      color: 'rgba(233,234,240,0.35)',
-    }}>
-      {children}
-    </div>
-  )
+  hub:         'grid',
+  settings:    'settings',
+  licences:    'shield',
+  community:   'chat',
+  support:     'chat',
 }
 
 // Sidebar divider — hairline
@@ -493,92 +483,46 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   }) => {
     const active = page === id
     const [hovered, setHovered] = useState(false)
-    const [pressed, setPressed] = useState(false)
+    const [tooltipY, setTooltipY] = useState(0)
+    const btnRef = useRef<HTMLButtonElement>(null)
+
     return (
-      <div style={{ position: 'relative', marginBottom: 2 }}>
+      <div style={{ marginBottom: 2 }}>
         <button
+          ref={btnRef}
+          className={`sf-sidebar-item${active ? ' is-active' : ''}`}
           onClick={() => { playNav(); onNavigate(id) }}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => { setHovered(false); setPressed(false) }}
-          onMouseDown={() => setPressed(true)}
-          onMouseUp={() => setPressed(false)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: collapsed ? 0 : 10,
-            width: '100%',
-            height: 36,
-            padding: '0 11px',
-            borderRadius: 5,
-            fontSize: 13.5,
-            fontWeight: active ? 600 : 450,
-            textAlign: 'left',
-            cursor: 'pointer',
-            border: 'none',
-            background: active
-              ? 'linear-gradient(90deg, rgba(99,102,241,0.16) 0%, rgba(99,102,241,0.08) 60%, transparent 100%)'
-              : hovered ? 'rgba(255,255,255,0.045)' : 'transparent',
-            color: active ? '#E9EAF0' : hovered ? 'rgba(241,240,247,0.82)' : 'rgba(233,234,240,0.48)',
-            boxShadow: active ? 'inset 3px 0 0 rgba(99,102,241,0.85)' : 'none',
-            transition: 'background 140ms ease, color 140ms ease, box-shadow 140ms ease',
-            transform: pressed ? 'scale(0.968)' : 'scale(1)',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            flexShrink: 0,
-            position: 'relative',
-            outline: 'none',
+          onMouseEnter={() => {
+            setHovered(true)
+            if (collapsed && btnRef.current) {
+              const r = btnRef.current.getBoundingClientRect()
+              setTooltipY(r.top + r.height / 2)
+            }
           }}
+          onMouseLeave={() => setHovered(false)}
+          style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
         >
-          <span style={{
-            flexShrink: 0,
-            display: 'flex',
-            color: active ? '#818CF8' : hovered ? 'rgba(233,234,240,0.65)' : 'rgba(233,234,240,0.32)',
-            transition: 'color 140ms ease',
-          }}>
+          <span className="sf-sidebar-icon">
             <NavIcon d={ICONS[iconKey]} size={17} />
           </span>
           {!collapsed && (
             <>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
               {beta && (
-                <span title="Fonctionnalité en test — comportement susceptible d'évoluer" style={{
-                  fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
-                  padding: '2px 6px', borderRadius: 4,
-                  background: 'rgba(99,102,241,0.15)', color: '#6366F1',
-                  border: '1px solid rgba(99,102,241,0.2)', flexShrink: 0,
-                }}>BETA</span>
+                <span title="Fonctionnalité en test — comportement susceptible d'évoluer" className="sf-badge sf-badge-beta" style={{ fontSize: 9, letterSpacing: '0.08em' }}>BETA</span>
               )}
               {isNew && (
-                <span title="Nouvelle fonctionnalité" style={{
-                  fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
-                  padding: '2px 6px', borderRadius: 4,
-                  background: 'rgba(16,185,129,0.15)', color: '#34d399',
-                  border: '1px solid rgba(52,211,153,0.2)', flexShrink: 0,
-                }}>NEW</span>
+                <span title="Nouvelle fonctionnalité" className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.08em' }}>NEW</span>
               )}
             </>
           )}
         </button>
-        {/* Floating tooltip when sidebar is collapsed */}
+        {/* Floating tooltip — collapsed mode */}
         {collapsed && hovered && (
-          <div style={{
-            position: 'fixed',
-            left: 60,
-            top: 'auto',
-            transform: 'translateY(-50%)',
-            background: '#13141A',
-            border: '1px solid rgba(99,102,241,0.28)',
-            borderRadius: 7,
-            padding: '5px 11px',
-            fontSize: 12,
-            fontWeight: 500,
-            color: '#E9EAF0',
-            whiteSpace: 'nowrap',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.06)',
-            zIndex: 9999,
-            pointerEvents: 'none',
-            animation: 'sf-slide-left 0.16s cubic-bezier(0.22,1,0.36,1) both',
-          }}>
+          <div className="sf-sidebar-tooltip" style={{ left: 58, top: tooltipY }}>
             {label}
+            {beta && <span style={{ marginLeft: 6, fontSize: 9, color: 'rgba(148,163,184,0.5)' }}>BETA</span>}
+            {isNew && <span style={{ marginLeft: 6, fontSize: 9, color: '#34d399' }}>NEW</span>}
           </div>
         )}
       </div>
@@ -687,133 +631,74 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 6px 8px' }}>
 
           {/* Hub — home, pinned at top */}
-          <button
-            onClick={() => { playNav(); onNavigate('hub') }}
-            title={collapsed ? t('navHub') : undefined}
-            style={{
-              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
-              fontSize: 13.5, fontWeight: page === 'hub' ? 600 : 400, textAlign: 'left',
-              cursor: 'pointer', border: 'none',
-              background: page === 'hub'
-                ? 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0.06) 60%, transparent 100%)'
-                : 'transparent',
-              color: page === 'hub' ? '#E9EAF0' : 'rgba(233,234,240,0.5)',
-              boxShadow: page === 'hub' ? 'inset 2px 0 0 rgba(99,102,241,0.9)' : 'none',
-              transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              marginBottom: 2,
-            }}
-            onMouseEnter={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
-            onMouseLeave={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
-          >
-            <span style={{ flexShrink: 0, color: page === 'hub' ? '#818CF8' : 'rgba(233,234,240,0.35)', display: 'flex' }}>
-              <NavIcon d={ICONS.grid} size={17} />
-            </span>
-            {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
-          </button>
+          <div style={{ marginBottom: 2 }}>
+            <button
+              className={`sf-sidebar-item${page === 'hub' ? ' is-active' : ''}`}
+              onClick={() => { playNav(); onNavigate('hub') }}
+              style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+            >
+              <span className="sf-sidebar-icon"><NavIcon d={ICONS.grid} size={17} /></span>
+              {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
+            </button>
+          </div>
 
           {/* Community — pinned */}
           {isVisibleTab('community') && (
-            <button
-              onClick={() => { playNav(); onNavigate('community') }}
-              title={collapsed ? t('navCommunity') : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-                width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
-                fontSize: 13.5, fontWeight: page === 'community' ? 600 : 400, textAlign: 'left',
-                cursor: 'pointer', border: 'none',
-                background: page === 'community'
-                  ? 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0.06) 60%, transparent 100%)'
-                  : 'transparent',
-                color: page === 'community' ? '#E9EAF0' : 'rgba(233,234,240,0.5)',
-                boxShadow: page === 'community' ? 'inset 2px 0 0 rgba(99,102,241,0.9)' : 'none',
-                transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                marginBottom: 2,
-              }}
-              onMouseEnter={e => {
-                if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
-              }}
-              onMouseLeave={e => {
-                if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-              }}
-            >
-              <span style={{ flexShrink: 0, color: page === 'community' ? '#818CF8' : 'rgba(233,234,240,0.35)', display: 'flex' }}>
-                <NavIcon d={ICONS.chat} size={17} />
-              </span>
-              {!collapsed && <span style={{ flex: 1 }}>{t('navCommunity')}</span>}
-            </button>
+            <div style={{ marginBottom: 2 }}>
+              <button
+                className={`sf-sidebar-item${page === 'community' ? ' is-active' : ''}`}
+                onClick={() => { playNav(); onNavigate('community') }}
+                style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+              >
+                <span className="sf-sidebar-icon"><NavIcon d={ICONS.chat} size={17} /></span>
+                {!collapsed && <span style={{ flex: 1 }}>{t('navCommunity')}</span>}
+              </button>
+            </div>
           )}
 
           <SidebarDivider />
 
-          {/* Principal section */}
-          {(() => {
-            const items = NAV_SECTIONS[0].items.filter(it => isVisibleTab(it.id))
-            if (items.length === 0) return null
-            return (
-              <>
-                {!collapsed && <SectionLabel>{t('sectionPrincipal')}</SectionLabel>}
-                {items.map(item => (
-                  <SidebarNavItem
-                    key={item.id}
-                    id={item.id}
-                    label={t(item.label as any)}
-                    iconKey={PAGE_ICON[item.id] ?? 'phone'}
-                    beta={item.beta}
-                    isNew={item.isNew}
-                  />
-                ))}
-              </>
-            )
-          })()}
-
-          <SidebarDivider />
-
-          {/* Instagram section */}
-          {(() => {
-            const items = NAV_SECTIONS[1].items.filter(it => isVisibleTab(it.id))
-            if (items.length === 0) return null
-            return (
-              <>
-                {!collapsed && <SectionLabel>{t('sectionInstagram')}</SectionLabel>}
-                {items.map(item => (
-                  <SidebarNavItem
-                    key={item.id}
-                    id={item.id}
-                    label={t(item.label as any)}
-                    iconKey={PAGE_ICON[item.id] ?? 'send'}
-                    beta={item.beta}
-                    isNew={item.isNew}
-                  />
-                ))}
-              </>
-            )
-          })()}
-
-          <SidebarDivider />
-
-          {/* Creation section */}
-          {(() => {
-            const items = NAV_SECTIONS[2].items.filter(it => isVisibleTab(it.id))
-            if (items.length === 0) return null
-            return (
-              <>
-                {!collapsed && <SectionLabel>{t('sectionCreation')}</SectionLabel>}
-                {items.map(item => (
-                  <SidebarNavItem
-                    key={item.id}
-                    id={item.id}
-                    label={t(item.label as any)}
-                    iconKey={PAGE_ICON[item.id] ?? 'edit'}
-                    beta={item.beta}
-                    isNew={item.isNew}
-                  />
-                ))}
-              </>
-            )
-          })()}
+          {/* Sections — collapsible */}
+          {([
+            { section: NAV_SECTIONS[0], labelKey: 'sectionPrincipal',  defaultIcon: 'phone'  as IconKey },
+            { section: NAV_SECTIONS[1], labelKey: 'sectionInstagram',  defaultIcon: 'send'   as IconKey },
+            { section: NAV_SECTIONS[2], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
+          ] as Array<{ section: typeof NAV_SECTIONS[0]; labelKey: string; defaultIcon: IconKey }>)
+            .map(({ section, labelKey, defaultIcon }) => {
+              const items = section.items.filter(it => isVisibleTab(it.id))
+              if (items.length === 0) return null
+              const isOpen = openSections[section.title] !== false
+              return (
+                <div key={section.title}>
+                  <SidebarDivider />
+                  {!collapsed && (
+                    <button
+                      className={`sf-sidebar-section${isOpen ? '' : ' is-closed'}`}
+                      onClick={() => toggleSection(section.title)}
+                    >
+                      <span className="sf-sidebar-section-label">{t(labelKey as any)}</span>
+                      <span className="sf-sidebar-section-line" />
+                      <span className="sf-sidebar-section-arrow">
+                        <NavIcon d={ICONS.chevronDown} size={10} />
+                      </span>
+                    </button>
+                  )}
+                  <div className={`sf-sidebar-items-wrap${(isOpen || collapsed) ? ' is-open' : ' is-closed'}`}>
+                    {items.map(item => (
+                      <SidebarNavItem
+                        key={item.id}
+                        id={item.id}
+                        label={t(item.label as any)}
+                        iconKey={PAGE_ICON[item.id] ?? defaultIcon}
+                        beta={item.beta}
+                        isNew={item.isNew}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })
+          }
 
         </nav>
 
@@ -822,61 +707,21 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
           {/* Settings */}
           <button
+            className={`sf-sidebar-item${page === 'settings' ? ' is-active' : ''}`}
             onClick={() => { playNav(); onNavigate('settings') }}
-            title={collapsed ? t('navSettings') : undefined}
-            style={{
-              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
-              fontSize: 13.5, fontWeight: page === 'settings' ? 600 : 400, textAlign: 'left',
-              cursor: 'pointer', border: 'none',
-              background: page === 'settings'
-                ? 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0.06) 60%, transparent 100%)'
-                : 'transparent',
-              color: page === 'settings' ? '#E9EAF0' : 'rgba(233,234,240,0.5)',
-              boxShadow: page === 'settings' ? 'inset 2px 0 0 rgba(99,102,241,0.9)' : 'none',
-              transition: 'background 0.15s, box-shadow 0.15s',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-            }}
-            onMouseEnter={e => {
-              if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
-            }}
-            onMouseLeave={e => {
-              if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            }}
+            style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
           >
-            <span style={{ flexShrink: 0, color: page === 'settings' ? '#818CF8' : 'rgba(233,234,240,0.35)', display: 'flex' }}>
-              <NavIcon d={ICONS.settings} size={17} />
-            </span>
+            <span className="sf-sidebar-icon"><NavIcon d={ICONS.settings} size={17} /></span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navSettings')}</span>}
           </button>
 
           {license.isSuperAdmin && (
             <button
+              className={`sf-sidebar-item${page === 'licences' ? ' is-active' : ''}`}
               onClick={() => { playNav(); onNavigate('licences') }}
-              title={collapsed ? t('navAdmin') : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-                width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
-                fontSize: 13.5, fontWeight: page === 'licences' ? 600 : 400, textAlign: 'left',
-                cursor: 'pointer', border: 'none',
-                background: page === 'licences'
-                  ? 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0.06) 60%, transparent 100%)'
-                  : 'transparent',
-                color: page === 'licences' ? '#E9EAF0' : 'rgba(233,234,240,0.5)',
-                boxShadow: page === 'licences' ? 'inset 2px 0 0 rgba(99,102,241,0.9)' : 'none',
-                transition: 'background 0.15s, box-shadow 0.15s',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-              }}
-              onMouseEnter={e => {
-                if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
-              }}
-              onMouseLeave={e => {
-                if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-              }}
+              style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
             >
-              <span style={{ flexShrink: 0, color: page === 'licences' ? '#818CF8' : 'rgba(233,234,240,0.35)', display: 'flex' }}>
-                <NavIcon d={ICONS.shield} size={17} />
-              </span>
+              <span className="sf-sidebar-icon"><NavIcon d={ICONS.shield} size={17} /></span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
             </button>
           )}
@@ -1095,8 +940,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
               {/* Notifications panel */}
               {notifOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50"
-                  style={{ background: '#0F1014', border: '1px solid rgba(99,102,241,0.2)', boxShadow: '0 16px 48px -8px rgba(0,0,0,0.8), 0 0 0 1px rgba(99,102,241,0.08)' }}>
+                <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50 sf-anim-slide-down"
+                  style={{ background: '#0F1014', border: '1px solid rgba(99,102,241,0.2)', boxShadow: '0 16px 56px -8px rgba(0,0,0,0.85), 0 0 0 1px rgba(99,102,241,0.08), 0 0 40px -16px rgba(99,102,241,0.2)' }}>
 
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>

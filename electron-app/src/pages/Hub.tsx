@@ -70,14 +70,20 @@ function KpiCard({ label, value, icon, loading, accent, delay = 0 }: {
   loading?: boolean; accent?: boolean; delay?: number
 }) {
   return (
-    <div style={{
-      flex: 1, minWidth: 0,
-      padding: '18px 22px',
-      background: BG2,
-      border: `1px solid ${accent ? 'rgba(99,102,241,0.22)' : HAIR}`,
-      borderRadius: 10,
-      animation: `hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) ${delay}s both`,
-    }}>
+    <div
+      className="sf-card-lift"
+      style={{
+        flex: 1, minWidth: 0,
+        padding: '18px 22px',
+        background: BG2,
+        border: `1px solid ${accent ? 'rgba(99,102,241,0.22)' : HAIR}`,
+        borderRadius: 12,
+        animation: `hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) ${delay}s both`,
+        transition: 'border-color 200ms ease, box-shadow 240ms ease, transform 240ms cubic-bezier(0.22,1,0.36,1)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <span style={{
           fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
@@ -107,25 +113,14 @@ function KpiCard({ label, value, icon, loading, accent, delay = 0 }: {
 function QuickBtn({ label, icon, primary, onClick }: {
   label: string; icon: string; primary?: boolean; onClick: () => void
 }) {
-  const [hover, setHover] = useState(false)
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => { setHover(true); playTick() }}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 9,
-        padding: '11px 20px', borderRadius: 8, cursor: 'pointer',
-        border: primary ? 'none' : `1px solid ${hover ? 'rgba(99,102,241,0.4)' : HAIR}`,
-        background: primary
-          ? (hover ? GOLD_D : GOLD)
-          : (hover ? 'rgba(99,102,241,0.08)' : BG2),
-        color: primary ? '#fff' : (hover ? GOLD_L : IVORY),
-        fontFamily: SANS, fontSize: 13.5, fontWeight: 600,
-        transition: 'all 0.18s',
-      }}
+      onMouseEnter={() => playTick()}
+      className={primary ? 'sf-btn sf-btn-primary' : 'sf-btn sf-btn-secondary'}
+      style={{ fontSize: 13, gap: 8, height: 38, padding: '0 18px' }}
     >
-      <SvgIcon d={ICONS[icon]} size={15} color="currentColor" strokeWidth={2} />
+      <SvgIcon d={ICONS[icon]} size={14} color="currentColor" strokeWidth={2} />
       {label}
     </button>
   )
@@ -153,21 +148,12 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Tool chip ──────────────────────────────────────────────────────────────────
 function ToolChip({ label, icon, onClick }: { label: string; icon: string; onClick: () => void }) {
-  const [hover, setHover] = useState(false)
   return (
     <button
       onClick={() => { playNav(); onClick() }}
-      onMouseEnter={() => { setHover(true); playTick() }}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 8,
-        padding: '8px 15px', borderRadius: 7, cursor: 'pointer',
-        border: `1px solid ${hover ? 'rgba(99,102,241,0.35)' : HAIR}`,
-        background: hover ? 'rgba(99,102,241,0.07)' : 'transparent',
-        color: hover ? GOLD_L : MUTED,
-        fontFamily: SANS, fontSize: 12.5, fontWeight: 500,
-        transition: 'all 0.16s', whiteSpace: 'nowrap',
-      }}
+      onMouseEnter={() => playTick()}
+      className="sf-btn sf-btn-ghost"
+      style={{ fontSize: 12.5, height: 32, gap: 7, padding: '0 13px', fontWeight: 500 }}
     >
       <SvgIcon d={ICONS[icon]} size={13} color="currentColor" />
       {label}
@@ -316,23 +302,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           </div>
           <button
             onClick={load}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 7,
-              padding: '8px 14px', borderRadius: 7, cursor: 'pointer',
-              border: `1px solid ${HAIR}`, background: 'transparent',
-              color: MUTED, fontSize: 12, fontWeight: 500, fontFamily: SANS,
-              transition: 'all 0.18s',
-            }}
-            onMouseEnter={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.borderColor = 'rgba(99,102,241,0.3)'
-              el.style.color = GOLD_L
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.borderColor = HAIR
-              el.style.color = MUTED
-            }}
+            className="sf-btn sf-btn-ghost"
+            style={{ fontSize: 12, height: 32, gap: 7, padding: '0 12px' }}
           >
             <SvgIcon d={ICONS.refresh} size={13} color="currentColor" />
             {t('hubRefresh')}
@@ -478,7 +449,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             }}>{t('hubAllTools')}</span>
             <div style={{ flex: 1, height: 1, background: HAIR }} />
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+          <div className="anim-stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {TOOL_SHORTCUTS.map(tool => (
               <ToolChip
                 key={tool.id}
