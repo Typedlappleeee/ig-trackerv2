@@ -430,7 +430,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
       {/* Global progress bar */}
       {running && (
-        <div className="sf-progress" style={{ borderRadius: 0, height: 2, flexShrink: 0 }}>
+        <div className="sf-progress" style={{ borderRadius: 99, height: 3, flexShrink: 0 }}>
           <div className="sf-progress-bar" style={{ width: `${donePct}%`, boxShadow: '0 0 8px rgba(99,102,241,0.5)' }} />
         </div>
       )}

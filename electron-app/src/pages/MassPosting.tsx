@@ -764,7 +764,7 @@ export function MassPosting({ user }: MassPostingProps) {
           {/* Right: live state + mode */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             {/* Mode seq/random */}
-            <div style={{ display: 'flex', border: `1px solid ${HAIR}` }}>
+            <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 8, overflow: 'hidden' }}>
               {([{ k: 'seq', label: t('schedulerSequential') }, { k: 'random', label: t('schedulerRandom') }] as const).map(m => (
                 <button key={m.k} onClick={() => setMode(m.k)}
                   className="cursor-pointer"
@@ -782,7 +782,7 @@ export function MassPosting({ user }: MassPostingProps) {
             {/* Status chip */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px',
-              border: `1px solid ${posting ? 'rgba(99,102,241,0.4)' : HAIR}`,
+              border: `1px solid ${posting ? 'rgba(99,102,241,0.4)' : HAIR}`, borderRadius: 8,
             }}>
               <span style={{
                 width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
@@ -828,10 +828,11 @@ export function MassPosting({ user }: MassPostingProps) {
                 {progressPct}%
               </span>
             </div>
-            <div style={{ height: 2, background: 'rgba(233,234,240,0.06)' }}>
+            <div style={{ height: 3, background: 'rgba(233,234,240,0.06)', borderRadius: 99 }}>
               <div style={{
-                height: '100%', width: `${progressPct}%`, transition: 'width 0.7s ease',
+                height: '100%', width: `${progressPct}%`, transition: 'width 0.7s ease', borderRadius: 99,
                 background: progressPct >= 100 ? '#7FD9B8' : `linear-gradient(90deg, #4F46E5, ${GOLD})`,
+                boxShadow: progressPct > 0 ? '0 0 8px -2px rgba(99,102,241,0.6)' : 'none',
               }} />
             </div>
           </div>
