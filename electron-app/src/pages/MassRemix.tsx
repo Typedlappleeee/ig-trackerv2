@@ -1510,36 +1510,30 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       {/* ── MAIN PAGE ── */}
       <div className="anim-page flex flex-col overflow-hidden" style={{ height: '100%' }}>
 
-        {/* ── Premium Page Header ── */}
+        {/* ── Page header ── */}
         <div className="flex-shrink-0 flex items-center justify-between border-b border-border"
-          style={{
-            padding: isMobile ? '10px 14px' : '14px 24px',
-            background: 'linear-gradient(90deg,rgba(99,102,241,0.08) 0%,rgba(99,102,241,0.03) 50%,transparent 100%)',
-          }}>
+          style={{ padding: isMobile ? '10px 14px' : '14px 24px' }}>
           {/* Left: icon + title */}
-          <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
+          <div className="flex items-center gap-3.5 min-w-0">
             {!isMobile && (
-              <div className="flex-shrink-0 flex items-center justify-center rounded-xl"
+              <div
+                className="sf-anim-scale-spring"
                 style={{
-                  width: 42, height: 42,
-                  background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(99,102,241,0.10))',
-                  border: '1px solid rgba(99,102,241,0.32)',
-                  boxShadow: '0 0 18px -4px rgba(99,102,241,0.45)',
+                  width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(99,102,241,0.08)',
+                  border: '1px solid rgba(99,102,241,0.28)',
+                  color: '#6366F1',
                 }}>
-                <IconZap size={20} style={{ color: '#c084fc' }} />
+                <IconZap size={22} />
               </div>
             )}
-            <div>
-              <h1 className="font-black leading-none tracking-tight"
-                style={{
-                  fontSize: isMobile ? 16 : 22, margin: 0,
-                  background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(233,234,240,0.82) 100%)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                }}>
+            <div className="min-w-0 sf-anim-slide-up sf-d50">
+              <h1 className="sf-page-title" style={{ fontSize: isMobile ? 16 : 22, letterSpacing: '-0.03em' }}>
                 {t('massRemixTitle')}
               </h1>
               {!isMobile && (
-                <p className="text-[11px] text-text3 mt-0.5 font-medium">{t('massRemixSub')}</p>
+                <p className="sf-page-sub">{t('massRemixSub')}</p>
               )}
             </div>
           </div>
@@ -1553,8 +1547,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               </span>
             )}
             {!isMobile && secondaries.length > 0 && (
-              <span className="sf-badge text-[10px] font-bold"
-                style={{ background: 'rgba(99,102,241,0.12)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.25)' }}>
+              <span className="sf-badge sf-badge-accent text-[10px] font-bold">
                 {secondaries.length} phase 1
               </span>
             )}
@@ -1570,10 +1563,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               onClick={() => launch()} disabled={!canLaunch}
               className="sf-btn sf-btn-primary transition-all"
               style={{
-                fontSize: isMobile ? 12 : 13, fontWeight: 800,
+                fontSize: isMobile ? 12 : 13,
                 opacity: canLaunch ? 1 : 0.45,
                 cursor: canLaunch ? 'pointer' : 'not-allowed',
-                boxShadow: canLaunch ? '0 4px 18px rgba(99,102,241,0.4)' : 'none',
               }}>
               <IconZap size={isMobile ? 13 : 14} />
               <span>

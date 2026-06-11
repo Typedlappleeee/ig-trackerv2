@@ -760,16 +760,17 @@ export function Bank({ user }: BankProps) {
         </div>
       )}
 
-      {/* ── Premium page header ── */}
+      {/* ── Page header ── */}
       <header className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between gap-4" style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
         {/* Icon + title */}
         <div className="flex items-center gap-3.5 min-w-0">
           <div
-            className="w-11 h-11 rounded-[13px] flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
+            className="sf-anim-scale-spring"
             style={{
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.05))',
-              border: '1px solid rgba(99,102,241,0.3)',
-              boxShadow: '0 0 20px -6px rgba(99,102,241,0.4)',
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.28)',
               color: '#6366F1',
             }}
           >
@@ -779,10 +780,10 @@ export function Bank({ user }: BankProps) {
           </div>
           <div className="min-w-0 sf-anim-slide-up sf-d50">
             <div className="flex items-center gap-2.5">
-              <h1 className="text-[22px] font-black text-text leading-none tracking-tight" style={{ letterSpacing: '-0.025em' }}>{t('bankTitle')}</h1>
+              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('bankTitle')}</h1>
               <span className="sf-badge sf-badge-accent text-[11px]">{items.length}</span>
             </div>
-            <p className="text-[12px] mt-1 text-text3">{t('bankSubtitle')}</p>
+            <p className="sf-page-sub">{t('bankSubtitle')}</p>
           </div>
         </div>
 

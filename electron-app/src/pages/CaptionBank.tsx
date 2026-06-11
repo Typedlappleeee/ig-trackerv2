@@ -403,15 +403,27 @@ export function CaptionBank({ user }: CaptionBankProps) {
 
         {/* Header */}
         <div className="flex-shrink-0 px-7 py-4 border-b border-border flex items-center gap-3">
-          <div className="flex items-center gap-3 flex-1 sf-anim-slide-up sf-d50">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.1))', border: '1px solid rgba(99,102,241,0.2)' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <div className="flex items-center gap-3.5 flex-1 min-w-0">
+            <div
+              className="sf-anim-scale-spring"
+              style={{
+                width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(99,102,241,0.08)',
+                border: '1px solid rgba(99,102,241,0.28)',
+                color: '#6366F1',
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>
             </div>
-            <h1 className="text-[20px] font-black text-text leading-none">Banque de Captions</h1>
-            <span className="sf-badge sf-badge-accent sf-anim-scale-spring sf-d200">{items.length}</span>
+            <div className="min-w-0 sf-anim-slide-up sf-d50">
+              <div className="flex items-center gap-2.5">
+                <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>Banque de Captions</h1>
+                <span className="sf-badge sf-badge-accent sf-anim-scale-spring sf-d200">{items.length}</span>
+              </div>
+            </div>
           </div>
 
           {/* Search */}
