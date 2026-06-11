@@ -334,7 +334,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
       <div style={{ position: 'relative', overflow: 'hidden', padding: '64px 48px 0' }}>
         {/* glow discret */}
         <div style={{ position: 'absolute', top: -140, left: '30%', width: 600, height: 320, background: 'radial-gradient(ellipse, rgba(201,181,132,0.05), transparent 65%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: -100, right: '10%', width: 420, height: 280, background: 'radial-gradient(ellipse, rgba(139,92,246,0.05), transparent 65%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -100, right: '10%', width: 420, height: 280, background: 'radial-gradient(ellipse, rgba(201,181,132,0.04), transparent 65%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', maxWidth: 1140, margin: '0 auto' }}>
           {/* Ligne méta */}

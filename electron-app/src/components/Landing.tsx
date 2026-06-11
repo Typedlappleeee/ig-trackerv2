@@ -553,7 +553,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
   return (
     <section style={{ position: 'relative', minHeight: 'calc(100vh - 64px)', overflow: 'hidden', background: BG, display: 'flex', flexDirection: 'column' }}>
       {/* glow */}
-      <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', width: 900, height: 700, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(139,92,246,0.05), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', width: 900, height: 700, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(201,181,132,0.04), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', top: '46%', left: '50%', transform: 'translate(-50%,-50%)', width: 560, height: 420, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(201,181,132,0.05), transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
 
       {/* Floating reels — refined monochrome frames */}
