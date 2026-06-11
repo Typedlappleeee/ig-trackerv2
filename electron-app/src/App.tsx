@@ -676,7 +676,10 @@ function AppContent({ user }: { user: User }) {
   // is not open. Uses the same atomic claimScheduledPost guard so it never
   // double-executes with the Scheduler page's own timers.
   useEffect(() => {
-    if (!window.electronAPI) return  // web mode has no GéeLark IPC — skip
+    // Runs on desktop AND web: main.tsx installs the webAPI shim as
+    // window.electronAPI in the browser, so GéeLark calls go through /api/*.
+    // The atomic claim prevents double-execution across tabs/devices.
+    if (!window.electronAPI) return
     const timers = new Map<string, ReturnType<typeof setTimeout>>()
     const running = new Set<string>()
 
@@ -689,6 +692,13 @@ function AppContent({ user }: { user: User }) {
       const ok = await executeScheduledPost(post, msg => logs.push(msg))
       await finishScheduledPost(post.id, ok, logs, ok ? undefined : logs[logs.length - 1])
       running.delete(post.id)
+      // Notify completion — the user may be on any page (or away)
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        const typeLabel = post.type === 'story' ? 'Stories' : post.type === 'mass_posting' ? 'Mass posting' : 'Posting'
+        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
+          body: `${post.phones?.length ?? 0} compte(s) — ScaleFlow`,
+        })
+      }
     }
 
     const schedule = (post: ScheduledPost) => {

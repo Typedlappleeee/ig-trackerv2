@@ -5,6 +5,22 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
 
 import { timeUntil, defaultSchedValue } from './schedulerService'
+import { scheduledPostCost, CREDIT_COSTS } from './credits'
+
+describe('scheduledPostCost', () => {
+  it('mass_posting : 2 crédits par téléphone', () => {
+    expect(scheduledPostCost('mass_posting', 10)).toBe(10 * CREDIT_COSTS.mass_posting)
+  })
+  it('story : 1 crédit par téléphone', () => {
+    expect(scheduledPostCost('story', 5)).toBe(5 * CREDIT_COSTS.story)
+  })
+  it('posting : 1 crédit par téléphone', () => {
+    expect(scheduledPostCost('posting', 3)).toBe(3 * CREDIT_COSTS.posting)
+  })
+  it('zéro téléphone = zéro coût', () => {
+    expect(scheduledPostCost('mass_posting', 0)).toBe(0)
+  })
+})
 
 describe('timeUntil', () => {
   it('retourne "maintenant" pour une date passée', () => {

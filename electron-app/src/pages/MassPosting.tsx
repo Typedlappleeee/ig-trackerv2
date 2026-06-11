@@ -343,6 +343,11 @@ export function MassPosting({ user }: MassPostingProps) {
     if (!bearer)                    { log('Missing GéeLark token — Settings', 'error'); return }
     if (phoneList.length === 0)     { log('Select at least one phone', 'warn'); return }
     if (selectedVideos.length === 0){ log('Select at least one video', 'warn'); return }
+    // GéeLark expire les fichiers uploadés après 30 jours — bloque au-delà de 25
+    if (scheduledAt.getTime() > Date.now() + 25 * 24 * 60 * 60 * 1000) {
+      log('❌ Programmation limitée à 25 jours (les vidéos uploadées chez GéeLark expirent après 30 jours)', 'error')
+      return
+    }
     setShowScheduleModal(false)
     setPosting(true); setLogs([])
     postingStartRef.current.clear()
@@ -359,25 +364,48 @@ export function MassPosting({ user }: MassPostingProps) {
         ? selectedVideos
         : selectedVideos.slice(0, Math.min(phoneList.length, selectedVideos.length))
 
+      // Crédits débités à la programmation (remboursés si annulation avant exécution)
+      const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
+      const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
+      if (!creditRes.ok) {
+        log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost} pour ${phoneList.length} téléphone${phoneList.length > 1 ? 's' : ''})`, 'error')
+        return
+      }
+      if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
+      log(`💳 ${creditCost} crédits débités — remboursés si tu annules avant l'exécution`, 'ok')
+
+      // Refund helper: any failure between deduction and creation gives the credits back
+      const refundOnFailure = async (reason: string) => {
+        const { refundCredits } = await import('@/lib/credits')
+        const ok = await refundCredits(credits.ownerId, creditCost)
+        log(`❌ ${reason}${ok ? ` — ${creditCost} crédits remboursés` : ''}`, 'error')
+        if (ok) credits.refresh()
+      }
+
       log(`📤 Upload de ${videosToSchedule.length} vidéo(s) vers GéeLark…`)
       const tokenMap = new Map<number, string>()
       for (let i = 0; i < videosToSchedule.length; i++) {
         const sv = videosToSchedule[i]
         const filePath = await resolveVideoPath(sv)
-        if (!filePath) { log(`❌ Chemin manquant pour ${sv.item.title}`, 'error'); return }
+        if (!filePath) { await refundOnFailure(`Chemin manquant pour ${sv.item.title}`); return }
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
-        if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.item.title}: ${up.error}`, 'error'); return }
+        if (!up.ok || !up.token) { await refundOnFailure(`Upload échoué pour ${sv.item.title}: ${up.error}`); return }
         tokenMap.set(i, up.token)
         log(`✅ Vidéo ${i + 1}/${videosToSchedule.length} prête`, 'ok')
       }
-      await createScheduledPost({
-        userId: user.id, orgId: currentOrg?.id ?? null,
-        createdByName: user.email?.split('@')[0] ?? 'Moi',
-        type: 'mass_posting', scheduledAt,
-        phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
-        videos: videosToSchedule.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
-        caption, delayMinutes: 0, mode, bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
-      })
+      try {
+        await createScheduledPost({
+          userId: user.id, orgId: currentOrg?.id ?? null,
+          createdByName: user.email?.split('@')[0] ?? 'Moi',
+          type: 'mass_posting', scheduledAt,
+          phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
+          videos: videosToSchedule.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
+          caption, delayMinutes: 0, mode, bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
+        })
+      } catch (err: any) {
+        await refundOnFailure(`Programmation échouée : ${err.message}`)
+        return
+      }
       log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
     } catch (err: any) {
       log(`❌ Erreur: ${err.message}`, 'error')

@@ -817,6 +817,8 @@ export function Community({ user, onNavigate }: CommunityProps) {
   const topicListRef   = useRef<HTMLDivElement>(null)
   const [messages, setMessages]     = useState<Message[]>([])
   const [loading, setLoading]       = useState(true)
+  const [hasMore, setHasMore]       = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [needsSetup, setNeedsSetup] = useState(false)
   const [profile, setProfile]       = useState<Profile>({ display_name: '', avatar_url: null, name_updated_at: null })
   const [showProfile, setShowProfile]   = useState(false)
@@ -864,8 +866,26 @@ export function Community({ user, onNavigate }: CommunityProps) {
     if (error) { if (error.code === '42P01') setNeedsSetup(true); setLoading(false); return }
     setNeedsSetup(false)
     setMessages((data ?? []).reverse())
+    setHasMore((data?.length ?? 0) >= 300)
     setLoading(false)
   }, [])
+
+  // Pagination: prepend the 200 messages older than the oldest one displayed
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingMore || messages.length === 0) return
+    setLoadingMore(true)
+    const oldest = messages[0].created_at
+    const { data } = await supabase
+      .from('community_messages')
+      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, thread_user_id, video_url, created_at')
+      .lt('created_at', oldest)
+      .order('created_at', { ascending: false })
+      .limit(200)
+    const older = (data ?? []).reverse()
+    if (older.length > 0) setMessages(prev => [...older, ...prev])
+    setHasMore(older.length >= 200)
+    setLoadingMore(false)
+  }, [messages, loadingMore])
 
   const loadReactions = useCallback(async () => {
     const { data } = await supabase.from('community_reactions').select('user_id, message_id')
@@ -1358,6 +1378,22 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 </div>
               ) : (
                 <>
+                  {/* Load older messages */}
+                  {hasMore && (
+                    <button
+                      onClick={loadOlderMessages}
+                      disabled={loadingMore}
+                      className="w-full py-2 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer"
+                      style={{
+                        background: 'rgba(99,102,241,0.06)', color: '#818CF8',
+                        border: '1px solid rgba(99,102,241,0.18)',
+                        opacity: loadingMore ? 0.5 : 1,
+                      }}
+                    >
+                      {loadingMore ? 'Chargement…' : '↑ Charger les messages plus anciens'}
+                    </button>
+                  )}
+
                   {/* Featured / pinned card */}
                   {featuredMsg && (
                     <div className="sf-card sf-card-lift sf-spotlight overflow-hidden cursor-pointer"

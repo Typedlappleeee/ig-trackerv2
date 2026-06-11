@@ -26,7 +26,17 @@ export const CREDIT_COSTS = {
   clone_vid:    0.5,  // per video (CloneVid / VideoRepurpose)
   posting:      1,    // per phone (Posting)
   mass_posting: 2,    // per phone (MassPosting)
+  story:        1,    // per phone (Story / StoryLink)
 } as const
+
+// Cost of a scheduled post, derived from its type — used for deduction at
+// scheduling time and refund on cancellation.
+export function scheduledPostCost(type: string, phoneCount: number): number {
+  const perPhone = type === 'mass_posting' ? CREDIT_COSTS.mass_posting
+    : type === 'story' ? CREDIT_COSTS.story
+    : CREDIT_COSTS.posting
+  return phoneCount * perPhone
+}
 
 // Credit packs — intentionally more expensive per credit than subscriptions
 // to encourage monthly plans (Standard = $0.020/cr, Pro = $0.0182/cr, Org = $0.0136/cr)
@@ -97,6 +107,23 @@ export async function checkAndDeductCredits(
     return data ?? { ok: false, error: 'Erreur inconnue' }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// Refund credits (e.g. cancelled scheduled post). Uses the refund_user_credits
+// RPC (see supabase/migrations/20260611_credits_and_heartbeat.sql). Silently
+// no-ops if the RPC isn't deployed yet — the deduction stays, which is the
+// safe direction for the business.
+export async function refundCredits(userId: string, amount: number): Promise<boolean> {
+  if (amount <= 0) return true
+  try {
+    const { error } = await supabase.rpc('refund_user_credits', {
+      p_user_id: userId,
+      p_amount:  amount,
+    })
+    return !error
+  } catch {
+    return false
   }
 }
 

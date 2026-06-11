@@ -5,6 +5,7 @@ import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, postInstagramStory, stopPhone, type GeelarkPhone } from '@/lib/geelark'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
+import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
 import { playSuccess, playError } from '@/lib/sounds'
 import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
@@ -167,6 +168,7 @@ export default function StoryLink({ user }: { user: User }) {
   const conns  = useConnections(user)
   const bearer = conns.bearer
   const { role, perms, currentOrg } = useOrg()
+  const credits = useCredits()
 
   // ── Phones ────────────────────────────────────────────────────────────────
   const [phones, setPhones]           = useState<GeelarkPhone[]>([])
@@ -189,6 +191,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [running, setRunning]               = useState(false)
   const [jobs, setJobs]                     = useState<Job[]>([])
   const [openLog, setOpenLog]               = useState<string | null>(null)
+  const [dryRun, setDryRun]                 = useState(false)
   const [showSchedule, setShowSchedule]     = useState(false)
   const [schedAt, setSchedAt]               = useState(() => defaultSchedValue(60))
   const [schedDelay, setSchedDelay]         = useState(2)
@@ -278,6 +281,19 @@ export default function StoryLink({ user }: { user: User }) {
   // ── Run ───────────────────────────────────────────────────────────────────
   async function run() {
     if (!canRun || !bearer) return
+
+    // Crédits : 1 par compte (comme le posting simple) — le mode test est gratuit
+    if (!dryRun) {
+      const creditCost = selectedIds.length * CREDIT_COSTS.story
+      const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
+      if (!creditRes.ok) {
+        playError()
+        setJobs(selectedIds.map(id => ({ phoneId: id, status: 'error', logs: [`[err] ${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost})`] })))
+        return
+      }
+      if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
+    }
+
     abortRef.current = false
     const assignments = buildAssignments(selectedIds)
     setRunning(true)
@@ -298,7 +314,7 @@ export default function StoryLink({ user }: { user: User }) {
       try {
         const res = await postInstagramStory(
           bearer, asgn.phoneId,
-          { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined },
+          { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun },
           m => addLog(asgn.phoneId, m),
         )
         if (res.ok) { setStatus(asgn.phoneId, 'ok'); okCount++ }
@@ -327,6 +343,15 @@ export default function StoryLink({ user }: { user: User }) {
         setScheduling(false)
         return
       }
+      // Crédits débités à la programmation — remboursés si annulation avant exécution
+      const creditCost = selectedIds.length * CREDIT_COSTS.story
+      const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
+      if (!creditRes.ok) {
+        setSchedErr(`${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost} crédits)`)
+        setScheduling(false)
+        return
+      }
+      if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
       // Freeze assignments now — each phone carries its photo/link/text
       const assignments = buildAssignments(selectedIds)
       await createScheduledPost({
@@ -359,7 +384,11 @@ export default function StoryLink({ user }: { user: User }) {
       setSchedDone(`${assignments.length} story(s) programmée(s) pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
       setTimeout(() => { setShowSchedule(false); setSchedDone('') }, 2200)
     } catch (e) {
-      setSchedErr(e instanceof Error ? e.message : String(e))
+      // Échec après déduction → remboursement
+      const refundAmount = selectedIds.length * CREDIT_COSTS.story
+      const refunded = await refundCredits(credits.ownerId, refundAmount)
+      if (refunded) credits.refresh()
+      setSchedErr(`${e instanceof Error ? e.message : String(e)}${refunded ? ` — ${refundAmount} crédits remboursés` : ''}`)
     } finally {
       setScheduling(false)
     }
@@ -422,6 +451,24 @@ export default function StoryLink({ user }: { user: User }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          {/* Dry-run toggle — runs the full automation but stops before publishing */}
+          <button
+            onClick={() => setDryRun(v => !v)}
+            disabled={running}
+            title="Déroule toute l'automation (image, caméra, sticker, lien) mais s'arrête avant de publier. Gratuit — idéal pour vérifier que le flux marche sur tes téléphones."
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '8px 13px', borderRadius: 8, cursor: 'pointer',
+              fontSize: 12, fontWeight: 600,
+              background: dryRun ? 'rgba(251,191,36,0.12)' : 'transparent',
+              border: `1px solid ${dryRun ? 'rgba(251,191,36,0.4)' : HAIR}`,
+              color: dryRun ? '#fbbf24' : 'var(--text-3)',
+              transition: 'all 0.15s',
+            }}
+          >
+            🧪 Mode test{dryRun ? ' ON' : ''}
+          </button>
+
           {/* Schedule button */}
           <button
             onClick={() => { setSchedAt(defaultSchedValue(60)); setSchedErr(''); setShowSchedule(true) }}

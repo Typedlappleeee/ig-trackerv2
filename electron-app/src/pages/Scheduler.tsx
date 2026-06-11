@@ -44,6 +44,8 @@ import {
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
 import { CreateScheduleModal } from '@/components/CreateScheduleModal'
+import { useCredits } from '@/lib/credits'
+import { useToast } from '@/components/Toast'
 
 interface Props { user: User; onNavigate?: (page: string, tab?: string) => void }
 
@@ -377,6 +379,8 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
 export function Scheduler({ user, onNavigate }: Props) {
   const t                         = useT()
   const { role }                  = useOrg()
+  const credits                   = useCredits()
+  const toast                     = useToast()
   const [posts, setPosts]         = useState<ScheduledPost[]>([])
   const [loading, setLoading]     = useState(true)
   const [tab, setTab]             = useState<TabFilter>('pending')
@@ -426,6 +430,18 @@ export function Scheduler({ user, onNavigate }: Props) {
       await finishScheduledPost(post.id, ok, msgs, ok ? undefined : msgs[msgs.length - 1])
       setRunningPost(null)
       runningRef.current.delete(post.id)
+      // Notify completion (toast + system notification)
+      const typeLabel = post.type === 'story' ? 'Stories' : post.type === 'mass_posting' ? 'Mass posting' : 'Posting'
+      toast.show({
+        title: ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`,
+        body: `${post.phones.length} compte${post.phones.length > 1 ? 's' : ''}`,
+        kind: ok ? 'ok' : 'error',
+      })
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
+          body: `${post.phones.length} compte${post.phones.length > 1 ? 's' : ''} — ScaleFlow`,
+        })
+      }
       reload()
     }
 
@@ -491,9 +507,13 @@ export function Scheduler({ user, onNavigate }: Props) {
     setCancelling(id)
     const timer = timersRef.current.get(id)
     if (timer) { clearTimeout(timer); timersRef.current.delete(id) }
-    await cancelScheduledPost(id)
+    const { refunded } = await cancelScheduledPost(id, credits.ownerId)
     setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p))
     setCancelling(null)
+    if (refunded > 0) {
+      credits.refresh()
+      toast.show({ title: 'Post annulé', body: `${refunded} crédits remboursés`, kind: 'ok' })
+    }
   }
 
   const pending = posts.filter(p => p.status === 'pending' || p.status === 'running')

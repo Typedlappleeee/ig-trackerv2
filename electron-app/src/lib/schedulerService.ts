@@ -97,37 +97,93 @@ export async function resolveBearerToken(post: ScheduledPost): Promise<string> {
   return post.bearer_token || ''
 }
 
-export async function cancelScheduledPost(id: string): Promise<void> {
-  // 'running' included: a post stuck in running (app closed mid-execution) must be stoppable
+// Cancels a post. Pending posts are refunded (credits were deducted at
+// scheduling time); running posts are stoppable but NOT refunded — the work
+// is already happening.
+export async function cancelScheduledPost(
+  id: string,
+  refundOwnerId?: string,
+): Promise<{ refunded: number }> {
+  // Phase 1: cancel while still pending → refund
+  const { data: pendingRows } = await supabase.from('scheduled_posts')
+    .update({ status: 'cancelled' })
+    .eq('id', id).eq('status', 'pending')
+    .select('type, phones')
+  if (pendingRows?.length) {
+    const row = pendingRows[0] as { type: string; phones: unknown }
+    const phones = (typeof row.phones === 'string' ? JSON.parse(row.phones) : row.phones) as unknown[]
+    if (refundOwnerId) {
+      const { scheduledPostCost, refundCredits } = await import('./credits')
+      const amount = scheduledPostCost(row.type, phones?.length ?? 0)
+      const ok = await refundCredits(refundOwnerId, amount)
+      return { refunded: ok ? amount : 0 }
+    }
+    return { refunded: 0 }
+  }
+  // Phase 2: post already running (stuck, app closed mid-run) — stop it, no refund
   await supabase.from('scheduled_posts')
     .update({ status: 'cancelled' })
-    .eq('id', id).in('status', ['pending', 'running'])
+    .eq('id', id).eq('status', 'running')
+  return { refunded: 0 }
 }
 
-// Self-healing: a post claimed as 'running' whose execution started more than
-// maxAgeMin ago can't still be alive (executions cap at ~11 min) — the app was
-// closed mid-run. Mark those as failed so they stop showing as "en cours".
-// Stories get a much wider window (6 h): sequential UI automation with
-// delay_minutes between accounts can legitimately run for hours.
+// Self-healing for posts stuck in 'running' (app closed mid-execution).
+// Primary signal: heartbeat — a live execution updates heartbeat_at every 60 s,
+// so anything without a beat for 5 min is dead, regardless of type or duration.
+// Fallback (heartbeat column not migrated, or pre-migration rows with null
+// heartbeat): fixed windows — 30 min for posts, 6 h for stories (sequential
+// UI automation with delays can legitimately run for hours).
 export async function failStaleRunningPosts(maxAgeMin = 30): Promise<number> {
+  const errorMsg = "Interrompu — l'application a été fermée pendant l'exécution"
+  const beatCutoff = new Date(Date.now() - 5 * 60_000).toISOString()
+
+  // Heartbeat-based heal (precise) — ignore errors if the column doesn't exist yet
+  let healed = 0
+  try {
+    const { data, error } = await supabase.from('scheduled_posts')
+      .update({ status: 'failed', error_msg: errorMsg })
+      .eq('status', 'running')
+      .lt('heartbeat_at', beatCutoff)
+      .select('id')
+    if (!error) healed += data?.length ?? 0
+  } catch { /* column not migrated yet */ }
+
+  // Window-based fallback — only for rows WITHOUT a heartbeat (a live beat
+  // means the execution is alive no matter how long it runs). If the column
+  // isn't migrated yet, retry without the heartbeat filter (old behaviour).
   const cutoff      = new Date(Date.now() - maxAgeMin * 60_000).toISOString()
   const storyCutoff = new Date(Date.now() - 6 * 60 * 60_000).toISOString()
-  const errorMsg = "Interrompu — l'application a été fermée pendant l'exécution"
+  const windowHeal = async (storyType: boolean, c: string, withBeatFilter: boolean) => {
+    let q = supabase.from('scheduled_posts')
+      .update({ status: 'failed', error_msg: errorMsg })
+      .eq('status', 'running')
+    q = storyType ? q.eq('type', 'story') : q.neq('type', 'story')
+    if (withBeatFilter) q = q.is('heartbeat_at', null)
+    const { data, error } = await q
+      .or(`executed_at.lt.${c},and(executed_at.is.null,created_at.lt.${c})`)
+      .select('id')
+    if (error && withBeatFilter) return windowHeal(storyType, c, false)
+    return data?.length ?? 0
+  }
   const [a, b] = await Promise.all([
-    supabase.from('scheduled_posts')
-      .update({ status: 'failed', error_msg: errorMsg })
-      .eq('status', 'running')
-      .neq('type', 'story')
-      .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
-      .select('id'),
-    supabase.from('scheduled_posts')
-      .update({ status: 'failed', error_msg: errorMsg })
-      .eq('status', 'running')
-      .eq('type', 'story')
-      .or(`executed_at.lt.${storyCutoff},and(executed_at.is.null,created_at.lt.${storyCutoff})`)
-      .select('id'),
+    windowHeal(false, cutoff, true),
+    windowHeal(true, storyCutoff, true),
   ])
-  return (a.data?.length ?? 0) + (b.data?.length ?? 0)
+  return healed + a + b
+}
+
+// Keeps a 'running' post visibly alive: updates heartbeat_at every 60 s.
+// Returns a stop() function. Failures are silent (column may not exist yet).
+export function startHeartbeat(postId: string): () => void {
+  const beat = () => {
+    supabase.from('scheduled_posts')
+      .update({ heartbeat_at: new Date().toISOString() })
+      .eq('id', postId).eq('status', 'running')
+      .then(() => {}, () => {})
+  }
+  beat()
+  const timer = setInterval(beat, 60_000)
+  return () => clearInterval(timer)
 }
 
 // Loads all posts visible to the user (RLS handles org filtering)
@@ -220,6 +276,18 @@ async function executeScheduledStory(
 }
 
 export async function executeScheduledPost(
+  post: ScheduledPost,
+  onLog: (msg: string) => void,
+): Promise<boolean> {
+  const stopBeat = startHeartbeat(post.id)
+  try {
+    return await executeScheduledPostInner(post, onLog)
+  } finally {
+    stopBeat()
+  }
+}
+
+async function executeScheduledPostInner(
   post: ScheduledPost,
   onLog: (msg: string) => void,
 ): Promise<boolean> {

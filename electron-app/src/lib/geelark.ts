@@ -799,6 +799,7 @@ export interface StoryConfig {
   imageUrl: string            // public/signed URL of the image to post
   linkUrl:  string            // destination URL for the link sticker
   linkText?: string           // optional custom label shown on the sticker
+  dryRun?:  boolean           // run every step but stop right before publishing
 }
 
 export async function postInstagramStory(
@@ -1021,6 +1022,12 @@ export async function postInstagramStory(
   await sleep(1500)
 
   // ── 7. Publish to "Your story" ─────────────────────────────────────────────
+  if (config.dryRun) {
+    log('🧪 Mode test : toutes les étapes ont fonctionné — arrêt AVANT publication.')
+    log('   (image téléchargée, caméra story, galerie, sticker lien, URL saisie)')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android').catch(() => {})
+    return { ok: true }
+  }
   log('🚀 Publication de la story…')
   xml = await dumpXml(bearer, phoneId)
   const sharePt =
