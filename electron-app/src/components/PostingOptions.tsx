@@ -3,11 +3,42 @@ import { type PostingOpts, type IntervalMode, savePostingOpts } from '@/lib/post
 interface Props {
   opts: PostingOpts
   onChange: (o: PostingOpts) => void
+  /** Nombre de téléphones sélectionnés — permet d'estimer l'heure du dernier post */
+  phonesCount?: number
 }
 
-export function PostingOptions({ opts, onChange }: Props) {
+// ── SVG icons (no emoji) ───────────────────────────────────────────────────────
+
+function IconTimer({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 2h4" />
+      <circle cx="12" cy="14" r="8" />
+      <path d="M12 10v4" />
+    </svg>
+  )
+}
+
+function IconFlask({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 2v6.5L3.7 17a2 2 0 0 0 1.7 3h13.2a2 2 0 0 0 1.7-3L15 8.5V2" />
+      <path d="M7.5 2h9" />
+      <path d="M6.2 14h11.6" />
+    </svg>
+  )
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+export function PostingOptions({ opts, onChange, phonesCount }: Props) {
   function set(patch: Partial<PostingOpts>) {
     const next = { ...opts, ...patch }
+    // Clamp croisé : en mode aléatoire, min ne doit jamais dépasser max
+    if (next.intervalMin > next.intervalMax) {
+      if ('intervalMin' in patch) next.intervalMax = next.intervalMin
+      else next.intervalMin = next.intervalMax
+    }
     onChange(next)
     // Only persist the numeric values + trial toggle, not intervalMode (always starts OFF)
     savePostingOpts({ ...next, intervalMode: 'none' })
@@ -15,13 +46,28 @@ export function PostingOptions({ opts, onChange }: Props) {
 
   const on = opts.intervalMode !== 'none'
 
+  // Estimation de l'heure du dernier post (1er immédiat, puis +N min par téléphone)
+  const intervalLabel = opts.intervalMode === 'random'
+    ? `${opts.intervalMin}–${opts.intervalMax}`
+    : String(opts.intervalMin)
+  let lastPostEstimate: string | null = null
+  if (on && phonesCount && phonesCount > 1) {
+    const perPhone = opts.intervalMode === 'random'
+      ? Math.max(opts.intervalMin, opts.intervalMax)
+      : opts.intervalMin
+    const last = new Date(Date.now() + (phonesCount - 1) * perPhone * 60_000)
+    lastPostEstimate = `${pad2(last.getHours())}:${pad2(last.getMinutes())}`
+  }
+
   return (
     <div className="rounded-2xl p-4 space-y-3"
       style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
 
       {/* Header row with toggle */}
       <div className="flex items-center gap-3">
-        <span className="text-[13px]" style={{ color: 'rgba(148,163,184,0.4)' }}>⏱</span>
+        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
+          <IconTimer size={14} />
+        </span>
         <span className="flex-1 text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>
           Intervalle entre posts
         </span>
@@ -34,9 +80,19 @@ export function PostingOptions({ opts, onChange }: Props) {
         </button>
       </div>
 
+      {/* Help line */}
+      {on && (
+        <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)', margin: 0, paddingLeft: 26 }}>
+          1er post immédiat, puis +{intervalLabel} min par téléphone
+          {lastPostEstimate ? ` — dernier post vers ~${lastPostEstimate}` : ''}
+        </p>
+      )}
+
       {/* Reels Trial toggle */}
       <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-        <span className="text-[13px]" style={{ color: 'rgba(148,163,184,0.4)' }}>🧪</span>
+        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
+          <IconFlask size={14} />
+        </span>
         <div className="flex-1 min-w-0">
           <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Reels Trial</span>
           <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Montré uniquement aux non-abonnés</p>

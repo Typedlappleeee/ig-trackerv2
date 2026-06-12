@@ -16,7 +16,10 @@ import { loadPostingOpts, savePostingOpts, buildScheduleTimes, type PostingOpts 
 import { PostingOptions } from '@/components/PostingOptions'
 import { playSuccess } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
-import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { startCreditRun } from '@/lib/withCredits'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ACCENT_L, OK, ERR, WARN } from '@/lib/theme'
 import { useToast } from '@/components/Toast'
 
 interface PostingProps { user: User }
@@ -28,8 +31,12 @@ async function geelark(bearer: string, path: string, body: unknown) {
     method: 'POST', url: `${GEELARK}${path}`,
     headers: { Authorization: `Bearer ${bearer}` }, body,
   })
-  return r.data as Record<string, unknown>
+  // r peut être undefined/null sur timeout IPC → ne jamais déréférencer à l'aveugle
+  return (r?.data ?? {}) as Record<string, unknown>
 }
+
+/** Statut d'un téléphone pendant le run — affiché en direct dans la carte de progression */
+type PhoneRunStatus = { status: 'pending' | 'posting' | 'done' | 'error'; detail?: string }
 
 // Avatar color palette — deterministic by name
 const AVATAR_COLORS = [
@@ -158,7 +165,18 @@ export function Posting({ user }: PostingProps) {
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [aiExpanded, setAiExpanded]    = useState(false)
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
+  const [stopping, setStopping]        = useState(false)
+  const [phoneRun, setPhoneRun]        = useState<Map<string, PhoneRunStatus>>(new Map())
+  const [lastRun, setLastRun]          = useState<{ ok: number; err: number; total: number } | null>(null)
   const logEndRef                      = useRef<HTMLDivElement>(null)
+  const stopRef                        = useRef(false)
+  const activePhonesRef                = useRef<string[]>([])   // geelark_ids démarrés
+  const activeTasksRef                 = useRef<string[]>([])   // tâches RPA créées
+
+  function setPhoneRunStatus(id: string, st: PhoneRunStatus) {
+    setPhoneRun(prev => { const next = new Map(prev); next.set(id, st); return next })
+  }
 
   function setSelPhones(v: Set<string> | ((p: Set<string>) => Set<string>)) {
     _setSelPhones(prev => { const next = typeof v === 'function' ? v(prev) : v; setPostingState({ selectedPhones: next }); return next })
@@ -257,17 +275,36 @@ export function Posting({ user }: PostingProps) {
   }
 
   async function schedulePost(scheduledAt: Date) {
+    if (posting)                  return
     if (!bearer)                  { log('Missing GéeLark token — Settings', 'error'); return }
     if (selectedPhones.size === 0){ log('Select at least one phone', 'warn'); return }
     if (!filePath)                { log('Select a video', 'warn'); return }
+    if (caption.length > 2200)    { log('❌ Description trop longue (max 2200 caractères)', 'error'); return }
+    // GéeLark expire les fichiers uploadés après 30 jours — bloque au-delà de 25
+    if (scheduledAt.getTime() > Date.now() + 25 * 24 * 60 * 60 * 1000) {
+      log('❌ Programmation limitée à 25 jours (les vidéos uploadées chez GéeLark expirent après 30 jours)', 'error')
+      return
+    }
     setShowScheduleModal(false)
 
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
+    // Verrou AVANT le débit (anti double-clic), rollback si échec du débit
     setPosting(true); setLogs([]); setProgress(5)
+
+    // Crédits débités à la programmation (remboursés si annulation avant exécution)
+    const run = await startCreditRun(credits.ownerId, CREDIT_COSTS.posting, 1)
+    if (!run.ok) {
+      log(`❌ ${run.error}`, 'error')
+      setPosting(false); setProgress(0)
+      return
+    }
+    if (typeof run.balance === 'number') credits.setBalance(run.balance)
+    log(`💳 ${CREDIT_COSTS.posting} crédit débité — remboursé si tu annules avant l'exécution`, 'ok')
+
     try {
       log('📤 Uploading video to GéeLark…')
       const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
-      if (!up.ok || !up.token) { log(`❌ Upload failed: ${up.error}`, 'error'); return }
+      if (!up.ok || !up.token) { run.markFailed(1); log(`❌ Upload failed: ${up.error}`, 'error'); return }
       log(`✅ Video ready (token: ${up.token.slice(0, 12)}…)`, 'ok')
       await createScheduledPost({
         userId: user.id, orgId: currentOrg?.id ?? null,
@@ -278,31 +315,78 @@ export function Posting({ user }: PostingProps) {
         caption, delayMinutes: postingOpts.intervalMode !== 'none' ? postingOpts.intervalMin : 0, mode: 'seq', bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
       })
       log(`📅 Scheduled for ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} phone(s)`, 'ok')
+      toast.show({ title: 'Publication programmée 📅', body: fmtScheduledTime(scheduledAt.toISOString()), kind: 'ok' })
     } catch (err: any) {
+      run.markFailed(1)
       log(`❌ Erreur: ${err.message}`, 'error')
     } finally {
+      const { refunded } = await run.settle()
+      if (refunded > 0) { log(`💳 ${refunded} crédit(s) remboursé(s)`, 'ok'); credits.refresh() }
       setPosting(false); setProgress(0)
     }
   }
 
+  /** Arrêt d'urgence : annule les tâches RPA et éteint les téléphones démarrés */
+  async function stopRun() {
+    stopRef.current = true
+    setStopping(true)
+    log('🛑 Stop demandé — annulation des tâches et extinction des téléphones…', 'warn')
+    try {
+      if (activeTasksRef.current.length > 0) {
+        await geelark(bearer, '/rpa/task/cancel', { ids: activeTasksRef.current })
+        log(`  ${activeTasksRef.current.length} tâche(s) annulée(s)`, 'warn')
+      }
+    } catch (e) {
+      log(`  ⚠️ annulation tâches: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+    }
+    try {
+      if (activePhonesRef.current.length > 0) {
+        await geelark(bearer, '/phone/stop', { ids: activePhonesRef.current })
+        log(`  ${activePhonesRef.current.length} téléphone(s) éteint(s)`, 'warn')
+      }
+    } catch (e) {
+      log(`  ⚠️ extinction téléphones: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+    }
+    activeTasksRef.current = []
+    activePhonesRef.current = []
+    setStopping(false)
+  }
+
   async function post() {
+    if (posting)               return
     if (!bearer)               { log('Missing GéeLark token — Settings', 'error'); return }
     if (selectedPhones.size === 0) { log('Select at least one phone', 'warn'); return }
     if (!filePath)             { log('Select a video', 'warn'); return }
+    if (caption.length > 2200) { log('❌ Description trop longue (max 2200 caractères)', 'error'); return }
 
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
     const total     = phoneList.length
 
-    const creditCost = total * CREDIT_COSTS.posting
-    const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
-    if (!creditRes.ok) {
-      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (requis: ${creditCost} pour ${total} téléphone${total > 1 ? 's' : ''})`, 'error')
+    // Verrou AVANT le débit de crédits (anti double-clic), rollback si échec
+    setPosting(true); setLogs([]); setProgress(0); setLastRun(null)
+    stopRef.current = false
+    activePhonesRef.current = []
+    activeTasksRef.current  = []
+    setPhoneRun(new Map(phoneList.map(p => [p.id, { status: 'pending' as const }])))
+
+    const run = await startCreditRun(credits.ownerId, CREDIT_COSTS.posting, total)
+    if (!run.ok) {
+      log(`❌ ${run.error} (requis: ${total * CREDIT_COSTS.posting} pour ${total} téléphone${total > 1 ? 's' : ''})`, 'error')
+      setPosting(false)
       return
     }
-    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
+    if (typeof run.balance === 'number') credits.setBalance(run.balance)
 
     playSuccess()
-    setPosting(true); setLogs([]); setProgress(0)
+
+    // Compteurs réels — pilotent le toast final et le remboursement
+    let okN = 0
+    let errN = 0
+    const markPhoneFailed = (phone: Phone, detail?: string) => {
+      errN++
+      run.markFailed(1)
+      setPhoneRunStatus(phone.id, { status: 'error', detail })
+    }
 
     logActivity({
       orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '',
@@ -314,22 +398,37 @@ export function Posting({ user }: PostingProps) {
       log('📤 Uploading video to GéeLark…')
       setProgress(5)
       const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
-      if (!up.ok || !up.token) { log(`❌ Upload failed: ${up.error}`, 'error'); setPosting(false); return }
+      if (!up.ok || !up.token) {
+        // Échec d'upload : rien n'a été publié → tout est remboursé au settle()
+        log(`❌ Upload failed: ${up.error}`, 'error')
+        phoneList.forEach(p => markPhoneFailed(p, 'Upload échoué'))
+        setProgress(0)
+        return
+      }
       const videoToken = up.token
       log(`✅ Video uploaded (token: ${videoToken.slice(0, 12)}…)`, 'ok')
       setProgress(20)
 
+      if (stopRef.current) { phoneList.forEach(p => markPhoneFailed(p, 'Stoppé')); setProgress(0); return }
+
       const geelarkIds = phoneList.map(p => p.geelark_id)
       log(`📱 Starting ${total} phone${total > 1 ? 's' : ''}…`)
       const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
+      activePhonesRef.current = [...geelarkIds]
       const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
       log(`  ${started} started`, started > 0 ? 'ok' : 'warn')
       setProgress(35)
 
       log('⏳ Attente 30s (boot)…')
       for (let i = 0; i < 30; i++) {
+        if (stopRef.current) break
         await new Promise(r => setTimeout(r, 1000))
         setProgress(35 + Math.round((i / 30) * 25))
+      }
+      if (stopRef.current) {
+        phoneList.forEach(p => markPhoneFailed(p, 'Stoppé'))
+        log('⏹ Run interrompu pendant le boot', 'warn')
+        return
       }
 
       setProgress(60)
@@ -343,6 +442,7 @@ export function Posting({ user }: PostingProps) {
 
       for (let pi = 0; pi < phoneList.length; pi++) {
         const phone = phoneList[pi]
+        if (stopRef.current) { markPhoneFailed(phone, 'Stoppé'); continue }
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
           scheduleAt:  scheduleTimes[pi],
@@ -353,8 +453,11 @@ export function Posting({ user }: PostingProps) {
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
           taskIds[phone.geelark_id] = tid
+          activeTasksRef.current = [...activeTasksRef.current, tid]
+          setPhoneRunStatus(phone.id, { status: 'posting' })
           log(`  ✅ Task created for ${phone.phone_name}`, 'ok')
         } else {
+          markPhoneFailed(phone, String(taskRes['msg'] ?? taskRes['code']))
           log(`  ❌ ${phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
         }
       }
@@ -369,9 +472,16 @@ export function Posting({ user }: PostingProps) {
         const STATUS: Record<number, string> = { 1: '⏳ Pending', 2: '🔄 In progress', 3: '✅ Done', 4: '❌ Failed', 7: '🚫 Cancelled' }
 
         let pollCount = 0
-        while (pending.size > 0 && Date.now() < deadline) {
+        while (pending.size > 0 && Date.now() < deadline && !stopRef.current) {
           await new Promise(r => setTimeout(r, 15000))
-          const qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
+          if (stopRef.current) { log('⏹ Polling interrompu (stop)', 'warn'); break }
+          let qRes: Record<string, unknown>
+          try {
+            qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
+          } catch (pollErr) {
+            log(`⚠️ Poll /task/query raté: ${pollErr instanceof Error ? pollErr.message : String(pollErr)} — on réessaie…`, 'warn')
+            continue
+          }
           pollCount++
 
           const d = (qRes['data'] as Record<string, unknown>) ?? {}
@@ -390,28 +500,74 @@ export function Posting({ user }: PostingProps) {
             const name   = phone?.phone_name ?? tid
             if ([3, 4, 7].includes(status)) {
               pending.delete(tid)
+              activeTasksRef.current = activeTasksRef.current.filter(id => id !== tid)
               const level = status === 3 ? 'ok' : 'error'
               const fail  = item['failDesc'] ? ` — ${item['failDesc']}` : ''
               log(`${STATUS[status] ?? status} ${name}${fail}`, level)
+              if (phone) {
+                if (status === 3) { okN++; setPhoneRunStatus(phone.id, { status: 'done' }) }
+                else markPhoneFailed(phone, (item['failDesc'] as string | undefined) ?? STATUS[status])
+              }
             }
           }
           const done = Object.keys(taskIds).length - pending.size
           setProgress(70 + Math.round((done / Object.keys(taskIds).length) * 25))
         }
-        if (pending.size > 0) log(`⏳ ${pending.size} task(s) with no response — continuing (posts likely done)`, 'warn')
+        if (pending.size > 0 && stopRef.current) {
+          // Stop utilisateur : les tâches restantes sont annulées → remboursées
+          for (const tid of pending) {
+            const phone = phoneList.find(p => taskIds[p.geelark_id] === tid)
+            if (phone) markPhoneFailed(phone, 'Stoppé')
+          }
+        } else if (pending.size > 0) {
+          log(`⏳ ${pending.size} task(s) with no response — continuing (posts likely done)`, 'warn')
+          // Sans réponse = probablement publié → compté comme réussi, pas remboursé
+          for (const tid of pending) {
+            const phone = phoneList.find(p => taskIds[p.geelark_id] === tid)
+            if (phone) { okN++; setPhoneRunStatus(phone.id, { status: 'done' }) }
+          }
+        }
       }
 
-      log('🛑 Stopping phones…')
-      await geelark(bearer, '/phone/stop', { ids: geelarkIds })
+      if (!stopRef.current) {
+        log('🛑 Stopping phones…')
+        await geelark(bearer, '/phone/stop', { ids: geelarkIds })
+        activePhonesRef.current = []
+      }
       setProgress(100)
-      log('🎉 Done!', 'ok')
-      toast.show({ title: 'Publication terminée ✓', body: `${selectedPhones.size} compte${selectedPhones.size > 1 ? 's' : ''}`, kind: 'ok' })
+      log(errN === 0 ? '🎉 Done!' : `🏁 Terminé — ${errN} échec${errN > 1 ? 's' : ''}`, errN === 0 ? 'ok' : 'warn')
+      setLastRun({ ok: total - errN, err: errN, total })
+      toast.show({
+        title: errN === 0 ? 'Publication terminée ✓' : 'Publication terminée avec erreurs',
+        body: `${total - errN}/${total} réussie${total - errN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`,
+        kind: errN === 0 ? 'ok' : 'error',
+      })
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
+      // Arrêt d'urgence : ne jamais laisser des téléphones cloud allumés (facturation)
+      const stuck = activePhonesRef.current
+      if (stuck.length > 0) {
+        log(`🛑 Arrêt d'urgence de ${stuck.length} téléphone(s)…`, 'warn')
+        geelark(bearer, '/phone/stop', { ids: stuck }).catch(() => {})
+        activePhonesRef.current = []
+      }
+      // Tout ce qui n'a pas abouti est remboursé
+      const remaining = total - okN - errN
+      if (remaining > 0) { run.markFailed(remaining); errN += remaining }
+      phoneList.forEach(p => {
+        const st = phoneRun.get(p.id)
+        if (!st || st.status === 'pending' || st.status === 'posting') setPhoneRunStatus(p.id, { status: 'error', detail: 'Erreur fatale' })
+      })
+      setProgress(0)
+      setLastRun({ ok: okN, err: errN, total })
+    } finally {
+      const { refunded } = await run.settle()
+      if (refunded > 0) { log(`💳 ${refunded} crédit(s) remboursé(s)`, 'ok'); credits.refresh() }
+      activePhonesRef.current = []
+      activeTasksRef.current  = []
+      setPosting(false)
     }
-
-    setPosting(false)
   }
 
   const visiblePhones = phones.filter(p => {
