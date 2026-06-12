@@ -1394,12 +1394,8 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     <button
                       onClick={loadOlderMessages}
                       disabled={loadingMore}
-                      className="w-full py-2 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer"
-                      style={{
-                        background: 'rgba(99,102,241,0.06)', color: '#818CF8',
-                        border: '1px solid rgba(99,102,241,0.18)',
-                        opacity: loadingMore ? 0.5 : 1,
-                      }}
+                      className="sf-btn sf-btn-ghost w-full cursor-pointer"
+                      style={{ opacity: loadingMore ? 0.5 : 1 }}
                     >
                       {loadingMore ? 'Chargement…' : '↑ Charger les messages plus anciens'}
                     </button>
@@ -1459,11 +1455,10 @@ export function Community({ user, onNavigate }: CommunityProps) {
                               ❤️ {reactions.get(featuredMsg.id) ?? 0}
                             </button>
                             {isAdmin && (
-                              <button onClick={e => { e.stopPropagation(); deleteMessage(featuredMsg.id) }}
-                                className="transition-opacity hover:opacity-80 flex items-center sf-press"
-                                style={{ color: 'rgba(239,68,68,0.5)' }} title="Supprimer" aria-label="Supprimer">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                              <button onClick={e => { e.stopPropagation(); setConfirmDeleteMsg(featuredMsg.id) }}
+                                className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label="Supprimer">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                 </svg>
                               </button>
                             )}
@@ -1535,15 +1530,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         <input ref={newsVideoRef} type="file" accept="image/*,video/*" className="hidden"
                           onChange={e => { if (e.target.files?.[0]) { setNewsVideo(e.target.files[0]); e.target.value = '' } }} />
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px]" style={{ color: 'rgba(233,234,240,0.3)' }}>{newsContent.length}/2000</span>
+                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{newsContent.length}/2000</span>
                           <div className="flex gap-2">
                             <button onClick={() => { setShowNewsForm(false); setNewsVideo(null) }}
-                              className="px-4 py-2 rounded-xl text-[12px] font-semibold"
-                              style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">
                               {t('cancel')}
                             </button>
                             <button onClick={sendNews} disabled={(!newsContent.trim() && !newsVideo) || newsSending}
-                              className="px-4 py-2 rounded-xl text-[12px] font-semibold btn-sf-primary disabled:opacity-40">
+                              className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer disabled:opacity-40">
                               {newsSending ? t('communityNewsPublishing') : t('communityNewsPublish')}
                             </button>
                           </div>
@@ -1590,11 +1584,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                               </div>
                             </div>
                             {isAdmin && (
-                              <button onClick={e => { e.stopPropagation(); deleteMessage(msg.id) }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1 flex items-center sf-press"
-                                style={{ color: 'rgba(239,68,68,0.5)' }} aria-label="Supprimer">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                              <button onClick={e => { e.stopPropagation(); setConfirmDeleteMsg(msg.id) }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1 sf-btn sf-btn-danger sf-btn-sm cursor-pointer"
+                                aria-label="Supprimer">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                 </svg>
                               </button>
                             )}
@@ -1605,14 +1599,17 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   )}
 
                   {newsMessages.length === 0 && !isAdmin && (
-                    <div className="sf-empty py-20">
-                      <div className="sf-empty-icon" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
-                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--accent-l)' }}>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
                         </svg>
                       </div>
-                      <p className="sf-empty-title">{t('communityNewsEmpty')}</p>
-                      <p className="sf-empty-desc">{t('communityNewsEmptyHint')}</p>
+                      <div className="space-y-1.5">
+                        <p className="text-[14px] font-bold" style={{ color: 'var(--ivory)' }}>{t('communityNewsEmpty')}</p>
+                        <p className="text-[12px]" style={{ color: 'var(--muted)' }}>{t('communityNewsEmptyHint')}</p>
+                      </div>
                     </div>
                   )}
                 </>
@@ -1747,16 +1744,19 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 </div>
 
                 {topics.length === 0 ? (
-                  <div className="sf-empty py-20">
-                    <div className="sf-empty-icon" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.15)', color: '#818CF8', width: 64, height: 64, borderRadius: 20 }}>
-                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--accent-l)' }}>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                       </svg>
                     </div>
-                    <p className="sf-empty-title">{t('communityTopicsEmpty')}</p>
-                    <p className="sf-empty-desc">{t('communityTopicsEmptyHint')}</p>
+                    <div className="space-y-1.5">
+                      <p className="text-[14px] font-bold" style={{ color: 'var(--ivory)' }}>{t('communityTopicsEmpty')}</p>
+                      <p className="text-[12px]" style={{ color: 'var(--muted)' }}>{t('communityTopicsEmptyHint')}</p>
+                    </div>
                     <button onClick={() => { if (!requirePseudo()) return; setShowCreateTopic(true) }}
-                      className="sf-btn sf-btn-primary mt-2 cursor-pointer">
+                      className="sf-btn sf-btn-primary cursor-pointer">
                       {t('communityTopicsEmptyCreate')}
                     </button>
                   </div>
@@ -1773,44 +1773,52 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     const isJoined = joinedTopicIds.has(topic.id)
                     const canDelete = isAdmin || topic.created_by === user.id
                     return (
-                      <div className="sf-card sf-card-lift relative group flex flex-col gap-3 p-4 cursor-pointer"
+                      <div
+                        className="sf-card sf-card-lift relative group flex flex-col gap-3 p-4 cursor-pointer overflow-hidden transition-all"
                         style={isJoined ? { background: 'rgba(99,102,241,0.08)', borderColor: 'rgba(99,102,241,0.28)' } : {}}
                         onClick={() => { setSelectedTopic(topic); setTopicsView('chat') }}>
+                        {/* Left accent bar on hover */}
+                        <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ background: isJoined ? 'var(--accent)' : 'var(--accent-l)' }} />
                         <div className="flex items-start gap-3">
-                          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                            style={{ background: isJoined ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)' }}>{topic.emoji}</div>
+                          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                            style={{ background: isJoined ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)', fontSize: 20 }}>{topic.emoji}</div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <p className="text-[13.5px] font-black text-white truncate">{topic.name}</p>
-                              {isJoined && <span className="text-[8px] font-black px-1.5 py-[2px] rounded-full flex-shrink-0"
-                                style={{ background: 'rgba(99,102,241,0.2)', color: '#818CF8' }}>{t('communityTopicsJoinedBadge')}</span>}
+                              <p className="text-[13.5px] font-black truncate" style={{ color: 'var(--ivory)' }}>{topic.name}</p>
+                              {isJoined && (
+                                <span className="sf-badge sf-badge-violet text-[8px] flex-shrink-0">
+                                  {t('communityTopicsJoinedBadge')}
+                                </span>
+                              )}
                             </div>
                             {topic.description && (
-                              <p className="text-[11.5px] leading-relaxed line-clamp-2" style={{ color: 'rgba(233,234,240,0.5)' }}>{topic.description}</p>
+                              <p className="text-[11.5px] leading-relaxed line-clamp-2" style={{ color: 'var(--muted)' }}>{topic.description}</p>
                             )}
                           </div>
                           {canDelete && (
-                            <button onClick={e => { e.stopPropagation(); deleteTopic(topic.id) }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg sf-press"
-                              style={{ color: 'rgba(239,68,68,0.6)' }} title="Supprimer" aria-label="Supprimer">
+                            <button onClick={e => { e.stopPropagation(); setConfirmDeleteTopic(topic.id) }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
+                              aria-label="Supprimer">
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                               </svg>
                             </button>
                           )}
                         </div>
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-[10px]" style={{ color: 'rgba(233,234,240,0.35)' }}>
-                            <span>👥 {members} {members !== 1 ? t('communityMemberPlural') : t('communityMemberSingular')}</span>
-                            {last && <><span>·</span><span className="truncate max-w-[140px]">{last.content.slice(0, 35)}{last.content.length > 35 ? '…' : ''}</span><span>·</span><span>{timeAgo(last.at)}</span></>}
+                          <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted)' }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span>{members} {members !== 1 ? t('communityMemberPlural') : t('communityMemberSingular')}</span>
+                            {last && <><span className="opacity-40">·</span><span className="truncate max-w-[130px]">{last.content.slice(0, 32)}{last.content.length > 32 ? '…' : ''}</span><span className="opacity-40">·</span><span>{timeAgo(last.at)}</span></>}
                           </div>
                           <button onClick={e => {
                               e.stopPropagation()
                               if (isJoined) leaveTopic(topic.id)
                               else joinTopic(topic.id)
                             }}
-                            className={`sf-btn flex-shrink-0 cursor-pointer${isJoined ? ' sf-btn-ghost' : ' sf-btn-secondary'}`}
-                            style={{ height: 28, padding: '0 12px', fontSize: 11, fontWeight: 700, ...(isJoined ? { color: 'rgba(252,165,165,0.75)', borderColor: 'rgba(239,68,68,0.2)' } : {}) }}>
+                            className={`sf-btn sf-btn-sm flex-shrink-0 cursor-pointer${isJoined ? ' sf-btn-ghost' : ' sf-btn-secondary'}`}
+                            style={isJoined ? { color: 'rgba(252,165,165,0.75)', borderColor: 'rgba(239,68,68,0.2)' } : {}}>
                             {isJoined ? t('communityTopicsLeave') : t('communityTopicsJoin')}
                           </button>
                         </div>
@@ -1839,10 +1847,10 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         </div>
                       )}
                       {filtered.length === 0 && topicSearch && (
-                        <div className="sf-empty py-12">
-                          <p className="sf-empty-title">{t('communityTopicsNoResult')} « {topicSearch} »</p>
+                        <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                          <p className="text-[13px] font-semibold" style={{ color: 'var(--muted)' }}>{t('communityTopicsNoResult')} « {topicSearch} »</p>
                           <button onClick={() => { setTopicSearch(''); setShowCreateTopic(true) }}
-                            className="sf-btn sf-btn-ghost cursor-pointer mt-1" style={{ fontSize: 11 }}>
+                            className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">
                             {t('communityTopicsCreateThis')}
                           </button>
                         </div>
@@ -1891,12 +1899,15 @@ export function Community({ user, onNavigate }: CommunityProps) {
               {/* Messages */}
               <div ref={topicListRef} className="flex-1 overflow-y-auto px-5 py-4">
                 {topicMessages.length === 0 ? (
-                  <div className="sf-empty h-full">
-                    <div className="sf-empty-icon text-3xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)', fontSize: 28, width: 60, height: 60, borderRadius: 16 }}>
+                  <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
                       {selectedTopic?.emoji}
                     </div>
-                    <p className="sf-empty-title">{selectedTopic?.name}</p>
-                    <p className="sf-empty-desc">{t('communityTopicsFirstWrite')}</p>
+                    <div className="space-y-1.5">
+                      <p className="text-[14px] font-bold" style={{ color: 'var(--ivory)' }}>{selectedTopic?.name}</p>
+                      <p className="text-[12px]" style={{ color: 'var(--muted)' }}>{t('communityTopicsFirstWrite')}</p>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -1941,12 +1952,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
                               </div>
                               {(isAdmin || msg.user_id === user.id) && (
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pb-0.5">
-                                  {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(233,234,240,0.35)' }}>{timeAgo(msg.created_at)}</span>}
-                                  <button onClick={() => deleteTopicMessage(msg.id)}
-                                    className="w-5 h-5 flex items-center justify-center rounded sf-press"
-                                    style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Supprimer">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                      <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                                  {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'var(--muted)' }}>{timeAgo(msg.created_at)}</span>}
+                                  <button onClick={() => setConfirmDeleteTopicMsg(msg.id)}
+                                    className="sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
+                                    aria-label="Supprimer">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                      <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                     </svg>
                                   </button>
                                 </div>
@@ -2033,12 +2044,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   {loading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
                   : threadList.length === 0 ? (
                     <div className="flex flex-col items-center py-8 gap-2 text-center">
-                      <span className="flex items-center" style={{ color: '#818CF8' }} aria-hidden="true">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <span style={{ color: 'var(--accent-l)' }} aria-hidden="true">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
                         </svg>
                       </span>
-                      <p className="text-[11px]" style={{ color: 'rgba(233,234,240,0.3)' }}>{t('communityAdminNoTickets')}</p>
+                      <p className="text-[11px]" style={{ color: 'var(--muted)' }}>{t('communityAdminNoTickets')}</p>
                     </div>
                   ) : threadList.map(th => {
                     const hasUnread = !th.lastMsg.is_admin && selectedThread !== th.user_id
@@ -2083,14 +2094,17 @@ export function Community({ user, onNavigate }: CommunityProps) {
               {/* Selected thread */}
               <div className="flex-1 flex flex-col overflow-hidden">
                 {!selectedThread ? (
-                  <div className="sf-empty flex-1">
-                    <div className="sf-empty-icon" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center p-6">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)', color: 'var(--accent-l)' }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
                       </svg>
                     </div>
-                    <p className="sf-empty-title">{t('communityAdminSelectTicket')}</p>
-                    <p className="sf-empty-desc">{t('communityAdminSelectTicketHint')}</p>
+                    <div className="space-y-1.5">
+                      <p className="text-[13px] font-bold" style={{ color: 'var(--ivory)' }}>{t('communityAdminSelectTicket')}</p>
+                      <p className="text-[11.5px]" style={{ color: 'var(--muted)' }}>{t('communityAdminSelectTicketHint')}</p>
+                    </div>
                   </div>
                 ) : (
                   <>

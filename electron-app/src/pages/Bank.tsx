@@ -1518,7 +1518,7 @@ export function Bank({ user }: BankProps) {
       <ConfirmDialog
         open={!!confirmDeleteItem}
         title={t('bankCtxDelete')}
-        message={confirmDeleteItem ? `« ${confirmDeleteItem.title} » ${t('bankDeleteConfirmMsg') || 'will be permanently deleted.'}` : ''}
+        message={confirmDeleteItem ? `« ${confirmDeleteItem.title} » sera définitivement supprimé.` : ''}
         confirmLabel={t('bankCtxDelete')}
         danger
         busy={deleteBusy}
@@ -1530,7 +1530,7 @@ export function Bank({ user }: BankProps) {
       <ConfirmDialog
         open={confirmBulkDelete}
         title={`${t('bankDeleteSelected')} (${selectedIds.size})`}
-        message={`${selectedIds.size} ${t('bankDeleteBulkConfirmMsg') || 'items will be permanently deleted.'}`}
+        message={`${selectedIds.size} éléments seront définitivement supprimés.`}
         confirmLabel={t('bankDeleteSelected')}
         danger
         busy={deleteBusy}
