@@ -754,7 +754,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                     {/* ── Color theme card ─────────────────────────────── */}
                     <div className="sf-card" style={{ padding: '20px 22px' }}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('colorTheme')}</h3>
+                      <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('colorTheme')}</h3>
                       <p style={{ fontSize: 12, color: S.text3, margin: '0 0 16px', lineHeight: 1.4 }}>{t('colorThemeSub')}</p>
 
                       <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
@@ -817,7 +817,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                     {/* ── UI Preview card ───────────────────────────────── */}
                     <div className="sf-card" style={{ padding: '20px 22px' }}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('preview')}</h3>
+                      <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('preview')}</h3>
                       <p style={{ fontSize: 12, color: S.text3, margin: '0 0 14px', lineHeight: 1.4 }}>{t('previewSub')}</p>
                       <div style={{ borderRadius: 10, overflow: 'hidden', background: 'rgba(0,0,0,0.35)', border: `1px solid ${S.border}`, height: 96 }}>
                         <div style={{ display: 'flex', height: '100%' }}>
@@ -856,7 +856,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                     {musicOn && (
                       <div className="sf-card" style={{ padding: '20px 22px' }}>
-                        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-4">{t('musicTrack')}</h3>
+                        <h3 className="text-[11px] font-semibold uppercase mb-4" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('musicTrack')}</h3>
 
                         {/* Horizontal track scroll */}
                         <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
@@ -909,7 +909,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     </div>
 
                     <div className="sf-card" style={{ padding: '16px 22px 6px' }}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-3">{t('inApp')}</h3>
+                      <h3 className="text-[11px] font-semibold uppercase mb-3" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('inApp')}</h3>
                       <div style={{ borderTop: `1px solid ${S.border}` }}>
                         <SettingToggle first label={t('popupNotifs')} sub={t('popupNotifsSub')}
                           checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
@@ -921,7 +921,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     </div>
 
                     <div className="sf-card" style={{ padding: '16px 22px 6px' }}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-3">{t('systemNotifs')}</h3>
+                      <h3 className="text-[11px] font-semibold uppercase mb-3" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('systemNotifs')}</h3>
                       <div style={{ borderTop: `1px solid ${S.border}` }}>
                         <SettingToggle first
                           label={t('desktopNotifs')}
@@ -960,7 +960,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     </div>
 
                     <div className="sf-card" style={{ padding: '20px 22px' }}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('languageLabel')}</h3>
+                      <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('languageLabel')}</h3>
                       <p style={{ fontSize: 12, color: S.text3, margin: '0 0 16px', lineHeight: 1.4 }}>{t('languageLabelSub')}</p>
 
                       <div style={{ display: 'flex', gap: 10 }}>
@@ -1003,7 +1003,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                     {/* Active session info */}
                     <div className="sf-card" style={{ padding: '20px 22px' }}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-4">{t('activeSession')}</h3>
+                      <h3 className="text-[11px] font-semibold uppercase mb-4" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('activeSession')}</h3>
                       {[
                         { label: t('account'),     value: user.email ?? '—' },
                         { label: t('connectedOn'), value: user.created_at ? new Date(user.created_at).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' },
@@ -1033,7 +1033,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                     {/* Account actions */}
                     <div className="sf-card" style={{ padding: '20px 22px' }}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-4">{t('accountActions')}</h3>
+                      <h3 className="text-[11px] font-semibold uppercase mb-4" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('accountActions')}</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button onClick={async () => { await supabase.auth.signOut() }}
                           className="sf-btn sf-btn-danger sf-btn-sm" style={{ justifyContent: 'flex-start', width: '100%' }}>
@@ -1111,7 +1111,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     )}
 
                     <div className="sf-card" style={{ padding: '20px 22px' }}>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-4">{t('dataCache')}</h3>
+                      <h3 className="text-[11px] font-semibold uppercase mb-4" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('dataCache')}</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button
                           onClick={() => {
@@ -1214,7 +1214,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                   {/* Profile form */}
                   <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('personalInfo')}</h3>
+                    <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('personalInfo')}</h3>
                     <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {[
                         { label: 'Email', type: 'email', value: profileEmail, onChange: (v: string) => setProfileEmail(v), placeholder: 'you@example.com' },
@@ -1231,8 +1231,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                   </div>
 
                   {/* Danger zone */}
-                  <div className="sf-card" style={{ padding: '20px 22px', background: 'rgba(239,68,68,0.03)', borderColor: 'rgba(239,68,68,0.18)' }}>
-                    <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#EF4444', margin: '0 0 6px' }}>{t('dangerZone')}</h3>
+                  <div className="sf-card" style={{ padding: '20px 22px', background: 'rgba(248,113,113,0.04)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                    <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--err)', margin: '0 0 6px', borderLeft: '2px solid var(--err)', paddingLeft: 8 }}>{t('dangerZone')}</h3>
                     <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', margin: '0 0 14px', lineHeight: 1.5 }}>{t('dangerZoneSub')}</p>
                     <button onClick={async () => { await supabase.auth.signOut() }}
                       className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer">
@@ -1277,7 +1277,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                   {/* GéeLark credentials */}
                   <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">GéeLark</h3>
+                    <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>GéeLark</h3>
                     <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {[
                         { label: t('bearerToken'), type: 'password', placeholder: 'Bearer …', value: bearer, onChange: (v: string) => setBearer(v) },
@@ -1296,7 +1296,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                   {/* AI API Keys */}
                   <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('aiApiKeys')}</h3>
+                    <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('aiApiKeys')}</h3>
                     <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {[
                         { label: 'Groq API Key', placeholder: 'gsk_…', value: groqKey, onChange: (v: string) => setGroqKey(v) },
@@ -1537,7 +1537,7 @@ function AdminPanel({ user: _user }: { user: User }) {
           [t('activeKeys'),  stats.actives,  'text-blue-400'],
           [t('expiredKeys'), stats.expirées, 'text-red-400'],
         ].map(([l, v, c]) => (
-          <div key={l as string} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.12)' }}>
+          <div key={l as string} className="sf-card sf-card-lift p-6 text-center sf-anim-slide-up sf-d50">
             <p className={`text-2xl font-black ${c}`}>{v}</p>
             <p className="text-[12px] text-text2 mt-1">{l}</p>
           </div>
@@ -1545,22 +1545,20 @@ function AdminPanel({ user: _user }: { user: User }) {
       </div>
 
       {/* Create key */}
-      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">{t('createKey')}</p>
+      <div className="sf-card p-6 space-y-4 sf-anim-slide-up sf-d100">
+        <p className="text-[11px] font-semibold uppercase mb-4" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('createKey')}</p>
         <div className="flex gap-2">
           <input
             value={newKey}
             onChange={e => setNewKey(e.target.value.toUpperCase())}
-            className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            className="sf-input flex-1 text-[13px] font-mono tracking-widest"
           />
-          <button onClick={() => setNewKey(genKey())} className="px-4 py-2.5 rounded-xl text-[13px] text-text2 hover:text-text sf-press cursor-pointer" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>↺</button>
+          <button onClick={() => setNewKey(genKey())} className="sf-btn sf-btn-ghost sf-btn-icon" title="↺">↺</button>
         </div>
         <div className="flex flex-wrap gap-2">
           {DURATIONS.map(d => (
             <button key={d.label} onClick={() => setDuration(d.days)}
-              className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
-              style={duration === d.days ? { background: 'linear-gradient(130deg,#6366F1,#6366F1)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className={`sf-btn sf-btn-sm ${duration === d.days ? 'sf-btn-primary' : 'sf-btn-secondary'}`}>
               {d.label}
             </button>
           ))}
@@ -1568,8 +1566,7 @@ function AdminPanel({ user: _user }: { user: User }) {
         <div className="flex gap-2">
           {['standard', 'pro', 'organisation'].map(p => (
             <button key={p} onClick={() => setPlan(p)}
-              className={`px-4 py-2 rounded-xl text-[13px] capitalize transition-all ${plan === p ? 'text-white' : 'text-text2'}`}
-              style={plan === p ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className={`sf-btn sf-btn-sm capitalize ${plan === p ? 'sf-btn-primary' : 'sf-btn-ghost'}`}>
               {p}
             </button>
           ))}
@@ -1585,27 +1582,26 @@ function AdminPanel({ user: _user }: { user: User }) {
         {loading ? <p className="text-[13px] text-text2 text-center py-8">{t('loading')}</p> : filtered.length === 0 ? (
           <p className="text-[13px] text-text2 text-center py-8">{t('noKeys')}</p>
         ) : filtered.map(k => (
-          <div key={k.id} className={`rounded-xl px-5 py-4 flex flex-wrap items-center gap-2 ${!k.is_active ? 'opacity-50' : ''}`}
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.1)' }}>
+          <div key={k.id} className={`sf-card px-5 py-4 flex flex-wrap items-center gap-2 ${!k.is_active ? 'opacity-50' : ''}`}>
             <button onClick={() => copy(k.key)} className="font-mono text-[13px] text-text tracking-widest hover:text-accent transition-colors">
               {k.key} {copied === k.key
                 ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:'inline',verticalAlign:'middle',color:'#22c55e'}}><path d="M20 6 9 17l-5-5"/></svg>
                 : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:'inline',verticalAlign:'middle',opacity:.5}}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
               }
             </button>
-            <span className="text-[12px] px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8' }}>{k.plan}</span>
+            <span className="sf-badge sf-badge-violet capitalize">{k.plan}</span>
             {!k.is_active
-              ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{t('keyRevoked')}</span>
+              ? <span className="sf-badge sf-badge-red">{t('keyRevoked')}</span>
               : k.user_id
-                ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{t('keyActivated')}</span>
-                : <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">{t('keyAvailable')}</span>
+                ? <span className="sf-badge sf-badge-violet">{t('keyActivated')}</span>
+                : <span className="sf-badge sf-badge-green">{t('keyAvailable')}</span>
             }
             <span className={`text-[13px] font-semibold ml-auto ${daysColor(k.expires_at)}`}>{daysLeft(k.expires_at)}</span>
             {k.user_email && <span className="text-[12px] text-text2 truncate max-w-[140px]">{k.user_email}</span>}
             {k.notes && <span className="text-[12px] text-text2 italic truncate max-w-[100px]">{k.notes}</span>}
             <div className="flex gap-1">
-              {k.is_active && <button onClick={() => revoke(k.id)} className="text-[12px] px-2 py-1 rounded text-orange-400 hover:bg-orange-400/10">{t('revoke')}</button>}
-              <button onClick={() => del(k.id)} className="text-[12px] px-2 py-1 rounded text-red-400 hover:bg-red-400/10">{t('delete')}</button>
+              {k.is_active && <button onClick={() => revoke(k.id)} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ color: 'var(--warn)' }}>{t('revoke')}</button>}
+              <button onClick={() => del(k.id)} className="sf-btn sf-btn-danger sf-btn-sm">{t('delete')}</button>
             </div>
           </div>
         ))}
@@ -1712,18 +1708,18 @@ function SubscriptionPanel() {
   return (
     <div className="space-y-6 max-w-2xl anim-stagger">
       {/* Current status */}
-      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(99,102,241,0.18)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">{t('mySubscription')}</p>
+      <div className="sf-card p-6 space-y-4 sf-anim-slide-up sf-d50">
+        <p className="text-[11px] font-semibold uppercase mb-4" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('mySubscription')}</p>
 
         <div className="flex items-center justify-between">
           <span className="text-[13px] text-text2">{t('status')}</span>
-          <span className="text-[13px] font-bold" style={{ color: statusColor }}>{statusLabel}</span>
+          <span className={`sf-badge ${!license.valid || (license.daysLeft !== null && license.daysLeft <= 0) ? 'sf-badge-red' : 'sf-badge-green'}`} style={{ color: statusColor }}>{statusLabel}</span>
         </div>
 
         {license.plan && (
           <div className="flex items-center justify-between">
             <span className="text-[13px] text-text2">{t('plan')}</span>
-            <span className="text-[13px] font-bold" style={{ color: '#818CF8' }}>{planLabel}</span>
+            <span className="sf-badge sf-badge-violet">{planLabel}</span>
           </div>
         )}
 
@@ -1740,13 +1736,13 @@ function SubscriptionPanel() {
           <div className="space-y-2">
             <p className="text-[12px] text-text2">{t('licenseKey')}</p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest text-text2 truncate" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <code className="sf-input flex-1 text-[13px] font-mono tracking-widest text-text2 truncate" style={{ display: 'block' }}>
                 {licenseKey}
               </code>
               <button
                 onClick={copy}
-                className="px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all flex-shrink-0"
-                style={{ background: copied ? 'rgba(34,197,94,0.12)' : 'rgba(99,102,241,0.1)', color: copied ? '#22C55E' : '#818CF8', border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(99,102,241,0.2)'}` }}
+                className="sf-btn sf-btn-ghost flex-shrink-0"
+                style={{ color: copied ? 'var(--ok)' : 'var(--accent-l)' }}
               >
                 {copied ? t('copied') : t('copy')}
               </button>
@@ -1756,23 +1752,22 @@ function SubscriptionPanel() {
       </div>
 
       {/* Activate a license key */}
-      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(99,102,241,0.18)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">{t('activateLicense')}</p>
+      <div className="sf-card p-6 space-y-4 sf-anim-slide-up sf-d100">
+        <p className="text-[11px] font-semibold uppercase mb-4" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('activateLicense')}</p>
         <form onSubmit={handleActivateKey} className="flex gap-2">
           <input
             value={newKey}
             onChange={e => setNewKey(e.target.value)}
             placeholder="XXXX-XXXX-XXXX-XXXX"
-            className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest focus:outline-none uppercase"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            className="sf-input flex-1 text-[13px] font-mono tracking-widest uppercase"
             spellCheck={false}
             autoComplete="off"
           />
           <button
             type="submit"
             disabled={keyLoading || !newKey.trim()}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-40 transition-all"
-            style={{ background: 'linear-gradient(135deg,#6366F1,#6D28D9)' }}
+            className="sf-btn sf-btn-primary"
+            style={{ opacity: keyLoading || !newKey.trim() ? 0.4 : 1 }}
           >{keyLoading ? '…' : t('activate')}</button>
         </form>
         {keyResult && (
@@ -1781,8 +1776,8 @@ function SubscriptionPanel() {
       </div>
 
       {/* Credits */}
-      <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.2)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">{t('credits')}</p>
+      <div className="sf-card p-6 space-y-5 sf-anim-slide-up sf-d150" style={{ background: 'rgba(99,102,241,0.04)', borderColor: 'rgba(99,102,241,0.2)' }}>
+        <p className="text-[11px] font-semibold uppercase mb-4" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('credits')}</p>
 
         <div className="flex items-center justify-between">
           <span className="text-[13px] text-text2">{t('currentBalance')}</span>
@@ -1830,8 +1825,7 @@ function SubscriptionPanel() {
               <select
                 value={codeTarget}
                 onChange={e => setCodeTarget(e.target.value)}
-                className="flex-1 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                className="sf-input flex-1 text-[12px] cursor-pointer"
               >
                 {myOrgs.map(({ org }) => (
                   <option key={org.id} value={org.id}>{org.name}</option>
@@ -1845,15 +1839,14 @@ function SubscriptionPanel() {
               value={creditCode}
               onChange={e => { setCreditCode(e.target.value); setCodeResult(null) }}
               placeholder="CODE-XXXX"
-              className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono focus:outline-none uppercase"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              className="sf-input flex-1 text-[13px] font-mono uppercase"
               spellCheck={false}
             />
             <button
               type="submit"
               disabled={codeLoading || !creditCode.trim()}
-              className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-40"
-              style={{ background: 'linear-gradient(135deg,#6366F1,#6D28D9)' }}
+              className="sf-btn sf-btn-primary"
+              style={{ opacity: codeLoading || !creditCode.trim() ? 0.4 : 1 }}
             >
               {codeLoading ? '…' : t('activate')}
             </button>
@@ -1866,11 +1859,11 @@ function SubscriptionPanel() {
 
       {/* Plan pricing */}
       <div>
-        <p className="text-[15px] font-bold text-white mb-6">{t('subscriptions')}</p>
+        <p className="text-[11px] font-semibold uppercase mb-6" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('subscriptions')}</p>
         <div className="grid grid-cols-3 gap-4 anim-stagger">
 
           {/* Standard */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col sf-hover-lift" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          <div className="sf-card sf-card-lift p-5 space-y-4 flex flex-col sf-anim-slide-up sf-d50" style={{ background: 'rgba(99,102,241,0.05)', borderColor: 'rgba(99,102,241,0.2)' }}>
             <div>
               <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#818CF8' }}>Standard</p>
               <div className="flex items-baseline gap-1 mt-1.5">
@@ -1892,15 +1885,15 @@ function SubscriptionPanel() {
               ))}
             </ul>
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
-              className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all hover:brightness-110"
-              style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.35)' }}>
+              className="sf-btn sf-btn-secondary w-full text-[12px] font-bold"
+              style={{ justifyContent: 'center', textDecoration: 'none' }}>
               {t('getBtn')}
             </a>
           </div>
 
           {/* Pro */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col relative overflow-hidden sf-hover-lift sf-spotlight" style={{ background: 'linear-gradient(145deg,rgba(99,102,241,0.08),rgba(99,102,241,0.08))', border: '1px solid rgba(99,102,241,0.4)', boxShadow: '0 0 28px -10px rgba(99,102,241,0.35)' }}>
-            <div className="absolute top-2.5 right-2.5 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: '#6366F1', color: '#fff' }}>
+          <div className="sf-card sf-card-lift p-5 space-y-4 flex flex-col relative overflow-hidden sf-spotlight sf-anim-slide-up sf-d100" style={{ background: 'linear-gradient(145deg,rgba(99,102,241,0.08),rgba(99,102,241,0.08))', borderColor: 'rgba(99,102,241,0.4)', boxShadow: '0 0 28px -10px rgba(99,102,241,0.35)' }}>
+            <div className="sf-badge sf-badge-violet absolute top-2.5 right-2.5 uppercase tracking-wider">
               {t('popular')}
             </div>
             <div>
@@ -1929,14 +1922,14 @@ function SubscriptionPanel() {
               ))}
             </ul>
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
-              className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all"
-              style={{ background: '#6366F1', boxShadow: '0 2px 16px -4px rgba(99,102,241,0.4)' }}>
+              className="sf-btn sf-btn-primary w-full text-[12px] font-bold"
+              style={{ justifyContent: 'center', textDecoration: 'none' }}>
               {t('getBtn')}
             </a>
           </div>
 
           {/* Organisation */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col sf-hover-lift" style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)' }}>
+          <div className="sf-card sf-card-lift p-5 space-y-4 flex flex-col sf-anim-slide-up sf-d150" style={{ background: 'rgba(34,197,94,0.05)', borderColor: 'rgba(34,197,94,0.2)' }}>
             <div>
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#22C55E' }}>Organisation</p>
@@ -1964,8 +1957,8 @@ function SubscriptionPanel() {
               ))}
             </ul>
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
-              className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all hover:brightness-110"
-              style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.35)' }}>
+              className="sf-btn sf-btn-secondary w-full text-[12px] font-bold"
+              style={{ justifyContent: 'center', textDecoration: 'none', background: 'rgba(34,197,94,0.18)', borderColor: 'rgba(34,197,94,0.35)', color: 'var(--ok)' }}>
               {t('getBtn')}
             </a>
           </div>
@@ -1973,7 +1966,7 @@ function SubscriptionPanel() {
 
         {/* Credit packs */}
         <div className="mt-6">
-          <p className="text-[13px] font-bold text-white mb-3">{t('creditPacks')}</p>
+          <p className="text-[11px] font-semibold uppercase mb-3" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('creditPacks')}</p>
           <div className="grid grid-cols-4 gap-3 anim-stagger">
             {[
               { cr: '1 000',  price: '19$',  label: 'Mini Pack'  },
@@ -1982,8 +1975,8 @@ function SubscriptionPanel() {
               { cr: '50 000', price: '499$', label: 'Ultra Pack' },
             ].map(pk => (
               <a key={pk.cr} href="https://t.me/justquentin" target="_blank" rel="noreferrer"
-                className="rounded-xl p-3.5 text-center transition-all hover:brightness-110 no-underline sf-hover-lift"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)', textDecoration: 'none' }}>
+                className="sf-card sf-card-lift p-3.5 text-center no-underline"
+                style={{ borderColor: 'rgba(99,102,241,0.15)', textDecoration: 'none' }}>
                 <div className="text-[11px] font-semibold mb-1" style={{ color: '#818CF8' }}>{pk.label}</div>
                 <div className="text-[15px] font-black text-white">{pk.cr}</div>
                 <div className="text-[10px] text-text2 mb-1.5">{t('creditsCosts')}</div>
@@ -1997,8 +1990,8 @@ function SubscriptionPanel() {
           href="https://t.me/justquentin"
           target="_blank"
           rel="noreferrer"
-          className="mt-5 flex items-center gap-3 rounded-2xl p-5 transition-all hover:scale-[1.01]"
-          style={{ background: 'rgba(33,150,243,0.08)', border: '1px solid rgba(33,150,243,0.25)', textDecoration: 'none' }}
+          className="sf-card sf-card-lift mt-5 flex items-center gap-3 p-5"
+          style={{ background: 'rgba(33,150,243,0.08)', borderColor: 'rgba(33,150,243,0.25)', textDecoration: 'none' }}
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0" style={{ color: '#29b6f6' }}>
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
