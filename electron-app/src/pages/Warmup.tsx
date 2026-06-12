@@ -46,7 +46,7 @@ async function pLimit<T>(items: T[], limit: number, worker: (item: T) => Promise
   await Promise.all(runners)
 }
 
-// ── Inline Lucide-style icons (no emoji UI icons) ──────────────────────────────
+// ── Inline Lucide-style icons ──────────────────────────────────────────────────
 const svgBase = {
   fill: 'none', stroke: 'currentColor', strokeWidth: 1.85,
   strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
@@ -173,7 +173,6 @@ export function Warmup({ user }: WarmupProps) {
       setPhones(list)
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
-      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
       if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
     } catch (e) { setPhonesError(e instanceof Error ? e.message : String(e)) }
     setLoadingPhones(false)
@@ -207,8 +206,6 @@ export function Warmup({ user }: WarmupProps) {
     })
   }
 
-  // Import en masse : « email:password:2fa » par ligne, mappé sur les
-  // téléphones sélectionnés dans l'ordre d'affichage.
   function applyBulkCreds() {
     const lines = bulkCreds.split('\n').map(l => l.trim()).filter(Boolean)
     if (lines.length === 0) return
@@ -220,7 +217,6 @@ export function Warmup({ user }: WarmupProps) {
         if (!line) return
         const parts = line.split(':')
         const email      = (parts[0] ?? '').trim()
-        // Le mot de passe peut contenir « : » — le 2FA est la dernière partie si ≥ 3 champs
         const totpSecret = parts.length >= 3 ? (parts[parts.length - 1] ?? '').trim() : ''
         const password   = (parts.length >= 3 ? parts.slice(1, -1).join(':') : parts.slice(1).join(':')).trim()
         if (!email || !password) return
@@ -245,7 +241,7 @@ export function Warmup({ user }: WarmupProps) {
     abortRef.current = { abort: false }
   }
 
-  // ── Launch LOG IN (parallel) ──────────────────────────────────────────────
+  // ── Launch LOG IN ─────────────────────────────────────────────────────────
   async function launchLogin() {
     if (!bearer || !selected.size) return
     const targets = phones.filter(p => selected.has(p.id))
@@ -281,7 +277,7 @@ export function Warmup({ user }: WarmupProps) {
     setRunning(false)
   }
 
-  // ── Launch MASS EDIT (parallel) ───────────────────────────────────────────
+  // ── Launch MASS EDIT ──────────────────────────────────────────────────────
   async function launchMassEdit() {
     if (!bearer || !selected.size) return
     const targets = phones.filter(p => selected.has(p.id))
@@ -292,8 +288,6 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets)
 
-    // Seules les photos par URL sont supportées : le téléphone télécharge
-    // l'image via curl, un chemin local ne fonctionnerait pas.
     const config = {
       profileName:   editName.trim()    || undefined,
       username:      editUsername.trim() || undefined,
@@ -320,7 +314,7 @@ export function Warmup({ user }: WarmupProps) {
     setRunning(false)
   }
 
-  // ── Launch WARMUP (parallel) ──────────────────────────────────────────────
+  // ── Launch WARMUP ─────────────────────────────────────────────────────────
   async function launchWarmup() {
     if (!bearer || !selected.size) return
     const targets = phones.filter(p => selected.has(p.id))
@@ -357,7 +351,6 @@ export function Warmup({ user }: WarmupProps) {
   const idleCount     = jobs.filter(j => j.status === 'idle').length
   const progress      = jobs.length > 0 ? Math.round((doneCount + errorCount) / jobs.length * 100) : 0
   const selectedPhones = phones.filter(p => selected.has(p.id))
-
   const onlineCount = phones.filter(isOnline).length
 
   // ── Guards ────────────────────────────────────────────────────────────────
@@ -383,17 +376,15 @@ export function Warmup({ user }: WarmupProps) {
       <div className="sf-page anim-page">
         <div className="sf-page-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            <div className="sf-anim-scale-spring" style={{
+            <div style={{
               width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.28)',
-              color: '#6366F1',
+              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)', color: 'var(--accent)',
             }}>
               <IconBolt size={22} />
             </div>
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('warmupPageTitle')}</h1>
+              <h1 className="sf-page-title">{t('warmupPageTitle')}</h1>
               <p className="sf-page-sub">{t('warmupPageSub')}</p>
             </div>
           </div>
@@ -401,10 +392,7 @@ export function Warmup({ user }: WarmupProps) {
         <div className="sf-page-body">
           <div className="sf-card" style={{ maxWidth: 480, padding: '20px 24px', borderColor: 'rgba(245,158,11,0.22)', background: 'rgba(245,158,11,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--warn)',
-              }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--warn)' }}>
                 <IconAlertTriangle size={15} />
               </div>
               <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--warn)' }}>{t('warmupMissingToken')}</p>
@@ -427,43 +415,43 @@ export function Warmup({ user }: WarmupProps) {
   return (
     <div className="sf-page anim-page">
 
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
+      {/* ── Page header ───────────────────────────────────────────────────────── */}
       <div className="sf-page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          <div className="sf-anim-scale-spring" style={{
+          <div style={{
             width: 46, height: 46, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)',
-            border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1', position: 'relative', overflow: 'hidden',
+            background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)',
+            color: 'var(--accent)', position: 'relative', overflow: 'hidden',
           }}>
             <IconBolt size={22} />
             {running && (
               <div style={{
                 position: 'absolute', inset: 0, borderRadius: 12,
-                background: 'linear-gradient(135deg, #6366F1, #818CF8)',
+                background: 'linear-gradient(135deg,var(--accent),var(--accent-l))',
                 opacity: 0.2, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
               }} />
             )}
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('warmupPageTitle')}</h1>
+            <h1 className="sf-page-title">{t('warmupPageTitle')}</h1>
             <p className="sf-page-sub">{t('warmupPageSub')}</p>
           </div>
         </div>
 
-        {/* Status pills */}
+        {/* Header right: status pills */}
         <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div className="sf-card" style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 10 }}>
-            <span className={onlineCount > 0 ? 'sf-ping-dot' : undefined}
-              style={onlineCount > 0 ? undefined : { width: 7, height: 7, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />
+            {onlineCount > 0
+              ? <span className="sf-ping-dot" />
+              : <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />}
             <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)' }}>
               <span style={{ color: onlineCount > 0 ? 'var(--ok)' : 'var(--text-4)', fontWeight: 700 }}>{onlineCount}</span>
               /{phones.length} {t('warmupOnline')}
             </span>
           </div>
           {selected.size > 0 && (
-            <span className="sf-badge sf-badge-accent" style={{ fontSize: 12, padding: '4px 10px' }}>
+            <span className="sf-badge sf-badge-violet" style={{ fontSize: 12, padding: '4px 10px' }}>
               {selected.size} {t('warmupSelected')}{lang === 'fr' && selected.size !== 1 ? 's' : ''}
             </span>
           )}
@@ -473,7 +461,7 @@ export function Warmup({ user }: WarmupProps) {
               background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
             }}>
               <div className="sf-spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} />
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--accent-glow)', fontWeight: 600 }}>
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--accent-l)', fontWeight: 600 }}>
                 {activeTab === 'login' ? t('warmupLoginRunning') : activeTab === 'massEdit' ? t('warmupMassEditRunning') : t('warmupWarmupRunning')}
               </span>
             </div>
@@ -481,21 +469,21 @@ export function Warmup({ user }: WarmupProps) {
         </div>
       </div>
 
-      {/* ── Body ────────────────────────────────────────────────────────────── */}
+      {/* ── Body ──────────────────────────────────────────────────────────────── */}
       <div className="sf-page-body">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 20, maxWidth: 1140 }}>
 
-          {/* ── Left: phone list ──────────────────────────────────────────── */}
+          {/* ── Left: phone list ──────────────────────────────────────────────── */}
           <div className="sf-anim-slide-up sf-d150">
             <div className="sf-card" style={{ overflow: 'hidden' }}>
 
               {/* Phone list header */}
               <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: 'var(--accent-glow)', display: 'flex' }}><IconSmartphone size={15} /></span>
+                  <span style={{ color: 'var(--accent-l)', display: 'flex' }}><IconSmartphone size={15} /></span>
                   <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{t('warmupPhoneList')}</span>
                   {phones.length > 0 && (
-                    <span className="sf-badge sf-badge-accent">{phones.length}</span>
+                    <span className="sf-badge sf-badge-violet">{phones.length}</span>
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -549,18 +537,18 @@ export function Warmup({ user }: WarmupProps) {
               {phonesError && (
                 <div style={{
                   margin: '10px 14px', padding: '10px 14px', borderRadius: 8,
-                  background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)',
+                  background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.18)',
                   display: 'flex', alignItems: 'center', gap: 8,
                 }}>
-                  <span style={{ color: 'var(--danger)', display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={14} /></span>
-                  <p style={{ fontSize: 12, color: 'var(--danger)', fontFamily: 'monospace' }}>{phonesError}</p>
+                  <span style={{ color: 'var(--err)', display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={14} /></span>
+                  <p style={{ fontSize: 12, color: 'var(--err)', fontFamily: 'monospace' }}>{phonesError}</p>
                 </div>
               )}
 
               {/* Empty state */}
               {phones.length === 0 && !loadingPhones && !phonesError && (
                 <div className="sf-empty">
-                  <div className="sf-empty-icon" style={{ color: 'var(--accent-glow)' }}><IconSmartphone size={22} /></div>
+                  <div className="sf-empty-icon" style={{ color: 'var(--accent-l)' }}><IconSmartphone size={22} /></div>
                   <p className="sf-empty-title">{t('warmupNoPhone')}</p>
                   <p className="sf-empty-desc">{t('warmupNoPhoneDesc')}</p>
                 </div>
@@ -574,34 +562,46 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
               )}
 
-              {/* Phone rows */}
-              <div style={{ borderTop: phones.length > 0 ? '1px solid var(--border)' : 'none' }}>
+              {/* Phone rows — anim-stagger */}
+              <div className="anim-stagger" style={{ borderTop: phones.length > 0 ? '1px solid var(--border)' : 'none' }}>
                 {visiblePhones.map(phone => {
                   const online = isOnline(phone)
                   const sel    = selected.has(phone.id)
                   const job    = jobs.find(j => j.phone.id === phone.id)
                   const grp    = phone.group?.name ?? phone.groupName
                   return (
-                    <button key={phone.id} onClick={() => togglePhone(phone.id)}
-                      className="cursor-pointer"
+                    <div key={phone.id}
+                      className="sf-card-lift cursor-pointer"
+                      onClick={() => togglePhone(phone.id)}
+                      role="checkbox"
+                      aria-checked={sel}
+                      tabIndex={0}
+                      onKeyDown={e => e.key === ' ' && togglePhone(phone.id)}
                       style={{
-                        width: '100%', padding: '12px 18px',
-                        display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
-                        borderBottom: '1px solid var(--border)', background: sel
-                          ? 'linear-gradient(90deg, rgba(99,102,241,0.08), transparent)'
+                        padding: '11px 16px',
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        borderBottom: '1px solid var(--border)',
+                        background: sel
+                          ? 'linear-gradient(90deg,rgba(99,102,241,0.09),transparent)'
                           : 'transparent',
-                        transition: 'background 140ms',
-                        border: 'none', borderBottomColor: 'var(--border)', cursor: 'pointer',
-                        borderBottomStyle: 'solid', borderBottomWidth: 1,
+                        transition: 'background 150ms',
+                        cursor: 'pointer',
                       }}>
+
+                      {/* Status dot (online indicator) */}
+                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                        {online
+                          ? <span className="sf-ping-dot" />
+                          : <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />}
+                      </div>
 
                       {/* Checkbox */}
                       <div style={{
                         width: 17, height: 17, borderRadius: 4, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: `1.5px solid ${sel ? '#6366F1' : 'rgba(99,102,241,0.25)'}`,
-                        background: sel ? '#6366F1' : 'transparent',
-                        transition: 'all 140ms',
+                        border: `1.5px solid ${sel ? 'var(--accent)' : 'rgba(99,102,241,0.25)'}`,
+                        background: sel ? 'var(--accent)' : 'transparent',
+                        transition: 'all 150ms',
                       }}>
                         {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>}
                       </div>
@@ -611,42 +611,34 @@ export function Warmup({ user }: WarmupProps) {
                         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {phoneName(phone)}
                         </p>
-                        {grp && (
-                          <span className="sf-badge sf-badge-muted" style={{ fontSize: 10, marginTop: 3 }}>{grp}</span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                          {grp && <span className="sf-badge" style={{ fontSize: 10 }}>{grp}</span>}
+                          <span style={{ fontSize: 11, fontFamily: 'monospace', color: online ? 'var(--ok)' : 'var(--text-4)' }}>
+                            {online ? t('warmupOnlineLabel') : t('warmupOfflineLabel')}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Job status badge */}
                       {job && job.status !== 'idle' && (
-                        <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-ok' : job.status === 'error' ? 'sf-badge-danger' : 'sf-badge-accent'}`}
+                        <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-green' : job.status === 'error' ? 'sf-badge-red' : 'sf-badge-violet'}`}
                           style={{ fontSize: 10, flexShrink: 0 }}>
                           {job.status === 'done' ? t('warmupDoneLabel') : job.status === 'error' ? t('warmupErrLabel') : t('warmupRunLabel')}
                         </span>
                       )}
-
-                      {/* Online dot */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                        {online
-                          ? <span className="sf-ping-dot" />
-                          : <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />
-                        }
-                        <span style={{ fontSize: 11, fontFamily: 'monospace', color: online ? 'var(--ok)' : 'var(--text-4)' }}>
-                          {online ? t('warmupOnlineLabel') : t('warmupOfflineLabel')}
-                        </span>
-                      </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
             </div>
           </div>
 
-          {/* ── Right: control panel ──────────────────────────────────────── */}
+          {/* ── Right: control panel ──────────────────────────────────────────── */}
           <div className="sf-anim-slide-up sf-d200" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* ── Execution / job panel ── */}
             {jobShowing && (
-              <div className="sf-card anim-slide-up" style={{ overflow: 'hidden' }}>
+              <div className="sf-card sf-anim-slide-up" style={{ overflow: 'hidden' }}>
 
                 {/* Panel header */}
                 <div style={{
@@ -659,12 +651,12 @@ export function Warmup({ user }: WarmupProps) {
                       <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
                         <div style={{
                           position: 'absolute', inset: 0, borderRadius: '50%',
-                          background: 'linear-gradient(135deg,#6366F1,#818CF8)',
+                          background: 'linear-gradient(135deg,var(--accent),var(--accent-l))',
                           opacity: 0.22, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
                         }} />
                         <div style={{
                           width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.35)', color: 'var(--accent-glow)',
+                          background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.35)', color: 'var(--accent-l)',
                         }}>
                           <IconSettings size={13} />
                         </div>
@@ -699,27 +691,32 @@ export function Warmup({ user }: WarmupProps) {
                       <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                         {t('warmupProgression')}
                       </span>
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-glow)' }}>{progress}%</span>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-l)' }}>{progress}%</span>
                     </div>
-                    <div className="sf-progress">
-                      <div className="sf-progress-bar" style={{ width: `${progress}%` }} />
+                    <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', borderRadius: 99,
+                        width: `${progress}%`,
+                        background: 'var(--ok)',
+                        transition: 'width 300ms ease',
+                      }} />
                     </div>
                   </div>
                 )}
 
                 {/* Job cards */}
-                <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '44vh', overflowY: 'auto' }}>
+                <div className="anim-stagger" style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '44vh', overflowY: 'auto' }}>
                   {jobs.map(job => {
-                    const borderColor = job.status === 'done' ? 'rgba(34,197,94,0.5)'
-                      : job.status === 'error' ? 'rgba(239,68,68,0.5)'
+                    const borderColor = job.status === 'done' ? 'rgba(52,211,153,0.5)'
+                      : job.status === 'error' ? 'rgba(248,113,113,0.5)'
                       : job.status === 'running' ? 'rgba(99,102,241,0.6)'
                       : 'rgba(255,255,255,0.06)'
                     const statusIcon = job.status === 'done'
                       ? <span style={{ color: 'var(--ok)' }}><IconCheckCircle size={14} /></span>
                       : job.status === 'error'
-                      ? <span style={{ color: 'var(--danger)' }}><IconXCircle size={14} /></span>
+                      ? <span style={{ color: 'var(--err)' }}><IconXCircle size={14} /></span>
                       : job.status === 'running'
-                      ? <span style={{ color: 'var(--accent-glow)' }}><IconLoader size={14} spinning /></span>
+                      ? <span style={{ color: 'var(--accent-l)' }}><IconLoader size={14} spinning /></span>
                       : <span style={{ color: 'var(--text-4)' }}><IconCircle size={14} /></span>
                     return (
                       <div key={job.phone.id} style={{
@@ -735,7 +732,7 @@ export function Warmup({ user }: WarmupProps) {
                               {phoneName(job.phone)}
                             </p>
                             {job.error && (
-                              <p style={{ fontSize: 11, color: 'var(--danger)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                              <p style={{ fontSize: 11, color: 'var(--err)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
                                 {job.error}
                               </p>
                             )}
@@ -745,13 +742,13 @@ export function Warmup({ user }: WarmupProps) {
                               </p>
                             )}
                           </div>
-                          <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-ok' : job.status === 'error' ? 'sf-badge-danger' : job.status === 'running' ? 'sf-badge-accent' : 'sf-badge-muted'}`}
+                          <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-green' : job.status === 'error' ? 'sf-badge-red' : job.status === 'running' ? 'sf-badge-violet' : ''}`}
                             style={{ fontSize: 9, flexShrink: 0 }}>
                             {job.status}
                           </span>
                         </div>
 
-                        {/* Inline log lines */}
+                        {/* Inline log lines — expand on running */}
                         {job.status === 'running' && job.logs.length > 1 && (
                           <div style={{
                             padding: '6px 12px 8px', borderTop: '1px solid var(--border)',
@@ -770,7 +767,7 @@ export function Warmup({ user }: WarmupProps) {
                   })}
                 </div>
 
-                {/* Cancel button */}
+                {/* Cancel */}
                 {running && (
                   <div style={{ padding: '6px 14px 14px' }}>
                     <button onClick={() => { abortRef.current.abort = true }}
@@ -783,25 +780,43 @@ export function Warmup({ user }: WarmupProps) {
               </div>
             )}
 
-            {/* ── Tab navigation ── */}
-            <div className="sf-tabs" style={{ padding: 3 }}>
-              {TABS.map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`sf-tab cursor-pointer ${activeTab === tab.id ? 'active' : ''}`}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 32 }}>
-                  {tab.icon} {tab.label}
-                </button>
-              ))}
+            {/* ── Pill tab switcher ── */}
+            <div style={{
+              display: 'flex', gap: 4, padding: 4,
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+            }}>
+              {TABS.map(tab => {
+                const active = activeTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className="cursor-pointer"
+                    style={{
+                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      height: 34, borderRadius: 9, fontSize: 12, fontWeight: 600,
+                      border: 'none', cursor: 'pointer',
+                      transition: 'all 160ms',
+                      background: active ? 'var(--accent)' : 'transparent',
+                      color: active ? '#fff' : 'var(--text-3)',
+                      boxShadow: active ? '0 2px 12px rgba(99,102,241,0.35)' : 'none',
+                    }}>
+                    {tab.icon} {tab.label}
+                  </button>
+                )
+              })}
             </div>
 
             {/* ── LOG IN tab ── */}
             {activeTab === 'login' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="anim-slide-up">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="sf-anim-slide-up">
 
-                {/* Bulk credentials import */}
+                {/* Bulk import */}
                 <div className="sf-card" style={{ overflow: 'hidden' }}>
                   <div style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--border)' }}>
-                    <span style={{ color: 'var(--accent-glow)', display: 'flex' }}><IconPaperclip size={13} /></span>
+                    <span style={{ color: 'var(--accent-l)', display: 'flex' }}><IconPaperclip size={13} /></span>
                     <div>
                       <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>Import en masse</p>
                       <p style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 1 }}>
@@ -833,12 +848,12 @@ export function Warmup({ user }: WarmupProps) {
                   </div>
                 </div>
 
-                {/* Credentials card */}
+                {/* Credentials per phone */}
                 <div className="sf-card" style={{ overflow: 'hidden' }}>
                   <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
                     <div style={{
                       width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-glow)',
+                      background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)',
                     }}>
                       <IconKey size={14} />
                     </div>
@@ -850,11 +865,11 @@ export function Warmup({ user }: WarmupProps) {
 
                   {selectedPhones.length === 0 ? (
                     <div className="sf-empty" style={{ paddingTop: 40, paddingBottom: 40 }}>
-                      <div className="sf-empty-icon" style={{ color: 'var(--accent-glow)' }}><IconArrowLeft size={18} /></div>
+                      <div className="sf-empty-icon" style={{ color: 'var(--accent-l)' }}><IconArrowLeft size={18} /></div>
                       <p className="sf-empty-desc">{t('warmupSelectPhones')}</p>
                     </div>
                   ) : (
-                    <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+                    <div className="anim-stagger" style={{ maxHeight: 340, overflowY: 'auto' }}>
                       {selectedPhones.map((phone, idx) => {
                         const cred = loginCreds[phone.id] ?? { email: '', password: '', totpSecret: '' }
                         return (
@@ -863,7 +878,7 @@ export function Warmup({ user }: WarmupProps) {
                             borderBottom: idx < selectedPhones.length - 1 ? '1px solid var(--border)' : 'none',
                             display: 'flex', flexDirection: 'column', gap: 8,
                           }}>
-                            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-glow)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-l)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                               {phoneName(phone)}
                             </p>
                             <input
@@ -893,7 +908,7 @@ export function Warmup({ user }: WarmupProps) {
                                   fontSize: 12, fontFamily: 'monospace',
                                   borderColor: cred.totpSecret ? 'rgba(99,102,241,0.45)' : undefined,
                                   background: cred.totpSecret ? 'rgba(99,102,241,0.07)' : undefined,
-                                  color: cred.totpSecret ? '#818CF8' : undefined,
+                                  color: cred.totpSecret ? 'var(--accent-l)' : undefined,
                                 }}
                               />
                               {cred.totpSecret && (
@@ -921,7 +936,7 @@ export function Warmup({ user }: WarmupProps) {
 
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"
-                  style={{ height: 40, fontSize: 13, fontWeight: 600 }}
+                  style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
                   disabled={selectedPhones.length === 0 || running ||
                     selectedPhones.some(p => !loginCreds[p.id]?.email || !loginCreds[p.id]?.password)}
                   loading={running}
@@ -936,18 +951,18 @@ export function Warmup({ user }: WarmupProps) {
 
             {/* ── MASS EDIT tab ── */}
             {activeTab === 'massEdit' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="anim-slide-up">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="sf-anim-slide-up">
 
                 {/* Bug banner */}
                 <div style={{
                   padding: '14px 16px', borderRadius: 10,
-                  background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.22)',
+                  background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.22)',
                   display: 'flex', alignItems: 'center', gap: 12,
                 }}>
-                  <span style={{ flexShrink: 0, color: 'var(--danger)', display: 'inline-flex' }}><IconConstruction size={20} /></span>
+                  <span style={{ flexShrink: 0, color: 'var(--err)', display: 'inline-flex' }}><IconConstruction size={20} /></span>
                   <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', margin: 0 }}>Bug rencontré — fonctionnalité indisponible</p>
-                    <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>Mass Edit est temporairement désactivé en raison d’un bug. Un correctif est en cours.</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--err)', margin: 0 }}>Bug rencontré — fonctionnalité indisponible</p>
+                    <p style={{ fontSize: 12, color: 'rgba(248,113,113,0.65)', margin: '3px 0 0' }}>Mass Edit est temporairement désactivé en raison d'un bug. Un correctif est en cours.</p>
                   </div>
                 </div>
 
@@ -967,7 +982,6 @@ export function Warmup({ user }: WarmupProps) {
                   </div>
 
                   <div className="anim-stagger" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Profile name */}
                     <div>
                       <label style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', marginBottom: 6, fontFamily: 'monospace' }}>
                         {t('warmupProfileName')}
@@ -978,13 +992,12 @@ export function Warmup({ user }: WarmupProps) {
                       />
                     </div>
 
-                    {/* Username */}
                     <div>
                       <label style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', marginBottom: 6, fontFamily: 'monospace' }}>
                         {t('warmupUsername')}
                       </label>
                       <div style={{ position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 12, fontFamily: 'monospace', color: 'var(--accent-glow)', opacity: 0.6 }}>@</span>
+                        <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 12, fontFamily: 'monospace', color: 'var(--accent-l)', opacity: 0.6 }}>@</span>
                         <input type="text" placeholder="marie.fitness"
                           value={editUsername.replace(/^@/, '')}
                           onChange={e => setEditUsername(e.target.value.replace(/^@/, ''))}
@@ -994,7 +1007,6 @@ export function Warmup({ user }: WarmupProps) {
                       <p style={{ fontSize: 10, marginTop: 4, color: 'var(--text-4)', fontFamily: 'monospace' }}>{t('warmupUsernameTaken')}</p>
                     </div>
 
-                    {/* Bio */}
                     <div>
                       <label style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', marginBottom: 6, fontFamily: 'monospace' }}>
                         {t('warmupBio')}
@@ -1003,12 +1015,11 @@ export function Warmup({ user }: WarmupProps) {
                         value={editBio} onChange={e => setEditBio(e.target.value)}
                         className="sf-input sf-textarea" style={{ fontSize: 12, resize: 'none' }}
                       />
-                      <p style={{ fontSize: 10, marginTop: 3, fontFamily: 'monospace', color: editBio.length > 150 ? 'var(--danger)' : 'var(--text-4)' }}>
+                      <p style={{ fontSize: 10, marginTop: 3, fontFamily: 'monospace', color: editBio.length > 150 ? 'var(--err)' : 'var(--text-4)' }}>
                         {editBio.length}/150
                       </p>
                     </div>
 
-                    {/* Profile pic */}
                     <div>
                       <label style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', marginBottom: 6, fontFamily: 'monospace' }}>
                         {t('warmupProfilePic')}
@@ -1042,7 +1053,7 @@ export function Warmup({ user }: WarmupProps) {
 
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"
-                  style={{ height: 40, fontSize: 13, fontWeight: 600 }}
+                  style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
                   disabled={selectedPhones.length === 0 || running ||
                     (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim())}
                   loading={running}
@@ -1057,27 +1068,27 @@ export function Warmup({ user }: WarmupProps) {
 
             {/* ── WARMUP tab ── */}
             {activeTab === 'warmup' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="anim-slide-up">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="sf-anim-slide-up">
 
                 {/* Bug banner */}
                 <div style={{
                   padding: '14px 16px', borderRadius: 10,
-                  background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.22)',
+                  background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.22)',
                   display: 'flex', alignItems: 'center', gap: 12,
                 }}>
-                  <span style={{ flexShrink: 0, color: 'var(--danger)', display: 'inline-flex' }}><IconConstruction size={20} /></span>
+                  <span style={{ flexShrink: 0, color: 'var(--err)', display: 'inline-flex' }}><IconConstruction size={20} /></span>
                   <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', margin: 0 }}>{t('warmupBugTitle')}</p>
-                    <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>{t('warmupBugDesc')}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--err)', margin: 0 }}>{t('warmupBugTitle')}</p>
+                    <p style={{ fontSize: 12, color: 'rgba(248,113,113,0.65)', margin: '3px 0 0' }}>{t('warmupBugDesc')}</p>
                   </div>
                 </div>
 
-                {/* Warmup config card */}
+                {/* Config card */}
                 <div className="sf-card" style={{ overflow: 'hidden' }}>
                   <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
                     <div style={{
                       width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(233,234,240,0.12)', border: '1px solid rgba(233,234,240,0.22)', color: '#818CF8',
+                      background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)',
                     }}>
                       <IconFlame size={14} />
                     </div>
@@ -1094,15 +1105,15 @@ export function Warmup({ user }: WarmupProps) {
                       <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
                         {t('warmupNavDuration')}
                       </p>
-                      <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                         {[0, 5, 10, 15, 20, 30].map(m => (
                           <button key={m} onClick={() => setBrowseMinutes(m)}
                             className="cursor-pointer"
                             style={{
                               padding: '9px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: 'monospace',
-                              cursor: 'pointer', border: 'none', transition: 'all 140ms',
+                              cursor: 'pointer', border: 'none', transition: 'all 150ms',
                               ...(browseMinutes === m
-                                ? { background: 'linear-gradient(140deg, #6366F1, #4F46E5)', color: '#fff', boxShadow: '0 0 18px -4px rgba(99,102,241,0.55)' }
+                                ? { background: 'linear-gradient(140deg,var(--accent),#4F46E5)', color: '#fff', boxShadow: '0 0 18px -4px rgba(99,102,241,0.55)' }
                                 : { background: 'var(--surface-2)', color: 'var(--text-3)', border: '1px solid var(--border)' }),
                             }}>
                             {m === 0 ? '—' : `${m}m`}
@@ -1125,14 +1136,13 @@ export function Warmup({ user }: WarmupProps) {
                           const disabled = browseMinutes === 0
                           return (
                             <div key={key} style={{
-                              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 8,
-                              opacity: disabled ? 0.35 : 1, transition: 'all 140ms',
+                              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10,
+                              opacity: disabled ? 0.35 : 1, transition: 'all 150ms',
                               background: value && !disabled ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.02)',
                               border: `1px solid ${value && !disabled ? 'rgba(99,102,241,0.2)' : 'var(--border)'}`,
                             }}>
-                              <span style={{ display: 'flex', flexShrink: 0, color: value && !disabled ? 'var(--accent-glow)' : 'var(--text-4)' }}>{icon}</span>
+                              <span style={{ display: 'flex', flexShrink: 0, color: value && !disabled ? 'var(--accent-l)' : 'var(--text-4)' }}>{icon}</span>
                               <span style={{ flex: 1, fontSize: 13, color: 'var(--text-2)', fontFamily: 'monospace' }}>{t(labelKey)}</span>
-                              {/* Toggle using sf-toggle-track */}
                               <div
                                 onClick={() => !disabled && set(!value)}
                                 className={`sf-toggle-track cursor-pointer ${value && !disabled ? 'on' : 'off'}`}
@@ -1166,7 +1176,7 @@ export function Warmup({ user }: WarmupProps) {
                   </p>
                   <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                     {[
-                      { label: t('warmupPhones'),        value: String(selectedPhones.length),  color: selectedPhones.length > 0 ? 'var(--accent-glow)' : 'var(--text-4)' },
+                      { label: t('warmupPhones'),        value: String(selectedPhones.length),  color: selectedPhones.length > 0 ? 'var(--accent-l)' : 'var(--text-4)' },
                       { label: t('warmupNavigation'),    value: browseMinutes === 0 ? '—' : `${browseMinutes} min`, color: browseMinutes > 0 ? 'var(--ok)' : 'var(--text-4)' },
                       { label: t('warmupActionsLabel'),  value: browseMinutes > 0 ? [likePosts && 'Likes', watchReels && 'Reels', followSuggested && 'Follows'].filter(Boolean).join(' + ') || '—' : '—', color: 'var(--text-2)' },
                       { label: t('warmupTotalDuration'), value: `${selectedPhones.length * (browseMinutes + 2)} min`, color: 'var(--warn)' },
@@ -1179,17 +1189,22 @@ export function Warmup({ user }: WarmupProps) {
                   </div>
                 </div>
 
-                <Button
-                  className="w-full btn-sf-primary cursor-pointer"
-                  style={{ height: 40, fontSize: 13, fontWeight: 600 }}
+                {/* Launch button — full width, accent, lg */}
+                <button
+                  className={`sf-btn sf-btn-primary sf-btn-lg cursor-pointer`}
+                  style={{
+                    width: '100%', justifyContent: 'center', gap: 8, height: 44, fontSize: 13, fontWeight: 700, borderRadius: 10,
+                    opacity: selectedPhones.length === 0 || running || browseMinutes === 0 ? 0.45 : 1,
+                    cursor: selectedPhones.length === 0 || running || browseMinutes === 0 ? 'not-allowed' : 'pointer',
+                  }}
                   disabled={selectedPhones.length === 0 || running || browseMinutes === 0}
-                  loading={running}
                   onClick={launchWarmup}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                    <IconFlame size={14} /> {t('warmupLaunchBtn')} ({selectedPhones.length})
-                  </span>
-                </Button>
+                  {running
+                    ? <><div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> {t('warmupWarmupRunning')}</>
+                    : <><IconFlame size={15} /> {t('warmupLaunchBtn')} ({selectedPhones.length})</>
+                  }
+                </button>
               </div>
             )}
 

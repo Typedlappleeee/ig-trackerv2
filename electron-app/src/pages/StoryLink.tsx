@@ -21,7 +21,6 @@ type Distribution = 'rotation' | 'random'
 const LS_PHOTO_POOL = 'sf-story-photo-pool'
 const LS_TEXT_POOL  = 'sf-story-text-pool'
 const LS_DISTRIB    = 'sf-story-distribution'
-// Per-phone link: one link = one account, persisted individually
 const lsLinkKey = (id: string) => `sf-story-link-${id}`
 
 function loadPhotoPool(): PoolPhoto[] {
@@ -184,7 +183,6 @@ export default function StoryLink({ user }: { user: User }) {
   const [photoPool, setPhotoPool]     = useState<PoolPhoto[]>(loadPhotoPool)
   const [textPool, setTextPool]       = useState<string[]>(loadTextPool)
   const [distribution, setDistrib]    = useState<Distribution>(loadDistrib)
-  // Per-phone link map (1 link = 1 account), hydrated from localStorage on demand
   const [phoneLinks, setPhoneLinks]   = useState<Record<string, string>>({})
 
   // ── UI state ──────────────────────────────────────────────────────────────
@@ -225,9 +223,7 @@ export default function StoryLink({ user }: { user: User }) {
       setPhones(list)
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
-      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
       if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
-      // Hydrate saved links into state for live preview
       setPhoneLinks(prev => {
         const n = { ...prev }
         list.forEach(p => { if (n[p.id] === undefined) { const v = loadPhoneLink(p.id); if (v) n[p.id] = v } })
@@ -256,7 +252,6 @@ export default function StoryLink({ user }: { user: User }) {
   }
 
   // ── Assignment preview ────────────────────────────────────────────────────
-  // Compute which photo/text each phone gets. Stable during run (frozen on launch).
   const selectedIds = [...selected]
 
   const buildAssignments = useCallback((ids: string[]) => {
@@ -271,22 +266,18 @@ export default function StoryLink({ user }: { user: User }) {
       phoneId: id,
       photo: photoPool[photoIndices[i % photoIndices.length]],
       text:  textIndices.length > 0 ? textPool[textIndices[i % textIndices.length]] : '',
-      link:  getLink(id).trim(),   // 1 link = 1 account
+      link:  getLink(id).trim(),
     }))
   }, [photoPool, textPool, distribution, phoneLinks])
 
   const previewAssignments = buildAssignments(selectedIds)
-
-  // Phones selected but still missing their own link
   const missingLinkIds = selectedIds.filter(id => !getLink(id).trim())
-
   const canRun = !!bearer && selectedIds.length > 0 && photoPool.length > 0 && missingLinkIds.length === 0 && !running
 
   // ── Run ───────────────────────────────────────────────────────────────────
   async function run() {
     if (!canRun || !bearer) return
 
-    // Crédits : 1 par compte (comme le posting simple) — le mode test est gratuit
     if (!dryRun) {
       const creditCost = selectedIds.length * CREDIT_COSTS.story
       const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
@@ -334,7 +325,7 @@ export default function StoryLink({ user }: { user: User }) {
     setRunning(false)
   }
 
-  // ── Schedule (programmer les stories) ─────────────────────────────────────
+  // ── Schedule ──────────────────────────────────────────────────────────────
   const canSchedule = !!bearer && selectedIds.length > 0 && photoPool.length > 0 && missingLinkIds.length === 0 && !running
 
   async function scheduleRun() {
@@ -347,7 +338,6 @@ export default function StoryLink({ user }: { user: User }) {
         setScheduling(false)
         return
       }
-      // Crédits débités à la programmation — remboursés si annulation avant exécution
       const creditCost = selectedIds.length * CREDIT_COSTS.story
       const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
@@ -356,7 +346,6 @@ export default function StoryLink({ user }: { user: User }) {
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
-      // Freeze assignments now — each phone carries its photo/link/text
       const assignments = buildAssignments(selectedIds)
       await createScheduledPost({
         userId:        user.id,
@@ -388,7 +377,6 @@ export default function StoryLink({ user }: { user: User }) {
       setSchedDone(`${assignments.length} story(s) programmée(s) pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
       setTimeout(() => { setShowSchedule(false); setSchedDone('') }, 2200)
     } catch (e) {
-      // Échec après déduction → remboursement
       const refundAmount = selectedIds.length * CREDIT_COSTS.story
       const refunded = await refundCredits(credits.ownerId, refundAmount)
       if (refunded) credits.refresh()
@@ -401,13 +389,13 @@ export default function StoryLink({ user }: { user: User }) {
   // ── Job status helpers ────────────────────────────────────────────────────
   const jobFor = (id: string) => jobs.find(j => j.phoneId === id)
   const statusColor = (s?: JobStatus) =>
-    s === 'ok' ? '#22c55e' : s === 'error' ? '#ef4444' : s === 'running' ? '#818CF8' : 'rgba(148,163,184,0.28)'
+    s === 'ok' ? 'var(--ok)' : s === 'error' ? 'var(--err)' : s === 'running' ? 'var(--accent-l)' : 'rgba(148,163,184,0.28)'
 
   // ── No connection guard ───────────────────────────────────────────────────
   if (!conns.loading && !bearer) return (
     <div className="sf-page anim-page" style={{ alignItems: 'center', justifyContent: 'center' }}>
       <div className="sf-empty">
-        <div className="sf-empty-icon" style={{ color: 'var(--accent-glow)' }}>
+        <div className="sf-empty-icon" style={{ color: 'var(--accent-l)' }}>
           <IconNoConnection />
         </div>
         <p className="sf-empty-title">GéeLark non connecté</p>
@@ -439,30 +427,28 @@ export default function StoryLink({ user }: { user: User }) {
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <header className="sf-page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div className="sf-anim-scale-spring" style={{
+          <div style={{
             width: 46, height: 46, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)',
-            border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1',
+            background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)', color: 'var(--accent)',
           }}>
             <IconLink />
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>Story</h1>
+            <h1 className="sf-page-title">Story</h1>
             <p className="sf-page-sub">Publie ou programme des stories avec lien sur tous tes comptes.</p>
           </div>
         </div>
 
         <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          {/* Dry-run toggle — runs the full automation but stops before publishing */}
+          {/* Dry-run toggle */}
           <button
             onClick={() => setDryRun(v => !v)}
             disabled={running}
             title={running ? 'Indisponible pendant une exécution' : "Déroule toute l'automation (image, caméra, sticker, lien) mais s'arrête avant de publier. Gratuit — idéal pour vérifier que le flux marche sur tes téléphones."}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
-              padding: '8px 13px', borderRadius: 8, cursor: 'pointer',
+              padding: '8px 13px', borderRadius: 8, cursor: running ? 'not-allowed' : 'pointer',
               fontSize: 12, fontWeight: 600,
               background: dryRun ? 'rgba(251,191,36,0.12)' : 'transparent',
               border: `1px solid ${dryRun ? 'rgba(251,191,36,0.4)' : HAIR}`,
@@ -470,7 +456,10 @@ export default function StoryLink({ user }: { user: User }) {
               transition: 'all 0.15s',
             }}
           >
-            🧪 Mode test{dryRun ? ' ON' : ''}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+            </svg>
+            Mode test{dryRun ? ' ON' : ''}
           </button>
 
           {/* Schedule button */}
@@ -480,36 +469,38 @@ export default function StoryLink({ user }: { user: User }) {
             className="sf-btn sf-btn-lg sf-btn-secondary"
             style={{ cursor: canSchedule ? 'pointer' : 'not-allowed', opacity: canSchedule ? 1 : 0.45, gap: 8 }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/>
             </svg>
             Programmer
           </button>
 
-          {/* Launch button */}
-          <button
-            onClick={run}
-            disabled={!canRun}
-            className={`sf-btn sf-btn-lg ${canRun ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
-            style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9 }}
-          >
-            {running ? (
-              <>
-                <span className="sf-spinner" style={{ width: 14, height: 14 }} />
-                En cours…
-              </>
-            ) : (
-              <>
-                <IconSend />
-                {`Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`}
-              </>
-            )}
-          </button>
+          {/* Launch / Stop button */}
+          {running ? (
+            <button
+              onClick={() => { abortRef.current = true; setRunning(false) }}
+              className="sf-btn sf-btn-lg sf-btn-danger"
+              style={{ cursor: 'pointer', gap: 8 }}
+            >
+              <IconStop />
+              Arrêter
+            </button>
+          ) : (
+            <button
+              onClick={run}
+              disabled={!canRun}
+              className={`sf-btn sf-btn-lg sf-btn-primary cursor-pointer`}
+              style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9, opacity: canRun ? 1 : 0.5 }}
+            >
+              <IconSend />
+              {`Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`}
+            </button>
+          )}
         </div>
       </header>
 
       {/* ── Body: 3-column split ─────────────────────────────────────────────── */}
-      <div className="anim-stagger" style={{ flex: 1, overflow: 'hidden', display: 'grid', gridTemplateColumns: '272px 1fr 304px', minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'grid', gridTemplateColumns: '272px 1fr 304px', minHeight: 0 }}>
 
         {/* ══ COL 1 — Phone selector ══════════════════════════════════════════ */}
         <div style={{ borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
@@ -519,7 +510,7 @@ export default function StoryLink({ user }: { user: User }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <span className="sf-section-label" style={{ margin: 0 }}>Comptes</span>
               {selected.size > 0 && (
-                <span className="sf-badge sf-badge-accent" style={{ fontSize: 10 }}>
+                <span className="sf-badge sf-badge-violet" style={{ fontSize: 10 }}>
                   {selected.size} sélectionné{selected.size > 1 ? 's' : ''}
                 </span>
               )}
@@ -536,7 +527,7 @@ export default function StoryLink({ user }: { user: User }) {
               </select>
             )}
 
-            {/* Search */}
+            {/* Search input */}
             <div style={{ position: 'relative', marginBottom: 10 }}>
               <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-3)' }}>
                 <IconSearch />
@@ -552,17 +543,17 @@ export default function StoryLink({ user }: { user: User }) {
 
             {/* Select / Clear */}
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={selectAll} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1, cursor: 'pointer' }}>
+              <button onClick={selectAll} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
                 Tout sélectionner
               </button>
-              <button onClick={clearAll} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ flex: 1, cursor: 'pointer' }}>
+              <button onClick={clearAll} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
                 Effacer
               </button>
             </div>
           </div>
 
-          {/* Phone list */}
-          <div className="sf-scroll" style={{ flex: 1, padding: '6px 8px 10px' }}>
+          {/* Phone list — anim-stagger */}
+          <div className="sf-scroll anim-stagger" style={{ flex: 1, padding: '6px 8px 10px' }}>
             {loadingPhones ? (
               <div style={{ padding: '32px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <div className="sf-spinner" />
@@ -575,30 +566,35 @@ export default function StoryLink({ user }: { user: User }) {
               const grp = p.group?.name ?? p.groupName
               const j = jobFor(p.id)
               return (
-                <button
+                <div
                   key={p.id}
+                  role="checkbox"
+                  aria-checked={sel}
+                  tabIndex={0}
                   onClick={() => togglePhone(p.id)}
+                  onKeyDown={e => e.key === ' ' && togglePhone(p.id)}
+                  className="sf-card-lift cursor-pointer"
                   style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 9,
-                    padding: '8px 10px', borderRadius: 9, cursor: 'pointer',
-                    textAlign: 'left', marginBottom: 2,
-                    background: sel ? 'rgba(99,102,241,0.1)' : 'transparent',
+                    display: 'flex', alignItems: 'center', gap: 9,
+                    padding: '9px 10px', borderRadius: 9, cursor: 'pointer',
+                    marginBottom: 3,
+                    background: sel ? 'rgba(99,102,241,0.09)' : 'transparent',
                     border: `1px solid ${sel ? 'rgba(99,102,241,0.32)' : 'transparent'}`,
-                    transition: 'all 0.14s',
+                    transition: 'all 0.15s',
                   }}
                 >
                   {/* Checkbox */}
                   <span style={{
                     width: 16, height: 16, borderRadius: 5, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: sel ? '#6366F1' : 'rgba(255,255,255,0.05)',
+                    background: sel ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
                     border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                    transition: 'all 0.14s',
+                    transition: 'all 0.15s',
                   }}>
                     {sel && <IconCheck />}
                   </span>
 
-                  {/* Name */}
+                  {/* Name + group */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
                       fontSize: 12.5, fontWeight: sel ? 600 : 400,
@@ -612,29 +608,38 @@ export default function StoryLink({ user }: { user: User }) {
                     )}
                   </div>
 
-                  {/* Job status dot */}
+                  {/* Job status badge */}
+                  {j && (
+                    <span className={`sf-badge ${j.status === 'ok' ? 'sf-badge-green' : j.status === 'error' ? 'sf-badge-red' : j.status === 'running' ? 'sf-badge-violet' : ''}`}
+                      style={{ fontSize: 9, flexShrink: 0 }}>
+                      {j.status === 'idle' ? '' : j.status}
+                    </span>
+                  )}
+
+                  {/* Status dot */}
                   {j && (
                     <span style={{
                       width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                       background: statusColor(j.status),
-                      boxShadow: j.status === 'running' ? '0 0 6px #818CF8' : 'none',
+                      boxShadow: j.status === 'running' ? '0 0 6px var(--accent-l)' : 'none',
+                      transition: 'all 0.2s',
                     }} />
                   )}
-                </button>
+                </div>
               )
             })}
           </div>
         </div>
 
         {/* ══ COL 2 — Pool config (centre) ════════════════════════════════════ */}
-        <div className="sf-scroll anim-stagger" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="sf-scroll" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* ── Photo pool ─────────────────────────────────────────────────── */}
-          <div className="sf-card" style={{ padding: 18 }}>
+          <div className="sf-card anim-stagger" style={{ padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--accent-glow)' }}><IconPhoto /></span>
+                  <span style={{ color: 'var(--accent-l)' }}><IconPhoto /></span>
                   <span className="sf-section-label" style={{ margin: 0 }}>Pool de photos</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
@@ -643,8 +648,8 @@ export default function StoryLink({ user }: { user: User }) {
               </div>
               <button
                 onClick={() => setShowBankPicker(true)}
-                className="sf-btn sf-btn-secondary sf-btn-sm"
-                style={{ cursor: 'pointer', flexShrink: 0, marginLeft: 12 }}
+                className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+                style={{ flexShrink: 0, marginLeft: 12 }}
               >
                 <IconPlus />
                 Ajouter depuis la banque
@@ -654,16 +659,15 @@ export default function StoryLink({ user }: { user: User }) {
             {photoPool.length === 0 ? (
               <button
                 onClick={() => setShowBankPicker(true)}
-                className="sf-empty"
+                className="sf-empty cursor-pointer"
                 style={{
-                  width: '100%', padding: '28px 0', borderRadius: 10, cursor: 'pointer',
+                  width: '100%', padding: '28px 0', borderRadius: 10,
                   border: '2px dashed rgba(99,102,241,0.18)',
                   background: 'rgba(99,102,241,0.03)',
-                  color: 'var(--text-3)', fontSize: 13,
-                  gap: 8,
+                  color: 'var(--text-3)', fontSize: 13, gap: 8,
                 }}
               >
-                <span style={{ color: 'var(--accent-glow)', opacity: 0.6 }}><IconPhoto /></span>
+                <span style={{ color: 'var(--accent-l)', opacity: 0.6 }}><IconPhoto /></span>
                 <span>Aucune photo — cliquer pour en ajouter depuis la banque</span>
               </button>
             ) : (
@@ -672,21 +676,20 @@ export default function StoryLink({ user }: { user: User }) {
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 7,
                     padding: '6px 10px', borderRadius: 8,
-                    background: 'rgba(99,102,241,0.08)',
-                    border: '1px solid rgba(99,102,241,0.18)',
+                    background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)',
                     maxWidth: 220,
                   }}>
-                    <span style={{ color: '#818CF8', flexShrink: 0 }}><IconPhotoSm /></span>
-                    <span style={{ fontSize: 12, color: '#818CF8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: 'var(--accent-l)', flexShrink: 0 }}><IconPhotoSm /></span>
+                    <span style={{ fontSize: 12, color: 'var(--accent-l)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {ph.name}
                     </span>
                     <button
                       onClick={() => setPhotoPool(prev => prev.filter((_, j) => j !== i))}
                       aria-label="Retirer la photo"
-                      className="sf-btn-icon sf-press"
+                      className="sf-btn-icon sf-press cursor-pointer"
                       style={{
-                        flexShrink: 0, width: 18, height: 18, borderRadius: 5, cursor: 'pointer',
-                        background: 'rgba(239,68,68,0.12)', border: 'none', color: '#f87171',
+                        flexShrink: 0, width: 18, height: 18, borderRadius: 5,
+                        background: 'rgba(248,113,113,0.12)', border: 'none', color: 'var(--err)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
                     >
@@ -696,8 +699,8 @@ export default function StoryLink({ user }: { user: User }) {
                 ))}
                 <button
                   onClick={() => setShowBankPicker(true)}
-                  className="sf-btn sf-btn-ghost sf-btn-sm"
-                  style={{ cursor: 'pointer', border: '1px dashed rgba(99,102,241,0.22)', color: 'var(--accent-glow)' }}
+                  className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+                  style={{ border: '1px dashed rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}
                 >
                   <IconPlus />
                   Ajouter
@@ -710,11 +713,11 @@ export default function StoryLink({ user }: { user: User }) {
           <div className="sf-card" style={{ padding: 18 }}>
             <div style={{ marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                <span style={{ color: 'var(--accent-glow)' }}><IconText /></span>
+                <span style={{ color: 'var(--accent-l)' }}><IconText /></span>
                 <span className="sf-section-label" style={{ margin: 0 }}>Pool de textes sticker</span>
               </div>
               <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l’URL.
+                Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.
               </p>
             </div>
 
@@ -724,14 +727,13 @@ export default function StoryLink({ user }: { user: User }) {
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 7,
                     padding: '5px 11px', borderRadius: 20,
-                    background: 'rgba(99,102,241,0.07)',
-                    border: '1px solid rgba(99,102,241,0.18)',
+                    background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)',
                   }}>
                     <span style={{ fontSize: 12.5, color: '#67e8f9' }}>{txt}</span>
                     <button
                       onClick={() => setTextPool(prev => prev.filter((_, j) => j !== i))}
                       aria-label="Retirer le texte"
-                      className="sf-press"
+                      className="sf-press cursor-pointer"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center' }}
                     >
                       <IconX />
@@ -758,7 +760,7 @@ export default function StoryLink({ user }: { user: User }) {
               <button
                 onClick={() => { if (editingText.trim()) { setTextPool(prev => [...prev, editingText.trim()]); setEditingText('') } }}
                 disabled={!editingText.trim()}
-                className="sf-btn sf-btn-secondary"
+                className="sf-btn sf-btn-secondary cursor-pointer"
                 style={{ cursor: editingText.trim() ? 'pointer' : 'not-allowed', opacity: editingText.trim() ? 1 : 0.4, color: '#67e8f9', borderColor: 'rgba(99,102,241,0.22)' }}
               >
                 Ajouter
@@ -778,16 +780,16 @@ export default function StoryLink({ user }: { user: User }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--accent-glow)' }}><IconLinkSm /></span>
+                  <span style={{ color: 'var(--accent-l)' }}><IconLinkSm /></span>
                   <span className="sf-section-label" style={{ margin: 0 }}>Liens — 1 lien par compte</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  Chaque compte a son propre lien, éditable dans l’aperçu et sauvegardé automatiquement.
+                  Chaque compte a son propre lien, éditable dans l'aperçu et sauvegardé automatiquement.
                 </p>
               </div>
               {selectedIds.length > 0 && (
                 <span
-                  className={`sf-badge ${missingLinkIds.length > 0 ? 'sf-badge-warn' : 'sf-badge-ok'}`}
+                  className={`sf-badge ${missingLinkIds.length > 0 ? 'sf-badge-red' : 'sf-badge-green'}`}
                   style={{ flexShrink: 0 }}
                 >
                   {selectedIds.length - missingLinkIds.length}/{selectedIds.length} liens
@@ -798,14 +800,13 @@ export default function StoryLink({ user }: { user: User }) {
             {missingLinkIds.length > 0 && (
               <div style={{
                 marginTop: 12, padding: '10px 12px', borderRadius: 9,
-                background: 'rgba(245,158,11,0.07)',
-                border: '1px solid rgba(245,158,11,0.18)',
+                background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)',
                 display: 'flex', alignItems: 'flex-start', gap: 8,
                 color: 'rgba(251,191,36,0.9)', fontSize: 12,
               }}>
                 <span style={{ flexShrink: 0, marginTop: 1, color: '#fbbf24' }}><IconWarn /></span>
                 <span>
-                  {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} dans l’aperçu avant de publier.
+                  {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} dans l'aperçu avant de publier.
                 </span>
               </div>
             )}
@@ -814,7 +815,7 @@ export default function StoryLink({ user }: { user: User }) {
           {/* ── Distribution mode ───────────────────────────────────────────── */}
           <div className="sf-card" style={{ padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
-              <span style={{ color: 'var(--accent-glow)' }}><IconShuffle /></span>
+              <span style={{ color: 'var(--accent-l)' }}><IconShuffle /></span>
               <span className="sf-section-label" style={{ margin: 0 }}>Distribution</span>
             </div>
 
@@ -828,7 +829,7 @@ export default function StoryLink({ user }: { user: User }) {
                   <button
                     key={m.k}
                     onClick={() => setDistrib(m.k)}
-                    className="sf-hover-lift sf-press"
+                    className="sf-card-lift cursor-pointer"
                     style={{
                       flex: 1, padding: '13px 14px', borderRadius: 11, textAlign: 'left', cursor: 'pointer',
                       background: active ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.025)',
@@ -836,8 +837,8 @@ export default function StoryLink({ user }: { user: User }) {
                       transition: 'all 0.15s',
                     }}
                   >
-                    <div style={{ marginBottom: 7, color: active ? '#818CF8' : 'var(--text-3)' }}>{m.icon}</div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: active ? '#818CF8' : 'var(--text-2)', marginBottom: 2 }}>{m.label}</p>
+                    <div style={{ marginBottom: 7, color: active ? 'var(--accent-l)' : 'var(--text-3)' }}>{m.icon}</div>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: active ? 'var(--accent-l)' : 'var(--text-2)', marginBottom: 2 }}>{m.label}</p>
                     <p style={{ fontSize: 10.5, color: 'var(--text-4)' }}>{m.desc}</p>
                   </button>
                 )
@@ -863,8 +864,8 @@ export default function StoryLink({ user }: { user: User }) {
             )}
           </div>
 
-          {/* Assignment list */}
-          <div className="sf-scroll" style={{ flex: 1, padding: '8px 10px' }}>
+          {/* Assignment list — anim-stagger */}
+          <div className="sf-scroll anim-stagger" style={{ flex: 1, padding: '8px 10px' }}>
             {previewAssignments.length === 0 ? (
               <div className="sf-empty" style={{ padding: '48px 24px' }}>
                 <div className="sf-empty-icon" style={{ color: 'var(--text-3)' }}>
@@ -877,7 +878,7 @@ export default function StoryLink({ user }: { user: User }) {
               const p = phoneById(a.phoneId)
               const j = jobFor(a.phoneId)
               const hasLog = j && j.logs.length > 0
-              const borderCol = j?.status === 'error' ? 'rgba(239,68,68,0.22)' : j?.status === 'ok' ? 'rgba(34,197,94,0.22)' : 'var(--border)'
+              const borderCol = j?.status === 'error' ? 'rgba(248,113,113,0.22)' : j?.status === 'ok' ? 'rgba(52,211,153,0.22)' : 'var(--border)'
               return (
                 <div
                   key={a.phoneId}
@@ -885,24 +886,32 @@ export default function StoryLink({ user }: { user: User }) {
                 >
                   {/* Phone row */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 11px', background: 'rgba(255,255,255,0.018)' }}>
+                    {/* Status dot */}
                     <span style={{
                       width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                       background: statusColor(j?.status),
-                      boxShadow: j?.status === 'running' ? '0 0 6px #818CF8' : 'none',
+                      boxShadow: j?.status === 'running' ? '0 0 6px var(--accent-l)' : 'none',
                       transition: 'all 0.2s',
                     }} />
                     <span style={{
                       flex: 1, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      color: j?.status === 'ok' ? '#4ade80' : j?.status === 'error' ? '#f87171' : 'var(--text-1)',
+                      color: j?.status === 'ok' ? 'var(--ok)' : j?.status === 'error' ? 'var(--err)' : 'var(--text-1)',
                     }}>
                       {p ? phoneName(p) : a.phoneId.slice(-6)}
                     </span>
+                    {/* Status badge */}
+                    {j && j.status !== 'idle' && (
+                      <span className={`sf-badge ${j.status === 'ok' ? 'sf-badge-green' : j.status === 'error' ? 'sf-badge-red' : j.status === 'running' ? 'sf-badge-violet' : ''}`}
+                        style={{ fontSize: 9 }}>
+                        {j.status}
+                      </span>
+                    )}
                     {hasLog && (
                       <button
                         onClick={() => setOpenLog(openLog === a.phoneId ? null : a.phoneId)}
                         aria-label={openLog === a.phoneId ? 'Masquer les logs' : 'Afficher les logs'}
-                        className="sf-btn sf-btn-ghost sf-btn-sm"
-                        style={{ padding: '2px 6px', height: 22, cursor: 'pointer', color: 'var(--text-3)' }}
+                        className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+                        style={{ padding: '2px 6px', height: 22, color: 'var(--text-3)' }}
                       >
                         <IconChevron open={openLog === a.phoneId} />
                       </button>
@@ -911,25 +920,23 @@ export default function StoryLink({ user }: { user: User }) {
 
                   {/* Details */}
                   <div style={{ padding: '7px 11px 10px', fontSize: 11, lineHeight: 1.65 }}>
-                    {/* Photo */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(129,140,248,0.75)', marginBottom: 3 }}>
                       <span style={{ flexShrink: 0 }}><IconPhotoSm /></span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.photo.name}</span>
                     </div>
 
-                    {/* Text sticker */}
                     {a.text && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-3)', marginBottom: 3 }}>
                         <span style={{ flexShrink: 0 }}><IconTextSm /></span>
-                        <span style={{ fontStyle: 'normal' }}>"{a.text}"</span>
+                        <span>"{a.text}"</span>
                       </div>
                     )}
 
-                    {/* Per-phone link — editable */}
+                    {/* Per-phone link input */}
                     <div style={{ position: 'relative', marginTop: 6 }}>
                       <span style={{
                         position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
-                        pointerEvents: 'none', color: getLink(a.phoneId).trim() ? '#6366F1' : 'var(--text-4)',
+                        pointerEvents: 'none', color: getLink(a.phoneId).trim() ? 'var(--accent)' : 'var(--text-4)',
                       }}>
                         <IconLinkSm />
                       </span>
@@ -948,7 +955,7 @@ export default function StoryLink({ user }: { user: User }) {
                       {getLink(a.phoneId).trim() && (
                         <span style={{
                           position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                          pointerEvents: 'none', display: 'inline-flex', color: '#6366F1',
+                          pointerEvents: 'none', display: 'inline-flex', color: 'var(--accent)',
                         }} title="Enregistré" aria-label="Enregistré">
                           <IconSave />
                         </span>
@@ -967,7 +974,7 @@ export default function StoryLink({ user }: { user: User }) {
                     }}>
                       {j.logs.map((l, i) => (
                         <div key={i} style={{
-                          color: l.startsWith('[err]') ? '#f87171' : l.includes('ok') ? '#4ade80' : 'var(--text-2)',
+                          color: l.startsWith('[err]') ? 'var(--err)' : l.includes('ok') ? 'var(--ok)' : 'var(--text-2)',
                         }}>
                           {l}
                         </div>
@@ -979,13 +986,13 @@ export default function StoryLink({ user }: { user: User }) {
             })}
           </div>
 
-          {/* Stop button */}
+          {/* Stop button — shown in col 3 when running */}
           {running && (
             <div style={{ flexShrink: 0, padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
               <button
                 onClick={() => { abortRef.current = true; setRunning(false) }}
-                className="sf-btn sf-btn-danger"
-                style={{ width: '100%', cursor: 'pointer', justifyContent: 'center' }}
+                className="sf-btn sf-btn-danger cursor-pointer"
+                style={{ width: '100%', justifyContent: 'center' }}
               >
                 <IconStop />
                 Arrêter
@@ -1007,10 +1014,10 @@ export default function StoryLink({ user }: { user: User }) {
         >
           <div style={{
             width: '100%', maxWidth: 420, margin: '0 16px',
-            background: BG_2, border: `1px solid ${HAIR}`, borderRadius: 12,
+            background: BG_2, border: `1px solid ${HAIR}`, borderRadius: 14,
             overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
           }}>
-            {/* Header */}
+            {/* Modal header */}
             <div style={{
               padding: '16px 20px', borderBottom: `1px solid ${HAIR}`,
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1024,8 +1031,9 @@ export default function StoryLink({ user }: { user: User }) {
               <button
                 onClick={() => !scheduling && setShowSchedule(false)}
                 aria-label="Fermer"
+                className="sf-btn-icon cursor-pointer"
                 style={{
-                  width: 28, height: 28, borderRadius: 7, cursor: 'pointer',
+                  width: 28, height: 28, borderRadius: 7,
                   background: 'transparent', border: 'none', color: 'var(--text-3)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
@@ -1034,7 +1042,9 @@ export default function StoryLink({ user }: { user: User }) {
 
             {schedDone ? (
               <div style={{ padding: '34px 20px', textAlign: 'center' }}>
-                <p style={{ fontSize: 26, margin: '0 0 10px' }}>✅</p>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                </div>
                 <p style={{ fontSize: 13.5, fontWeight: 600, color: TEXT_1, margin: 0 }}>{schedDone}</p>
                 <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '6px 0 0' }}>
                   Retrouve-la dans l'onglet Programmation.
@@ -1069,6 +1079,7 @@ export default function StoryLink({ user }: { user: User }) {
                         <button
                           key={m}
                           onClick={() => setSchedDelay(m)}
+                          className="cursor-pointer"
                           style={{
                             flex: 1, height: 34, borderRadius: 8, cursor: 'pointer',
                             fontSize: 12.5, fontWeight: 600,
@@ -1084,14 +1095,14 @@ export default function StoryLink({ user }: { user: User }) {
 
                   {schedErr && (
                     <p style={{
-                      fontSize: 12, color: '#f87171', margin: 0, padding: '9px 12px',
-                      background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
+                      fontSize: 12, color: 'var(--err)', margin: 0, padding: '9px 12px',
+                      background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.18)',
                       borderRadius: 8,
                     }}>{schedErr}</p>
                   )}
 
                   <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0, lineHeight: 1.55 }}>
-                    ⚠ Les stories utilisent l'automation du téléphone — l'application doit être
+                    Les stories utilisent l'automation du téléphone — l'application doit être
                     ouverte à l'heure programmée pour qu'elles partent.
                   </p>
                 </div>
@@ -1101,16 +1112,17 @@ export default function StoryLink({ user }: { user: User }) {
                   <button
                     onClick={() => setShowSchedule(false)}
                     disabled={scheduling}
-                    className="sf-btn sf-btn-secondary"
-                    style={{ flex: 1, cursor: 'pointer', justifyContent: 'center' }}
+                    className="sf-btn sf-btn-secondary cursor-pointer"
+                    style={{ flex: 1, justifyContent: 'center' }}
                   >Annuler</button>
                   <button
                     onClick={scheduleRun}
                     disabled={scheduling}
-                    className="sf-btn"
+                    className="sf-btn sf-btn-primary cursor-pointer"
                     style={{
-                      flex: 2, cursor: scheduling ? 'wait' : 'pointer', justifyContent: 'center',
-                      background: scheduling ? ACCENT_D : ACCENT, color: '#fff', border: 'none', gap: 8,
+                      flex: 2, justifyContent: 'center',
+                      opacity: scheduling ? 0.7 : 1,
+                      cursor: scheduling ? 'wait' : 'pointer', gap: 8,
                     }}
                   >
                     {scheduling ? (
