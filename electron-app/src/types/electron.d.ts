@@ -97,6 +97,7 @@ interface ElectronAPI {
     Promise<{ ok: boolean; text?: string; error?: string }>
   adspowerRequest: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) =>
     Promise<{ ok: boolean; data?: unknown; error?: string }>
+  setMassPostingRunning: (running: boolean) => void
 }
 
 declare global {

@@ -56,8 +56,12 @@ export function setMassPostingState(patch: Partial<MassPostingState>) {
   if (patch.selectedVideos) state.selectedVideos = [...patch.selectedVideos]
   const rest = { ...patch }
   delete rest.taskStatuses; delete rest.selectedPhones; delete rest.selectedVideos
+  const postingChanged = 'posting' in rest && rest.posting !== state.posting
   Object.assign(state, rest)
   notify()
+  if (postingChanged) {
+    window.electronAPI?.setMassPostingRunning(!!state.posting)
+  }
 }
 
 export function resetMassPosting() {

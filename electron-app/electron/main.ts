@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol, Tray, Menu, nativeImage } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import os from 'node:os'
@@ -44,6 +44,57 @@ export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 let win: BrowserWindow | null = null
+let tray: Tray | null = null
+let isMassPostingRunning = false
+
+// Resolve tray icon path — falls back gracefully if logo not found
+function getTrayIcon() {
+  const logoPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'logo.png')
+    : path.join(process.env.APP_ROOT!, 'public', 'logo.png')
+  try {
+    const img = nativeImage.createFromPath(logoPath)
+    if (!img.isEmpty()) return img.resize({ width: 16, height: 16 })
+  } catch { /* ignore */ }
+  return nativeImage.createEmpty()
+}
+
+function ensureTray() {
+  if (tray && !tray.isDestroyed()) return
+  tray = new Tray(getTrayIcon())
+  tray.setToolTip('Mass Posting en cours...')
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: 'Afficher l\'application',
+      click: () => { win?.show(); win?.focus() },
+    },
+    { type: 'separator' },
+    {
+      label: 'Arrêter et quitter',
+      click: () => { isMassPostingRunning = false; app.quit() },
+    },
+  ]))
+  tray.on('double-click', () => { win?.show(); win?.focus() })
+}
+
+function destroyTray() {
+  if (tray && !tray.isDestroyed()) tray.destroy()
+  tray = null
+}
+
+ipcMain.on('mass-posting-running', (_event, running: boolean) => {
+  isMassPostingRunning = running
+  if (running) {
+    ensureTray()
+  } else {
+    destroyTray()
+    // Re-show the window if it was hidden so the user can see the results
+    if (win && !win.isDestroyed() && !win.isVisible()) {
+      win.show()
+      win.focus()
+    }
+  }
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom protocol `localvideo://` for serving local video files to <video> tags.
@@ -1517,6 +1568,16 @@ function createWindow() {
 
   win.once('ready-to-show', () => { win?.show(); win?.maximize() })
 
+  // While a mass posting run is active: hide to tray instead of closing the app.
+  // The renderer process (and its timers/loops) keeps running; phones get stopped
+  // normally and results log as usual. The tray icon lets the user come back.
+  win.on('close', (event) => {
+    if (isMassPostingRunning) {
+      event.preventDefault()
+      win?.hide()
+    }
+  })
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
     win.webContents.openDevTools()
@@ -1621,7 +1682,8 @@ ipcMain.handle('write-temp-file', async (_event, opts: { name: string; bytes: Ar
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') { app.quit(); win = null }
+  // Don't quit while a mass posting run is in progress — the window is just hidden
+  if (process.platform !== 'darwin' && !isMassPostingRunning) { app.quit(); win = null }
 })
 
 app.on('activate', () => {

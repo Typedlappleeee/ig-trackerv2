@@ -141,4 +141,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AdsPower local API — uses Node http (bypasses Electron's net.fetch HTTP restrictions)
   adspowerRequest: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) =>
     ipcRenderer.invoke('adspower-request', opts),
+
+  // Notify main process that a mass posting run started/ended so it can keep the
+  // app alive in the system tray instead of quitting when the window is closed.
+  setMassPostingRunning: (running: boolean) =>
+    ipcRenderer.send('mass-posting-running', running),
 })
