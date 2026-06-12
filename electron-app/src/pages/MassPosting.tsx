@@ -829,23 +829,15 @@ export function MassPosting({ user }: MassPostingProps) {
       setLastRun({ ok: okN, err: errN, total: assignments.length })
       toast.show({ title: errN === 0 ? 'Mass posting terminé ✓' : 'Mass posting terminé avec erreurs', body: `${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`, kind: errN === 0 ? 'ok' : 'error' })
 
-      // Log to scheduled_posts so Hub stats (weekPosts) count this run
+      // Log run for the Hub "posts this week" counter (post_runs table, not scheduled_posts)
       if (okN > 0) {
-        const now = new Date().toISOString()
-        supabase.from('scheduled_posts').insert({
-          user_id:      user.id,
-          org_id:       currentOrg?.id ?? null,
-          type:         'mass_posting',
-          status:       errN === 0 ? 'done' : 'failed',
-          scheduled_at: now,
-          executed_at:  now,
-          phones:       phoneList.map(p => ({ id: p.id, name: p.phone_name })),
-          videos:       selectedVideos.map(v => ({ id: v.item.id, title: v.item.title ?? '' })),
-          caption:      caption,
-          delay_minutes: 0,
-          mode:         mode,
-          bearer_token: bearer,
-          result:       { ok: okN, err: errN, total: assignments.length },
+        supabase.from('post_runs').insert({
+          user_id:   user.id,
+          org_id:    currentOrg?.id ?? null,
+          type:      'mass_posting',
+          ok_count:  okN,
+          err_count: errN,
+          total:     assignments.length,
         }) // fire-and-forget, non-blocking
       }
       log('Done! Resetting in 5s…', 'ok')

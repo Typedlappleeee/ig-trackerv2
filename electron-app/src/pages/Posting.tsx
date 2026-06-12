@@ -577,23 +577,15 @@ export function Posting({ user }: PostingProps) {
       setProgress(0)
       setLastRun({ ok: okN, err: errN, total })
 
-      // Log to scheduled_posts so Hub weekPosts stat counts this run
+      // Log run for the Hub "posts this week" counter (post_runs table, not scheduled_posts)
       if (okN > 0) {
-        const now = new Date().toISOString()
-        supabase.from('scheduled_posts').insert({
-          user_id:      user.id,
-          org_id:       currentOrg?.id ?? null,
-          type:         'posting',
-          status:       errN === 0 ? 'done' : 'failed',
-          scheduled_at: now,
-          executed_at:  now,
-          phones:       phones.filter(p => selectedPhones.has(p.id)).map(p => ({ id: p.id, name: p.phone_name })),
-          videos:       [],
-          caption:      caption,
-          delay_minutes: 0,
-          mode:         'seq',
-          bearer_token: bearer,
-          result:       { ok: okN, err: errN, total },
+        supabase.from('post_runs').insert({
+          user_id:   user.id,
+          org_id:    currentOrg?.id ?? null,
+          type:      'posting',
+          ok_count:  okN,
+          err_count: errN,
+          total,
         }) // fire-and-forget
       }
     } finally {

@@ -199,12 +199,16 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const load = useCallback(async () => {
     setLoading(true)
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const [phonesRes, videosRes, weekRes, upcomingRes, recentRes] = await Promise.all([
+    const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes] = await Promise.all([
       supabase.from('phones').select('id', { count: 'exact', head: true }),
       supabase.from('content_bank').select('id', { count: 'exact', head: true }),
       supabase.from('scheduled_posts')
         .select('id', { count: 'exact', head: true })
         .in('status', ['done', 'failed'])
+        .gte('created_at', weekAgo),
+      // Runs directs (Posting / Mass Posting) — chaque ligne porte son ok_count
+      supabase.from('post_runs')
+        .select('ok_count')
         .gte('created_at', weekAgo),
       supabase.from('scheduled_posts')
         .select('*')
@@ -219,7 +223,9 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     ])
     setPhoneCount(phonesRes.count ?? 0)
     setVideoCount(videosRes.count ?? 0)
-    setWeekPosts(weekRes.count ?? 0)
+    const runPosts = ((runsRes.data ?? []) as Array<{ ok_count: number | null }>)
+      .reduce((sum, r) => sum + (r.ok_count ?? 0), 0)
+    setWeekPosts((weekRes.count ?? 0) + runPosts)
     setUpcoming((upcomingRes.data ?? []) as ScheduledPost[])
     setRecent((recentRes.data ?? []) as ScheduledPost[])
     setLoading(false)
@@ -235,6 +241,10 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     let t: ReturnType<typeof setTimeout> | null = null
     const ch = supabase.channel('hub-dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts' }, () => {
+        if (t) clearTimeout(t)
+        t = setTimeout(load, 1_500)
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'post_runs' }, () => {
         if (t) clearTimeout(t)
         t = setTimeout(load, 1_500)
       })
