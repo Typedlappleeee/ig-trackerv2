@@ -1827,11 +1827,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   }
 
                   return (
-                    <div className="space-y-5 sf-reveal">
+                    <div className="space-y-5">
                       {joined.length > 0 && (
                         <div>
                           <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(99,102,241,0.5)' }}>{t('communityTopicsMyCommunities')}</p>
-                          <div className="space-y-2">
+                          <div className="space-y-2 anim-stagger">
                             {joined.map(topic => <TopicCard key={topic.id} t={topic} />)}
                           </div>
                         </div>
@@ -1841,7 +1841,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(99,102,241,0.5)' }}>
                             {joined.length > 0 ? t('communityTopicsDiscover') : t('communityTopicsAll')}
                           </p>
-                          <div className="space-y-2">
+                          <div className="space-y-2 anim-stagger">
                             {others.map(topic => <TopicCard key={topic.id} t={topic} />)}
                           </div>
                         </div>
@@ -2034,9 +2034,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
           {isAdmin ? (
             <>
               {/* Thread list */}
-              <div className="w-56 flex-shrink-0 overflow-y-auto sf-reveal"
+              <div className="w-56 flex-shrink-0 overflow-y-auto"
                 style={{ borderRight: '1px solid rgba(99,102,241,0.1)', background: 'rgba(15,16,20,0.4)' }}>
-                <div className="px-3 pt-3 pb-2">
+                <div className="px-3 pt-3 pb-2 anim-stagger">
                   <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-1"
                     style={{ color: 'rgba(99,102,241,0.5)' }}>
                     {t('communityAdminTickets')} ({threadList.length})
@@ -2177,14 +2177,20 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
                 {loading ? <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
                 : myThreadMessages.length === 0 ? (
-                  <div className="sf-empty h-full">
-                    <div className="sf-empty-icon" style={{ color: '#818CF8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.15)', width: 64, height: 64, borderRadius: 20 }}>
-                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--accent-l)' }}>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
                       </svg>
                     </div>
-                    <p className="sf-empty-title">{t('communitySupportEmpty')}</p>
-                    <p className="sf-empty-desc">{t('communitySupportEmptyHint')}</p>
+                    <div className="space-y-1.5">
+                      <p className="text-[14px] font-bold" style={{ color: 'var(--ivory)' }}>{t('communitySupportEmpty')}</p>
+                      <p className="text-[12px]" style={{ color: 'var(--muted)' }}>{t('communitySupportEmptyHint')}</p>
+                    </div>
+                    <button onClick={() => setTab('support')} className="sf-btn sf-btn-primary cursor-pointer">
+                      {t('communityOpenTicket')}
+                    </button>
                   </div>
                 ) : (
                   <>
@@ -2341,6 +2347,51 @@ export function Community({ user, onNavigate }: CommunityProps) {
           onMute={minutes => muteUser(muteTarget.id, minutes)}
           onClose={() => { setShowMuteModal(false); setMuteTarget(null) }} />
       )}
+
+      {/* ── Confirm: delete message ───────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={confirmDeleteMsg !== null}
+        title="Supprimer ce message ?"
+        message="Cette action est irréversible."
+        confirmLabel="Supprimer"
+        danger
+        onConfirm={() => {
+          if (confirmDeleteMsg) {
+            deleteMessage(confirmDeleteMsg)
+            if (selectedPost?.id === confirmDeleteMsg) setSelectedPost(null)
+          }
+          setConfirmDeleteMsg(null)
+        }}
+        onCancel={() => setConfirmDeleteMsg(null)}
+      />
+
+      {/* ── Confirm: delete topic ─────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={confirmDeleteTopic !== null}
+        title="Supprimer ce topic ?"
+        message="Le topic et tous ses messages seront définitivement supprimés."
+        confirmLabel="Supprimer"
+        danger
+        onConfirm={() => {
+          if (confirmDeleteTopic) deleteTopic(confirmDeleteTopic)
+          setConfirmDeleteTopic(null)
+        }}
+        onCancel={() => setConfirmDeleteTopic(null)}
+      />
+
+      {/* ── Confirm: delete topic message ────────────────────────────────────── */}
+      <ConfirmDialog
+        open={confirmDeleteTopicMsg !== null}
+        title="Supprimer ce message ?"
+        message="Cette action est irréversible."
+        confirmLabel="Supprimer"
+        danger
+        onConfirm={() => {
+          if (confirmDeleteTopicMsg) deleteTopicMessage(confirmDeleteTopicMsg)
+          setConfirmDeleteTopicMsg(null)
+        }}
+        onCancel={() => setConfirmDeleteTopicMsg(null)}
+      />
     </div>
   )
 }
