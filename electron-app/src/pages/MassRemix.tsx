@@ -1312,7 +1312,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 </div>
               </div>
 
-              {/* Job rows */}
+              {/* Job rows with status badges */}
               <div className="flex flex-col gap-1 max-h-52 overflow-auto">
                 {jobs.map(job => (
                   <div key={job.id}
@@ -1325,23 +1325,25 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                           : job.status === 'pending'
                             ? 'transparent'
                             : 'rgba(99,102,241,0.07)',
+                      border: `1px solid ${
+                        job.status === 'done' ? 'rgba(52,211,153,0.12)'
+                        : job.status === 'error' ? 'rgba(239,68,68,0.12)'
+                        : 'transparent'
+                      }`,
                     }}>
-                    <span className="text-[11px] font-black tabular-nums flex-shrink-0 text-text3 w-5 text-center">
+                    <span className="text-[11px] font-black tabular-nums flex-shrink-0 w-5 text-center"
+                      style={{ color: 'rgba(99,102,241,0.5)' }}>
                       #{job.id + 1}
                     </span>
-                    <span className="flex-1 text-[11px] font-mono truncate text-text2">
+                    <span className="flex-1 text-[11px] font-mono truncate" style={{ color: 'var(--ivory)', opacity: 0.7 }}>
                       {fileName(job.originalPath)}
                     </span>
-                    <span className="text-[10px] font-semibold flex-shrink-0"
-                      style={{
-                        color: job.status === 'done'
-                          ? 'var(--ok)'
-                          : job.status === 'error'
-                            ? 'var(--danger)'
-                            : job.status === 'pending'
-                              ? 'rgba(233,234,240,0.3)'
-                              : 'var(--accent)',
-                      }}>
+                    <span className={`sf-badge flex-shrink-0 ${
+                      job.status === 'done' ? 'sf-badge-green'
+                      : job.status === 'error' ? 'sf-badge-red'
+                      : job.status === 'pending' ? ''
+                      : 'sf-badge-violet'
+                    }`} style={{ fontSize: 9, padding: '2px 6px' }}>
                       {STATUS_LABEL[job.status]}
                     </span>
                   </div>
@@ -1538,30 +1540,37 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             </div>
           </div>
 
-          {/* Right: stats + actions */}
+          {/* Right: stats + credit cost + actions */}
           <div className="flex items-center gap-2 sf-anim-slide-up sf-d100">
             {/* Live stats badges */}
             {!isMobile && originals.length > 0 && (
-              <span className="sf-badge sf-badge-accent text-[10px] font-bold">
+              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, fontWeight: 700 }}>
                 {originals.length} orig.
               </span>
             )}
             {!isMobile && secondaries.length > 0 && (
-              <span className="sf-badge sf-badge-accent text-[10px] font-bold">
+              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, fontWeight: 700 }}>
                 {secondaries.length} phase 1
+              </span>
+            )}
+            {/* Credit cost indicator */}
+            {!isMobile && canLaunch && (
+              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                {copies * CREDIT_COSTS.remix} crédit{copies * CREDIT_COSTS.remix > 1 ? 's' : ''}
               </span>
             )}
             {!isMobile && (
               <button onClick={openPreview} disabled={!canLaunch}
-                className="sf-btn sf-btn-ghost text-[12px] cursor-pointer transition-all"
-                style={{ opacity: canLaunch ? 1 : 0.4, cursor: canLaunch ? 'pointer' : 'not-allowed' }}>
+                className="sf-btn sf-btn-ghost cursor-pointer transition-all"
+                style={{ fontSize: 12, opacity: canLaunch ? 1 : 0.4, cursor: canLaunch ? 'pointer' : 'not-allowed' }}>
                 <IconClapperboard size={13} />
                 {t('massRemixPlanBtn')}
               </button>
             )}
             <button
               onClick={() => launch()} disabled={!canLaunch}
-              className="sf-btn sf-btn-primary transition-all"
+              className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer transition-all"
               style={{
                 fontSize: isMobile ? 12 : 13,
                 opacity: canLaunch ? 1 : 0.45,
