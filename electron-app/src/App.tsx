@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { useAuth }           from '@/hooks/useAuth'
 import { supabase }          from '@/lib/supabase'
 import { AuthPage }          from '@/components/auth/AuthPage'
+import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary'
 import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
 import { OrgProvider, useOrg } from '@/lib/orgContext'
@@ -858,9 +859,11 @@ function AppContent({ user }: { user: User }) {
         phoneCount={phoneCount}
         lastRefresh={lastRefresh}
       >
-        <Suspense fallback={<FullPageLoader />}>
-          {content}
-        </Suspense>
+        <ChunkErrorBoundary>
+          <Suspense fallback={<FullPageLoader />}>
+            {content}
+          </Suspense>
+        </ChunkErrorBoundary>
       </Layout>
     </CreditContext.Provider>
     </LicenseContext.Provider>
@@ -885,7 +888,7 @@ export default function App() {
   }, [])
 
   // Web: show landing when not logged in (Electron keeps the auth page directly)
-  if (!isElectron && !loading && !user) return <Suspense fallback={<FullPageLoader />}><Landing /></Suspense>
+  if (!isElectron && !loading && !user) return <ChunkErrorBoundary><Suspense fallback={<FullPageLoader />}><Landing /></Suspense></ChunkErrorBoundary>
 
   return (
     <>
