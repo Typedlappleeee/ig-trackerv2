@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { zipSync } from 'fflate'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
@@ -732,10 +732,10 @@ export function Bank({ user }: BankProps) {
   }
 
   // Derived data — folders come from items + empty (newly-created) folders
-  const folders = [...new Set([
+  const folders = useMemo(() => [...new Set([
     ...items.map(i => (i as unknown as {folder?: string | null}).folder).filter((f): f is string => Boolean(f)),
     ...emptyFolders,
-  ])].sort()
+  ])].sort(), [items, emptyFolders])
 
   function inferType(filePath: string | null): 'video' | 'photo' | 'gif' | 'audio' {
     if (!filePath) return 'video'
@@ -746,7 +746,7 @@ export function Bank({ user }: BankProps) {
     return 'video'
   }
 
-  const visible = items.filter(item => {
+  const visible = useMemo(() => items.filter(item => {
     const folder = (item as unknown as {folder?: string | null}).folder
     const folderMatch = selectedFolder === null ? true : folder === selectedFolder
     if (!folderMatch) return false
@@ -754,7 +754,13 @@ export function Bank({ user }: BankProps) {
     if (!search) return true
     const q = search.toLowerCase()
     return item.title.toLowerCase().includes(q) || item.notes.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
-  })
+  }), [items, selectedFolder, typeFilter, search])
+
+  // Pagination — reset when filters/folder change
+  const PAGE_SIZE = 60
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [selectedFolder, typeFilter, search])
+  const visiblePage = useMemo(() => visible.slice(0, visibleCount), [visible, visibleCount])
 
   const openCtx = useCallback((e: React.MouseEvent, item: ContentItem) => {
     e.preventDefault()
@@ -1240,22 +1246,35 @@ export function Bank({ user }: BankProps) {
 
             ) : viewMode === 'grid' ? (
               /* ── Grid view ── */
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 anim-stagger">
-                {visible.map(item => (
-                  <VideoCard
-                    key={item.id}
-                    item={item}
-                    onContextMenu={openCtx}
-                    onPlay={setPlayingItem}
-                    selectionMode={selectionMode}
-                    isSelected={selectedIds.has(item.id)}
-                    onToggleSelect={() => toggleSelection(item.id)}
-                  />
-                ))}
+              <div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 anim-stagger">
+                  {visiblePage.map(item => (
+                    <VideoCard
+                      key={item.id}
+                      item={item}
+                      onContextMenu={openCtx}
+                      onPlay={setPlayingItem}
+                      selectionMode={selectionMode}
+                      isSelected={selectedIds.has(item.id)}
+                      onToggleSelect={() => toggleSelection(item.id)}
+                    />
+                  ))}
+                </div>
+                {visibleCount < visible.length && (
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                      className="sf-btn sf-btn-secondary cursor-pointer"
+                    >
+                      Voir plus ({visible.length - visibleCount} restants)
+                    </button>
+                  </div>
+                )}
               </div>
 
             ) : (
               /* ── List view ── */
+              <div>
               <div className="sf-card overflow-hidden">
                 {/* List header */}
                 <div
@@ -1268,7 +1287,7 @@ export function Bank({ user }: BankProps) {
                   <span>{t('bankColTags')}</span>
                   <span />
                 </div>
-                {visible.map((item, idx) => (
+                {visiblePage.map((item, idx) => (
                   <div
                     key={item.id}
                     className="grid gap-3 px-4 py-2.5 items-center group cursor-default transition-colors"
@@ -1324,6 +1343,17 @@ export function Bank({ user }: BankProps) {
                     </button>
                   </div>
                 ))}
+              </div>
+              {visibleCount < visible.length && (
+                <div className="flex justify-center mt-4">
+                  <button
+                    onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                    className="sf-btn sf-btn-secondary cursor-pointer"
+                  >
+                    Voir plus ({visible.length - visibleCount} restants)
+                  </button>
+                </div>
+              )}
               </div>
             )}
           </div>
@@ -1873,7 +1903,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
 }
 
 // ── Video card ───────────────────────────────────────────────────────────────
-function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onToggleSelect }: {
+const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onToggleSelect }: {
   item: ContentItem
   onContextMenu: (e: React.MouseEvent, item: ContentItem) => void
   onPlay: (item: ContentItem) => void
@@ -1999,7 +2029,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
       )}
     </div>
   )
-}
+})
 
 // ── BankPicker (modal for Posting/MassPosting) ───────────────────────────────
 export interface BankPickerProps {
