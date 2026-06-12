@@ -4,6 +4,7 @@ import { useT, useLang } from '@/lib/i18n'
 import { playNav, playTick } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { useCredits } from '@/lib/credits'
+import { useOrg } from '@/lib/orgContext'
 import { timeUntil, fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import type { Page } from '@/components/Layout'
@@ -187,6 +188,7 @@ function SectionHead({ title, action, onAction }: { title: string; action?: stri
 export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: Page) => void }) {
   const t = useT()
   const { balance, loading: credLoading } = useCredits()
+  const { currentOrg } = useOrg()
   useHubCSS()
 
   const [loading, setLoading] = useState(true)
@@ -199,9 +201,15 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const load = useCallback(async () => {
     setLoading(true)
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const phonesQ = currentOrg
+      ? supabase.from('phones').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
+      : supabase.from('phones').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
+    const bankQ = currentOrg
+      ? supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
+      : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
     const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes] = await Promise.all([
-      supabase.from('phones').select('id', { count: 'exact', head: true }),
-      supabase.from('content_bank').select('id', { count: 'exact', head: true }),
+      phonesQ,
+      bankQ,
       supabase.from('scheduled_posts')
         .select('id', { count: 'exact', head: true })
         .in('status', ['done', 'failed'])
@@ -229,7 +237,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     setUpcoming((upcomingRes.data ?? []) as ScheduledPost[])
     setRecent((recentRes.data ?? []) as ScheduledPost[])
     setLoading(false)
-  }, [])
+  }, [currentOrg?.id, user.id])
 
   useEffect(() => { load() }, [load])
 
