@@ -84,6 +84,7 @@ import { useT, useLang } from '@/lib/i18n'
 import { useOrg }     from '@/lib/orgContext'
 import { useLicense } from '@/lib/license'
 import { Spinner }    from '@/components/ui/Spinner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 interface CommunityProps { user: User; onNavigate?: (page: Page) => void }
 type Channel = 'news' | 'chat' | 'support'
@@ -756,22 +757,29 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
       .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
   }
   return (
-    <div className="h-full flex flex-col items-center justify-center gap-6 p-6">
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-        style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>💬</div>
-      <div className="text-center space-y-2">
-        <p className="text-lg font-black text-white">{t('communitySetupTitle')}</p>
-        <p className="text-sm max-w-sm" style={{ color: 'rgba(233,234,240,0.5)' }}>
-          {t('communitySetupDesc')} <strong className="text-accent">Supabase → SQL Editor</strong> to enable the community.
+    <div className="h-full flex flex-col items-center justify-center gap-6 p-6 anim-page">
+      <div className="sf-anim-scale-spring w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+        style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818CF8' }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <div className="text-center space-y-2 sf-anim-slide-up sf-d50">
+        <p className="text-lg font-black" style={{ color: 'var(--ivory)' }}>{t('communitySetupTitle')}</p>
+        <p className="text-sm max-w-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
+          {t('communitySetupDesc')} <strong style={{ color: 'var(--accent-l)' }}>Supabase → SQL Editor</strong> to enable the community.
         </p>
       </div>
-      <div className="w-full max-w-2xl rounded-xl overflow-hidden"
+      <div className="w-full max-w-2xl rounded-xl overflow-hidden sf-anim-slide-up sf-d100"
         style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(99,102,241,0.15)' }}>
         <div className="flex items-center justify-between px-4 py-2.5"
           style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.08)' }}>
-          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: '#818CF8' }}>SQL</span>
-          <button onClick={copy} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all"
-            style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.15)', color: copied ? '#34d399' : '#818CF8' }}>
+          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: 'var(--accent-l)' }}>SQL</span>
+          <button onClick={copy}
+            className="sf-btn sf-btn-sm cursor-pointer text-[10px] transition-all"
+            style={copied
+              ? { background: 'rgba(52,211,153,0.15)', color: 'var(--ok)', borderColor: 'rgba(52,211,153,0.3)' }
+              : {}}>
             {copied ? t('communitySetupCopied') : t('communitySetupCopy')}
           </button>
         </div>
@@ -780,7 +788,7 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
           {SETUP_SQL}
         </pre>
       </div>
-      <button onClick={onRetry} className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-sf-primary">
+      <button onClick={onRetry} className="sf-btn sf-btn-primary sf-anim-slide-up sf-d150 cursor-pointer">
         {t('communitySetupRetry')}
       </button>
     </div>
@@ -846,6 +854,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
   const [newsSending, setNewsSend]    = useState(false)
   const [showNewsForm, setShowNewsForm] = useState(false)
   const [selectedPost, setSelectedPost] = useState<Message | null>(null)
+
+  // ── Confirm dialogs ────────────────────────────────────────────────────────
+  const [confirmDeleteMsg, setConfirmDeleteMsg]     = useState<string | null>(null)
+  const [confirmDeleteTopic, setConfirmDeleteTopic] = useState<string | null>(null)
+  const [confirmDeleteTopicMsg, setConfirmDeleteTopicMsg] = useState<string | null>(null)
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
