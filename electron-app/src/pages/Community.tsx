@@ -275,10 +275,10 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             )}
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
-                className="w-5 h-5 flex items-center justify-center rounded sf-press"
-                style={{ color: 'rgba(239,68,68,0.6)' }} title="Supprimer" aria-label="Supprimer">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                className="sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
+                aria-label="Supprimer">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
               </button>
             )}
@@ -317,10 +317,10 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
               style={{ color: 'rgba(233,234,240,0.5)' }}>{timeAgo(msg.created_at)}</span>
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center sf-press"
-                style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Supprimer">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                className="opacity-0 group-hover:opacity-100 transition-opacity sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
+                aria-label="Supprimer">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
               </button>
             )}
@@ -2127,7 +2127,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         const prev    = threadMessages[i - 1]
                         const compact = prev?.user_id === msg.user_id &&
                           new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
-                        return <SupportMsgRow key={msg.id} msg={msg} isAdmin={isAdmin} compact={compact} onDelete={deleteMessage} />
+                        return <SupportMsgRow key={msg.id} msg={msg} isAdmin={isAdmin} compact={compact} onDelete={setConfirmDeleteMsg} />
                       })}
                       <div ref={bottomRef} className="h-2" />
                     </div>
@@ -2197,7 +2197,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       const prev    = myThreadMessages[i - 1]
                       const compact = prev?.user_id === msg.user_id &&
                         new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
-                      return <SupportMsgRow key={msg.id} msg={msg} isAdmin={isAdmin} compact={compact} onDelete={deleteMessage} />
+                      return <SupportMsgRow key={msg.id} msg={msg} isAdmin={isAdmin} compact={compact} onDelete={setConfirmDeleteMsg} />
                     })}
                     <div ref={bottomRef} className="h-1" />
                   </>
@@ -2286,11 +2286,10 @@ export function Community({ user, onNavigate }: CommunityProps) {
               </div>
               <div className="flex items-center gap-2">
                 {isAdmin && (
-                  <button onClick={() => { deleteMessage(selectedPost.id); setSelectedPost(null) }}
-                    className="opacity-50 hover:opacity-80 transition-opacity flex items-center sf-press"
-                    style={{ color: '#f87171' }} aria-label="Supprimer">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                  <button onClick={() => setConfirmDeleteMsg(selectedPost.id)}
+                    className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label="Supprimer">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                     </svg>
                   </button>
                 )}
