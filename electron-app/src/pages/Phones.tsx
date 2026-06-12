@@ -16,24 +16,8 @@ import { PLAN_MAX_PHONES } from '@/lib/credits'
 
 interface PhonesProps { user: User }
 
-// Header de colonne — uppercase lisible (min 10px, letterSpacing raisonnable)
-const TH_STYLE: React.CSSProperties = {
-  fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-  textTransform: 'uppercase', color: TEXT_3,
-  background: 'transparent', borderBottom: `1px solid ${HAIR}`,
-}
-
-// Bouton primaire — ivoire → accent
-const PRIMARY_BTN: React.CSSProperties = {
-  fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em',
-  textTransform: 'uppercase', padding: '11px 18px',
-  background: TEXT_1, color: '#0F1014', border: 'none', borderRadius: 8,
-  transition: 'background 0.25s, transform 0.12s',
-}
-const primaryHover = {
-  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = ACCENT },
-  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = TEXT_1 },
-}
+type SortKey = 'name' | 'status' | 'group'
+type SortDir = 'asc' | 'desc'
 
 const INTERVALS = [
   { label: '30 s',  value: 30  },
@@ -42,35 +26,35 @@ const INTERVALS = [
   { label: '5 min', value: 300 },
 ]
 
-type SortKey = 'name' | 'status' | 'group'
-type SortDir = 'asc' | 'desc'
-
-// ── GéeLark status dot ──────────────────────────────────────────────────────
+// ── Status dot ───────────────────────────────────────────────────────────────
 function StatusDot({ status }: { status: string }) {
   const t = useT()
-  const online = status === 'online'
+  const online  = status === 'online'
+  const warming = status === 'warming'
+
+  const dotColor  = online ? 'var(--ok)' : warming ? 'var(--warn)' : 'rgba(233,234,240,0.28)'
+  const glowColor = online ? 'rgba(52,211,153,0.28)' : warming ? 'rgba(251,191,36,0.28)' : 'transparent'
+  const label     = online ? t('online') : warming ? 'warming' : t('offline')
+  const badgeCls  = online ? 'sf-badge sf-badge-ok' : warming ? 'sf-badge sf-badge-warn' : 'sf-badge sf-badge-muted'
+
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '3px 9px 2px', borderRadius: 99,
-      background: online ? 'rgba(127,217,184,0.07)' : 'rgba(240,160,171,0.07)',
-      border: online ? '1px solid rgba(127,217,184,0.35)' : '1px solid rgba(240,160,171,0.35)',
-      fontFamily: SANS, fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-      color: online ? '#7FD9B8' : '#F0A0AB',
-    }}>
-      {online
-        ? <span className="sf-ping-dot" style={{ background: '#7FD9B8' }} />
-        : <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(240,160,171,0.45)', display: 'inline-block' }} />
-      }
-      {online ? t('online') : t('offline')}
-    </span>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+      <span style={{
+        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+        background: dotColor,
+        boxShadow: online || warming ? `0 0 0 3px ${glowColor}` : 'none',
+        display: 'inline-block',
+        animation: online ? 'sf-ping 2s ease infinite' : 'none',
+      }} />
+      <span className={badgeCls}>{label}</span>
+    </div>
   )
 }
 
-// ── IG Status badge ─────────────────────────────────────────────────────────
+// ── IG Status badge ──────────────────────────────────────────────────────────
 function IgStatusBadge({ phone }: { phone: Phone }) {
   const t = useT()
-  if (!phone.ig_username) return <span style={{ fontSize: 13, color: 'rgba(233,234,240,0.35)' }}>—</span>
+  if (!phone.ig_username) return <span style={{ fontSize: 13, color: 'rgba(233,234,240,0.25)' }}>—</span>
 
   if (phone.ig_status === 'active')
     return <span className="sf-badge sf-badge-ok">{t('phoneOk')}</span>
@@ -85,8 +69,7 @@ function IgStatusBadge({ phone }: { phone: Phone }) {
   return <span className="sf-badge sf-badge-muted">{t('phonePublic')}</span>
 }
 
-// ── Countdown — composant feuille isolé : son propre setInterval, ────────────
-//    ne re-render que lui-même chaque seconde (plus toute la page).
+// ── Countdown chip ───────────────────────────────────────────────────────────
 const CountdownTicker = memo(function CountdownTicker({ enabled }: { enabled: boolean }) {
   const [secondsLeft, setSecondsLeft] = useState(() => poller.getIntervalSec())
 
@@ -105,26 +88,30 @@ const CountdownTicker = memo(function CountdownTicker({ enabled }: { enabled: bo
   if (!enabled) return null
   const m = Math.floor(secondsLeft / 60)
   const s = secondsLeft % 60
+
   return (
-    <span style={{ fontSize: 12, color: 'rgba(99,102,241,0.72)', fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace' }}>
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }}>
-        <path d="M9 5A4 4 0 1 1 6.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-        <path d="M6 1l1.5 1.5L6 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 9px', borderRadius: 99,
+      background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+      fontSize: 11, fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace',
+      color: 'rgba(99,102,241,0.85)',
+    }}>
+      {/* Clock icon */}
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0 }}>
+        <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2"/>
+        <path d="M5 2.5v2.5l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
       {m > 0 ? `${m}m ` : ''}{s.toString().padStart(2, '0')}s
     </span>
   )
 })
 
-// ── Session ID dialog ────────────────────────────────────────────────────────
+// ── Session ID dialog ─────────────────────────────────────────────────────────
 function SessionDialog({
-  phone,
-  bearer,
-  onClose,
-  onSaved,
+  phone, bearer, onClose, onSaved,
 }: {
-  phone: Phone
-  bearer: string
+  phone: Phone; bearer: string
   onClose: () => void
   onSaved: (id: string, sessionid: string, detectedUsername?: string) => void
 }) {
@@ -185,16 +172,10 @@ function SessionDialog({
     const addLog = (msg: string) => {
       logs.push(msg)
       setExtractLogs([...logs])
-      // Auto-scroll after state update
       setTimeout(() => logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 30)
     }
     try {
-      const sessionid = await extractInstagramSessionId(
-        bearer,
-        phone.geelark_id,
-        addLog,
-        ctrl.signal,
-      )
+      const sessionid = await extractInstagramSessionId(bearer, phone.geelark_id, addLog, ctrl.signal)
       if (sessionid) {
         setValue(sessionid)
         handleChange(sessionid)
@@ -210,11 +191,8 @@ function SessionDialog({
     setExtracting(false)
   }
 
-  function cancelExtract() {
-    abortCtrlRef.current?.abort()
-  }
+  function cancelExtract() { abortCtrlRef.current?.abort() }
 
-  // Auto-test 800ms after the user stops typing
   function handleChange(v: string) {
     setValue(v)
     setTestResult('idle')
@@ -228,25 +206,16 @@ function SessionDialog({
 
   async function save() {
     if (!value.trim()) return
-    setSaving(true)
-    setSaveError(null)
-    // Test first if not already validated
+    setSaving(true); setSaveError(null)
     let username = detectedUser ?? undefined
     if (testResult !== 'ok') {
       const r = await runTest(value)
-      if (!r.ok) { setSaving(false); return }  // don’t save invalid session
+      if (!r.ok) { setSaving(false); return }
       username = r.username
     }
-    const { error } = await supabase
-      .from('phones')
-      .update({ ig_sessionid: value.trim() || null })
-      .eq('id', phone.id)
+    const { error } = await supabase.from('phones').update({ ig_sessionid: value.trim() || null }).eq('id', phone.id)
     setSaving(false)
-    if (error) {
-      // L'update a échoué : afficher l'erreur et NE PAS fermer le dialog
-      setSaveError(error.message)
-      return
-    }
+    if (error) { setSaveError(error.message); return }
     onSaved(phone.id, value.trim(), username)
     onClose()
   }
@@ -254,19 +223,14 @@ function SessionDialog({
   const busy = testing || saving
 
   return (
-    <div
-      className="sf-modal-bg"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
+    <div className="sf-modal-bg" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="sf-modal sf-anim-scale-spring" style={{ width: 480, maxWidth: '90vw' }}>
-        {/* Header */}
         <div className="sf-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.06)',
-              border: '1px solid rgba(99,102,241,0.35)', color: ACCENT,
+              background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.35)', color: ACCENT,
             }}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1.5" y="5.5" width="13" height="9" rx="2" stroke="currentColor" strokeWidth="1.4"/>
@@ -275,9 +239,7 @@ function SessionDialog({
             </div>
             <div>
               <h2 className="sf-modal-title">{t('phoneSessionTitle')}</h2>
-              {phone.ig_username && (
-                <p style={{ fontSize: 12, color: ACCENT, margin: '2px 0 0' }}>@{phone.ig_username}</p>
-              )}
+              {phone.ig_username && <p style={{ fontSize: 12, color: ACCENT, margin: '2px 0 0' }}>@{phone.ig_username}</p>}
             </div>
           </div>
           <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ width: 28, height: 28, borderRadius: 8 }}>
@@ -288,7 +250,6 @@ function SessionDialog({
         </div>
 
         <div className="sf-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Auto-extract via GéeLark shell */}
           {phone.geelark_id && bearer && (
             <div style={{
               background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.15)',
@@ -338,7 +299,6 @@ function SessionDialog({
             </div>
           )}
 
-          {/* Manual instructions */}
           <div style={{
             background: 'rgba(233,234,240,0.025)', border: '1px solid rgba(233,234,240,0.07)',
             borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4,
@@ -354,7 +314,6 @@ function SessionDialog({
             ))}
           </div>
 
-          {/* Session input */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={{ fontFamily: SANS, fontSize: 9, fontWeight: 700, color: TEXT_3, letterSpacing: '0.25em', textTransform: 'uppercase' }}>{t('phoneSessionLabel')}</label>
             <div style={{ position: 'relative' }}>
@@ -366,16 +325,12 @@ function SessionDialog({
                 placeholder={t('phoneSessionPlaceholder')}
                 className="sf-input"
                 style={{
-                  width: '100%', boxSizing: 'border-box',
-                  paddingRight: 36,
+                  width: '100%', boxSizing: 'border-box', paddingRight: 36,
                   borderColor: testResult === 'ok' ? '#7FD9B8' : testResult === 'fail' ? '#F0A0AB' : undefined,
                   fontFamily: 'monospace',
                 }}
               />
-              <span style={{
-                position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                fontSize: 13, pointerEvents: 'none',
-              }}>
+              <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, pointerEvents: 'none' }}>
                 {testing ? (
                   <svg style={{ animation: 'spin 1s linear infinite' }} width="13" height="13" viewBox="0 0 13 13" fill="none">
                     <circle cx="6.5" cy="6.5" r="5" stroke={ACCENT} strokeWidth="1.5" strokeDasharray="10 20" strokeLinecap="round"/>
@@ -416,7 +371,6 @@ function SessionDialog({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="sf-modal-footer">
           <button onClick={onClose} disabled={busy} className="sf-btn sf-btn-ghost" style={{ cursor: 'pointer' }}>
             {t('cancel')}
@@ -430,7 +384,7 @@ function SessionDialog({
   )
 }
 
-// ── Context menu ─────────────────────────────────────────────────────────────
+// ── Context menu ──────────────────────────────────────────────────────────────
 function ContextMenu({
   phone, x, y, onClose, onSession, onUnlink, onDelete, canDelete,
 }: {
@@ -471,16 +425,12 @@ function ContextMenu({
   )
 
   return (
-    <div
-      ref={menuRef}
-      style={{
-        position: 'fixed', zIndex: 50,
-        background: '#0F1014', border: '1px solid rgba(233,234,240,0.09)',
-        borderRadius: 12, boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
-        padding: '4px 0', width: 208,
-        left, top,
-      }}
-    >
+    <div ref={menuRef} style={{
+      position: 'fixed', zIndex: 50,
+      background: '#0F1014', border: '1px solid rgba(233,234,240,0.09)',
+      borderRadius: 12, boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+      padding: '4px 0', width: 208, left, top,
+    }}>
       <div style={{ padding: '6px 12px 8px', borderBottom: '1px solid rgba(233,234,240,0.055)', marginBottom: 4 }}>
         <p style={{ fontSize: 12, fontWeight: 600, color: TEXT_1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.phone_name}</p>
         {phone.ig_username && <p style={{ fontSize: 10, color: ACCENT, margin: '1px 0 0' }}>@{phone.ig_username}</p>}
@@ -506,14 +456,13 @@ function ContextMenu({
   )
 }
 
-// ── Inline Instagram username edit ─────────────────────────────────────────────
+// ── Inline IG username edit ───────────────────────────────────────────────────
 function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: string) => Promise<void> }) {
   const t = useT()
   const [editing, setEditing] = useState(false)
   const [value, setValue]     = useState(phone.ig_username ?? '')
   const [saving, setSaving]   = useState(false)
   const ref                   = useRef<HTMLInputElement>(null)
-  // Empêche le double save Enter (keydown) + blur qui suit
   const savedRef              = useRef(false)
 
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
@@ -555,21 +504,20 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
       ) : (
         <span style={{ color: 'rgba(233,234,240,0.35)', fontStyle: 'normal' }}>{t('phoneIgCellAdd')}</span>
       )}
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ opacity: 0, flexShrink: 0, transition: 'opacity 0.15s' }} className="edit-pencil">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ opacity: 0.3, flexShrink: 0 }}>
         <path d="M7.5 1.5l2 2-6 6H1.5v-2l6-6z" stroke="rgba(233,234,240,0.52)" strokeWidth="1.2" strokeLinejoin="round"/>
       </svg>
     </button>
   )
 }
 
-// ── Inline note (remark) edit ─────────────────────────────────────────────────
+// ── Inline note edit ──────────────────────────────────────────────────────────
 function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
   const t = useT()
   const [editing, setEditing] = useState(false)
   const [value, setValue]     = useState(phone.remark ?? '')
   const [saving, setSaving]   = useState(false)
   const ref                   = useRef<HTMLInputElement>(null)
-  // Empêche le double save Enter (keydown) + blur qui suit
   const savedRef              = useRef(false)
 
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
@@ -613,39 +561,13 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
   )
 }
 
-// ── small icon action button (niveau module — pas recréé à chaque render) ────
-function ActionBtn({
-  onClick, title, children, danger,
-}: { onClick: () => void; title: string; children: React.ReactNode; danger?: boolean }) {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className="sf-press"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        width: 28, height: 28, borderRadius: 7,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: hovered ? (danger ? 'rgba(240,160,171,0.15)' : 'rgba(99,102,241,0.15)') : 'rgba(233,234,240,0.06)',
-        border: '1px solid rgba(233,234,240,0.1)',
-        color: hovered ? (danger ? '#F0A0AB' : ACCENT) : 'rgba(233,234,240,0.52)',
-        cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-// ── Table row — memoïsé pour éviter les re-renders inutiles ──────────────────
+// ── Phone card row ────────────────────────────────────────────────────────────
 const PhoneRow = memo(function PhoneRow({
-  phone, isSelected, checked, col, canDelete,
+  phone, isSelected, checked, col, canDelete, index,
   setSelectedPhone, setContextMenu, setSessionDialog,
   saveIgUsername, saveRemark, requestDelete, toggleSelect,
 }: {
-  phone: Phone; isSelected: boolean; checked: boolean; col: string
+  phone: Phone; isSelected: boolean; checked: boolean; col: string; index: number
   canDelete: boolean
   setSelectedPhone: (p: Phone | null) => void
   setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
@@ -656,24 +578,29 @@ const PhoneRow = memo(function PhoneRow({
   toggleSelect: (id: string) => void
 }) {
   const t = useT()
-  const [hovered, setHovered] = useState(false)
-  const online = phone.status === 'online'
+  const online  = phone.status === 'online'
+  const warming = phone.status === 'warming'
+  const dotColor = online ? 'var(--ok)' : warming ? 'var(--warn)' : 'rgba(233,234,240,0.22)'
+
+  const TH: React.CSSProperties = {
+    fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+    textTransform: 'uppercase', color: TEXT_3,
+    background: 'transparent', borderBottom: `1px solid ${HAIR}`,
+  }
 
   const cellStyle: React.CSSProperties = {
-    padding: '9px 12px',
+    padding: '10px 12px',
     background: isSelected ? 'rgba(99,102,241,0.07)' : 'transparent',
     transition: 'background 0.12s',
   }
 
   return (
     <tr
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onClick={() => setSelectedPhone(isSelected ? null : phone)}
       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
       style={{ cursor: 'pointer' }}
     >
-      {/* Checkbox — bulk selection. First td carries the left accent bar */}
+      {/* Checkbox */}
       <td
         style={{
           ...cellStyle, width: 36, textAlign: 'center',
@@ -692,10 +619,9 @@ const PhoneRow = memo(function PhoneRow({
       {/* Status dot */}
       <td style={{ ...cellStyle, width: 44, textAlign: 'center' }}>
         <span style={{
-          display: 'inline-block',
-          width: 8, height: 8, borderRadius: '50%',
-          background: online ? '#7FD9B8' : 'rgba(233,234,240,0.22)',
-          boxShadow: online ? '0 0 0 3px rgba(127,217,184,0.15)' : 'none',
+          display: 'inline-block', width: 9, height: 9, borderRadius: '50%',
+          background: dotColor,
+          boxShadow: online ? '0 0 0 3px rgba(52,211,153,0.2)' : warming ? '0 0 0 3px rgba(251,191,36,0.2)' : 'none',
           flexShrink: 0,
         }} />
       </td>
@@ -703,12 +629,10 @@ const PhoneRow = memo(function PhoneRow({
       {/* Phone name + serial */}
       <td style={cellStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Colored avatar */}
           <div style={{
-            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+            width: 32, height: 32, borderRadius: 9, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: `${col}14`,
-            border: `1px solid ${col}30`, color: col,
+            background: `${col}14`, border: `1px solid ${col}30`, color: col,
             fontSize: 12, fontWeight: 700,
           }}>
             {phone.phone_name.charAt(0).toUpperCase()}
@@ -730,53 +654,47 @@ const PhoneRow = memo(function PhoneRow({
       <td style={cellStyle}>
         {phone.group_name
           ? <span style={{
-              display: 'inline-block',
-              fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
+              display: 'inline-block', fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
               background: 'rgba(99,102,241,0.1)', color: ACCENT,
-              border: '1px solid rgba(99,102,241,0.18)',
-              whiteSpace: 'nowrap',
+              border: '1px solid rgba(99,102,241,0.18)', whiteSpace: 'nowrap',
             }}>{phone.group_name}</span>
           : <span style={{ color: 'rgba(233,234,240,0.2)' }}>—</span>
         }
       </td>
 
-      {/* IG Username — inline editable */}
+      {/* IG username */}
       <td style={cellStyle} onClick={e => e.stopPropagation()}>
         <IgCell phone={phone} onSave={saveIgUsername} />
       </td>
 
-      {/* IG Status badge */}
+      {/* IG status */}
       <td style={cellStyle}>
         <IgStatusBadge phone={phone} />
       </td>
 
-      {/* Note — inline editable */}
+      {/* Note */}
       <td style={cellStyle} onClick={e => e.stopPropagation()}>
         <NoteCell phone={phone} onSave={saveRemark} />
       </td>
 
-      {/* Actions — visible on hover or selected */}
-      <td style={{ ...cellStyle, padding: '9px 10px' }} onClick={e => e.stopPropagation()}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
-          opacity: hovered || isSelected ? 1 : 0,
-          transition: 'opacity 0.15s',
-        }}>
-          <ActionBtn onClick={() => setSessionDialog({ phone })} title={t('phonesRowSessionId')}>
+      {/* Actions */}
+      <td style={{ ...cellStyle, padding: '10px 10px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+          <button
+            onClick={() => setSessionDialog({ phone })}
+            title={t('phonesRowSessionId')}
+            className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
+            style={{ cursor: 'pointer' }}
+          >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
               <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
             </svg>
-          </ActionBtn>
+          </button>
           <button
-            className="sf-press"
-            style={{
-              width: 26, height: 26, borderRadius: 7,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(233,234,240,0.06)', border: '1px solid rgba(233,234,240,0.1)',
-              color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
-            }}
-            title="Plus"
+            className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
+            title="More"
+            style={{ cursor: 'pointer' }}
             onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -786,11 +704,16 @@ const PhoneRow = memo(function PhoneRow({
             </svg>
           </button>
           {canDelete && (
-            <ActionBtn onClick={() => requestDelete(phone)} title={t('phonesRowDelete')} danger>
+            <button
+              onClick={() => requestDelete(phone)}
+              title={t('phonesRowDelete')}
+              className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
+              style={{ cursor: 'pointer', color: 'var(--err)' }}
+            >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M2 3h8M4.5 3V2h3v1M4 3l.4 7h3.2L8 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </ActionBtn>
+            </button>
           )}
         </div>
       </td>
@@ -807,13 +730,13 @@ export function Phones({ user }: PhonesProps) {
   const { currentOrg, role, perms } = useOrg()
   const conns = useConnections(user)
   const license = useLicense()
+
   const [phones, setPhones]           = useState<Phone[]>([])
   const [loading, setLoading]         = useState(true)
   const [syncing, setSyncing]         = useState(false)
   const [error, setError]             = useState<string | null>(null)
   const [filter, setFilter]           = useState<'all' | 'online' | 'offline'>('all')
   const [search, setSearch]           = useState('')
-  // Interval + autoRefresh: read from the singleton (which persists in localStorage)
   const [intervalSec, setIntervalSec] = useState(poller.getIntervalSec)
   const [autoRefresh, setAutoRefresh] = useState(poller.getEnabled)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -824,24 +747,16 @@ export function Phones({ user }: PhonesProps) {
   const [selectedPhone, setSelectedPhone] = useState<Phone | null>(null)
   const [groupFilter, setGroupFilter]     = useState<string>('all')
 
-  // Tri de colonnes
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
-  // Suppression (ConfirmDialog au lieu du confirm() natif)
-  const [confirmDelete, setConfirmDelete] = useState<Phone | null>(null)
-  const [deleteBusy, setDeleteBusy]       = useState(false)
-
-  // Bulk selection
-  const [selectedIds, setSelectedIds]           = useState<Set<string>>(new Set())
+  const [confirmDelete, setConfirmDelete]     = useState<Phone | null>(null)
+  const [deleteBusy, setDeleteBusy]           = useState(false)
+  const [selectedIds, setSelectedIds]         = useState<Set<string>>(new Set())
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
-  const [bulkBusy, setBulkBusy]                 = useState(false)
+  const [bulkBusy, setBulkBusy]               = useState(false)
 
   const fr = useCallback((frs: string, en: string) => (lang === 'fr' ? frs : en), [lang])
-
-  // Use the reactive bearer from connections (org-aware), not the poller snapshot.
-  // The poller singleton is updated async in App.tsx; reading from it here causes
-  // a race: loadPhones fires with the new currentOrg but the old bearer.
   const bearer = conns.bearer
 
   const phonesRef     = useRef<Phone[]>([])
@@ -849,7 +764,6 @@ export function Phones({ user }: PhonesProps) {
 
   useEffect(() => { phonesRef.current = phones }, [phones])
 
-  // ── Subscribe to the global poller for live status updates ─────────────────
   useEffect(() => {
     return poller.subscribe(statusMap => {
       const now = new Date()
@@ -862,7 +776,6 @@ export function Phones({ user }: PhonesProps) {
         phonesRef.current = next
         return next
       })
-      // Persist status to DB every 5 min
       const sinceDb = lastDbSyncRef.current
         ? (now.getTime() - lastDbSyncRef.current.getTime()) / 1000 : Infinity
       if (sinceDb >= 300) {
@@ -883,26 +796,15 @@ export function Phones({ user }: PhonesProps) {
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data, error: err } = await q
     if (err) setError('Error loading phones.')
-    else {
-      setPhones(data ?? [])
-    }
+    else setPhones(data ?? [])
     setLoading(false)
-    // Trigger an immediate poll if one hasn’t happened recently
     poller.pollNow()
   }, [bearer, currentOrg, user.id])
 
   useEffect(() => {
-    // Wait until connections have resolved for the current org before loading.
-    // Without this guard, switching org triggers loadPhones with bearer=null
-    // (connections still loading) then again when bearer arrives — causing a
-    // blank flash and, worse, a race where the old bearer could be read.
     if (conns.loading) return
     loadPhones()
   }, [conns.loading, loadPhones])
-
-  // NB : pas de boucle locale de refresh des stats IG ici — le singleton
-  // igStatsPoller (lib/igStatsPoller.ts) fait déjà ce travail en continu.
-  // Un double polling provoquait des rate-limits Instagram.
 
   function changeInterval(sec: number) {
     setIntervalSec(sec)
@@ -911,7 +813,6 @@ export function Phones({ user }: PhonesProps) {
 
   const phoneLimit = PLAN_MAX_PHONES[effectivePlan(license) ?? ''] ?? Infinity
 
-  // ── Full sync from GéeLark ─────────────────────────────────────────────
   const syncFromGeelark = useCallback(async () => {
     if (!bearer) { setError(t('phoneMissingToken')); return }
     setSyncing(true); setError(null)
@@ -919,7 +820,6 @@ export function Phones({ user }: PhonesProps) {
       let items = await fetchAllPhones(bearer)
       if (items.length === 0) { setError(t('noPhones')); setSyncing(false); return }
       if (items.length > phoneLimit) {
-        // Import partiel jusqu'à la limite du plan + warning, au lieu de tout refuser
         toast.show({
           kind: 'warn',
           title: fr('Limite du plan atteinte', 'Plan limit reached'),
@@ -933,7 +833,7 @@ export function Phones({ user }: PhonesProps) {
       }
 
       const rows = items.map(p => ({
-        user_id:    user.id,                        // always the current authenticated user (RLS requires it)
+        user_id:    user.id,
         org_id:     currentOrg?.id ?? null,
         geelark_id: p.id,
         serial_no:  p.serialNo ?? null,
@@ -943,36 +843,21 @@ export function Phones({ user }: PhonesProps) {
         remark:     p.remark ?? null,
         synced_at:  new Date().toISOString(),
       }))
-      // Conflict strategy: always fetch by (user_id + geelark_id) globally to avoid
-      // duplicate key violations when a phone exists under a different org_id.
       const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
 
       if (currentOrg) {
-        // Delete phones removed from GéeLark (only those already in this org)
-        const { data: orgPhones } = await supabase
-          .from('phones').select('id,geelark_id').eq('org_id', currentOrg.id)
+        const { data: orgPhones } = await supabase.from('phones').select('id,geelark_id').eq('org_id', currentOrg.id)
         const toDelete = (orgPhones ?? []).filter((p: { geelark_id: string }) => !currentGeelarkIds.has(p.geelark_id))
         if (toDelete.length > 0) {
           await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
         }
-
-        const { error } = await supabase.rpc('sync_geelark_phones', {
-          p_rows:   rows,
-          p_org_id: currentOrg.id,
-        })
+        const { error } = await supabase.rpc('sync_geelark_phones', { p_rows: rows, p_org_id: currentOrg.id })
         if (error) throw new Error(error.message)
       } else {
-        // Solo mode — delete phones no longer in GéeLark then upsert the rest
         await supabase.from('phones')
-          .delete()
-          .eq('user_id', user.id)
-          .is('org_id', null)
+          .delete().eq('user_id', user.id).is('org_id', null)
           .not('geelark_id', 'in', `(${[...currentGeelarkIds].join(',')})`)
-
-        const { error: upsertErr } = await supabase.rpc('sync_geelark_phones', {
-          p_rows:   rows,
-          p_org_id: null,
-        })
+        const { error: upsertErr } = await supabase.rpc('sync_geelark_phones', { p_rows: rows, p_org_id: null })
         if (upsertErr) throw new Error(upsertErr.message)
       }
       lastDbSyncRef.current = new Date()
@@ -984,15 +869,11 @@ export function Phones({ user }: PhonesProps) {
     setSyncing(false)
   }, [bearer, user.id, currentOrg, phoneLimit, license, t, toast, fr, loadPhones])
 
-  // ── Save ig_username ─────────────────────────────────────────────────────
   const saveIgUsername = useCallback(async (id: string, username: string) => {
-    // Normalise : pas de @ ni d'espaces en base — le poller et l'API IG
-    // attendent le pseudo nu
     const clean = username.replace(/^@+/, '').trim() || null
-    const { error: err } = await supabase
-      .from('phones').update({ ig_username: clean }).eq('id', id)
+    const { error: err } = await supabase.from('phones').update({ ig_username: clean }).eq('id', id)
     if (err) {
-      toast.show({ kind: 'error', title: fr('Échec de l’enregistrement Instagram', 'Failed to save Instagram username'), body: err.message })
+      toast.show({ kind: 'error', title: fr(`Échec de l'enregistrement Instagram`, 'Failed to save Instagram username'), body: err.message })
       return
     }
     setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: clean } : p))
@@ -1003,11 +884,10 @@ export function Phones({ user }: PhonesProps) {
     setPhones(prev => prev.map(p => p.id === id ? { ...p, remark: val } : p))
     const { error: err } = await supabase.from('phones').update({ remark: val }).eq('id', id)
     if (err) {
-      toast.show({ kind: 'error', title: fr('Échec de l’enregistrement de la note', 'Failed to save note'), body: err.message })
+      toast.show({ kind: 'error', title: fr(`Échec de l'enregistrement de la note`, 'Failed to save note'), body: err.message })
     }
   }, [toast, fr])
 
-  // ── Unlink Instagram ─────────────────────────────────────────────────────
   const unlinkIg = useCallback(async (id: string) => {
     const { error: err } = await supabase
       .from('phones').update({ ig_username: null, ig_sessionid: null, ig_status: null }).eq('id', id)
@@ -1018,12 +898,9 @@ export function Phones({ user }: PhonesProps) {
     setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: null, ig_sessionid: null, ig_status: null } : p))
   }, [toast, fr])
 
-  // ── Delete phone — owner/admin only in org mode ──────────────────────────
   const canDelete = !currentOrg || role === 'owner' || role === 'admin'
 
-  const requestDelete = useCallback((phone: Phone) => {
-    setConfirmDelete(phone)
-  }, [])
+  const requestDelete = useCallback((phone: Phone) => { setConfirmDelete(phone) }, [])
 
   async function doDeletePhone() {
     if (!confirmDelete || !canDelete) return
@@ -1041,7 +918,6 @@ export function Phones({ user }: PhonesProps) {
     setConfirmDelete(null)
   }
 
-  // ── Bulk actions ──────────────────────────────────────────────────────────
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -1087,8 +963,7 @@ export function Phones({ user }: PhonesProps) {
     if (selectedIds.size === 0) return
     setBulkBusy(true)
     const ids = [...selectedIds]
-    const { error: err } = await supabase
-      .from('phones').update({ group_name: group }).in('id', ids)
+    const { error: err } = await supabase.from('phones').update({ group_name: group }).in('id', ids)
     if (err) {
       toast.show({ kind: 'error', title: fr('Échec du changement de groupe', 'Failed to change group'), body: err.message })
     } else {
@@ -1099,7 +974,6 @@ export function Phones({ user }: PhonesProps) {
     setBulkBusy(false)
   }
 
-  // ── Session saved → update username + immediately fetch IG stats ────────
   async function onSessionSaved(id: string, sessionid: string, detectedUsername?: string) {
     const updates: Partial<Phone> = { ig_sessionid: sessionid || null }
     if (detectedUsername) {
@@ -1108,7 +982,6 @@ export function Phones({ user }: PhonesProps) {
     }
     setPhones(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
 
-    // Immediately fetch IG stats now that we have a session
     const username = detectedUsername ?? phonesRef.current.find(p => p.id === id)?.ig_username
     if (sessionid && username && window.electronAPI?.fetchInstagramBySession) {
       try {
@@ -1126,16 +999,14 @@ export function Phones({ user }: PhonesProps) {
           await supabase.from('phones').update(statUpdates).eq('id', id)
           setPhones(prev => prev.map(p => p.id === id ? { ...p, ...statUpdates } : p))
         }
-      } catch { /* silent — stats will refresh on next poll */ }
+      } catch { /* silent */ }
     }
   }
 
-  // ── Escape ferme le panneau détail ────────────────────────────────────────
   useEffect(() => {
     if (!selectedPhone) return
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
-      // Ne pas fermer le panneau si un overlay plus prioritaire est ouvert
       if (sessionDialog || contextMenu || confirmDelete || confirmBulkDelete) return
       setSelectedPhone(null)
     }
@@ -1143,7 +1014,7 @@ export function Phones({ user }: PhonesProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedPhone, sessionDialog, contextMenu, confirmDelete, confirmBulkDelete])
 
-  // ── Filtered + sorted view ────────────────────────────────────────────────
+  // ── Filtering + sorting ────────────────────────────────────────────────────
   const visible = phones.filter(p => {
     if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (filter !== 'all' && p.status !== filter) return false
@@ -1188,7 +1059,7 @@ export function Phones({ user }: PhonesProps) {
   function relativeTime(iso: string): string {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
     const isFr = lang === 'fr'
-    if (diff < 60)        return isFr ? 'à l’instant' : '< 1 min ago'
+    if (diff < 60)        return isFr ? `à l'instant` : '< 1 min ago'
     if (diff < 3600)      { const m = Math.floor(diff / 60);    return isFr ? `il y a ${m} min` : `${m} min ago` }
     if (diff < 86400)     { const h = Math.floor(diff / 3600);  return isFr ? `il y a ${h} h`   : `${h}h ago` }
     if (diff < 86400 * 7) { const d = Math.floor(diff / 86400); return isFr ? `il y a ${d} j`   : `${d}d ago` }
@@ -1202,7 +1073,6 @@ export function Phones({ user }: PhonesProps) {
     return palette[Math.abs(h) % palette.length]
   }
 
-  // ── Export CSV de la liste filtrée ────────────────────────────────────────
   function exportCsv() {
     const header = lang === 'fr'
       ? ['Nom', 'Instagram', 'Followers', 'Statut', 'Groupe']
@@ -1210,47 +1080,49 @@ export function Phones({ user }: PhonesProps) {
     const rows = [
       header,
       ...sortedVisible.map(p => [
-        p.phone_name,
-        p.ig_username ? `@${p.ig_username}` : '',
-        String(p.followers ?? 0),
-        p.status ?? '',
-        p.group_name ?? '',
+        p.phone_name, p.ig_username ? `@${p.ig_username}` : '',
+        String(p.followers ?? 0), p.status ?? '', p.group_name ?? '',
       ]),
     ]
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
-    a.href     = url
-    a.download = `phones-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
+    a.href = url; a.download = `phones-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
     URL.revokeObjectURL(url)
     toast.show({ kind: 'ok', title: fr(`Export CSV — ${sortedVisible.length} ligne(s)`, `CSV export — ${sortedVisible.length} row(s)`) })
   }
 
-  // ── Sortable header cell ──────────────────────────────────────────────────
+  // Sortable TH helper
+  const TH_BASE: React.CSSProperties = {
+    fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+    textTransform: 'uppercase', color: TEXT_3,
+    background: 'transparent', borderBottom: `1px solid ${HAIR}`,
+  }
   const sortTh = (label: React.ReactNode, key: SortKey, style?: React.CSSProperties, title?: string) => (
     <th
-      style={{ ...TH_STYLE, ...style, cursor: 'pointer', userSelect: 'none' }}
+      style={{ ...TH_BASE, ...style, cursor: 'pointer', userSelect: 'none' }}
       onClick={() => toggleSort(key)}
       title={title ?? fr('Cliquer pour trier', 'Click to sort')}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         {label}
-        <span style={{ fontSize: 8, opacity: sortKey === key ? 1 : 0.25 }}>
-          {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
-        </span>
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ opacity: sortKey === key ? 1 : 0.28, flexShrink: 0 }}>
+          {sortDir === 'asc' || sortKey !== key
+            ? <path d="M4 1.5L6.5 5.5H1.5L4 1.5Z" fill="currentColor"/>
+            : <path d="M4 6.5L1.5 2.5H6.5L4 6.5Z" fill="currentColor"/>
+          }
+        </svg>
       </span>
     </th>
   )
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
       {sessionDialog && (
         <SessionDialog
-          phone={sessionDialog.phone}
-          bearer={bearer}
+          phone={sessionDialog.phone} bearer={bearer}
           onClose={() => setSessionDialog(null)}
           onSaved={onSessionSaved}
         />
@@ -1266,7 +1138,6 @@ export function Phones({ user }: PhonesProps) {
         />
       )}
 
-      {/* Suppression individuelle */}
       <ConfirmDialog
         open={!!confirmDelete}
         title={t('phoneDeleteConfirm')}
@@ -1276,13 +1147,11 @@ export function Phones({ user }: PhonesProps) {
         ) : undefined}
         confirmLabel={fr('Supprimer', 'Delete')}
         cancelLabel={t('cancel')}
-        danger
-        busy={deleteBusy}
+        danger busy={deleteBusy}
         onConfirm={doDeletePhone}
         onCancel={() => setConfirmDelete(null)}
       />
 
-      {/* Suppression bulk */}
       <ConfirmDialog
         open={confirmBulkDelete}
         title={fr(`Supprimer ${selectedIds.size} téléphone(s) ?`, `Delete ${selectedIds.size} phone(s)?`)}
@@ -1292,82 +1161,65 @@ export function Phones({ user }: PhonesProps) {
         )}
         confirmLabel={fr('Supprimer', 'Delete')}
         cancelLabel={t('cancel')}
-        danger
-        busy={bulkBusy}
+        danger busy={bulkBusy}
         onConfirm={bulkDelete}
         onCancel={() => setConfirmBulkDelete(false)}
       />
 
-      <div
-        className="anim-page"
-        style={{ height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', background: '#0A0B0E' }}
-        onClick={() => setContextMenu(null)}
-      >
+      <div className="sf-page anim-page" onClick={() => setContextMenu(null)}>
 
-        {/* ── Page header ──────────────────────────────────────────────────── */}
-        <div className="sf-page-header" style={{
-          flexShrink: 0,
-          padding: '24px 32px 18px',
-          borderBottom: `1px solid ${HAIR}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-        }}>
-          {/* Left: icon tile + title */}
+        {/* ── Page header ─────────────────────────────────────────────────── */}
+        <div className="sf-page-header">
+          {/* Left: icon + title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            {/* Icon */}
             <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              width: 44, height: 44, borderRadius: 12, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.28)',
-              color: ACCENT,
+              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)', color: ACCENT,
             }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="6" y="2" width="12" height="20" rx="3"/>
                 <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>
               </svg>
             </div>
-
-            {/* Text */}
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
-                {t('phonesHeading')}
-              </h1>
+              <h1 className="sf-page-title">{t('phonesHeading')}</h1>
               <p className="sf-page-sub">{t('phonesSubtitle')}</p>
             </div>
           </div>
 
-          {/* Right: auto-refresh control + sync button */}
-          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Auto-refresh pill */}
+          {/* Right: auto-refresh + sync */}
+          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+
+            {/* Auto-refresh toggle pill */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '7px 12px', borderRadius: 8,
+              padding: '6px 12px', borderRadius: 8,
               background: 'rgba(233,234,240,0.02)', border: `1px solid ${HAIR}`,
-              flexShrink: 0,
             }}>
               <button
                 onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
                 style={{
                   position: 'relative', width: 28, height: 15, borderRadius: 99,
-                  background: autoRefresh ? '#7FD9B8' : 'rgba(233,234,240,0.2)',
-                  flexShrink: 0, border: 'none', cursor: 'pointer', padding: 0,
-                  transition: 'background 0.2s',
+                  background: autoRefresh ? 'var(--ok)' : 'rgba(233,234,240,0.2)',
+                  border: 'none', cursor: 'pointer', padding: 0, transition: 'background 0.2s', flexShrink: 0,
                 }}
+                aria-label={fr(`Activer/désactiver l'actualisation automatique`, 'Toggle auto-refresh')}
               >
                 <span style={{
                   position: 'absolute', top: 2.5, width: 10, height: 10,
-                  background: TEXT_1, borderRadius: 99, boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                  background: 'var(--ivory)', borderRadius: 99, boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
                   transition: 'left 0.2s', left: autoRefresh ? 15 : 2.5,
                 }} />
               </button>
               <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(233,234,240,0.52)', whiteSpace: 'nowrap' }}>{t('phonesAutoLabel')}</span>
               {autoRefresh && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '2px 3px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '2px 3px' }}>
                   {INTERVALS.map(({ label, value }) => (
                     <button key={value} onClick={() => changeInterval(value)}
                       style={{
                         padding: '3px 7px', borderRadius: 5, fontSize: 10, border: 'none', cursor: 'pointer',
-                        background: intervalSec === value ? TEXT_1 : 'transparent',
+                        background: intervalSec === value ? 'var(--ivory)' : 'transparent',
                         color: intervalSec === value ? '#0F1014' : 'rgba(233,234,240,0.52)',
                         fontWeight: intervalSec === value ? 700 : 400,
                         transition: 'all 0.15s', whiteSpace: 'nowrap',
@@ -1378,15 +1230,11 @@ export function Phones({ user }: PhonesProps) {
               <CountdownTicker enabled={autoRefresh && !!bearer} />
             </div>
 
-            {/* Sync / Add button */}
+            {/* Sync button */}
             <button
               onClick={syncFromGeelark} disabled={!bearer || syncing}
               className="sf-btn sf-btn-primary"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
-                opacity: (!bearer || syncing) ? 0.5 : 1,
-              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer', opacity: (!bearer || syncing) ? 0.5 : 1 }}
             >
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0, animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
                 <path d="M13 7.5A5.5 5.5 0 1 1 10 2.7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
@@ -1397,112 +1245,139 @@ export function Phones({ user }: PhonesProps) {
 
             {/* Plan limit badge */}
             {phoneLimit !== Infinity && (
-              <span style={{
-                fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 99,
-                background: phones.length >= phoneLimit ? 'rgba(240,160,171,0.07)' : 'rgba(99,102,241,0.07)',
-                border: `1px solid ${phones.length >= phoneLimit ? 'rgba(240,160,171,0.35)' : 'rgba(99,102,241,0.35)'}`,
-                color: phones.length >= phoneLimit ? '#F0A0AB' : ACCENT,
-                whiteSpace: 'nowrap', flexShrink: 0,
-              }}>
+              <span className={phones.length >= phoneLimit ? 'sf-badge sf-badge-red' : 'sf-badge sf-badge-violet'}>
                 {phones.length} / {phoneLimit}
               </span>
             )}
           </div>
         </div>
 
-        {/* ── Stats bar (informative — le filtrage se fait via les pills toolbar) ── */}
-        {!loading && phones.length > 0 && (() => {
-          const onlinePct = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
-          const withSession = phones.filter(p => p.ig_sessionid).length
-          const statChips = [
-            {
-              label: t('phoneSummaryTotal'), value: phones.length,
-              icon: (
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="3.5" y="0.5" width="7" height="13" rx="2" stroke="currentColor" strokeWidth="1.3"/>
-                  <circle cx="7" cy="11" r="0.7" fill="currentColor"/>
-                </svg>
-              ),
-              color: ACCENT, sub: undefined as string | undefined,
-            },
-            {
-              label: t('phoneSummaryOnline'), value: onlineCount,
-              sub: `${onlinePct}%`,
-              icon: <span className="sf-ping-dot" style={{ background: '#7FD9B8', width: 8, height: 8 }} />,
-              color: '#7FD9B8',
-            },
-            {
-              label: t('phoneSummaryOffline'), value: offlineCount,
-              icon: (
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                  <circle cx="4" cy="4" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
-                </svg>
-              ),
-              color: 'rgba(233,234,240,0.5)', sub: undefined as string | undefined,
-            },
-            ...(withSession > 0 ? [{
-              label: t('phoneSession'), value: withSession,
-              icon: (
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-                  <path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                </svg>
-              ),
-              color: ACCENT, sub: undefined as string | undefined,
-            }] : []),
-          ]
-          return (
-            <div style={{
-              flexShrink: 0, padding: '14px 32px 0',
-              display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-            }}>
-              {statChips.map((chip, ci) => (
-                <div
-                  key={chip.label}
-                  className={`anim-scale-in sf-d${(ci + 1) * 50}`}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 7,
-                    padding: '6px 12px', borderRadius: 8,
-                    background: 'rgba(233,234,240,0.04)',
-                    border: '1px solid rgba(233,234,240,0.08)',
-                  }}
-                >
-                  <span style={{ color: chip.color, display: 'flex', alignItems: 'center' }}>{chip.icon}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, fontVariantNumeric: 'tabular-nums' }}>{chip.value}</span>
-                  <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.55)', fontWeight: 500 }}>{chip.label}</span>
-                  {chip.sub && <span style={{ fontSize: 10, color: chip.color, fontWeight: 600 }}>{chip.sub}</span>}
-                </div>
-              ))}
-              {lastUpdated && (
-                <span style={{
-                  fontSize: 11, color: 'rgba(233,234,240,0.35)', marginLeft: 'auto',
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}>
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2"/>
-                    <path d="M5 2.5v2.5l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        {/* ── Page body ───────────────────────────────────────────────────── */}
+        <div className="sf-page-body">
+
+          {/* ── Stats chips ──────────────────────────────────────────────── */}
+          {!loading && phones.length > 0 && (() => {
+            const onlinePct  = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
+            const withSession = phones.filter(p => p.ig_sessionid).length
+            const statChips = [
+              {
+                label: t('phoneSummaryTotal'), value: phones.length,
+                icon: (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <rect x="3.5" y="0.5" width="7" height="13" rx="2" stroke="currentColor" strokeWidth="1.3"/>
+                    <circle cx="7" cy="11" r="0.7" fill="currentColor"/>
                   </svg>
-                  {lastUpdated.toLocaleTimeString(lang === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                ),
+                color: ACCENT, sub: undefined as string | undefined,
+              },
+              {
+                label: t('phoneSummaryOnline'), value: onlineCount, sub: `${onlinePct}%`,
+                icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)', display: 'inline-block' }} />,
+                color: 'var(--ok)',
+              },
+              {
+                label: t('phoneSummaryOffline'), value: offlineCount,
+                icon: <span style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid rgba(233,234,240,0.4)', display: 'inline-block' }} />,
+                color: 'rgba(233,234,240,0.5)', sub: undefined as string | undefined,
+              },
+              ...(withSession > 0 ? [{
+                label: t('phoneSession'), value: withSession,
+                icon: (
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                ),
+                color: ACCENT, sub: undefined as string | undefined,
+              }] : []),
+            ]
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+                <div className="anim-stagger" style={{ display: 'contents' }}>
+                  {statChips.map(chip => (
+                    <div key={chip.label} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 7,
+                      padding: '6px 12px', borderRadius: 8,
+                      background: 'rgba(233,234,240,0.04)', border: '1px solid rgba(233,234,240,0.08)',
+                    }}>
+                      <span style={{ color: chip.color, display: 'flex', alignItems: 'center' }}>{chip.icon}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, fontVariantNumeric: 'tabular-nums' }}>{chip.value}</span>
+                      <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.55)', fontWeight: 500 }}>{chip.label}</span>
+                      {chip.sub && <span style={{ fontSize: 10, color: chip.color, fontWeight: 600 }}>{chip.sub}</span>}
+                    </div>
+                  ))}
+                </div>
+                {lastUpdated && (
+                  <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.35)', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M5 2.5v2.5l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {lastUpdated.toLocaleTimeString(lang === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ── Alerts ──────────────────────────────────────────────────── */}
+          {(!bearer || error || pollError) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {!bearer && (
+                <div className="sf-anim-slide-up" style={{
+                  padding: '10px 14px', borderRadius: 10,
+                  background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)',
+                  color: 'var(--warn)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
+                    <path d="M7.5 1L14 13.5H1L7.5 1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                    <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                    <circle cx="7.5" cy="11" r="0.7" fill="currentColor"/>
+                  </svg>
+                  {t('phoneMissingToken')}
+                </div>
+              )}
+              {error && (
+                <div className="sf-anim-slide-up" style={{
+                  padding: '10px 14px', borderRadius: 10,
+                  background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.2)',
+                  color: 'var(--err)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                }}>
+                  <span>{error}</span>
+                  <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+              )}
+              {pollError && (
+                <div className="sf-anim-slide-up" style={{
+                  padding: '10px 14px', borderRadius: 10,
+                  background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)',
+                  color: 'var(--warn)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                }}>
+                  <span>{pollError}</span>
+                  <button onClick={() => setPollError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
               )}
             </div>
-          )
-        })()}
+          )}
 
-        {/* ── Content area (scrolls with the page) ───────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* ── Main area: toolbar + table + detail panel ──────────────── */}
+          <div style={{ flex: 1, display: 'flex', gap: 0 }}>
 
-          {/* ── Main area (table + detail panel) ──────────────────────────── */}
-          <div style={{ flex: 1, display: 'flex' }}>
-
-            {/* Table + toolbar column */}
+            {/* Table column */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
-              {/* ── Toolbar ──────────────────────────────────────────────── */}
-              <div className="sf-toolbar" style={{ gap: 8 }}>
-                {/* Search */}
-                <div style={{ flex: 1, position: 'relative', minWidth: 160 }}>
-                  <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(233,234,240,0.35)', pointerEvents: 'none' }}>
+              {/* ── Toolbar ──────────────────────────────────────────── */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                marginBottom: 12,
+              }}>
+                {/* Search input */}
+                <div style={{ flex: 1, position: 'relative', minWidth: 180 }}>
+                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(233,234,240,0.35)', pointerEvents: 'none' }}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                       <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
                       <path d="M9.5 9.5l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -1514,11 +1389,7 @@ export function Phones({ user }: PhonesProps) {
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     className="sf-input"
-                    style={{
-                      width: '100%', boxSizing: 'border-box', paddingLeft: 34, paddingRight: 30,
-                      background: 'transparent', border: 'none', borderRadius: 0,
-                      borderBottom: '1px solid rgba(233,234,240,0.18)', boxShadow: 'none',
-                    }}
+                    style={{ width: '100%', boxSizing: 'border-box', paddingLeft: 34, paddingRight: search ? 30 : 12 }}
                   />
                   {search && (
                     <button
@@ -1539,30 +1410,39 @@ export function Phones({ user }: PhonesProps) {
                   )}
                 </div>
 
-                {/* Group filter */}
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <select
-                    value={groupFilter}
-                    onChange={e => setGroupFilter(e.target.value)}
-                    className="sf-input"
+                {/* Group filter — pill tabs */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
+                  <button
+                    onClick={() => setGroupFilter('all')}
+                    className={`sf-btn sf-btn-ghost sf-btn-sm${groupFilter === 'all' ? '' : ''}`}
                     style={{
-                      appearance: 'none', paddingRight: 28, paddingLeft: 12,
-                      fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                      background: 'transparent', border: `1px solid ${HAIR}`, borderRadius: 8,
+                      background: groupFilter === 'all' ? 'rgba(99,102,241,0.18)' : 'transparent',
+                      color: groupFilter === 'all' ? 'var(--accent-l)' : 'rgba(233,234,240,0.52)',
+                      border: groupFilter === 'all' ? '1px solid rgba(99,102,241,0.28)' : '1px solid transparent',
+                      fontSize: 11, fontWeight: 600, cursor: 'pointer',
                     }}
                   >
-                    <option value="all">{t('phonesAllGroups')}</option>
-                    {groups.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                  <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(233,234,240,0.4)', fontSize: 9 }}>▼</span>
+                    {t('phonesAllGroups')}
+                  </button>
+                  {groups.map(g => (
+                    <button
+                      key={g}
+                      onClick={() => setGroupFilter(g)}
+                      className="sf-btn sf-btn-ghost sf-btn-sm"
+                      style={{
+                        background: groupFilter === g ? 'rgba(99,102,241,0.18)' : 'transparent',
+                        color: groupFilter === g ? 'var(--accent-l)' : 'rgba(233,234,240,0.52)',
+                        border: groupFilter === g ? '1px solid rgba(99,102,241,0.28)' : '1px solid transparent',
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {g}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Status filter pills — système de filtre statut unique */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 2,
-                  background: 'rgba(10,10,12,0.8)', border: '1px solid rgba(233,234,240,0.08)',
-                  borderRadius: 8, padding: '3px 4px', flexShrink: 0,
-                }}>
+                {/* Status filter pills */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
                   {(['all', 'online', 'offline'] as const).map(v => (
                     <button
                       key={v}
@@ -1570,9 +1450,9 @@ export function Phones({ user }: PhonesProps) {
                       style={{
                         padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
                         border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                        background: filter === v ? TEXT_1 : 'transparent',
+                        background: filter === v ? 'var(--ivory)' : 'transparent',
                         color: filter === v ? '#0F1014' : 'rgba(233,234,240,0.52)',
-                        letterSpacing: '0.08em', textTransform: 'uppercase',
+                        letterSpacing: '0.06em', textTransform: 'uppercase',
                       }}
                     >
                       {v === 'all' ? t('phonesFilterAll') : v === 'online' ? t('phonesFilterOnline') : t('phonesFilterOffline')}
@@ -1580,16 +1460,11 @@ export function Phones({ user }: PhonesProps) {
                   ))}
                 </div>
 
-                {/* Export CSV */}
+                {/* CSV export */}
                 <button
-                  onClick={exportCsv}
-                  disabled={sortedVisible.length === 0}
+                  onClick={exportCsv} disabled={sortedVisible.length === 0}
                   className="sf-btn sf-btn-secondary sf-btn-sm"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                    cursor: sortedVisible.length === 0 ? 'not-allowed' : 'pointer',
-                    opacity: sortedVisible.length === 0 ? 0.5 : 1,
-                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: sortedVisible.length === 0 ? 'not-allowed' : 'pointer', opacity: sortedVisible.length === 0 ? 0.5 : 1 }}
                   title={fr('Exporter la liste filtrée en CSV', 'Export filtered list as CSV')}
                 >
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -1599,11 +1474,11 @@ export function Phones({ user }: PhonesProps) {
                   CSV
                 </button>
 
-                {/* Refresh button */}
+                {/* Refresh now */}
                 <button
                   onClick={() => poller.pollNow()}
                   className="sf-btn sf-btn-secondary sf-btn-sm"
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flexShrink: 0 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                   title={fr('Actualiser maintenant', 'Refresh now')}
                 >
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -1614,203 +1489,163 @@ export function Phones({ user }: PhonesProps) {
                 </button>
               </div>
 
-              {/* ── Alerts ───────────────────────────────────────────────── */}
-              {(!bearer || error || pollError) && (
-                <div style={{ padding: '12px 28px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {!bearer && (
-                    <div className="sf-anim-slide-up" style={{
-                      padding: '10px 14px', borderRadius: 10,
-                      background: 'rgba(229,192,123,0.07)', border: '1px solid rgba(229,192,123,0.18)',
-                      color: '#E5C07B', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                    }}>
-                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
-                        <path d="M7.5 1L14 13.5H1L7.5 1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-                        <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                        <circle cx="7.5" cy="11" r="0.7" fill="currentColor"/>
-                      </svg>
-                      {t('phoneMissingToken')}
-                    </div>
-                  )}
-                  {error && (
-                    <div className="sf-anim-slide-up" style={{
-                      padding: '10px 14px', borderRadius: 10,
-                      background: 'rgba(240,160,171,0.07)', border: '1px solid rgba(240,160,171,0.18)',
-                      color: '#F0A0AB', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                    }}>
-                      <span>{error}</span>
-                      <button onClick={() => setError(null)} className="sf-press" style={{ background: 'none', border: 'none', color: '#F0A0AB', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                      </button>
-                    </div>
-                  )}
-                  {pollError && (
-                    <div className="sf-anim-slide-up" style={{
-                      padding: '10px 14px', borderRadius: 10,
-                      background: 'rgba(229,192,123,0.07)', border: '1px solid rgba(229,192,123,0.18)',
-                      color: '#E5C07B', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                    }}>
-                      <span>{pollError}</span>
-                      <button onClick={() => setPollError(null)} className="sf-press" style={{ background: 'none', border: 'none', color: '#E5C07B', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                      </button>
-                    </div>
-                  )}
+              {/* ── Content ──────────────────────────────────────────── */}
+              {loading ? (
+                /* Loading skeleton */
+                <div className="sf-table-wrap" style={{ borderRadius: 12, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
+                  <table className="sf-table">
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH_BASE, width: 36 }}></th>
+                        <th style={{ ...TH_BASE, width: 44 }}></th>
+                        <th style={TH_BASE}>{t('phonesDetailModel')}</th>
+                        <th style={{ ...TH_BASE, width: 120 }}>{t('phonesDetailGroup')}</th>
+                        <th style={{ ...TH_BASE, width: 160 }}>Instagram</th>
+                        <th style={{ ...TH_BASE, width: 110 }}>{t('phonesIgStatus')}</th>
+                        <th style={{ ...TH_BASE, width: 150 }}>Note</th>
+                        <th style={{ ...TH_BASE, width: 90 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[0,1,2,3,4,5].map(i => (
+                        <tr key={i}>
+                          <td></td>
+                          <td style={{ textAlign: 'center' }}><div className="sf-skeleton" style={{ width: 9, height: 9, borderRadius: '50%', margin: '0 auto' }} /></td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div className="sf-skeleton" style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0 }} />
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                <div className="sf-skeleton" style={{ height: 11, width: 110, borderRadius: 4 }} />
+                                <div className="sf-skeleton" style={{ height: 8, width: 70, borderRadius: 4 }} />
+                              </div>
+                            </div>
+                          </td>
+                          <td><div className="sf-skeleton" style={{ height: 20, width: 65, borderRadius: 99 }} /></td>
+                          <td><div className="sf-skeleton" style={{ height: 20, width: 100, borderRadius: 4 }} /></td>
+                          <td><div className="sf-skeleton" style={{ height: 20, width: 72, borderRadius: 99 }} /></td>
+                          <td><div className="sf-skeleton" style={{ height: 11, width: 90, borderRadius: 4 }} /></td>
+                          <td></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+              ) : phones.length === 0 ? (
+                /* Empty state — no phones at all */
+                <div className="sf-empty sf-reveal">
+                  <div className="sf-empty-icon" style={{ width: 64, height: 64, borderRadius: 20 }}>
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="6" y="1" width="16" height="26" rx="3.5"/>
+                      <circle cx="14" cy="22" r="1.5" fill={ACCENT} stroke="none"/>
+                      <path d="M10 5h8"/>
+                    </svg>
+                  </div>
+                  <p className="sf-empty-title">{t('phonesNoConfigured')}</p>
+                  <p className="sf-empty-desc">{t('phonesNoConfiguredDesc')}</p>
+                  <button
+                    onClick={syncFromGeelark}
+                    disabled={!bearer || syncing}
+                    className="sf-btn sf-btn-primary sf-btn-lg"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer', opacity: (!bearer || syncing) ? 0.5 : 1 }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                      <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {t('phonesSyncGeelark')}
+                  </button>
+                </div>
+
+              ) : visible.length === 0 ? (
+                /* No search results */
+                <div className="sf-empty sf-reveal">
+                  <div className="sf-empty-icon">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={ACCENT} strokeWidth="1.6" strokeLinecap="round">
+                      <circle cx="9.5" cy="9.5" r="7"/>
+                      <path d="M15 15l5 5"/>
+                      <path d="M7 9.5h5M9.5 7v5" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <p className="sf-empty-title">{t('phonesNoSearchResults')}</p>
+                  <p className="sf-empty-desc">{fr(`Essayez d'ajuster votre recherche ou vos filtres.`, 'Try adjusting your search or filters.')}</p>
+                  <button
+                    onClick={() => { setSearch(''); setFilter('all'); setGroupFilter('all') }}
+                    className="sf-btn sf-btn-secondary"
+                  >
+                    {fr('Réinitialiser les filtres', 'Reset filters')}
+                  </button>
+                </div>
+
+              ) : (
+                /* Phone table */
+                <div className="sf-table-wrap" style={{ borderRadius: 12, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
+                  <table className="sf-table">
+                    <thead>
+                      <tr>
+                        {/* Select all */}
+                        <th style={{ ...TH_BASE, width: 36, textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={allVisibleSelected}
+                            onChange={toggleSelectAll}
+                            title={fr('Tout sélectionner', 'Select all')}
+                            style={{ cursor: 'pointer', accentColor: ACCENT, width: 14, height: 14 }}
+                          />
+                        </th>
+                        {/* Status sort */}
+                        {sortTh('', 'status', { width: 44 }, fr('Trier par statut', 'Sort by status'))}
+                        {/* Name sort */}
+                        {sortTh(t('phonesDetailModel'), 'name')}
+                        {/* Group sort */}
+                        {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
+                        <th style={{ ...TH_BASE, width: 160 }}>Instagram</th>
+                        <th style={{ ...TH_BASE, width: 110 }}>{t('phonesIgStatus')}</th>
+                        <th style={{ ...TH_BASE, width: 150 }}>Note</th>
+                        <th style={{ ...TH_BASE, width: 100 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody className="anim-stagger">
+                      {sortedVisible.map((phone, index) => (
+                        <PhoneRow
+                          key={phone.id}
+                          phone={phone}
+                          index={index}
+                          isSelected={selectedPhone?.id === phone.id}
+                          checked={selectedIds.has(phone.id)}
+                          col={phoneColor(phone.phone_name)}
+                          canDelete={canDelete}
+                          setSelectedPhone={setSelectedPhone}
+                          setContextMenu={setContextMenu}
+                          setSessionDialog={setSessionDialog}
+                          saveIgUsername={saveIgUsername}
+                          saveRemark={saveRemark}
+                          requestDelete={requestDelete}
+                          toggleSelect={toggleSelect}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
-              {/* ── Content ───────────────────────────────────────────────── */}
-              <div style={{ flex: 1, padding: '16px 28px 28px' }}>
-
-                {loading ? (
-                  /* ── Loading skeleton rows ─────────────────────────────── */
-                  <div className="sf-table-wrap" style={{ borderRadius: 12, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
-                    <table className="sf-table">
-                      <thead>
-                        <tr>
-                          <th style={{ ...TH_STYLE, width: 36 }}></th>
-                          <th style={{ ...TH_STYLE, width: 44 }}></th>
-                          <th style={TH_STYLE}>{t('phonesDetailModel')}</th>
-                          <th style={{ ...TH_STYLE, width: 120 }}>{t('phonesDetailGroup')}</th>
-                          <th style={{ ...TH_STYLE, width: 160 }}>Instagram</th>
-                          <th style={{ ...TH_STYLE, width: 110 }}>{t('phonesIgStatus')}</th>
-                          <th style={{ ...TH_STYLE, width: 150 }}>Note</th>
-                          <th style={{ ...TH_STYLE, width: 90 }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[0,1,2,3,4,5,6,7].map(i => (
-                          <tr key={i}>
-                            <td></td>
-                            <td style={{ textAlign: 'center' }}><div className="sf-skeleton" style={{ width: 8, height: 8, borderRadius: '50%', margin: '0 auto' }} /></td>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div className="sf-skeleton" style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0 }} />
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                  <div className="sf-skeleton" style={{ height: 11, width: 110, borderRadius: 4 }} />
-                                  <div className="sf-skeleton" style={{ height: 8, width: 70, borderRadius: 4 }} />
-                                </div>
-                              </div>
-                            </td>
-                            <td><div className="sf-skeleton" style={{ height: 20, width: 65, borderRadius: 6 }} /></td>
-                            <td><div className="sf-skeleton" style={{ height: 20, width: 100, borderRadius: 6 }} /></td>
-                            <td><div className="sf-skeleton" style={{ height: 20, width: 75, borderRadius: 6 }} /></td>
-                            <td><div className="sf-skeleton" style={{ height: 11, width: 90, borderRadius: 4 }} /></td>
-                            <td></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                ) : phones.length === 0 ? (
-                  /* ── Empty state ────────────────────────────────────────── */
-                  <div className="sf-empty sf-reveal">
-                    <div className="sf-empty-icon" style={{ width: 64, height: 64, borderRadius: 20 }}>
-                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="6" y="1" width="16" height="26" rx="3.5"/>
-                        <circle cx="14" cy="22" r="1.5" fill={ACCENT} stroke="none"/>
-                        <path d="M10 5h8"/>
-                      </svg>
-                    </div>
-                    <p className="sf-empty-title">{t('phonesNoConfigured')}</p>
-                    <p className="sf-empty-desc">{t('phonesNoConfiguredDesc')}</p>
-                    <button
-                      onClick={syncFromGeelark}
-                      disabled={!bearer || syncing}
-                      style={{
-                        ...PRIMARY_BTN,
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
-                        opacity: (!bearer || syncing) ? 0.5 : 1,
-                      }}
-                      {...primaryHover}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                        <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      {t('phonesSyncGeelark')}
-                    </button>
-                  </div>
-
-                ) : visible.length === 0 ? (
-                  /* ── No search results ──────────────────────────────────── */
-                  <div className="sf-empty sf-reveal">
-                    <div className="sf-empty-icon">
-                      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={ACCENT} strokeWidth="1.6" strokeLinecap="round">
-                        <circle cx="9.5" cy="9.5" r="7"/>
-                        <path d="M15 15l5 5"/>
-                        <path d="M7 9.5h5M9.5 7v5" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <p className="sf-empty-title">{t('phonesNoSearchResults')}</p>
-                    <p className="sf-empty-desc">{fr('Essayez d’ajuster votre recherche ou vos filtres.', 'Try adjusting your search or filters.')}</p>
-                  </div>
-
-                ) : (
-                  /* ── Phone table list ───────────────────────────────────── */
-                  <div className="sf-table-wrap" style={{ borderRadius: 12, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
-                    <table className="sf-table">
-                      <thead>
-                        <tr>
-                          <th style={{ ...TH_STYLE, width: 36, textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={allVisibleSelected}
-                              onChange={toggleSelectAll}
-                              title={fr('Tout sélectionner', 'Select all')}
-                              style={{ cursor: 'pointer', accentColor: ACCENT, width: 14, height: 14 }}
-                            />
-                          </th>
-                          {sortTh('', 'status', { width: 44 }, fr('Trier par statut', 'Sort by status'))}
-                          {sortTh(t('phonesDetailModel'), 'name')}
-                          {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
-                          <th style={{ ...TH_STYLE, width: 160 }}>Instagram</th>
-                          <th style={{ ...TH_STYLE, width: 110 }}>{t('phonesIgStatus')}</th>
-                          <th style={{ ...TH_STYLE, width: 150 }}>Note</th>
-                          <th style={{ ...TH_STYLE, width: 90 }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedVisible.map(phone => (
-                          <PhoneRow
-                            key={phone.id}
-                            phone={phone}
-                            isSelected={selectedPhone?.id === phone.id}
-                            checked={selectedIds.has(phone.id)}
-                            col={phoneColor(phone.phone_name)}
-                            canDelete={canDelete}
-                            setSelectedPhone={setSelectedPhone}
-                            setContextMenu={setContextMenu}
-                            setSessionDialog={setSessionDialog}
-                            saveIgUsername={saveIgUsername}
-                            saveRemark={saveRemark}
-                            requestDelete={requestDelete}
-                            toggleSelect={toggleSelect}
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {!loading && visible.length > 0 && (
-                  <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', marginTop: 16, textAlign: 'center' }}>
-                    {visible.length} {t('phonesCountOf')} {phones.length} {phones.length > 1 ? t('phonesPhonesPlural') : t('phonesPhonesSuffix')}
-                  </p>
-                )}
-              </div>
+              {!loading && visible.length > 0 && (
+                <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', marginTop: 14, textAlign: 'center' }}>
+                  {visible.length} {t('phonesCountOf')} {phones.length} {phones.length > 1 ? t('phonesPhonesPlural') : t('phonesPhonesSuffix')}
+                </p>
+              )}
             </div>
 
-            {/* ── Right detail panel ──────────────────────────────────────── */}
+            {/* ── Right detail panel ──────────────────────────────────── */}
             {selectedPhone && (() => {
-              const p = selectedPhone
+              const p   = selectedPhone
               const col = phoneColor(p.phone_name)
               return (
                 <div className="sf-reveal" style={{
                   width: 300, flexShrink: 0,
                   borderLeft: `1px solid ${HAIR}`,
                   background: '#0F1014', overflowY: 'auto',
+                  marginLeft: 16,
                 }}>
                   {/* Panel header */}
                   <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
@@ -1819,8 +1654,7 @@ export function Phones({ user }: PhonesProps) {
                         <div style={{
                           width: 42, height: 42, borderRadius: 10, flexShrink: 0,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: `${col}14`,
-                          border: `1px solid ${col}33`, color: col,
+                          background: `${col}14`, border: `1px solid ${col}33`, color: col,
                         }}>
                           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                             <rect x="4" y="1" width="10" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -1829,58 +1663,50 @@ export function Phones({ user }: PhonesProps) {
                         </div>
                         <div>
                           <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0, lineHeight: 1.2 }}>{p.phone_name}</p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                             <StatusDot status={p.status ?? 'offline'} />
                             {p.group_name && (
-                              <span style={{
-                                fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 600,
-                                background: 'rgba(99,102,241,0.12)', color: ACCENT,
-                                border: '1px solid rgba(99,102,241,0.22)',
-                              }}>
-                                {p.group_name}
-                              </span>
+                              <span className="sf-badge sf-badge-violet">{p.group_name}</span>
                             )}
                           </div>
                         </div>
                       </div>
                       <button
                         onClick={() => setSelectedPhone(null)}
-                        className="sf-btn sf-btn-ghost sf-btn-icon"
-                        style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, cursor: 'pointer' }}
+                        className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
+                        style={{ cursor: 'pointer', flexShrink: 0 }}
                       >
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                           <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                         </svg>
                       </button>
                     </div>
-                    {/* Quick actions */}
+
+                    {/* Quick action buttons */}
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[
-                        { label: t('phoneSession'), icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>, action: () => setSessionDialog({ phone: p }) },
-                        { label: t('phonesSync'), icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8 2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M7.5 1l1.5 1.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>, action: () => poller.pollNow() },
+                        {
+                          label: t('phoneSession'),
+                          icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+                          action: () => setSessionDialog({ phone: p }),
+                        },
+                        {
+                          label: t('phonesSync'),
+                          icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8 2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M7.5 1l1.5 1.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+                          action: () => poller.pollNow(),
+                        },
                       ].map(a => (
                         <button key={a.label} onClick={a.action}
-                          style={{
-                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                            padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 500,
-                            background: 'rgba(233,234,240,0.04)', border: '1px solid rgba(233,234,240,0.09)',
-                            color: 'rgba(99,102,241,0.72)', cursor: 'pointer', transition: 'all 0.15s',
-                          }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.1)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.25)' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(233,234,240,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(233,234,240,0.09)' }}
+                          className="sf-btn sf-btn-ghost sf-btn-sm"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }}
                         >
                           {a.icon}{a.label}
                         </button>
                       ))}
                       <button
                         onClick={e => { e.stopPropagation(); setContextMenu({ phone: p, x: e.clientX, y: e.clientY }) }}
-                        className="sf-press"
-                        style={{
-                          width: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          borderRadius: 8, background: 'rgba(233,234,240,0.04)',
-                          border: '1px solid rgba(233,234,240,0.09)',
-                          color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
-                        }}
+                        className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
+                        style={{ cursor: 'pointer' }}
                       >
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                           <circle cx="6.5" cy="2" r="1" fill="currentColor"/>
@@ -1896,11 +1722,11 @@ export function Phones({ user }: PhonesProps) {
                     <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 12px' }}>{t('phonesInfoSection')}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                       {[
-                        { label: t('phonesDetailModel'),    value: p.phone_name },
-                        { label: t('phonesDetailSerial'),   value: p.serial_no ?? '—' },
+                        { label: t('phonesDetailModel'),     value: p.phone_name },
+                        { label: t('phonesDetailSerial'),    value: p.serial_no ?? '—' },
                         { label: t('phonesDetailGeelarkId'), value: p.geelark_id ?? '—' },
-                        { label: t('phonesDetailGroup'),    value: p.group_name ?? '—' },
-                        { label: t('phonesDetailLastSync'), value: p.synced_at ? relativeTime(p.synced_at) : '—' },
+                        { label: t('phonesDetailGroup'),     value: p.group_name ?? '—' },
+                        { label: t('phonesDetailLastSync'),  value: p.synced_at ? relativeTime(p.synced_at) : '—' },
                       ].map(row => (
                         <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                           <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)', flexShrink: 0 }}>{row.label}</span>
@@ -1939,14 +1765,14 @@ export function Phones({ user }: PhonesProps) {
                           <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)' }}>{t('phonesIgStatus')}</span>
                           <span style={{
                             fontSize: 11, fontWeight: 600,
-                            color: p.ig_status === 'active' ? '#7FD9B8' : (p.ig_status === 'expired' || p.ig_status === 'error') ? '#F0A0AB' : 'rgba(233,234,240,0.52)',
+                            color: p.ig_status === 'active' ? 'var(--ok)' : (p.ig_status === 'expired' || p.ig_status === 'error') ? 'var(--err)' : 'rgba(233,234,240,0.52)',
                           }}>
                             {p.ig_status === 'active' ? t('phonesIgStatusActive') : p.ig_status === 'expired' ? t('phonesIgStatusExpired') : p.ig_status === 'error' ? t('phonesIgStatusError') : t('phonesIgNotConfigured')}
                           </span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)' }}>{t('phonesIgSession')}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? '#7FD9B8' : 'rgba(233,234,240,0.52)' }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? 'var(--ok)' : 'rgba(233,234,240,0.52)' }}>
                             {p.ig_sessionid ? t('phonesIgSessionConfigured') : t('phonesIgNotConfigured')}
                           </span>
                         </div>
@@ -1961,8 +1787,7 @@ export function Phones({ user }: PhonesProps) {
                       <button onClick={() => setSessionDialog({ phone: p })} className="sf-btn sf-btn-ghost" style={{
                         width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
                         borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
-                        color: 'rgba(99,102,241,0.72)', cursor: 'pointer',
-                        justifyContent: 'flex-start',
+                        color: ACCENT, cursor: 'pointer', justifyContent: 'flex-start',
                       }}>
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
                         {t('phonesSessionIdAction')}
@@ -1971,8 +1796,7 @@ export function Phones({ user }: PhonesProps) {
                         <button onClick={() => { unlinkIg(p.id); setSelectedPhone(null) }} className="sf-btn sf-btn-ghost" style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
                           borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
-                          color: 'rgba(99,102,241,0.72)', cursor: 'pointer',
-                          justifyContent: 'flex-start',
+                          color: ACCENT, cursor: 'pointer', justifyContent: 'flex-start',
                         }}>
                           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
                           {t('phonesUnlinkIgAction')}
@@ -1982,8 +1806,7 @@ export function Phones({ user }: PhonesProps) {
                         <button onClick={() => requestDelete(p)} className="sf-btn sf-btn-ghost" style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
                           borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
-                          color: '#F0A0AB', cursor: 'pointer',
-                          justifyContent: 'flex-start',
+                          color: 'var(--err)', cursor: 'pointer', justifyContent: 'flex-start',
                         }}>
                           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                           {t('phonesDeleteAction')}
@@ -1997,32 +1820,30 @@ export function Phones({ user }: PhonesProps) {
           </div>
         </div>
 
-        {/* ── Floating bulk-actions bar ───────────────────────────────────── */}
+        {/* ── Floating bulk-action bar ──────────────────────────────────────── */}
         {selectedIds.size > 0 && (
           <div className="sf-anim-slide-up" style={{
             position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
             zIndex: 40, display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 14px', borderRadius: 14,
-            background: '#13141A', border: '1px solid rgba(99,102,241,0.35)',
+            background: 'var(--surface2)', border: '1px solid rgba(99,102,241,0.35)',
             boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 24px -8px rgba(99,102,241,0.4)',
+            whiteSpace: 'nowrap',
           }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: TEXT_1, whiteSpace: 'nowrap' }}>
+            {/* Count pill */}
+            <span className="sf-badge sf-badge-violet" style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px' }}>
               {selectedIds.size} {fr('sélectionné(s)', 'selected')}
             </span>
 
             <div style={{ width: 1, height: 20, background: HAIR }} />
 
+            {/* Delete bulk */}
             {canDelete && (
               <button
                 onClick={() => setConfirmBulkDelete(true)}
                 disabled={bulkBusy}
-                className="sf-btn sf-btn-sm"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.4)',
-                  color: '#F87171', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  padding: '7px 12px', cursor: bulkBusy ? 'wait' : 'pointer',
-                }}
+                className="sf-btn sf-btn-danger sf-btn-sm"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: bulkBusy ? 'wait' : 'pointer' }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                   <path d="M2 3h8M4.5 3V2h3v1M4 3l.4 7h3.2L8 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -2031,11 +1852,12 @@ export function Phones({ user }: PhonesProps) {
               </button>
             )}
 
+            {/* Unlink IG bulk */}
             <button
               onClick={bulkUnlinkIg}
               disabled={bulkBusy}
               className="sf-btn sf-btn-secondary sf-btn-sm"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: bulkBusy ? 'wait' : 'pointer', fontSize: 12 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: bulkBusy ? 'wait' : 'pointer' }}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M2 6C2 3.8 3.8 2 6 2s4 1.8 4 4-2 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -2044,6 +1866,7 @@ export function Phones({ user }: PhonesProps) {
               {fr('Délier IG', 'Unlink IG')}
             </button>
 
+            {/* Change group */}
             {groups.length > 0 && (
               <select
                 value=""
@@ -2051,7 +1874,7 @@ export function Phones({ user }: PhonesProps) {
                 onChange={e => { if (e.target.value) bulkChangeGroup(e.target.value) }}
                 className="sf-input"
                 style={{
-                  fontSize: 12, fontWeight: 500, padding: '6px 10px',
+                  fontSize: 12, fontWeight: 500, padding: '5px 10px', height: 28,
                   background: 'rgba(233,234,240,0.04)', border: `1px solid ${HAIR}`,
                   borderRadius: 8, cursor: bulkBusy ? 'wait' : 'pointer', color: TEXT_1,
                 }}
@@ -2061,15 +1884,12 @@ export function Phones({ user }: PhonesProps) {
               </select>
             )}
 
+            {/* Deselect all */}
             <button
               onClick={() => setSelectedIds(new Set())}
               title={fr('Annuler la sélection', 'Clear selection')}
-              style={{
-                width: 26, height: 26, borderRadius: 7,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(233,234,240,0.06)', border: 'none',
-                color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
-              }}
+              className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
+              style={{ cursor: 'pointer' }}
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
