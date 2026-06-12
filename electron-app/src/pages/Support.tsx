@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useLicense } from '@/lib/license'
 import { useOrg } from '@/lib/orgContext'
 import { useT, useLang } from '@/lib/i18n'
+import { useToast } from '@/components/Toast'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type TicketStatus   = 'open' | 'in_progress' | 'resolved' | 'closed'
@@ -72,9 +74,19 @@ const PRIORITY_BADGE_CLASS: Record<TicketPriority, string> = {
   urgent: 'sf-badge sf-badge-danger',
 }
 
-function fmtDate(iso: string) {
+function fmtDate(iso: string, lang: string) {
   const d = new Date(iso)
-  return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// Libellés de catégorie partagés (une seule source de vérité)
+function categoryLabel(t: ReturnType<typeof useT>, cat: TicketCategory | string): string {
+  switch (cat) {
+    case 'billing':   return t('supportCategoryBilling')
+    case 'technical': return t('supportCategoryTechnical')
+    case 'other':     return t('supportCategoryOther')
+    default:          return t('supportCategoryGeneral')
+  }
 }
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
@@ -184,6 +196,7 @@ function CreateTicketForm({
   const [subject,     setSubject]     = useState('')
   const [description, setDescription] = useState('')
   const [category,    setCategory]    = useState<TicketCategory>('general')
+  const [priority,    setPriority]    = useState<TicketPriority>('normal')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState<string | null>(null)
 
@@ -202,6 +215,7 @@ function CreateTicketForm({
       subject:     subject.trim(),
       description: description.trim(),
       category,
+      priority,
     })
     setSaving(false)
     if (err) { setError(err.message); return }
@@ -246,6 +260,21 @@ function CreateTicketForm({
               className="sf-input w-full cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               {([['general', t('supportCategoryGeneral')], ['billing', t('supportCategoryBilling')], ['technical', t('supportCategoryTechnical')], ['other', t('supportCategoryOther')]] as [TicketCategory, string][]).map(([k, v]) => (
+                <option key={k} value={k} style={{ background: '#0d1120', color: '#e2d9f3' }}>{v}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Priority */}
+          <div className="space-y-2">
+            <label className="block text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColPriority')}</label>
+            <select
+              name="priority"
+              value={priority}
+              onChange={e => setPriority(e.target.value as TicketPriority)}
+              className="sf-input w-full cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              {([['low', t('supportPriorityLow')], ['normal', t('supportPriorityNormal')], ['high', t('supportPriorityHigh')]] as [TicketPriority, string][]).map(([k, v]) => (
                 <option key={k} value={k} style={{ background: '#0d1120', color: '#e2d9f3' }}>{v}</option>
               ))}
             </select>
@@ -309,14 +338,18 @@ function ThreadView({
   onStatusChange: (id: string, status: TicketStatus) => void
 }) {
   const t = useT()
+  const { lang } = useLang()
+  const toast = useToast()
   const [messages, setMessages]   = useState<TicketMessage[]>([])
   const [reply,    setReply]      = useState('')
   const [sending,  setSending]    = useState(false)
   const [loading,  setLoading]    = useState(true)
+  const [confirmClose, setConfirmClose] = useState(false)
+  const [closing,  setClosing]    = useState(false)
   const bottomRef                 = useRef<HTMLDivElement>(null)
 
-  async function load() {
-    setLoading(true)
+  async function load(showSpinner = true) {
+    if (showSpinner) setLoading(true)
     if (isAdmin) {
       const { data } = await supabase.rpc('get_ticket_messages_admin', { p_ticket_id: ticket.id })
       setMessages((data as TicketMessage[]) ?? [])
@@ -328,43 +361,80 @@ function ThreadView({
         .order('created_at', { ascending: true })
       setMessages((data as TicketMessage[]) ?? [])
     }
-    setLoading(false)
+    if (showSpinner) setLoading(false)
   }
 
   useEffect(() => { load() }, [ticket.id])
+
+  // Polling 15 s — voir les nouvelles réponses sans ressortir du thread
+  useEffect(() => {
+    const id = setInterval(() => { load(false) }, 15000)
+    return () => clearInterval(id)
+  }, [ticket.id])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   async function sendReply() {
-    if (!reply.trim()) return
+    const text = reply.trim()
+    if (!text || sending) return
     setSending(true)
+    let err: { message: string } | null = null
     if (isAdmin) {
-      await supabase.rpc('admin_reply_ticket', { p_ticket_id: ticket.id, p_message: reply.trim() })
+      const { error } = await supabase.rpc('admin_reply_ticket', { p_ticket_id: ticket.id, p_message: text })
+      err = error
     } else {
       const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('ticket_messages').insert({
+      const { error } = await supabase.from('ticket_messages').insert({
         ticket_id:    ticket.id,
         sender_id:    userId,
         sender_email: user?.email ?? '',
         is_admin:     false,
-        message:      reply.trim(),
+        message:      text,
       })
+      err = error
+    }
+    setSending(false)
+    if (err) {
+      // Échec : on garde le brouillon dans le champ et on prévient l'utilisateur
+      toast.show({
+        title: lang === 'fr' ? 'Échec de l’envoi' : 'Failed to send',
+        body:  lang === 'fr' ? 'Ton message n’a pas été envoyé. Réessaie.' : 'Your message was not sent. Please try again.',
+        kind:  'error',
+      })
+      return
     }
     setReply('')
-    setSending(false)
-    load()
+    load(false)
+  }
+
+  // L'utilisateur clôture lui-même son ticket
+  async function closeOwnTicket() {
+    setClosing(true)
+    const { error } = await supabase
+      .from('support_tickets')
+      .update({ status: 'closed' })
+      .eq('id', ticket.id)
+      .eq('user_id', userId)
+    setClosing(false)
+    setConfirmClose(false)
+    if (error) {
+      toast.show({
+        title: lang === 'fr' ? 'Impossible de clôturer le ticket' : 'Could not close the ticket',
+        body:  error.message,
+        kind:  'error',
+      })
+      return
+    }
+    toast.show({
+      title: lang === 'fr' ? 'Ticket clôturé' : 'Ticket closed',
+      kind:  'ok',
+    })
+    onStatusChange(ticket.id, 'closed')
   }
 
   const isClosed = ticket.status === 'closed' || ticket.status === 'resolved'
-
-  const categoryLabel: Record<string, string> = {
-    general:   t('supportCategoryGeneral'),
-    billing:   t('supportCategoryBilling'),
-    technical: t('supportCategoryTechnical'),
-    other:     t('supportCategoryOther'),
-  }
 
   return (
     <div className="anim-page space-y-5 max-w-3xl">
@@ -392,9 +462,9 @@ function ThreadView({
               </>
             )}
             <span className="text-border">·</span>
-            <span>{categoryLabel[ticket.category]}</span>
+            <span>{categoryLabel(t, ticket.category)}</span>
             <span className="text-border">·</span>
-            <span>{fmtDate(ticket.created_at)}</span>
+            <span>{fmtDate(ticket.created_at, lang)}</span>
           </p>
         </div>
         {isAdmin && (
@@ -451,7 +521,7 @@ function ThreadView({
                       {m.is_admin && (
                         <span className="sf-badge sf-badge-accent text-[10px]">Admin</span>
                       )}
-                      <span className="text-[11px] text-text3">{fmtDate(m.created_at)}</span>
+                      <span className="text-[11px] text-text3">{fmtDate(m.created_at, lang)}</span>
                     </div>
                     <div
                       className={`rounded-2xl px-4 py-3 text-[13px] text-text whitespace-pre-wrap leading-relaxed max-w-[85%] ${
@@ -642,7 +712,7 @@ function UserSupport({ user }: { user: User }) {
                       <p className="text-[11px] text-text3 flex items-center gap-1.5">
                         <span>{categoryLabel[tk.category]}</span>
                         <span className="text-border">·</span>
-                        <span>{fmtDate(tk.created_at)}</span>
+                        <span>{fmtDate(tk.created_at, lang)}</span>
                       </p>
                     </div>
                     <div className="text-text3 group-hover:text-text2 transition-colors mt-1 shrink-0">
@@ -662,6 +732,7 @@ function UserSupport({ user }: { user: User }) {
 // ── Admin View ─────────────────────────────────────────────────────────────────
 function AdminSupport({ user }: { user: User }) {
   const t = useT()
+  const { lang } = useLang()
   const [tickets,  setTickets]  = useState<Ticket[]>([])
   const [loading,  setLoading]  = useState(true)
   const [active,   setActive]   = useState<Ticket | null>(null)
@@ -813,7 +884,7 @@ function AdminSupport({ user }: { user: User }) {
                     <td className="px-5 py-4"><StatusBadge status={tk.status} /></td>
                     <td className="px-5 py-4"><PriorityBadge priority={tk.priority} /></td>
                     <td className="px-5 py-4 text-[13px] text-text2 text-center">{tk.message_count ?? 0}</td>
-                    <td className="px-5 py-4 text-[13px] text-text3 whitespace-nowrap">{fmtDate(tk.updated_at)}</td>
+                    <td className="px-5 py-4 text-[13px] text-text3 whitespace-nowrap">{fmtDate(tk.updated_at, lang)}</td>
                   </tr>
                 ))}
               </tbody>

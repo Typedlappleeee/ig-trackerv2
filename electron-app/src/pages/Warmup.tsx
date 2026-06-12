@@ -25,7 +25,26 @@ interface PhoneJob {
 
 interface LoginCred { email: string; password: string; totpSecret: string }
 
-function fileName(p: string) { return p.split(/[\\/]/).pop() ?? p }
+function fileName(p: string): string {
+  return p.split(/[\\/]/).pop() ?? p
+}
+
+// Flags bug — tant qu'ils sont affichés, les lancements correspondants sont bloqués.
+const MASS_EDIT_BUGGED = true
+const WARMUP_BUGGED    = true
+
+// Pool de concurrence — limite le nombre de téléphones traités en parallèle.
+const MAX_CONCURRENCY = 8
+async function pLimit<T>(items: T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
+  let cursor = 0
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const item = items[cursor++]
+      await worker(item)
+    }
+  })
+  await Promise.all(runners)
+}
 
 // ── Inline Lucide-style icons (no emoji UI icons) ──────────────────────────────
 const svgBase = {
@@ -123,6 +142,7 @@ export function Warmup({ user }: WarmupProps) {
 
   // ── LOG IN state ──────────────────────────────────────────────────────────
   const [loginCreds, setLoginCreds] = useState<Record<string, LoginCred>>({})
+  const [bulkCreds,  setBulkCreds]  = useState('')
 
   // ── MASS EDIT state ───────────────────────────────────────────────────────
   const [editName,     setEditName]     = useState('')
@@ -177,13 +197,38 @@ export function Warmup({ user }: WarmupProps) {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  function selectAll() { setSelected(new Set(visiblePhones.map(p => p.id))) }
+  function selectAll()   { setSelected(new Set(visiblePhones.map(p => p.id))) }
+  function deselectAll() { setSelected(new Set()) }
 
   function setLoginCred(phoneId: string, field: keyof LoginCred, value: string) {
     setLoginCreds(prev => {
       const existing = prev[phoneId] ?? { email: '', password: '', totpSecret: '' }
       return { ...prev, [phoneId]: { ...existing, [field]: value } }
     })
+  }
+
+  // Import en masse : « email:password:2fa » par ligne, mappé sur les
+  // téléphones sélectionnés dans l'ordre d'affichage.
+  function applyBulkCreds() {
+    const lines = bulkCreds.split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length === 0) return
+    const targets = phones.filter(p => selected.has(p.id))
+    setLoginCreds(prev => {
+      const next = { ...prev }
+      targets.forEach((phone, i) => {
+        const line = lines[i]
+        if (!line) return
+        const parts = line.split(':')
+        const email      = (parts[0] ?? '').trim()
+        // Le mot de passe peut contenir « : » — le 2FA est la dernière partie si ≥ 3 champs
+        const totpSecret = parts.length >= 3 ? (parts[parts.length - 1] ?? '').trim() : ''
+        const password   = (parts.length >= 3 ? parts.slice(1, -1).join(':') : parts.slice(1).join(':')).trim()
+        if (!email || !password) return
+        next[phone.id] = { email, password, totpSecret }
+      })
+      return next
+    })
+    setBulkCreds('')
   }
 
   // ── Job helpers ───────────────────────────────────────────────────────────
@@ -211,10 +256,14 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets)
 
-    await Promise.all(targets.map(async phone => {
+    await pLimit(targets, MAX_CONCURRENCY, async phone => {
+      if (abortRef.current.abort) {
+        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        return
+      }
       const cred = loginCreds[phone.id]
       if (!cred?.email || !cred?.password) {
-        updateJob(phone.id, { status: 'error', error: 'Missing credentials' })
+        updateJob(phone.id, { status: 'error', error: 'Identifiants manquants' })
         return
       }
       updateJob(phone.id, { status: 'running' })
@@ -225,9 +274,9 @@ export function Warmup({ user }: WarmupProps) {
         cred.totpSecret || undefined,
       )
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-      addLog(phone.id, '💤 Extinction du téléphone…')
+      addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
-    }))
+    })
 
     setRunning(false)
   }
@@ -243,28 +292,30 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets)
 
-    // editPicFile is a local path — the phone uses curl to download the URL so a
-    // local file path won’t work. Only URL-based profile pictures are supported.
-    const resolvedPicUrl = editPicUrl.trim() || undefined
-
+    // Seules les photos par URL sont supportées : le téléphone télécharge
+    // l'image via curl, un chemin local ne fonctionnerait pas.
     const config = {
       profileName:   editName.trim()    || undefined,
       username:      editUsername.trim() || undefined,
-      bio:           editBio.trim()     || undefined,
-      profilePicUrl: resolvedPicUrl,
+      bio:           editBio.trim().slice(0, 150) || undefined,
+      profilePicUrl: editPicUrl.trim() || undefined,
     }
 
-    await Promise.all(targets.map(async phone => {
+    await pLimit(targets, MAX_CONCURRENCY, async phone => {
+      if (abortRef.current.abort) {
+        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        return
+      }
       updateJob(phone.id, { status: 'running' })
       try {
         await updateInstagramProfile(bearer, phone.id, config, msg => addLog(phone.id, msg))
-        updateJob(phone.id, { status: 'done' })
+        updateJob(phone.id, abortRef.current.abort ? { status: 'error', error: 'Annulé' } : { status: 'done' })
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
-      addLog(phone.id, '💤 Extinction du téléphone…')
+      addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
-    }))
+    })
 
     setRunning(false)
   }
@@ -282,13 +333,17 @@ export function Warmup({ user }: WarmupProps) {
 
     const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested }
 
-    await Promise.all(targets.map(async phone => {
+    await pLimit(targets, MAX_CONCURRENCY, async phone => {
+      if (abortRef.current.abort) {
+        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        return
+      }
       updateJob(phone.id, { status: 'running' })
       const result = await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-      addLog(phone.id, '💤 Extinction du téléphone…')
+      addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
-    }))
+    })
 
     setRunning(false)
   }
@@ -446,6 +501,11 @@ export function Warmup({ user }: WarmupProps) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <button onClick={selectAll} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">
                     {t('warmupSelectAll')}
+                  </button>
+                  <button onClick={deselectAll} disabled={selected.size === 0}
+                    className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+                    style={selected.size === 0 ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}>
+                    Tout désélectionner
                   </button>
                   <button onClick={loadPhones} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
                     style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -737,6 +797,41 @@ export function Warmup({ user }: WarmupProps) {
             {/* ── LOG IN tab ── */}
             {activeTab === 'login' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="anim-slide-up">
+
+                {/* Bulk credentials import */}
+                <div className="sf-card" style={{ overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--accent-glow)', display: 'flex' }}><IconPaperclip size={13} /></span>
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>Import en masse</p>
+                      <p style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 1 }}>
+                        email:password:2fa par ligne — appliqué aux téléphones sélectionnés dans l'ordre
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <textarea
+                      rows={4}
+                      placeholder={'compte1@mail.com:motdepasse1:SECRET2FA\ncompte2@mail.com:motdepasse2'}
+                      value={bulkCreds}
+                      onChange={e => setBulkCreds(e.target.value)}
+                      className="sf-input sf-textarea"
+                      style={{ fontSize: 11, fontFamily: 'monospace', resize: 'vertical' }}
+                    />
+                    <button
+                      onClick={applyBulkCreds}
+                      disabled={!bulkCreds.trim() || selectedPhones.length === 0}
+                      className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+                      style={{
+                        alignSelf: 'flex-end',
+                        opacity: !bulkCreds.trim() || selectedPhones.length === 0 ? 0.45 : 1,
+                        cursor: !bulkCreds.trim() || selectedPhones.length === 0 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Appliquer ({Math.min(bulkCreds.split('\n').filter(l => l.trim()).length, selectedPhones.length)})
+                    </button>
+                  </div>
+                </div>
 
                 {/* Credentials card */}
                 <div className="sf-card" style={{ overflow: 'hidden' }}>

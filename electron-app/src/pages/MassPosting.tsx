@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
@@ -17,6 +17,8 @@ import {
 import { playSuccess } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { startCreditRun } from '@/lib/withCredits'
+import { ACCENT, ACCENT_L, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR, OK, WARN, ERR, SANS } from '@/lib/theme'
 import { useToast } from '@/components/Toast'
 import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
@@ -49,6 +51,87 @@ async function geelark(bearer: string, path: string, body: unknown) {
   return r.data as Record<string, unknown>
 }
 
+const LS_MODE = 'sf-mass-posting-mode'
+
+const STATUS_DOT: Record<string, string> = {
+  uploading: 'var(--info, #38BDF8)', posting: WARN, done: OK, error: ERR,
+}
+
+// Ligne de téléphone mémoïsée — la liste se re-render toutes les 10s pendant
+// le polling ; avec 100+ téléphones, seules les lignes dont le statut change
+// doivent repeindre.
+const PhoneRow = memo(function PhoneRow({ phone, checked, videoIndex, videoTitle, ts, statusLabel, onToggle }: {
+  phone: Phone
+  checked: boolean
+  videoIndex: number
+  videoTitle: string | null
+  ts: TaskStatus | undefined
+  statusLabel: string
+  onToggle: (id: string) => void
+}) {
+  const initials = (phone.ig_username?.[0] ?? phone.phone_name?.[0] ?? '?').toUpperCase()
+  return (
+    <button onClick={() => onToggle(phone.id)}
+      className="cursor-pointer"
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '9px 14px',
+        textAlign: 'left', position: 'relative', border: 'none',
+        borderBottom: `1px solid rgba(233,234,240,0.04)`,
+        background: checked ? 'rgba(99,102,241,0.06)' : 'transparent',
+        transition: 'background 0.15s',
+      }}
+      onMouseEnter={e => { if (!checked) e.currentTarget.style.background = 'rgba(233,234,240,0.03)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = checked ? 'rgba(99,102,241,0.06)' : 'transparent' }}>
+      {checked && <div style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 2, borderRadius: 99, background: ACCENT }} />}
+
+      {/* Avatar */}
+      <div style={{
+        width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 11, fontWeight: 800, borderRadius: 8,
+        border: `1px solid ${checked ? 'rgba(99,102,241,0.45)' : HAIR}`,
+        color: checked ? ACCENT : FAINT,
+        background: checked ? 'rgba(99,102,241,0.08)' : 'transparent',
+        transition: 'all 0.15s',
+      }}>
+        {initials}
+      </div>
+
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <p style={{ fontSize: 12, fontWeight: 600, color: checked ? IVORY : 'rgba(233,234,240,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {phone.phone_name}
+        </p>
+        {phone.ig_username && (
+          <p style={{ fontSize: 10, color: checked ? 'rgba(99,102,241,0.7)' : FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{phone.ig_username}</p>
+        )}
+        {ts && ts.status !== 'idle' && ts.status !== 'pending' && (
+          <p style={{ fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 1, color: STATUS_DOT[ts.status] ?? MUTED }}>
+            <span style={{ width: 4, height: 4, borderRadius: '50%', display: 'inline-block', background: STATUS_DOT[ts.status] ?? MUTED }} />
+            {statusLabel}{ts.detail ? ` · ${ts.detail}` : ''}
+          </p>
+        )}
+      </div>
+
+      {videoIndex >= 0 && (
+        <span title={videoTitle ?? undefined}
+          style={{ fontSize: 10, fontWeight: 700, color: ACCENT, flexShrink: 0, fontVariantNumeric: 'tabular-nums', padding: '2px 7px', borderRadius: 99, background: 'rgba(99,102,241,0.1)' }}>
+          #{videoIndex + 1}
+        </span>
+      )}
+
+      {/* Checkbox */}
+      <div style={{
+        width: 14, height: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: 4,
+        background: checked ? ACCENT : 'transparent',
+        border: checked ? 'none' : `1px solid rgba(233,234,240,0.18)`,
+        transition: 'all 0.15s',
+      }}>
+        {checked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+      </div>
+    </button>
+  )
+})
+
 export function MassPosting({ user }: MassPostingProps) {
   const t = useT()
   const { lang } = useLang()
@@ -67,7 +150,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [selectedPhones, _setSelPhones]   = useState<Set<string>>(ms.selectedPhones)
   const [selectedVideos, _setSelVideos]   = useState<SelectedVideo[]>(ms.selectedVideos)
   const [caption, _setCaption]            = useState(ms.caption)
-  const [mode, setMode]                   = useState<'seq' | 'random'>('seq')
+  const [mode, _setMode]                  = useState<'seq' | 'random'>(() => localStorage.getItem(LS_MODE) === 'random' ? 'random' : 'seq')
+  const setMode = (m: 'seq' | 'random') => { _setMode(m); localStorage.setItem(LS_MODE, m) }
   const [bearer, setBearer]               = useState('')
   const [groqKey, setGroqKey]             = useState('')
   const [posting, _setPosting]            = useState(ms.posting)
@@ -98,6 +182,14 @@ export function MassPosting({ user }: MassPostingProps) {
   const postingStartRef                   = useRef<Map<string, number>>(new Map())
   // Which phones already triggered a screenshot notification this session
   const notifiedRef                       = useRef<Set<string>>(new Set())
+  // Auto-stop timers (5 min par téléphone) — clear sur Stop et à l'unmount
+  const autoStopTimersRef                 = useRef<number[]>([])
+
+  // Clear ghost timers if the page unmounts mid-run
+  useEffect(() => () => {
+    autoStopTimersRef.current.forEach(id => clearTimeout(id))
+    autoStopTimersRef.current = []
+  }, [])
 
   // Persist-aware setters
   function setSelPhones(v: Set<string> | ((p: Set<string>) => Set<string>)) {
@@ -157,14 +249,16 @@ export function MassPosting({ user }: MassPostingProps) {
     setTaskStatuses(prev => new Map(prev).set(phoneId, status))
   }
 
-  function togglePhone(id: string) {
+  // Stable pour React.memo(PhoneRow) — ne dépend que de setters fonctionnels
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const togglePhone = useCallback((id: string) => {
     setSelPhones(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }
+  }, [])
 
   async function openFolderPick() {
     setFolderLoading(true)
@@ -286,6 +380,9 @@ export function MassPosting({ user }: MassPostingProps) {
 
   async function stop() {
     stopRef.current = true
+    // Clear les auto-stop de 5 min — sinon ils raniment des statuts après le stop
+    autoStopTimersRef.current.forEach(id => clearTimeout(id))
+    autoStopTimersRef.current = []
     log('🛑 Stop requested — cancelling tasks and shutting down phones…', 'warn')
     const tasks = activeTasksRef.current
     const phones = activePhonesRef.current
@@ -433,18 +530,23 @@ export function MassPosting({ user }: MassPostingProps) {
     if (phoneList.length === 0)   { log('Select at least one phone', 'warn'); return }
     if (selectedVideos.length === 0) { log('Select at least one video', 'warn'); return }
 
+    // Débit upfront via le cycle de vie unifié — chaque téléphone en échec
+    // sera remboursé au settle() en fin de run.
     const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
-    const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
-    if (!creditRes.ok) {
-      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (requis: ${creditCost} pour ${phoneList.length} téléphone${phoneList.length > 1 ? 's' : ''})`, 'error')
+    const run = await startCreditRun(credits.ownerId, CREDIT_COSTS.mass_posting, phoneList.length)
+    if (!run.ok) {
+      log(`❌ ${run.error} (requis: ${creditCost} pour ${phoneList.length} téléphone${phoneList.length > 1 ? 's' : ''})`, 'error')
+      toast.show({ title: 'Crédits insuffisants', body: `${creditCost} crédits requis — solde : ${credits.balance}`, kind: 'error' })
       return
     }
-    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
+    if (typeof run.balance === 'number') credits.setBalance(run.balance)
 
     playSuccess()
     setPosting(true)
     setLogs([])
+    setLastRun(null)
     stopRef.current = false
+    log(`💳 ${creditCost} crédits débités — les échecs seront remboursés en fin de run`, 'info')
     const newStatuses = new Map<string, TaskStatus>()
     phoneList.forEach(p => newStatuses.set(p.id, { status: 'pending' }))
     setTaskStatuses(newStatuses)
@@ -488,6 +590,7 @@ export function MassPosting({ user }: MassPostingProps) {
       }
 
       // ── Step 2: start phones ──────────────────────────────────────────────
+      if (stopRef.current) { log('⏹ Run interrompu avant le démarrage des téléphones', 'warn'); return }
       const geelarkIds = phoneList.map(p => p.geelark_id)
       activePhonesRef.current = geelarkIds
       log(`📱 Démarrage de ${phoneList.length} téléphone(s)…`)
@@ -495,8 +598,21 @@ export function MassPosting({ user }: MassPostingProps) {
       const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
       log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
 
+      // Aucun téléphone démarré → inutile de continuer : abort + refund total
+      if (started === 0) {
+        run.abort()
+        const cur = getMassPostingState().taskStatuses
+        for (const p of phoneList) {
+          if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: 'démarrage échoué' })
+        }
+        log('❌ Aucun téléphone démarré — run annulé', 'error')
+        return
+      }
+
+      if (stopRef.current) { log('⏹ Run interrompu avant le boot', 'warn'); return }
       log('⏳ Attente 30s (boot)…')
       await new Promise(r => setTimeout(r, 30000))
+      if (stopRef.current) { log('⏹ Run interrompu après le boot', 'warn'); return }
 
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
       log('🎬 Creating post tasks…')
@@ -508,6 +624,7 @@ export function MassPosting({ user }: MassPostingProps) {
       }
 
       for (let ai = 0; ai < assignments.length; ai++) {
+        if (stopRef.current) { log('⏹ Création des tâches interrompue (stop)', 'warn'); break }
         const asgn = assignments[ai]
         const token = tokenMap.get(asgn.videoIndex)
         if (!token) {
@@ -530,8 +647,9 @@ export function MassPosting({ user }: MassPostingProps) {
           activeTasksRef.current = [...activeTasksRef.current, tid]
           setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
           log(`  ✅ Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
-          // Auto-stop after 5 minutes regardless of task status
-          setTimeout(() => {
+          // Auto-stop after 5 minutes regardless of task status (clearable on Stop/unmount)
+          const timerId = window.setTimeout(() => {
+            autoStopTimersRef.current = autoStopTimersRef.current.filter(id => id !== timerId)
             if (activePhonesRef.current.includes(asgn.phone.geelark_id)) {
               geelark(bearer, '/phone/stop', { ids: [asgn.phone.geelark_id] })
                 .then(() => log(`  ✅ ${asgn.phone.phone_name} — posting fini`, 'ok'))
@@ -540,6 +658,7 @@ export function MassPosting({ user }: MassPostingProps) {
               activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
             }
           }, 5 * 60 * 1000)
+          autoStopTimersRef.current.push(timerId)
         } else {
           log(`  ❌ ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
           setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
@@ -553,12 +672,18 @@ export function MassPosting({ user }: MassPostingProps) {
         const deadline = Date.now() + 6 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ Pending', 2: '🔄 In progress', 3: '✅ Done', 4: '❌ Failed', 7: '🚫 Cancelled' }
 
-        // Keywords that indicate a login / verification popup on the phone screen
+        // Phrases spécifiques d'un popup login/vérification — des mots isolés
+        // ('confirm', 'login') matchaient l'UI normale d'Instagram (faux positifs).
         const ALERT_KEYWORDS = [
-          'log in', 'login', 'sign in', 'password', 'mot de passe', 'connexion',
-          'verify', 'verification', 'vérification', 'suspicious', 'unusual',
-          'confirm', 'phone number', 'email address', 'enter code', 'code envoyé',
-          'we detected', 'challenge', '2-step', 'deux étapes',
+          'log in to instagram', 'log into another account', 'sign in to instagram',
+          'enter your password', 'forgot password', 'mot de passe oublié', 'saisis ton mot de passe',
+          'confirm your identity', 'confirme ton identité',
+          'suspicious login', 'suspicious activity', 'connexion suspecte', 'activité suspecte',
+          'unusual login', 'unusual activity', 'activité inhabituelle',
+          'verify your account', 'verify your identity', 'vérifie ton compte',
+          'verification code', 'code de vérification', 'enter the code', 'entre le code',
+          'we detected', 'nous avons détecté', 'challenge_required',
+          '2-step verification', 'two-factor authentication', 'validation en deux étapes',
         ]
         function containsAlertKeyword(text: string): string | null {
           const lower = text.toLowerCase()
@@ -655,12 +780,13 @@ export function MassPosting({ user }: MassPostingProps) {
             }
           }
         }
-        if (pending.size > 0) {
-          log(`⏳ ${pending.size} tâche(s) sans réponse — on continue (les posts sont probablement faits)`, 'warn')
-          // Mark remaining as done so UI reflects completion (the post almost certainly succeeded)
+        if (pending.size > 0 && !stopRef.current) {
+          log(`⏳ ${pending.size} tâche(s) sans réponse après le délai — marquées « non confirmé »`, 'warn')
+          // Le post a probablement abouti, mais GéeLark n'a pas confirmé :
+          // statut visuel distinct plutôt qu'un done silencieux.
           for (const tid of pending) {
             const phone = phoneList.find(p => taskIds[p.geelark_id] === tid)
-            if (phone) setPhoneStatus(phone.id, { status: 'done' })
+            if (phone) setPhoneStatus(phone.id, { status: 'done', detail: 'non confirmé' })
           }
         }
       }
@@ -720,34 +846,28 @@ export function MassPosting({ user }: MassPostingProps) {
   const toast = useToast()
   const [lastRun, setLastRun] = useState<{ ok: number; err: number; total: number } | null>(null)
   const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0
-
-  // ── ScaleFlow Noir tokens ──────────────────────────────────────────────────
-  const GOLD  = '#6366F1'
-  const IVORY = '#E9EAF0'
-  const MUTED = 'rgba(233,234,240,0.42)'
-  const FAINT = 'rgba(233,234,240,0.22)'
-  const HAIR  = 'rgba(233,234,240,0.08)'
-  const SERIF = "'Inter', system-ui, sans-serif"
-
-  const STATUS_DOT: Record<string, string> = {
-    uploading: '#7FB8D9', posting: '#D9B97F', done: '#7FD9B8', error: '#F0A0AB',
-  }
+  const launchCost = phoneList.length * CREDIT_COSTS.mass_posting
 
   // Readiness checklist — tells the user exactly what’s missing
   const checklist = [
     { ok: !!bearer,                  label: 'Token GéeLark connecté',  hint: 'Ajoute ton token dans Paramètres → Connexions' },
     { ok: phoneList.length > 0,      label: `Téléphones ciblés${phoneList.length > 0 ? ` — ${phoneList.length}` : ''}`, hint: 'Coche des téléphones dans le panneau de gauche' },
     { ok: selectedVideos.length > 0, label: `Vidéos sélectionnées${selectedVideos.length > 0 ? ` — ${selectedVideos.length}` : ''}`, hint: 'Ajoute des vidéos depuis la banque ou un dossier' },
+    {
+      ok:    launchCost > 0 && credits.balance >= launchCost,
+      label: `Crédits suffisants${launchCost > 0 ? ` — ${launchCost} requis` : ''}`,
+      hint:  launchCost > 0 ? `Solde actuel : ${credits.balance}` : 'Sélectionne des téléphones pour estimer le coût',
+    },
   ]
   const readyCount = checklist.filter(c => c.ok).length
 
   function SectionHeader({ num, title, count, action }: { num: string; title: string; count?: number; action?: React.ReactNode }) {
     return (
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '0 2px 12px' }}>
-        <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 17, color: GOLD, lineHeight: 1 }}>{num}</span>
+        <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 17, color: ACCENT, lineHeight: 1 }}>{num}</span>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{title}</span>
         {typeof count === 'number' && count > 0 && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: GOLD, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
         )}
         <div style={{ flex: 1, height: 1, background: HAIR, alignSelf: 'center' }} />
         {action}
@@ -756,7 +876,7 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   return (
-    <div className="anim-page h-full flex flex-col overflow-hidden" style={{ background: '#0A0B0E' }}>
+    <div className="anim-page h-full flex flex-col overflow-hidden" style={{ background: 'var(--base)' }}>
 
       {/* ── Page header ──────────────────────────────────────────────────────── */}
       <header style={{ flexShrink: 0, padding: '20px 28px 0', borderBottom: `1px solid ${HAIR}` }}>
@@ -795,7 +915,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   style={{
                     padding: '7px 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
                     background: mode === m.k ? IVORY : 'transparent',
-                    color: mode === m.k ? '#0A0B0E' : MUTED,
+                    color: mode === m.k ? 'var(--base)' : MUTED,
                     border: 'none', transition: 'all 0.18s',
                   }}>
                   {m.label}
@@ -827,10 +947,10 @@ export function MassPosting({ user }: MassPostingProps) {
             }}>
               <span style={{
                 width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                background: posting ? GOLD : 'rgba(233,234,240,0.25)',
+                background: posting ? ACCENT : 'rgba(233,234,240,0.25)',
                 animation: posting ? 'pulse-soft 1.6s ease-in-out infinite' : 'none',
               }} />
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: posting ? GOLD : MUTED }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: posting ? ACCENT : MUTED }}>
                 {posting ? t('running') : t('idle')}
               </span>
             </div>
@@ -861,18 +981,18 @@ export function MassPosting({ user }: MassPostingProps) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, color: MUTED }}>
                 <span style={{ color: IVORY, fontWeight: 700 }}>{doneTasks + errorTasks} / {totalTasks} {t('massPostingTasksProgress')}</span>
-                {activeTasks > 0 && <span style={{ color: '#D9B97F' }}>{activeTasks} en cours</span>}
-                {doneTasks > 0 && <span style={{ color: '#7FD9B8' }}>{doneTasks} ok</span>}
-                {errorTasks > 0 && <span style={{ color: '#F0A0AB' }}>{errorTasks} erreur{errorTasks > 1 ? 's' : ''}</span>}
+                {activeTasks > 0 && <span style={{ color: WARN }}>{activeTasks} en cours</span>}
+                {doneTasks > 0 && <span style={{ color: OK }}>{doneTasks} ok</span>}
+                {errorTasks > 0 && <span style={{ color: ERR }}>{errorTasks} erreur{errorTasks > 1 ? 's' : ''}</span>}
               </div>
-              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 18, color: progressPct >= 100 ? '#7FD9B8' : GOLD, lineHeight: 1 }}>
+              <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 18, color: progressPct >= 100 ? OK : ACCENT, lineHeight: 1 }}>
                 {progressPct}%
               </span>
             </div>
             <div style={{ height: 3, background: 'rgba(233,234,240,0.06)', borderRadius: 99 }}>
               <div style={{
                 height: '100%', width: `${progressPct}%`, transition: 'width 0.7s ease', borderRadius: 99,
-                background: progressPct >= 100 ? '#7FD9B8' : `linear-gradient(90deg, #4F46E5, ${GOLD})`,
+                background: progressPct >= 100 ? OK : `linear-gradient(90deg, #4F46E5, ${ACCENT})`,
                 boxShadow: progressPct > 0 ? '0 0 8px -2px rgba(99,102,241,0.6)' : 'none',
               }} />
             </div>
@@ -884,15 +1004,15 @@ export function MassPosting({ user }: MassPostingProps) {
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
 
         {/* ── LEFT: phone targets (01) ─────────────────────────────────────── */}
-        <aside style={{ width: 292, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${HAIR}`, background: '#0C0D11' }}>
+        <aside style={{ width: 292, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${HAIR}`, background: 'var(--surface)' }}>
 
           {/* Panel header */}
           <div style={{ flexShrink: 0, padding: '16px 16px 12px', borderBottom: `1px solid ${HAIR}` }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
-              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 16, color: GOLD }}>01</span>
+              <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 16, color: ACCENT }}>01</span>
               <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{t('massPostingTargets')}</span>
               {selectedPhones.size > 0 && (
-                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: GOLD, fontVariantNumeric: 'tabular-nums' }}>{selectedPhones.size}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>{selectedPhones.size}</span>
               )}
             </div>
 
@@ -904,8 +1024,8 @@ export function MassPosting({ user }: MassPostingProps) {
                   style={{
                     flex: 1, padding: '6px 0', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
                     background: phonePickMode === m.k ? 'rgba(99,102,241,0.1)' : 'transparent',
-                    color: phonePickMode === m.k ? GOLD : FAINT,
-                    border: 'none', borderBottom: phonePickMode === m.k ? `1px solid ${GOLD}` : '1px solid transparent',
+                    color: phonePickMode === m.k ? ACCENT : FAINT,
+                    border: 'none', borderBottom: phonePickMode === m.k ? `1px solid ${ACCENT}` : '1px solid transparent',
                     transition: 'all 0.18s',
                   }}>
                   {m.l}
@@ -923,7 +1043,7 @@ export function MassPosting({ user }: MassPostingProps) {
                       background: 'transparent', color: IVORY,
                       border: 'none', borderBottom: `1px solid ${HAIR}`, outline: 'none',
                     }}>
-                    {groups.map(g => <option key={g} value={g} style={{ background: '#0F1014', color: IVORY }}>{g}</option>)}
+                    {groups.map(g => <option key={g} value={g} style={{ background: 'var(--surface-2)', color: IVORY }}>{g}</option>)}
                   </select>
                 )}
                 <input type="text" placeholder={t('massPostingSearchPhone')} value={phoneSearch}
@@ -941,7 +1061,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingTop: 2 }}>
                   <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
                     className="cursor-pointer"
-                    style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: GOLD, background: 'none', border: 'none', padding: 0 }}>
+                    style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: ACCENT, background: 'none', border: 'none', padding: 0 }}>
                     {t('massPostingAllGroup')}
                   </button>
                   <button onClick={() => setSelPhones(new Set())}
@@ -964,7 +1084,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     return Boolean(p.group_name)
                   }).map(p => p.id)))
                 }} className="cursor-pointer"
-                  style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: GOLD, background: 'none', border: 'none', padding: 0 }}>
+                  style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: ACCENT, background: 'none', border: 'none', padding: 0 }}>
                   {t('massPostingAllGroup')}
                 </button>
                 <button onClick={() => { setSelectedGroups(new Set()); setSelPhones(new Set()) }}
@@ -995,14 +1115,14 @@ export function MassPosting({ user }: MassPostingProps) {
                   }}
                   onMouseEnter={e => { if (!checked) e.currentTarget.style.background = 'rgba(233,234,240,0.03)' }}
                   onMouseLeave={e => { e.currentTarget.style.background = checked ? 'rgba(99,102,241,0.06)' : 'transparent' }}>
-                  {checked && <div style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 2, background: GOLD }} />}
+                  {checked && <div style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 2, background: ACCENT }} />}
 
                   {/* Avatar */}
                   <div style={{
                     width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 11, fontWeight: 800,
                     border: `1px solid ${checked ? 'rgba(99,102,241,0.45)' : HAIR}`,
-                    color: checked ? GOLD : FAINT,
+                    color: checked ? ACCENT : FAINT,
                     background: checked ? 'rgba(99,102,241,0.08)' : 'transparent',
                     transition: 'all 0.15s',
                   }}>
@@ -1025,13 +1145,13 @@ export function MassPosting({ user }: MassPostingProps) {
                   </div>
 
                   {asgn?.video && (
-                    <span style={{ fontSize: 10, fontWeight: 700, color: GOLD, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>#{asgn.videoIndex + 1}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: ACCENT, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>#{asgn.videoIndex + 1}</span>
                   )}
 
                   {/* Checkbox */}
                   <div style={{
                     width: 14, height: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: checked ? GOLD : 'transparent',
+                    background: checked ? ACCENT : 'transparent',
                     border: checked ? 'none' : `1px solid rgba(233,234,240,0.18)`,
                     transition: 'all 0.15s',
                   }}>
@@ -1068,13 +1188,13 @@ export function MassPosting({ user }: MassPostingProps) {
                     }}
                     onMouseEnter={e => { if (!checked) e.currentTarget.style.background = 'rgba(233,234,240,0.03)' }}
                     onMouseLeave={e => { e.currentTarget.style.background = checked ? 'rgba(99,102,241,0.06)' : 'transparent' }}>
-                    {checked && <div style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 2, background: GOLD }} />}
+                    {checked && <div style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 2, background: ACCENT }} />}
                     <div style={{
                       width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                       border: `1px solid ${checked ? 'rgba(99,102,241,0.45)' : HAIR}`,
                       background: checked ? 'rgba(99,102,241,0.08)' : 'transparent',
                     }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={checked ? GOLD : FAINT} strokeWidth="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={checked ? ACCENT : FAINT} strokeWidth="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <p style={{ fontSize: 13, fontWeight: 700, color: checked ? IVORY : 'rgba(233,234,240,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g}</p>
@@ -1084,7 +1204,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     </div>
                     <div style={{
                       width: 14, height: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: checked ? GOLD : 'transparent',
+                      background: checked ? ACCENT : 'transparent',
                       border: checked ? 'none' : `1px solid rgba(233,234,240,0.18)`,
                     }}>
                       {checked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -1106,7 +1226,7 @@ export function MassPosting({ user }: MassPostingProps) {
               {!posting && readyCount < 3 && (
                 <div style={{ border: `1px solid ${HAIR}` }}>
                   <div style={{ padding: '12px 16px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: GOLD }}>Préparation</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: ACCENT }}>Préparation</span>
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{readyCount}/3</span>
                   </div>
                   {checklist.map((c, i) => (
@@ -1138,10 +1258,10 @@ export function MassPosting({ user }: MassPostingProps) {
                       <button onClick={() => setShowBankPicker(true)} className="cursor-pointer"
                         style={{
                           padding: '6px 13px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                          background: GOLD, color: '#fff', border: 'none', transition: 'background 0.18s',
+                          background: ACCENT, color: '#fff', border: 'none', transition: 'background 0.18s',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#818CF8' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = GOLD }}>
+                        onMouseEnter={e => { e.currentTarget.style.background = ACCENT_L }}
+                        onMouseLeave={e => { e.currentTarget.style.background = ACCENT }}>
                         {t('massPostingFromBank')}
                       </button>
                       <button onClick={openFolderPick} className="cursor-pointer"
@@ -1169,7 +1289,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 />
 
                 {addingFolder && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', fontSize: 12, color: GOLD }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', fontSize: 12, color: ACCENT }}>
                     <div className="sf-spinner" style={{ width: 12, height: 12 }} />
                     {t('massPostingAddingFolder')} «{addingFolder}»…
                   </div>
@@ -1193,11 +1313,11 @@ export function MassPosting({ user }: MassPostingProps) {
                       const fp = sv.localPath ?? sv.item.file_url
                       return (
                         <div key={sv.item.id} className="group"
-                          style={{ position: 'relative', aspectRatio: '9/16', maxHeight: 190, overflow: 'hidden', background: '#0F1014' }}>
+                          style={{ position: 'relative', aspectRatio: '9/16', maxHeight: 190, overflow: 'hidden', background: 'var(--surface-2)' }}>
                           <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
                           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(6,6,8,0.85) 0%, transparent 45%)', pointerEvents: 'none' }} />
                           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 7 }}>
-                            <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 12, color: GOLD, lineHeight: 1, marginBottom: 2 }}>{selIdx + 1}</p>
+                            <p style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 12, color: ACCENT, lineHeight: 1, marginBottom: 2 }}>{selIdx + 1}</p>
                             <p style={{ fontSize: 10.5, fontWeight: 600, color: IVORY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sv.item.title}</p>
                           </div>
                           <button onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
@@ -1205,7 +1325,7 @@ export function MassPosting({ user }: MassPostingProps) {
                             style={{
                               position: 'absolute', top: 5, right: 5, width: 20, height: 20,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              background: 'rgba(6,6,8,0.85)', border: `1px solid rgba(240,160,171,0.4)`, color: '#F0A0AB',
+                              background: 'rgba(6,6,8,0.85)', border: `1px solid rgba(240,160,171,0.4)`, color: ERR,
                               transition: 'opacity 0.15s',
                             }}>
                             <svg width="7" height="7" viewBox="0 0 8 8" fill="none"><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -1217,9 +1337,9 @@ export function MassPosting({ user }: MassPostingProps) {
                       style={{
                         aspectRatio: '9/16', maxHeight: 190,
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        background: '#0C0D11', border: 'none', color: FAINT, transition: 'color 0.18s',
+                        background: 'var(--surface)', border: 'none', color: FAINT, transition: 'color 0.18s',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.color = GOLD }}
+                      onMouseEnter={e => { e.currentTarget.style.color = ACCENT }}
                       onMouseLeave={e => { e.currentTarget.style.color = FAINT }}>
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
                       <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Ajouter</span>
@@ -1232,7 +1352,7 @@ export function MassPosting({ user }: MassPostingProps) {
               <section>
                 <SectionHeader num="03" title={t('massPostingDescription')}
                   action={
-                    <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: caption.length > 2200 ? '#F0A0AB' : FAINT }}>
+                    <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: caption.length > 2200 ? ERR : FAINT }}>
                       {caption.length}/2200
                     </span>
                   }
@@ -1253,7 +1373,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 7,
                       padding: '7px 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                      background: 'transparent', color: (!groqKey || generating) ? FAINT : GOLD,
+                      background: 'transparent', color: (!groqKey || generating) ? FAINT : ACCENT,
                       border: `1px solid ${(!groqKey || generating) ? HAIR : 'rgba(99,102,241,0.4)'}`,
                       opacity: (!groqKey || generating) ? 0.5 : 1, transition: 'all 0.18s',
                     }}>
@@ -1273,8 +1393,8 @@ export function MassPosting({ user }: MassPostingProps) {
                   <button onClick={() => setWithHashtags(v => !v)} title="Inclure les hashtags" className="cursor-pointer"
                     style={{
                       width: 30, height: 30, fontSize: 14, fontWeight: 800,
-                      background: withHashtags ? GOLD : 'transparent',
-                      color: withHashtags ? '#0A0B0E' : FAINT,
+                      background: withHashtags ? ACCENT : 'transparent',
+                      color: withHashtags ? 'var(--base)' : FAINT,
                       border: withHashtags ? 'none' : `1px solid ${HAIR}`, transition: 'all 0.18s',
                     }}>
                     #
@@ -1323,7 +1443,7 @@ export function MassPosting({ user }: MassPostingProps) {
                               <td style={{ padding: '9px 14px' }}>
                                 {video ? (
                                   <span style={{ fontSize: 11.5, color: MUTED }}>
-                                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', color: GOLD, marginRight: 6 }}>{videoIndex + 1}</span>
+                                    <span style={{ fontFamily: SANS, fontStyle: 'normal', color: ACCENT, marginRight: 6 }}>{videoIndex + 1}</span>
                                     {video.item.title.length > 32 ? video.item.title.slice(0, 32) + '…' : video.item.title}
                                   </span>
                                 ) : <span style={{ fontSize: 11.5, color: FAINT, fontStyle: 'normal' }}>—</span>}
@@ -1355,7 +1475,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     action={!posting ? (
                       <button onClick={() => setLogs([])} className="cursor-pointer"
                         style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: FAINT, background: 'none', border: 'none', padding: 0 }}
-                        onMouseEnter={e => { e.currentTarget.style.color = '#F0A0AB' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = ERR }}
                         onMouseLeave={e => { e.currentTarget.style.color = FAINT }}>
                         Effacer
                       </button>
@@ -1367,7 +1487,7 @@ export function MassPosting({ user }: MassPostingProps) {
                         const scMatch = l.message.match(/^(.*)\[screenshot\]::(data:image\/[^,]+,[^\s]+)(.*)$/)
                         const msgText = scMatch ? scMatch[1].trim() : l.message
                         const scUrl   = scMatch ? scMatch[2] : null
-                        const color = l.level === 'ok' ? '#7FD9B8' : l.level === 'error' ? '#F0A0AB' : l.level === 'warn' ? '#D9B97F' : MUTED
+                        const color = l.level === 'ok' ? OK : l.level === 'error' ? ERR : l.level === 'warn' ? WARN : MUTED
                         return (
                           <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, lineHeight: 1.55 }}>
                             <div style={{ display: 'flex', gap: 12 }}>
@@ -1398,19 +1518,19 @@ export function MassPosting({ user }: MassPostingProps) {
             {/* Summary */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 20, color: phoneList.length > 0 ? GOLD : FAINT, lineHeight: 1 }}>{phoneList.length}</span>
+                <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 20, color: phoneList.length > 0 ? ACCENT : FAINT, lineHeight: 1 }}>{phoneList.length}</span>
                 <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: FAINT }}>{lang === 'en' ? 'phones' : 'téléphones'}</span>
               </div>
               <div style={{ width: 1, height: 18, background: HAIR, alignSelf: 'center' }} />
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 20, color: selectedVideos.length > 0 ? GOLD : FAINT, lineHeight: 1 }}>{selectedVideos.length}</span>
+                <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 20, color: selectedVideos.length > 0 ? ACCENT : FAINT, lineHeight: 1 }}>{selectedVideos.length}</span>
                 <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: FAINT }}>{lang === 'en' ? 'videos' : 'vidéos'}</span>
               </div>
               {phoneList.length > 0 && (
                 <>
                   <div style={{ width: 1, height: 18, background: HAIR, alignSelf: 'center' }} />
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 20, color: 'rgba(233,234,240,0.7)', lineHeight: 1 }}>{phoneList.length * CREDIT_COSTS.mass_posting}</span>
+                    <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 20, color: 'rgba(233,234,240,0.7)', lineHeight: 1 }}>{phoneList.length * CREDIT_COSTS.mass_posting}</span>
                     <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: FAINT }}>{lang === 'en' ? 'credits' : 'crédits'}</span>
                   </div>
                 </>
@@ -1424,7 +1544,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 7,
                     padding: '10px 18px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
-                    background: 'transparent', color: '#F0A0AB', border: `1px solid rgba(240,160,171,0.4)`,
+                    background: 'transparent', color: ERR, border: `1px solid rgba(240,160,171,0.4)`,
                     transition: 'all 0.18s',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(240,160,171,0.1)' }}
@@ -1459,12 +1579,12 @@ export function MassPosting({ user }: MassPostingProps) {
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   padding: '10px 26px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
-                  background: canLaunch ? GOLD : 'rgba(233,234,240,0.08)',
+                  background: canLaunch ? ACCENT : 'rgba(233,234,240,0.08)',
                   color: canLaunch ? '#fff' : FAINT,
                   border: 'none', opacity: posting ? 0.6 : 1, transition: 'all 0.18s',
                 }}
-                onMouseEnter={e => { if (canLaunch) e.currentTarget.style.background = '#818CF8' }}
-                onMouseLeave={e => { if (canLaunch) e.currentTarget.style.background = GOLD }}>
+                onMouseEnter={e => { if (canLaunch) e.currentTarget.style.background = ACCENT_L }}
+                onMouseLeave={e => { if (canLaunch) e.currentTarget.style.background = ACCENT }}>
                 {posting ? (
                   <><div className="sf-spinner" style={{ width: 12, height: 12 }} />{t('running')}…</>
                 ) : (
@@ -1475,7 +1595,7 @@ export function MassPosting({ user }: MassPostingProps) {
             {/* Coût en crédits — visible AVANT de lancer */}
             {phoneList.length > 0 && !posting && (
               <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'rgba(233,234,240,0.42)', textAlign: 'right' }}>
-                💎 Coût : <strong style={{ color: '#818CF8' }}>{phoneList.length * CREDIT_COSTS.mass_posting} crédits</strong> · solde : {credits.balance}
+                💎 Coût : <strong style={{ color: ACCENT_L }}>{phoneList.length * CREDIT_COSTS.mass_posting} crédits</strong> · solde : {credits.balance}
               </p>
             )}
           </div>
@@ -1489,7 +1609,7 @@ export function MassPosting({ user }: MassPostingProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, outline: 'none',
         }} onClick={() => setShowFolderPick(false)}>
           <div className="anim-scale-in" onClick={e => e.stopPropagation()}
-            style={{ width: 340, background: '#0F1014', border: `1px solid ${HAIR}` }}>
+            style={{ width: 340, background: 'var(--surface-2)', border: `1px solid ${HAIR}` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderBottom: `1px solid ${HAIR}` }}>
               <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: IVORY }}>Choisir un dossier</p>
               <button onClick={() => setShowFolderPick(false)} className="cursor-pointer"
@@ -1516,9 +1636,9 @@ export function MassPosting({ user }: MassPostingProps) {
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(233,234,240,0.03)' }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: IVORY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</span>
-                    <span style={{ fontSize: 11, color: GOLD, fontVariantNumeric: 'tabular-nums' }}>{f.count}</span>
+                    <span style={{ fontSize: 11, color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>{f.count}</span>
                   </button>
                 ))}
               </div>

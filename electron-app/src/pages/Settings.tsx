@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useT, useLang } from '@/lib/i18n'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
 import { OrganizationPanel } from '@/components/OrganizationPanel'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
@@ -181,6 +183,11 @@ const NAV_ICONS: Record<string, JSX.Element> = {
       <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
     </svg>
   ),
+  desktop: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+    </svg>
+  ),
 }
 
 // SVG icons for general sub-tabs
@@ -215,6 +222,48 @@ const GEN_ICONS: Record<GeneralTab, JSX.Element> = {
       <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
     </svg>
   ),
+}
+
+// ── Shared settings rows (module level — stable identity across renders) ─────
+function SelectRow({ label, sub, value, onChange, options, first }: {
+  label: string; sub: string; value: string; first?: boolean
+  onChange: (v: string) => void; options: { value: string; label: string }[]
+}) {
+  return (
+    <div className={`flex items-center justify-between py-3 px-[22px] ${first ? '' : 'border-t border-border'}`}>
+      <div className="flex-1 pr-4">
+        <p className="text-[13px] font-medium text-text m-0">{label}</p>
+        <p className="text-[12px] text-text3 mt-0.5 mb-0">{sub}</p>
+      </div>
+      <div className="relative flex-shrink-0">
+        <select value={value} onChange={e => onChange(e.target.value)} className="sf-input cursor-pointer"
+          style={{ appearance: 'none', padding: '7px 28px 7px 10px', fontSize: 12, fontWeight: 500, minWidth: 130 }}>
+          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text3" style={{ fontSize: 9 }}>▼</span>
+      </div>
+    </div>
+  )
+}
+
+function SettingToggle({ label, sub, checked, onChange, first }: {
+  label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; first?: boolean
+}) {
+  return (
+    <div className={`flex items-center justify-between py-3 px-[22px] cursor-pointer select-none ${first ? '' : 'border-t border-border'}`}
+      onClick={() => onChange(!checked)}>
+      <div className="flex-1 pr-4">
+        <p className="text-[13px] font-medium text-text m-0">{label}</p>
+        <p className="text-[12px] text-text3 mt-0.5 mb-0">{sub}</p>
+      </div>
+      <div
+        className={`sf-toggle-track ${checked ? 'on' : 'off'} flex-shrink-0`}
+        onClick={e => { e.stopPropagation(); onChange(!checked) }}
+      >
+        <span className="sf-toggle-thumb" />
+      </div>
+    </div>
+  )
 }
 
 export function Settings({ user, initialPanel, initialTab, onNavigate }: SettingsProps) {

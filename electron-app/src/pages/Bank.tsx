@@ -9,6 +9,8 @@ import { uploadVideoFromPath, uploadVideoFromBlob, deleteStorageObjects, type Up
 import { logActivity } from '@/lib/activityLog'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
 
 interface BankProps { user: User }
 
@@ -316,6 +318,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
 
 export function Bank({ user }: BankProps) {
   const t = useT()
+  const toast = useToast()
   const { currentOrg, role, perms } = useOrg()
   const [personalMode, setPersonalMode] = useState(false)
   // true when we should show personal (user-scoped) items regardless of org
@@ -344,6 +347,14 @@ export function Bank({ user }: BankProps) {
   const [sqlCopied, setSqlCopied]           = useState(false)
   // Type filter (Python: Tous/Vidéo/Photo/GIF/Audio)
   const [typeFilter, setTypeFilter] = useState<'all' | 'video' | 'photo' | 'gif' | 'audio'>('all')
+  // Sort order
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'name' | 'duration'>('date-desc')
+  // Delete confirmations (single item / bulk selection)
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<ContentItem | null>(null)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  // Bulk ZIP download progress
+  const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null)
   // Empty folders — now stored in Supabase (sentinel rows) so all org members see them
   const [emptyFolders, setEmptyFolders] = useState<string[]>([])
 
@@ -364,26 +375,33 @@ export function Bank({ user }: BankProps) {
   }
   function exitSelection() { setSelectedIds(new Set()) }
 
-  async function deleteSelected() {
+  async function performDeleteSelected() {
     if (!selectedIds.size) return
-    if (!confirm(`${t('bankDeleteSelected')} ${selectedIds.size} video(s)? ${t('phoneDeleteMsg')}`)) return
+    setDeleteBusy(true)
     const ids = [...selectedIds]
     const toDelete = items.filter(i => ids.includes(i.id))
     let q = scopeQ(supabase.from('content_bank').delete().in('id', ids))
     const { error: err } = await q
+    setDeleteBusy(false)
+    setConfirmBulkDelete(false)
     if (err) {
-      setError('Deletion failed: ' + err.message)
+      toast.show({ title: 'Suppression échouée', body: err.message, kind: 'error' })
       return
     }
     deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
     setItems(prev => prev.filter(i => !ids.includes(i.id)))
     exitSelection()
+    toast.show({ title: `${ids.length} média${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`, kind: 'ok' })
   }
 
   async function moveSelected(folder: string | null) {
     if (!selectedIds.size) return
     const ids = [...selectedIds]
-    await supabase.from('content_bank').update({ folder }).in('id', ids)
+    const { error: err } = await supabase.from('content_bank').update({ folder }).in('id', ids)
+    if (err) {
+      toast.show({ title: 'Déplacement échoué', body: err.message, kind: 'error' })
+      return
+    }
     setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, folder: folder as unknown as string } : i))
     setShowBulkMove(false)
     exitSelection()
@@ -494,9 +512,9 @@ export function Bank({ user }: BankProps) {
   function uploadProgressLabels(phase: string): string {
     const labels: Record<string, string> = {
       'reading':          'Lecture du fichier…',
-      'uploading-video':  'Upload vers Supabase…',
-      'thumbnail':        'Generating thumbnail…',
-      'uploading-thumb':  'Upload de la miniature…',
+      'uploading-video':  'Envoi du fichier…',
+      'thumbnail':        'Génération de la miniature…',
+      'uploading-thumb':  'Envoi de la miniature…',
     }
     return labels[phase] ?? ''
   }
@@ -543,9 +561,9 @@ export function Bank({ user }: BankProps) {
       const { storagePath, thumbnailPath } = await uploadVideoFromPath(item.file_url, scope, phase => {
         const labels: Record<string, string> = {
           'reading':          'Lecture du fichier local…',
-          'uploading-video':  'Upload vers Supabase…',
-          'thumbnail':        'Miniature…',
-          'uploading-thumb':  'Upload miniature…',
+          'uploading-video':  'Envoi du fichier…',
+          'thumbnail':        'Génération de la miniature…',
+          'uploading-thumb':  'Envoi de la miniature…',
         }
         setUploadStatus(`${item.title} : ${labels[phase] ?? ''}`)
       })
@@ -602,36 +620,48 @@ export function Bank({ user }: BankProps) {
     for (const file of files) await addFromFile(file)
   }
 
-  async function deleteItem(id: string) {
-    const item = items.find(i => i.id === id)
-    let q = scopeQ(supabase.from('content_bank').delete().eq('id', id))
+  async function performDeleteItem(item: ContentItem) {
+    setDeleteBusy(true)
+    let q = scopeQ(supabase.from('content_bank').delete().eq('id', item.id))
     const { error: err } = await q
+    setDeleteBusy(false)
+    setConfirmDeleteItem(null)
     if (err) {
-      setError('Deletion failed: ' + err.message)
-    } else {
-      setItems(prev => prev.filter(i => i.id !== id))
-      if (item) {
-        deleteStorageObjects([item.storage_path, item.thumbnail_path])
-        logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_delete', details: { title: item.title, folder: item.folder } })
-      }
+      toast.show({ title: 'Suppression échouée', body: err.message, kind: 'error' })
+      return
     }
-    setCtxMenu(null)
+    setItems(prev => prev.filter(i => i.id !== item.id))
+    deleteStorageObjects([item.storage_path, item.thumbnail_path])
+    logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_delete', details: { title: item.title, folder: item.folder } })
+    toast.show({ title: 'Média supprimé', kind: 'ok' })
   }
 
   async function renameItemSave(id: string, newTitle: string) {
     if (!newTitle) return
     const { error: err } = await supabase.from('content_bank').update({ title: newTitle }).eq('id', id)
-    if (!err) setItems(prev => prev.map(i => i.id === id ? { ...i, title: newTitle } : i))
+    if (err) {
+      toast.show({ title: 'Renommage échoué', body: err.message, kind: 'error' })
+      return
+    }
+    setItems(prev => prev.map(i => i.id === id ? { ...i, title: newTitle } : i))
   }
 
   async function moveItemSave(id: string, folder: string | null) {
     const { error: err } = await supabase.from('content_bank').update({ folder }).eq('id', id)
-    if (!err) setItems(prev => prev.map(i => i.id === id ? { ...i, folder: folder as unknown as string } : i))
+    if (err) {
+      toast.show({ title: 'Déplacement échoué', body: err.message, kind: 'error' })
+      return
+    }
+    setItems(prev => prev.map(i => i.id === id ? { ...i, folder: folder as unknown as string } : i))
   }
 
   async function saveTagsSave(id: string, newTags: string[]) {
     const { error: err } = await supabase.from('content_bank').update({ tags: newTags }).eq('id', id)
-    if (!err) setItems(prev => prev.map(i => i.id === id ? { ...i, tags: newTags } : i))
+    if (err) {
+      toast.show({ title: 'Mise à jour des tags échouée', body: err.message, kind: 'error' })
+      return
+    }
+    setItems(prev => prev.map(i => i.id === id ? { ...i, tags: newTags } : i))
   }
 
   async function createFolder() {
@@ -1023,41 +1053,56 @@ export function Bank({ user }: BankProps) {
 
               <button
                 onClick={async () => {
+                  if (zipProgress) return
                   const sel = items.filter(i => selectedIds.has(i.id))
                   if (!sel.length) return
                   if (sel.length <= 5) {
                     sel.forEach((it, i) => setTimeout(() => downloadItem(it), i * 600))
                   } else {
-                    // More than 5 → bundle into a ZIP
+                    // More than 5 → bundle into a ZIP.
+                    // Pool séquentiel de 3 téléchargements — évite de tout charger en RAM d'un coup.
                     const files: Record<string, Uint8Array> = {}
                     const seen = new Set<string>()
                     let failed = 0
-                    await Promise.all(sel.map(async it => {
-                      let buf: ArrayBuffer | null = null
-                      if (it.storage_path) {
-                        const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(it.storage_path)
-                        if (data) buf = await data.arrayBuffer()
-                      } else if (it.file_url) {
-                        try { buf = await (await fetch(it.file_url)).arrayBuffer() } catch (_) { /* compté ci-dessous */ }
+                    let nextIdx = 0
+                    let done = 0
+                    setZipProgress({ done: 0, total: sel.length })
+                    const worker = async () => {
+                      while (nextIdx < sel.length) {
+                        const it = sel[nextIdx++]
+                        let buf: ArrayBuffer | null = null
+                        if (it.storage_path) {
+                          const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(it.storage_path)
+                          if (data) buf = await data.arrayBuffer()
+                        } else if (it.file_url) {
+                          try { buf = await (await fetch(it.file_url)).arrayBuffer() } catch (_) { /* compté ci-dessous */ }
+                        }
+                        done++
+                        setZipProgress({ done, total: sel.length })
+                        if (!buf) { failed++; continue }
+                        let name = getDownloadName(it)
+                        // Deduplicate filenames
+                        if (seen.has(name)) {
+                          const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '.mp4'
+                          const base = name.slice(0, name.lastIndexOf('.') || name.length)
+                          let n = 2
+                          while (seen.has(`${base}_${n}${ext}`)) n++
+                          name = `${base}_${n}${ext}`
+                        }
+                        seen.add(name)
+                        files[name] = new Uint8Array(buf)
                       }
-                      if (!buf) { failed++; return }
-                      let name = getDownloadName(it)
-                      // Deduplicate filenames
-                      if (seen.has(name)) {
-                        const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '.mp4'
-                        const base = name.slice(0, name.lastIndexOf('.') || name.length)
-                        let n = 2
-                        while (seen.has(`${base}_${n}${ext}`)) n++
-                        name = `${base}_${n}${ext}`
-                      }
-                      seen.add(name)
-                      files[name] = new Uint8Array(buf)
-                    }))
+                    }
+                    try {
+                      await Promise.all([worker(), worker(), worker()])
+                    } finally {
+                      setZipProgress(null)
+                    }
                     if (!Object.keys(files).length) {
-                      alert('Téléchargement impossible — aucune vidéo n\u2019a pu être récupérée.')
+                      toast.show({ title: 'Téléchargement impossible', body: 'Aucune vidéo n\u2019a pu être récupérée.', kind: 'error' })
                       return
                     }
-                    if (failed > 0) alert(`${failed} vidéo${failed > 1 ? 's' : ''} n\u2019a pas pu être incluse dans le ZIP.`)
+                    if (failed > 0) toast.show({ title: 'ZIP incomplet', body: `${failed} vidéo${failed > 1 ? 's' : ''} n\u2019a pas pu être incluse dans le ZIP.`, kind: 'warn' })
                     const zipped = zipSync(files, { level: 0 })
                     const blob = new Blob([zipped], { type: 'application/zip' })
                     const url = URL.createObjectURL(blob)
@@ -1069,14 +1114,17 @@ export function Bank({ user }: BankProps) {
                   }
                 }}
                 className="sf-btn sf-btn-sm cursor-pointer flex items-center gap-1.5"
-                style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}
+                style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)', opacity: zipProgress ? 0.7 : 1 }}
+                disabled={!!zipProgress}
               >
-                <IconDownload size={11} />
-                {selectedIds.size > 5 ? `ZIP (${selectedIds.size})` : `Télécharger (${selectedIds.size})`}
+                {zipProgress ? <span className="sf-spinner" /> : <IconDownload size={11} />}
+                {zipProgress
+                  ? `ZIP ${zipProgress.done}/${zipProgress.total}…`
+                  : selectedIds.size > 5 ? `ZIP (${selectedIds.size})` : `Télécharger (${selectedIds.size})`}
               </button>
 
               <button
-                onClick={deleteSelected}
+                onClick={() => setConfirmBulkDelete(true)}
                 className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer flex items-center gap-1.5"
               >
                 <IconTrash size={11} />
@@ -1320,7 +1368,7 @@ export function Bank({ user }: BankProps) {
           ))}
           <div className="h-px bg-border mx-2 my-1" />
           <button
-            onClick={() => deleteItem(ctxMenu.item.id)}
+            onClick={() => { setConfirmDeleteItem(ctxMenu.item); setCtxMenu(null) }}
             className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors cursor-pointer text-danger hover:bg-danger/10"
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

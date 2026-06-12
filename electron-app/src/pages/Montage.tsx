@@ -4,6 +4,8 @@ import { supabase, type ContentItem } from '@/lib/supabase'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
 import { useOrg } from '@/lib/orgContext'
 import { uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
 import { logActivity } from '@/lib/activityLog'
@@ -27,6 +29,20 @@ const IconPalette      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) 
 const IconSliders      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></SfIcon>
 const IconScissors     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></SfIcon>
 const IconZap          = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></SfIcon>
+
+// Badge "Aperçu uniquement" — affiché sur les options visibles dans la preview
+// mais NON transmises à FFmpeg lors de l'export (vitesse, fade, filtres, textes).
+function PreviewOnlyBadge() {
+  return (
+    <span
+      className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0"
+      style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}
+      title="Cette option est visible dans l'aperçu mais n'est pas encore appliquée à l'export"
+    >
+      Aperçu uniquement
+    </span>
+  )
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────────────
 interface TimelineClip {
@@ -271,7 +287,7 @@ function PropertiesPanel({
 
       {/* Speed */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageSpeedLabel')} <span className="text-accent">{clip.speed}×</span></p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider flex items-center gap-1.5">{t('montageSpeedLabel')} <span className="text-accent">{clip.speed}×</span> <PreviewOnlyBadge /></p>
         <input type="range" min={0.25} max={4} step={0.25} value={clip.speed}
           onChange={e => onUpdate(clip.uid, { speed: parseFloat(e.target.value) })}
           className="w-full accent-accent h-1.5" />
@@ -282,7 +298,7 @@ function PropertiesPanel({
 
       {/* Fade */}
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageFadeInLabel')}</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider flex items-center gap-1.5">{t('montageFadeInLabel')} <PreviewOnlyBadge /></p>
         <button
           onClick={() => onUpdate(clip.uid, { fade: !clip.fade })}
           className={`w-8 h-4 rounded-full transition-colors ${clip.fade ? 'bg-accent' : 'bg-surface2'}`}
@@ -382,8 +398,11 @@ function DraggableText({ overlay, onMove }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────────────────────
+const DRAFT_KEY = 'sf-montage-draft'
+
 export function Montage({ user }: MontageProps) {
   const t = useT()
+  const toast = useToast()
   const { currentOrg } = useOrg()
   const credits = useCredits()
   const conns = useConnections(user)
@@ -426,6 +445,11 @@ export function Montage({ user }: MontageProps) {
   const [exporting, setExporting]   = useState(false)
   const [expResult, setExpResult]   = useState<{ ok: boolean; msg: string; command?: string } | null>(null)
 
+  // Clear-all confirmation + draft restore banner
+  const [confirmClear, setConfirmClear]   = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
+  const draftLoadedRef = useRef(false)
+
   // Refs
   const videoRef      = useRef<HTMLVideoElement>(null)
   const timelineRef   = useRef<HTMLDivElement>(null)
@@ -440,6 +464,35 @@ export function Montage({ user }: MontageProps) {
       .then(({ data }) => { setBankItems(data ?? []); setLL(false) })
       .catch((err: unknown) => { console.error('[Montage] bank load failed:', err); setLL(false) })
   }, [currentOrg?.id])
+
+  // ── Autosave draft (localStorage) ───────────────────────────────────────────
+  // Restore once on mount
+  useEffect(() => {
+    if (draftLoadedRef.current) return
+    draftLoadedRef.current = true
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (!raw) return
+      const d = JSON.parse(raw) as { clips?: TimelineClip[]; transitions?: Transition[]; textOverlays?: TextOverlay[]; projectName?: string }
+      if (Array.isArray(d.clips) && d.clips.length > 0) {
+        setClips(d.clips)
+        setTrans(Array.isArray(d.transitions) ? d.transitions : [])
+        setTexts(Array.isArray(d.textOverlays) ? d.textOverlays : [])
+        if (typeof d.projectName === 'string' && d.projectName) setProjName(d.projectName)
+        setDraftRestored(true)
+      }
+    } catch { /* brouillon corrompu — ignoré */ }
+  }, [])
+
+  // Persist on every project change
+  useEffect(() => {
+    if (!draftLoadedRef.current) return
+    try {
+      const manualTexts = textOverlays.filter(t => t.uid !== '__auto_caption__')
+      if (clips.length === 0 && manualTexts.length === 0) { localStorage.removeItem(DRAFT_KEY); return }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ clips, transitions, textOverlays: manualTexts, projectName }))
+    } catch { /* quota localStorage plein — autosave désactivé silencieusement */ }
+  }, [clips, transitions, textOverlays, projectName])
 
   // Sync auto-caption overlay → textOverlays
   useEffect(() => {
@@ -497,7 +550,7 @@ export function Montage({ user }: MontageProps) {
     const cutPoint = clip.trimStart + (playhead - offset) * clip.speed
     const clipEnd  = clip.trimEnd > 0 ? clip.trimEnd : raw
     if (cutPoint <= clip.trimStart + 0.5 || cutPoint >= clipEnd - 0.5) {
-      alert('Impossible de couper ici — place le curseur à au moins 0,5 s des bords du clip.')
+      toast.show({ title: 'Impossible de couper ici', body: 'Place le curseur à au moins 0,5 s des bords du clip.', kind: 'warn' })
       return
     }
     const a: TimelineClip = { ...clip, uid: `${clip.uid}-a`, trimEnd: cutPoint }
@@ -505,7 +558,7 @@ export function Montage({ user }: MontageProps) {
     const b: TimelineClip = { ...clip, uid: `${clip.uid}-b`, trimStart: Math.min(cutPoint + 0.3, clipEnd - 0.1), trimEnd: clip.trimEnd }
     setClips(prev => { const next = [...prev]; const i = next.findIndex(c => c.uid === selectedUid); next.splice(i, 1, a, b); return next })
     setSelUid(a.uid)
-  }, [clips, selectedUid, playhead])
+  }, [clips, selectedUid, playhead, toast])
 
   // ── Transitions ────────────────────────────────────────────────────────────────────────────
   function getTransition(afterUid: string): Transition['type'] {

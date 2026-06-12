@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -8,36 +8,31 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
-import { Spinner } from '@/components/ui/Spinner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
+import { ACCENT, HAIR, SANS, TEXT_1, TEXT_3 } from '@/lib/theme'
 import { useLicense, effectivePlan } from '@/lib/license'
 import { PLAN_MAX_PHONES } from '@/lib/credits'
 
 interface PhonesProps { user: User }
 
-// ── Design tokens — "ScaleFlow Noir" ─────────────────────────────────────────
-const SANS  = "'Inter', system-ui, sans-serif"
-const IVORY = '#E9EAF0'
-const FAINT = 'rgba(233,234,240,0.22)'
-const HAIR  = 'rgba(233,234,240,0.08)'
-const GOLD  = '#6366F1'
-
-// Header de colonne — uppercase 9px hairline éditorial
+// Header de colonne — uppercase lisible (min 10px, letterSpacing raisonnable)
 const TH_STYLE: React.CSSProperties = {
-  fontFamily: SANS, fontSize: 9, fontWeight: 700, letterSpacing: '0.25em',
-  textTransform: 'uppercase', color: FAINT,
+  fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+  textTransform: 'uppercase', color: TEXT_3,
   background: 'transparent', borderBottom: `1px solid ${HAIR}`,
 }
 
-// Bouton primaire — ivoire → or
+// Bouton primaire — ivoire → accent
 const PRIMARY_BTN: React.CSSProperties = {
   fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em',
   textTransform: 'uppercase', padding: '11px 18px',
-  background: IVORY, color: '#0F1014', border: 'none', borderRadius: 8,
+  background: TEXT_1, color: '#0F1014', border: 'none', borderRadius: 8,
   transition: 'background 0.25s, transform 0.12s',
 }
 const primaryHover = {
-  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = GOLD },
-  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = IVORY },
+  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = ACCENT },
+  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = TEXT_1 },
 }
 
 const INTERVALS = [
@@ -46,6 +41,9 @@ const INTERVALS = [
   { label: '2 min', value: 120 },
   { label: '5 min', value: 300 },
 ]
+
+type SortKey = 'name' | 'status' | 'group'
+type SortDir = 'asc' | 'desc'
 
 // ── GéeLark status dot ──────────────────────────────────────────────────────
 function StatusDot({ status }: { status: string }) {
@@ -87,8 +85,24 @@ function IgStatusBadge({ phone }: { phone: Phone }) {
   return <span className="sf-badge sf-badge-muted">{t('phonePublic')}</span>
 }
 
-// ── Countdown display ────────────────────────────────────────────────────────
-function Countdown({ secondsLeft }: { secondsLeft: number }) {
+// ── Countdown — composant feuille isolé : son propre setInterval, ────────────
+//    ne re-render que lui-même chaque seconde (plus toute la page).
+const CountdownTicker = memo(function CountdownTicker({ enabled }: { enabled: boolean }) {
+  const [secondsLeft, setSecondsLeft] = useState(() => poller.getIntervalSec())
+
+  useEffect(() => {
+    if (!enabled) return
+    const compute = () => {
+      const sec  = poller.getIntervalSec()
+      const last = poller.getLastPollMs() || Date.now()
+      setSecondsLeft(Math.max(0, sec - Math.floor((Date.now() - last) / 1000)))
+    }
+    compute()
+    const id = setInterval(compute, 1000)
+    return () => clearInterval(id)
+  }, [enabled])
+
+  if (!enabled) return null
   const m = Math.floor(secondsLeft / 60)
   const s = secondsLeft % 60
   return (
@@ -100,7 +114,7 @@ function Countdown({ secondsLeft }: { secondsLeft: number }) {
       {m > 0 ? `${m}m ` : ''}{s.toString().padStart(2, '0')}s
     </span>
   )
-}
+})
 
 // ── Session ID dialog ────────────────────────────────────────────────────────
 function SessionDialog({
@@ -120,6 +134,7 @@ function SessionDialog({
   const [testResult, setTestResult]     = useState<'idle' | 'ok' | 'fail'>('idle')
   const [detectedUser, setDetectedUser] = useState<string | null>(null)
   const [saving, setSaving]             = useState(false)
+  const [saveError, setSaveError]       = useState<string | null>(null)
   const [extracting, setExtracting]     = useState(false)
   const [extractLogs, setExtractLogs]   = useState<string[]>([])
   const [extractError, setExtractError] = useState<string | null>(null)
@@ -204,6 +219,7 @@ function SessionDialog({
     setValue(v)
     setTestResult('idle')
     setDetectedUser(null)
+    setSaveError(null)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (v.trim().length > 10) {
       debounceRef.current = setTimeout(() => runTest(v), 400)
@@ -213,6 +229,7 @@ function SessionDialog({
   async function save() {
     if (!value.trim()) return
     setSaving(true)
+    setSaveError(null)
     // Test first if not already validated
     let username = detectedUser ?? undefined
     if (testResult !== 'ok') {
@@ -224,8 +241,13 @@ function SessionDialog({
       .from('phones')
       .update({ ig_sessionid: value.trim() || null })
       .eq('id', phone.id)
-    if (!error) onSaved(phone.id, value.trim(), username)
     setSaving(false)
+    if (error) {
+      // L'update a échoué : afficher l'erreur et NE PAS fermer le dialog
+      setSaveError(error.message)
+      return
+    }
+    onSaved(phone.id, value.trim(), username)
     onClose()
   }
 
@@ -244,7 +266,7 @@ function SessionDialog({
               width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'rgba(99,102,241,0.06)',
-              border: '1px solid rgba(99,102,241,0.35)', color: '#6366F1',
+              border: '1px solid rgba(99,102,241,0.35)', color: ACCENT,
             }}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1.5" y="5.5" width="13" height="9" rx="2" stroke="currentColor" strokeWidth="1.4"/>
@@ -254,7 +276,7 @@ function SessionDialog({
             <div>
               <h2 className="sf-modal-title">{t('phoneSessionTitle')}</h2>
               {phone.ig_username && (
-                <p style={{ fontSize: 12, color: '#6366F1', margin: '2px 0 0' }}>@{phone.ig_username}</p>
+                <p style={{ fontSize: 12, color: ACCENT, margin: '2px 0 0' }}>@{phone.ig_username}</p>
               )}
             </div>
           </div>
@@ -274,7 +296,7 @@ function SessionDialog({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: '#E9EAF0', margin: 0 }}>{t('phoneAutoExtract')}</p>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: TEXT_1, margin: 0 }}>{t('phoneAutoExtract')}</p>
                   <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.52)', margin: '2px 0 0' }}>{t('phoneAutoExtractDesc')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -321,12 +343,12 @@ function SessionDialog({
             background: 'rgba(233,234,240,0.025)', border: '1px solid rgba(233,234,240,0.07)',
             borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4,
           }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: '#E9EAF0', margin: '0 0 4px' }}>{t('phoneManualInstructions')}</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_1, margin: '0 0 4px' }}>{t('phoneManualInstructions')}</p>
             {[
-              <>1. Open <span style={{ color: '#6366F1' }}>{t('phoneManualStep1Chrome')}</span> in Chrome</>,
-              <>2. Press <span style={{ color: '#6366F1' }}>{t('phoneManualStep2DevTools')}</span> (DevTools)</>,
-              <>3. Go to <span style={{ color: '#6366F1' }}>{t('phoneManualStep3Cookies')}</span></>,
-              <>4. Find the <span style={{ color: '#6366F1', fontFamily: 'monospace' }}>{t('phoneManualStep4Cookie')}</span> cookie and copy its value</>,
+              <>1. Open <span style={{ color: ACCENT }}>{t('phoneManualStep1Chrome')}</span> in Chrome</>,
+              <>2. Press <span style={{ color: ACCENT }}>{t('phoneManualStep2DevTools')}</span> (DevTools)</>,
+              <>3. Go to <span style={{ color: ACCENT }}>{t('phoneManualStep3Cookies')}</span></>,
+              <>4. Find the <span style={{ color: ACCENT, fontFamily: 'monospace' }}>{t('phoneManualStep4Cookie')}</span> cookie and copy its value</>,
             ].map((step, i) => (
               <p key={i} style={{ fontSize: 11, color: 'rgba(233,234,240,0.52)', margin: 0 }}>{step}</p>
             ))}
@@ -334,7 +356,7 @@ function SessionDialog({
 
           {/* Session input */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontFamily: SANS, fontSize: 9, fontWeight: 700, color: FAINT, letterSpacing: '0.25em', textTransform: 'uppercase' }}>{t('phoneSessionLabel')}</label>
+            <label style={{ fontFamily: SANS, fontSize: 9, fontWeight: 700, color: TEXT_3, letterSpacing: '0.25em', textTransform: 'uppercase' }}>{t('phoneSessionLabel')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 ref={inputRef}
@@ -356,7 +378,7 @@ function SessionDialog({
               }}>
                 {testing ? (
                   <svg style={{ animation: 'spin 1s linear infinite' }} width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <circle cx="6.5" cy="6.5" r="5" stroke="#6366F1" strokeWidth="1.5" strokeDasharray="10 20" strokeLinecap="round"/>
+                    <circle cx="6.5" cy="6.5" r="5" stroke={ACCENT} strokeWidth="1.5" strokeDasharray="10 20" strokeLinecap="round"/>
                   </svg>
                 ) : testResult === 'ok' ? (
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -371,7 +393,7 @@ function SessionDialog({
             </div>
             {testResult === 'ok' && detectedUser && (
               <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.52)', margin: 0 }}>
-                {t('phoneSessionTestOkUser')} <span style={{ color: '#6366F1', fontWeight: 600 }}>@{detectedUser}</span>
+                {t('phoneSessionTestOkUser')} <span style={{ color: ACCENT, fontWeight: 600 }}>@{detectedUser}</span>
                 {phone.ig_username && phone.ig_username !== detectedUser && (
                   <span style={{ color: '#E5C07B', marginLeft: 4 }}>{t('phoneSessionDifferentUser')} @{phone.ig_username} {t('phoneSessionWillUpdate')}</span>
                 )}
@@ -380,6 +402,16 @@ function SessionDialog({
             {testResult === 'fail' && <p style={{ fontSize: 11, color: '#F0A0AB', margin: 0 }}>{t('phoneSessionInvalid')}</p>}
             {testResult === 'idle' && value.trim().length > 10 && !testing && (
               <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.52)', margin: 0 }}>{t('phoneSessionAutoTest')}</p>
+            )}
+            {saveError && (
+              <p style={{ fontSize: 11, color: '#F0A0AB', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.3"/>
+                  <path d="M6 3.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  <circle cx="6" cy="8.5" r="0.6" fill="currentColor"/>
+                </svg>
+                {saveError}
+              </p>
             )}
           </div>
         </div>
@@ -428,7 +460,7 @@ function ContextMenu({
         width: '100%', display: 'flex', alignItems: 'center', gap: 8,
         padding: '7px 12px', fontSize: 13, textAlign: 'left', borderRadius: 6,
         background: 'none', border: 'none', cursor: 'pointer',
-        color: danger ? '#F0A0AB' : '#E9EAF0', transition: 'background 0.12s',
+        color: danger ? '#F0A0AB' : TEXT_1, transition: 'background 0.12s',
       }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = danger ? 'rgba(240,160,171,0.10)' : 'rgba(233,234,240,0.06)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
@@ -450,8 +482,8 @@ function ContextMenu({
       }}
     >
       <div style={{ padding: '6px 12px 8px', borderBottom: '1px solid rgba(233,234,240,0.055)', marginBottom: 4 }}>
-        <p style={{ fontSize: 12, fontWeight: 600, color: '#E9EAF0', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.phone_name}</p>
-        {phone.ig_username && <p style={{ fontSize: 10, color: '#6366F1', margin: '1px 0 0' }}>@{phone.ig_username}</p>}
+        <p style={{ fontSize: 12, fontWeight: 600, color: TEXT_1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.phone_name}</p>
+        {phone.ig_username && <p style={{ fontSize: 10, color: ACCENT, margin: '1px 0 0' }}>@{phone.ig_username}</p>}
       </div>
       {item(
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
@@ -481,11 +513,15 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
   const [value, setValue]     = useState(phone.ig_username ?? '')
   const [saving, setSaving]   = useState(false)
   const ref                   = useRef<HTMLInputElement>(null)
+  // Empêche le double save Enter (keydown) + blur qui suit
+  const savedRef              = useRef(false)
 
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
   useEffect(() => { setValue(phone.ig_username ?? '') }, [phone.ig_username])
 
   async function save() {
+    if (savedRef.current) return
+    savedRef.current = true
     setSaving(true)
     await onSave(phone.id, value.replace(/^@/, '').trim())
     setSaving(false)
@@ -493,7 +529,7 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
   }
   function onKey(e: React.KeyboardEvent) {
     if (e.key === 'Enter')  save()
-    if (e.key === 'Escape') { setValue(phone.ig_username ?? ''); setEditing(false) }
+    if (e.key === 'Escape') { savedRef.current = true; setValue(phone.ig_username ?? ''); setEditing(false) }
   }
 
   if (editing) return (
@@ -503,19 +539,19 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
         ref={ref} value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={onKey} onBlur={save} disabled={saving}
         className="sf-input"
-        style={{ width: 112, padding: '2px 6px', fontSize: 13, borderColor: '#6366F1' }}
+        style={{ width: 112, padding: '2px 6px', fontSize: 13, borderColor: ACCENT }}
       />
     </div>
   )
 
   return (
     <button
-      onClick={() => setEditing(true)}
+      onClick={() => { savedRef.current = false; setEditing(true) }}
       style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, padding: 0 }}
       title={t('phoneClickToEdit')}
     >
       {phone.ig_username ? (
-        <span style={{ color: '#6366F1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{phone.ig_username}</span>
+        <span style={{ color: ACCENT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{phone.ig_username}</span>
       ) : (
         <span style={{ color: 'rgba(233,234,240,0.35)', fontStyle: 'normal' }}>{t('phoneIgCellAdd')}</span>
       )}
@@ -533,11 +569,15 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
   const [value, setValue]     = useState(phone.remark ?? '')
   const [saving, setSaving]   = useState(false)
   const ref                   = useRef<HTMLInputElement>(null)
+  // Empêche le double save Enter (keydown) + blur qui suit
+  const savedRef              = useRef(false)
 
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
   useEffect(() => { setValue(phone.remark ?? '') }, [phone.remark])
 
   async function save() {
+    if (savedRef.current) return
+    savedRef.current = true
     setSaving(true)
     await onSave(phone.id, value)
     setSaving(false)
@@ -545,7 +585,7 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
   }
   function onKey(e: React.KeyboardEvent) {
     if (e.key === 'Enter')  save()
-    if (e.key === 'Escape') { setValue(phone.remark ?? ''); setEditing(false) }
+    if (e.key === 'Escape') { savedRef.current = true; setValue(phone.remark ?? ''); setEditing(false) }
   }
 
   if (editing) return (
@@ -553,14 +593,14 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
       ref={ref} value={value} onChange={e => setValue(e.target.value)}
       onKeyDown={onKey} onBlur={save} disabled={saving}
       className="sf-input"
-      style={{ width: '100%', padding: '2px 6px', fontSize: 13, borderColor: '#6366F1' }}
+      style={{ width: '100%', padding: '2px 6px', fontSize: 13, borderColor: ACCENT }}
       placeholder={t('phoneNoteCellPlaceholder')}
     />
   )
 
   return (
     <button
-      onClick={() => setEditing(true)}
+      onClick={() => { savedRef.current = false; setEditing(true) }}
       style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, width: '100%', padding: 0 }}
       title={t('phoneClickToEdit')}
     >
@@ -573,10 +613,197 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
   )
 }
 
+// ── small icon action button (niveau module — pas recréé à chaque render) ────
+function ActionBtn({
+  onClick, title, children, danger,
+}: { onClick: () => void; title: string; children: React.ReactNode; danger?: boolean }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="sf-press"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: 28, height: 28, borderRadius: 7,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: hovered ? (danger ? 'rgba(240,160,171,0.15)' : 'rgba(99,102,241,0.15)') : 'rgba(233,234,240,0.06)',
+        border: '1px solid rgba(233,234,240,0.1)',
+        color: hovered ? (danger ? '#F0A0AB' : ACCENT) : 'rgba(233,234,240,0.52)',
+        cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ── Table row — memoïsé pour éviter les re-renders inutiles ──────────────────
+const PhoneRow = memo(function PhoneRow({
+  phone, isSelected, checked, col, canDelete,
+  setSelectedPhone, setContextMenu, setSessionDialog,
+  saveIgUsername, saveRemark, requestDelete, toggleSelect,
+}: {
+  phone: Phone; isSelected: boolean; checked: boolean; col: string
+  canDelete: boolean
+  setSelectedPhone: (p: Phone | null) => void
+  setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
+  setSessionDialog: (v: { phone: Phone } | null) => void
+  saveIgUsername: (id: string, u: string) => Promise<void>
+  saveRemark: (id: string, v: string) => Promise<void>
+  requestDelete: (p: Phone) => void
+  toggleSelect: (id: string) => void
+}) {
+  const t = useT()
+  const [hovered, setHovered] = useState(false)
+  const online = phone.status === 'online'
+
+  const cellStyle: React.CSSProperties = {
+    padding: '9px 12px',
+    background: isSelected ? 'rgba(99,102,241,0.07)' : 'transparent',
+    transition: 'background 0.12s',
+  }
+
+  return (
+    <tr
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setSelectedPhone(isSelected ? null : phone)}
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+      style={{ cursor: 'pointer' }}
+    >
+      {/* Checkbox — bulk selection. First td carries the left accent bar */}
+      <td
+        style={{
+          ...cellStyle, width: 36, textAlign: 'center',
+          boxShadow: isSelected ? 'inset 3px 0 0 rgba(99,102,241,0.75)' : 'none',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => toggleSelect(phone.id)}
+          style={{ cursor: 'pointer', accentColor: ACCENT, width: 14, height: 14 }}
+        />
+      </td>
+
+      {/* Status dot */}
+      <td style={{ ...cellStyle, width: 44, textAlign: 'center' }}>
+        <span style={{
+          display: 'inline-block',
+          width: 8, height: 8, borderRadius: '50%',
+          background: online ? '#7FD9B8' : 'rgba(233,234,240,0.22)',
+          boxShadow: online ? '0 0 0 3px rgba(127,217,184,0.15)' : 'none',
+          flexShrink: 0,
+        }} />
+      </td>
+
+      {/* Phone name + serial */}
+      <td style={cellStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Colored avatar */}
+          <div style={{
+            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `${col}14`,
+            border: `1px solid ${col}30`, color: col,
+            fontSize: 12, fontWeight: 700,
+          }}>
+            {phone.phone_name.charAt(0).toUpperCase()}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: TEXT_1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {phone.phone_name}
+            </p>
+            {phone.serial_no && (
+              <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(233,234,240,0.3)', margin: '1px 0 0' }}>
+                {phone.serial_no}
+              </p>
+            )}
+          </div>
+        </div>
+      </td>
+
+      {/* Group */}
+      <td style={cellStyle}>
+        {phone.group_name
+          ? <span style={{
+              display: 'inline-block',
+              fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
+              background: 'rgba(99,102,241,0.1)', color: ACCENT,
+              border: '1px solid rgba(99,102,241,0.18)',
+              whiteSpace: 'nowrap',
+            }}>{phone.group_name}</span>
+          : <span style={{ color: 'rgba(233,234,240,0.2)' }}>—</span>
+        }
+      </td>
+
+      {/* IG Username — inline editable */}
+      <td style={cellStyle} onClick={e => e.stopPropagation()}>
+        <IgCell phone={phone} onSave={saveIgUsername} />
+      </td>
+
+      {/* IG Status badge */}
+      <td style={cellStyle}>
+        <IgStatusBadge phone={phone} />
+      </td>
+
+      {/* Note — inline editable */}
+      <td style={cellStyle} onClick={e => e.stopPropagation()}>
+        <NoteCell phone={phone} onSave={saveRemark} />
+      </td>
+
+      {/* Actions — visible on hover or selected */}
+      <td style={{ ...cellStyle, padding: '9px 10px' }} onClick={e => e.stopPropagation()}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
+          opacity: hovered || isSelected ? 1 : 0,
+          transition: 'opacity 0.15s',
+        }}>
+          <ActionBtn onClick={() => setSessionDialog({ phone })} title={t('phonesRowSessionId')}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </ActionBtn>
+          <button
+            className="sf-press"
+            style={{
+              width: 26, height: 26, borderRadius: 7,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(233,234,240,0.06)', border: '1px solid rgba(233,234,240,0.1)',
+              color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
+            }}
+            title="Plus"
+            onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="2" cy="6" r="1" fill="currentColor"/>
+              <circle cx="6" cy="6" r="1" fill="currentColor"/>
+              <circle cx="10" cy="6" r="1" fill="currentColor"/>
+            </svg>
+          </button>
+          {canDelete && (
+            <ActionBtn onClick={() => requestDelete(phone)} title={t('phonesRowDelete')} danger>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 3h8M4.5 3V2h3v1M4 3l.4 7h3.2L8 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </ActionBtn>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+})
+
 // ────────────────────────────────────────────────────────────────────────────
 
 export function Phones({ user }: PhonesProps) {
   const t = useT()
+  const { lang } = useLang()
+  const toast = useToast()
   const { currentOrg, role, perms } = useOrg()
   const conns = useConnections(user)
   const license = useLicense()
@@ -589,25 +816,36 @@ export function Phones({ user }: PhonesProps) {
   // Interval + autoRefresh: read from the singleton (which persists in localStorage)
   const [intervalSec, setIntervalSec] = useState(poller.getIntervalSec)
   const [autoRefresh, setAutoRefresh] = useState(poller.getEnabled)
-  const [countdown, setCountdown]     = useState(poller.getIntervalSec())
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [pollError, setPollError]     = useState<string | null>(null)
 
-  const [contextMenu, setContextMenu]   = useState<{ phone: Phone; x: number; y: number } | null>(null)
+  const [contextMenu, setContextMenu]     = useState<{ phone: Phone; x: number; y: number } | null>(null)
   const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
   const [selectedPhone, setSelectedPhone] = useState<Phone | null>(null)
   const [groupFilter, setGroupFilter]     = useState<string>('all')
+
+  // Tri de colonnes
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  // Suppression (ConfirmDialog au lieu du confirm() natif)
+  const [confirmDelete, setConfirmDelete] = useState<Phone | null>(null)
+  const [deleteBusy, setDeleteBusy]       = useState(false)
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds]           = useState<Set<string>>(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [bulkBusy, setBulkBusy]                 = useState(false)
+
+  const fr = useCallback((frs: string, en: string) => (lang === 'fr' ? frs : en), [lang])
 
   // Use the reactive bearer from connections (org-aware), not the poller snapshot.
   // The poller singleton is updated async in App.tsx; reading from it here causes
   // a race: loadPhones fires with the new currentOrg but the old bearer.
   const bearer = conns.bearer
 
-  const phonesRef      = useRef<Phone[]>([])
-  const lastPollMsRef  = useRef(poller.getLastPollMs() || Date.now())
-  const countdownRef   = useRef<ReturnType<typeof setInterval> | null>(null)
-  const lastDbSyncRef  = useRef<Date | null>(null)
-  const lastIgSyncRef  = useRef<Date | null>(null)
+  const phonesRef     = useRef<Phone[]>([])
+  const lastDbSyncRef = useRef<Date | null>(null)
 
   useEffect(() => { phonesRef.current = phones }, [phones])
 
@@ -616,8 +854,6 @@ export function Phones({ user }: PhonesProps) {
     return poller.subscribe(statusMap => {
       const now = new Date()
       setLastUpdated(now)
-      lastPollMsRef.current = now.getTime()
-      setCountdown(poller.getIntervalSec())
       setPhones(prev => {
         const next = prev.map(p => {
           const s = statusMap.get(p.geelark_id)
@@ -639,29 +875,8 @@ export function Phones({ user }: PhonesProps) {
     })
   }, [user.id])
 
-  // ── Countdown ticker (purely cosmetic — based on elapsed time) ─────────────
-  useEffect(() => {
-    if (countdownRef.current) clearInterval(countdownRef.current)
-    if (!autoRefresh) { setCountdown(0); return }
-    const sec = poller.getIntervalSec()
-    countdownRef.current = setInterval(() => {
-      const elapsed  = (Date.now() - lastPollMsRef.current) / 1000
-      const remaining = Math.max(0, sec - Math.floor(elapsed))
-      setCountdown(remaining)
-    }, 1000)
-    return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
-  }, [autoRefresh, intervalSec])
-
-  useEffect(() => {
-    // Wait until connections have resolved for the current org before loading.
-    // Without this guard, switching org triggers loadPhones with bearer=null
-    // (connections still loading) then again when bearer arrives — causing a
-    // blank flash and, worse, a race where the old bearer could be read.
-    if (conns.loading) return
-    loadPhones()
-  }, [currentOrg?.id, bearer, conns.loading])
-
-  async function loadPhones() {
+  const loadPhones = useCallback(async () => {
+    setError(null)
     if (!bearer) { setPhones([]); setLoading(false); return }
     setLoading(true)
     let q = supabase.from('phones').select('*').order('phone_name')
@@ -674,75 +889,47 @@ export function Phones({ user }: PhonesProps) {
     setLoading(false)
     // Trigger an immediate poll if one hasn’t happened recently
     poller.pollNow()
-  }
+  }, [bearer, currentOrg, user.id])
 
-  // ── Periodic IG stats refresh (every 5 min, only when Phones is mounted) ───
-  const igFailCountRef = useRef(0)
-  const igBackoffUntilRef = useRef(0)
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (!window.electronAPI?.fetchInstagramBySession) return
-      if (Date.now() < igBackoffUntilRef.current) return
-      const sinceIg = lastIgSyncRef.current
-        ? (Date.now() - lastIgSyncRef.current.getTime()) / 1000 : Infinity
-      if (sinceIg < 290) return
-      lastIgSyncRef.current = new Date()
-      const withSession = phonesRef.current.filter(p => p.ig_username && p.ig_sessionid)
-      for (const phone of withSession) {
-        try {
-          const r = await window.electronAPI.fetchInstagramBySession({
-            username: phone.ig_username!, sessionid: phone.ig_sessionid!,
-          })
-          if (r.ok) {
-            igFailCountRef.current = 0
-            await supabase.from('phones').update({
-              followers: r.followers ?? 0, following: r.following ?? 0,
-              total_views: r.total_views ?? 0, posts: r.posts ?? 0,
-              bio: r.bio ?? null, ig_status: 'active',
-            }).eq('id', phone.id)
-            setPhones(prev => prev.map(p =>
-              p.id === phone.id ? { ...p,
-                followers: r.followers ?? 0, following: r.following ?? 0,
-                total_views: r.total_views ?? 0, posts: r.posts ?? 0,
-                bio: r.bio ?? null, ig_status: 'active' } : p
-            ))
-          } else {
-            igFailCountRef.current++
-            if (igFailCountRef.current >= 3) {
-              // Back off 30 min after 3 consecutive failures to avoid hammering the API
-              igBackoffUntilRef.current = Date.now() + 30 * 60 * 1000
-              igFailCountRef.current = 0
-              break
-            }
-            await supabase.from('phones').update({ ig_status: 'error' }).eq('id', phone.id)
-            setPhones(prev => prev.map(p =>
-              p.id === phone.id ? { ...p, ig_status: 'error' } : p
-            ))
-          }
-        } catch { /* silent */ }
-      }
-    }, 60_000)
-    return () => clearInterval(interval)
-  }, [user.id])
+    // Wait until connections have resolved for the current org before loading.
+    // Without this guard, switching org triggers loadPhones with bearer=null
+    // (connections still loading) then again when bearer arrives — causing a
+    // blank flash and, worse, a race where the old bearer could be read.
+    if (conns.loading) return
+    loadPhones()
+  }, [conns.loading, loadPhones])
+
+  // NB : pas de boucle locale de refresh des stats IG ici — le singleton
+  // igStatsPoller (lib/igStatsPoller.ts) fait déjà ce travail en continu.
+  // Un double polling provoquait des rate-limits Instagram.
 
   function changeInterval(sec: number) {
     setIntervalSec(sec)
     poller.setIntervalSec(sec)
-    lastPollMsRef.current = Date.now()
-    setCountdown(sec)
   }
+
+  const phoneLimit = PLAN_MAX_PHONES[effectivePlan(license) ?? ''] ?? Infinity
 
   // ── Full sync from GéeLark ─────────────────────────────────────────────
   const syncFromGeelark = useCallback(async () => {
     if (!bearer) { setError(t('phoneMissingToken')); return }
     setSyncing(true); setError(null)
     try {
-      const items = await fetchAllPhones(bearer)
+      let items = await fetchAllPhones(bearer)
       if (items.length === 0) { setError(t('noPhones')); setSyncing(false); return }
       if (items.length > phoneLimit) {
-        setError(`Plan limit reached: ${phoneLimit} phones max (${effectivePlan(license) ?? 'standard'}). Upgrade your plan to add more.`)
-        setSyncing(false)
-        return
+        // Import partiel jusqu'à la limite du plan + warning, au lieu de tout refuser
+        toast.show({
+          kind: 'warn',
+          title: fr('Limite du plan atteinte', 'Plan limit reached'),
+          body: fr(
+            `${items.length} téléphones trouvés — seuls les ${phoneLimit} premiers ont été importés (plan ${effectivePlan(license) ?? 'standard'}).`,
+            `${items.length} phones found — only the first ${phoneLimit} were imported (${effectivePlan(license) ?? 'standard'} plan).`,
+          ),
+          duration: 7000,
+        })
+        items = items.slice(0, phoneLimit)
       }
 
       const rows = items.map(p => ({
@@ -795,41 +982,121 @@ export function Phones({ user }: PhonesProps) {
       setError(e instanceof Error ? e.message : 'Sync error.')
     }
     setSyncing(false)
-  }, [bearer, user.id, currentOrg?.id])
+  }, [bearer, user.id, currentOrg, phoneLimit, license, t, toast, fr, loadPhones])
 
   // ── Save ig_username ─────────────────────────────────────────────────────
-  async function saveIgUsername(id: string, username: string) {
+  const saveIgUsername = useCallback(async (id: string, username: string) => {
     // Normalise : pas de @ ni d'espaces en base — le poller et l'API IG
     // attendent le pseudo nu
     const clean = username.replace(/^@+/, '').trim() || null
     const { error: err } = await supabase
       .from('phones').update({ ig_username: clean }).eq('id', id)
-    if (!err)
-      setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: clean } : p))
-  }
+    if (err) {
+      toast.show({ kind: 'error', title: fr('Échec de l’enregistrement Instagram', 'Failed to save Instagram username'), body: err.message })
+      return
+    }
+    setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: clean } : p))
+  }, [toast, fr])
 
-  async function saveRemark(id: string, remark: string) {
+  const saveRemark = useCallback(async (id: string, remark: string) => {
     const val = remark.trim() || null
     setPhones(prev => prev.map(p => p.id === id ? { ...p, remark: val } : p))
-    await supabase.from('phones').update({ remark: val }).eq('id', id)
-  }
+    const { error: err } = await supabase.from('phones').update({ remark: val }).eq('id', id)
+    if (err) {
+      toast.show({ kind: 'error', title: fr('Échec de l’enregistrement de la note', 'Failed to save note'), body: err.message })
+    }
+  }, [toast, fr])
 
   // ── Unlink Instagram ─────────────────────────────────────────────────────
-  async function unlinkIg(id: string) {
+  const unlinkIg = useCallback(async (id: string) => {
     const { error: err } = await supabase
       .from('phones').update({ ig_username: null, ig_sessionid: null, ig_status: null }).eq('id', id)
-    if (!err)
-      setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: null, ig_sessionid: null, ig_status: null } : p))
-  }
+    if (err) {
+      toast.show({ kind: 'error', title: fr('Échec du déliage Instagram', 'Failed to unlink Instagram'), body: err.message })
+      return
+    }
+    setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: null, ig_sessionid: null, ig_status: null } : p))
+  }, [toast, fr])
 
   // ── Delete phone — owner/admin only in org mode ──────────────────────────
   const canDelete = !currentOrg || role === 'owner' || role === 'admin'
 
-  async function deletePhone(id: string) {
-    if (!canDelete) return
-    if (!confirm(t('phoneDeleteConfirm'))) return
-    const { error: err } = await supabase.from('phones').delete().eq('id', id)
-    if (!err) setPhones(prev => prev.filter(p => p.id !== id))
+  const requestDelete = useCallback((phone: Phone) => {
+    setConfirmDelete(phone)
+  }, [])
+
+  async function doDeletePhone() {
+    if (!confirmDelete || !canDelete) return
+    setDeleteBusy(true)
+    const { error: err } = await supabase.from('phones').delete().eq('id', confirmDelete.id)
+    if (err) {
+      toast.show({ kind: 'error', title: fr('Échec de la suppression', 'Failed to delete phone'), body: err.message })
+    } else {
+      const id = confirmDelete.id
+      setPhones(prev => prev.filter(p => p.id !== id))
+      setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n })
+      setSelectedPhone(prev => (prev?.id === id ? null : prev))
+    }
+    setDeleteBusy(false)
+    setConfirmDelete(null)
+  }
+
+  // ── Bulk actions ──────────────────────────────────────────────────────────
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }, [])
+
+  async function bulkDelete() {
+    if (!canDelete || selectedIds.size === 0) return
+    setBulkBusy(true)
+    const ids = [...selectedIds]
+    const { error: err } = await supabase.from('phones').delete().in('id', ids)
+    if (err) {
+      toast.show({ kind: 'error', title: fr('Échec de la suppression', 'Failed to delete phones'), body: err.message })
+    } else {
+      setPhones(prev => prev.filter(p => !selectedIds.has(p.id)))
+      setSelectedPhone(prev => (prev && selectedIds.has(prev.id) ? null : prev))
+      setSelectedIds(new Set())
+      toast.show({ kind: 'ok', title: fr(`${ids.length} téléphone(s) supprimé(s)`, `${ids.length} phone(s) deleted`) })
+    }
+    setBulkBusy(false)
+    setConfirmBulkDelete(false)
+  }
+
+  async function bulkUnlinkIg() {
+    if (selectedIds.size === 0) return
+    setBulkBusy(true)
+    const ids = [...selectedIds]
+    const { error: err } = await supabase
+      .from('phones').update({ ig_username: null, ig_sessionid: null, ig_status: null }).in('id', ids)
+    if (err) {
+      toast.show({ kind: 'error', title: fr('Échec du déliage Instagram', 'Failed to unlink Instagram'), body: err.message })
+    } else {
+      setPhones(prev => prev.map(p => selectedIds.has(p.id) ? { ...p, ig_username: null, ig_sessionid: null, ig_status: null } : p))
+      toast.show({ kind: 'ok', title: fr(`Instagram délié sur ${ids.length} téléphone(s)`, `Instagram unlinked on ${ids.length} phone(s)`) })
+      setSelectedIds(new Set())
+    }
+    setBulkBusy(false)
+  }
+
+  async function bulkChangeGroup(group: string) {
+    if (selectedIds.size === 0) return
+    setBulkBusy(true)
+    const ids = [...selectedIds]
+    const { error: err } = await supabase
+      .from('phones').update({ group_name: group }).in('id', ids)
+    if (err) {
+      toast.show({ kind: 'error', title: fr('Échec du changement de groupe', 'Failed to change group'), body: err.message })
+    } else {
+      setPhones(prev => prev.map(p => selectedIds.has(p.id) ? { ...p, group_name: group } : p))
+      toast.show({ kind: 'ok', title: fr(`${ids.length} téléphone(s) déplacé(s) vers « ${group} »`, `${ids.length} phone(s) moved to "${group}"`) })
+      setSelectedIds(new Set())
+    }
+    setBulkBusy(false)
   }
 
   // ── Session saved → update username + immediately fetch IG stats ────────
@@ -852,7 +1119,7 @@ export function Phones({ user }: PhonesProps) {
             followers:    r.followers  ?? 0,
             following:    r.following  ?? 0,
             total_views:  r.total_views ?? 0,
-            posts:        r.posts       ?? 0,
+            video_count:  r.posts       ?? 0,
             bio:          r.bio         ?? '',
             ig_status:    'active',
           }
@@ -863,9 +1130,20 @@ export function Phones({ user }: PhonesProps) {
     }
   }
 
-  const phoneLimit = PLAN_MAX_PHONES[effectivePlan(license) ?? ''] ?? Infinity
+  // ── Escape ferme le panneau détail ────────────────────────────────────────
+  useEffect(() => {
+    if (!selectedPhone) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      // Ne pas fermer le panneau si un overlay plus prioritaire est ouvert
+      if (sessionDialog || contextMenu || confirmDelete || confirmBulkDelete) return
+      setSelectedPhone(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedPhone, sessionDialog, contextMenu, confirmDelete, confirmBulkDelete])
 
-  // ── Filtered view ─────────────────────────────────────────────────────────
+  // ── Filtered + sorted view ────────────────────────────────────────────────
   const visible = phones.filter(p => {
     if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (filter !== 'all' && p.status !== filter) return false
@@ -882,53 +1160,89 @@ export function Phones({ user }: PhonesProps) {
     return true
   })
 
+  const sortedVisible = sortKey
+    ? [...visible].sort((a, b) => {
+        let cmp = 0
+        if (sortKey === 'name')        cmp = a.phone_name.localeCompare(b.phone_name)
+        else if (sortKey === 'status') cmp = (a.status ?? '').localeCompare(b.status ?? '')
+        else                           cmp = (a.group_name ?? '').localeCompare(b.group_name ?? '')
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    : visible
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const allVisibleSelected = sortedVisible.length > 0 && sortedVisible.every(p => selectedIds.has(p.id))
+  function toggleSelectAll() {
+    if (allVisibleSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(sortedVisible.map(p => p.id)))
+  }
+
   const onlineCount  = phones.filter(p => p.status === 'online').length
   const offlineCount = phones.filter(p => p.status === 'offline').length
   const groups       = Array.from(new Set(phones.map(p => p.group_name).filter(Boolean))) as string[]
 
   function relativeTime(iso: string): string {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-    if (diff < 60)        return '< 1 min ago'
-    if (diff < 3600)      return `${Math.floor(diff / 60)} min ago`
-    if (diff < 86400)     return `${Math.floor(diff / 3600)}h ago`
-    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`
-    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    const isFr = lang === 'fr'
+    if (diff < 60)        return isFr ? 'à l’instant' : '< 1 min ago'
+    if (diff < 3600)      { const m = Math.floor(diff / 60);    return isFr ? `il y a ${m} min` : `${m} min ago` }
+    if (diff < 86400)     { const h = Math.floor(diff / 3600);  return isFr ? `il y a ${h} h`   : `${h}h ago` }
+    if (diff < 86400 * 7) { const d = Math.floor(diff / 86400); return isFr ? `il y a ${d} j`   : `${d}d ago` }
+    return new Date(iso).toLocaleDateString(isFr ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'short' })
   }
 
   function phoneColor(name: string): string {
-    const palette = ['#6366F1','#9DB8D9','#7FD9B8','#E5C07B','#F0A0AB','#A9C9C0','#D9C49D','#8FA9C9']
+    const palette = [ACCENT,'#9DB8D9','#7FD9B8','#E5C07B','#F0A0AB','#A9C9C0','#D9C49D','#8FA9C9']
     let h = 0
     for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
     return palette[Math.abs(h) % palette.length]
   }
 
-  const COLS = '40px 1fr 160px 130px 120px'
-
-  // ── small icon action button ──────────────────────────────────────────────
-  const ActionBtn = ({
-    onClick, title, children, danger,
-  }: { onClick: () => void; title: string; children: React.ReactNode; danger?: boolean }) => {
-    const [hovered, setHovered] = useState(false)
-    return (
-      <button
-        onClick={onClick}
-        title={title}
-        className="sf-press"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          width: 28, height: 28, borderRadius: 7,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: hovered ? (danger ? 'rgba(240,160,171,0.15)' : 'rgba(99,102,241,0.15)') : 'rgba(233,234,240,0.06)',
-          border: '1px solid rgba(233,234,240,0.1)',
-          color: hovered ? (danger ? '#F0A0AB' : '#6366F1') : 'rgba(233,234,240,0.52)',
-          cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
-        }}
-      >
-        {children}
-      </button>
-    )
+  // ── Export CSV de la liste filtrée ────────────────────────────────────────
+  function exportCsv() {
+    const header = lang === 'fr'
+      ? ['Nom', 'Instagram', 'Followers', 'Statut', 'Groupe']
+      : ['Name', 'Instagram', 'Followers', 'Status', 'Group']
+    const rows = [
+      header,
+      ...sortedVisible.map(p => [
+        p.phone_name,
+        p.ig_username ? `@${p.ig_username}` : '',
+        String(p.followers ?? 0),
+        p.status ?? '',
+        p.group_name ?? '',
+      ]),
+    ]
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `phones-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.show({ kind: 'ok', title: fr(`Export CSV — ${sortedVisible.length} ligne(s)`, `CSV export — ${sortedVisible.length} row(s)`) })
   }
+
+  // ── Sortable header cell ──────────────────────────────────────────────────
+  const sortTh = (label: React.ReactNode, key: SortKey, style?: React.CSSProperties, title?: string) => (
+    <th
+      style={{ ...TH_STYLE, ...style, cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => toggleSort(key)}
+      title={title ?? fr('Cliquer pour trier', 'Click to sort')}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {label}
+        <span style={{ fontSize: 8, opacity: sortKey === key ? 1 : 0.25 }}>
+          {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
+        </span>
+      </span>
+    </th>
+  )
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -947,10 +1261,42 @@ export function Phones({ user }: PhonesProps) {
           onClose={() => setContextMenu(null)}
           onSession={() => setSessionDialog({ phone: contextMenu.phone })}
           onUnlink={() => unlinkIg(contextMenu.phone.id)}
-          onDelete={() => deletePhone(contextMenu.phone.id)}
+          onDelete={() => requestDelete(contextMenu.phone)}
           canDelete={canDelete}
         />
       )}
+
+      {/* Suppression individuelle */}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title={t('phoneDeleteConfirm')}
+        message={confirmDelete ? fr(
+          `« ${confirmDelete.phone_name} » sera définitivement supprimé.`,
+          `"${confirmDelete.phone_name}" will be permanently deleted.`,
+        ) : undefined}
+        confirmLabel={fr('Supprimer', 'Delete')}
+        cancelLabel={t('cancel')}
+        danger
+        busy={deleteBusy}
+        onConfirm={doDeletePhone}
+        onCancel={() => setConfirmDelete(null)}
+      />
+
+      {/* Suppression bulk */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title={fr(`Supprimer ${selectedIds.size} téléphone(s) ?`, `Delete ${selectedIds.size} phone(s)?`)}
+        message={fr(
+          'Ces téléphones seront définitivement supprimés de la liste.',
+          'These phones will be permanently removed from the list.',
+        )}
+        confirmLabel={fr('Supprimer', 'Delete')}
+        cancelLabel={t('cancel')}
+        danger
+        busy={bulkBusy}
+        onConfirm={bulkDelete}
+        onCancel={() => setConfirmBulkDelete(false)}
+      />
 
       <div
         className="anim-page"
@@ -973,7 +1319,7 @@ export function Phones({ user }: PhonesProps) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'rgba(99,102,241,0.08)',
               border: '1px solid rgba(99,102,241,0.28)',
-              color: '#6366F1',
+              color: ACCENT,
             }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="6" y="2" width="12" height="20" rx="3"/>
@@ -1010,7 +1356,7 @@ export function Phones({ user }: PhonesProps) {
               >
                 <span style={{
                   position: 'absolute', top: 2.5, width: 10, height: 10,
-                  background: IVORY, borderRadius: 99, boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                  background: TEXT_1, borderRadius: 99, boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
                   transition: 'left 0.2s', left: autoRefresh ? 15 : 2.5,
                 }} />
               </button>
@@ -1021,7 +1367,7 @@ export function Phones({ user }: PhonesProps) {
                     <button key={value} onClick={() => changeInterval(value)}
                       style={{
                         padding: '3px 7px', borderRadius: 5, fontSize: 10, border: 'none', cursor: 'pointer',
-                        background: intervalSec === value ? IVORY : 'transparent',
+                        background: intervalSec === value ? TEXT_1 : 'transparent',
                         color: intervalSec === value ? '#0F1014' : 'rgba(233,234,240,0.52)',
                         fontWeight: intervalSec === value ? 700 : 400,
                         transition: 'all 0.15s', whiteSpace: 'nowrap',
@@ -1029,7 +1375,7 @@ export function Phones({ user }: PhonesProps) {
                   ))}
                 </div>
               )}
-              {autoRefresh && bearer && <Countdown secondsLeft={countdown} />}
+              <CountdownTicker enabled={autoRefresh && !!bearer} />
             </div>
 
             {/* Sync / Add button */}
@@ -1055,7 +1401,7 @@ export function Phones({ user }: PhonesProps) {
                 fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 99,
                 background: phones.length >= phoneLimit ? 'rgba(240,160,171,0.07)' : 'rgba(99,102,241,0.07)',
                 border: `1px solid ${phones.length >= phoneLimit ? 'rgba(240,160,171,0.35)' : 'rgba(99,102,241,0.35)'}`,
-                color: phones.length >= phoneLimit ? '#F0A0AB' : '#6366F1',
+                color: phones.length >= phoneLimit ? '#F0A0AB' : ACCENT,
                 whiteSpace: 'nowrap', flexShrink: 0,
               }}>
                 {phones.length} / {phoneLimit}
@@ -1064,7 +1410,7 @@ export function Phones({ user }: PhonesProps) {
           </div>
         </div>
 
-        {/* ── Stats bar ─────────────────────────────────────────────────────── */}
+        {/* ── Stats bar (informative — le filtrage se fait via les pills toolbar) ── */}
         {!loading && phones.length > 0 && (() => {
           const onlinePct = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
           const withSession = phones.filter(p => p.ig_sessionid).length
@@ -1077,13 +1423,13 @@ export function Phones({ user }: PhonesProps) {
                   <circle cx="7" cy="11" r="0.7" fill="currentColor"/>
                 </svg>
               ),
-              color: '#6366F1', filter: 'all' as const,
+              color: ACCENT, sub: undefined as string | undefined,
             },
             {
               label: t('phoneSummaryOnline'), value: onlineCount,
               sub: `${onlinePct}%`,
               icon: <span className="sf-ping-dot" style={{ background: '#7FD9B8', width: 8, height: 8 }} />,
-              color: '#7FD9B8', filter: 'online' as const,
+              color: '#7FD9B8',
             },
             {
               label: t('phoneSummaryOffline'), value: offlineCount,
@@ -1092,7 +1438,7 @@ export function Phones({ user }: PhonesProps) {
                   <circle cx="4" cy="4" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
                 </svg>
               ),
-              color: 'rgba(233,234,240,0.5)', filter: 'offline' as const,
+              color: 'rgba(233,234,240,0.5)', sub: undefined as string | undefined,
             },
             ...(withSession > 0 ? [{
               label: t('phoneSession'), value: withSession,
@@ -1102,7 +1448,7 @@ export function Phones({ user }: PhonesProps) {
                   <path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
                 </svg>
               ),
-              color: '#6366F1', filter: null,
+              color: ACCENT, sub: undefined as string | undefined,
             }] : []),
           ]
           return (
@@ -1111,28 +1457,21 @@ export function Phones({ user }: PhonesProps) {
               display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
             }}>
               {statChips.map((chip, ci) => (
-                <button
+                <div
                   key={chip.label}
-                  onClick={() => chip.filter && setFilter(chip.filter)}
                   className={`anim-scale-in sf-d${(ci + 1) * 50}`}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 7,
                     padding: '6px 12px', borderRadius: 8,
-                    background: chip.filter && filter === chip.filter
-                      ? 'rgba(99,102,241,0.12)'
-                      : 'rgba(233,234,240,0.04)',
-                    border: chip.filter && filter === chip.filter
-                      ? '1px solid rgba(99,102,241,0.3)'
-                      : '1px solid rgba(233,234,240,0.08)',
-                    cursor: chip.filter ? 'pointer' : 'default',
-                    transition: 'all 0.15s',
+                    background: 'rgba(233,234,240,0.04)',
+                    border: '1px solid rgba(233,234,240,0.08)',
                   }}
                 >
                   <span style={{ color: chip.color, display: 'flex', alignItems: 'center' }}>{chip.icon}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#E9EAF0', fontVariantNumeric: 'tabular-nums' }}>{chip.value}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, fontVariantNumeric: 'tabular-nums' }}>{chip.value}</span>
                   <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.55)', fontWeight: 500 }}>{chip.label}</span>
                   {chip.sub && <span style={{ fontSize: 10, color: chip.color, fontWeight: 600 }}>{chip.sub}</span>}
-                </button>
+                </div>
               ))}
               {lastUpdated && (
                 <span style={{
@@ -1143,7 +1482,7 @@ export function Phones({ user }: PhonesProps) {
                     <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2"/>
                     <path d="M5 2.5v2.5l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  {lastUpdated.toLocaleTimeString(lang === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
             </div>
@@ -1153,10 +1492,10 @@ export function Phones({ user }: PhonesProps) {
         {/* ── Content area (scrolls with the page) ───────────────────────────── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-          {/* ── Main area (cards + detail panel) ──────────────────────────── */}
+          {/* ── Main area (table + detail panel) ──────────────────────────── */}
           <div style={{ flex: 1, display: 'flex' }}>
 
-            {/* Cards + toolbar column */}
+            {/* Table + toolbar column */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
               {/* ── Toolbar ──────────────────────────────────────────────── */}
@@ -1176,11 +1515,28 @@ export function Phones({ user }: PhonesProps) {
                     onChange={e => setSearch(e.target.value)}
                     className="sf-input"
                     style={{
-                      width: '100%', boxSizing: 'border-box', paddingLeft: 34, paddingRight: 14,
+                      width: '100%', boxSizing: 'border-box', paddingLeft: 34, paddingRight: 30,
                       background: 'transparent', border: 'none', borderRadius: 0,
                       borderBottom: '1px solid rgba(233,234,240,0.18)', boxShadow: 'none',
                     }}
                   />
+                  {search && (
+                    <button
+                      onClick={() => setSearch('')}
+                      title={fr('Effacer la recherche', 'Clear search')}
+                      style={{
+                        position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                        width: 20, height: 20, borderRadius: 6,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(233,234,240,0.06)', border: 'none',
+                        color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
+                      }}
+                    >
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                        <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  )}
                 </div>
 
                 {/* Group filter */}
@@ -1201,7 +1557,7 @@ export function Phones({ user }: PhonesProps) {
                   <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(233,234,240,0.4)', fontSize: 9 }}>▼</span>
                 </div>
 
-                {/* Status filter pills */}
+                {/* Status filter pills — système de filtre statut unique */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 2,
                   background: 'rgba(10,10,12,0.8)', border: '1px solid rgba(233,234,240,0.08)',
@@ -1214,7 +1570,7 @@ export function Phones({ user }: PhonesProps) {
                       style={{
                         padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
                         border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                        background: filter === v ? IVORY : 'transparent',
+                        background: filter === v ? TEXT_1 : 'transparent',
                         color: filter === v ? '#0F1014' : 'rgba(233,234,240,0.52)',
                         letterSpacing: '0.08em', textTransform: 'uppercase',
                       }}
@@ -1224,12 +1580,31 @@ export function Phones({ user }: PhonesProps) {
                   ))}
                 </div>
 
+                {/* Export CSV */}
+                <button
+                  onClick={exportCsv}
+                  disabled={sortedVisible.length === 0}
+                  className="sf-btn sf-btn-secondary sf-btn-sm"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                    cursor: sortedVisible.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: sortedVisible.length === 0 ? 0.5 : 1,
+                  }}
+                  title={fr('Exporter la liste filtrée en CSV', 'Export filtered list as CSV')}
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <path d="M6.5 1v7M3.5 5.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M1.5 9.5v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                  CSV
+                </button>
+
                 {/* Refresh button */}
                 <button
                   onClick={() => poller.pollNow()}
                   className="sf-btn sf-btn-secondary sf-btn-sm"
                   style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flexShrink: 0 }}
-                  title="Refresh now"
+                  title={fr('Actualiser maintenant', 'Refresh now')}
                 >
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                     <path d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -1292,6 +1667,7 @@ export function Phones({ user }: PhonesProps) {
                     <table className="sf-table">
                       <thead>
                         <tr>
+                          <th style={{ ...TH_STYLE, width: 36 }}></th>
                           <th style={{ ...TH_STYLE, width: 44 }}></th>
                           <th style={TH_STYLE}>{t('phonesDetailModel')}</th>
                           <th style={{ ...TH_STYLE, width: 120 }}>{t('phonesDetailGroup')}</th>
@@ -1304,6 +1680,7 @@ export function Phones({ user }: PhonesProps) {
                       <tbody>
                         {[0,1,2,3,4,5,6,7].map(i => (
                           <tr key={i}>
+                            <td></td>
                             <td style={{ textAlign: 'center' }}><div className="sf-skeleton" style={{ width: 8, height: 8, borderRadius: '50%', margin: '0 auto' }} /></td>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1329,9 +1706,9 @@ export function Phones({ user }: PhonesProps) {
                   /* ── Empty state ────────────────────────────────────────── */
                   <div className="sf-empty sf-reveal">
                     <div className="sf-empty-icon" style={{ width: 64, height: 64, borderRadius: 20 }}>
-                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#6366F1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="6" y="1" width="16" height="26" rx="3.5"/>
-                        <circle cx="14" cy="22" r="1.5" fill="#6366F1" stroke="none"/>
+                        <circle cx="14" cy="22" r="1.5" fill={ACCENT} stroke="none"/>
                         <path d="M10 5h8"/>
                       </svg>
                     </div>
@@ -1360,14 +1737,14 @@ export function Phones({ user }: PhonesProps) {
                   /* ── No search results ──────────────────────────────────── */
                   <div className="sf-empty sf-reveal">
                     <div className="sf-empty-icon">
-                      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#6366F1" strokeWidth="1.6" strokeLinecap="round">
+                      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke={ACCENT} strokeWidth="1.6" strokeLinecap="round">
                         <circle cx="9.5" cy="9.5" r="7"/>
                         <path d="M15 15l5 5"/>
                         <path d="M7 9.5h5M9.5 7v5" strokeLinejoin="round"/>
                       </svg>
                     </div>
                     <p className="sf-empty-title">{t('phonesNoSearchResults')}</p>
-                    <p className="sf-empty-desc">Try adjusting your search or filters.</p>
+                    <p className="sf-empty-desc">{fr('Essayez d’ajuster votre recherche ou vos filtres.', 'Try adjusting your search or filters.')}</p>
                   </div>
 
                 ) : (
@@ -1376,9 +1753,18 @@ export function Phones({ user }: PhonesProps) {
                     <table className="sf-table">
                       <thead>
                         <tr>
-                          <th style={{ ...TH_STYLE, width: 44 }}></th>
-                          <th style={TH_STYLE}>{t('phonesDetailModel')}</th>
-                          <th style={{ ...TH_STYLE, width: 120 }}>{t('phonesDetailGroup')}</th>
+                          <th style={{ ...TH_STYLE, width: 36, textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={allVisibleSelected}
+                              onChange={toggleSelectAll}
+                              title={fr('Tout sélectionner', 'Select all')}
+                              style={{ cursor: 'pointer', accentColor: ACCENT, width: 14, height: 14 }}
+                            />
+                          </th>
+                          {sortTh('', 'status', { width: 44 }, fr('Trier par statut', 'Sort by status'))}
+                          {sortTh(t('phonesDetailModel'), 'name')}
+                          {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
                           <th style={{ ...TH_STYLE, width: 160 }}>Instagram</th>
                           <th style={{ ...TH_STYLE, width: 110 }}>{t('phonesIgStatus')}</th>
                           <th style={{ ...TH_STYLE, width: 150 }}>Note</th>
@@ -1386,31 +1772,23 @@ export function Phones({ user }: PhonesProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {visible.map((phone, i) => {
-                          const col = phoneColor(phone.phone_name)
-                          return (
-                            <PhoneRow
-                              key={phone.id}
-                              phone={phone}
-                              index={i}
-                              isSelected={selectedPhone?.id === phone.id}
-                              isLast={i === visible.length - 1}
-                              col={col}
-                              phones={phones}
-                              COLS={COLS}
-                              relativeTime={relativeTime}
-                              setSelectedPhone={setSelectedPhone}
-                              setContextMenu={setContextMenu}
-                              setSessionDialog={setSessionDialog}
-                              saveIgUsername={saveIgUsername}
-                              saveRemark={saveRemark}
-                              unlinkIg={unlinkIg}
-                              deletePhone={deletePhone}
-                              canDelete={canDelete}
-                              ActionBtn={ActionBtn}
-                            />
-                          )
-                        })}
+                        {sortedVisible.map(phone => (
+                          <PhoneRow
+                            key={phone.id}
+                            phone={phone}
+                            isSelected={selectedPhone?.id === phone.id}
+                            checked={selectedIds.has(phone.id)}
+                            col={phoneColor(phone.phone_name)}
+                            canDelete={canDelete}
+                            setSelectedPhone={setSelectedPhone}
+                            setContextMenu={setContextMenu}
+                            setSessionDialog={setSessionDialog}
+                            saveIgUsername={saveIgUsername}
+                            saveRemark={saveRemark}
+                            requestDelete={requestDelete}
+                            toggleSelect={toggleSelect}
+                          />
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -1450,13 +1828,13 @@ export function Phones({ user }: PhonesProps) {
                           </svg>
                         </div>
                         <div>
-                          <p style={{ fontSize: 14, fontWeight: 700, color: '#E9EAF0', margin: 0, lineHeight: 1.2 }}>{p.phone_name}</p>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0, lineHeight: 1.2 }}>{p.phone_name}</p>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                             <StatusDot status={p.status ?? 'offline'} />
                             {p.group_name && (
                               <span style={{
                                 fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 600,
-                                background: 'rgba(99,102,241,0.12)', color: '#6366F1',
+                                background: 'rgba(99,102,241,0.12)', color: ACCENT,
                                 border: '1px solid rgba(99,102,241,0.22)',
                               }}>
                                 {p.group_name}
@@ -1515,7 +1893,7 @@ export function Phones({ user }: PhonesProps) {
 
                   {/* Info rows */}
                   <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
-                    <p style={{ fontFamily: SANS, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.25em', color: FAINT, margin: '0 0 12px' }}>{t('phonesInfoSection')}</p>
+                    <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 12px' }}>{t('phonesInfoSection')}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                       {[
                         { label: t('phonesDetailModel'),    value: p.phone_name },
@@ -1526,7 +1904,7 @@ export function Phones({ user }: PhonesProps) {
                       ].map(row => (
                         <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                           <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)', flexShrink: 0 }}>{row.label}</span>
-                          <span style={{ fontSize: 11, fontWeight: 500, color: '#E9EAF0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, textAlign: 'right' }}>{row.value}</span>
+                          <span style={{ fontSize: 11, fontWeight: 500, color: TEXT_1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, textAlign: 'right' }}>{row.value}</span>
                         </div>
                       ))}
                     </div>
@@ -1535,18 +1913,18 @@ export function Phones({ user }: PhonesProps) {
                   {/* Instagram section */}
                   {p.ig_username && (
                     <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
-                      <p style={{ fontFamily: SANS, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.25em', color: FAINT, margin: '0 0 12px' }}>{t('phonesIgSection')}</p>
+                      <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 12px' }}>{t('phonesIgSection')}</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                         <div style={{
                           width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: GOLD, fontSize: 13, fontWeight: 700,
+                          color: ACCENT, fontSize: 13, fontWeight: 700,
                           background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.4)',
                         }}>
                           {p.ig_username.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: '#6366F1', margin: 0 }}>@{p.ig_username}</p>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: ACCENT, margin: 0 }}>@{p.ig_username}</p>
                           {(p.followers || p.following) ? (
                             <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.45)', margin: '2px 0 0' }}>
                               {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} ${t('phonesIgFollowers')}` : ''}
@@ -1578,7 +1956,7 @@ export function Phones({ user }: PhonesProps) {
 
                   {/* Quick actions */}
                   <div style={{ padding: '16px 18px' }}>
-                    <p style={{ fontFamily: SANS, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.25em', color: FAINT, margin: '0 0 10px' }}>{t('phonesQuickActions')}</p>
+                    <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }}>{t('phonesQuickActions')}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <button onClick={() => setSessionDialog({ phone: p })} className="sf-btn sf-btn-ghost" style={{
                         width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
@@ -1601,7 +1979,7 @@ export function Phones({ user }: PhonesProps) {
                         </button>
                       )}
                       {canDelete && (
-                        <button onClick={() => { deletePhone(p.id); setSelectedPhone(null) }} className="sf-btn sf-btn-ghost" style={{
+                        <button onClick={() => requestDelete(p)} className="sf-btn sf-btn-ghost" style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
                           borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
                           color: '#F0A0AB', cursor: 'pointer',
@@ -1618,342 +1996,88 @@ export function Phones({ user }: PhonesProps) {
             })()}
           </div>
         </div>
+
+        {/* ── Floating bulk-actions bar ───────────────────────────────────── */}
+        {selectedIds.size > 0 && (
+          <div className="sf-anim-slide-up" style={{
+            position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 40, display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 14px', borderRadius: 14,
+            background: '#13141A', border: '1px solid rgba(99,102,241,0.35)',
+            boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 24px -8px rgba(99,102,241,0.4)',
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: TEXT_1, whiteSpace: 'nowrap' }}>
+              {selectedIds.size} {fr('sélectionné(s)', 'selected')}
+            </span>
+
+            <div style={{ width: 1, height: 20, background: HAIR }} />
+
+            {canDelete && (
+              <button
+                onClick={() => setConfirmBulkDelete(true)}
+                disabled={bulkBusy}
+                className="sf-btn sf-btn-sm"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.4)',
+                  color: '#F87171', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  padding: '7px 12px', cursor: bulkBusy ? 'wait' : 'pointer',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 3h8M4.5 3V2h3v1M4 3l.4 7h3.2L8 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {fr(`Supprimer ${selectedIds.size}`, `Delete ${selectedIds.size}`)}
+              </button>
+            )}
+
+            <button
+              onClick={bulkUnlinkIg}
+              disabled={bulkBusy}
+              className="sf-btn sf-btn-secondary sf-btn-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: bulkBusy ? 'wait' : 'pointer', fontSize: 12 }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6C2 3.8 3.8 2 6 2s4 1.8 4 4-2 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M2 10l3.5-3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              {fr('Délier IG', 'Unlink IG')}
+            </button>
+
+            {groups.length > 0 && (
+              <select
+                value=""
+                disabled={bulkBusy}
+                onChange={e => { if (e.target.value) bulkChangeGroup(e.target.value) }}
+                className="sf-input"
+                style={{
+                  fontSize: 12, fontWeight: 500, padding: '6px 10px',
+                  background: 'rgba(233,234,240,0.04)', border: `1px solid ${HAIR}`,
+                  borderRadius: 8, cursor: bulkBusy ? 'wait' : 'pointer', color: TEXT_1,
+                }}
+              >
+                <option value="">{fr('Changer de groupe…', 'Change group…')}</option>
+                {groups.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            )}
+
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              title={fr('Annuler la sélection', 'Clear selection')}
+              style={{
+                width: 26, height: 26, borderRadius: 7,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(233,234,240,0.06)', border: 'none',
+                color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </>
-  )
-}
-
-// ── PhoneCard sub-component ───────────────────────────────────────────────────
-function PhoneCard({
-  phone, index, isSelected, col, phones,
-  relativeTime, setSelectedPhone, setContextMenu, setSessionDialog,
-  saveIgUsername, saveRemark, unlinkIg, deletePhone, canDelete,
-}: {
-  phone: Phone; index: number; isSelected: boolean; col: string
-  phones: Phone[]
-  relativeTime: (iso: string) => string
-  setSelectedPhone: (p: Phone | null) => void
-  setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
-  setSessionDialog: (v: { phone: Phone } | null) => void
-  saveIgUsername: (id: string, u: string) => Promise<void>
-  saveRemark: (id: string, v: string) => Promise<void>
-  unlinkIg: (id: string) => Promise<void>
-  deletePhone: (id: string) => Promise<void>
-  canDelete: boolean
-}) {
-  const t = useT()
-  const online = phone.status === 'online'
-
-  return (
-    <div
-      className="sf-card anim-scale-in"
-      style={{
-        padding: '16px',
-        display: 'flex', flexDirection: 'column', gap: 12,
-        cursor: 'pointer',
-        borderColor: isSelected ? 'rgba(99,102,241,0.45)' : undefined,
-        boxShadow: isSelected ? '0 0 0 1px rgba(99,102,241,0.2), 0 8px 32px -8px rgba(0,0,0,0.5)' : undefined,
-        position: 'relative', overflow: 'hidden',
-      }}
-      onClick={() => setSelectedPhone(isSelected ? null : phone)}
-      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
-    >
-      {/* Subtle top highlight when selected */}
-      {isSelected && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-          background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.6), transparent)',
-          pointerEvents: 'none',
-        }} />
-      )}
-
-      {/* Card header: icon + name + status */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        {/* Phone icon with gradient */}
-        <div style={{
-          width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: `${col}14`,
-          border: `1px solid ${col}2e`, color: col,
-        }}>
-          <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
-            <rect x="3.5" y="1" width="10" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.4"/>
-            <circle cx="8.5" cy="13.5" r="0.8" fill="currentColor"/>
-          </svg>
-        </div>
-
-        {/* Name + serial */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{
-            fontSize: 13, fontWeight: 700, color: '#E9EAF0',
-            margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            lineHeight: 1.3,
-          }}>
-            {phone.phone_name}
-          </p>
-          {(phone.serial_no || phone.geelark_id) && (
-            <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(233,234,240,0.35)', margin: '2px 0 0' }}>
-              {phone.serial_no ? `SN: ${phone.serial_no}` : `GL: ${phone.geelark_id}`}
-            </p>
-          )}
-        </div>
-
-        {/* Online/offline status */}
-        <StatusDot status={phone.status ?? 'offline'} />
-      </div>
-
-      {/* Badges row: IG username + group + IG status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        {phone.ig_username ? (
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '3px 8px 3px 5px', borderRadius: 99,
-            background: 'rgba(99,102,241,0.06)',
-            border: '1px solid rgba(99,102,241,0.2)',
-          }}>
-            <div style={{
-              width: 16, height: 16, borderRadius: '50%',
-              background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 8, fontWeight: 700, color: GOLD, flexShrink: 0,
-            }}>
-              {phone.ig_username.charAt(0).toUpperCase()}
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#6366F1' }}>@{phone.ig_username}</span>
-          </div>
-        ) : (
-          <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', fontStyle: 'normal' }}>{t('phoneIgCellAdd')}</span>
-        )}
-
-        {phone.group_name && (
-          <span style={{
-            fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 600,
-            background: 'rgba(99,102,241,0.1)', color: '#6366F1',
-            border: '1px solid rgba(99,102,241,0.18)',
-          }}>
-            {phone.group_name}
-          </span>
-        )}
-
-        <span style={{ marginLeft: 'auto' }}>
-          <IgStatusBadge phone={phone} />
-        </span>
-      </div>
-
-      {/* Remark (if any) */}
-      {phone.remark && (
-        <p style={{
-          fontSize: 11, color: 'rgba(99,102,241,0.55)', margin: 0,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          fontStyle: 'normal',
-        }}>
-          {phone.remark}
-        </p>
-      )}
-
-      {/* Action buttons */}
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}
-        onClick={e => e.stopPropagation()}
-      >
-        <button
-          className="sf-btn sf-btn-secondary sf-btn-sm"
-          onClick={() => setSessionDialog({ phone })}
-          title={t('phonesRowSessionId')}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
-            <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          {t('phoneSession')}
-        </button>
-        <button
-          className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
-          onClick={() => setSelectedPhone(isSelected ? null : phone)}
-          title={t('phonesRowViewDetails')}
-          style={{ width: 30, height: 30, cursor: 'pointer' }}
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <ellipse cx="6.5" cy="6.5" rx="5" ry="3" stroke="currentColor" strokeWidth="1.4"/>
-            <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor"/>
-          </svg>
-        </button>
-        <button
-          className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
-          onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
-          title="More options"
-          style={{ width: 30, height: 30, cursor: 'pointer' }}
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <circle cx="2" cy="6.5" r="1" fill="currentColor"/>
-            <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
-            <circle cx="11" cy="6.5" r="1" fill="currentColor"/>
-          </svg>
-        </button>
-        {canDelete && (
-          <button
-            className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
-            onClick={() => deletePhone(phone.id)}
-            title={t('phonesRowDelete')}
-            style={{ width: 30, height: 30, color: '#F0A0AB', cursor: 'pointer' }}
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Keep legacy PhoneRow for compatibility (used by ActionBtn)
-function PhoneRow({
-  phone, index, isSelected, isLast, col, phones, COLS,
-  relativeTime, setSelectedPhone, setContextMenu, setSessionDialog,
-  saveIgUsername, saveRemark, unlinkIg, deletePhone, canDelete, ActionBtn,
-}: {
-  phone: Phone; index: number; isSelected: boolean; isLast: boolean; col: string
-  phones: Phone[]; COLS: string
-  relativeTime: (iso: string) => string
-  setSelectedPhone: (p: Phone | null) => void
-  setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
-  setSessionDialog: (v: { phone: Phone } | null) => void
-  saveIgUsername: (id: string, u: string) => Promise<void>
-  saveRemark: (id: string, v: string) => Promise<void>
-  unlinkIg: (id: string) => Promise<void>
-  deletePhone: (id: string) => Promise<void>
-  canDelete: boolean
-  ActionBtn: React.ComponentType<{ onClick: () => void; title: string; children: React.ReactNode; danger?: boolean }>
-}) {
-  const t = useT()
-  const [hovered, setHovered] = useState(false)
-  const online = phone.status === 'online'
-
-  const cellStyle: React.CSSProperties = {
-    padding: '9px 12px',
-    background: isSelected ? 'rgba(99,102,241,0.07)' : 'transparent',
-    transition: 'background 0.12s',
-  }
-
-  return (
-    <tr
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={() => setSelectedPhone(isSelected ? null : phone)}
-      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
-      style={{ cursor: 'pointer' }}
-    >
-      {/* Status dot — first td carries the left accent bar */}
-      <td style={{
-        ...cellStyle,
-        width: 44, textAlign: 'center',
-        boxShadow: isSelected ? 'inset 3px 0 0 rgba(99,102,241,0.75)' : 'none',
-      }}>
-        <span style={{
-          display: 'inline-block',
-          width: 8, height: 8, borderRadius: '50%',
-          background: online ? '#7FD9B8' : 'rgba(233,234,240,0.22)',
-          boxShadow: online ? '0 0 0 3px rgba(127,217,184,0.15)' : 'none',
-          flexShrink: 0,
-        }} />
-      </td>
-
-      {/* Phone name + serial */}
-      <td style={cellStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Colored avatar */}
-          <div style={{
-            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: `${col}14`,
-            border: `1px solid ${col}30`, color: col,
-            fontSize: 12, fontWeight: 700,
-          }}>
-            {phone.phone_name.charAt(0).toUpperCase()}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#E9EAF0', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {phone.phone_name}
-            </p>
-            {phone.serial_no && (
-              <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(233,234,240,0.3)', margin: '1px 0 0' }}>
-                {phone.serial_no}
-              </p>
-            )}
-          </div>
-        </div>
-      </td>
-
-      {/* Group */}
-      <td style={cellStyle}>
-        {phone.group_name
-          ? <span style={{
-              display: 'inline-block',
-              fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
-              background: 'rgba(99,102,241,0.1)', color: '#6366F1',
-              border: '1px solid rgba(99,102,241,0.18)',
-              whiteSpace: 'nowrap',
-            }}>{phone.group_name}</span>
-          : <span style={{ color: 'rgba(233,234,240,0.2)' }}>—</span>
-        }
-      </td>
-
-      {/* IG Username — inline editable */}
-      <td style={cellStyle} onClick={e => e.stopPropagation()}>
-        <IgCell phone={phone} onSave={saveIgUsername} />
-      </td>
-
-      {/* IG Status badge */}
-      <td style={cellStyle}>
-        <IgStatusBadge phone={phone} />
-      </td>
-
-      {/* Note — inline editable */}
-      <td style={cellStyle} onClick={e => e.stopPropagation()}>
-        <NoteCell phone={phone} onSave={saveRemark} />
-      </td>
-
-      {/* Actions — visible on hover or selected */}
-      <td style={{ ...cellStyle, padding: '9px 10px' }} onClick={e => e.stopPropagation()}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
-          opacity: hovered || isSelected ? 1 : 0,
-          transition: 'opacity 0.15s',
-        }}>
-          <ActionBtn onClick={() => setSessionDialog({ phone })} title={t('phonesRowSessionId')}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
-          </ActionBtn>
-          <button
-            className="sf-press"
-            style={{
-              width: 26, height: 26, borderRadius: 7,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(233,234,240,0.06)', border: '1px solid rgba(233,234,240,0.1)',
-              color: 'rgba(233,234,240,0.52)', cursor: 'pointer',
-            }}
-            title="Plus"
-            onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <circle cx="2" cy="6" r="1" fill="currentColor"/>
-              <circle cx="6" cy="6" r="1" fill="currentColor"/>
-              <circle cx="10" cy="6" r="1" fill="currentColor"/>
-            </svg>
-          </button>
-          {canDelete && (
-            <ActionBtn onClick={() => deletePhone(phone.id)} title={t('phonesRowDelete')} danger>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2 3h8M4.5 3V2h3v1M4 3l.4 7h3.2L8 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </ActionBtn>
-          )}
-        </div>
-      </td>
-    </tr>
   )
 }

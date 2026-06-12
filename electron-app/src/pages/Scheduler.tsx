@@ -45,8 +45,15 @@ import {
 import { Spinner } from '@/components/ui/Spinner'
 import { CreateScheduleModal } from '@/components/CreateScheduleModal'
 import { CreateStoryScheduleModal } from '@/components/CreateStoryScheduleModal'
+import { ScheduleModal } from '@/components/ScheduleModal'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useCredits } from '@/lib/credits'
 import { useToast } from '@/components/Toast'
+
+// setTimeout overflows int32 (~24.8 days) and fires immediately beyond this —
+// chain shorter timeouts instead of arming one long timer.
+const MAX_TIMEOUT_MS = 2_147_000_000
+const RESCHEDULE_CHUNK_MS = 24 * 60 * 60 * 1000 // re-arm every 24 h for far-future posts
 
 interface Props { user: User; onNavigate?: (page: string, tab?: string) => void }
 
@@ -387,6 +394,8 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [tab, setTab]             = useState<TabFilter>('pending')
   const [search, setSearch]       = useState('')
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<ScheduledPost | null>(null)
+  const [reschedule, setReschedule] = useState<ScheduledPost | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showStoryCreate, setShowStoryCreate] = useState(false)
   const [showTypeChoice, setShowTypeChoice] = useState(false)
@@ -394,6 +403,13 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [runLogs, setRunLogs]     = useState<{ id: string; msgs: string[] } | null>(null)
   const timersRef                 = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const runningRef                = useRef<Set<string>>(new Set())
+
+  // 30 s ticker: keeps the relative "dans Xh Ymin" labels fresh without reloading
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   // Can cancel: own post OR org admin/owner
   function canCancel(post: ScheduledPost) {
@@ -413,9 +429,18 @@ export function Scheduler({ user, onNavigate }: Props) {
   // Register a timeout for a pending post and execute when due
   const scheduleExecution = useCallback((post: ScheduledPost) => {
     if (runningRef.current.has(post.id)) return
-    const delay = new Date(post.scheduled_at).getTime() - Date.now()
+    // Guard against duplicate timers (realtime updates re-trigger the effect)
+    if (timersRef.current.has(post.id)) return
 
     const run = async () => {
+      timersRef.current.delete(post.id)
+      // Re-verify due time before claiming — protects against early fires
+      // (int32 setTimeout overflow, system clock changes, rescheduled posts)
+      if (new Date(post.scheduled_at).getTime() - Date.now() > 1500) {
+        arm()
+        return
+      }
+      if (runningRef.current.has(post.id)) return
       runningRef.current.add(post.id)
       const claimed = await claimScheduledPost(post.id)
       if (!claimed) { runningRef.current.delete(post.id); return }
@@ -448,13 +473,25 @@ export function Scheduler({ user, onNavigate }: Props) {
       reload()
     }
 
-    if (delay <= 0) {
-      run()
-    } else {
-      const timer = setTimeout(run, delay)
-      timersRef.current.set(post.id, timer)
+    // Arm a timer; for delays beyond the int32 setTimeout limit (~24.8 days),
+    // chain a 24 h timeout that re-arms until the real deadline is reachable.
+    const arm = () => {
+      const delay = new Date(post.scheduled_at).getTime() - Date.now()
+      if (delay <= 0) { void run(); return }
+      if (delay > MAX_TIMEOUT_MS) {
+        const timer = setTimeout(() => {
+          timersRef.current.delete(post.id)
+          arm()
+        }, RESCHEDULE_CHUNK_MS)
+        timersRef.current.set(post.id, timer)
+      } else {
+        const timer = setTimeout(() => { void run() }, delay)
+        timersRef.current.set(post.id, timer)
+      }
     }
-  }, [reload])
+
+    arm()
+  }, [reload, toast])
 
   useEffect(() => {
     reload().then(() => {
@@ -510,12 +547,62 @@ export function Scheduler({ user, onNavigate }: Props) {
     setCancelling(id)
     const timer = timersRef.current.get(id)
     if (timer) { clearTimeout(timer); timersRef.current.delete(id) }
-    const { refunded } = await cancelScheduledPost(id, credits.ownerId)
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p))
-    setCancelling(null)
-    if (refunded > 0) {
-      credits.refresh()
-      toast.show({ title: 'Post annulé', body: `${refunded} crédits remboursés`, kind: 'ok' })
+    try {
+      const { refunded } = await cancelScheduledPost(id, credits.ownerId)
+      // Verify the cancellation actually landed in DB before updating the UI
+      const { data, error } = await supabase.from('scheduled_posts')
+        .select('status').eq('id', id).maybeSingle()
+      if (error || (data && data.status !== 'cancelled')) {
+        toast.show({ title: 'Annulation échouée', body: 'Le post n’a pas pu être annulé — statut rechargé.', kind: 'error' })
+        await reload()
+        return
+      }
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p))
+      if (refunded > 0) {
+        credits.refresh()
+        toast.show({ title: 'Post annulé', body: `${refunded} crédits remboursés`, kind: 'ok' })
+      } else {
+        toast.show({ title: 'Post annulé', kind: 'ok' })
+      }
+    } catch (e) {
+      toast.show({
+        title: 'Annulation échouée',
+        body: e instanceof Error ? e.message : 'Erreur réseau — réessaie.',
+        kind: 'error',
+      })
+      await reload()
+    } finally {
+      setCancelling(null)
+    }
+  }
+
+  // Reschedule a pending post: clear its timer, update scheduled_at in DB,
+  // then let the auto-schedule effect re-arm a fresh timer.
+  async function doReschedule(post: ScheduledPost, date: Date) {
+    const timer = timersRef.current.get(post.id)
+    if (timer) { clearTimeout(timer); timersRef.current.delete(post.id) }
+    try {
+      const { data, error } = await supabase.from('scheduled_posts')
+        .update({ scheduled_at: date.toISOString() })
+        .eq('id', post.id).eq('status', 'pending')
+        .select('id')
+      if (error || !data?.length) {
+        toast.show({ title: 'Report échoué', body: 'Le post n’est plus en attente — statut rechargé.', kind: 'error' })
+        setReschedule(null)
+        await reload()
+        return
+      }
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, scheduled_at: date.toISOString() } : p))
+      setReschedule(null)
+      toast.show({ title: 'Post reporté', body: `Nouveau départ : ${fmtScheduledTime(date.toISOString())}`, kind: 'ok' })
+    } catch (e) {
+      setReschedule(null)
+      toast.show({
+        title: 'Report échoué',
+        body: e instanceof Error ? e.message : 'Erreur réseau — réessaie.',
+        kind: 'error',
+      })
+      await reload()
     }
   }
 
@@ -576,13 +663,6 @@ export function Scheduler({ user, onNavigate }: Props) {
                 {history.length} {t('schedulerTabHistory')}
               </span>
             )}
-            <button
-              onClick={reload}
-              className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer"
-              title="Actualiser"
-            >
-              <IconRefresh size={14} color="rgba(233,234,240,0.72)" spinning={loading} />
-            </button>
             <button
               onClick={() => setShowTypeChoice(true)}
               className="cursor-pointer"
@@ -713,10 +793,11 @@ export function Scheduler({ user, onNavigate }: Props) {
             {tab === 'pending' && (
               <button
                 className="sf-btn sf-btn-primary cursor-pointer"
-                style={{ marginTop: 4 }}
+                style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 8 }}
                 onClick={() => setShowTypeChoice(true)}
               >
-                {t('schedulerSchedulePost')}
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                {posts.length === 0 ? 'Programmer ton premier post' : t('schedulerSchedulePost')}
               </button>
             )}
           </div>
@@ -732,7 +813,14 @@ export function Scheduler({ user, onNavigate }: Props) {
                 isRunning={runningPost === post.id}
                 runLogs={runLogs?.id === post.id ? runLogs.msgs : null}
                 cancelling={cancelling === post.id}
-                onCancel={() => cancel(post.id)}
+                onCancel={() => {
+                  // Stuck-running posts are stopped directly (no refund, no config to lose)
+                  if (post.status === 'running') cancel(post.id)
+                  else setConfirmCancel(post)
+                }}
+                onReschedule={post.status === 'pending' && post.user_id === user.id
+                  ? () => setReschedule(post)
+                  : undefined}
               />
             ))}
           </div>
@@ -754,6 +842,35 @@ export function Scheduler({ user, onNavigate }: Props) {
           </p>
         </div>
       </div>
+
+      {/* ── Confirm cancel ───────────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!confirmCancel}
+        title="Annuler ce post programmé ?"
+        message="Les crédits seront remboursés, mais tu devras tout reconfigurer (téléphones, vidéos, légende) pour le reprogrammer."
+        confirmLabel="Annuler le post"
+        cancelLabel="Garder"
+        danger
+        busy={!!confirmCancel && cancelling === confirmCancel.id}
+        onConfirm={async () => {
+          if (!confirmCancel) return
+          const id = confirmCancel.id
+          await cancel(id)
+          setConfirmCancel(null)
+        }}
+        onCancel={() => setConfirmCancel(null)}
+      />
+
+      {/* ── Reschedule modal — reuses ScheduleModal to pick the new date ─────── */}
+      {reschedule && (
+        <ScheduleModal
+          type={reschedule.type === 'mass_posting' ? 'mass_posting' : 'posting'}
+          phonesCount={reschedule.phones.length}
+          videosCount={reschedule.videos.length}
+          onConfirm={date => { void doReschedule(reschedule, date) }}
+          onClose={() => setReschedule(null)}
+        />
+      )}
 
       {/* ── Create modal — Reel ──────────────────────────────────────────────── */}
       {showCreate && (
@@ -861,7 +978,7 @@ export function Scheduler({ user, onNavigate }: Props) {
 
 // ── Post card ──────────────────────────────────────────────────────────────────
 
-function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancelling, onCancel }: {
+function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancelling, onCancel, onReschedule }: {
   post: ScheduledPost
   index: number
   isOwn: boolean
@@ -870,6 +987,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
   runLogs: string[] | null
   cancelling: boolean
   onCancel: () => void
+  onReschedule?: () => void
 }) {
   const t = useT()
   const [showLogs, setShowLogs] = useState(false)

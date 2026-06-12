@@ -382,10 +382,19 @@ export function Posting({ user }: PostingProps) {
     // Compteurs réels — pilotent le toast final et le remboursement
     let okN = 0
     let errN = 0
+    const settledIds = new Set<string>()   // phones au statut final connu (done|error)
     const markPhoneFailed = (phone: Phone, detail?: string) => {
+      if (settledIds.has(phone.id)) return
+      settledIds.add(phone.id)
       errN++
       run.markFailed(1)
       setPhoneRunStatus(phone.id, { status: 'error', detail })
+    }
+    const markPhoneDone = (phone: Phone) => {
+      if (settledIds.has(phone.id)) return
+      settledIds.add(phone.id)
+      okN++
+      setPhoneRunStatus(phone.id, { status: 'done' })
     }
 
     logActivity({
@@ -505,7 +514,7 @@ export function Posting({ user }: PostingProps) {
               const fail  = item['failDesc'] ? ` — ${item['failDesc']}` : ''
               log(`${STATUS[status] ?? status} ${name}${fail}`, level)
               if (phone) {
-                if (status === 3) { okN++; setPhoneRunStatus(phone.id, { status: 'done' }) }
+                if (status === 3) markPhoneDone(phone)
                 else markPhoneFailed(phone, (item['failDesc'] as string | undefined) ?? STATUS[status])
               }
             }
@@ -524,7 +533,7 @@ export function Posting({ user }: PostingProps) {
           // Sans réponse = probablement publié → compté comme réussi, pas remboursé
           for (const tid of pending) {
             const phone = phoneList.find(p => taskIds[p.geelark_id] === tid)
-            if (phone) { okN++; setPhoneRunStatus(phone.id, { status: 'done' }) }
+            if (phone) markPhoneDone(phone)
           }
         }
       }
@@ -553,12 +562,7 @@ export function Posting({ user }: PostingProps) {
         activePhonesRef.current = []
       }
       // Tout ce qui n'a pas abouti est remboursé
-      const remaining = total - okN - errN
-      if (remaining > 0) { run.markFailed(remaining); errN += remaining }
-      phoneList.forEach(p => {
-        const st = phoneRun.get(p.id)
-        if (!st || st.status === 'pending' || st.status === 'posting') setPhoneRunStatus(p.id, { status: 'error', detail: 'Erreur fatale' })
-      })
+      phoneList.forEach(p => { if (!settledIds.has(p.id)) markPhoneFailed(p, 'Erreur fatale') })
       setProgress(0)
       setLastRun({ ok: okN, err: errN, total })
     } finally {
@@ -580,7 +584,9 @@ export function Posting({ user }: PostingProps) {
     return true
   })
   const fileName = filePath ? filePath.replace(/\\/g, '/').split('/').pop() ?? filePath : null
-  const canPost = !posting && !!bearer && selectedPhones.size > 0 && !!filePath
+  const captionTooLong = caption.length > 2200
+  const creditCost = selectedPhones.size * CREDIT_COSTS.posting
+  const canPost = !posting && !!bearer && selectedPhones.size > 0 && !!filePath && !captionTooLong
 
   return (
     <div className="sf-page anim-page" style={{ flexDirection: 'row', overflow: 'hidden' }}>
@@ -763,16 +769,17 @@ export function Posting({ user }: PostingProps) {
         {/* Page header */}
         <div className="sf-page-header">
           <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            <div className="flex items-center justify-center flex-shrink-0"
               style={{
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.22) 0%, rgba(99,102,241,0.08) 100%)',
-                border: '1px solid var(--border-accent)',
-                color: 'var(--accent-glow)',
+                width: 46, height: 46, borderRadius: 12,
+                background: 'rgba(99,102,241,0.08)',
+                border: '1px solid rgba(99,102,241,0.28)',
+                color: ACCENT_L,
               }}>
               <IconSend />
             </div>
             <div>
-              <h1 className="sf-page-title">{t('newPost')}</h1>
+              <h1 className="sf-page-title" style={{ fontSize: 22 }}>{t('newPost')}</h1>
               <p className="sf-page-sub">Reel Instagram · GéeLark Cloud</p>
             </div>
           </div>
@@ -819,6 +826,7 @@ export function Posting({ user }: PostingProps) {
             <div className="sf-card sf-spotlight overflow-hidden">
               {/* Card header */}
               <div className="flex items-center gap-2.5 px-5 py-3.5" style={{ borderBottom: '1px solid var(--border)' }}>
+                <span className="text-[12px] font-bold tabular-nums flex-shrink-0" style={{ color: ACCENT_L }}>01</span>
                 <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                   style={{ background: 'var(--accent-dim)', color: 'var(--accent-glow)' }}>
                   <IconVideo />
@@ -912,6 +920,7 @@ export function Posting({ user }: PostingProps) {
               {/* Card header */}
               <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-2.5">
+                  <span className="text-[12px] font-bold tabular-nums flex-shrink-0" style={{ color: ACCENT_L }}>02</span>
                   <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                     style={{ background: 'var(--accent-dim)', color: 'var(--accent-glow)' }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -1019,6 +1028,7 @@ export function Posting({ user }: PostingProps) {
             {/* ── OPTIONS CARD ───────────────────────────────────────────── */}
             <div className="sf-card overflow-hidden">
               <div className="flex items-center gap-2.5 px-5 py-3.5" style={{ borderBottom: '1px solid var(--border)' }}>
+                <span className="text-[12px] font-bold tabular-nums flex-shrink-0" style={{ color: ACCENT_L }}>03</span>
                 <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                   style={{ background: 'var(--accent-dim)', color: 'var(--accent-glow)' }}>
                   <IconSettings2 />
@@ -1077,16 +1087,31 @@ export function Posting({ user }: PostingProps) {
                       <span className="text-[13px] font-semibold text-text">
                         {posting ? t('publishingProgress') : t('publishingDone')}
                       </span>
-                      {!posting && progress >= 100 && (
-                        <span className="sf-badge sf-badge-ok">{t('publishingDone')}</span>
+                      {!posting && lastRun && (
+                        <span className={`sf-badge ${lastRun.err === 0 ? 'sf-badge-ok' : 'sf-badge-warn'}`}>
+                          {lastRun.ok}/{lastRun.total} réussie{lastRun.ok > 1 ? 's' : ''}{lastRun.err ? ` · ${lastRun.err} échec${lastRun.err > 1 ? 's' : ''}` : ''}
+                        </span>
                       )}
                     </div>
-                    <span
-                      className="text-[15px] font-black font-mono tabular-nums"
-                      style={{ color: progress >= 100 ? 'var(--ok)' : 'var(--accent-glow)' }}
-                    >
-                      {progress}%
-                    </span>
+                    <div className="flex items-center gap-2.5">
+                      {posting && (
+                        <button
+                          onClick={() => setShowStopConfirm(true)}
+                          disabled={stopping}
+                          className="sf-btn sf-btn-danger sf-btn-sm gap-1.5 text-[12px]"
+                          style={{ height: 28 }}
+                        >
+                          <span style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor', display: 'inline-block' }} />
+                          {stopping ? 'Arrêt…' : 'Stop'}
+                        </button>
+                      )}
+                      <span
+                        className="text-[15px] font-black font-mono tabular-nums"
+                        style={{ color: progress >= 100 ? 'var(--ok)' : 'var(--accent-glow)' }}
+                      >
+                        {progress}%
+                      </span>
+                    </div>
                   </div>
 
                   {/* Progress bar */}
@@ -1102,6 +1127,38 @@ export function Posting({ user }: PostingProps) {
                       }}
                     />
                   </div>
+
+                  {/* Statut par téléphone — visible en direct pendant le run */}
+                  {phoneRun.size > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {phones.filter(p => phoneRun.has(p.id)).map(p => {
+                        const st = phoneRun.get(p.id)!
+                        const color =
+                          st.status === 'done'    ? OK :
+                          st.status === 'error'   ? ERR :
+                          st.status === 'posting' ? ACCENT_L : WARN
+                        const label =
+                          st.status === 'done'    ? 'publié' :
+                          st.status === 'error'   ? (st.detail ?? 'échec') :
+                          st.status === 'posting' ? 'en cours' : 'en attente'
+                        return (
+                          <span
+                            key={p.id}
+                            title={st.detail}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium"
+                            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-2)', maxWidth: 220 }}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.status === 'posting' || st.status === 'pending' ? 'animate-pulse' : ''}`}
+                              style={{ background: color }}
+                            />
+                            <span className="truncate">{p.ig_username ? `@${p.ig_username}` : p.phone_name}</span>
+                            <span className="flex-shrink-0" style={{ color }}>{label}</span>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   {/* Logs toggle */}
                   <button
@@ -1146,6 +1203,7 @@ export function Posting({ user }: PostingProps) {
                   : !bearer ? 'Connecte GéeLark dans les Paramètres'
                   : selectedPhones.size === 0 ? 'Sélectionne au moins un téléphone'
                   : !filePath ? 'Choisis une vidéo à publier'
+                  : captionTooLong ? 'Description trop longue (max 2200 caractères)'
                   : 'Publication en cours…'}
                 className="flex-[2] py-3.5 rounded-2xl text-[14px] font-bold text-white transition-all active:scale-[0.99] disabled:cursor-not-allowed relative overflow-hidden"
                 style={canPost ? {
@@ -1173,7 +1231,12 @@ export function Posting({ user }: PostingProps) {
                 ) : (
                   <span className="flex items-center justify-center gap-2">
                     <IconSend />
-                    {t('launchPost')} · {selectedPhones.size} {selectedPhones.size !== 1 ? t('postingAccountsSelected') : t('postingAccountSelected')}
+                    {t('launchPost')}
+                    {selectedPhones.size > 0 && (
+                      <span style={{ opacity: 0.85, fontWeight: 600 }}>
+                        · {creditCost} cr
+                      </span>
+                    )}
                   </span>
                 )}
               </button>
@@ -1186,20 +1249,22 @@ export function Posting({ user }: PostingProps) {
                   : !bearer ? 'Connecte GéeLark dans les Paramètres'
                   : selectedPhones.size === 0 ? 'Sélectionne au moins un téléphone'
                   : !filePath ? 'Choisis une vidéo à publier'
+                  : captionTooLong ? 'Description trop longue (max 2200 caractères)'
                   : 'Publication en cours…'}
                 className="sf-btn sf-btn-secondary flex-1 gap-2 text-[13px] font-semibold rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ height: 'auto', paddingTop: '0.875rem', paddingBottom: '0.875rem' }}
               >
                 <IconCalendar />
-                {t('scheduleBtn')}
+                {t('scheduleBtn')} · {CREDIT_COSTS.posting} cr
               </button>
             </div>
 
             {/* Coût en crédits — visible AVANT de lancer */}
             {selectedPhones.size > 0 && (
-              <p style={{ margin: '-12px 0 18px', fontSize: 11.5, color: 'rgba(233,234,240,0.42)', textAlign: 'center' }}>
-                💎 Coût : <strong style={{ color: '#818CF8' }}>{selectedPhones.size * CREDIT_COSTS.posting} crédit{selectedPhones.size * CREDIT_COSTS.posting > 1 ? 's' : ''}</strong>
-                {' '}· solde : {credits.balance}
+              <p style={{ margin: '-12px 0 18px', fontSize: 11.5, color: 'var(--text-3)', textAlign: 'center' }}>
+                💎 Coût immédiat : <strong style={{ color: ACCENT_L }}>{creditCost} crédit{creditCost > 1 ? 's' : ''}</strong>
+                {' '}({selectedPhones.size} téléphone{selectedPhones.size > 1 ? 's' : ''} × {CREDIT_COSTS.posting})
+                {' '}· programmation : {CREDIT_COSTS.posting} cr · solde : {credits.balance ?? '—'}
               </p>
             )}
 

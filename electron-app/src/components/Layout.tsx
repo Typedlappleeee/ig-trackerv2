@@ -81,6 +81,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'phones',      label: 'navPhones',      icon: '📱' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'captionbank', label: 'navCaptionBank',  icon: '💬' },
     ],
   },
   {
@@ -89,6 +90,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
+      { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
@@ -173,15 +175,76 @@ function SidebarDivider() {
   )
 }
 
+// ── Sidebar NavItem (module-level: stable identity across Layout renders) ────
+interface SidebarNavItemProps {
+  id: Page
+  label: string
+  iconKey: IconKey
+  beta?: boolean
+  isNew?: boolean
+  active: boolean
+  collapsed: boolean
+  onNavigate: (page: Page) => void
+}
 
-export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefresh, children }: LayoutProps) {
+function SidebarNavItem({ id, label, iconKey, beta, isNew, active, collapsed, onNavigate }: SidebarNavItemProps) {
+  const [hovered, setHovered] = useState(false)
+  const [tooltipY, setTooltipY] = useState(0)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  return (
+    <div style={{ marginBottom: 2 }}>
+      <button
+        ref={btnRef}
+        className={`sf-sidebar-item${active ? ' is-active' : ''}`}
+        onClick={() => { playNav(); onNavigate(id) }}
+        aria-label={label}
+        aria-current={active ? 'page' : undefined}
+        onMouseEnter={() => {
+          setHovered(true)
+          if (collapsed && btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect()
+            setTooltipY(r.top + r.height / 2)
+          }
+        }}
+        onMouseLeave={() => setHovered(false)}
+        style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+      >
+        <span className="sf-sidebar-icon">
+          <NavIcon d={ICONS[iconKey]} size={17} />
+        </span>
+        {!collapsed && (
+          <>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+            {beta && (
+              <span title="Fonctionnalité en test — comportement susceptible d'évoluer" className="sf-badge sf-badge-beta" style={{ fontSize: 9, letterSpacing: '0.08em' }}>BETA</span>
+            )}
+            {isNew && (
+              <span title="Nouvelle fonctionnalité" className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.08em' }}>NEW</span>
+            )}
+          </>
+        )}
+      </button>
+      {/* Floating tooltip — collapsed mode */}
+      {collapsed && hovered && (
+        <div className="sf-sidebar-tooltip" style={{ left: 58, top: tooltipY }}>
+          {label}
+          {beta && <span style={{ marginLeft: 6, fontSize: 9, color: 'rgba(148,163,184,0.5)' }}>BETA</span>}
+          {isNew && <span style={{ marginLeft: 6, fontSize: 9, color: '#34d399' }}>NEW</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const t = useT()
   const toast = useToast()
   const [collapsed, setCollapsed]         = useState(() => {
     const v = localStorage.getItem('sf-sidebar')
     return v === 'reduite' || v === 'masquee'
   })
-  const [groupCount, setGroupCount]       = useState<number | null>(null)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('sidebar-sections') ?? '{}')
@@ -190,7 +253,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       return Object.fromEntries(NAV_SECTIONS.map(s => [s.title, s.defaultOpen ?? true]))
     }
   })
-  const [now, setNow] = useState(Date.now())
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
   const orgTriggerRef                 = useRef<HTMLButtonElement>(null)
   const [orgMenuPos, setOrgMenuPos]   = useState<{ left: number; bottom: number; width: number } | null>(null)
@@ -285,6 +347,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title: errors === 0 ? 'Post publié' : `Post terminé avec ${errors} erreur${errors > 1 ? 's' : ''}`,
             body:  errors === 0 ? 'Ton Reel a été posté avec succès.' : `${ok} succès · ${errors} erreur${errors > 1 ? 's' : ''}`,
             level: errors === 0 ? 'ok' : 'warn',
+            page:  'posting',
           })
         }
       }
@@ -298,6 +361,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title: errCount === 0 ? 'Mass Posting terminé' : `Mass Posting: ${errCount} erreur${errCount > 1 ? 's' : ''}`,
             body:  `${doneCount} succès · ${errCount} erreur${errCount > 1 ? 's' : ''} · ${statuses.length} téléphone${statuses.length > 1 ? 's' : ''}`,
             level: errCount === 0 ? 'ok' : 'warn',
+            page:  'massposting',
           })
         }
       }
@@ -334,6 +398,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title: '📢 Nouvelle actualité',
             body: msg.title || msg.content?.slice(0, 80) || undefined,
             level: 'info',
+            page: 'community',
           })
         }
       })
@@ -341,11 +406,18 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     return () => { supabase.removeChannel(ch) }
   }, [])
 
+  // Close the notif panel (marks everything as read on close, not on open,
+  // so the unread badge stays meaningful while the panel is visible)
+  function closeNotifPanel() {
+    setNotifOpen(false)
+    markAllRead()
+  }
+
   // Close notif panel on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false)
+        closeNotifPanel()
       }
     }
     if (notifOpen) document.addEventListener('mousedown', handler)
@@ -356,7 +428,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     if (orgId === (currentOrg?.id ?? null)) { setOrgMenuOpen(false); return }
     switchOrg(orgId)
     setOrgMenuOpen(false)
-    onNavigate('community')
+    onNavigate('hub')
     toast.show({
       title: orgId ? `→ "${orgName}"` : t('soloMode'),
       kind:  'info',
@@ -410,17 +482,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 10000)
-    return () => clearInterval(t)
-  }, [])
-
-  // Auto-redirect to community when the current page isn’t accessible in this org
+  // Auto-redirect to the hub when the current page isn’t accessible in this org
   useEffect(() => {
     if (!orgLoading && page !== 'settings' && !isVisibleTab(page)) {
-      onNavigate('community')
+      onNavigate('hub')
     }
-  }, [page, orgLoading, currentOrg?.id])
+  }, [page, orgLoading, currentOrg?.id, role, perms])
 
   function toggleSection(title: string) {
     setOpenSections(prev => {
@@ -439,25 +506,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     }
   }, [page])
 
-  // Fetch distinct group count for the bottom stats
-  useEffect(() => {
-    let q = supabase.from('phones').select('group_name')
-    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
-    q.then(({ data }: { data: Array<{ group_name?: string | null }> | null }) => {
-      const g = new Set((data ?? []).map(r => r.group_name).filter(Boolean))
-      setGroupCount(g.size)
-    })
-  }, [currentOrg?.id, user.id])
-
-  const lastRefreshLabel = lastRefresh
-    ? (() => {
-        const diff = Math.floor((now - lastRefresh.getTime()) / 1000)
-        if (diff < 60) return 'Màj à l’instant'
-        if (diff < 3600) return `Màj il y a ${Math.floor(diff / 60)}m`
-        return `Màj ${lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
-      })()
-    : null
-
   const userInitial = user.email?.[0].toUpperCase() ?? '?'
   const userName = user.email?.split('@')[0] ?? userInitial
   const planLabel = license.isSuperAdmin
@@ -466,68 +514,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     : license.plan === 'pro'          ? 'Plan Pro'
     : license.plan === 'standard'     ? 'Plan Standard'
     : 'Free plan'
-
-  // ── Sidebar NavItem ────────────────────────────────────────────────────────
-  const SidebarNavItem = ({
-    id,
-    label,
-    iconKey,
-    beta,
-    isNew,
-  }: {
-    id: Page
-    label: string
-    iconKey: IconKey
-    beta?: boolean
-    isNew?: boolean
-  }) => {
-    const active = page === id
-    const [hovered, setHovered] = useState(false)
-    const [tooltipY, setTooltipY] = useState(0)
-    const btnRef = useRef<HTMLButtonElement>(null)
-
-    return (
-      <div style={{ marginBottom: 2 }}>
-        <button
-          ref={btnRef}
-          className={`sf-sidebar-item${active ? ' is-active' : ''}`}
-          onClick={() => { playNav(); onNavigate(id) }}
-          onMouseEnter={() => {
-            setHovered(true)
-            if (collapsed && btnRef.current) {
-              const r = btnRef.current.getBoundingClientRect()
-              setTooltipY(r.top + r.height / 2)
-            }
-          }}
-          onMouseLeave={() => setHovered(false)}
-          style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
-        >
-          <span className="sf-sidebar-icon">
-            <NavIcon d={ICONS[iconKey]} size={17} />
-          </span>
-          {!collapsed && (
-            <>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-              {beta && (
-                <span title="Fonctionnalité en test — comportement susceptible d'évoluer" className="sf-badge sf-badge-beta" style={{ fontSize: 9, letterSpacing: '0.08em' }}>BETA</span>
-              )}
-              {isNew && (
-                <span title="Nouvelle fonctionnalité" className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.08em' }}>NEW</span>
-              )}
-            </>
-          )}
-        </button>
-        {/* Floating tooltip — collapsed mode */}
-        {collapsed && hovered && (
-          <div className="sf-sidebar-tooltip" style={{ left: 58, top: tooltipY }}>
-            {label}
-            {beta && <span style={{ marginLeft: 6, fontSize: 9, color: 'rgba(148,163,184,0.5)' }}>BETA</span>}
-            {isNew && <span style={{ marginLeft: 6, fontSize: 9, color: '#34d399' }}>NEW</span>}
-          </div>
-        )}
-      </div>
-    )
-  }
 
   const pageLabels: Record<string, string> = {
     hub:         t('navHub'),
@@ -551,14 +537,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     settings:    t('pageSettings'),
     licences:    t('pageLicences'),
   }
-
-  // Suppress unused variable warnings for variables kept for logic parity
-  void groupCount
-  void lastRefreshLabel
-  void phoneCount
-  void onRefresh
-  void openSections
-  void now
 
   return (
     <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', background: '#0A0B0E' }}>
@@ -609,6 +587,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(v => !v)}
+            aria-label={collapsed ? t('expandSidebar') : t('collapseSidebar')}
+            aria-expanded={!collapsed}
             style={{
               width: 26, height: 26, borderRadius: 7,
               border: 'none',
@@ -692,6 +672,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                         iconKey={PAGE_ICON[item.id] ?? defaultIcon}
                         beta={item.beta}
                         isNew={item.isNew}
+                        active={page === item.id}
+                        collapsed={collapsed}
+                        onNavigate={onNavigate}
                       />
                     ))}
                   </div>
@@ -726,11 +709,33 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </button>
           )}
 
-          {/* Org switcher */}
-          {!collapsed && (
+          {/* Org switcher — compact icon button when collapsed */}
+          {collapsed ? (
             <button
               ref={orgTriggerRef}
               onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
+              aria-label={currentOrg?.name ?? 'Organisation'}
+              aria-expanded={orgMenuOpen}
+              title={currentOrg?.name ?? 'Organisation'}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '100%', padding: '7px 0', borderRadius: 8,
+                cursor: 'pointer',
+                background: 'rgba(255,255,255,0.025)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                color: 'rgba(233,234,240,0.42)', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.025)' }}
+            >
+              <NavIcon d={ICONS.building} size={14} />
+            </button>
+          ) : (
+            <button
+              ref={orgTriggerRef}
+              onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
+              aria-label={currentOrg?.name ?? 'Organisation'}
+              aria-expanded={orgMenuOpen}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 width: '100%', padding: '7px 8px', borderRadius: 8, fontSize: 12, textAlign: 'left',
@@ -891,6 +896,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 <button
                   onClick={() => onNavigate('settings', 'abonnement')}
                   title="Acheter des crédits"
+                  aria-label="Acheter des crédits"
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 26, height: 30, borderRadius: '0 8px 8px 0',
@@ -912,7 +918,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             {/* Notification bell */}
             <div style={{ position: 'relative' }} ref={notifRef}>
               <button
-                onClick={() => { setNotifOpen(v => !v); if (!notifOpen) markAllRead() }}
+                onClick={() => { if (notifOpen) closeNotifPanel(); else setNotifOpen(true) }}
+                aria-label={`${t('notifications')}${unread > 0 ? ` (${unread})` : ''}`}
+                aria-expanded={notifOpen}
                 style={{
                   width: 32, height: 32, borderRadius: 8,
                   border: `1px solid ${unread > 0 ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.07)'}`,
@@ -990,9 +998,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                         if (n.level === 'warn')  return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L10 9.5H1L5.5 1Z" stroke={iconColor} strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 4.5v2.5M5.5 8.5v.1" stroke={iconColor} strokeWidth="1.2" strokeLinecap="round"/></svg>
                         return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke={iconColor} strokeWidth="1.2"/><path d="M5.5 3.5v2.5M5.5 7.5v.1" stroke={iconColor} strokeWidth="1.2" strokeLinecap="round"/></svg>
                       }
+                      const targetPage = n.page as Page | undefined
                       return (
-                        <div key={n.id} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
-                          style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div key={n.id}
+                          className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
+                          role={targetPage ? 'button' : undefined}
+                          tabIndex={targetPage ? 0 : undefined}
+                          onClick={targetPage ? () => { playNav(); onNavigate(targetPage); closeNotifPanel() } : undefined}
+                          onKeyDown={targetPage ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playNav(); onNavigate(targetPage); closeNotifPanel() } } : undefined}
+                          style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: targetPage ? 'pointer' : 'default' }}>
                           <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
                             style={{ background: iconBg, border: `1px solid ${iconColor}22` }}>
                             <Icon />
@@ -1001,7 +1015,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                             <p className="text-[12px] font-bold text-white leading-snug">{n.title}</p>
                             {n.body && <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'rgba(233,234,240,0.48)' }}>{n.body}</p>}
                           </div>
-                          <span className="text-[10px] flex-shrink-0 mt-0.5 tabular-nums" style={{ color: 'rgba(82,82,91,0.7)' }}>{n.time}</span>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0 mt-0.5">
+                            <span className="text-[10px] tabular-nums" style={{ color: 'rgba(82,82,91,0.7)' }}>{n.time}</span>
+                            {targetPage && (
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(99,102,241,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M9 18l6-6-6-6"/>
+                              </svg>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -1025,6 +1046,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
               title={user.email}
+              aria-label={user.email ?? t('activeAccount')}
             >
               {userInitial}
             </button>
@@ -1306,6 +1328,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div style={{ position: 'relative', width: '100%', maxWidth: 420 }}>
             <button
               onClick={() => setShowAddAccount(false)}
+              aria-label="Fermer"
               style={{ position: 'absolute', top: -14, right: -14, zIndex: 10, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#12121c', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(148,163,184,0.7)', cursor: 'pointer', fontSize: 14 }}
             >✕</button>
             <AuthPage />
