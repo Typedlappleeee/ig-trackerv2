@@ -81,7 +81,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'phones',      label: 'navPhones',      icon: '📱' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
-      { id: 'captionbank', label: 'navCaptionBank',  icon: '💬' },
     ],
   },
   {
@@ -90,7 +89,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
-      { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
@@ -100,7 +98,6 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Outils vidéo',
     defaultOpen: true,
     items: [
-      { id: 'montage',     label: 'pageMontage',    icon: '✂️' },
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
       { id: 'mixer',       label: 'navMixer',       icon: '🎞️', isNew: true },
