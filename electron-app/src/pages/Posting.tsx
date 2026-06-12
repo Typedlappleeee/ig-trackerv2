@@ -135,6 +135,17 @@ const IconSettings2 = () => (
     <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
   </svg>
 )
+const IconStop = () => (
+  <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+    <rect x="1" y="1" width="7" height="7" rx="1.5" fill="currentColor"/>
+  </svg>
+)
+const IconCredit = () => (
+  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+    <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.1"/>
+    <path d="M5.5 3.5v2l1.2 1" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+  </svg>
+)
 
 export function Posting({ user }: PostingProps) {
   const t = useT()
@@ -611,7 +622,7 @@ export function Posting({ user }: PostingProps) {
               <span className="text-[13px] font-bold text-text">{t('postingAccountsLabel')}</span>
             </div>
             {selectedPhones.size > 0 && (
-              <span className="sf-badge sf-badge-accent anim-scale-in">
+              <span className="sf-badge sf-badge-violet anim-scale-in">
                 {selectedPhones.size}
               </span>
             )}
@@ -656,7 +667,7 @@ export function Posting({ user }: PostingProps) {
         <div className="flex-shrink-0 flex items-center px-3 py-1.5 gap-1 sf-anim-slide-up sf-d100" style={{ borderBottom: '1px solid var(--border)' }}>
           <button
             onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-            className="sf-btn sf-btn-ghost sf-btn-sm flex-1 text-[11px] font-semibold"
+            className="sf-btn sf-btn-ghost sf-btn-sm flex-1 text-[11px] font-semibold cursor-pointer"
             style={{ height: 26, color: 'var(--accent-glow)' }}
           >
             {t('selectAll')}
@@ -664,7 +675,7 @@ export function Posting({ user }: PostingProps) {
           <div className="sf-divider-v" style={{ height: 16 }} />
           <button
             onClick={() => setSelPhones(new Set())}
-            className="sf-btn sf-btn-ghost sf-btn-sm flex-1 text-[11px]"
+            className="sf-btn sf-btn-ghost sf-btn-sm flex-1 text-[11px] cursor-pointer"
             style={{ height: 26 }}
           >
             {t('deselect')}
@@ -673,7 +684,7 @@ export function Posting({ user }: PostingProps) {
           <span className="text-[11px] px-2 tabular-nums text-text3">{visiblePhones.length}</span>
         </div>
 
-        {/* Phone list */}
+        {/* Phone list — sf-card rows with checkbox + avatar + name */}
         <div className="flex-1 overflow-y-auto sf-scroll">
           {visiblePhones.length === 0 ? (
             <div className="sf-empty py-12 sf-reveal">
@@ -683,29 +694,42 @@ export function Posting({ user }: PostingProps) {
               <p className="sf-empty-desc text-[12px]">{t('noPhones')}</p>
             </div>
           ) : (
-            <div className="py-1">
+            <div className="py-1 anim-stagger">
               {visiblePhones.map(phone => {
                 const checked = selectedPhones.has(phone.id)
                 const initials = (phone.ig_username?.[0] ?? phone.phone_name?.[0] ?? '?').toUpperCase()
+                // Status dot: green if online/active, grey otherwise
+                const isOnline = checked // simplified: selected = highlighted as active
                 return (
                   <button
                     key={phone.id}
                     onClick={() => togglePhone(phone.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left relative transition-all"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left relative transition-all cursor-pointer"
                     style={{
                       background: checked ? 'rgba(99,102,241,0.10)' : 'transparent',
-                      borderLeft: checked ? '2px solid var(--accent-lt)' : '2px solid transparent',
+                      borderLeft: checked ? '2px solid var(--accent-l)' : '2px solid transparent',
                     }}
                   >
-                    {/* Avatar */}
-                    <div
-                      className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-black flex-shrink-0"
-                      style={checked
-                        ? { background: avatarGradient(phone.phone_name ?? ''), color: '#fff', boxShadow: '0 2px 10px -3px rgba(99,102,241,0.6)' }
-                        : { background: 'var(--surface-2)', color: 'var(--text-3)' }
-                      }
-                    >
-                      {initials}
+                    {/* Avatar with status dot */}
+                    <div className="relative flex-shrink-0">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-black"
+                        style={checked
+                          ? { background: avatarGradient(phone.phone_name ?? ''), color: '#fff', boxShadow: '0 2px 10px -3px rgba(99,102,241,0.6)' }
+                          : { background: 'var(--surface-2)', color: 'var(--text-3)' }
+                        }
+                      >
+                        {initials}
+                      </div>
+                      {/* Status dot */}
+                      <span
+                        className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                        style={{
+                          borderColor: 'var(--surface)',
+                          background: checked ? 'var(--ok)' : 'rgba(148,163,184,0.3)',
+                          boxShadow: checked ? '0 0 6px rgba(52,211,153,0.5)' : 'none',
+                        }}
+                      />
                     </div>
 
                     {/* Info */}
@@ -724,7 +748,7 @@ export function Posting({ user }: PostingProps) {
                     <div
                       className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
                       style={checked
-                        ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-lt))', boxShadow: '0 0 8px rgba(99,102,241,0.4)' }
+                        ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-l))', boxShadow: '0 0 8px rgba(99,102,241,0.4)' }
                         : { border: '1px solid var(--border-md)' }
                       }
                     >
@@ -737,8 +761,20 @@ export function Posting({ user }: PostingProps) {
           )}
         </div>
 
-        {/* Footer summary */}
-        <div className="flex-shrink-0 p-3 sf-anim-slide-up sf-d150" style={{ borderTop: '1px solid var(--border)' }}>
+        {/* Footer — credit cost badge + selection summary */}
+        <div className="flex-shrink-0 p-3 sf-anim-slide-up sf-d150 space-y-2" style={{ borderTop: '1px solid var(--border)' }}>
+          {/* Credit cost badge */}
+          {selectedPhones.size > 0 && (
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl"
+              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
+              <span className="text-[11px] text-text3">Coût estimé</span>
+              <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <IconCredit />
+                {creditCost} cr
+              </span>
+            </div>
+          )}
+          {/* Selection summary */}
           <div
             className="rounded-xl px-3 py-2.5 flex items-center gap-2.5"
             style={{
@@ -784,19 +820,16 @@ export function Posting({ user }: PostingProps) {
             </div>
           </div>
           <div className="flex items-center gap-2 sf-anim-slide-up sf-d100">
-            {/* Credit pill */}
+            {/* Credit balance pill */}
             {credits.balance !== null && (
-              <div className="sf-badge sf-badge-muted gap-1.5">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <circle cx="5" cy="5" r="4" stroke="var(--accent-glow)" strokeWidth="1.2"/>
-                  <path d="M5 3v2l1.5 1" stroke="var(--accent-glow)" strokeWidth="1" strokeLinecap="round"/>
-                </svg>
-                <span className="text-text2">{credits.balance} cr</span>
-              </div>
+              <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <IconCredit />
+                {credits.balance} cr
+              </span>
             )}
             <button
               onClick={() => { setFilePath(null); setCaption(''); setTopic('') }}
-              className="sf-btn sf-btn-ghost sf-btn-sm gap-1.5 text-[12px]"
+              className="sf-btn sf-btn-ghost sf-btn-sm gap-1.5 text-[12px] cursor-pointer"
             >
               <IconReset />
               {t('reset')}
@@ -811,12 +844,12 @@ export function Posting({ user }: PostingProps) {
             {/* Warning banner */}
             {!bearer && (
               <div className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[12.5px]"
-                style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(245,158,11,0.12)', color: '#FCD34D' }}>
+                  style={{ background: 'rgba(251,191,36,0.12)', color: 'var(--warn)' }}>
                   <IconWarning />
                 </div>
-                <p style={{ color: '#FCD34D' }}>
+                <p style={{ color: 'var(--warn)' }}>
                   {t('bearerMissingWarning')} <strong>{t('navSettings')}</strong>
                 </p>
               </div>
@@ -833,7 +866,7 @@ export function Posting({ user }: PostingProps) {
                 </div>
                 <span className="text-[13px] font-semibold text-text">{t('fileLabel')}</span>
                 {filePath && (
-                  <span className="sf-badge sf-badge-ok ml-auto">{t('readyToPost')}</span>
+                  <span className="sf-badge sf-badge-green ml-auto">{t('readyToPost')}</span>
                 )}
               </div>
 
@@ -841,7 +874,7 @@ export function Posting({ user }: PostingProps) {
                 {filePath ? (
                   /* File selected state */
                   <div className="flex items-center gap-4">
-                    {/* Thumbnail */}
+                    {/* Phone-shaped thumbnail */}
                     <div className="relative flex-shrink-0 rounded-xl overflow-hidden"
                       style={{ width: 80, height: 142, background: '#000', border: '1.5px solid var(--border-accent)', boxShadow: '0 0 20px -5px rgba(99,102,241,0.4)' }}>
                       <VideoThumbnail filePath={filePath} />
@@ -860,22 +893,23 @@ export function Posting({ user }: PostingProps) {
                       <div className="flex gap-2 flex-wrap">
                         <button
                           onClick={() => setShowBankPicker(true)}
-                          className="sf-btn sf-btn-secondary sf-btn-sm gap-1.5 text-[12px]"
+                          className="sf-btn sf-btn-secondary sf-btn-sm gap-1.5 text-[12px] cursor-pointer"
                         >
                           <IconGrid />
                           {t('postFromBank')}
                         </button>
                         <button
                           onClick={pickLocalFile}
-                          className="sf-btn sf-btn-ghost sf-btn-sm gap-1.5 text-[12px]"
+                          className="sf-btn sf-btn-ghost sf-btn-sm gap-1.5 text-[12px] cursor-pointer"
                         >
                           <IconUpload />
                           {t('localFile')}
                         </button>
                         <button
                           onClick={() => setFilePath(null)}
-                          className="sf-btn sf-btn-danger sf-btn-sm sf-btn-icon"
+                          className="sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
                           title="Retirer la vidéo"
+                          aria-label="Retirer la vidéo"
                         >
                           <IconX />
                         </button>
@@ -883,19 +917,23 @@ export function Posting({ user }: PostingProps) {
                     </div>
                   </div>
                 ) : (
-                  /* Empty dropzone */
-                  <div className="flex flex-col items-center justify-center py-10 px-6 rounded-xl text-center"
-                    style={{ border: '1.5px dashed rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.03)' }}>
+                  /* Upload area — sf-card upload zone with icon + filename display */
+                  <div className="flex flex-col items-center justify-center py-10 px-6 rounded-xl text-center cursor-pointer"
+                    style={{ border: '1.5px dashed rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.03)', transition: 'background 0.18s, border-color 0.18s' }}
+                    onClick={() => setShowBankPicker(true)}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.06)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.03)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)' }}
+                  >
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                       style={{ background: 'var(--accent-dim)', border: '1px solid var(--border-accent)', color: 'var(--accent-glow)' }}>
                       <IconVideo />
                     </div>
                     <p className="text-[13.5px] font-semibold text-text mb-1">{t('noVideoSelected')}</p>
                     <p className="text-[12px] text-text3 mb-5">Format 9:16 recommandé · Reel Instagram</p>
-                    <div className="flex gap-2.5 flex-wrap justify-center">
+                    <div className="flex gap-2.5 flex-wrap justify-center" onClick={e => e.stopPropagation()}>
                       <button
                         onClick={() => setShowBankPicker(true)}
-                        className="sf-btn sf-btn-primary sf-btn-sm gap-1.5 text-[12.5px] px-4"
+                        className="sf-btn sf-btn-primary sf-btn-sm gap-1.5 text-[12.5px] px-4 cursor-pointer"
                         style={{ height: 34 }}
                       >
                         <IconGrid />
@@ -903,7 +941,7 @@ export function Posting({ user }: PostingProps) {
                       </button>
                       <button
                         onClick={pickLocalFile}
-                        className="sf-btn sf-btn-secondary sf-btn-sm gap-1.5 text-[12.5px] px-4"
+                        className="sf-btn sf-btn-secondary sf-btn-sm gap-1.5 text-[12.5px] px-4 cursor-pointer"
                         style={{ height: 34 }}
                       >
                         <IconUpload />
@@ -930,7 +968,7 @@ export function Posting({ user }: PostingProps) {
                   <span className="text-[13px] font-semibold text-text">{t('postingDescriptionLabel')}</span>
                 </div>
                 <span
-                  className={`text-[11px] font-mono tabular-nums px-2 py-0.5 rounded-lg sf-badge ${caption.length > 2200 ? 'sf-badge-danger' : 'sf-badge-muted'}`}
+                  className={`text-[11px] font-mono tabular-nums px-2 py-0.5 rounded-lg sf-badge ${caption.length > 2200 ? 'sf-badge-red' : 'sf-badge-violet'}`}
                 >
                   {caption.length}/2200
                 </span>
@@ -957,7 +995,7 @@ export function Posting({ user }: PostingProps) {
                 >
                   <button
                     onClick={() => setAiExpanded(v => !v)}
-                    className="w-full flex items-center justify-between px-4 py-3 transition-all hover:bg-white/[0.02]"
+                    className="w-full flex items-center justify-between px-4 py-3 transition-all hover:bg-white/[0.02] cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5">
                       <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
@@ -971,7 +1009,7 @@ export function Posting({ user }: PostingProps) {
                         {t('generateWithAI')}
                       </span>
                       {!groqKey && (
-                        <span className="sf-badge sf-badge-warn text-[10px]">
+                        <span className="sf-badge sf-badge-violet text-[10px]">
                           {t('postingGroqRequired')}
                         </span>
                       )}
@@ -995,7 +1033,7 @@ export function Posting({ user }: PostingProps) {
                         <button
                           onClick={generateCaption}
                           disabled={!groqKey || generating}
-                          className="sf-btn sf-btn-primary sf-btn-sm gap-1.5 text-[12px] disabled:opacity-40"
+                          className="sf-btn sf-btn-primary sf-btn-sm gap-1.5 text-[12px] disabled:opacity-40 cursor-pointer"
                           style={{ minWidth: 90, height: 34 }}
                         >
                           {generating ? (
@@ -1057,9 +1095,9 @@ export function Posting({ user }: PostingProps) {
                   </div>
                   <button
                     onClick={() => setWithHashtags(v => !v)}
-                    className="relative w-11 h-6 rounded-full flex-shrink-0 transition-all"
+                    className="relative w-11 h-6 rounded-full flex-shrink-0 transition-all cursor-pointer"
                     style={{
-                      background: withHashtags ? 'linear-gradient(130deg, var(--accent), var(--accent-lt))' : 'var(--surface-3)',
+                      background: withHashtags ? 'linear-gradient(130deg, var(--accent), var(--accent-l))' : 'var(--surface-3)',
                       border: `1px solid ${withHashtags ? 'var(--border-accent)' : 'var(--border-md)'}`,
                       boxShadow: withHashtags ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
                     }}
@@ -1076,7 +1114,7 @@ export function Posting({ user }: PostingProps) {
             {(posting || progress > 0) && (
               <div
                 className="sf-card overflow-hidden anim-scale-in"
-                style={{ borderColor: posting ? 'rgba(99,102,241,0.35)' : 'var(--border)', boxShadow: posting ? '0 0 30px -8px rgba(99,102,241,0.25)' : 'none' }}
+                style={{ borderColor: posting ? 'rgba(99,102,241,0.35)' : 'var(--border)', boxShadow: posting ? '0 0 0 1px var(--accent), 0 0 30px -8px rgba(99,102,241,0.25)' : 'none' }}
               >
                 <div className="p-5 space-y-3">
                   <div className="flex items-center justify-between">
@@ -1088,26 +1126,27 @@ export function Posting({ user }: PostingProps) {
                         {posting ? t('publishingProgress') : t('publishingDone')}
                       </span>
                       {!posting && lastRun && (
-                        <span className={`sf-badge ${lastRun.err === 0 ? 'sf-badge-ok' : 'sf-badge-warn'}`}>
+                        <span className={`sf-badge ${lastRun.err === 0 ? 'sf-badge-green' : 'sf-badge-violet'}`}>
                           {lastRun.ok}/{lastRun.total} réussie{lastRun.ok > 1 ? 's' : ''}{lastRun.err ? ` · ${lastRun.err} échec${lastRun.err > 1 ? 's' : ''}` : ''}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2.5">
+                      {/* Stop button — sf-btn-danger, prominent during run */}
                       {posting && (
                         <button
                           onClick={() => setShowStopConfirm(true)}
                           disabled={stopping}
-                          className="sf-btn sf-btn-danger sf-btn-sm gap-1.5 text-[12px]"
+                          className="sf-btn sf-btn-danger sf-btn-sm gap-1.5 text-[12px] cursor-pointer"
                           style={{ height: 28 }}
                         >
-                          <span style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor', display: 'inline-block' }} />
+                          <IconStop />
                           {stopping ? 'Arrêt…' : 'Stop'}
                         </button>
                       )}
                       <span
                         className="text-[15px] font-black font-mono tabular-nums"
-                        style={{ color: progress >= 100 ? 'var(--ok)' : 'var(--accent-glow)' }}
+                        style={{ color: progress >= 100 ? 'var(--ok)' : 'var(--accent-l)' }}
                       >
                         {progress}%
                       </span>
@@ -1117,18 +1156,18 @@ export function Posting({ user }: PostingProps) {
                   {/* Progress bar */}
                   <div className="sf-progress">
                     <div
-                      className={`sf-progress-bar ${progress >= 100 ? '' : ''}`}
+                      className="sf-progress-bar"
                       style={{
                         width: `${progress}%`,
                         background: progress >= 100
                           ? 'var(--ok)'
-                          : 'linear-gradient(90deg, var(--accent), var(--accent-glow))',
+                          : 'linear-gradient(90deg, var(--accent), var(--accent-l))',
                         transition: 'width 0.7s ease',
                       }}
                     />
                   </div>
 
-                  {/* Statut par téléphone — visible en direct pendant le run */}
+                  {/* Per-phone progress rows with status badges */}
                   {phoneRun.size > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {phones.filter(p => phoneRun.has(p.id)).map(p => {
@@ -1137,6 +1176,10 @@ export function Posting({ user }: PostingProps) {
                           st.status === 'done'    ? OK :
                           st.status === 'error'   ? ERR :
                           st.status === 'posting' ? ACCENT_L : WARN
+                        const badgeCls =
+                          st.status === 'done'    ? 'sf-badge sf-badge-green' :
+                          st.status === 'error'   ? 'sf-badge sf-badge-red' :
+                          st.status === 'posting' ? 'sf-badge sf-badge-violet' : 'sf-badge'
                         const label =
                           st.status === 'done'    ? 'publié' :
                           st.status === 'error'   ? (st.detail ?? 'échec') :
@@ -1153,17 +1196,17 @@ export function Posting({ user }: PostingProps) {
                               style={{ background: color }}
                             />
                             <span className="truncate">{p.ig_username ? `@${p.ig_username}` : p.phone_name}</span>
-                            <span className="flex-shrink-0" style={{ color }}>{label}</span>
+                            <span className={badgeCls} style={{ padding: '1px 5px', fontSize: 10 }}>{label}</span>
                           </span>
                         )
                       })}
                     </div>
                   )}
 
-                  {/* Logs toggle */}
+                  {/* Logs expansion — monospace dark inset panel */}
                   <button
                     onClick={() => setShowLogs(v => !v)}
-                    className="sf-btn sf-btn-ghost sf-btn-sm gap-1.5 text-[11.5px]"
+                    className="sf-btn sf-btn-ghost sf-btn-sm gap-1.5 text-[11.5px] cursor-pointer"
                     style={{ color: 'var(--text-3)', height: 28 }}
                   >
                     <span style={{ color: 'var(--text-3)' }}>
@@ -1174,15 +1217,20 @@ export function Posting({ user }: PostingProps) {
 
                   {showLogs && logs.length > 0 && (
                     <div
-                      className="rounded-xl p-3 max-h-52 overflow-auto font-mono text-[11px] space-y-1"
-                      style={{ background: 'rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}
+                      className="rounded-xl p-3 max-h-52 overflow-auto"
+                      style={{
+                        background: '#050508',
+                        border: '1px solid rgba(255,255,255,0.07)',
+                        fontFamily: 'ui-monospace, "Cascadia Code", "Fira Code", monospace',
+                        fontSize: 11,
+                      }}
                     >
                       {logs.map((l, i) => (
                         <div
                           key={i}
-                          className={`flex gap-2 ${l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'}`}
+                          className={`flex gap-2 leading-relaxed ${l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'}`}
                         >
-                          <span className="flex-shrink-0 text-text3 tabular-nums">{l.time}</span>
+                          <span className="flex-shrink-0 text-text3 tabular-nums select-none">{l.time}</span>
                           <span className="break-all">{l.message}</span>
                         </div>
                       ))}
@@ -1194,79 +1242,84 @@ export function Posting({ user }: PostingProps) {
             )}
 
             {/* ── ACTION BAR ─────────────────────────────────────────────── */}
-            <div className="flex gap-3 pb-6 pt-1">
-              {/* Post now */}
-              <button
-                onClick={post}
-                disabled={!canPost}
-                title={canPost ? undefined
-                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
-                  : selectedPhones.size === 0 ? 'Sélectionne au moins un téléphone'
-                  : !filePath ? 'Choisis une vidéo à publier'
-                  : captionTooLong ? 'Description trop longue (max 2200 caractères)'
-                  : 'Publication en cours…'}
-                className="flex-[2] py-3.5 rounded-2xl text-[14px] font-bold text-white transition-all active:scale-[0.99] disabled:cursor-not-allowed relative overflow-hidden"
-                style={canPost ? {
-                  background: 'linear-gradient(130deg, #4F46E5, #6366F1, #A855F7)',
-                  boxShadow: '0 6px 28px -6px rgba(99,102,241,0.65), 0 0 0 1px rgba(168,85,247,0.3)',
-                } : {
-                  background: 'var(--surface-2)',
-                  border: '1px solid var(--border)',
-                  opacity: 0.5,
-                }}
-              >
-                {/* Shimmer when active */}
-                {canPost && (
-                  <div className="absolute inset-0 pointer-events-none" style={{
-                    background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.07) 50%, transparent 60%)',
-                    backgroundSize: '200% 100%',
-                    animation: 'progressShimmer 3s linear infinite',
-                  }} />
-                )}
-                {posting ? (
-                  <span className="flex items-center justify-center gap-2.5">
-                    <span className="sf-spinner" style={{ width: 16, height: 16 }} />
-                    {t('publishingProgress')}
+            <div className="space-y-3 pb-6 pt-1">
+              {/* Credit cost display — sf-badge-violet showing total cost */}
+              {selectedPhones.size > 0 && (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12 }}>
+                    <IconCredit />
+                    {creditCost} crédit{creditCost > 1 ? 's' : ''}
+                    <span style={{ opacity: 0.6, fontSize: 11 }}>
+                      · {selectedPhones.size} tel × {CREDIT_COSTS.posting}
+                    </span>
                   </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-2">
-                    <IconSend />
-                    {t('launchPost')}
-                    {selectedPhones.size > 0 && (
-                      <span style={{ opacity: 0.85, fontWeight: 600 }}>
-                        · {creditCost} cr
-                      </span>
-                    )}
-                  </span>
-                )}
-              </button>
+                  {credits.balance !== null && (
+                    <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                      solde : {credits.balance}
+                    </span>
+                  )}
+                </div>
+              )}
 
-              {/* Schedule */}
-              <button
-                onClick={() => setShowScheduleModal(true)}
-                disabled={!canPost}
-                title={canPost ? undefined
-                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
-                  : selectedPhones.size === 0 ? 'Sélectionne au moins un téléphone'
-                  : !filePath ? 'Choisis une vidéo à publier'
-                  : captionTooLong ? 'Description trop longue (max 2200 caractères)'
-                  : 'Publication en cours…'}
-                className="sf-btn sf-btn-secondary flex-1 gap-2 text-[13px] font-semibold rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ height: 'auto', paddingTop: '0.875rem', paddingBottom: '0.875rem' }}
-              >
-                <IconCalendar />
-                {t('scheduleBtn')} · {CREDIT_COSTS.posting} cr
-              </button>
+              <div className="flex gap-3">
+                {/* Post now — sf-btn-primary sf-btn-lg */}
+                <button
+                  onClick={post}
+                  disabled={!canPost}
+                  title={canPost ? undefined
+                    : !bearer ? 'Connecte GéeLark dans les Paramètres'
+                    : selectedPhones.size === 0 ? 'Sélectionne au moins un téléphone'
+                    : !filePath ? 'Choisis une vidéo à publier'
+                    : captionTooLong ? 'Description trop longue (max 2200 caractères)'
+                    : 'Publication en cours…'}
+                  className="sf-btn sf-btn-primary sf-btn-lg flex-[2] cursor-pointer disabled:cursor-not-allowed"
+                  style={canPost ? {
+                    background: 'linear-gradient(130deg, #4F46E5, #6366F1, #A855F7)',
+                    boxShadow: '0 6px 28px -6px rgba(99,102,241,0.65), 0 0 0 1px rgba(168,85,247,0.3)',
+                    position: 'relative', overflow: 'hidden',
+                  } : {
+                    opacity: 0.5,
+                  }}
+                >
+                  {/* Shimmer when active */}
+                  {canPost && (
+                    <span aria-hidden className="absolute inset-0 pointer-events-none" style={{
+                      background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.07) 50%, transparent 60%)',
+                      backgroundSize: '200% 100%',
+                      animation: 'progressShimmer 3s linear infinite',
+                    }} />
+                  )}
+                  {posting ? (
+                    <span className="flex items-center justify-center gap-2.5">
+                      <span className="sf-spinner" style={{ width: 16, height: 16 }} />
+                      {t('publishingProgress')}
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <IconSend />
+                      {t('launchPost')}
+                    </span>
+                  )}
+                </button>
+
+                {/* Schedule */}
+                <button
+                  onClick={() => setShowScheduleModal(true)}
+                  disabled={!canPost}
+                  title={canPost ? undefined
+                    : !bearer ? 'Connecte GéeLark dans les Paramètres'
+                    : selectedPhones.size === 0 ? 'Sélectionne au moins un téléphone'
+                    : !filePath ? 'Choisis une vidéo à publier'
+                    : captionTooLong ? 'Description trop longue (max 2200 caractères)'
+                    : 'Publication en cours…'}
+                  className="sf-btn sf-btn-secondary flex-1 gap-2 text-[13px] font-semibold rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  style={{ height: 'auto', paddingTop: '0.875rem', paddingBottom: '0.875rem' }}
+                >
+                  <IconCalendar />
+                  {t('scheduleBtn')} · {CREDIT_COSTS.posting} cr
+                </button>
+              </div>
             </div>
-
-            {/* Coût en crédits — visible AVANT de lancer */}
-            {selectedPhones.size > 0 && (
-              <p style={{ margin: '-12px 0 18px', fontSize: 11.5, color: 'var(--text-3)', textAlign: 'center' }}>
-                💎 Coût immédiat : <strong style={{ color: ACCENT_L }}>{creditCost} crédit{creditCost > 1 ? 's' : ''}</strong>
-                {' '}({selectedPhones.size} téléphone{selectedPhones.size > 1 ? 's' : ''} × {CREDIT_COSTS.posting})
-                {' '}· programmation : {CREDIT_COSTS.posting} cr · solde : {credits.balance ?? '—'}
-              </p>
-            )}
 
           </div>
         </div>
@@ -1293,6 +1346,19 @@ export function Posting({ user }: PostingProps) {
           onClose={() => setShowScheduleModal(false)}
         />
       )}
+
+      {/* Stop confirmation dialog */}
+      <ConfirmDialog
+        open={showStopConfirm}
+        title="Arrêter la publication ?"
+        message="Les tâches en cours seront annulées et les téléphones éteints. Les crédits des publications non terminées seront remboursés."
+        confirmLabel="Arrêter"
+        cancelLabel="Continuer"
+        danger
+        busy={stopping}
+        onConfirm={async () => { setShowStopConfirm(false); await stopRun() }}
+        onCancel={() => setShowStopConfirm(false)}
+      />
     </div>
   )
 }
