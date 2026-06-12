@@ -140,6 +140,9 @@ export function Warmup({ user }: WarmupProps) {
   // ── Tab ───────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>('login')
 
+  // ── Avertissement développement ───────────────────────────────────────────
+  const [devNoticeOpen, setDevNoticeOpen] = useState(true)
+
   // ── LOG IN state ──────────────────────────────────────────────────────────
   const [loginCreds, setLoginCreds] = useState<Record<string, LoginCred>>({})
   const [bulkCreds,  setBulkCreds]  = useState('')
@@ -415,19 +418,21 @@ export function Warmup({ user }: WarmupProps) {
   return (
     <div className="sf-page anim-page">
 
-      {/* ── En cours de développement ── */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(14,14,22,0.97)', backdropFilter: 'blur(6px)' }}>
-        <div className="sf-card sf-anim-slide-up" style={{ maxWidth: 440, padding: '48px 56px', textAlign: 'center', borderColor: 'rgba(99,102,241,0.18)', background: 'rgba(99,102,241,0.03)' }}>
-          <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', color: 'var(--accent)' }}>
-            <IconBolt size={28} />
-          </div>
-          <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ivory)', marginBottom: 12 }}>En cours de développement</h2>
-          <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65 }}>Cette fonctionnalité sera bientôt disponible. Merci de votre patience.</p>
-          <div style={{ marginTop: 24 }}>
-            <span className="sf-badge sf-badge-violet" style={{ fontSize: 11, padding: '5px 14px' }}>Bientôt disponible</span>
+      {/* ── Avertissement : en développement ── */}
+      {devNoticeOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(14,14,22,0.85)', backdropFilter: 'blur(6px)' }}>
+          <div className="sf-card sf-anim-slide-up" style={{ maxWidth: 440, padding: '40px 48px', textAlign: 'center', borderColor: 'rgba(245,158,11,0.22)', background: 'rgba(245,158,11,0.03)' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#F59E0B' }}>
+              <IconBolt size={26} />
+            </div>
+            <h2 style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ivory)', marginBottom: 10 }}>En développement</h2>
+            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65 }}>Cette fonctionnalité est encore en développement — il peut y avoir des bugs.</p>
+            <button onClick={() => setDevNoticeOpen(false)} className="sf-btn sf-btn-primary cursor-pointer" style={{ marginTop: 24 }}>
+              Continuer
+            </button>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Page header ───────────────────────────────────────────────────────── */}
       <div className="sf-page-header">

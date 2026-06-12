@@ -71,7 +71,7 @@ interface LayoutProps {
   children:  React.ReactNode
 }
 
-interface NavItem  { id: Page; label: string; icon: string; beta?: boolean; isNew?: boolean }
+interface NavItem  { id: Page; label: string; icon: string; beta?: boolean; isNew?: boolean; dev?: boolean }
 interface NavSection { title: string; items: NavItem[]; defaultOpen?: boolean }
 
 const NAV_SECTIONS: NavSection[] = [
@@ -90,7 +90,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
+      { id: 'warmup',      label: 'navWarmup',       icon: '🔥', dev: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
   },
@@ -100,7 +100,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
-      { id: 'mixer',       label: 'navMixer',       icon: '🎞️', isNew: true },
+      { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
     ],
   },
 ]
@@ -179,12 +179,13 @@ interface SidebarNavItemProps {
   iconKey: IconKey
   beta?: boolean
   isNew?: boolean
+  dev?: boolean
   active: boolean
   collapsed: boolean
   onNavigate: (page: Page) => void
 }
 
-function SidebarNavItem({ id, label, iconKey, beta, isNew, active, collapsed, onNavigate }: SidebarNavItemProps) {
+function SidebarNavItem({ id, label, iconKey, beta, isNew, dev, active, collapsed, onNavigate }: SidebarNavItemProps) {
   const [hovered, setHovered] = useState(false)
   const [tooltipY, setTooltipY] = useState(0)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -219,6 +220,9 @@ function SidebarNavItem({ id, label, iconKey, beta, isNew, active, collapsed, on
             {isNew && (
               <span title="Nouvelle fonctionnalité" className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.08em' }}>NEW</span>
             )}
+            {dev && (
+              <span title="En cours de développement — des bugs peuvent survenir" className="sf-badge sf-badge-warn" style={{ fontSize: 9, letterSpacing: '0.08em' }}>EN DEV</span>
+            )}
           </>
         )}
       </button>
@@ -228,6 +232,7 @@ function SidebarNavItem({ id, label, iconKey, beta, isNew, active, collapsed, on
           {label}
           {beta && <span style={{ marginLeft: 6, fontSize: 9, color: 'rgba(148,163,184,0.5)' }}>BETA</span>}
           {isNew && <span style={{ marginLeft: 6, fontSize: 9, color: '#34d399' }}>NEW</span>}
+          {dev && <span style={{ marginLeft: 6, fontSize: 9, color: '#F59E0B' }}>EN DEV</span>}
         </div>
       )}
     </div>
@@ -669,6 +674,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                         iconKey={PAGE_ICON[item.id] ?? defaultIcon}
                         beta={item.beta}
                         isNew={item.isNew}
+                        dev={item.dev}
                         active={page === item.id}
                         collapsed={collapsed}
                         onNavigate={onNavigate}
