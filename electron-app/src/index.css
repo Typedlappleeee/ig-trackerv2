@@ -87,7 +87,7 @@ html, body, #root {
 /* ── Page & element entrance animations ─────────────────────────────────────── */
 @keyframes page-fade-in {
   0%   { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 1; transform: none; }
 }
 @keyframes slide-in-right {
   0%   { opacity: 0; transform: translateX(14px); }
@@ -1821,10 +1821,13 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
 html[data-glass="off"] #root::after { display: none; }
 
 /* ── Cinematic page entrance (slight rise + blur settle) ─────────────────── */
+/* 100% must end at none — a lingering transform/filter (fill-mode: both) turns
+   the page into the containing block for position:fixed modals, breaking their
+   centering once the page is scrolled. */
 @keyframes sf-page-cine {
   0%   { opacity: 0; transform: translateY(12px) scale(0.995); filter: blur(5px); }
   60%  { filter: blur(0); }
-  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: none; }
 }
 .anim-page { animation: sf-page-cine 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
