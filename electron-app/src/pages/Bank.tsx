@@ -265,15 +265,16 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Drag-drop zone */}
+          {/* Drag-drop zone — dashed border upload area */}
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
-            className={`
-              border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 py-10 transition-all cursor-default
-              ${dragOver ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/50 bg-surface2/40'}
-            `}
+            className="border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 py-10 transition-all cursor-default"
+            style={{
+              borderColor: dragOver ? 'rgba(99,102,241,0.7)' : 'rgba(99,102,241,0.3)',
+              background: dragOver ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.02)',
+            }}
           >
             <span className={dragOver ? 'text-accent' : 'text-text3'}>
               {dragOver ? <IconFolderOpen size={44} /> : <IconClapperboard size={44} />}
@@ -913,7 +914,7 @@ export function Bank({ user }: BankProps) {
 
         <div className="w-px h-5 bg-border flex-shrink-0" />
 
-        {/* Type filter pills */}
+        {/* Sort/filter bar — sf-btn-ghost tab pills */}
         <div className="flex gap-1">
           {([
             { k: 'all',   l: t('bankTypeAll')   },
@@ -925,11 +926,15 @@ export function Bank({ user }: BankProps) {
             <button
               key={tf.k}
               onClick={() => setTypeFilter(tf.k)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`sf-btn sf-btn-ghost sf-btn-sm cursor-pointer px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
                 typeFilter === tf.k
-                  ? 'bg-accent/20 text-accent border border-accent/40'
-                  : 'bg-transparent text-text3 border border-transparent hover:text-text2'
+                  ? 'text-accent'
+                  : 'text-text3 hover:text-text2'
               }`}
+              style={typeFilter === tf.k ? {
+                background: 'rgba(99,102,241,0.15)',
+                border: '1px solid rgba(99,102,241,0.35)',
+              } : {}}
             >{tf.l}</button>
           ))}
         </div>
@@ -1193,20 +1198,28 @@ export function Bank({ user }: BankProps) {
               <div className="flex justify-center py-20"><Spinner size="lg" /></div>
 
             ) : items.length === 0 ? (
-              /* Empty state — no items at all */
-              <div className="sf-empty py-24">
-                <div className="sf-empty-icon sf-anim-scale-spring">
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                  </svg>
+              /* Empty state — upload CTA centered */
+              <div className="flex flex-col items-center justify-center py-24 gap-6">
+                <div
+                  className="w-24 h-24 rounded-3xl flex items-center justify-center sf-anim-scale-spring"
+                  style={{
+                    background: 'rgba(99,102,241,0.08)',
+                    border: '2px dashed rgba(99,102,241,0.3)',
+                    color: 'var(--accent)',
+                    boxShadow: '0 0 40px -10px rgba(99,102,241,0.3)',
+                  }}
+                >
+                  <IconUpload size={36} />
                 </div>
-                <p className="sf-empty-title">{t('bankEmptyTitle')}</p>
-                <p className="sf-empty-desc">{t('bankEmptyDesc')}</p>
+                <div className="text-center max-w-sm">
+                  <p className="text-[17px] font-bold text-text">{t('bankEmptyTitle')}</p>
+                  <p className="text-[13px] text-text2 mt-1.5 leading-relaxed">{t('bankEmptyDesc')}</p>
+                </div>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="sf-btn sf-btn-primary mt-4 cursor-pointer"
+                  className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
                 >
-                  <IconPlus size={13} />
+                  <IconPlus size={14} />
                   {t('bankAddMediaBtn')}
                 </button>
               </div>
@@ -1223,7 +1236,7 @@ export function Bank({ user }: BankProps) {
 
             ) : viewMode === 'grid' ? (
               /* ── Grid view ── */
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 anim-stagger">
                 {visible.map(item => (
                   <VideoCard
                     key={item.id}
@@ -1500,6 +1513,30 @@ export function Bank({ user }: BankProps) {
       {tagsItem && (
         <TagsModal item={tagsItem} onSave={saveTagsSave} onClose={() => setTagsItem(null)} />
       )}
+
+      {/* ── ConfirmDialog — single item delete ── */}
+      <ConfirmDialog
+        open={!!confirmDeleteItem}
+        title={t('bankCtxDelete')}
+        message={confirmDeleteItem ? `« ${confirmDeleteItem.title} » ${t('bankDeleteConfirmMsg') || 'will be permanently deleted.'}` : ''}
+        confirmLabel={t('bankCtxDelete')}
+        danger
+        busy={deleteBusy}
+        onConfirm={() => { if (confirmDeleteItem) performDeleteItem(confirmDeleteItem) }}
+        onCancel={() => setConfirmDeleteItem(null)}
+      />
+
+      {/* ── ConfirmDialog — bulk delete ── */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title={`${t('bankDeleteSelected')} (${selectedIds.size})`}
+        message={`${selectedIds.size} ${t('bankDeleteBulkConfirmMsg') || 'items will be permanently deleted.'}`}
+        confirmLabel={t('bankDeleteSelected')}
+        danger
+        busy={deleteBusy}
+        onConfirm={performDeleteSelected}
+        onCancel={() => setConfirmBulkDelete(false)}
+      />
     </div>
   )
 

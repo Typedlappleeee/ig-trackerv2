@@ -81,9 +81,9 @@ function CopyButton({ text }: { text: string }) {
       onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
       className="cursor-pointer inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider transition-all"
       style={{
-        background: copied ? 'rgba(34,197,94,0.1)' : 'rgba(99,102,241,0.08)',
-        color: copied ? '#22C55E' : '#818CF8',
-        border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(99,102,241,0.2)'}`,
+        background: copied ? 'rgba(52,211,153,0.12)' : 'rgba(99,102,241,0.08)',
+        color: copied ? 'var(--ok)' : 'var(--accent-l)',
+        border: `1px solid ${copied ? 'rgba(52,211,153,0.28)' : 'rgba(99,102,241,0.2)'}`,
       }}>
       <Icon name={copied ? 'check' : 'copy'} size={13} />
       <span>{copied ? t('copied').toUpperCase() : t('copy').toUpperCase()}</span>
@@ -95,7 +95,7 @@ function CopyButton({ text }: { text: string }) {
 function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
   const charCount = value.length
   return (
-    <div className="relative rounded-2xl overflow-hidden anim-scale-in"
+    <div className="sf-card sf-anim-slide-up relative rounded-2xl overflow-hidden"
       style={{ background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(99,102,241,0.18)' }}>
       {/* Terminal header */}
       <div className="flex items-center gap-3 px-4 py-2.5"
@@ -116,7 +116,7 @@ function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
         value={value}
         readOnly
         className="w-full px-5 py-4 text-[12px] font-mono resize-none focus:outline-none leading-relaxed"
-        style={{ background: 'transparent', color: '#818CF8' }}
+        style={{ background: 'transparent', color: 'var(--accent-l)' }}
       />
     </div>
   )
@@ -162,7 +162,7 @@ function ToolShell({ title, icon, children, onBack, error }: {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'rgba(99,102,241,0.08)',
             border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1',
+            color: 'var(--accent)',
           }}>
             {icon}
           </div>
@@ -176,11 +176,12 @@ function ToolShell({ title, icon, children, onBack, error }: {
 
       <div className="sf-page-body">
         <div className="max-w-2xl space-y-4">
+          {/* Error state — red-tinted card */}
           {error && (
-            <div className="rounded-xl px-4 py-3 flex items-center gap-3 anim-scale-in"
-              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)' }}>
-              <span className="text-danger flex-shrink-0"><Icon name="alert-triangle" size={15} /></span>
-              <p className="text-[12px] font-mono text-danger">{error}</p>
+            <div className="sf-card rounded-xl px-4 py-3 flex items-center gap-3 sf-anim-slide-up"
+              style={{ background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.28)', boxShadow: '0 0 16px -4px rgba(248,113,113,0.15)' }}>
+              <span style={{ color: 'var(--err)' }} className="flex-shrink-0"><Icon name="alert-triangle" size={15} /></span>
+              <p className="text-[12px] font-mono" style={{ color: 'var(--err)' }}>{error}</p>
             </div>
           )}
           {children}
@@ -212,7 +213,7 @@ function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => 
     setLoading(true); setError(null); setResult('')
     try {
       const text = await groqCall(groqKey,
-        `Expert Instagram growth hacking. Analyse la stratégie pour la niche/compte : ${handle.trim()}. Recommandations structurées : 1) Type de contenu à créer, 2) Fréquence idéale, 3) Heures de publication optimales, 4) Stratégie hashtags, 5) Idées Reels viraux, 6) Tactiques d’engagement. Bullet points clairs.`,
+        `Expert Instagram growth hacking. Analyse la stratégie pour la niche/compte : ${handle.trim()}. Recommandations structurées : 1) Type de contenu à créer, 2) Fréquence idéale, 3) Heures de publication optimales, 4) Stratégie hashtags, 5) Idées Reels viraux, 6) Tactiques d'engagement. Bullet points clairs.`,
         700)
       setResult(text)
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
@@ -329,9 +330,9 @@ Ton : ${tone}
 Structure obligatoire :
 🎣 HOOK (0-3s) : phrase choc ou question qui arrête le scroll
 📖 CORPS (corps principal) : développement en étapes claires, chaque point sur une nouvelle ligne
-🚀 CTA (dernières secondes) : appel à l’action précis (follow, like, commentaire)
+🚀 CTA (dernières secondes) : appel à l'action précis (follow, like, commentaire)
 
-Format le script comme si c’était prêt à lire face caméra. Inclus les indications de timing. Maximum ${duration === '15s' ? '80' : duration === '30s' ? '150' : '280'} mots.`,
+Format le script comme si c'était prêt à lire face caméra. Inclus les indications de timing. Maximum ${duration === '15s' ? '80' : duration === '30s' ? '150' : '280'} mots.`,
         600)
       setResult(text)
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
@@ -382,7 +383,7 @@ function HooksAB({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
     setLoading(true); setError(null); setResult('')
     try {
       const text = await groqCall(groqKey,
-        `Tu es expert en copywriting Instagram. Pour le sujet : "${subject.trim()}", génère exactement 3 hooks d’accroche radicalement différents pour un Reel.
+        `Tu es expert en copywriting Instagram. Pour le sujet : "${subject.trim()}", génère exactement 3 hooks d'accroche radicalement différents pour un Reel.
 
 HOOK A — Style CURIOSITÉ : crée une tension, donne envie de savoir la suite
 HOOK B — Style CHOC/CONTRADICTION : affirmation surprenante ou contre-intuitive
@@ -598,15 +599,15 @@ Produis une analyse complète :
 [types de vidéos, formats, fréquence, longueur, style]
 
 🪝 FORMULES DE HOOKS
-[les patterns de hooks qu’ils utilisent le plus]
+[les patterns de hooks qu'ils utilisent le plus]
 
 📊 POINTS FORTS À COPIER
-[ce qu’ils font bien et que tu peux répliquer]
+[ce qu'ils font bien et que tu peux répliquer]
 
 💥 GAPS & OPPORTUNITÉS
-[ce qu’ils ne font pas et que tu peux exploiter pour les dépasser]
+[ce qu'ils ne font pas et que tu peux exploiter pour les dépasser]
 
-🎯 PLAN D’ACTION
+🎯 PLAN D'ACTION
 [3 actions concrètes à mettre en place cette semaine]`,
         800)
       setResult(text)
@@ -647,7 +648,7 @@ const GROQ_TOOLS: { id: GroqToolId; icon: React.ReactNode; title: string; desc: 
 
 const VISION_TOOLS_META: { id: VisionToolId; icon: React.ReactNode; title: string; desc: string; tags: string[]; needsAnthopic: boolean }[] = [
   { id: 'vision-score',     icon: <Icon name="flame" />, title: 'Viral Score',      desc: 'Score 1-10 on 5 criteria: hook, retention, text, thumbnail, dynamism.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
-  { id: 'vision-structure', icon: <Icon name="dna" />,   title: 'Viral Structure',  desc: 'Breaks down a video’s timeline: hook, value, CTA, transitions.',        tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
+  { id: 'vision-structure', icon: <Icon name="dna" />,   title: 'Viral Structure',  desc: 'Breaks down a video\'s timeline: hook, value, CTA, transitions.',        tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
   { id: 'vision-thumb',     icon: <Icon name="image" />, title: 'Audit Thumbnail',   desc: 'Score contrast, readability, emotion, colors + priority fixes.',         tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
 ]
 
@@ -670,13 +671,14 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
         {/* Icon row */}
         <div className="flex items-start justify-between gap-2">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
-            style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(99,102,241,0.22)', color: '#818CF8' }}>
+            style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}>
             {icon}
           </div>
           {locked && (
-            <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0"
+            <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0 inline-flex items-center gap-1"
               style={{ background: 'rgba(245,158,11,0.08)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.18)' }}>
-              🔒 Clé Anthropic requise
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Clé Anthropic requise
             </span>
           )}
         </div>
@@ -754,12 +756,14 @@ export function AiTools({ user }: AiToolsProps) {
         {/* Page header */}
         <div className="sf-page-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            {/* Sparkle icon in header tile */}
             <div className="sf-anim-scale-spring" style={{
               width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.10))',
               border: '1px solid rgba(99,102,241,0.28)',
-              color: '#6366F1',
+              color: 'var(--accent)',
+              boxShadow: '0 0 20px -6px rgba(99,102,241,0.4)',
             }}>
               <Icon name="sparkles" size={22} />
             </div>
@@ -772,7 +776,7 @@ export function AiTools({ user }: AiToolsProps) {
 
         <div className="sf-page-body">
           <div className="max-w-lg">
-            <div className="sf-card rounded-2xl p-6 anim-scale-in"
+            <div className="sf-card rounded-2xl p-6 sf-anim-slide-up"
               style={{ background: 'rgba(245,158,11,0.04)', borderColor: 'rgba(245,158,11,0.18)' }}>
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -822,13 +826,14 @@ export function AiTools({ user }: AiToolsProps) {
       {/* ── Page header ── */}
       <div className="sf-page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          {/* Icon */}
+          {/* Sparkle/AI icon in header tile */}
           <div className="sf-anim-scale-spring" style={{
             width: 46, height: 46, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.10))',
             border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1',
+            color: 'var(--accent)',
+            boxShadow: '0 0 20px -6px rgba(99,102,241,0.4)',
           }}>
             <Icon name="sparkles" size={22} />
           </div>
