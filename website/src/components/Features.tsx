@@ -1,120 +1,236 @@
-import type { ComponentType, SVGProps } from 'react'
-import {
-  IconLayers,
-  IconCalendar,
-  IconSparkles,
-  IconFlame,
-  IconScissors,
-  IconSmartphone,
-  IconUsers,
-  IconCoins,
-} from './Icons'
+import { useEffect, useRef } from 'react'
 
-type Feature = {
-  icon: ComponentType<SVGProps<SVGSVGElement>>
-  title: string
-  text: string
-  accent: string
-  /** Tailwind column-span classes for the bento grid (lg breakpoint). */
-  span: string
-}
+// ── Inline SVG icons ─────────────────────────────────────────────────────────
+const ILayers   = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+const ICalendar = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+const ISparkles = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M5 3l.5 1.5L7 5l-1.5.5L5 7l-.5-1.5L3 5l1.5-.5z"/><path d="M19 13l.5 1.5L21 15l-1.5.5L19 17l-.5-1.5L17 15l1.5-.5z"/></svg>
+const IFlame    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3z"/></svg>
+const IScissors = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+const IPhone    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+const IUsers    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+const ICoins    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><line x1="16.71" y1="13.88" x2="13.38" y2="17.21"/></svg>
 
-const FEATURES: Feature[] = [
+const FEATURES = [
   {
-    icon: IconLayers,
+    icon: ILayers,
     title: 'Mass Posting',
-    text: "Publie sur des dizaines de comptes en parallèle. Choisis un dossier de vidéos, lance, et chaque appareil se libère dès sa publication terminée.",
+    text: 'Publie simultanément sur des dizaines de comptes. Chaque phone se libère dès que sa publication est terminée.',
     accent: '#A855F7',
     span: 'lg:col-span-2',
+    big: true,
+    preview: (
+      <div className="mt-4 flex gap-2 flex-wrap">
+        {['iPhone-01', 'iPhone-02', 'iPhone-03', 'iPhone-04', 'iPhone-05'].map((n, i) => (
+          <div key={n} className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"
+            style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#C084FC', animationDelay: `${i * 0.15}s` }}>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            {n}
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"
+          style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#C084FC' }}>
+          +47 appareils...
+        </div>
+      </div>
+    ),
   },
   {
-    icon: IconCalendar,
+    icon: ICalendar,
     title: 'Programmation',
-    text: "Planifie tes posts à l'avance sur un calendrier visuel. Files d'attente par compte, fuseaux horaires et créneaux récurrents.",
+    text: 'Calendrier visuel, files d\'attente par compte, fuseaux horaires et créneaux récurrents.',
     accent: '#22D3EE',
     span: 'lg:col-span-1',
+    preview: (
+      <div className="mt-4 grid grid-cols-7 gap-1">
+        {Array.from({ length: 21 }, (_, i) => {
+          const hasPost = [2,5,7,9,11,14,16,18].includes(i)
+          return (
+            <div key={i} className="aspect-square rounded-md flex items-center justify-center text-[9px]"
+              style={{
+                background: hasPost ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${hasPost ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                color: hasPost ? '#22D3EE' : 'rgba(255,255,255,0.2)',
+              }}>
+              {i + 1}
+            </div>
+          )
+        })}
+      </div>
+    ),
   },
   {
-    icon: IconSparkles,
+    icon: ISparkles,
     title: 'Captions IA',
-    text: "Génère captions, hashtags et idées de contenu en un clic. Propulsé par Claude & Groq via ton solde de crédits.",
+    text: 'Génère captions, hashtags et idées de contenu. Propulsé par Claude & Groq.',
     accent: '#818CF8',
     span: 'lg:col-span-1',
+    preview: (
+      <div className="mt-4 rounded-xl p-3 text-[11px] leading-relaxed text-text2"
+        style={{ background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)' }}>
+        <span className="font-mono text-indigo">✦</span>{' '}
+        "Chaque matin est une nouvelle chance de créer du contenu qui connecte avec ton audience. 🔥
+        <br /><span className="mt-1.5 inline-block text-indigo opacity-70">#motivation #contentcreator #instagram</span>"
+      </div>
+    ),
   },
   {
-    icon: IconScissors,
+    icon: IScissors,
     title: 'Remix & Repurpose vidéo',
-    text: "Mixe, recoupe et réinvente tes vidéos pour multiplier les variantes uniques. Sous-titres, watermarks et préréglages réutilisables pour produire en masse.",
+    text: 'Mixe, recoupe et réinvente tes vidéos. Sous-titres, watermarks et préréglages pour produire en masse.',
     accent: '#F472B6',
     span: 'lg:col-span-2',
+    big: true,
+    preview: (
+      <div className="mt-4 flex gap-3">
+        {['9:16', '1:1', '16:9'].map(ratio => (
+          <div key={ratio} className="flex flex-col items-center gap-1.5">
+            <div className="rounded-lg flex items-center justify-center text-[8px] font-bold text-pink-400"
+              style={{
+                width: ratio === '9:16' ? 28 : ratio === '1:1' ? 40 : 60,
+                height: ratio === '9:16' ? 48 : ratio === '1:1' ? 40 : 34,
+                background: 'rgba(244,114,182,0.1)',
+                border: '1.5px solid rgba(244,114,182,0.4)',
+              }}>
+              {ratio === '9:16' ? '↕' : '□'}
+            </div>
+            <span className="text-[9px] text-muted">{ratio}</span>
+          </div>
+        ))}
+        <div className="flex-1 flex flex-col gap-1.5 justify-center">
+          <div className="h-1.5 rounded-full bg-pink-400/30"><div className="h-full w-3/4 rounded-full bg-pink-400/60" /></div>
+          <div className="h-1.5 rounded-full bg-pink-400/30"><div className="h-full w-1/2 rounded-full bg-pink-400/60" /></div>
+          <div className="h-1.5 rounded-full bg-pink-400/30"><div className="h-full w-2/3 rounded-full bg-pink-400/60" /></div>
+        </div>
+      </div>
+    ),
   },
   {
-    icon: IconFlame,
+    icon: IFlame,
     title: 'Auto-Warmup',
-    text: "Chauffe automatiquement tes nouveaux comptes : likes, follows et vues à rythme humain. Routines configurables par groupe.",
+    text: 'Chauffe tes nouveaux comptes automatiquement : likes, follows à rythme humain. Routines configurables.',
     accent: '#FB923C',
     span: 'lg:col-span-1',
+    preview: (
+      <div className="mt-4 space-y-2">
+        {[
+          { label: 'Likes/h', val: 8, max: 15 },
+          { label: 'Follows/h', val: 5, max: 10 },
+          { label: 'Vues/h', val: 12, max: 20 },
+        ].map(r => (
+          <div key={r.label} className="flex items-center gap-2">
+            <span className="text-[10px] text-muted w-16 shrink-0">{r.label}</span>
+            <div className="flex-1 h-1.5 rounded-full bg-white/[0.06]">
+              <div className="h-full rounded-full" style={{ width: `${(r.val/r.max)*100}%`, background: 'linear-gradient(90deg, #FB923C, #F97316)' }} />
+            </div>
+            <span className="text-[10px] font-mono text-orange-400 w-4 text-right">{r.val}</span>
+          </div>
+        ))}
+      </div>
+    ),
   },
   {
-    icon: IconSmartphone,
-    title: 'Multi-comptes & Appareils',
-    text: "Pilote tes cloud phones GeeLark depuis un seul tableau de bord. Statut en temps réel, IP et sessions isolées par appareil.",
+    icon: IPhone,
+    title: 'Cloud Phones GeeLark',
+    text: 'Pilote tes cloud phones depuis un seul dashboard. Statut en temps réel, IP et sessions isolées.',
     accent: '#34D399',
     span: 'lg:col-span-1',
+    preview: (
+      <div className="mt-4 space-y-1.5">
+        {[
+          { name: 'iPhone-01', status: 'online', followers: '12,4K' },
+          { name: 'iPhone-02', status: 'posting', followers: '8,9K' },
+          { name: 'iPhone-03', status: 'online', followers: '23,1K' },
+        ].map(p => (
+          <div key={p.name} className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[10px]"
+            style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
+            <span className="text-text font-mono">{p.name}</span>
+            <span className="text-text2">{p.followers}</span>
+            <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5"
+              style={{ background: p.status === 'posting' ? 'rgba(251,191,36,0.15)' : 'rgba(52,211,153,0.15)', color: p.status === 'posting' ? '#FCD34D' : '#34D399' }}>
+              <span className="h-1 w-1 rounded-full" style={{ background: 'currentColor' }} />
+              {p.status}
+            </span>
+          </div>
+        ))}
+      </div>
+    ),
   },
   {
-    icon: IconUsers,
+    icon: IUsers,
     title: 'Collaboration d\'équipe',
-    text: "Invite ton organisation, attribue des rôles (admin, membre, viewer) et restreins les accès par dossier ou groupe d'appareils.",
+    text: 'Invite ton organisation, attribue des rôles (admin, membre, viewer) et restreins les accès.',
     accent: '#60A5FA',
     span: 'lg:col-span-1',
   },
   {
-    icon: IconCoins,
-    title: 'Système de crédits',
-    text: "Un solde unique pour l'IA et les actions automatisées. Recharge à la demande, transparent et partagé par organisation.",
+    icon: ICoins,
+    title: 'Crédits à la demande',
+    text: 'Un solde unique pour l\'IA et les automatisations. Recharge à la demande, partagé par organisation.',
     accent: '#FBBF24',
     span: 'lg:col-span-1',
   },
 ]
 
-function FeatureCard({ feature }: { feature: Feature }) {
-  const { icon: Icon, title, text, accent, span } = feature
-  return (
-    <article
-      className={`group glass flex flex-col rounded-2xl p-6 transition-all duration-200 hover:-translate-y-1 hover:border-white/15 hover:bg-white/[0.06] ${span}`}
-    >
-      <span
-        className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl"
-        style={{ background: `${accent}1A`, border: `1px solid ${accent}33`, color: accent }}
-      >
-        <Icon width={22} height={22} />
-      </span>
-      <h3 className="text-base font-bold text-text">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-text2">{text}</p>
-    </article>
-  )
+function useReveal() {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => e.isIntersecting && e.target.classList.add('visible')),
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    )
+    el.querySelectorAll('.reveal').forEach(n => obs.observe(n))
+    return () => obs.disconnect()
+  }, [])
+  return ref
 }
 
 export function Features() {
+  const ref = useReveal()
+
   return (
-    <section id="features" className="relative px-5 py-24">
+    <section id="features" className="relative px-5 py-28" ref={ref}>
+      {/* Soft background */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-[0.06]"
+          style={{ background: 'radial-gradient(circle, #818CF8, transparent)', filter: 'blur(80px)' }} />
+      </div>
+
       <div className="mx-auto max-w-6xl">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label">Tout pour scaler</p>
-          <h2 className="mt-3 text-3xl font-extrabold text-text sm:text-5xl">
-            Une seule app, <span className="gradient-text">tout dedans.</span>
+        <div className="mx-auto max-w-2xl text-center reveal">
+          <span className="section-label">Tout pour scaler</span>
+          <h2 className="text-3xl font-black text-text sm:text-5xl">
+            Une seule app,{' '}
+            <span className="gradient-text">tout dedans.</span>
           </h2>
           <p className="mt-4 text-text2">
-            Fini de jongler entre dix outils. ScaleFlow réunit publication, automatisation et
-            production de contenu pour faire grandir ton empire Instagram.
+            Fini de jongler entre dix outils. ScaleFlow réunit publication, automatisation
+            et production de contenu pour faire grandir ton empire Instagram.
           </p>
         </div>
 
         <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <FeatureCard key={f.title} feature={f} />
-          ))}
+          {FEATURES.map((f, i) => {
+            const delay = (i % 3) * 0.1
+            return (
+              <article
+                key={f.title}
+                className={`reveal glass-card rounded-2xl p-6 flex flex-col ${f.span}`}
+                style={{ transitionDelay: `${delay}s` }}
+              >
+                <span
+                  className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl"
+                  style={{ background: `${f.accent}1A`, border: `1px solid ${f.accent}33`, color: f.accent }}
+                >
+                  <f.icon />
+                </span>
+                <h3 className="text-base font-bold text-text">{f.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-text2">{f.text}</p>
+                {f.preview && <div className="mt-auto">{f.preview}</div>}
+              </article>
+            )
+          })}
         </div>
       </div>
     </section>
