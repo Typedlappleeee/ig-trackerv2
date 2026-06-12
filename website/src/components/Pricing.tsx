@@ -1,13 +1,13 @@
-import { IconCheck, IconArrowRight } from './Icons'
+import { useEffect, useRef } from 'react'
+import { IconCheck, IconArrowRight, IconCoins, IconTelegram } from './Icons'
 
 const TELEGRAM_URL = 'https://t.me/justquentin'
 
 type Plan = {
   name: string
   price: string
-  period: string
+  desc: string
   accent: string
-  cta: string
   popular?: boolean
   features: string[]
 }
@@ -16,28 +16,26 @@ const PLANS: Plan[] = [
   {
     name: 'Standard',
     price: '49,99$',
-    period: '/mois',
-    accent: '#60A5FA',
-    cta: 'Choisir Standard',
+    desc: 'Pour démarrer sérieusement ta première ferme de comptes.',
+    accent: '#22D3EE',
     features: [
       '2 500 crédits / mois',
-      '50 téléphones max',
-      'Accès à toutes les fonctionnalités',
-      'Mass Posting — 10 comptes max',
+      '50 phones max',
+      'Toutes les fonctionnalités',
+      'Mass Posting 10 comptes max',
       'Support 24/7',
     ],
   },
   {
     name: 'Pro',
     price: '99,99$',
-    period: '/mois',
-    accent: '#A855F7',
+    desc: 'Le sweet spot des agences et growth hackers qui scalent.',
+    accent: '#818CF8',
     popular: true,
-    cta: 'Choisir Pro',
     features: [
       '5 500 crédits / mois',
-      '200 téléphones max',
-      'Accès à toutes les fonctionnalités',
+      '200 phones max',
+      'Toutes les fonctionnalités',
       'Mass Posting illimité',
       'Support 24/7',
     ],
@@ -45,13 +43,12 @@ const PLANS: Plan[] = [
   {
     name: 'Organisation',
     price: '149,99$',
-    period: '/mois',
-    accent: '#34D399',
-    cta: 'Choisir Organisation',
+    desc: 'Pour les structures qui pilotent des centaines de comptes.',
+    accent: '#A855F7',
     features: [
       '11 000 crédits / mois',
-      'Téléphones illimités',
-      'Accès à toutes les fonctionnalités',
+      'Phones illimités',
+      'Toutes les fonctionnalités',
       'Mass Posting illimité',
       'Support 24/7 prioritaire',
       "Proposition d'ajouts avec les devs",
@@ -67,115 +64,148 @@ const PACKS = [
   { credits: '15 000', price: '374,99$' },
 ]
 
-function PlanCard({ plan }: { plan: Plan }) {
-  return (
-    <div
-      className={`group rounded-3xl transition-transform duration-200 hover:-translate-y-1 ${
-        plan.popular ? 'gradient-ring shadow-glow-soft' : 'glass'
-      }`}
-    >
-      <div className="relative flex flex-col rounded-3xl p-7">
-        {plan.popular && (
-          <span
-            className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#0a0a16]"
-            style={{ background: 'linear-gradient(135deg,#22D3EE,#818CF8,#A855F7)' }}
-          >
-            Populaire
-          </span>
-        )}
-
-        <div className="mb-6">
-          <div
-            className="mb-2 text-xs font-bold uppercase tracking-[0.16em]"
-            style={{ color: plan.accent }}
-          >
-            {plan.name}
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-4xl font-extrabold text-text">{plan.price}</span>
-            <span className="text-sm text-text2">{plan.period}</span>
-          </div>
-        </div>
-
-        <ul className="mb-7 flex-1 space-y-3">
-          {plan.features.map((f) => (
-            <li key={f} className="flex items-start gap-2.5 text-sm text-text2">
-              <IconCheck
-                width={18}
-                height={18}
-                className="mt-0.5 shrink-0"
-                style={{ color: plan.accent }}
-              />
-              <span>{f}</span>
-            </li>
-          ))}
-        </ul>
-
-        <a
-          href={TELEGRAM_URL}
-          target="_blank"
-          rel="noreferrer"
-          className={
-            plan.popular
-              ? 'btn-primary w-full'
-              : 'btn-secondary w-full'
-          }
-        >
-          {plan.cta}
-          <IconArrowRight width={17} height={17} />
-        </a>
-      </div>
-    </div>
-  )
+function useReveal() {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add('visible')),
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    )
+    el.querySelectorAll('.reveal').forEach((n) => obs.observe(n))
+    return () => obs.disconnect()
+  }, [])
+  return ref
 }
 
 export function Pricing() {
+  const ref = useReveal()
+
   return (
-    <section id="pricing" className="relative px-5 py-24">
-      <div className="mx-auto max-w-5xl">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label">Tarifs</p>
-          <h2 className="mt-3 text-3xl font-extrabold text-text sm:text-5xl">
-            Choisis ton <span className="gradient-text">plan.</span>
+    <section id="pricing" className="relative px-5 py-28" ref={ref}>
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute left-1/2 top-1/3 h-[600px] w-[600px] -translate-x-1/2 rounded-full opacity-[0.07]"
+          style={{ background: 'radial-gradient(circle, #818CF8, transparent)', filter: 'blur(100px)' }}
+        />
+      </div>
+
+      <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-2xl text-center reveal">
+          <span className="section-label">Tarifs</span>
+          <h2 className="text-3xl font-black text-text sm:text-5xl">
+            Un prix, <span className="gradient-text">zéro friction.</span>
           </h2>
           <p className="mt-4 text-text2">
-            Tout est inclus dès le Standard. Abonnement via Telegram — activation immédiate.
+            Trois plans qui grandissent avec ton volume. Crédits inclus chaque mois, recharge à la demande quand tu pousses fort.
           </p>
         </div>
 
-        <div className="mt-16 grid grid-cols-1 gap-5 md:grid-cols-3">
-          {PLANS.map((p) => (
-            <PlanCard key={p.name} plan={p} />
+        {/* Plans */}
+        <div className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-3 md:items-stretch">
+          {PLANS.map((plan, i) => (
+            <article
+              key={plan.name}
+              className={`reveal relative flex flex-col overflow-hidden rounded-2xl ${
+                plan.popular ? 'gradient-ring md:-my-3' : 'glass-card'
+              }`}
+              style={{ transitionDelay: `${i * 0.12}s` }}
+            >
+              {/* Accent top bar */}
+              <div
+                className="h-1 w-full shrink-0"
+                style={{ background: `linear-gradient(90deg, ${plan.accent}, ${plan.accent}33)` }}
+                aria-hidden="true"
+              />
+
+              <div className={`flex flex-1 flex-col p-7 ${plan.popular ? 'md:pt-9' : ''}`}>
+                {plan.popular && (
+                  <span
+                    className="absolute right-5 top-5 rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[#0a0a16]"
+                    style={{ background: 'linear-gradient(135deg, #22D3EE, #818CF8, #A855F7)' }}
+                  >
+                    Populaire
+                  </span>
+                )}
+
+                <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: plan.accent }}>
+                  {plan.name}
+                </h3>
+                <div className="mt-3 flex items-baseline gap-1.5">
+                  <span className="stat-value text-4xl font-black text-text">{plan.price}</span>
+                  <span className="text-sm text-text2">/mois</span>
+                </div>
+                <p className="mt-2.5 text-sm leading-relaxed text-text2">{plan.desc}</p>
+
+                <ul className="mt-6 space-y-3">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2.5 text-sm text-text">
+                      <span
+                        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+                        style={{ color: plan.accent }}
+                      >
+                        <IconCheck width={16} height={16} />
+                      </span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <a
+                  href={TELEGRAM_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`${plan.popular ? 'btn-primary' : 'btn-secondary'} mt-8 w-full cursor-pointer`}
+                >
+                  Choisir {plan.name}
+                  <IconArrowRight width={18} height={18} />
+                </a>
+              </div>
+            </article>
           ))}
         </div>
 
         {/* Credit packs */}
-        <div className="glass mt-12 rounded-3xl p-7">
-          <p className="text-sm font-bold uppercase tracking-[0.14em] text-text2">
-            Packs de crédits
-          </p>
-          <p className="mb-5 mt-1 text-xs text-muted">
-            Pour compléter ton solde. Les abonnements restent plus avantageux au crédit.
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {PACKS.map((pk) => (
-              <a
-                key={pk.credits}
-                href={TELEGRAM_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="cursor-pointer rounded-2xl border border-border bg-white/[0.03] p-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-violet/40 hover:bg-white/[0.06]"
+        <div className="reveal mt-12 overflow-hidden rounded-2xl glass-strong">
+          <div className="flex flex-col gap-5 p-7 sm:p-8">
+            <div className="flex items-center gap-3">
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)', color: '#FBBF24' }}
               >
-                <div className="text-lg font-extrabold text-text">{pk.credits}</div>
-                <div className="mb-2 text-[10px] text-text2">crédits</div>
-                <div className="text-sm font-bold text-indigo">{pk.price}</div>
-              </a>
-            ))}
+                <IconCoins width={20} height={20} />
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-text">Packs de crédits</h3>
+                <p className="text-xs text-text2">Recharge ton solde à la demande, sans changer de plan.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+              {PACKS.map((pack) => (
+                <a
+                  key={pack.credits}
+                  href={TELEGRAM_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group cursor-pointer rounded-xl border border-border bg-white/[0.03] px-4 py-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-violet/40 hover:bg-white/[0.06]"
+                >
+                  <span className="stat-value block text-lg font-extrabold text-text">
+                    {pack.credits}
+                    <span className="ml-1 text-[10px] font-semibold uppercase text-text2">cr</span>
+                  </span>
+                  <span className="gradient-text mt-0.5 block text-sm font-bold">{pack.price}</span>
+                </a>
+              ))}
+            </div>
           </div>
         </div>
 
-        <p className="mt-8 text-center text-xs text-muted">
-          Paiement via Telegram · Crypto ou virement · Clé activable immédiatement
+        {/* Payment note */}
+        <p className="reveal mt-8 flex flex-wrap items-center justify-center gap-2 text-center text-xs text-text2">
+          <IconTelegram width={14} height={14} className="text-cyan" />
+          Paiement via Telegram · Crypto ou virement · Activation immédiate
         </p>
       </div>
     </section>
