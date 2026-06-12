@@ -576,6 +576,26 @@ export function Posting({ user }: PostingProps) {
       phoneList.forEach(p => { if (!settledIds.has(p.id)) markPhoneFailed(p, 'Erreur fatale') })
       setProgress(0)
       setLastRun({ ok: okN, err: errN, total })
+
+      // Log to scheduled_posts so Hub weekPosts stat counts this run
+      if (okN > 0) {
+        const now = new Date().toISOString()
+        supabase.from('scheduled_posts').insert({
+          user_id:      user.id,
+          org_id:       currentOrg?.id ?? null,
+          type:         'posting',
+          status:       errN === 0 ? 'done' : 'failed',
+          scheduled_at: now,
+          executed_at:  now,
+          phones:       phones.filter(p => selectedPhones.has(p.id)).map(p => ({ id: p.id, name: p.phone_name })),
+          videos:       [],
+          caption:      caption,
+          delay_minutes: 0,
+          mode:         'seq',
+          bearer_token: bearer,
+          result:       { ok: okN, err: errN, total },
+        }) // fire-and-forget
+      }
     } finally {
       const { refunded } = await run.settle()
       if (refunded > 0) { log(`💳 ${refunded} crédit(s) remboursé(s)`, 'ok'); credits.refresh() }

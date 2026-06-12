@@ -584,12 +584,16 @@ export function Bank({ user }: BankProps) {
   }
 
   async function pickFile() {
-    if (!window.electronAPI?.pickVideoFile) return
-    const p = await window.electronAPI.pickVideoFile()
+    const api = window.electronAPI
+    if (!api) return
+    // Use pickAnyFile to support both videos and images; fall back to pickVideoFile
+    const picker = api.pickAnyFile ?? api.pickVideoFile
+    if (!picker) return
+    const p = await (api.pickAnyFile
+      ? api.pickAnyFile({ filters: [{ name: 'Médias', extensions: ['mp4','mov','avi','mkv','webm','m4v','jpg','jpeg','png','webp','gif','bmp','heic'] }] })
+      : api.pickVideoFile())
     if (!p) return
-    // In web mode, pickVideoFile returns a blob: URL. Fetching it via readFileBytes
-    // can fail ("Failed to fetch"). Get the original File from the in-memory store
-    // and upload it directly as a Blob — same path drag-drop uses.
+    // blob: URL from web mode — get the File object from in-memory store
     if (p.startsWith('blob:')) {
       const { getStoredFile } = await import('@/lib/webAPI')
       const file = getStoredFile(p)
@@ -1500,7 +1504,7 @@ export function Bank({ user }: BankProps) {
       {showAddModal && (
         <AddMediaModal
           onFiles={async files => { for (const f of files) await addFromFile(f) }}
-          onElectronPick={window.electronAPI?.pickVideoFile ? pickFile : undefined}
+          onElectronPick={(window.electronAPI?.pickAnyFile || window.electronAPI?.pickVideoFile) ? pickFile : undefined}
           onClose={() => setShowAddModal(false)}
         />
       )}

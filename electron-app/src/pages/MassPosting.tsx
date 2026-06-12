@@ -813,13 +813,41 @@ export function MassPosting({ user }: MassPostingProps) {
         await geelark(bearer, '/phone/stop', { ids: remaining })
       }
 
-      // Mark every phone as done
-      for (const p of phoneList) setPhoneStatus(p.id, { status: 'done' })
+      // Mark only phones without a final status yet as done (preserve 'error' states)
+      const currentStatuses = getMassPostingState().taskStatuses
+      for (const p of phoneList) {
+        const existing = currentStatuses.get(p.id)?.status
+        if (existing !== 'done' && existing !== 'error') {
+          setPhoneStatus(p.id, { status: 'done' })
+        }
+      }
 
-      const okN = [...taskStatuses.values()].filter(s => s.status === 'done').length
-      const errN = [...taskStatuses.values()].filter(s => s.status === 'error').length
+      // Read final counts from sync store (not stale React closure)
+      const finalStatuses = getMassPostingState().taskStatuses
+      const okN = [...finalStatuses.values()].filter(s => s.status === 'done').length
+      const errN = [...finalStatuses.values()].filter(s => s.status === 'error').length
       setLastRun({ ok: okN, err: errN, total: assignments.length })
       toast.show({ title: errN === 0 ? 'Mass posting terminé ✓' : 'Mass posting terminé avec erreurs', body: `${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`, kind: errN === 0 ? 'ok' : 'error' })
+
+      // Log to scheduled_posts so Hub stats (weekPosts) count this run
+      if (okN > 0) {
+        const now = new Date().toISOString()
+        supabase.from('scheduled_posts').insert({
+          user_id:      user.id,
+          org_id:       currentOrg?.id ?? null,
+          type:         'mass_posting',
+          status:       errN === 0 ? 'done' : 'failed',
+          scheduled_at: now,
+          executed_at:  now,
+          phones:       phoneList.map(p => ({ id: p.id, name: p.phone_name })),
+          videos:       selectedVideos.map(v => ({ id: v.item.id, title: v.item.title ?? '' })),
+          caption:      caption,
+          delay_minutes: 0,
+          mode:         mode,
+          bearer_token: bearer,
+          result:       { ok: okN, err: errN, total: assignments.length },
+        }) // fire-and-forget, non-blocking
+      }
       log('Done! Resetting in 5s…', 'ok')
       await new Promise(r => setTimeout(r, 5000))
       resetMassPosting()
