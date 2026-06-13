@@ -827,15 +827,22 @@ ipcMain.handle('run-ffmpeg-repurpose', async (_event, opts: {
   for (let i = 0; i < opts.variants.length; i++) {
     const v   = opts.variants[i]
     const out = path.join(dir, `clonevid-${Date.now()}-${i}.mp4`)
+    // Random creation_time per variant within the last ~30 days — so the metadata
+    // doesn't betray that all variants came from the same source at the same moment.
+    const randomMs = Date.now() - Math.floor(Math.random() * 30 * 24 * 3600 * 1000)
+    const creationTime = new Date(randomMs).toISOString()
     const args = [
       '-nostdin', '-fflags', '+genpts', '-i', srcPath,
       '-map', '0:v:0', '-map', '0:a?',
+      '-map_metadata', '-1',           // strip ALL source metadata (encoder, GPS, dates, tags…)
+      '-map_chapters', '-1',           // drop chapters too
       '-vf', v.vf,
       '-r', '30',
       '-c:v', 'libx264', '-preset', 'veryfast',
       '-crf', String(v.crf),
       '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+      '-metadata', `creation_time=${creationTime}`,  // fresh, randomised per variant
       '-movflags', '+faststart',
       '-y', out,
     ]
