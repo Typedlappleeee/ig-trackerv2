@@ -154,4 +154,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Copy a generated file to a user-chosen location via a native Save dialog
   saveFileAs: (opts: { sourcePath: string; defaultName: string }) =>
     ipcRenderer.invoke('save-file-as', opts),
+
+  // Mixer — burn a caption onto a video with native ffmpeg
+  runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) =>
+    ipcRenderer.invoke('run-ffmpeg-mix-overlay', opts),
 })

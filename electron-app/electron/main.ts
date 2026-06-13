@@ -881,6 +881,106 @@ ipcMain.handle('save-file-as', async (_event, opts: { sourcePath: string; defaul
   }
 })
 
+// ── IPC: Mixer — burn caption text onto a video (native ffmpeg) ──────────────
+// Replaces the broken /api/mix-overlay Vercel fetch that doesn't work in
+// Electron. Source can be an http(s) signed URL or an absolute local path.
+ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
+  sourcePath: string
+  caption:    string
+  position:   'top' | 'middle' | 'bottom'
+  fontSize:   number
+  fontColor:  string
+}) => {
+  const ffmpegBin = getFfmpegBin()
+  const dir = path.join(os.tmpdir(), 'ig-tracker-mixer')
+  try { mkdirSync(dir, { recursive: true }) } catch { /* ignore */ }
+
+  // Download remote source to a temp file if needed
+  let srcPath = opts.sourcePath
+  let tempSrc: string | null = null
+  try {
+    if (srcPath.startsWith('http://') || srcPath.startsWith('https://')) {
+      const res = await net.fetch(srcPath)
+      if (!res.ok) return { ok: false, error: `Téléchargement source échoué: ${res.status}` }
+      const buf = Buffer.from(await res.arrayBuffer())
+      tempSrc = path.join(dir, `src-${Date.now()}.mp4`)
+      writeFileSync(tempSrc, buf)
+      srcPath = tempSrc
+    } else if (srcPath.startsWith('file://')) {
+      srcPath = fileURLToPath(srcPath)
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+  if (!existsSync(srcPath)) return { ok: false, error: 'Fichier source introuvable' }
+
+  // Resolve a font file cross-platform (bold for the chunky POV style)
+  const fontCandidates = process.platform === 'win32'
+    ? ['C:\\Windows\\Fonts\\arialbd.ttf', 'C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\segoeui.ttf']
+    : process.platform === 'darwin'
+      ? ['/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial Bold.ttf', '/Library/Fonts/Arial.ttf']
+      : ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+         '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+         '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf',
+         '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf']
+  const fontFile = fontCandidates.find(f => existsSync(f)) ?? null
+
+  function escText(t: string): string {
+    return t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:')
+             .replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/%/g, '%%')
+  }
+
+  // y position: bottom-anchored (text_h from bottom) or centred, or near top
+  const yExpr = opts.position === 'bottom'
+    ? '(h-text_h-60)'   // ~60px above the very bottom — matches the POV style
+    : opts.position === 'top'
+      ? '60'
+      : '(h/2-text_h/2)'
+
+  const borderPx = Math.max(3, Math.round(opts.fontSize * 0.08))
+  const dtParts = [`text='${escText(opts.caption)}'`]
+  if (fontFile) dtParts.push(`fontfile='${fontFile}'`)
+  dtParts.push(
+    `x=(w-text_w)/2`,              // horizontally centred
+    `y=${yExpr}`,
+    `fontsize=${opts.fontSize}`,
+    `fontcolor=${opts.fontColor}`,
+    `borderw=${borderPx}`, `bordercolor=black@1.0`,
+    `shadowx=3:shadowy=3:shadowcolor=black@0.7`,
+  )
+  const drawtext = `drawtext=${dtParts.join(':')}`
+  const vf = `scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black,setsar=1,${drawtext}`
+
+  const out = path.join(dir, `mixer-${Date.now()}.mp4`)
+  const args = [
+    '-nostdin', '-fflags', '+genpts', '-i', srcPath,
+    '-map', '0:v:0', '-map', '0:a?',
+    '-map_metadata', '-1', '-map_chapters', '-1',
+    '-vf', vf,
+    '-r', '30', '-fps_mode', 'cfr',
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '20',
+    '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+    '-g', '30', '-keyint_min', '15',
+    '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+    '-movflags', '+faststart',
+    '-y', out,
+  ]
+
+  return new Promise(resolve => {
+    execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024, timeout: FFMPEG_REMIX_TIMEOUT, killSignal: 'SIGKILL' }, (err, _stdout, stderr) => {
+      if (tempSrc) { try { rmSync(tempSrc) } catch { /* ignore */ } }
+      if (err) {
+        const detail = (stderr ?? '').split('\n').filter((l: string) => /error|invalid/i.test(l)).slice(-2).join(' ')
+        return resolve({ ok: false, error: err.message.split('\n')[0] + (detail ? ` — ${detail.slice(0, 160)}` : '') })
+      }
+      try {
+        if (statSync(out).size < 5000) return resolve({ ok: false, error: 'Sortie vide' })
+      } catch { return resolve({ ok: false, error: 'Sortie manquante' }) }
+      resolve({ ok: true, outputPath: out })
+    })
+  })
+})
+
 // ── IPC: detect scene change via raw RGB pixel comparison ────────────────────
 // FFmpeg outputs a single rawvideo file (rgb24, 32×32, 2fps) — no codec,
 // no header, pure pixels. Node.js reads it back, computes Euclidean RGB

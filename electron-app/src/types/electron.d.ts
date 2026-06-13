@@ -102,6 +102,8 @@ interface ElectronAPI {
     Promise<{ ok: boolean; results: Array<{ ok: boolean; outputPath?: string; error?: string }>; error?: string }>
   saveFileAs: (opts: { sourcePath: string; defaultName: string }) =>
     Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>
+  runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) =>
+    Promise<{ ok: boolean; outputPath?: string; error?: string }>
 }
 
 declare global {

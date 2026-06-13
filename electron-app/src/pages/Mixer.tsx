@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import type { CaptionItem } from './CaptionBank'
 
 interface MixerProps { user: User }
-type MixPosition = 'bottom' | 'center' | 'top'
+type MixPosition = 'bottom' | 'middle' | 'top'
 
 // ── Inline Lucide-style icons (no emoji UI icons) ─────────────────────────────
 function SfIcon({ size = 16, children, ...rest }: { size?: number; children: React.ReactNode } & React.SVGProps<SVGSVGElement>) {
@@ -28,7 +28,8 @@ interface MixJob {
   videoItem: ContentItem
   caption:   CaptionItem
   status:    'pending' | 'processing' | 'done' | 'error'
-  outputUrl?: string
+  outputUrl?:  string
+  localPath?:  string
   error?:    string
 }
 
@@ -282,7 +283,7 @@ export function Mixer({ user }: MixerProps) {
   const [showCaptionPicker, setShowCaptionPicker] = useState(false)
 
   const [position,  setPosition]  = useState<MixPosition>('bottom')
-  const [fontSize,  setFontSize]  = useState(36)
+  const [fontSize,  setFontSize]  = useState(52)
   const [fontColor, setFontColor] = useState('#ffffff')
   const [mode,      setMode]      = useState<'random' | 'all'>('random')
 
@@ -331,15 +332,28 @@ export function Mixer({ user }: MixerProps) {
       updateJob(job.id, { status: 'processing' })
       try {
         const signedUrl = await getSignedUrl(job.videoItem.storage_path)
-        if (!signedUrl) throw new Error('Could not get video URL')
-        const resp = await fetch('/api/mix-overlay', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videoUrl: signedUrl, caption: job.caption.content, userId: user.id, position, fontSize, fontColor }),
+        if (!signedUrl) throw new Error('Impossible d\'obtenir l\'URL vidéo')
+
+        const api = window.electronAPI
+        if (!api?.runFfmpegMixOverlay) throw new Error('runFfmpegMixOverlay IPC indisponible — rebuild l\'app')
+
+        const res = await api.runFfmpegMixOverlay({
+          sourcePath: signedUrl,
+          caption:    job.caption.content,
+          position,
+          fontSize,
+          fontColor,
         })
-        const data = await resp.json()
-        if (!data.ok) throw new Error(data.error ?? 'Server error')
-        updateJob(job.id, { status: 'done', outputUrl: data.url })
+        if (!res.ok || !res.outputPath) throw new Error(res.error ?? 'Échec ffmpeg')
+
+        // Make the output URL playable in the renderer via localvideo://
+        const localUrl = (() => {
+          let n = res.outputPath.replace(/\\/g, '/')
+          if (!n.startsWith('/')) n = '/' + n
+          return 'localvideo://' + n.split('/').map(encodeURIComponent).join('/')
+        })()
+
+        updateJob(job.id, { status: 'done', outputUrl: localUrl, localPath: res.outputPath })
         supabase.from('caption_bank').update({ used_count: (job.caption.used_count ?? 0) + 1 }).eq('id', job.caption.id).then(() => {})
       } catch (e: unknown) {
         updateJob(job.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
@@ -555,10 +569,10 @@ export function Mixer({ user }: MixerProps) {
             <div style={{ marginBottom: 20 }}>
               <p className="sf-section-label" style={{ marginBottom: 8 }}>Position du texte</p>
               <div style={{ display: 'flex', gap: 8 }}>
-                {(['top', 'center', 'bottom'] as MixPosition[]).map(p => (
+                {(['top', 'middle', 'bottom'] as MixPosition[]).map(p => (
                   <button key={p} onClick={() => setPosition(p)} className="cursor-pointer"
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, transition: 'all 0.12s', border: position === p ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', background: position === p ? 'rgba(99,102,241,0.18)' : 'var(--surface)', color: position === p ? '#818CF8' : 'var(--text-3)', cursor: 'pointer' }}>
-                    {p === 'top' ? <><IconChevronUp size={14} /> Haut</> : p === 'center' ? <><IconAlignCenter size={14} /> Centre</> : <><IconChevronDown size={14} /> Bas</>}
+                    {p === 'top' ? <><IconChevronUp size={14} /> Haut</> : p === 'middle' ? <><IconAlignCenter size={14} /> Centre</> : <><IconChevronDown size={14} /> Bas</>}
                   </button>
                 ))}
               </div>
@@ -640,11 +654,19 @@ export function Mixer({ user }: MixerProps) {
                     <div className="sf-spinner" />
                   )}
                   {job.status === 'done' && job.outputUrl && (
-                    <a href={job.outputUrl} download onClick={e => e.stopPropagation()}
-                      className="sf-press"
-                      style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <button
+                      onClick={async e => {
+                        e.stopPropagation()
+                        if (job.localPath && window.electronAPI?.saveFileAs) {
+                          const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `mixer-${job.videoItem.title}.mp4` })
+                          if (r.ok || r.canceled) return
+                        }
+                        const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `mixer-${job.videoItem.title}.mp4`; a.click()
+                      }}
+                      className="sf-press cursor-pointer"
+                      style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    </a>
+                    </button>
                   )}
                 </div>
                 <p style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{job.videoItem.title}</p>
