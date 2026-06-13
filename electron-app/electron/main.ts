@@ -798,6 +798,7 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
 ipcMain.handle('run-ffmpeg-repurpose', async (_event, opts: {
   sourcePath: string
   variants:   Array<{ vf: string; crf: number }>
+  format?:    '9:16' | '1:1' | '16:9' | 'keep'
 }) => {
   const ffmpegBin = getFfmpegBin()
   const dir = path.join(os.tmpdir(), 'ig-tracker-clonevid')
@@ -823,26 +824,33 @@ ipcMain.handle('run-ffmpeg-repurpose', async (_event, opts: {
 
   if (!existsSync(srcPath)) return { ok: false, results: [], error: 'Fichier source introuvable' }
 
+  // Final scale to Instagram-recommended full-HD dimensions (appended to vf chain).
+  // The variant vf caps at 720p — the native path always outputs at 1080p so GéeLark
+  // and Instagram accept the file without complaints about resolution or bitrate.
+  const finalScale = opts.format === '9:16'  ? ',scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black,setsar=1,scale=trunc(iw/2)*2:trunc(ih/2)*2'
+                   : opts.format === '1:1'   ? ',scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:-1:-1:color=black,setsar=1,scale=trunc(iw/2)*2:trunc(ih/2)*2'
+                   : opts.format === '16:9'  ? ',scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1,scale=trunc(iw/2)*2:trunc(ih/2)*2'
+                   : ''  // 'keep' — don't force a specific resolution
+
   const results: Array<{ ok: boolean; outputPath?: string; error?: string }> = []
   for (let i = 0; i < opts.variants.length; i++) {
     const v   = opts.variants[i]
     const out = path.join(dir, `clonevid-${Date.now()}-${i}.mp4`)
-    // Random creation_time per variant within the last ~30 days — so the metadata
-    // doesn't betray that all variants came from the same source at the same moment.
     const randomMs = Date.now() - Math.floor(Math.random() * 30 * 24 * 3600 * 1000)
     const creationTime = new Date(randomMs).toISOString()
     const args = [
       '-nostdin', '-fflags', '+genpts', '-i', srcPath,
       '-map', '0:v:0', '-map', '0:a?',
-      '-map_metadata', '-1',           // strip ALL source metadata (encoder, GPS, dates, tags…)
-      '-map_chapters', '-1',           // drop chapters too
-      '-vf', v.vf,
+      '-map_metadata', '-1',
+      '-map_chapters', '-1',
+      '-vf', v.vf + finalScale,
       '-r', '30',
-      '-c:v', 'libx264', '-preset', 'veryfast',
-      '-crf', String(v.crf),
+      '-c:v', 'libx264', '-preset', 'fast',   // 'fast' > 'veryfast' — better quality/size
+      '-crf', '20',                             // fixed CRF 20 — 1080p Instagram-safe bitrate
       '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      '-g', '30', '-keyint_min', '15',          // keyframe every 1s — required by Instagram
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
-      '-metadata', `creation_time=${creationTime}`,  // fresh, randomised per variant
+      '-metadata', `creation_time=${creationTime}`,
       '-movflags', '+faststart',
       '-y', out,
     ]

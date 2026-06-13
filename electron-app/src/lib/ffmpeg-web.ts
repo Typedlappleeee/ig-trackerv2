@@ -1375,13 +1375,14 @@ export async function runRepurposeNative(opts: {
   intensity:  'subtle' | 'medium' | 'aggressive' | 'vener'
   format:     '9:16' | '1:1' | '16:9' | 'keep'
 }): Promise<RepurposeResult[]> {
-  const api = (window as { electronAPI?: { runFfmpegRepurpose?: (o: { sourcePath: string; variants: Array<{ vf: string; crf: number }> }) => Promise<{ ok: boolean; results: Array<{ ok: boolean; outputPath?: string; error?: string }>; error?: string }> } }).electronAPI
+  const api = (window as { electronAPI?: { runFfmpegRepurpose?: (o: { sourcePath: string; variants: Array<{ vf: string; crf: number }>; format?: string }) => Promise<{ ok: boolean; results: Array<{ ok: boolean; outputPath?: string; error?: string }>; error?: string }> } }).electronAPI
   if (!api?.runFfmpegRepurpose) throw new Error('IPC native indisponible')
 
   const built = opts.seeds.map(seed => buildRepurposeVariant(seed, opts.intensity, opts.format))
   const resp  = await api.runFfmpegRepurpose({
     sourcePath: opts.sourcePath,
     variants:   built.map(b => ({ vf: b.vf, crf: b.crf })),
+    format:     opts.format,
   })
   if (!resp.ok) throw new Error(resp.error ?? 'Échec ffmpeg natif')
 
