@@ -60,7 +60,7 @@ export function setMassPostingState(patch: Partial<MassPostingState>) {
   Object.assign(state, rest)
   notify()
   if (postingChanged) {
-    window.electronAPI?.setMassPostingRunning(!!state.posting)
+    window.electronAPI?.setMassPostingRunning?.(!!state.posting)
   }
 }
 
