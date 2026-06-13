@@ -146,4 +146,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // app alive in the system tray instead of quitting when the window is closed.
   setMassPostingRunning: (running: boolean) =>
     ipcRenderer.send('mass-posting-running', running),
+
+  // CloneVid — native ffmpeg multi-variant repurpose (fast, always postable MP4)
+  runFfmpegRepurpose: (opts: { sourcePath: string; variants: Array<{ vf: string; crf: number }> }) =>
+    ipcRenderer.invoke('run-ffmpeg-repurpose', opts),
+
+  // Copy a generated file to a user-chosen location via a native Save dialog
+  saveFileAs: (opts: { sourcePath: string; defaultName: string }) =>
+    ipcRenderer.invoke('save-file-as', opts),
 })

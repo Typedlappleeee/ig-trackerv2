@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol, Tray, Menu, nativeImage } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync, readdirSync, rmSync, copyFileSync } from 'node:fs'
 import os from 'node:os'
 import { execFile, spawn } from 'node:child_process'
 import https from 'node:https'
@@ -788,6 +788,90 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
       else     resolve({ ok: true, outputPath: opts.outputPath, command })
     })
   })
+})
+
+// ── IPC: run FFmpeg CloneVid repurpose (native, multi-variant) ───────────────
+// Uses the bundled native ffmpeg instead of WASM — far faster, handles every
+// codec/container, and always produces an Instagram-postable MP4
+// (H.264 + AAC, yuv420p, +faststart). One decode per variant.
+// `sourcePath` may be a local absolute path OR an http(s) URL (bank signed URL).
+ipcMain.handle('run-ffmpeg-repurpose', async (_event, opts: {
+  sourcePath: string
+  variants:   Array<{ vf: string; crf: number }>
+}) => {
+  const ffmpegBin = getFfmpegBin()
+  const dir = path.join(os.tmpdir(), 'ig-tracker-clonevid')
+  try { mkdirSync(dir, { recursive: true }) } catch { /* ignore */ }
+
+  // Resolve the source to a local file (download it first if it's a remote URL)
+  let srcPath = opts.sourcePath
+  let tempSrc: string | null = null
+  try {
+    if (srcPath.startsWith('http://') || srcPath.startsWith('https://')) {
+      const res = await net.fetch(srcPath)
+      if (!res.ok) return { ok: false, results: [], error: `Téléchargement source échoué: ${res.status}` }
+      const buf = Buffer.from(await res.arrayBuffer())
+      tempSrc = path.join(dir, `src-${Date.now()}.mp4`)
+      writeFileSync(tempSrc, buf)
+      srcPath = tempSrc
+    } else if (srcPath.startsWith('file://')) {
+      srcPath = fileURLToPath(srcPath)
+    }
+  } catch (err) {
+    return { ok: false, results: [], error: err instanceof Error ? err.message : String(err) }
+  }
+
+  if (!existsSync(srcPath)) return { ok: false, results: [], error: 'Fichier source introuvable' }
+
+  const results: Array<{ ok: boolean; outputPath?: string; error?: string }> = []
+  for (let i = 0; i < opts.variants.length; i++) {
+    const v   = opts.variants[i]
+    const out = path.join(dir, `clonevid-${Date.now()}-${i}.mp4`)
+    const args = [
+      '-nostdin', '-fflags', '+genpts', '-i', srcPath,
+      '-map', '0:v:0', '-map', '0:a?',
+      '-vf', v.vf,
+      '-r', '30',
+      '-c:v', 'libx264', '-preset', 'veryfast',
+      '-crf', String(v.crf),
+      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+      '-movflags', '+faststart',
+      '-y', out,
+    ]
+    const r = await new Promise<{ ok: boolean; outputPath?: string; error?: string }>(resolve => {
+      execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024, timeout: FFMPEG_REMIX_TIMEOUT, killSignal: 'SIGKILL' }, (err) => {
+        if (err) return resolve({ ok: false, error: err.message.split('\n').slice(-2).join(' ').slice(0, 200) })
+        try {
+          if (statSync(out).size < 5000) return resolve({ ok: false, error: 'Sortie vide' })
+        } catch { return resolve({ ok: false, error: 'Sortie manquante' }) }
+        resolve({ ok: true, outputPath: out })
+      })
+    })
+    results.push(r)
+  }
+
+  if (tempSrc) { try { rmSync(tempSrc) } catch { /* ignore */ } }
+  return { ok: true, results }
+})
+
+// ── IPC: copy a generated file to a user-chosen location (native "Save As") ──
+ipcMain.handle('save-file-as', async (_event, opts: { sourcePath: string; defaultName: string }) => {
+  try {
+    let src = opts.sourcePath
+    if (src.startsWith('file://')) src = fileURLToPath(src)
+    if (!existsSync(src)) return { ok: false, error: 'Fichier introuvable' }
+    const res = await dialog.showSaveDialog(win!, {
+      title: 'Enregistrer la vidéo',
+      defaultPath: opts.defaultName,
+      filters: [{ name: 'Vidéo MP4', extensions: ['mp4'] }],
+    })
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true }
+    copyFileSync(src, res.filePath)
+    return { ok: true, path: res.filePath }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 })
 
 // ── IPC: detect scene change via raw RGB pixel comparison ────────────────────

@@ -98,6 +98,10 @@ interface ElectronAPI {
   adspowerRequest: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) =>
     Promise<{ ok: boolean; data?: unknown; error?: string }>
   setMassPostingRunning: (running: boolean) => void
+  runFfmpegRepurpose: (opts: { sourcePath: string; variants: Array<{ vf: string; crf: number }> }) =>
+    Promise<{ ok: boolean; results: Array<{ ok: boolean; outputPath?: string; error?: string }>; error?: string }>
+  saveFileAs: (opts: { sourcePath: string; defaultName: string }) =>
+    Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>
 }
 
 declare global {

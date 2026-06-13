@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { runFfmpegRepurposeBatch, runRepurposeViaServer } from '@/lib/ffmpeg-web'
+import { runFfmpegRepurposeBatch, runRepurposeViaServer, runRepurposeNative } from '@/lib/ffmpeg-web'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useT, useLang } from '@/lib/i18n'
@@ -17,12 +17,19 @@ type Intensity  = 'subtle' | 'medium' | 'aggressive'
 type Format     = '9:16' | '1:1' | '16:9' | 'keep'
 type JobStatus  = 'queued' | 'processing' | 'done' | 'error'
 
-interface SourceVideo { url: string; name: string }
+interface SourceVideo { url: string; name: string; path?: string }
+
+// Accepted video file extensions — used as a fallback when the OS doesn't report
+// a MIME type for the file (common for .mov/.mkv on some platforms).
+const VIDEO_EXT_RE = /\.(mp4|mov|m4v|webm|mkv|avi|wmv|flv|mpg|mpeg|3gp|ts)$/i
+function isVideoFile(f: File): boolean {
+  return f.type.startsWith('video/') || VIDEO_EXT_RE.test(f.name)
+}
 
 interface VariantJob {
   id: number; seed: number; status: JobStatus; progress: number
   sourceIndex: number; sourceName: string
-  outputPath?: string; similarityPct?: number; transforms?: string[]
+  outputPath?: string; localPath?: string; similarityPct?: number; transforms?: string[]
   error?: string; thumb?: string; uploading?: boolean; uploadError?: string
 }
 
@@ -58,6 +65,17 @@ async function downloadBlob(url: string, filename: string) {
     const a = document.createElement('a')
     a.href = url; a.download = filename; a.click()
   }
+}
+
+// Save a generated variant. On desktop, the variant is a real file on disk → use a
+// native "Save As" dialog (guaranteed-correct MP4, no browser download quirks).
+// Otherwise fall back to a blob download.
+async function downloadVariant(job: VariantJob, filename: string) {
+  if (job.localPath && window.electronAPI?.saveFileAs) {
+    const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: filename })
+    if (r.ok || r.canceled) return
+  }
+  if (job.outputPath) await downloadBlob(job.outputPath, filename)
 }
 
 // ── VariantCard ───────────────────────────────────────────────────────────────
@@ -125,7 +143,7 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
       <div style={{ padding: '6px 8px' }}>
         {isDone && (
           <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => job.outputPath && downloadBlob(job.outputPath, `variant_${index + 1}.mp4`)}
+            <button onClick={() => downloadVariant(job, `clonevid_${index + 1}.mp4`)}
               className="sf-btn cursor-pointer"
               style={{ flex: 1, height: 28, fontSize: 9, background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 6 }}
             >
@@ -244,11 +262,13 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
   }
 
   function addFiles(files: FileList | File[]) {
-    const vids = Array.from(files).filter(f => f.type.startsWith('video/'))
+    const vids = Array.from(files).filter(isVideoFile)
     if (!vids.length) return
     setSources(prev => [
       ...prev,
-      ...vids.map(f => ({ url: URL.createObjectURL(f), name: f.name })),
+      // (f as { path?: string }).path is Electron-only — the real absolute path,
+      // which lets us use native ffmpeg (no MIME/codec restrictions).
+      ...vids.map(f => ({ url: URL.createObjectURL(f), name: f.name, path: (f as { path?: string }).path })),
     ])
     setJobs([]); setTotalDone(0)
   }
@@ -298,30 +318,47 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
         const src = sources[si]
         const sourceJobs = allJobs.filter(j => j.sourceIndex === si)
 
-        // Try server-side FFmpeg first (native speed, ~3s/video, all variants in parallel)
-        // Falls back to WASM automatically if the API is unavailable
         sourceJobs.forEach(j => updateJob(j.id, { status: 'processing', progress: 5 }))
         let results
-        try {
-          results = await runRepurposeViaServer({
-            sourceUrl: src.url,
-            userId:    user.id,
-            seeds:     sourceJobs.map(j => j.seed),
+
+        // Desktop (Electron): native ffmpeg — fastest, handles every codec, and
+        // always outputs a standard Instagram-postable MP4. Source can be the real
+        // file path (file picker / drag-drop) or an http signed URL (from the bank).
+        const nativeSource = src.path ?? (src.url.startsWith('http') ? src.url : null)
+        const hasNative = !isWeb && !!window.electronAPI?.runFfmpegRepurpose
+
+        if (hasNative && nativeSource) {
+          sourceJobs.forEach(j => updateJob(j.id, { progress: 30 }))
+          results = await runRepurposeNative({
+            sourcePath: nativeSource,
+            seeds:      sourceJobs.map(j => j.seed),
             intensity,
             format,
-            onUploadProgress: pct => sourceJobs.forEach(j => updateJob(j.id, { progress: Math.round(pct * 0.25) })),
-            onProcessing:     ()  => sourceJobs.forEach(j => updateJob(j.id, { progress: 30 })),
           })
           sourceJobs.forEach(j => updateJob(j.id, { progress: 90 }))
-        } catch {
-          results = await runFfmpegRepurposeBatch({
-            inputPath: src.url,
-            seeds:     sourceJobs.map(j => j.seed),
-            intensity,
-            format,
-            onVariantStart:    idx => updateJob(sourceJobs[idx].id, { status: 'processing', progress: 5 }),
-            onVariantProgress: (idx, pct) => updateJob(sourceJobs[idx].id, { progress: pct }),
-          })
+        } else {
+          // Web / fallback: server-side FFmpeg first, then WASM in-browser.
+          try {
+            results = await runRepurposeViaServer({
+              sourceUrl: src.url,
+              userId:    user.id,
+              seeds:     sourceJobs.map(j => j.seed),
+              intensity,
+              format,
+              onUploadProgress: pct => sourceJobs.forEach(j => updateJob(j.id, { progress: Math.round(pct * 0.25) })),
+              onProcessing:     ()  => sourceJobs.forEach(j => updateJob(j.id, { progress: 30 })),
+            })
+            sourceJobs.forEach(j => updateJob(j.id, { progress: 90 }))
+          } catch {
+            results = await runFfmpegRepurposeBatch({
+              inputPath: src.url,
+              seeds:     sourceJobs.map(j => j.seed),
+              intensity,
+              format,
+              onVariantStart:    idx => updateJob(sourceJobs[idx].id, { status: 'processing', progress: 5 }),
+              onVariantProgress: (idx, pct) => updateJob(sourceJobs[idx].id, { progress: pct }),
+            })
+          }
         }
 
         for (let vi = 0; vi < sourceJobs.length; vi++) {
@@ -334,6 +371,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             updateJob(job.id, {
               status: 'done', progress: 100,
               outputPath: result.outputPath,
+              localPath: result.localPath,
               similarityPct: result.similarityPct,
               transforms: result.transformSummary,
               thumb: thumb ?? undefined,
@@ -349,7 +387,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   storagePath = result.storagePath  // server already uploaded
                   thumbnailPath = result.thumbnailPath ?? null
                 } else {
-                  const up = await uploadVideoFromPath(result.outputPath!, scope)
+                  // Prefer the real fs path (native) so upload reads bytes directly
+                  const up = await uploadVideoFromPath(result.localPath ?? result.outputPath!, scope)
                   storagePath   = up.storagePath
                   thumbnailPath = up.thumbnailPath
                 }
@@ -500,7 +539,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 transition: 'all 0.2s',
               }}
             >
-              <input ref={fileInputRef} type="file" accept="video/*" multiple style={{ display: 'none' }}
+              <input ref={fileInputRef} type="file" accept="video/*,.mp4,.mov,.m4v,.webm,.mkv,.avi,.wmv,.flv,.mpg,.mpeg,.3gp,.ts" multiple style={{ display: 'none' }}
                 onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = '' }} />
               {/* Upload icon */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
