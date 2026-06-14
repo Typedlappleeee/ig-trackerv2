@@ -1699,15 +1699,16 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 }) {
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [failed,    setFailed]    = useState(false)
-  const [loading,   setLoading]   = useState(true)
-  const [thumbUrl,  setThumbUrl]  = useState<string | null>(null)
-  const [videoSrc,  setVideoSrc]  = useState<string | null>(null)
-  const [retryKey,  setRetryKey]  = useState(0)
+  const [failed,      setFailed]      = useState(false)
+  const [loading,     setLoading]     = useState(true)
+  const [thumbUrl,    setThumbUrl]    = useState<string | null>(null)
+  const [videoSrc,    setVideoSrc]    = useState<string | null>(null)
+  const [retryKey,    setRetryKey]    = useState(0)
+  const [tryAsImage,  setTryAsImage]  = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    setThumbUrl(null); setVideoSrc(null); setFailed(false); setLoading(true)
+    setThumbUrl(null); setVideoSrc(null); setFailed(false); setLoading(true); setTryAsImage(false)
     if (thumbnailPath) {
       getSignedUrl(thumbnailPath).then(u => {
         if (cancelled) return
@@ -1728,9 +1729,11 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
     return () => { cancelled = true }
   }, [thumbnailPath, storagePath, retryKey])
 
-  // Retry once on load error (URL may have expired mid-session)
+  // Retry once on URL expiry; then try rendering as <img> (handles PNG stored with .mp4 ext);
+  // only give up after both retries fail.
   const handleError = () => {
     if (retryKey === 0) setRetryKey(1)
+    else if (!tryAsImage) setTryAsImage(true)
     else setFailed(true)
   }
 
@@ -1754,11 +1757,12 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   // 2. Cloud asset (image or video)
   if (storagePath) {
     if (loading || !videoSrc) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-text2/40 animate-pulse"><IconClapperboard size={36} /></div>
-    if (isImagePath(storagePath)) {
+    // isImagePath covers normal uploads; tryAsImage covers PNG stored with wrong extension
+    if (isImagePath(storagePath) || tryAsImage) {
       return (
         <img src={videoSrc} alt=""
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          onError={handleError} />
+          onError={tryAsImage ? () => setFailed(true) : handleError} />
       )
     }
     return (
@@ -1803,9 +1807,10 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () => void }) {
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [cloudUrl, setCloudUrl] = useState<string | null>(null)
-  const [urlError, setUrlError] = useState(false)
-  const [retryKey, setRetryKey] = useState(0)
+  const [cloudUrl,    setCloudUrl]    = useState<string | null>(null)
+  const [urlError,    setUrlError]    = useState(false)
+  const [retryKey,    setRetryKey]    = useState(0)
+  const [tryAsImage,  setTryAsImage]  = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -1821,6 +1826,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
 
   const handleVideoError = () => {
     if (retryKey === 0) { setCloudUrl(null); setRetryKey(1) }
+    else if (!tryAsImage) setTryAsImage(true)
     else setUrlError(true)
   }
 
@@ -1885,8 +1891,16 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
           </div>
         )}
 
-        {/* Video fills the container */}
-        {localUrl && (
+        {/* Image or video fills the container */}
+        {localUrl && ((isImagePath(item.storage_path ?? item.file_url) || tryAsImage) ? (
+          <img
+            key={localUrl + '-img'}
+            src={localUrl}
+            alt={item.title}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            onError={() => setUrlError(true)}
+          />
+        ) : (
           <video
             key={localUrl}
             ref={videoRef}
@@ -1896,7 +1910,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
             onError={handleVideoError}
           />
-        )}
+        ))}
       </div>
     </div>
   )
