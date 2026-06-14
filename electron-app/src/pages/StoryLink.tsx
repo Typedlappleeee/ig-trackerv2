@@ -8,6 +8,8 @@ import { fetchAllPhones, postInstagramStory, stopPhone, type GeelarkPhone } from
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
+import type { CaptionItem } from '@/pages/CaptionBank'
+import { supabase } from '@/lib/supabase'
 import { playSuccess, playError } from '@/lib/sounds'
 import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
 
@@ -164,6 +166,130 @@ const IconNoConnection = () => (
   </svg>
 )
 
+// ── Caption Bank Picker modal ─────────────────────────────────────────────────
+function CaptionBankPicker({
+  user, onSelect, onClose,
+}: {
+  user: User
+  onSelect: (texts: string[]) => void
+  onClose: () => void
+}) {
+  const { currentOrg } = useOrg()
+  const [items,    setItems]    = useState<CaptionItem[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [folder,   setFolder]   = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      let q = supabase.from('caption_bank').select('*').order('created_at', { ascending: false })
+      if (currentOrg?.id) q = q.eq('org_id', currentOrg.id)
+      else q = q.eq('user_id', user.id)
+      const { data } = await q
+      setItems((data as CaptionItem[]) ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [user.id, currentOrg?.id])
+
+  const folders = ['Tous', ...Array.from(new Set(items.map(i => i.folder).filter(Boolean) as string[])).sort()]
+  const visible = folder && folder !== 'Tous' ? items.filter(i => i.folder === folder) : items
+
+  function toggleAll() {
+    if (visible.every(i => selected.has(i.id))) {
+      setSelected(prev => { const n = new Set(prev); visible.forEach(i => n.delete(i.id)); return n })
+    } else {
+      setSelected(prev => { const n = new Set(prev); visible.forEach(i => n.add(i.id)); return n })
+    }
+  }
+
+  function confirm() {
+    const texts = items.filter(i => selected.has(i.id)).map(i => i.content).filter(Boolean)
+    if (texts.length) onSelect(texts)
+    onClose()
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 9990, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(8px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ width: '100%', maxWidth: 560, margin: '0 16px', maxHeight: '80vh', background: BG_2, border: `1px solid ${HAIR}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0 }}>Banque de captions</p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0' }}>{selected.size} sélectionné{selected.size !== 1 ? 's' : ''}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', lineHeight: 1, display: 'flex' }}><IconX /></button>
+        </div>
+
+        {/* Folder tabs */}
+        {folders.length > 1 && (
+          <div style={{ padding: '10px 14px 0', display: 'flex', gap: 6, flexWrap: 'wrap', flexShrink: 0, borderBottom: `1px solid ${HAIR}` }}>
+            {folders.map(f => {
+              const active = (folder ?? 'Tous') === f
+              return (
+                <button key={f} onClick={() => setFolder(f === 'Tous' ? null : f)}
+                  style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11.5, fontWeight: active ? 700 : 400, cursor: 'pointer', marginBottom: 10,
+                    background: active ? 'rgba(99,102,241,0.15)' : 'transparent', border: `1px solid ${active ? 'rgba(99,102,241,0.4)' : HAIR}`, color: active ? ACCENT_L : 'var(--text-3)', transition: 'all 0.12s' }}>
+                  {f}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* List */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px' }}>
+          {loading ? (
+            <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}><div className="sf-spinner" /></div>
+          ) : visible.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '32px 0' }}>Aucune caption trouvée</p>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 4px', marginBottom: 4 }}>
+                <button onClick={toggleAll} style={{ fontSize: 11, color: ACCENT_L, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  {visible.every(i => selected.has(i.id)) ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </button>
+                <span style={{ fontSize: 11, color: 'var(--text-4)' }}>({visible.length} caption{visible.length !== 1 ? 's' : ''})</span>
+              </div>
+              {visible.map(item => {
+                const sel = selected.has(item.id)
+                return (
+                  <div key={item.id}
+                    onClick={() => setSelected(prev => { const n = new Set(prev); sel ? n.delete(item.id) : n.add(item.id); return n })}
+                    style={{ display: 'flex', gap: 10, padding: '9px 10px', borderRadius: 9, cursor: 'pointer', marginBottom: 4,
+                      background: sel ? 'rgba(99,102,241,0.09)' : 'rgba(255,255,255,0.025)', border: `1px solid ${sel ? 'rgba(99,102,241,0.32)' : 'transparent'}`, transition: 'all 0.12s' }}>
+                    <span style={{ width: 16, height: 16, borderRadius: 5, flexShrink: 0, marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: sel ? 'var(--accent)' : 'rgba(255,255,255,0.05)', border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
+                      {sel && <IconCheck />}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 12.5, fontWeight: 600, color: sel ? TEXT_1 : 'var(--text-2)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || item.content.slice(0, 40)}</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.content}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 16px', borderTop: `1px solid ${HAIR}`, display: 'flex', gap: 9, flexShrink: 0 }}>
+          <button onClick={onClose} className="sf-btn sf-btn-secondary cursor-pointer" style={{ flex: 1, justifyContent: 'center' }}>Annuler</button>
+          <button onClick={confirm} disabled={selected.size === 0} className="sf-btn sf-btn-primary cursor-pointer"
+            style={{ flex: 2, justifyContent: 'center', opacity: selected.size === 0 ? 0.45 : 1, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}>
+            Ajouter {selected.size > 0 ? `(${selected.size})` : ''} caption{selected.size !== 1 ? 's' : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function StoryLink({ user }: { user: User }) {
   const conns  = useConnections(user)
   const bearer = conns.bearer
@@ -186,8 +312,9 @@ export default function StoryLink({ user }: { user: User }) {
   const [phoneLinks, setPhoneLinks]   = useState<Record<string, string>>({})
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [showBankPicker, setShowBankPicker] = useState(false)
-  const [editingText, setEditingText]       = useState('')
+  const [showBankPicker, setShowBankPicker]         = useState(false)
+  const [showCaptionPicker, setShowCaptionPicker]   = useState(false)
+  const [editingText, setEditingText]               = useState('')
   const [running, setRunning]               = useState(false)
   const [jobs, setJobs]                     = useState<Job[]>([])
   const [openLog, setOpenLog]               = useState<string | null>(null)
@@ -421,6 +548,17 @@ export default function StoryLink({ user }: { user: User }) {
             setShowBankPicker(false)
           }}
           onClose={() => setShowBankPicker(false)}
+        />
+      )}
+
+      {showCaptionPicker && (
+        <CaptionBankPicker
+          user={user}
+          onSelect={texts => setTextPool(prev => {
+            const existing = new Set(prev)
+            return [...prev, ...texts.filter(t => !existing.has(t))]
+          })}
+          onClose={() => setShowCaptionPicker(false)}
         />
       )}
 
@@ -711,14 +849,24 @@ export default function StoryLink({ user }: { user: User }) {
 
           {/* ── Text pool ──────────────────────────────────────────────────── */}
           <div className="sf-card" style={{ padding: 18 }}>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                <span style={{ color: 'var(--accent-l)' }}><IconText /></span>
-                <span className="sf-section-label" style={{ margin: 0 }}>Pool de textes sticker</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--accent-l)' }}><IconText /></span>
+                  <span className="sf-section-label" style={{ margin: 0 }}>Pool de textes sticker</span>
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
+                  Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.
+                </p>
               </div>
-              <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.
-              </p>
+              <button
+                onClick={() => setShowCaptionPicker(true)}
+                className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+                style={{ flexShrink: 0, marginLeft: 12 }}
+              >
+                <IconPlus />
+                Depuis la banque
+              </button>
             </div>
 
             {textPool.length > 0 && (
@@ -728,13 +876,14 @@ export default function StoryLink({ user }: { user: User }) {
                     display: 'flex', alignItems: 'center', gap: 7,
                     padding: '5px 11px', borderRadius: 20,
                     background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)',
+                    maxWidth: 260,
                   }}>
-                    <span style={{ fontSize: 12.5, color: '#67e8f9' }}>{txt}</span>
+                    <span style={{ fontSize: 12, color: '#67e8f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txt}</span>
                     <button
                       onClick={() => setTextPool(prev => prev.filter((_, j) => j !== i))}
                       aria-label="Retirer le texte"
                       className="sf-press cursor-pointer"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', flexShrink: 0 }}
                     >
                       <IconX />
                     </button>
@@ -753,7 +902,7 @@ export default function StoryLink({ user }: { user: User }) {
                     setEditingText('')
                   }
                 }}
-                placeholder='Ex: "Regarde ici" puis Entrée…'
+                placeholder='Ou saisir manuellement puis Entrée…'
                 className="sf-input"
                 style={{ flex: 1, height: 36 }}
               />
