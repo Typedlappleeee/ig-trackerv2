@@ -331,11 +331,14 @@ export function Mixer({ user }: MixerProps) {
     const processJob = async (job: MixJob) => {
       updateJob(job.id, { status: 'processing' })
       try {
-        const signedUrl = await getSignedUrl(job.videoItem.storage_path)
-        if (!signedUrl) throw new Error('Impossible d\'obtenir l\'URL vidéo')
+        // Resolve video URL — prefer storage_path (fresh signed URL), fall back to file_url
+        const signedUrl = job.videoItem.storage_path
+          ? await getSignedUrl(job.videoItem.storage_path)
+          : job.videoItem.file_url ?? null
+        if (!signedUrl) throw new Error('URL vidéo introuvable (storage_path et file_url sont vides)')
 
         const api = window.electronAPI
-        if (!api?.runFfmpegMixOverlay) throw new Error('runFfmpegMixOverlay IPC indisponible — rebuild l\'app')
+        if (!api?.runFfmpegMixOverlay) throw new Error('IPC runFfmpegMixOverlay manquant — rebuild l\'app Electron')
 
         const res = await api.runFfmpegMixOverlay({
           sourcePath: signedUrl,
@@ -649,7 +652,10 @@ export function Mixer({ user }: MixerProps) {
                       onMouseEnter={e => (e.target as HTMLVideoElement).play()}
                       onMouseLeave={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }} />
                   ) : job.status === 'error' ? (
-                    <span style={{ color: '#f87171', fontSize: 10, textAlign: 'center', padding: 6 }}>Erreur</span>
+                    <div title={job.error} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, width: '100%', height: '100%' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <span style={{ color: '#f87171', fontSize: 9, textAlign: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}>{job.error ?? 'Erreur'}</span>
+                    </div>
                   ) : (
                     <div className="sf-spinner" />
                   )}
