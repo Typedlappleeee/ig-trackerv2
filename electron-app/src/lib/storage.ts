@@ -18,6 +18,13 @@ function extOf(filePath: string): string {
   return m ? m[1].toLowerCase() : 'mp4'
 }
 
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+  'image/gif': 'gif', 'image/webp': 'webp', 'image/bmp': 'bmp',
+  'image/heic': 'heic', 'image/heif': 'heif',
+  'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm',
+}
+
 function mimeFor(ext: string): string {
   switch (ext.toLowerCase()) {
     case 'mp4':  return 'video/mp4'
@@ -131,7 +138,12 @@ export async function uploadVideoFromBlob(
   scope: UploadScope,
   onProgress?: (phase: UploadPhase) => void,
 ): Promise<UploadResult> {
-  const ext  = extOf(name)
+  let ext = extOf(name)
+  // If the filename has no extension (default 'mp4') but blob.type indicates an image,
+  // use the correct image extension so inferType() classifies it as a photo, not a video.
+  if (ext === 'mp4' && blob.type && MIME_TO_EXT[blob.type]) {
+    ext = MIME_TO_EXT[blob.type]
+  }
   const mime = blob.type || mimeFor(ext)
   const id   = crypto.randomUUID()
   const folder = scopeFolder(scope)

@@ -35,7 +35,17 @@ function loadDistrib(): Distribution {
   return (localStorage.getItem(LS_DISTRIB) as Distribution | null) ?? 'rotation'
 }
 function loadPhoneLink(id: string): string {
-  return localStorage.getItem(lsLinkKey(id)) ?? ''
+  const raw = localStorage.getItem(lsLinkKey(id)) ?? ''
+  // Guard against old JSON format e.g. {"linkUrl":"https://...","linkText":"..."}
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && typeof parsed.linkUrl === 'string') {
+      const url = parsed.linkUrl
+      if (url) localStorage.setItem(lsLinkKey(id), url) // migrate to plain string
+      return url
+    }
+  } catch { /* not JSON — use as-is */ }
+  return raw
 }
 function savePhoneLink(id: string, link: string) {
   if (link.trim()) localStorage.setItem(lsLinkKey(id), link.trim())

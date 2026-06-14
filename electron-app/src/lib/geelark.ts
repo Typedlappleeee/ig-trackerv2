@@ -828,7 +828,16 @@ export async function postInstagramStory(
 
   // ── 1. Download image into the phone gallery ───────────────────────────────
   log('🖼 Téléchargement de l\'image…')
-  const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
+  // Detect real extension from the URL path (handles PNG, WEBP, etc.)
+  const _imgExt = (() => {
+    try {
+      const p = new URL(config.imageUrl).pathname
+      const m = /\.(png|gif|webp|bmp|heic|heif|jpe?g)$/i.exec(p)
+      if (m) return m[1].toLowerCase().replace('jpeg', 'jpg')
+    } catch { /* ignore */ }
+    return 'jpg'
+  })()
+  const imgPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
   // Try curl first; fall back to wget if curl isn't available on the device
   await shellExec(bearer, phoneId,
     `mkdir -p /sdcard/DCIM/Camera && ` +
@@ -838,11 +847,12 @@ export async function postInstagramStory(
   const checkDl = await shellExec(bearer, phoneId,
     `wc -c < ${imgPath} 2>/dev/null || echo 0`)
   const dlBytes = parseInt(checkDl.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-  log(`   📎 Image: ${dlBytes} octets`)
+  log(`   📎 Image (${_imgExt}): ${dlBytes} octets`)
   if (dlBytes < 2000) {
     log(`   ❌ Échec téléchargement image (${dlBytes} octets)`)
     return { ok: false, error: 'Impossible de télécharger l\'image sur le téléphone' }
   }
+  // Force media scanner to index the file so Instagram's gallery picker sees it
   await shellExec(bearer, phoneId,
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
   await sleep(2500)
