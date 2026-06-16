@@ -838,31 +838,63 @@ export async function postInstagramStory(
   })()
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
 
-  // Download image as base64 then push to phone via shell — works on web AND Electron.
-  // 1. Browser fetch (works on web + Electron renderer; Supabase URLs have CORS headers).
-  // 2. Electron IPC fallback (if renderer is blocked by CSP).
-  // 3. On-phone curl/wget last resort.
+  // Download image as base64 — 3-tier strategy:
+  // 1. /api/proxy server-side fetch (web; no CORS, always works)
+  // 2. Direct browser fetch (Electron renderer; full network access)
+  // 3. Electron IPC (last resort for CSP-blocked renderer)
   let imgBase64: string | null = null
 
-  try {
-    const resp = await fetch(config.imageUrl)
-    if (resp.ok) {
-      const u8 = new Uint8Array(await resp.arrayBuffer())
-      let b64 = ''
-      const CS = 8192
-      for (let i = 0; i < u8.length; i += CS) {
-        b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + CS, u8.length))))
-      }
-      imgBase64 = b64
-      log(`   📥 Image téléchargée (${Math.round(b64.length / 1024)} KB)`)
-    } else {
-      log(`   ⚠️ fetch HTTP ${resp.status}`)
+  // Helper: convert ArrayBuffer → base64 string
+  function bufToB64(buf: ArrayBuffer): string {
+    const u8 = new Uint8Array(buf)
+    let b64 = ''
+    const CS = 8192
+    for (let i = 0; i < u8.length; i += CS) {
+      b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + CS, u8.length))))
     }
-  } catch (e) {
-    log(`   ⚠️ fetch échoué (${e instanceof Error ? e.message : String(e)})`)
+    return b64
   }
 
-  // Electron IPC fallback (if browser fetch was blocked by CSP or CORS in Electron)
+  // Tier 1: server-side proxy (/api/proxy) — works on web, avoids CORS entirely
+  try {
+    const proxyRes = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: config.imageUrl }),
+    })
+    if (proxyRes.ok) {
+      const data = await proxyRes.json()
+      if (data.ok && data.dataUrl) {
+        // data.dataUrl = "data:image/png;base64,XXXXXXX"
+        const comma = data.dataUrl.indexOf(',')
+        if (comma !== -1) {
+          imgBase64 = data.dataUrl.slice(comma + 1)
+          log(`   📥 Image via proxy serveur (${Math.round(imgBase64.length / 1024)} KB)`)
+        }
+      } else if (data.ok === false) {
+        log(`   ⚠️ Proxy: ${data.error ?? 'erreur inconnue'}`)
+      }
+    }
+  } catch (e) {
+    log(`   ⚠️ Proxy échoué (${e instanceof Error ? e.message : String(e)})`)
+  }
+
+  // Tier 2: direct browser fetch (Electron renderer / CORS-friendly origins)
+  if (!imgBase64) {
+    try {
+      const resp = await fetch(config.imageUrl)
+      if (resp.ok) {
+        imgBase64 = bufToB64(await resp.arrayBuffer())
+        log(`   📥 Image via fetch direct (${Math.round(imgBase64.length / 1024)} KB)`)
+      } else {
+        log(`   ⚠️ fetch HTTP ${resp.status}`)
+      }
+    } catch (e) {
+      log(`   ⚠️ fetch échoué (${e instanceof Error ? e.message : String(e)})`)
+    }
+  }
+
+  // Tier 3: Electron IPC (if renderer blocked by CSP)
   if (!imgBase64) {
     try {
       const api = (window as { electronAPI?: { fetchIgVideo?: (o: { url: string }) => Promise<{ ok: boolean; path?: string }>; readFileBytes?: (p: string) => Promise<{ ok: boolean; bytes?: ArrayBuffer }> } }).electronAPI
@@ -870,14 +902,8 @@ export async function postInstagramStory(
       if (dlRes?.ok && dlRes?.path) {
         const readRes = await api?.readFileBytes?.(dlRes.path)
         if (readRes?.ok && readRes?.bytes) {
-          const u8 = new Uint8Array(readRes.bytes)
-          let b64 = ''
-          const CS = 8192
-          for (let i = 0; i < u8.length; i += CS) {
-            b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + CS, u8.length))))
-          }
-          imgBase64 = b64
-          log(`   📥 Image via Electron IPC (${Math.round(b64.length / 1024)} KB)`)
+          imgBase64 = bufToB64(readRes.bytes)
+          log(`   📥 Image via Electron IPC (${Math.round(imgBase64.length / 1024)} KB)`)
         }
       }
     } catch (e) {
