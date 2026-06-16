@@ -838,49 +838,69 @@ export async function postInstagramStory(
   })()
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
 
-  // Primary: download in Electron (guaranteed network/SSL access) then push via base64.
-  // This avoids curl/wget availability issues and SSL cert problems on Android.
-  let pushedViaBase64 = false
+  // Download image as base64 then push to phone via shell — works on web AND Electron.
+  // 1. Browser fetch (works on web + Electron renderer; Supabase URLs have CORS headers).
+  // 2. Electron IPC fallback (if renderer is blocked by CSP).
+  // 3. On-phone curl/wget last resort.
+  let imgBase64: string | null = null
+
   try {
-    const api = (window as { electronAPI?: { fetchIgVideo?: (o: { url: string }) => Promise<{ ok: boolean; path?: string }>; readFileBytes?: (p: string) => Promise<{ ok: boolean; bytes?: ArrayBuffer }> } }).electronAPI
-    const dlRes = await api?.fetchIgVideo?.({ url: config.imageUrl })
-    if (dlRes?.ok && dlRes?.path) {
-      const readRes = await api?.readFileBytes?.(dlRes.path)
-      if (readRes?.ok && readRes?.bytes) {
-        const u8 = new Uint8Array(readRes.bytes)
-        // Encode as base64 in 8 KB chunks to avoid stack overflow on large images
-        let b64 = ''
-        const CS = 8192
-        for (let i = 0; i < u8.length; i += CS) {
-          b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + CS, u8.length))))
-        }
-        log(`   📦 Push image via base64 (${Math.round(b64.length / 1024)} KB)…`)
-        // Write to phone: split base64 into chunks, batch into few shellExec calls
-        const CHUNK = 4000
-        const BATCH = 12
-        const chunks: string[] = []
-        for (let i = 0; i < b64.length; i += CHUNK) chunks.push(b64.slice(i, i + CHUNK))
-        // First chunk: create file
-        await shellExec(bearer, phoneId,
-          `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-        // Remaining chunks: append in batches (base64 only uses A-Za-z0-9+/= — safe in single quotes)
-        for (let b = 1; b < chunks.length; b += BATCH) {
-          const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-          await shellExec(bearer, phoneId, cmd)
-        }
-        // Decode and clean up
-        await shellExec(bearer, phoneId,
-          `base64 -d '${imgPath}.b64' > '${imgPath}' 2>/dev/null && rm -f '${imgPath}.b64'`)
-        pushedViaBase64 = true
-        log(`   ✅ Image poussée via Electron`)
+    const resp = await fetch(config.imageUrl)
+    if (resp.ok) {
+      const u8 = new Uint8Array(await resp.arrayBuffer())
+      let b64 = ''
+      const CS = 8192
+      for (let i = 0; i < u8.length; i += CS) {
+        b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + CS, u8.length))))
       }
+      imgBase64 = b64
+      log(`   📥 Image téléchargée (${Math.round(b64.length / 1024)} KB)`)
+    } else {
+      log(`   ⚠️ fetch HTTP ${resp.status}`)
     }
   } catch (e) {
-    log(`   ⚠️ Push Electron échoué (${e instanceof Error ? e.message : String(e)}) — fallback curl…`)
+    log(`   ⚠️ fetch échoué (${e instanceof Error ? e.message : String(e)})`)
   }
 
-  if (!pushedViaBase64) {
-    // Fallback: download directly on the phone (requires curl or wget + internet access)
+  // Electron IPC fallback (if browser fetch was blocked by CSP or CORS in Electron)
+  if (!imgBase64) {
+    try {
+      const api = (window as { electronAPI?: { fetchIgVideo?: (o: { url: string }) => Promise<{ ok: boolean; path?: string }>; readFileBytes?: (p: string) => Promise<{ ok: boolean; bytes?: ArrayBuffer }> } }).electronAPI
+      const dlRes = await api?.fetchIgVideo?.({ url: config.imageUrl })
+      if (dlRes?.ok && dlRes?.path) {
+        const readRes = await api?.readFileBytes?.(dlRes.path)
+        if (readRes?.ok && readRes?.bytes) {
+          const u8 = new Uint8Array(readRes.bytes)
+          let b64 = ''
+          const CS = 8192
+          for (let i = 0; i < u8.length; i += CS) {
+            b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + CS, u8.length))))
+          }
+          imgBase64 = b64
+          log(`   📥 Image via Electron IPC (${Math.round(b64.length / 1024)} KB)`)
+        }
+      }
+    } catch (e) {
+      log(`   ⚠️ Electron IPC échoué (${e instanceof Error ? e.message : String(e)})`)
+    }
+  }
+
+  if (imgBase64) {
+    // Push via base64 — base64 only uses A-Za-z0-9+/= which are safe inside single quotes
+    const CHUNK = 4000
+    const BATCH = 12
+    const chunks: string[] = []
+    for (let i = 0; i < imgBase64.length; i += CHUNK) chunks.push(imgBase64.slice(i, i + CHUNK))
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+    for (let b = 1; b < chunks.length; b += BATCH) {
+      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+      await shellExec(bearer, phoneId, cmd)
+    }
+    await shellExec(bearer, phoneId,
+      `base64 -d '${imgPath}.b64' > '${imgPath}' 2>/dev/null && rm -f '${imgPath}.b64'`)
+  } else {
+    log('   ⚠️ Fallback: téléchargement sur le téléphone (curl/wget)…')
     await shellExec(bearer, phoneId,
       `mkdir -p /sdcard/DCIM/Camera && ` +
       `(curl -fsSLk --max-time 60 -o '${imgPath}' '${config.imageUrl}' 2>/dev/null || ` +
