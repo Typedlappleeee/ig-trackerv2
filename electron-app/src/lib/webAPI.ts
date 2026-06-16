@@ -267,10 +267,6 @@ export function buildWebAPI() {
         // Fallback client-side (blob: URLs, ou proxy serveur indisponible)
         // Step 1: get video bytes — try multiple strategies in order
         let bytes: Uint8Array | null = null
-
-        // Pour blob: URLs (fichiers locaux) → téléchargement navigateur + upload direct
-        console.log(`${V} [B] blob URL → téléchargement direct`)
-        let bytes: Uint8Array | null = null
         try {
           const r = await fetch(opts.filePath)
           if (r.ok) {
