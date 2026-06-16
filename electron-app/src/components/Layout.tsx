@@ -479,7 +479,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   }
 
   const isVisibleTab = (id: Page): boolean => {
-    if (id === 'licences')  return license.isSuperAdmin
+    if (id === 'licences' || id === 'storylink') return license.isSuperAdmin
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
