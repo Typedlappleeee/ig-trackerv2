@@ -242,7 +242,7 @@ function SessionDialog({
               {phone.ig_username && <p style={{ fontSize: 12, color: ACCENT, margin: '2px 0 0' }}>@{phone.ig_username}</p>}
             </div>
           </div>
-          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ width: 28, height: 28, borderRadius: 8 }}>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ width: 28, height: 28, borderRadius: 0 }}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
             </svg>
@@ -273,7 +273,7 @@ function SessionDialog({
               </div>
               {extractLogs.length > 0 && (
                 <div style={{
-                  background: 'rgba(0,0,0,0.35)', borderRadius: 8, padding: '8px 10px',
+                  background: 'rgba(0,0,0,0.35)', borderRadius: 0, padding: '8px 10px',
                   maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
                   border: '1px solid rgba(233,234,240,0.06)',
                 }}>
@@ -412,7 +412,7 @@ function ContextMenu({
       onClick={() => { onClick(); onClose() }}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-        padding: '7px 12px', fontSize: 13, textAlign: 'left', borderRadius: 6,
+        padding: '7px 12px', fontSize: 13, textAlign: 'left', borderRadius: 0,
         background: 'none', border: 'none', cursor: 'pointer',
         color: danger ? '#F0A0AB' : TEXT_1, transition: 'background 0.12s',
       }}
@@ -1186,6 +1186,17 @@ export function Phones({ user }: PhonesProps) {
               <h1 className="sf-page-title">{t('phonesHeading')}</h1>
               <p className="sf-page-sub">{t('phonesSubtitle')}</p>
             </div>
+            <h1 style={{ margin: 0, lineHeight: 1.05, letterSpacing: '-0.04em' }}>
+              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 26, color: IVORY }}>
+                {headingMain}
+              </span>
+              {headingAccent && (
+                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 29, color: GOLD, marginLeft: '0.25em' }}>
+                  {headingAccent}
+                </span>
+              )}
+            </h1>
+            <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: '7px 0 0', lineHeight: 1.5 }}>{t('phonesSubtitle')}</p>
           </div>
 
           {/* Right: auto-refresh + sync */}

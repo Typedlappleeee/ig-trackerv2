@@ -943,7 +943,7 @@ export default function StoryLink({ user }: { user: User }) {
                   <span className="sf-section-label" style={{ margin: 0 }}>Liens — 1 lien par compte</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  Chaque compte a son propre lien, éditable dans l'aperçu et sauvegardé automatiquement.
+                  Chaque compte a son propre lien, éditable dans l’aperçu et sauvegardé automatiquement.
                 </p>
               </div>
               {selectedIds.length > 0 && (
@@ -965,7 +965,7 @@ export default function StoryLink({ user }: { user: User }) {
               }}>
                 <span style={{ flexShrink: 0, marginTop: 1, color: '#fbbf24' }}><IconWarn /></span>
                 <span>
-                  {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} dans l'aperçu avant de publier.
+                  {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} dans l’aperçu avant de publier.
                 </span>
               </div>
             )}

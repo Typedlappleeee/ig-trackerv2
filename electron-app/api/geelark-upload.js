@@ -12,33 +12,41 @@ function getSupabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+const SV = '[SERVER-v3]'
+
 module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
       return res.status(200).json({ ok: true })
     }
     if (req.method !== 'POST') {
-      return res.status(405).json({ ok: false, error: 'Method not allowed' })
+      return res.status(405).json({ ok: false, error: `${SV} Method not allowed` })
     }
 
     const { storagePath, bucket = 'content', bearer, signedUrl } = req.body ?? {}
+    console.log(`${SV} body keys: ${Object.keys(req.body ?? {}).join(',')} | signedUrl=${!!signedUrl} | storagePath=${!!storagePath}`)
+
     if ((!storagePath && !signedUrl) || !bearer) {
-      return res.status(400).json({ ok: false, error: 'Missing storagePath/signedUrl or bearer' })
+      return res.status(400).json({ ok: false, error: `${SV}[SV-E001] Missing storagePath/signedUrl or bearer` })
     }
 
     let bytes
     if (signedUrl) {
-      // Signed URL already contains auth token — fetch directly, no service role key needed
+      // Direct fetch — no admin key needed (signed URL already contains auth token)
+      console.log(`${SV} [SV-A] fetch signedUrl (${String(signedUrl).slice(0, 80)})`)
       const dlRes = await fetch(signedUrl)
       if (!dlRes.ok) {
-        return res.status(200).json({ ok: false, error: `Download failed: ${dlRes.status}` })
+        return res.status(200).json({ ok: false, error: `${SV}[SV-E002] Fetch vidéo échoué: ${dlRes.status}` })
       }
       bytes = Buffer.from(await dlRes.arrayBuffer())
+      console.log(`${SV} [SV-A] fetch ok, ${bytes.length} bytes`)
     } else {
+      // storagePath — requires SUPABASE_SERVICE_ROLE_KEY
+      console.log(`${SV} [SV-B] storagePath path, tentative admin client`)
       const supabase = getSupabaseAdmin()
       const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
       if (dlErr || !blob) {
-        return res.status(200).json({ ok: false, error: 'Supabase download failed: ' + (dlErr?.message ?? 'unknown') })
+        return res.status(200).json({ ok: false, error: `${SV}[SV-E003] Supabase download failed: ${dlErr?.message ?? 'unknown'}` })
       }
       bytes = Buffer.from(await blob.arrayBuffer())
     }
@@ -49,51 +57,33 @@ module.exports = async (req, res) => {
       body: JSON.stringify({ fileType: 'mp4' }),
     })
     if (!glUrlRes.ok) {
-      return res.status(200).json({ ok: false, error: `GéeLark URL error: ${glUrlRes.status}` })
+      return res.status(200).json({ ok: false, error: `${SV}[SV-E004a] GéeLark URL HTTP: ${glUrlRes.status}` })
     }
     const glData = await glUrlRes.json()
     if (glData.code !== 0) {
-      return res.status(200).json({ ok: false, error: `GéeLark error: ${glData.msg ?? glData.code}` })
+      return res.status(200).json({ ok: false, error: `${SV}[SV-E004b] GéeLark error: ${glData.msg ?? glData.code}` })
     }
     const d = glData.data ?? {}
     const uploadUrl = d.uploadUrl
-    const token     = d.resourceUrl  // resourceUrl is what gets passed to the post task as "video"
+    const token     = d.resourceUrl
     if (!uploadUrl || !token) {
-      return res.status(200).json({
-        ok: false,
-        error: 'No uploadUrl/resourceUrl from GéeLark. Keys: ' + Object.keys(d).join(','),
-      })
+      return res.status(200).json({ ok: false, error: `${SV}[SV-E005] No uploadUrl/resourceUrl. Keys: ${Object.keys(d).join(',')}` })
     }
 
-    // Step 3: PUT video bytes to GéeLark's S3 URL
-    // Try with no Content-Type first (some presigned URLs don't sign Content-Type)
-    let putRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: bytes,
-    })
+    let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes })
     if (!putRes.ok) {
-      const errBody = await putRes.text().catch(() => '')
-      console.error('S3 PUT failed (no content-type):', putRes.status, errBody.slice(0, 500))
-      // Retry with explicit Content-Type
-      putRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'video/mp4' },
-        body: bytes,
-      })
+      putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes })
       if (!putRes.ok) {
-        const errBody2 = await putRes.text().catch(() => '')
-        console.error('S3 PUT failed (with content-type):', putRes.status, errBody2.slice(0, 500))
-        return res.status(200).json({
-          ok: false,
-          error: `S3 PUT failed: ${putRes.status} — ${errBody2.slice(0, 200)}`,
-        })
+        const errBody = await putRes.text().catch(() => '')
+        return res.status(200).json({ ok: false, error: `${SV}[SV-E006] S3 PUT failed: ${putRes.status} — ${errBody.slice(0, 200)}` })
       }
     }
 
+    console.log(`${SV} [OK] token=${token.slice(0, 40)}`)
     return res.status(200).json({ ok: true, token })
   } catch (err) {
     const msg = err?.message ?? String(err)
-    console.error('geelark-upload error', msg)
-    return res.status(200).json({ ok: false, error: msg })
+    console.error(`${SV} exception:`, msg)
+    return res.status(200).json({ ok: false, error: `${SV}[SV-E000] ${msg}` })
   }
 }

@@ -541,7 +541,7 @@ input, select, textarea { border-radius: 7px; }
   background: linear-gradient(90deg, #6366F1 0%, #818CF8 50%, #6366F1 100%);
   background-size: 200% auto;
   animation: progressShimmer 2s linear infinite;
-  border-radius: 99px;
+  border-radius: 0;
 }
 
 /* Gradient text utility */

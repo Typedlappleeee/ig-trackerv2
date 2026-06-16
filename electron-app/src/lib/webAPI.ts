@@ -244,6 +244,8 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
+      const V = '[CLIENT-v7]'
+      console.log(`${V} uploadVideoGeelark filePath=${opts.filePath.slice(0, 80)}`)
       try {
         // Preferred path: server-side proxy (/api/geelark-upload) does
         // download + getUrl + PUT entirely côté serveur — pas de CORS.
@@ -266,25 +268,24 @@ export function buildWebAPI() {
         // Step 1: get video bytes — try multiple strategies in order
         let bytes: Uint8Array | null = null
 
-        // Strategy A: direct fetch (works for blob: URLs and signed Supabase URLs)
+        // Pour blob: URLs (fichiers locaux) → téléchargement navigateur + upload direct
+        console.log(`${V} [B] blob URL → téléchargement direct`)
+        let bytes: Uint8Array | null = null
         try {
           const r = await fetch(opts.filePath)
-          if (r.ok) bytes = new Uint8Array(await r.arrayBuffer())
-        } catch { /* fall through */ }
-
-        // Strategy B: Supabase SDK download (works when strategy A is blocked by CORS)
-        if (!bytes) {
-          const m = opts.filePath.match(/\/object\/(?:sign|public)\/([^/?]+)\/(.+?)(?:\?|$)/)
-          if (m) {
-            try {
-              const { supabase } = await import('./supabase')
-              const { data, error } = await supabase.storage.from(m[1]).download(decodeURIComponent(m[2]))
-              if (!error && data) bytes = new Uint8Array(await data.arrayBuffer())
-            } catch { /* fall through */ }
+          if (r.ok) {
+            bytes = new Uint8Array(await r.arrayBuffer())
+            console.log(`${V} [B] fetch ok, ${bytes.length} bytes`)
+          } else {
+            console.warn(`${V} [B] fetch HTTP ${r.status}`)
           }
+        } catch (e) {
+          console.warn(`${V} [B] fetch exception: ${e}`)
         }
 
-        if (!bytes) return { ok: false, error: 'Impossible de lire la vidéo (CORS ou source introuvable)' }
+        if (!bytes) {
+          return { ok: false, error: `${V}[E001] Impossible de lire le fichier local` }
+        }
 
         // Step 2: get GéeLark presigned upload URL — reuse geelarkRequest so network
         // errors are caught cleanly instead of bubbling up as uncaught "Failed to fetch"
@@ -312,12 +313,12 @@ export function buildWebAPI() {
           return { ok: false, error: 'Upload S3 bloqué par le navigateur (CORS) — utilisez une vidéo depuis la Banque (Supabase)' }
         }
 
+        console.log(`${V} [OK] upload réussi token=${token.slice(0, 40)}`)
         return { ok: true, token }
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
       }
     },
-
     // ── FFmpeg operations (delegate to ffmpeg.wasm, serialised via wasmQueue) ──
     async runFfmpeg(opts: unknown) {
       return wasmQueue(async () => {

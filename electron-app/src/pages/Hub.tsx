@@ -456,6 +456,9 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
               })
             )}
           </div>
+
+          {/* Filet bas de hero */}
+          <div style={{ height: 1, background: HAIR, margin: '52px 0 0', transformOrigin: 'left', animation: 'hub-line-grow 1s cubic-bezier(0.16,1,0.3,1) 0.3s both' }} />
         </div>
 
         {/* ── Tool shortcuts ─────────────────────────────────────────────── */}
