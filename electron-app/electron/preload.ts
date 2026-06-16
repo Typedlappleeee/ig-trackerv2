@@ -141,4 +141,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AdsPower local API — uses Node http (bypasses Electron's net.fetch HTTP restrictions)
   adspowerRequest: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) =>
     ipcRenderer.invoke('adspower-request', opts),
+
+  // Notify main process that a mass posting run started/ended so it can keep the
+  // app alive in the system tray instead of quitting when the window is closed.
+  setMassPostingRunning: (running: boolean) =>
+    ipcRenderer.send('mass-posting-running', running),
+
+  // CloneVid — native ffmpeg multi-variant repurpose (fast, always postable MP4)
+  runFfmpegRepurpose: (opts: { sourcePath: string; variants: Array<{ vf: string; crf: number }> }) =>
+    ipcRenderer.invoke('run-ffmpeg-repurpose', opts),
+
+  // Copy a generated file to a user-chosen location via a native Save dialog
+  saveFileAs: (opts: { sourcePath: string; defaultName: string }) =>
+    ipcRenderer.invoke('save-file-as', opts),
+
+  // Mixer — burn a caption onto a video with native ffmpeg
+  runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) =>
+    ipcRenderer.invoke('run-ffmpeg-mix-overlay', opts),
 })

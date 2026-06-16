@@ -71,7 +71,7 @@ interface LayoutProps {
   children:  React.ReactNode
 }
 
-interface NavItem  { id: Page; label: string; icon: string; beta?: boolean; isNew?: boolean }
+interface NavItem  { id: Page; label: string; icon: string; beta?: boolean; isNew?: boolean; dev?: boolean }
 interface NavSection { title: string; items: NavItem[]; defaultOpen?: boolean }
 
 const NAV_SECTIONS: NavSection[] = [
@@ -89,19 +89,18 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
-      { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
+      { id: 'warmup',      label: 'navWarmup',       icon: '🔥', dev: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
   },
   {
-    title: 'Montage',
+    title: 'Outils vidéo',
     defaultOpen: true,
     items: [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
-      { id: 'mixer',       label: 'navMixer',       icon: '🎞️', isNew: true },
+      { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
     ],
   },
 ]
@@ -159,22 +158,11 @@ const PAGE_ICON: Record<string, IconKey> = {
   mixer:       'edit',
   textcopy:    'edit',
   scaleia:     'sparkles',
-}
-
-// Section label — editorial eyebrow (gold, wide letter-spacing)
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      padding: '16px 12px 7px',
-      fontSize: 10.5,
-      fontWeight: 600,
-      textTransform: 'uppercase',
-      letterSpacing: '0.07em',
-      color: 'rgba(233,234,240,0.35)',
-    }}>
-      {children}
-    </div>
-  )
+  hub:         'grid',
+  settings:    'settings',
+  licences:    'shield',
+  community:   'chat',
+  support:     'chat',
 }
 
 // Sidebar divider — hairline
@@ -184,15 +172,81 @@ function SidebarDivider() {
   )
 }
 
+// ── Sidebar NavItem (module-level: stable identity across Layout renders) ────
+interface SidebarNavItemProps {
+  id: Page
+  label: string
+  iconKey: IconKey
+  beta?: boolean
+  isNew?: boolean
+  dev?: boolean
+  active: boolean
+  collapsed: boolean
+  onNavigate: (page: Page) => void
+}
 
-export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefresh, children }: LayoutProps) {
+function SidebarNavItem({ id, label, iconKey, beta, isNew, dev, active, collapsed, onNavigate }: SidebarNavItemProps) {
+  const [hovered, setHovered] = useState(false)
+  const [tooltipY, setTooltipY] = useState(0)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  return (
+    <div style={{ marginBottom: 2 }}>
+      <button
+        ref={btnRef}
+        className={`sf-sidebar-item${active ? ' is-active' : ''}`}
+        onClick={() => { playNav(); onNavigate(id) }}
+        aria-label={label}
+        aria-current={active ? 'page' : undefined}
+        onMouseEnter={() => {
+          setHovered(true)
+          if (collapsed && btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect()
+            setTooltipY(r.top + r.height / 2)
+          }
+        }}
+        onMouseLeave={() => setHovered(false)}
+        style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+      >
+        <span className="sf-sidebar-icon">
+          <NavIcon d={ICONS[iconKey]} size={17} />
+        </span>
+        {!collapsed && (
+          <>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+            {beta && (
+              <span title="Fonctionnalité en test — comportement susceptible d'évoluer" className="sf-badge sf-badge-beta" style={{ fontSize: 9, letterSpacing: '0.08em' }}>BETA</span>
+            )}
+            {isNew && (
+              <span title="Nouvelle fonctionnalité" className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.08em' }}>NEW</span>
+            )}
+            {dev && (
+              <span title="En cours de développement — des bugs peuvent survenir" className="sf-badge sf-badge-warn" style={{ fontSize: 9, letterSpacing: '0.08em' }}>EN DEV</span>
+            )}
+          </>
+        )}
+      </button>
+      {/* Floating tooltip — collapsed mode */}
+      {collapsed && hovered && (
+        <div className="sf-sidebar-tooltip" style={{ left: 58, top: tooltipY }}>
+          {label}
+          {beta && <span style={{ marginLeft: 6, fontSize: 9, color: 'rgba(148,163,184,0.5)' }}>BETA</span>}
+          {isNew && <span style={{ marginLeft: 6, fontSize: 9, color: '#34d399' }}>NEW</span>}
+          {dev && <span style={{ marginLeft: 6, fontSize: 9, color: '#F59E0B' }}>EN DEV</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const t = useT()
   const toast = useToast()
   const [collapsed, setCollapsed]         = useState(() => {
     const v = localStorage.getItem('sf-sidebar')
     return v === 'reduite' || v === 'masquee'
   })
-  const [groupCount, setGroupCount]       = useState<number | null>(null)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('sidebar-sections') ?? '{}')
@@ -201,7 +255,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       return Object.fromEntries(NAV_SECTIONS.map(s => [s.title, s.defaultOpen ?? true]))
     }
   })
-  const [now, setNow] = useState(Date.now())
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
   const orgTriggerRef                 = useRef<HTMLButtonElement>(null)
   const [orgMenuPos, setOrgMenuPos]   = useState<{ left: number; bottom: number; width: number } | null>(null)
@@ -296,6 +349,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title: errors === 0 ? 'Post publié' : `Post terminé avec ${errors} erreur${errors > 1 ? 's' : ''}`,
             body:  errors === 0 ? 'Ton Reel a été posté avec succès.' : `${ok} succès · ${errors} erreur${errors > 1 ? 's' : ''}`,
             level: errors === 0 ? 'ok' : 'warn',
+            page:  'posting',
           })
         }
       }
@@ -309,6 +363,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title: errCount === 0 ? 'Mass Posting terminé' : `Mass Posting: ${errCount} erreur${errCount > 1 ? 's' : ''}`,
             body:  `${doneCount} succès · ${errCount} erreur${errCount > 1 ? 's' : ''} · ${statuses.length} téléphone${statuses.length > 1 ? 's' : ''}`,
             level: errCount === 0 ? 'ok' : 'warn',
+            page:  'massposting',
           })
         }
       }
@@ -345,6 +400,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title: '📢 Nouvelle actualité',
             body: msg.title || msg.content?.slice(0, 80) || undefined,
             level: 'info',
+            page: 'community',
           })
         }
       })
@@ -352,11 +408,18 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     return () => { supabase.removeChannel(ch) }
   }, [])
 
+  // Close the notif panel (marks everything as read on close, not on open,
+  // so the unread badge stays meaningful while the panel is visible)
+  function closeNotifPanel() {
+    setNotifOpen(false)
+    markAllRead()
+  }
+
   // Close notif panel on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false)
+        closeNotifPanel()
       }
     }
     if (notifOpen) document.addEventListener('mousedown', handler)
@@ -367,7 +430,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     if (orgId === (currentOrg?.id ?? null)) { setOrgMenuOpen(false); return }
     switchOrg(orgId)
     setOrgMenuOpen(false)
-    onNavigate('community')
+    onNavigate('hub')
     toast.show({
       title: orgId ? `→ "${orgName}"` : t('soloMode'),
       kind:  'info',
@@ -421,17 +484,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 10000)
-    return () => clearInterval(t)
-  }, [])
-
-  // Auto-redirect to community when the current page isn’t accessible in this org
+  // Auto-redirect to the hub when the current page isn’t accessible in this org
   useEffect(() => {
     if (!orgLoading && page !== 'settings' && !isVisibleTab(page)) {
-      onNavigate('community')
+      onNavigate('hub')
     }
-  }, [page, orgLoading, currentOrg?.id])
+  }, [page, orgLoading, currentOrg?.id, role, perms])
 
   function toggleSection(title: string) {
     setOpenSections(prev => {
@@ -450,25 +508,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     }
   }, [page])
 
-  // Fetch distinct group count for the bottom stats
-  useEffect(() => {
-    let q = supabase.from('phones').select('group_name')
-    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
-    q.then(({ data }: { data: Array<{ group_name?: string | null }> | null }) => {
-      const g = new Set((data ?? []).map(r => r.group_name).filter(Boolean))
-      setGroupCount(g.size)
-    })
-  }, [currentOrg?.id, user.id])
-
-  const lastRefreshLabel = lastRefresh
-    ? (() => {
-        const diff = Math.floor((now - lastRefresh.getTime()) / 1000)
-        if (diff < 60) return 'Màj à l’instant'
-        if (diff < 3600) return `Màj il y a ${Math.floor(diff / 60)}m`
-        return `Màj ${lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
-      })()
-    : null
-
   const userInitial = user.email?.[0].toUpperCase() ?? '?'
   const userName = user.email?.split('@')[0] ?? userInitial
   const planLabel = license.isSuperAdmin
@@ -477,114 +516,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     : license.plan === 'pro'          ? 'Plan Pro'
     : license.plan === 'standard'     ? 'Plan Standard'
     : 'Free plan'
-
-  // ── Sidebar NavItem ────────────────────────────────────────────────────────
-  const SidebarNavItem = ({
-    id,
-    label,
-    iconKey,
-    beta,
-    isNew,
-  }: {
-    id: Page
-    label: string
-    iconKey: IconKey
-    beta?: boolean
-    isNew?: boolean
-  }) => {
-    const active = page === id
-    const [hovered, setHovered] = useState(false)
-    const [pressed, setPressed] = useState(false)
-    return (
-      <div style={{ position: 'relative', marginBottom: 2 }}>
-        <button
-          onClick={() => { playNav(); onNavigate(id) }}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => { setHovered(false); setPressed(false) }}
-          onMouseDown={() => setPressed(true)}
-          onMouseUp={() => setPressed(false)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: collapsed ? 0 : 10,
-            width: '100%',
-            height: 36,
-            padding: '0 11px',
-            borderRadius: 5,
-            fontSize: 13.5,
-            fontWeight: active ? 600 : 450,
-            textAlign: 'left',
-            cursor: 'pointer',
-            border: 'none',
-            background: active
-              ? 'linear-gradient(90deg, rgba(99,102,241,0.16) 0%, rgba(99,102,241,0.08) 60%, transparent 100%)'
-              : hovered ? 'rgba(255,255,255,0.045)' : 'transparent',
-            color: active ? '#E9EAF0' : hovered ? 'rgba(241,240,247,0.82)' : 'rgba(233,234,240,0.48)',
-            boxShadow: active ? 'inset 3px 0 0 rgba(99,102,241,0.85)' : 'none',
-            transition: 'background 140ms ease, color 140ms ease, box-shadow 140ms ease',
-            transform: pressed ? 'scale(0.968)' : 'scale(1)',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            flexShrink: 0,
-            position: 'relative',
-            outline: 'none',
-          }}
-        >
-          <span style={{
-            flexShrink: 0,
-            display: 'flex',
-            color: active ? '#818CF8' : hovered ? 'rgba(233,234,240,0.65)' : 'rgba(233,234,240,0.32)',
-            transition: 'color 140ms ease',
-          }}>
-            <NavIcon d={ICONS[iconKey]} size={17} />
-          </span>
-          {!collapsed && (
-            <>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-              {beta && (
-                <span style={{
-                  fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
-                  padding: '2px 6px', borderRadius: 4,
-                  background: 'rgba(99,102,241,0.15)', color: '#6366F1',
-                  border: '1px solid rgba(99,102,241,0.2)', flexShrink: 0,
-                }}>BETA</span>
-              )}
-              {isNew && (
-                <span style={{
-                  fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
-                  padding: '2px 6px', borderRadius: 4,
-                  background: 'rgba(16,185,129,0.15)', color: '#34d399',
-                  border: '1px solid rgba(52,211,153,0.2)', flexShrink: 0,
-                }}>NEW</span>
-              )}
-            </>
-          )}
-        </button>
-        {/* Floating tooltip when sidebar is collapsed */}
-        {collapsed && hovered && (
-          <div style={{
-            position: 'fixed',
-            left: 60,
-            top: 'auto',
-            transform: 'translateY(-50%)',
-            background: '#13141A',
-            border: '1px solid rgba(99,102,241,0.28)',
-            borderRadius: 7,
-            padding: '5px 11px',
-            fontSize: 12,
-            fontWeight: 500,
-            color: '#E9EAF0',
-            whiteSpace: 'nowrap',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.06)',
-            zIndex: 9999,
-            pointerEvents: 'none',
-            animation: 'sf-slide-left 0.16s cubic-bezier(0.22,1,0.36,1) both',
-          }}>
-            {label}
-          </div>
-        )}
-      </div>
-    )
-  }
 
   const pageLabels: Record<string, string> = {
     hub:         t('navHub'),
@@ -608,14 +539,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     settings:    t('pageSettings'),
     licences:    t('pageLicences'),
   }
-
-  // Suppress unused variable warnings for variables kept for logic parity
-  void groupCount
-  void lastRefreshLabel
-  void phoneCount
-  void onRefresh
-  void openSections
-  void now
 
   return (
     <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', background: '#0A0B0E' }}>
@@ -666,6 +589,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(v => !v)}
+            aria-label={collapsed ? t('expandSidebar') : t('collapseSidebar')}
+            aria-expanded={!collapsed}
             style={{
               width: 26, height: 26, borderRadius: 7,
               border: 'none',
@@ -688,133 +613,78 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 6px 8px' }}>
 
           {/* Hub — home, pinned at top */}
-          <button
-            onClick={() => { playNav(); onNavigate('hub') }}
-            title={collapsed ? t('navHub') : undefined}
-            style={{
-              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
-              fontSize: 13.5, fontWeight: page === 'hub' ? 600 : 400, textAlign: 'left',
-              cursor: 'pointer', border: 'none',
-              background: page === 'hub'
-                ? 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0.06) 60%, transparent 100%)'
-                : 'transparent',
-              color: page === 'hub' ? '#E9EAF0' : 'rgba(233,234,240,0.5)',
-              boxShadow: page === 'hub' ? 'inset 2px 0 0 rgba(99,102,241,0.9)' : 'none',
-              transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              marginBottom: 2,
-            }}
-            onMouseEnter={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
-            onMouseLeave={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
-          >
-            <span style={{ flexShrink: 0, color: page === 'hub' ? '#818CF8' : 'rgba(233,234,240,0.35)', display: 'flex' }}>
-              <NavIcon d={ICONS.grid} size={17} />
-            </span>
-            {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
-          </button>
+          <div style={{ marginBottom: 2 }}>
+            <button
+              className={`sf-sidebar-item${page === 'hub' ? ' is-active' : ''}`}
+              onClick={() => { playNav(); onNavigate('hub') }}
+              style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+            >
+              <span className="sf-sidebar-icon"><NavIcon d={ICONS.grid} size={17} /></span>
+              {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
+            </button>
+          </div>
 
           {/* Community — pinned */}
           {isVisibleTab('community') && (
-            <button
-              onClick={() => { playNav(); onNavigate('community') }}
-              title={collapsed ? t('navCommunity') : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-                width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
-                fontSize: 13.5, fontWeight: page === 'community' ? 600 : 400, textAlign: 'left',
-                cursor: 'pointer', border: 'none',
-                background: page === 'community'
-                  ? 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0.06) 60%, transparent 100%)'
-                  : 'transparent',
-                color: page === 'community' ? '#E9EAF0' : 'rgba(233,234,240,0.5)',
-                boxShadow: page === 'community' ? 'inset 2px 0 0 rgba(99,102,241,0.9)' : 'none',
-                transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                marginBottom: 2,
-              }}
-              onMouseEnter={e => {
-                if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
-              }}
-              onMouseLeave={e => {
-                if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-              }}
-            >
-              <span style={{ flexShrink: 0, color: page === 'community' ? '#818CF8' : 'rgba(233,234,240,0.35)', display: 'flex' }}>
-                <NavIcon d={ICONS.chat} size={17} />
-              </span>
-              {!collapsed && <span style={{ flex: 1 }}>{t('navCommunity')}</span>}
-            </button>
+            <div style={{ marginBottom: 2 }}>
+              <button
+                className={`sf-sidebar-item${page === 'community' ? ' is-active' : ''}`}
+                onClick={() => { playNav(); onNavigate('community') }}
+                style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+              >
+                <span className="sf-sidebar-icon"><NavIcon d={ICONS.chat} size={17} /></span>
+                {!collapsed && <span style={{ flex: 1 }}>{t('navCommunity')}</span>}
+              </button>
+            </div>
           )}
 
           <SidebarDivider />
 
-          {/* Principal section */}
-          {(() => {
-            const items = NAV_SECTIONS[0].items.filter(it => isVisibleTab(it.id))
-            if (items.length === 0) return null
-            return (
-              <>
-                {!collapsed && <SectionLabel>{t('sectionPrincipal')}</SectionLabel>}
-                {items.map(item => (
-                  <SidebarNavItem
-                    key={item.id}
-                    id={item.id}
-                    label={t(item.label as any)}
-                    iconKey={PAGE_ICON[item.id] ?? 'phone'}
-                    beta={item.beta}
-                    isNew={item.isNew}
-                  />
-                ))}
-              </>
-            )
-          })()}
-
-          <SidebarDivider />
-
-          {/* Instagram section */}
-          {(() => {
-            const items = NAV_SECTIONS[1].items.filter(it => isVisibleTab(it.id))
-            if (items.length === 0) return null
-            return (
-              <>
-                {!collapsed && <SectionLabel>{t('sectionInstagram')}</SectionLabel>}
-                {items.map(item => (
-                  <SidebarNavItem
-                    key={item.id}
-                    id={item.id}
-                    label={t(item.label as any)}
-                    iconKey={PAGE_ICON[item.id] ?? 'send'}
-                    beta={item.beta}
-                    isNew={item.isNew}
-                  />
-                ))}
-              </>
-            )
-          })()}
-
-          <SidebarDivider />
-
-          {/* Creation section */}
-          {(() => {
-            const items = NAV_SECTIONS[2].items.filter(it => isVisibleTab(it.id))
-            if (items.length === 0) return null
-            return (
-              <>
-                {!collapsed && <SectionLabel>{t('sectionCreation')}</SectionLabel>}
-                {items.map(item => (
-                  <SidebarNavItem
-                    key={item.id}
-                    id={item.id}
-                    label={t(item.label as any)}
-                    iconKey={PAGE_ICON[item.id] ?? 'edit'}
-                    beta={item.beta}
-                    isNew={item.isNew}
-                  />
-                ))}
-              </>
-            )
-          })()}
+          {/* Sections — collapsible */}
+          {([
+            { section: NAV_SECTIONS[0], labelKey: 'sectionPrincipal',  defaultIcon: 'phone'  as IconKey },
+            { section: NAV_SECTIONS[1], labelKey: 'sectionInstagram',  defaultIcon: 'send'   as IconKey },
+            { section: NAV_SECTIONS[2], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
+          ] as Array<{ section: typeof NAV_SECTIONS[0]; labelKey: string; defaultIcon: IconKey }>)
+            .map(({ section, labelKey, defaultIcon }) => {
+              const items = section.items.filter(it => isVisibleTab(it.id))
+              if (items.length === 0) return null
+              const isOpen = openSections[section.title] !== false
+              return (
+                <div key={section.title}>
+                  <SidebarDivider />
+                  {!collapsed && (
+                    <button
+                      className={`sf-sidebar-section${isOpen ? '' : ' is-closed'}`}
+                      onClick={() => toggleSection(section.title)}
+                    >
+                      <span className="sf-sidebar-section-label">{t(labelKey as any)}</span>
+                      <span className="sf-sidebar-section-line" />
+                      <span className="sf-sidebar-section-arrow">
+                        <NavIcon d={ICONS.chevronDown} size={10} />
+                      </span>
+                    </button>
+                  )}
+                  <div className={`sf-sidebar-items-wrap${(isOpen || collapsed) ? ' is-open' : ' is-closed'}`}>
+                    {items.map(item => (
+                      <SidebarNavItem
+                        key={item.id}
+                        id={item.id}
+                        label={t(item.label as any)}
+                        iconKey={PAGE_ICON[item.id] ?? defaultIcon}
+                        beta={item.beta}
+                        isNew={item.isNew}
+                        dev={item.dev}
+                        active={page === item.id}
+                        collapsed={collapsed}
+                        onNavigate={onNavigate}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })
+          }
 
         </nav>
 
@@ -823,70 +693,52 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
           {/* Settings */}
           <button
+            className={`sf-sidebar-item${page === 'settings' ? ' is-active' : ''}`}
             onClick={() => { playNav(); onNavigate('settings') }}
-            title={collapsed ? t('navSettings') : undefined}
-            style={{
-              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
-              fontSize: 13.5, fontWeight: page === 'settings' ? 600 : 400, textAlign: 'left',
-              cursor: 'pointer', border: 'none',
-              background: page === 'settings'
-                ? 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0.06) 60%, transparent 100%)'
-                : 'transparent',
-              color: page === 'settings' ? '#E9EAF0' : 'rgba(233,234,240,0.5)',
-              boxShadow: page === 'settings' ? 'inset 2px 0 0 rgba(99,102,241,0.9)' : 'none',
-              transition: 'background 0.15s, box-shadow 0.15s',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-            }}
-            onMouseEnter={e => {
-              if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
-            }}
-            onMouseLeave={e => {
-              if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            }}
+            style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
           >
-            <span style={{ flexShrink: 0, color: page === 'settings' ? '#818CF8' : 'rgba(233,234,240,0.35)', display: 'flex' }}>
-              <NavIcon d={ICONS.settings} size={17} />
-            </span>
+            <span className="sf-sidebar-icon"><NavIcon d={ICONS.settings} size={17} /></span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navSettings')}</span>}
           </button>
 
           {license.isSuperAdmin && (
             <button
+              className={`sf-sidebar-item${page === 'licences' ? ' is-active' : ''}`}
               onClick={() => { playNav(); onNavigate('licences') }}
-              title={collapsed ? t('navAdmin') : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-                width: '100%', height: 36, padding: '0 11px', borderRadius: 5,
-                fontSize: 13.5, fontWeight: page === 'licences' ? 600 : 400, textAlign: 'left',
-                cursor: 'pointer', border: 'none',
-                background: page === 'licences'
-                  ? 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0.06) 60%, transparent 100%)'
-                  : 'transparent',
-                color: page === 'licences' ? '#E9EAF0' : 'rgba(233,234,240,0.5)',
-                boxShadow: page === 'licences' ? 'inset 2px 0 0 rgba(99,102,241,0.9)' : 'none',
-                transition: 'background 0.15s, box-shadow 0.15s',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-              }}
-              onMouseEnter={e => {
-                if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
-              }}
-              onMouseLeave={e => {
-                if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-              }}
+              style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
             >
-              <span style={{ flexShrink: 0, color: page === 'licences' ? '#818CF8' : 'rgba(233,234,240,0.35)', display: 'flex' }}>
-                <NavIcon d={ICONS.shield} size={17} />
-              </span>
+              <span className="sf-sidebar-icon"><NavIcon d={ICONS.shield} size={17} /></span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
             </button>
           )}
 
-          {/* Org switcher */}
-          {!collapsed && (
+          {/* Org switcher — compact icon button when collapsed */}
+          {collapsed ? (
             <button
               ref={orgTriggerRef}
               onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
+              aria-label={currentOrg?.name ?? 'Organisation'}
+              aria-expanded={orgMenuOpen}
+              title={currentOrg?.name ?? 'Organisation'}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '100%', padding: '7px 0', borderRadius: 8,
+                cursor: 'pointer',
+                background: 'rgba(255,255,255,0.025)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                color: 'rgba(233,234,240,0.42)', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.025)' }}
+            >
+              <NavIcon d={ICONS.building} size={14} />
+            </button>
+          ) : (
+            <button
+              ref={orgTriggerRef}
+              onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
+              aria-label={currentOrg?.name ?? 'Organisation'}
+              aria-expanded={orgMenuOpen}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 width: '100%', padding: '7px 8px', borderRadius: 8, fontSize: 12, textAlign: 'left',
@@ -1047,6 +899,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 <button
                   onClick={() => onNavigate('settings', 'abonnement')}
                   title="Acheter des crédits"
+                  aria-label="Acheter des crédits"
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 26, height: 30, borderRadius: '0 8px 8px 0',
@@ -1068,7 +921,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             {/* Notification bell */}
             <div style={{ position: 'relative' }} ref={notifRef}>
               <button
-                onClick={() => { setNotifOpen(v => !v); if (!notifOpen) markAllRead() }}
+                onClick={() => { if (notifOpen) closeNotifPanel(); else setNotifOpen(true) }}
+                aria-label={`${t('notifications')}${unread > 0 ? ` (${unread})` : ''}`}
+                aria-expanded={notifOpen}
                 style={{
                   width: 32, height: 32, borderRadius: 8,
                   border: `1px solid ${unread > 0 ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.07)'}`,
@@ -1096,8 +951,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
               {/* Notifications panel */}
               {notifOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50"
-                  style={{ background: '#0F1014', border: '1px solid rgba(99,102,241,0.2)', boxShadow: '0 16px 48px -8px rgba(0,0,0,0.8), 0 0 0 1px rgba(99,102,241,0.08)' }}>
+                <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50 sf-anim-slide-down"
+                  style={{ background: '#0F1014', border: '1px solid rgba(99,102,241,0.2)', boxShadow: '0 16px 56px -8px rgba(0,0,0,0.85), 0 0 0 1px rgba(99,102,241,0.08), 0 0 40px -16px rgba(99,102,241,0.2)' }}>
 
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
@@ -1146,9 +1001,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                         if (n.level === 'warn')  return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L10 9.5H1L5.5 1Z" stroke={iconColor} strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 4.5v2.5M5.5 8.5v.1" stroke={iconColor} strokeWidth="1.2" strokeLinecap="round"/></svg>
                         return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke={iconColor} strokeWidth="1.2"/><path d="M5.5 3.5v2.5M5.5 7.5v.1" stroke={iconColor} strokeWidth="1.2" strokeLinecap="round"/></svg>
                       }
+                      const targetPage = n.page as Page | undefined
                       return (
-                        <div key={n.id} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
-                          style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div key={n.id}
+                          className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
+                          role={targetPage ? 'button' : undefined}
+                          tabIndex={targetPage ? 0 : undefined}
+                          onClick={targetPage ? () => { playNav(); onNavigate(targetPage); closeNotifPanel() } : undefined}
+                          onKeyDown={targetPage ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playNav(); onNavigate(targetPage); closeNotifPanel() } } : undefined}
+                          style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: targetPage ? 'pointer' : 'default' }}>
                           <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
                             style={{ background: iconBg, border: `1px solid ${iconColor}22` }}>
                             <Icon />
@@ -1157,7 +1018,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                             <p className="text-[12px] font-bold text-white leading-snug">{n.title}</p>
                             {n.body && <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'rgba(233,234,240,0.48)' }}>{n.body}</p>}
                           </div>
-                          <span className="text-[10px] flex-shrink-0 mt-0.5 tabular-nums" style={{ color: 'rgba(82,82,91,0.7)' }}>{n.time}</span>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0 mt-0.5">
+                            <span className="text-[10px] tabular-nums" style={{ color: 'rgba(82,82,91,0.7)' }}>{n.time}</span>
+                            {targetPage && (
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(99,102,241,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M9 18l6-6-6-6"/>
+                              </svg>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -1181,6 +1049,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
               title={user.email}
+              aria-label={user.email ?? t('activeAccount')}
             >
               {userInitial}
             </button>
@@ -1249,7 +1118,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div onClick={() => setOrgMenuOpen(false)} className="fixed inset-0 z-[9998]" style={{ background: 'transparent' }} />
           <div
             className="fixed z-[9999] rounded-xl shadow-2xl overflow-hidden anim-slide-down"
-            style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width, background: '#0c0919', border: '1px solid rgba(99,102,241,0.2)' }}
+            style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width, background: '#13141A', border: '1px solid rgba(99,102,241,0.2)' }}
           >
             {myOrgs.map(({ org }) => (
               <button
@@ -1341,7 +1210,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div onClick={() => setUserMenuOpen(false)} className="fixed inset-0 z-[9998]" style={{ background: 'transparent' }} />
           <div
             className="fixed z-[9999] rounded-xl shadow-2xl overflow-hidden anim-slide-down"
-            style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240), background: '#0c0919', border: '1px solid rgba(99,102,241,0.2)' }}
+            style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240), background: '#13141A', border: '1px solid rgba(99,102,241,0.2)' }}
           >
             <div className="px-3 py-3 border-b flex items-center gap-2.5" style={{ borderColor: 'rgba(99,102,241,0.12)', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(233,234,240,0.04))' }}>
               <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[13px] font-black flex-shrink-0"
@@ -1462,6 +1331,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div style={{ position: 'relative', width: '100%', maxWidth: 420 }}>
             <button
               onClick={() => setShowAddAccount(false)}
+              aria-label="Fermer"
               style={{ position: 'absolute', top: -14, right: -14, zIndex: 10, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#12121c', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(148,163,184,0.7)', cursor: 'pointer', fontSize: 14 }}
             >✕</button>
             <AuthPage />

@@ -1,12 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
-import { Button } from '@/components/ui/Button'
 import { MetadataChanger } from './MetadataChanger'
-import { VisionTools, type VisionToolId } from './VisionTools'
 import { TextCopy } from './TextCopy'
-import { useT, useLang } from '@/lib/i18n'
+import { useT } from '@/lib/i18n'
 
 interface AiToolsProps { user: User }
 
@@ -52,600 +49,7 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   )
 }
 
-type GroqToolId =
-  | 'strat' | 'caption' | 'plan'
-  | 'script' | 'hooks' | 'bio' | 'replies' | 'translate' | 'competitor'
-
-type ActiveTool = 'hub' | 'metadata' | 'textcopy' | GroqToolId | VisionToolId
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-async function groqCall(apiKey: string, prompt: string, maxTokens = 600): Promise<string> {
-  const result = await window.electronAPI?.groqRequest({
-    apiKey,
-    messages: [{ role: 'user', content: prompt }],
-    model: 'llama-3.1-8b-instant',
-    maxTokens,
-  })
-  if (!result?.ok) throw new Error(result?.error ?? 'Erreur Groq')
-  const data = result.data as Record<string, unknown>
-  const choices = data?.['choices'] as Array<Record<string, unknown>>
-  return ((choices?.[0]?.['message'] as Record<string, unknown>)?.['content'] as string) ?? ''
-}
-
-// ── Copy Button ────────────────────────────────────────────────────────────────
-function CopyButton({ text }: { text: string }) {
-  const t = useT()
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
-      className="cursor-pointer inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider transition-all"
-      style={{
-        background: copied ? 'rgba(34,197,94,0.1)' : 'rgba(139,92,246,0.08)',
-        color: copied ? '#22C55E' : '#a78bfa',
-        border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.2)'}`,
-      }}>
-      <Icon name={copied ? 'check' : 'copy'} size={13} />
-      <span>{copied ? t('copied').toUpperCase() : t('copy').toUpperCase()}</span>
-    </button>
-  )
-}
-
-// ── Result Box ─────────────────────────────────────────────────────────────────
-function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
-  const charCount = value.length
-  return (
-    <div className="relative rounded-2xl overflow-hidden anim-scale-in"
-      style={{ background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(139,92,246,0.18)' }}>
-      {/* Terminal header */}
-      <div className="flex items-center gap-3 px-4 py-2.5"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.04)' }}>
-        <div className="flex gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(239,68,68,0.45)' }} />
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(245,158,11,0.45)' }} />
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(34,197,94,0.45)' }} />
-        </div>
-        <span className="text-[10px] font-mono text-text3 uppercase tracking-widest ml-1">Output IA</span>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-[10px] font-mono text-text3">{charCount} chars</span>
-          <div className="w-1.5 h-1.5 rounded-full sf-live-dot" />
-        </div>
-      </div>
-      <textarea
-        rows={rows}
-        value={value}
-        readOnly
-        className="w-full px-5 py-4 text-[12px] font-mono resize-none focus:outline-none leading-relaxed"
-        style={{ background: 'transparent', color: '#c4b5fd' }}
-      />
-    </div>
-  )
-}
-
-// ── Field Input ────────────────────────────────────────────────────────────────
-function FieldInput({ placeholder, value, onChange, textarea, rows }: {
-  placeholder: string; value: string; onChange: (v: string) => void; textarea?: boolean; rows?: number
-}) {
-  const cls = "sf-input w-full rounded-xl px-4 py-2.5 text-[13px] font-mono"
-  return textarea
-    ? <textarea rows={rows ?? 4} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} />
-    : <input type="text" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} />
-}
-
-// ── Select Input ───────────────────────────────────────────────────────────────
-function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
-  return (
-    <select value={value} onChange={e => onChange(e.target.value)}
-      className="sf-input w-full rounded-xl px-4 py-2.5 text-[13px] font-mono cursor-pointer focus:outline-none">
-      {options.map(o => <option key={o} value={o} style={{ background: '#0E0E16' }}>{o}</option>)}
-    </select>
-  )
-}
-
-// ── Tool Shell (individual tool page wrapper) ──────────────────────────────────
-function ToolShell({ title, icon, children, onBack, error }: {
-  title: string; icon: React.ReactNode; children: React.ReactNode; onBack: () => void; error?: string | null
-}) {
-  const t = useT()
-  return (
-    <div className="h-full flex flex-col overflow-y-auto bg-bg anim-page">
-      {/* Header */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 sf-topbar">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="cursor-pointer inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-bold font-mono uppercase tracking-wider transition-all flex-shrink-0"
-            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', color: '#a78bfa' }}>
-            <Icon name="arrow-left" size={13} />
-            {t('back')}
-          </button>
-
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d50"
-            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.28)', color: '#c4b5fd' }}>
-            {icon}
-          </div>
-
-          <div className="sf-anim-slide-up sf-d100">
-            <h1 className="text-[19px] font-black text-text leading-none">{title}</h1>
-            <p className="text-[10px] text-text3 font-mono mt-0.5 uppercase tracking-widest">{t('aiToolsTitle')} — Studio</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 px-8 pb-10 pt-6">
-        <div className="max-w-2xl space-y-4">
-          {error && (
-            <div className="rounded-xl px-4 py-3 flex items-center gap-3 anim-scale-in"
-              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)' }}>
-              <span className="text-danger flex-shrink-0"><Icon name="alert-triangle" size={15} /></span>
-              <p className="text-[12px] font-mono text-danger">{error}</p>
-            </div>
-          )}
-          {children}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Form Section wrapper ───────────────────────────────────────────────────────
-function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="sf-card rounded-2xl p-5 space-y-3">
-      <p className="text-[10px] uppercase tracking-widest font-black text-text3 font-mono">{label}</p>
-      {children}
-    </div>
-  )
-}
-
-// ── Groq tool pages ───────────────────────────────────────────────────────────
-
-function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const [handle, setHandle] = useState('')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run() {
-    setLoading(true); setError(null); setResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Expert Instagram growth hacking. Analyse la stratégie pour la niche/compte : ${handle.trim()}. Recommandations structurées : 1) Type de contenu à créer, 2) Fréquence idéale, 3) Heures de publication optimales, 4) Stratégie hashtags, 5) Idées Reels viraux, 6) Tactiques d’engagement. Bullet points clairs.`,
-        700)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="Niche Strategy" icon={<Icon name="search" />} onBack={onBack} error={error}>
-      <FormSection label="Niche ou compte concurrent">
-        <p className="text-[12px] text-text2 font-mono">Enter a competitor handle or niche for a complete strategy.</p>
-        <FieldInput placeholder="@concurrent ou niche (ex: fitness, crypto)" value={handle} onChange={setHandle} />
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!handle.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="search" size={15} />Analyser la niche</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={12} />}
-    </ToolShell>
-  )
-}
-
-function CaptionsVirales({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const TONES = ['Engaging', 'Humorous', 'Informative', 'Mysterious', 'Inspiring', 'Provocative']
-  const [subject, setSubject] = useState('')
-  const [tone, setTone] = useState('Engaging')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run() {
-    setLoading(true); setError(null); setResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Génère une caption Instagram virale en français pour : ${subject.trim()}. Ton : ${tone}. Structure : Hook accrocheur (première ligne), body engageant (2-4 lignes), CTA clair, puis 15 hashtags pertinents. Maximum 250 mots.`,
-        500)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="Captions Virales" icon={<Icon name="message-square" />} onBack={onBack} error={error}>
-      <FormSection label="Configuration de la caption">
-        <p className="text-[12px] text-text2 font-mono">Hook + body + CTA + 15 hashtags generated automatically.</p>
-        <div className="grid grid-cols-2 gap-3">
-          <FieldInput placeholder="Sujet du post" value={subject} onChange={setSubject} />
-          <SelectInput value={tone} onChange={setTone} options={TONES} />
-        </div>
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!subject.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="sparkles" size={15} />Générer la caption</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={10} />}
-    </ToolShell>
-  )
-}
-
-function Planificateur({ groqKey, onBack, userId }: { groqKey: string; onBack: () => void; userId: string }) {
-  const [niche, setNiche] = useState('')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    supabase.from('app_config').select('profile_niche').eq('user_id', userId).maybeSingle()
-      .then(({ data }) => { if (data?.profile_niche) setNiche(data.profile_niche) })
-  }, [userId])
-
-  async function run() {
-    setLoading(true); setError(null); setResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Crée un calendrier éditorial Instagram pour 7 jours sur la niche : ${niche.trim()}. Pour chaque jour : Heure optimale / Type de contenu (Reel/Carousel/Story) / Idée précise / Titre accrocheur / 5 hashtags pertinents. Format structuré jour par jour.`,
-        900)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="7-Day Planner" icon={<Icon name="calendar" />} onBack={onBack} error={error}>
-      <FormSection label="Editorial Niche">
-        <p className="text-[12px] text-text2 font-mono">Full editorial calendar — 7 days with times, types and ideas.</p>
-        <FieldInput placeholder="Niche (fitness, crypto, lifestyle…)" value={niche} onChange={setNiche} />
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!niche.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="calendar" size={15} />Générer le planning</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={14} />}
-    </ToolShell>
-  )
-}
-
-function ScriptReel({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const [subject, setSubject] = useState('')
-  const [duration, setDuration] = useState('30s')
-  const [tone, setTone] = useState('Engaging')
-  const TONES = ['Engaging', 'Humorous', 'Informative', 'Inspiring', 'Provocative', 'Éducatif']
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run() {
-    setLoading(true); setError(null); setResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Tu es expert en création de contenu Instagram viral. Génère un script Reel complet en français.
-Sujet : ${subject.trim()}
-Durée cible : ${duration}
-Ton : ${tone}
-
-Structure obligatoire :
-🎣 HOOK (0-3s) : phrase choc ou question qui arrête le scroll
-📖 CORPS (corps principal) : développement en étapes claires, chaque point sur une nouvelle ligne
-🚀 CTA (dernières secondes) : appel à l’action précis (follow, like, commentaire)
-
-Format le script comme si c’était prêt à lire face caméra. Inclus les indications de timing. Maximum ${duration === '15s' ? '80' : duration === '30s' ? '150' : '280'} mots.`,
-        600)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="Script Reel Complet" icon={<Icon name="clapperboard" />} onBack={onBack} error={error}>
-      <FormSection label="Reel Settings">
-        <p className="text-[12px] text-text2 font-mono">Camera-ready script — hook, body, CTA with precise timings.</p>
-        <FieldInput placeholder="Video topic" value={subject} onChange={setSubject} />
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Target Duration</p>
-            <div className="flex gap-2">
-              {['15s', '30s', '60s'].map(d => (
-                <button key={d} onClick={() => setDuration(d)}
-                  className="cursor-pointer flex-1 py-2.5 rounded-xl text-[12px] font-bold font-mono transition-all"
-                  style={duration === d
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 14px -4px rgba(124,58,237,0.5)' }
-                    : { background: 'rgba(139,92,246,0.06)', color: 'rgba(139,92,246,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
-                  }>{d}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Ton</p>
-            <SelectInput value={tone} onChange={setTone} options={TONES} />
-          </div>
-        </div>
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!subject.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="clapperboard" size={15} />Générer le script</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={14} />}
-    </ToolShell>
-  )
-}
-
-function HooksAB({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const [subject, setSubject] = useState('')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run() {
-    setLoading(true); setError(null); setResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Tu es expert en copywriting Instagram. Pour le sujet : "${subject.trim()}", génère exactement 3 hooks d’accroche radicalement différents pour un Reel.
-
-HOOK A — Style CURIOSITÉ : crée une tension, donne envie de savoir la suite
-HOOK B — Style CHOC/CONTRADICTION : affirmation surprenante ou contre-intuitive
-HOOK C — Style QUESTION DIRECTE : question personnelle qui touche le viewer
-
-Chaque hook doit faire maximum 2 lignes. Format :
-
-🔵 HOOK A (Curiosité)
-[texte du hook]
-
-🔴 HOOK B (Choc)
-[texte du hook]
-
-🟢 HOOK C (Question)
-[texte du hook]
-
-💡 Lequel choisir : [conseil rapide]`,
-        400)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="3 Hooks A/B/C" icon={<Icon name="anchor" />} onBack={onBack} error={error}>
-      <FormSection label="Video Topic">
-        <p className="text-[12px] text-text2 font-mono">3 radically different hooks to test the best one.</p>
-        <FieldInput placeholder="Video topic" value={subject} onChange={setSubject} />
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!subject.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="anchor" size={15} />Générer les hooks</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={12} />}
-    </ToolShell>
-  )
-}
-
-function BioOptimizer({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const [bio, setBio] = useState('')
-  const [niche, setNiche] = useState('')
-  const [goal, setGoal] = useState('Followers')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run() {
-    setLoading(true); setError(null); setResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Tu es expert en optimisation de profil Instagram. Optimise cette bio pour maximiser : ${goal}.
-Niche : ${niche.trim() || 'non précisée'}
-Bio actuelle : "${bio.trim()}"
-
-Réponds avec :
-✅ BIO OPTIMISÉE :
-[nouvelle bio max 150 caractères, avec emojis stratégiques et mots-clés SEO]
-
-📊 AMÉLIORATIONS APPORTÉES :
-[liste des changements et pourquoi]
-
-💡 BONUS — Suggestions pour le nom de profil et le lien en bio :
-[recommandations]`,
-        500)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="Bio Optimizer" icon={<Icon name="user" />} onBack={onBack} error={error}>
-      <FormSection label="Bio et objectif">
-        <p className="text-[12px] text-text2 font-mono">Rewrites your bio to maximize conversions based on your goal.</p>
-        <FieldInput placeholder="Ta bio actuelle (colle-la ici)" value={bio} onChange={setBio} textarea rows={3} />
-        <div className="grid grid-cols-2 gap-3">
-          <FieldInput placeholder="Niche / domaine" value={niche} onChange={setNiche} />
-          <SelectInput value={goal} onChange={setGoal} options={['Followers', 'Sales', 'Bio link traffic', 'DMs', 'Brand awareness']} />
-        </div>
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!bio.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="user" size={15} />Optimiser la bio</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={10} />}
-    </ToolShell>
-  )
-}
-
-function CommentReplies({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const [comments, setComments] = useState('')
-  const [tone, setTone] = useState('Friendly')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run() {
-    setLoading(true); setError(null); setResult('')
-    const lines = comments.trim().split('\n').filter(l => l.trim()).slice(0, 20)
-    try {
-      const text = await groqCall(groqKey,
-        `Tu gères un compte Instagram. Génère une réponse personnalisée pour chaque commentaire ci-dessous. Ton de marque : ${tone}. Chaque réponse doit être courte (1-2 lignes max), naturelle, engageante et avec 1 emoji.
-
-${lines.map((c, i) => `Commentaire ${i + 1}: ${c}`).join('\n')}
-
-Format de réponse :
-Commentaire 1 → [réponse]
-Commentaire 2 → [réponse]
-...`,
-        600)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="Comment Replies" icon={<Icon name="message-square" />} onBack={onBack} error={error}>
-      <FormSection label="Comments to process">
-        <p className="text-[12px] text-text2 font-mono">Up to 20 comments (one per line) — personalized reply for each.</p>
-        <FieldInput placeholder={"Commentaire 1\nCommentaire 2\nCommentaire 3…"} value={comments} onChange={setComments} textarea rows={5} />
-        <SelectInput value={tone} onChange={setTone} options={['Friendly', 'Professional', 'Humorous', 'Motivating', 'Mysterious']} />
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!comments.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="message-square" size={15} />Générer les réponses</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={10} />}
-    </ToolShell>
-  )
-}
-
-function ContentTranslator({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const [caption, setCaption] = useState('')
-  const [langs, setLangs] = useState<string[]>(['Anglais (US)', 'Espagnol'])
-  const LANG_OPTIONS = ['Anglais (US)', 'Espagnol', 'Portugais (BR)', 'Allemand', 'Italien', 'Arabe']
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  function toggleLang(l: string) {
-    setLangs(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])
-  }
-
-  async function run() {
-    if (!langs.length) return
-    setLoading(true); setError(null); setResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Tu es expert en marketing Instagram international. Adapte cette caption (pas juste une traduction — adapte le ton, les expressions, la culture) pour chaque marché demandé. Inclus des hashtags locaux pertinents pour chaque langue.
-
-Caption originale (français) :
-"${caption.trim()}"
-
-Marchés cibles : ${langs.join(', ')}
-
-Pour chaque langue, format :
-🌍 [LANGUE]
-[caption adaptée]
-[hashtags locaux]
-`,
-        800)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="Multi-Market Translator" icon={<Icon name="globe" />} onBack={onBack} error={error}>
-      <FormSection label="Caption and target markets">
-        <p className="text-[12px] text-text2 font-mono">Adaptation culturelle + hashtags locaux — pas juste une traduction.</p>
-        <FieldInput placeholder="Paste your caption here…" value={caption} onChange={setCaption} textarea rows={4} />
-        <div>
-          <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Langues cibles</p>
-          <div className="flex flex-wrap gap-2">
-            {LANG_OPTIONS.map(l => (
-              <button key={l} onClick={() => toggleLang(l)}
-                className="cursor-pointer px-3.5 py-2 rounded-xl text-[12px] font-semibold font-mono transition-all"
-                style={langs.includes(l)
-                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 12px -4px rgba(124,58,237,0.5)' }
-                  : { background: 'rgba(139,92,246,0.06)', color: 'rgba(139,92,246,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
-                }>{l}</button>
-            ))}
-          </div>
-        </div>
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!caption.trim() || !langs.length}><span className="inline-flex items-center gap-1.5"><Icon name="globe" size={15} />Traduire & adapter</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={14} />}
-    </ToolShell>
-  )
-}
-
-function CompetitorAnalysis({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const [handle, setHandle] = useState('')
-  const [niche, setNiche] = useState('')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run() {
-    setLoading(true); setError(null); setResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Tu es un expert en espionnage concurrentiel Instagram. Analyse en profondeur le compte/niche : "${handle.trim()}"${niche.trim() ? ` (niche: ${niche.trim()})` : ''}.
-
-Produis une analyse complète :
-
-🕵️ POSITIONNEMENT
-[comment ils se positionnent, leur proposition de valeur unique]
-
-📹 STRATÉGIE CONTENU
-[types de vidéos, formats, fréquence, longueur, style]
-
-🪝 FORMULES DE HOOKS
-[les patterns de hooks qu’ils utilisent le plus]
-
-📊 POINTS FORTS À COPIER
-[ce qu’ils font bien et que tu peux répliquer]
-
-💥 GAPS & OPPORTUNITÉS
-[ce qu’ils ne font pas et que tu peux exploiter pour les dépasser]
-
-🎯 PLAN D’ACTION
-[3 actions concrètes à mettre en place cette semaine]`,
-        800)
-      setResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setLoading(false)
-  }
-
-  return (
-    <ToolShell title="Competitor Analysis" icon={<Icon name="search-check" />} onBack={onBack} error={error}>
-      <FormSection label="Account to analyze">
-        <p className="text-[12px] text-text2 font-mono">Gaps, hook formulas, action plan — to outperform a competitor.</p>
-        <div className="grid grid-cols-2 gap-3">
-          <FieldInput placeholder="@concurrent ou compte" value={handle} onChange={setHandle} />
-          <FieldInput placeholder="Niche (optionnel)" value={niche} onChange={setNiche} />
-        </div>
-        <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!handle.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="search-check" size={15} />Analyser le concurrent</span></Button>
-          {result && <CopyButton text={result} />}
-        </div>
-      </FormSection>
-      {result && <ResultBox value={result} rows={14} />}
-    </ToolShell>
-  )
-}
-
-// ── Hub tool metadata ─────────────────────────────────────────────────────────
-const GROQ_TOOLS: { id: GroqToolId; icon: React.ReactNode; title: string; desc: string; tags: string[] }[] = [
-  { id: 'script',     icon: <Icon name="clapperboard" />,   title: 'Script Reel',            desc: 'Full camera-ready script — hook, body, CTA with timings.',              tags: ['Script', 'Hook', 'CTA'] },
-  { id: 'hooks',      icon: <Icon name="anchor" />,         title: '3 Hooks A/B/C',          desc: '3 radically different hooks to test the best one.',                     tags: ['A/B Test', 'Hook', 'Copywriting'] },
-  { id: 'caption',    icon: <Icon name="message-square" />, title: 'Captions Virales',        desc: 'Full caption: hook, body, CTA and 15 hashtags.',                        tags: ['Caption', 'Hashtags'] },
-  { id: 'bio',        icon: <Icon name="user" />,           title: 'Bio Optimizer',           desc: 'Rewrites your bio to maximize follows, sales or traffic.',              tags: ['Bio', 'Profil', 'SEO'] },
-  { id: 'replies',    icon: <Icon name="message-square" />, title: 'Comment Replies',         desc: 'Personalized replies for 20 comments in one click.',                   tags: ['Engagement', 'Commentaires'] },
-  { id: 'translate',  icon: <Icon name="globe" />,          title: 'Multi-Market Translator', desc: 'Adapts your caption for EN/ES/PT/DE/IT with local hashtags.',          tags: ['International', 'Traduction'] },
-  { id: 'competitor', icon: <Icon name="search-check" />,   title: 'Competitor Analysis',    desc: 'Gaps, hook formulas, action plan to outperform an account.',           tags: ['Concurrent', 'Stratégie'] },
-  { id: 'strat',      icon: <Icon name="search" />,         title: 'Niche Strategy',          desc: 'Frequency, times, hashtags and Reels ideas for a niche.',              tags: ['Niche', 'Planning'] },
-  { id: 'plan',       icon: <Icon name="calendar" />,       title: '7-Day Planner',           desc: 'Full 7-day editorial calendar with times and ideas.',                  tags: ['Calendrier', 'Contenu'] },
-]
-
-const VISION_TOOLS_META: { id: VisionToolId; icon: React.ReactNode; title: string; desc: string; tags: string[]; needsAnthopic: boolean }[] = [
-  { id: 'vision-score',     icon: <Icon name="flame" />, title: 'Viral Score',      desc: 'Score 1-10 on 5 criteria: hook, retention, text, thumbnail, dynamism.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
-  { id: 'vision-structure', icon: <Icon name="dna" />,   title: 'Viral Structure',  desc: 'Breaks down a video’s timeline: hook, value, CTA, transitions.',        tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
-  { id: 'vision-thumb',     icon: <Icon name="image" />, title: 'Audit Thumbnail',   desc: 'Score contrast, readability, emotion, colors + priority fixes.',         tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
-]
+type ActiveTool = 'hub' | 'metadata' | 'textcopy'
 
 // ── Premium bento tool card ────────────────────────────────────────────────────
 function ToolCard({ icon, title, desc, tags, locked, onClick }: {
@@ -655,24 +59,25 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
     <button onClick={onClick} className="cursor-pointer text-left w-full group relative rounded-2xl p-4 transition-all card-lift sf-card-lift sf-spotlight overflow-hidden"
       style={{
         background: '#0E0E16',
-        border: '1px solid rgba(139,92,246,0.12)',
+        border: '1px solid rgba(99,102,241,0.12)',
         opacity: locked ? 0.6 : 1,
       }}>
       {/* Hover glow overlay */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-        style={{ background: 'radial-gradient(ellipse 160px 100px at 20% 30%, rgba(124,58,237,0.08), transparent)' }} />
+        style={{ background: 'radial-gradient(ellipse 160px 100px at 20% 30%, rgba(99,102,241,0.08), transparent)' }} />
 
       <div className="relative space-y-3">
         {/* Icon row */}
         <div className="flex items-start justify-between gap-2">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
-            style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(139,92,246,0.22)', color: '#c4b5fd' }}>
+            style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}>
             {icon}
           </div>
           {locked && (
-            <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0"
+            <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0 inline-flex items-center gap-1"
               style={{ background: 'rgba(245,158,11,0.08)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.18)' }}>
-              Anthropic Key
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Clé Anthropic requise
             </span>
           )}
         </div>
@@ -709,7 +114,7 @@ function SectionHeader({ label, badge, icon }: { label: string; badge?: string; 
           {badge}
         </span>
       )}
-      <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(139,92,246,0.2), transparent)' }} />
+      <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(99,102,241,0.2), transparent)' }} />
     </div>
   )
 }
@@ -717,66 +122,24 @@ function SectionHeader({ label, badge, icon }: { label: string; badge?: string; 
 // ── Main component ────────────────────────────────────────────────────────────
 export function AiTools({ user }: AiToolsProps) {
   const t = useT()
-  const { lang } = useLang()
   const [active, setActive] = useState<ActiveTool>('hub')
   const conns = useConnections(user)
 
   // Loading state
   if (conns.loading) {
     return (
-      <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
+      <div className="sf-page anim-page">
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-5">
             <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.08))', border: '1px solid rgba(139,92,246,0.2)' }}>
+              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.08))', border: '1px solid rgba(99,102,241,0.2)' }}>
               <span className="relative z-10 text-accent"><Icon name="sparkles" size={24} /></span>
               <div className="absolute inset-0 animate-pulse rounded-2xl"
-                style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(236,72,153,0.06))' }} />
+                style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.06))' }} />
             </div>
             <div className="text-center">
               <p className="text-[13px] font-bold text-text2">{t('loading')}</p>
               <p className="text-[11px] text-text3 font-mono mt-1 tracking-wider">Connecting to studio</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // No Groq key state
-  if (!conns.groq) {
-    return (
-      <div className="h-full flex flex-col overflow-y-auto bg-bg anim-page">
-        {/* Page header */}
-        <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
-          <div className="flex items-center gap-4">
-            <div className="relative w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0 sf-anim-scale-spring"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.12))', border: '1px solid rgba(139,92,246,0.28)' }}>
-              <span className="text-accent relative z-10"><Icon name="sparkles" size={22} /></span>
-              <div className="absolute inset-0 anim-glow rounded-2xl" />
-            </div>
-            <div className="sf-anim-slide-up sf-d50">
-              <h1 className="text-[22px] font-black leading-none sf-text-gradient">{t('aiToolsTitle')}</h1>
-              <p className="text-[11px] text-text3 font-mono mt-0.5 tracking-widest uppercase">AI Creative Studio</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 px-8 pb-10 pt-8">
-          <div className="max-w-lg">
-            <div className="sf-card rounded-2xl p-6 anim-scale-in"
-              style={{ background: 'rgba(245,158,11,0.04)', borderColor: 'rgba(245,158,11,0.18)' }}>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.22)' }}>
-                  <span className="text-warn"><Icon name="alert-triangle" size={16} /></span>
-                </div>
-                <p className="text-[14px] font-bold text-warn">{t('noGroqKey')}</p>
-              </div>
-              <p className="text-[13px] text-text2 mb-2">{t('configureGroq')}</p>
-              <p className="text-[11px] font-mono" style={{ color: 'rgba(139,92,246,0.6)' }}>
-                Free on groq.com → API Keys → Create
-              </p>
             </div>
           </div>
         </div>
@@ -790,117 +153,55 @@ export function AiTools({ user }: AiToolsProps) {
   // Route — text copy
   if (active === 'textcopy') return <TextCopy user={user} onBack={() => setActive('hub')} />
 
-  // Route — vision tools
-  if (active === 'vision-score' || active === 'vision-structure' || active === 'vision-thumb') {
-    return <VisionTools user={user} tool={active} anthropicKey={conns.anthropic} onBack={() => setActive('hub')} />
-  }
-
-  // Route — groq tools
-  const back = () => setActive('hub')
-  if (active === 'strat')      return <StratConcurrente  groqKey={conns.groq} onBack={back} />
-  if (active === 'caption')    return <CaptionsVirales   groqKey={conns.groq} onBack={back} />
-  if (active === 'plan')       return <Planificateur     groqKey={conns.groq} onBack={back} userId={user.id} />
-  if (active === 'script')     return <ScriptReel        groqKey={conns.groq} onBack={back} />
-  if (active === 'hooks')      return <HooksAB           groqKey={conns.groq} onBack={back} />
-  if (active === 'bio')        return <BioOptimizer      groqKey={conns.groq} onBack={back} />
-  if (active === 'replies')    return <CommentReplies    groqKey={conns.groq} onBack={back} />
-  if (active === 'translate')  return <ContentTranslator groqKey={conns.groq} onBack={back} />
-  if (active === 'competitor') return <CompetitorAnalysis groqKey={conns.groq} onBack={back} />
-
   // ── Hub ────────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col overflow-y-auto bg-bg anim-page">
+    <div className="sf-page anim-page">
 
-      {/* ── Premium page header ── */}
-      <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            {/* Icon with glow */}
-            <div className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden sf-anim-scale-spring"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(236,72,153,0.13))', border: '1px solid rgba(139,92,246,0.3)' }}>
-              <span className="relative z-10 text-accent"><Icon name="sparkles" size={22} /></span>
-              <div className="absolute inset-0 anim-glow rounded-2xl" />
-            </div>
-
-            <div className="sf-anim-slide-up sf-d50">
-              <h1 className="text-[26px] font-black leading-none sf-text-gradient">{t('aiToolsTitle')}</h1>
-              <p className="text-[11px] text-text3 font-mono mt-1 tracking-widest uppercase">AI Creative Studio</p>
-            </div>
+      {/* ── Page header ── */}
+      <div className="sf-page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+          {/* Sparkle/AI icon in header tile */}
+          <div className="sf-anim-scale-spring" style={{
+            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.10))',
+            border: '1px solid rgba(99,102,241,0.28)',
+            color: 'var(--accent)',
+            boxShadow: '0 0 20px -6px rgba(99,102,241,0.4)',
+          }}>
+            <Icon name="sparkles" size={22} />
           </div>
 
-          {/* Anthropic key warning badge */}
-          {!conns.anthropic && (
-            <div className="flex items-center gap-2 rounded-xl px-3.5 py-2 flex-shrink-0 sf-anim-scale-in sf-d150"
-              style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
-              <span className="text-warn"><Icon name="alert-triangle" size={13} /></span>
-              <p className="text-[11px] font-mono font-semibold" style={{ color: 'rgba(245,158,11,0.8)' }}>Missing Anthropic key</p>
-            </div>
-          )}
+          {/* Text */}
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('aiToolsTitle')}</h1>
+            <p className="sf-page-sub">AI Creative Studio</p>
+          </div>
         </div>
 
-        {/* Subtitle / description */}
-        <p className="mt-4 text-[13px] text-text2 max-w-xl leading-relaxed sf-anim-slide-up sf-d100">
-          Supercharge your content with AI-powered tools — from viral scripts and captions to competitor intelligence.
-        </p>
       </div>
 
-      {/* ── Content (scrolls with the page) ── */}
-      <div className="flex-1 px-8 pb-10">
-        <div className="pt-7 space-y-10 max-w-6xl">
-
-          {/* ── Video Processing section ── */}
+      {/* ── Content ── */}
+      <div className="sf-page-body">
+        <div className="space-y-10 max-w-6xl">
+          {/* ── Outils IA ── */}
           <section>
-            <SectionHeader label="Video Processing" badge="FFmpeg" icon={<Icon name="video" size={13} />} />
+            <SectionHeader label="Outils vidéo" badge="FFmpeg" icon={<Icon name="video" size={13} />} />
             <div className="grid grid-cols-3 gap-4 anim-stagger">
               <ToolCard
                 icon={<Icon name="tag" />}
-                title="Metadata Changer"
-                desc="Removes all metadata and injects a random timestamp."
+                title="Métadonnées"
+                desc="Supprime toutes les métadonnées et injecte un timestamp aléatoire."
                 tags={['FFmpeg', 'Stream copy', 'Instant']}
                 onClick={() => setActive('metadata')}
               />
               <ToolCard
                 icon={<Icon name="pen-line" />}
                 title="Texte IA"
-                desc="Add text at multiple positions to create unique video copies."
+                desc="Ajoute du texte à plusieurs positions pour créer des copies vidéo uniques."
                 tags={['FFmpeg', 'Texte', 'Anti-ban']}
                 onClick={() => setActive('textcopy')}
               />
-            </div>
-          </section>
-
-          {/* ── Vision / Claude tools section ── */}
-          <section>
-            <SectionHeader label="Vision Analysis" badge="Claude AI" icon={<Icon name="cpu" size={13} />} />
-            <div className="grid grid-cols-3 gap-4 anim-stagger">
-              {VISION_TOOLS_META.map(tool => (
-                <ToolCard
-                  key={tool.id}
-                  icon={tool.icon}
-                  title={tool.title}
-                  desc={tool.desc}
-                  tags={tool.tags}
-                  locked={tool.needsAnthopic && !conns.anthropic}
-                  onClick={() => setActive(tool.id)}
-                />
-              ))}
-            </div>
-          </section>
-
-          {/* ── Groq / LLM tools section ── */}
-          <section>
-            <SectionHeader label="Content Generation" badge="Groq LLM" icon={<Icon name="zap" size={13} />} />
-            <div className="grid grid-cols-3 gap-4 anim-stagger">
-              {GROQ_TOOLS.map(tool => (
-                <ToolCard
-                  key={tool.id}
-                  icon={tool.icon}
-                  title={tool.title}
-                  desc={tool.desc}
-                  tags={tool.tags}
-                  onClick={() => setActive(tool.id)}
-                />
-              ))}
             </div>
           </section>
 

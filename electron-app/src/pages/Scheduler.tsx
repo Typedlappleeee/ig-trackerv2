@@ -44,6 +44,16 @@ import {
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
 import { CreateScheduleModal } from '@/components/CreateScheduleModal'
+import { CreateStoryScheduleModal } from '@/components/CreateStoryScheduleModal'
+import { ScheduleModal } from '@/components/ScheduleModal'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useCredits } from '@/lib/credits'
+import { useToast } from '@/components/Toast'
+
+// setTimeout overflows int32 (~24.8 days) and fires immediately beyond this —
+// chain shorter timeouts instead of arming one long timer.
+const MAX_TIMEOUT_MS = 2_147_000_000
+const RESCHEDULE_CHUNK_MS = 24 * 60 * 60 * 1000 // re-arm every 24 h for far-future posts
 
 interface Props { user: User; onNavigate?: (page: string, tab?: string) => void }
 
@@ -230,12 +240,14 @@ function StatusPill({ status }: { status: ScheduleStatus }) {
     failed:    t('schedulerStatusFailed'),
     cancelled: t('schedulerStatusCancelled'),
   }
+
+  // Map to design-system sf-badge variants
   const cfg: Record<ScheduleStatus, { cls: string; icon: JSX.Element }> = {
-    pending:   { cls: 'sf-badge sf-badge-warn',   icon: <IconClock   size={11} color="#F59E0B" /> },
-    running:   { cls: 'sf-badge sf-badge-accent',  icon: <IconSpinner size={11} color="#6366F1" /> },
-    done:      { cls: 'sf-badge sf-badge-ok',      icon: <IconCheck   size={11} color="#22C55E" /> },
-    failed:    { cls: 'sf-badge sf-badge-danger',  icon: <IconX       size={11} color="#EF4444" /> },
-    cancelled: { cls: 'sf-badge sf-badge-muted',   icon: <IconBan     size={11} color="rgba(148,163,184,0.52)" /> },
+    pending:   { cls: 'sf-badge sf-badge-violet', icon: <IconClock   size={11} color="var(--accent-l)" /> },
+    running:   { cls: 'sf-badge sf-badge-violet', icon: <IconSpinner size={11} color="var(--accent-l)" /> },
+    done:      { cls: 'sf-badge sf-badge-green',  icon: <IconCheck   size={11} color="var(--ok)" /> },
+    failed:    { cls: 'sf-badge sf-badge-red',    icon: <IconX       size={11} color="var(--err)" /> },
+    cancelled: { cls: 'sf-badge',                 icon: <IconBan     size={11} color="rgba(148,163,184,0.52)" /> },
   }
   const { cls, icon } = cfg[status]
   return (
@@ -253,11 +265,12 @@ function TypeBadge({ type }: { type: string }) {
   const TYPE_LABELS: Record<string, string> = {
     posting:      t('schedulerTypePosting'),
     mass_posting: t('schedulerTypeMassPosting'),
+    story:        'Story',
   }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
-      background: 'rgba(99,102,241,0.10)', color: '#6366F1',
+      background: 'rgba(99,102,241,0.10)', color: 'var(--accent)',
       border: '1px solid rgba(99,102,241,0.22)', borderRadius: 6,
       padding: '3px 9px', fontSize: 11, fontWeight: 600,
     }}>
@@ -272,7 +285,7 @@ function StatChip({ icon, label }: { icon: JSX.Element; label: string }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
-      background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.72)',
+      background: 'rgba(255,255,255,0.04)', color: 'var(--muted)',
       border: '1px solid rgba(255,255,255,0.055)', borderRadius: 6,
       padding: '3px 9px', fontSize: 11,
     }}>
@@ -299,13 +312,13 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
     if (
       m.startsWith('✓') || m.startsWith('[OK]') ||
       m.toLowerCase().includes('success') || m.toLowerCase().includes('done')
-    ) return '#4ade80'
+    ) return 'var(--ok)'
     if (
       m.startsWith('✗') || m.startsWith('[ERR]') ||
       m.toLowerCase().includes('error') || m.toLowerCase().includes('failed') ||
       m.startsWith('❌')
-    ) return '#f87171'
-    if (m.startsWith('✅')) return '#4ade80'
+    ) return 'var(--err)'
+    if (m.startsWith('✅')) return 'var(--ok)'
     return 'rgba(148,163,184,0.65)'
   }
 
@@ -329,8 +342,8 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
         }}>
           <span style={{
             width: 6, height: 6, borderRadius: '50%',
-            background: '#4ade80',
-            boxShadow: '0 0 6px #4ade80',
+            background: 'var(--ok)',
+            boxShadow: '0 0 6px var(--ok)',
             display: 'inline-block',
             animation: 'pulse 1.4s ease-in-out infinite',
           }} />
@@ -340,6 +353,7 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
           onClick={onClose}
           className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
           style={{ width: 22, height: 22 }}
+          aria-label="Close logs"
         >
           <IconClose size={10} color="rgba(148,163,184,0.52)" />
         </button>
@@ -355,7 +369,7 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
       >
         {logs.map((msg, i) => (
           <div key={i} style={{
-            fontFamily: 'ui-monospace, monospace',
+            fontFamily: 'ui-monospace, "Cascadia Code", "Fira Code", monospace',
             fontSize: 12,
             lineHeight: 1.7,
             color: lineColor(msg),
@@ -376,16 +390,29 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
 export function Scheduler({ user, onNavigate }: Props) {
   const t                         = useT()
   const { role }                  = useOrg()
+  const credits                   = useCredits()
+  const toast                     = useToast()
   const [posts, setPosts]         = useState<ScheduledPost[]>([])
   const [loading, setLoading]     = useState(true)
   const [tab, setTab]             = useState<TabFilter>('pending')
   const [search, setSearch]       = useState('')
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<ScheduledPost | null>(null)
+  const [reschedule, setReschedule] = useState<ScheduledPost | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showStoryCreate, setShowStoryCreate] = useState(false)
+  const [showTypeChoice, setShowTypeChoice] = useState(false)
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]     = useState<{ id: string; msgs: string[] } | null>(null)
   const timersRef                 = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const runningRef                = useRef<Set<string>>(new Set())
+
+  // 30 s ticker: keeps the relative "dans Xh Ymin" labels fresh without reloading
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   // Can cancel: own post OR org admin/owner
   function canCancel(post: ScheduledPost) {
@@ -405,9 +432,18 @@ export function Scheduler({ user, onNavigate }: Props) {
   // Register a timeout for a pending post and execute when due
   const scheduleExecution = useCallback((post: ScheduledPost) => {
     if (runningRef.current.has(post.id)) return
-    const delay = new Date(post.scheduled_at).getTime() - Date.now()
+    // Guard against duplicate timers (realtime updates re-trigger the effect)
+    if (timersRef.current.has(post.id)) return
 
     const run = async () => {
+      timersRef.current.delete(post.id)
+      // Re-verify due time before claiming — protects against early fires
+      // (int32 setTimeout overflow, system clock changes, rescheduled posts)
+      if (new Date(post.scheduled_at).getTime() - Date.now() > 1500) {
+        arm()
+        return
+      }
+      if (runningRef.current.has(post.id)) return
       runningRef.current.add(post.id)
       const claimed = await claimScheduledPost(post.id)
       if (!claimed) { runningRef.current.delete(post.id); return }
@@ -425,16 +461,40 @@ export function Scheduler({ user, onNavigate }: Props) {
       await finishScheduledPost(post.id, ok, msgs, ok ? undefined : msgs[msgs.length - 1])
       setRunningPost(null)
       runningRef.current.delete(post.id)
+      // Notify completion (toast + system notification)
+      const typeLabel = post.type === 'story' ? 'Stories' : post.type === 'mass_posting' ? 'Mass posting' : 'Posting'
+      toast.show({
+        title: ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`,
+        body: `${post.phones.length} compte${post.phones.length > 1 ? 's' : ''}`,
+        kind: ok ? 'ok' : 'error',
+      })
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
+          body: `${post.phones.length} compte${post.phones.length > 1 ? 's' : ''} — ScaleFlow`,
+        })
+      }
       reload()
     }
 
-    if (delay <= 0) {
-      run()
-    } else {
-      const timer = setTimeout(run, delay)
-      timersRef.current.set(post.id, timer)
+    // Arm a timer; for delays beyond the int32 setTimeout limit (~24.8 days),
+    // chain a 24 h timeout that re-arms until the real deadline is reachable.
+    const arm = () => {
+      const delay = new Date(post.scheduled_at).getTime() - Date.now()
+      if (delay <= 0) { void run(); return }
+      if (delay > MAX_TIMEOUT_MS) {
+        const timer = setTimeout(() => {
+          timersRef.current.delete(post.id)
+          arm()
+        }, RESCHEDULE_CHUNK_MS)
+        timersRef.current.set(post.id, timer)
+      } else {
+        const timer = setTimeout(() => { void run() }, delay)
+        timersRef.current.set(post.id, timer)
+      }
     }
-  }, [reload])
+
+    arm()
+  }, [reload, toast])
 
   useEffect(() => {
     reload().then(() => {
@@ -490,9 +550,63 @@ export function Scheduler({ user, onNavigate }: Props) {
     setCancelling(id)
     const timer = timersRef.current.get(id)
     if (timer) { clearTimeout(timer); timersRef.current.delete(id) }
-    await cancelScheduledPost(id)
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p))
-    setCancelling(null)
+    try {
+      const { refunded } = await cancelScheduledPost(id, credits.ownerId)
+      // Verify the cancellation actually landed in DB before updating the UI
+      const { data, error } = await supabase.from('scheduled_posts')
+        .select('status').eq('id', id).maybeSingle()
+      if (error || (data && data.status !== 'cancelled')) {
+        toast.show({ title: 'Annulation échouée', body: `Le post n'a pas pu être annulé — statut rechargé.`, kind: 'error' })
+        await reload()
+        return
+      }
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p))
+      if (refunded > 0) {
+        credits.refresh()
+        toast.show({ title: 'Post annulé', body: `${refunded} crédits remboursés`, kind: 'ok' })
+      } else {
+        toast.show({ title: 'Post annulé', kind: 'ok' })
+      }
+    } catch (e) {
+      toast.show({
+        title: 'Annulation échouée',
+        body: e instanceof Error ? e.message : 'Erreur réseau — réessaie.',
+        kind: 'error',
+      })
+      await reload()
+    } finally {
+      setCancelling(null)
+    }
+  }
+
+  // Reschedule a pending post: clear its timer, update scheduled_at in DB,
+  // then let the auto-schedule effect re-arm a fresh timer.
+  async function doReschedule(post: ScheduledPost, date: Date) {
+    const timer = timersRef.current.get(post.id)
+    if (timer) { clearTimeout(timer); timersRef.current.delete(post.id) }
+    try {
+      const { data, error } = await supabase.from('scheduled_posts')
+        .update({ scheduled_at: date.toISOString() })
+        .eq('id', post.id).eq('status', 'pending')
+        .select('id')
+      if (error || !data?.length) {
+        toast.show({ title: 'Report échoué', body: `Le post n'est plus en attente — statut rechargé.`, kind: 'error' })
+        setReschedule(null)
+        await reload()
+        return
+      }
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, scheduled_at: date.toISOString() } : p))
+      setReschedule(null)
+      toast.show({ title: 'Post reporté', body: `Nouveau départ : ${fmtScheduledTime(date.toISOString())}`, kind: 'ok' })
+    } catch (e) {
+      setReschedule(null)
+      toast.show({
+        title: 'Report échoué',
+        body: e instanceof Error ? e.message : 'Erreur réseau — réessaie.',
+        kind: 'error',
+      })
+      await reload()
+    }
   }
 
   const pending = posts.filter(p => p.status === 'pending' || p.status === 'running')
@@ -518,13 +632,13 @@ export function Scheduler({ user, onNavigate }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             {/* Icon */}
             <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 2, flexShrink: 0,
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'rgba(99,102,241,0.08)',
               border: '1px solid rgba(99,102,241,0.28)',
-              color: '#6366F1',
+              color: 'var(--accent)',
             }}>
-              <IconCalendarSm size={22} color="#6366F1" />
+              <IconCalendarSm size={22} color="var(--accent)" />
             </div>
 
             {/* Text */}
@@ -538,39 +652,24 @@ export function Scheduler({ user, onNavigate }: Props) {
             </div>
           </div>
 
-          {/* Right: stat chips + refresh */}
+          {/* Right: stat chips + schedule button */}
           <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {pending.length > 0 && (
-              <span className="sf-badge sf-badge-warn" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                <IconClock size={11} color="#F59E0B" />
+              <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <IconClock size={11} color="var(--accent-l)" />
                 {pending.length} {t('schedulerPendingCount')}
               </span>
             )}
             {history.length > 0 && (
-              <span className="sf-badge sf-badge-muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span className="sf-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <IconCheck size={11} color="rgba(148,163,184,0.52)" />
                 {history.length} {t('schedulerTabHistory')}
               </span>
             )}
             <button
-              onClick={reload}
-              className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer"
-              title="Actualiser"
-            >
-              <IconRefresh size={14} color="rgba(233,234,240,0.72)" spinning={loading} />
-            </button>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="cursor-pointer"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '9px 20px', fontSize: 10.5, fontWeight: 800,
-                letterSpacing: '0.05em', textTransform: 'uppercase',
-                background: '#6366F1', color: '#fff', border: 'none',
-                transition: 'background 0.18s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#818CF8' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#6366F1' }}
+              onClick={() => setShowTypeChoice(true)}
+              className="sf-btn sf-btn-primary cursor-pointer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
               Programmer
@@ -596,9 +695,9 @@ export function Scheduler({ user, onNavigate }: Props) {
                 padding: '10px 18px',
                 background: 'transparent',
                 border: 'none',
-                borderBottom: tab === tabItem.id ? '2px solid #6366F1' : '2px solid transparent',
+                borderBottom: tab === tabItem.id ? '2px solid var(--accent)' : '2px solid transparent',
                 cursor: 'pointer',
-                color: tab === tabItem.id ? '#E9EAF0' : 'rgba(148,163,184,0.45)',
+                color: tab === tabItem.id ? 'var(--ivory)' : 'rgba(148,163,184,0.45)',
                 fontSize: 13, fontWeight: tab === tabItem.id ? 600 : 500,
                 transition: 'color 0.15s, border-color 0.15s',
                 marginBottom: -1,
@@ -615,7 +714,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               {tabItem.count > 0 && (
                 <span style={{
                   background: tab === tabItem.id ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)',
-                  color: tab === tabItem.id ? '#6366F1' : 'rgba(148,163,184,0.4)',
+                  color: tab === tabItem.id ? 'var(--accent)' : 'rgba(148,163,184,0.4)',
                   borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
                   transition: 'background 0.15s, color 0.15s',
                 }}>
@@ -639,7 +738,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             className="sf-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search posts…"
+            placeholder="Rechercher un post…"
             style={{ paddingLeft: 32, height: 32, fontSize: 12.5 }}
           />
         </div>
@@ -677,27 +776,40 @@ export function Scheduler({ user, onNavigate }: Props) {
           </div>
         ) : shown.length === 0 ? (
           /* ── Empty state ──────────────────────────────────────────────────────── */
-          <div className="sf-empty anim-scale-in sf-card" style={{ marginTop: 8 }}>
-            <div className="sf-empty-icon">
-              <IconCalendar size={26} color="rgba(99,102,241,0.6)" />
+          <div className="sf-card" style={{
+            marginTop: 8,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '56px 32px', textAlign: 'center',
+          }}>
+            {/* Illustration area */}
+            <div style={{
+              width: 80, height: 80, borderRadius: 20, marginBottom: 20,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.18)',
+              boxShadow: '0 0 40px -12px rgba(99,102,241,0.35)',
+            }}>
+              <IconCalendar size={36} color="rgba(99,102,241,0.6)" />
             </div>
-            <p className="sf-empty-title">
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--ivory)', marginBottom: 8 }}>
               {tab === 'pending' ? t('schedulerEmptyPending') : t('schedulerEmptyHistory')}
             </p>
-            <p className="sf-empty-desc">
+            <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--muted)', marginBottom: 20, maxWidth: 320 }}>
               {tab === 'pending' ? t('schedulerEmptyPendingHint') : t('schedulerEmptyHistoryHint')}
             </p>
             {tab === 'pending' && (
               <button
                 className="sf-btn sf-btn-primary cursor-pointer"
-                style={{ marginTop: 4 }}
-                onClick={() => setShowCreate(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                onClick={() => setShowTypeChoice(true)}
               >
-                {t('schedulerSchedulePost')}
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                {posts.length === 0 ? 'Programmer ton premier post' : t('schedulerSchedulePost')}
               </button>
             )}
           </div>
         ) : (
+          /* ── Post card list with stagger animation ────────────────────────────── */
           <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {shown.map((post, index) => (
               <PostCard
@@ -709,7 +821,14 @@ export function Scheduler({ user, onNavigate }: Props) {
                 isRunning={runningPost === post.id}
                 runLogs={runLogs?.id === post.id ? runLogs.msgs : null}
                 cancelling={cancelling === post.id}
-                onCancel={() => cancel(post.id)}
+                onCancel={() => {
+                  // Stuck-running posts are stopped directly (no refund, no config to lose)
+                  if (post.status === 'running') cancel(post.id)
+                  else setConfirmCancel(post)
+                }}
+                onReschedule={post.status === 'pending' && post.user_id === user.id
+                  ? () => setReschedule(post)
+                  : undefined}
               />
             ))}
           </div>
@@ -726,13 +845,42 @@ export function Scheduler({ user, onNavigate }: Props) {
           <span style={{ flexShrink: 0, marginTop: 1 }}>
             <IconInfo size={14} color="rgba(99,102,241,0.7)" />
           </span>
-          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(233,234,240,0.72)', margin: 0 }}>
+          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
             {t('schedulerAutoBanner')}
           </p>
         </div>
       </div>
 
-      {/* ── Create modal — schedule directly from this page ───────────────────── */}
+      {/* ── Confirm cancel ───────────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!confirmCancel}
+        title="Annuler ce post programmé ?"
+        message="Les crédits seront remboursés, mais tu devras tout reconfigurer (téléphones, vidéos, légende) pour le reprogrammer."
+        confirmLabel="Annuler le post"
+        cancelLabel="Garder"
+        danger
+        busy={!!confirmCancel && cancelling === confirmCancel.id}
+        onConfirm={async () => {
+          if (!confirmCancel) return
+          const id = confirmCancel.id
+          await cancel(id)
+          setConfirmCancel(null)
+        }}
+        onCancel={() => setConfirmCancel(null)}
+      />
+
+      {/* ── Reschedule modal — reuses ScheduleModal to pick the new date ─────── */}
+      {reschedule && (
+        <ScheduleModal
+          type={reschedule.type === 'mass_posting' ? 'mass_posting' : 'posting'}
+          phonesCount={reschedule.phones.length}
+          videosCount={reschedule.videos.length}
+          onConfirm={date => { void doReschedule(reschedule, date) }}
+          onClose={() => setReschedule(null)}
+        />
+      )}
+
+      {/* ── Create modal — Reel ──────────────────────────────────────────────── */}
       {showCreate && (
         <CreateScheduleModal
           user={user}
@@ -740,13 +888,103 @@ export function Scheduler({ user, onNavigate }: Props) {
           onClose={() => setShowCreate(false)}
         />
       )}
+
+      {/* ── Create modal — Story ─────────────────────────────────────────────── */}
+      {showStoryCreate && (
+        <CreateStoryScheduleModal
+          user={user}
+          onCreated={() => { setShowStoryCreate(false); reload() }}
+          onClose={() => setShowStoryCreate(false)}
+        />
+      )}
+
+      {/* ── Type chooser : Reel ou Story ─────────────────────────────────── */}
+      {showTypeChoice && (
+        <div
+          tabIndex={-1}
+          ref={el => el?.focus()}
+          onKeyDown={e => { if (e.key === 'Escape') setShowTypeChoice(false) }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9000, outline: 'none',
+            background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(10px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowTypeChoice(false) }}
+        >
+          <div className="anim-scale-in" style={{
+            width: '100%', maxWidth: 460,
+            background: '#13141A', border: '1px solid rgba(233,234,240,0.08)',
+            borderRadius: 12, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+          }}>
+            <div style={{ padding: '18px 22px 14px', borderBottom: '1px solid rgba(233,234,240,0.08)' }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ivory)' }}>
+                Que veux-tu programmer ?
+              </p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 18 }}>
+              {/* Reel */}
+              <button
+                onClick={() => { setShowTypeChoice(false); setShowCreate(true) }}
+                className="cursor-pointer"
+                style={{
+                  padding: '22px 16px', borderRadius: 10, textAlign: 'left',
+                  background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.25)',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.13)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.45)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.07)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)' }}
+              >
+                <div style={{ marginBottom: 10, color: 'var(--accent-l)' }}>
+                  <IconVideo size={22} color="currentColor" />
+                </div>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--ivory)' }}>Reel</p>
+                <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'var(--muted)' }}>
+                  Vidéos de la banque, légende, mode séquentiel ou aléatoire. Part même app fermée.
+                </p>
+              </button>
+              {/* Story */}
+              <button
+                onClick={() => { setShowTypeChoice(false); setShowStoryCreate(true) }}
+                className="cursor-pointer"
+                style={{
+                  padding: '22px 16px', borderRadius: 10, textAlign: 'left',
+                  background: 'rgba(233,234,240,0.025)', border: '1px solid rgba(233,234,240,0.1)',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.07)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(233,234,240,0.025)'; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.1)' }}
+              >
+                <div style={{ marginBottom: 10, color: 'var(--accent-l)' }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                  </svg>
+                </div>
+                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--ivory)' }}>Story avec lien</p>
+                <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'var(--muted)' }}>
+                  Photos + sticker lien par compte. Configure et programme directement ici.
+                </p>
+              </button>
+            </div>
+            <div style={{ padding: '0 18px 16px' }}>
+              <button
+                onClick={() => setShowTypeChoice(false)}
+                className="sf-btn sf-btn-ghost cursor-pointer"
+                style={{ width: '100%' }}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Post card ──────────────────────────────────────────────────────────────────
 
-function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancelling, onCancel }: {
+function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancelling, onCancel, onReschedule }: {
   post: ScheduledPost
   index: number
   isOwn: boolean
@@ -755,6 +993,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
   runLogs: string[] | null
   cancelling: boolean
   onCancel: () => void
+  onReschedule?: () => void
 }) {
   const t = useT()
   const [showLogs, setShowLogs] = useState(false)
@@ -764,25 +1003,32 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
   const isStuckRunning = post.status === 'running' && !isRunning
   const allLogs = runLogs ?? (post.result?.logs ?? [])
 
-  const statusColor =
-    post.status === 'done'        ? '#22C55E'
-    : post.status === 'failed'   ? '#EF4444'
-    : post.status === 'running'  ? '#6366F1'
-    : post.status === 'cancelled'? 'rgba(148,163,184,0.2)'
-    : '#F59E0B'  // pending → amber
+  // Status-based left border color per design spec
+  const statusBorderColor =
+    post.status === 'pending'   ? 'var(--accent)'
+    : post.status === 'running' ? 'var(--warn)'
+    : post.status === 'done'    ? 'var(--ok)'
+    : post.status === 'failed'  ? 'var(--err)'
+    : 'rgba(148,163,184,0.2)'   // cancelled
+
+  // Running posts get an accent glow box-shadow
+  const cardBoxShadow = isRunning
+    ? '0 0 0 1px var(--accent), 0 6px 24px -8px rgba(99,102,241,0.35)'
+    : hovered
+    ? '0 6px 24px -8px rgba(0,0,0,0.4)'
+    : 'none'
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="sf-card"
       style={{
-        background: hovered ? 'rgba(99,102,241,0.032)' : 'var(--surface)',
-        border: `1px solid ${hovered ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.055)'}`,
-        borderLeft: `3px solid ${statusColor}`,
-        borderRadius: 14,
+        borderLeft: `3px solid ${statusBorderColor}`,
         padding: '16px 20px',
         transition: 'background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
-        boxShadow: hovered ? '0 6px 24px -8px rgba(0,0,0,0.4)' : 'none',
+        boxShadow: cardBoxShadow,
+        background: hovered ? 'rgba(99,102,241,0.032)' : undefined,
       }}
     >
       {/* ── Row 1: status + type + user — right: actions ──────────────────── */}
@@ -795,11 +1041,11 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               background: isOwn ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.04)',
-              color: isOwn ? '#6366F1' : 'rgba(233,234,240,0.5)',
+              color: isOwn ? 'var(--accent)' : 'rgba(233,234,240,0.5)',
               border: `1px solid ${isOwn ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.055)'}`,
               borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 500,
             }}>
-              <IconUser size={11} color={isOwn ? '#6366F1' : 'rgba(233,234,240,0.5)'} />
+              <IconUser size={11} color={isOwn ? 'var(--accent)' : 'rgba(233,234,240,0.5)'} />
               {isOwn ? t('schedulerMe') : post.created_by_name}
             </span>
           )}
@@ -824,24 +1070,30 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               cursor: cancelling ? 'not-allowed' : 'pointer',
             }}
           >
-            <IconX size={11} color="#EF4444" />
+            <IconX size={11} color="var(--err)" />
             {cancelling ? t('schedulerCancelling') : isStuckRunning ? 'Arrêter' : t('cancel')}
           </button>
         )}
       </div>
 
-      {/* ── Row 2: scheduled time + time until ─────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 11, flexWrap: 'wrap' }}>
+      {/* ── Row 2: prominent time chip with clock icon ─────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+        {/* Time chip */}
         <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          color: '#6366F1', fontSize: 12, fontWeight: 600,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: 'rgba(99,102,241,0.10)',
+          border: '1px solid rgba(99,102,241,0.22)',
+          borderRadius: 8,
+          padding: '4px 10px',
+          color: 'var(--accent-l)', fontSize: 12.5, fontWeight: 700,
+          letterSpacing: '-0.01em',
         }}>
-          <IconClock size={12} color="#6366F1" />
+          <IconClock size={13} color="var(--accent-l)" />
           {fmtScheduledTime(post.scheduled_at)}
         </span>
         {isPending && (
           <span style={{
-            fontSize: 12, color: 'rgba(148,163,184,0.52)',
+            fontSize: 12, color: 'var(--muted)',
             borderLeft: '1px solid rgba(255,255,255,0.08)',
             paddingLeft: 10,
           }}>
@@ -850,16 +1102,18 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
         )}
       </div>
 
-      {/* ── Row 3: stat chips ─────────────────────────────────────────────── */}
+      {/* ── Row 3: stat chips (phones + videos + delay + mode) ────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
         <StatChip
           icon={<IconPhone size={11} color="rgba(233,234,240,0.72)" />}
           label={`${post.phones.length} ${post.phones.length !== 1 ? t('schedulerPhonePlural') : t('schedulerPhone')}`}
         />
-        <StatChip
-          icon={<IconVideo size={11} color="rgba(233,234,240,0.72)" />}
-          label={`${post.videos.length} ${post.videos.length !== 1 ? t('schedulerVideoPlural') : t('schedulerVideo')}`}
-        />
+        {post.type !== 'story' && (
+          <StatChip
+            icon={<IconVideo size={11} color="rgba(233,234,240,0.72)" />}
+            label={`${post.videos.length} ${post.videos.length !== 1 ? t('schedulerVideoPlural') : t('schedulerVideo')}`}
+          />
+        )}
         {post.delay_minutes > 0 && (
           <StatChip
             icon={<IconTime size={11} color="rgba(233,234,240,0.72)" />}
@@ -881,8 +1135,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
         <p style={{
           marginTop: 10, marginBottom: 0,
           fontSize: 12, lineHeight: 1.6,
-          color: 'rgba(148,163,184,0.52)',
-          fontStyle: 'normal',
+          color: 'var(--muted)',
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
@@ -905,10 +1158,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             </span>
           ))}
           {post.phones.length > 6 && (
-            <span style={{
-              background: 'rgba(99,102,241,0.1)', color: '#6366F1',
-              borderRadius: 5, padding: '2px 8px', fontSize: 11,
-            }}>
+            <span className="sf-badge sf-badge-violet" style={{ borderRadius: 5, padding: '2px 8px', fontSize: 11 }}>
               +{post.phones.length - 6} {t('schedulerMoreItems')}
             </span>
           )}
@@ -944,8 +1194,9 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           marginTop: 10, marginBottom: 0,
           fontSize: 12, lineHeight: 1.6,
           padding: '8px 12px',
-          background: 'rgba(239,68,68,0.07)', color: '#EF4444',
-          border: '1px solid rgba(239,68,68,0.14)', borderRadius: 8,
+          background: 'rgba(248,113,113,0.07)', color: 'var(--err)',
+          border: '1px solid rgba(248,113,113,0.18)', borderRadius: 8,
+          fontFamily: 'ui-monospace, monospace',
         }}>
           {post.error_msg}
         </p>

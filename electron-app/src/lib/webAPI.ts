@@ -247,23 +247,26 @@ export function buildWebAPI() {
       const V = '[CLIENT-v7]'
       console.log(`${V} uploadVideoGeelark filePath=${opts.filePath.slice(0, 80)}`)
       try {
-        // Pour toute URL distante → proxy serveur (pas de CORS, pas de clé admin)
-        // Le serveur télécharge la vidéo ET upload vers S3 GéeLark
-        if (opts.filePath.startsWith('https://') || opts.filePath.startsWith('http://')) {
-          console.log(`${V} [A] URL distante → proxy serveur /api/geelark-upload`)
-          const r = await fetch('/api/geelark-upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer }),
-          })
+        // Preferred path: server-side proxy (/api/geelark-upload) does
+        // download + getUrl + PUT entirely côté serveur — pas de CORS.
+        // Works whenever the source is an https URL (Supabase signed/public URL).
+        if (/^https?:\/\//.test(opts.filePath)) {
           try {
-            const result = await r.json()
-            console.log(`${V} [A] résultat serveur:`, result)
-            return result
-          } catch {
-            return { ok: false, error: `${V}[E-SRV] Erreur serveur HTTP ${r.status}` }
-          }
+            const r = await fetch('/api/geelark-upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer }),
+            })
+            const j = await r.json() as { ok: boolean; token?: string; error?: string }
+            if (j.ok && j.token) return { ok: true, token: j.token }
+            // Server reachable but upload failed — report its error directly
+            if (j.error) return { ok: false, error: j.error }
+          } catch { /* serveur indisponible — bascule sur le flux client ci-dessous */ }
         }
+
+        // Fallback client-side (blob: URLs, ou proxy serveur indisponible)
+        // Step 1: get video bytes — try multiple strategies in order
+        let bytes: Uint8Array | null = null
 
         // Pour blob: URLs (fichiers locaux) → téléchargement navigateur + upload direct
         console.log(`${V} [B] blob URL → téléchargement direct`)
@@ -284,45 +287,36 @@ export function buildWebAPI() {
           return { ok: false, error: `${V}[E001] Impossible de lire le fichier local` }
         }
 
-        // Obtenir l'URL de dépôt GéeLark
-        console.log(`${V} [C] demande uploadUrl GéeLark (${bytes.length} bytes)`)
-        const urlRes = await fetch('/api/gx', {
+        // Step 2: get GéeLark presigned upload URL — reuse geelarkRequest so network
+        // errors are caught cleanly instead of bubbling up as uncaught "Failed to fetch"
+        const urlData = await this.geelarkRequest({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            method: 'POST',
-            url: 'https://openapi.geelark.com/open/v1/upload/getUrl',
-            headers: { Authorization: `Bearer ${opts.bearer}` },
-            body: { fileType: 'mp4' },
-          }),
-        })
-        const urlData = await urlRes.json() as Record<string, unknown>
-        if (!urlData.ok) {
-          return { ok: false, error: `${V}[E002] GéeLark getUrl: ${(urlData as any).error ?? urlRes.status}` }
-        }
-        const apiResp = ((urlData.data as Record<string, unknown>)?.['data'] ?? urlData.data) as Record<string, unknown>
-        const uploadUrl = apiResp?.['uploadUrl'] as string | undefined
-        const token     = (apiResp?.['resourceUrl'] ?? apiResp?.['token']) as string | undefined
-        if (!uploadUrl || !token) {
-          return { ok: false, error: `${V}[E003] GéeLark: pas d'uploadUrl/resourceUrl — clés: ${Object.keys(apiResp ?? {}).join(',')}` }
-        }
+          url: 'https://openapi.geelark.com/open/v1/upload/getUrl',
+          headers: { Authorization: `Bearer ${opts.bearer}` },
+          body: { fileType: 'mp4' },
+        }) as Record<string, unknown>
+        if (!urlData['ok']) return { ok: false, error: String(urlData['error'] ?? 'GéeLark URL error') }
+        const apiResp = ((urlData['data'] as Record<string, unknown>)?.['data'] ?? urlData['data']) as Record<string, unknown>
+        const uploadUrl   = apiResp?.['uploadUrl']   as string | undefined
+        const resourceUrl = apiResp?.['resourceUrl'] as string | undefined
+        const token       = resourceUrl ?? apiResp?.['token'] as string | undefined
+        if (!uploadUrl || !token) return { ok: false, error: 'Réponse GéeLark invalide (pas de uploadUrl/resourceUrl)' }
 
-        // PUT vers S3 GéeLark
-        console.log(`${V} [D] PUT vers S3 GéeLark`)
-        let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
-        if (!putRes.ok) {
-          putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
-        }
-        if (!putRes.ok) {
-          console.error(`${V} [E004] S3 PUT ${putRes.status}`)
-          return { ok: false, error: `${V}[E004] S3 PUT échoué: ${putRes.status}` }
+        // Step 3: PUT bytes to GéeLark S3 (peut être bloqué par CORS dans le navigateur)
+        try {
+          let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
+          if (!putRes.ok) {
+            putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
+          }
+          if (!putRes.ok) return { ok: false, error: `S3 PUT échoué: ${putRes.status}` }
+        } catch {
+          return { ok: false, error: 'Upload S3 bloqué par le navigateur (CORS) — utilisez une vidéo depuis la Banque (Supabase)' }
         }
 
         console.log(`${V} [OK] upload réussi token=${token.slice(0, 40)}`)
         return { ok: true, token }
       } catch (err) {
-        console.error(`${V} [E000] exception:`, err)
-        return { ok: false, error: `${V}[E000] ${err instanceof Error ? err.message : String(err)}` }
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
       }
     },
     // ── FFmpeg operations (delegate to ffmpeg.wasm, serialised via wasmQueue) ──

@@ -799,6 +799,7 @@ export interface StoryConfig {
   imageUrl: string            // public/signed URL of the image to post
   linkUrl:  string            // destination URL for the link sticker
   linkText?: string           // optional custom label shown on the sticker
+  dryRun?:  boolean           // run every step but stop right before publishing
 }
 
 export async function postInstagramStory(
@@ -825,23 +826,134 @@ export async function postInstagramStory(
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
 
-  // ── 1. Download image into the phone gallery ───────────────────────────────
-  log('🖼 Téléchargement de l\'image…')
+  // ── 1. Push image to phone gallery ────────────────────────────────────────
+  log('🖼 Chargement de l\'image…')
+  const _imgExt = (() => {
+    try {
+      const p = new URL(config.imageUrl).pathname
+      const m = /\.(png|gif|webp|bmp|heic|heif|jpe?g)$/i.exec(p)
+      if (m) return m[1].toLowerCase().replace('jpeg', 'jpg')
+    } catch { /* ignore */ }
+    return 'jpg'
+  })()
+  // Always save as jpg on phone (Instagram accepts JPEG; avoids PNG classification issues)
   const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
-  // Try curl first; fall back to wget if curl isn't available on the device
-  await shellExec(bearer, phoneId,
-    `mkdir -p /sdcard/DCIM/Camera && ` +
-    `(curl -fsSL --max-time 60 -o ${imgPath} "${config.imageUrl}" 2>/dev/null || ` +
-    ` wget -q --timeout=60 -O ${imgPath} "${config.imageUrl}" 2>/dev/null) ; echo DL_DONE`)
-  // Verify the file was actually written (anything > 2 KB is likely a real image)
-  const checkDl = await shellExec(bearer, phoneId,
-    `wc -c < ${imgPath} 2>/dev/null || echo 0`)
-  const dlBytes = parseInt(checkDl.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-  log(`   📎 Image: ${dlBytes} octets`)
-  if (dlBytes < 2000) {
-    log(`   ❌ Échec téléchargement image (${dlBytes} octets)`)
-    return { ok: false, error: 'Impossible de télécharger l\'image sur le téléphone' }
+  let imgOnPhone = false
+
+  // PRIMARY: upload to GeeLark CDN server-side (Vercel → GeeLark S3), then wget on phone.
+  // Same mechanism as mass posting — CDN URLs are always reachable from GeeLark phones.
+  try {
+    log('   ☁️ Upload CDN GeeLark (côté serveur)…')
+    const upRes = await fetch('/api/geelark-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signedUrl: config.imageUrl, bearer }),
+    })
+    const upData: { ok: boolean; token?: string; error?: string } = upRes.ok
+      ? await upRes.json()
+      : { ok: false, error: `HTTP ${upRes.status}` }
+
+    if (upData.ok && upData.token) {
+      const cdnUrl = upData.token
+      log('   📲 Téléchargement depuis CDN GeeLark…')
+      await shellExec(bearer, phoneId,
+        `mkdir -p /sdcard/DCIM/Camera && ` +
+        `(curl -fsSLk --max-time 90 -o '${imgPath}' '${cdnUrl}' 2>/dev/null || ` +
+        ` wget -q --no-check-certificate --timeout=90 -O '${imgPath}' '${cdnUrl}' 2>/dev/null)`)
+      const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+      const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+      if (sz > 2000) {
+        log(`   ✅ Image via CDN GeeLark (${sz} octets)`)
+        imgOnPhone = true
+      } else {
+        log(`   ⚠️ CDN wget: ${sz} octets — passage au fallback base64`)
+      }
+    } else {
+      log(`   ⚠️ CDN upload: ${upData.error ?? 'échec inconnu'}`)
+    }
+  } catch (e) {
+    log(`   ⚠️ CDN: ${e instanceof Error ? e.message : String(e)}`)
   }
+
+  // FALLBACK: download in browser, compress with OffscreenCanvas, push via base64 chunks.
+  if (!imgOnPhone) {
+    log('   🔄 Fallback base64…')
+    let imgBase64: string | null = null
+
+    const bufToB64 = (buf: ArrayBuffer): string => {
+      const u8 = new Uint8Array(buf)
+      let b64 = ''
+      for (let i = 0; i < u8.length; i += 8192)
+        b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + 8192, u8.length))))
+      return b64
+    }
+
+    // Download image client-side
+    try {
+      const resp = await fetch(config.imageUrl)
+      if (resp.ok) {
+        imgBase64 = bufToB64(await resp.arrayBuffer())
+        log(`   📥 Image téléchargée (${Math.round(imgBase64.length / 1024)} KB)`)
+      }
+    } catch { /* ignore */ }
+
+    // Compress via OffscreenCanvas (no DOM needed, no data: URL size limit)
+    if (imgBase64) {
+      try {
+        const mimeIn = _imgExt === 'png' ? 'image/png' : 'image/jpeg'
+        const binStr = atob(imgBase64)
+        const u8in = new Uint8Array(binStr.length)
+        for (let i = 0; i < binStr.length; i++) u8in[i] = binStr.charCodeAt(i)
+        const inBlob = new Blob([u8in], { type: mimeIn })
+        const bitmap = await createImageBitmap(inBlob)
+        const MAX_W = 1080, MAX_H = 1920
+        let w = bitmap.width, h = bitmap.height
+        if (w > MAX_W || h > MAX_H) {
+          const r = Math.min(MAX_W / w, MAX_H / h)
+          w = Math.round(w * r); h = Math.round(h * r)
+        }
+        const oc = new OffscreenCanvas(w, h)
+        const ctx = oc.getContext('2d')!
+        ctx.drawImage(bitmap, 0, 0, w, h)
+        const outBlob = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.85 })
+        const outBuf = await outBlob.arrayBuffer()
+        const compressed = bufToB64(outBuf)
+        log(`   🗜️ Compression: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB JPEG`)
+        imgBase64 = compressed
+      } catch (e) {
+        log(`   ⚠️ Compression ignorée (${e instanceof Error ? e.message : String(e)})`)
+      }
+    }
+
+    // Push via base64 shell chunks
+    if (imgBase64) {
+      const CHUNK = 2000, BATCH = 6
+      const chunks: string[] = []
+      for (let i = 0; i < imgBase64.length; i += CHUNK) chunks.push(imgBase64.slice(i, i + CHUNK))
+      log(`   📤 Push base64: ${chunks.length} chunks…`)
+      await shellExec(bearer, phoneId,
+        `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+      for (let b = 1; b < chunks.length; b += BATCH) {
+        const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+        await shellExec(bearer, phoneId, cmd)
+      }
+      await shellExec(bearer, phoneId,
+        `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || ` +
+        `base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; ` +
+        `rm -f '${imgPath}.b64'`)
+    }
+
+    const ck2 = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+    const sz2 = parseInt(ck2.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    if (sz2 > 2000) { imgOnPhone = true; log(`   ✅ Image via base64 (${sz2} octets)`) }
+    else { log(`   ❌ Fallback base64: ${sz2} octets`) }
+  }
+
+  if (!imgOnPhone) {
+    return { ok: false, error: 'Impossible de transférer l\'image sur le téléphone' }
+  }
+
+  // Force media scanner so Instagram's gallery picker sees the new file
   await shellExec(bearer, phoneId,
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
   await sleep(2500)
@@ -888,6 +1000,26 @@ export async function postInstagramStory(
     await sleep(5000)
   }
 
+  // Android/IG permission prompts ("Allow access to photos") silently block the
+  // flow if not dismissed — accept them whenever they appear.
+  async function dismissPermissionDialog() {
+    const permXml = await dumpXml(bearer, phoneId)
+    const allowPt =
+      findByText(permXml, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser',
+        'While using the app', 'Lorsque l\'application est utilisée', 'Continue', 'Continuer') ??
+      findByResourceId(permXml, 'permission_allow_button', 'permission_allow_all_button',
+        'permission_allow_foreground_only_button')
+    if (allowPt) {
+      log('   ✓ Popup de permission détectée — acceptation…')
+      await shellExec(bearer, phoneId, `input tap ${allowPt[0]} ${allowPt[1]}`)
+      await sleep(2000)
+      return true
+    }
+    return false
+  }
+
+  await dismissPermissionDialog()
+
   // ── 3. Pick the uploaded image from the gallery ────────────────────────────
   log('🖼 Sélection de l\'image dans la galerie…')
   xml = await dumpXml(bearer, phoneId)
@@ -901,6 +1033,7 @@ export async function postInstagramStory(
     await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.13)} ${Math.floor(sh * 0.88)}`)
   }
   await sleep(2500)
+  await dismissPermissionDialog()
 
   // Tap the first (most-recent) gallery image — the one we just downloaded.
   xml = await dumpXml(bearer, phoneId)
@@ -994,12 +1127,23 @@ export async function postInstagramStory(
 
   // ── 6. Drag the link sticker to the bottom-right ───────────────────────────
   log('↘️  Positionnement du sticker en bas à droite…')
-  // The sticker appears roughly centered after confirmation; drag it down-right.
+  // After "Done", IG places the sticker in the upper-center area (~25-35% down).
+  // A 1200ms swipe acts as long-press+drag which triggers the drag handle.
   await shellExec(bearer, phoneId,
-    `input swipe ${cx} ${Math.floor(sh * 0.5)} ${Math.floor(sw * 0.8)} ${Math.floor(sh * 0.82)} 700`)
+    `input swipe ${cx} ${Math.floor(sh * 0.28)} ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.85)} 1200`)
+  await sleep(800)
+  // Second pass in case the first swipe missed — try from a slightly lower start
+  await shellExec(bearer, phoneId,
+    `input swipe ${cx} ${Math.floor(sh * 0.38)} ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.85)} 1200`)
   await sleep(1500)
 
   // ── 7. Publish to "Your story" ─────────────────────────────────────────────
+  if (config.dryRun) {
+    log('🧪 Mode test : toutes les étapes ont fonctionné — arrêt AVANT publication.')
+    log('   (image téléchargée, caméra story, galerie, sticker lien, URL saisie)')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android').catch(() => {})
+    return { ok: true }
+  }
   log('🚀 Publication de la story…')
   xml = await dumpXml(bearer, phoneId)
   const sharePt =
@@ -1014,8 +1158,12 @@ export async function postInstagramStory(
   await sleep(5000)
 
   // ── Verify we left the editor (best-effort) ────────────────────────────────
+  // Only check editor-specific elements. "Your story" must NOT be in this list:
+  // after a successful publish IG returns to the home feed, whose story tray
+  // contains "Your story" — matching it produced false "failed" results on
+  // stories that were actually published.
   const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
-  const stillEditing = /sticker_button|done_button|link_url|your story|votre story/.test(finalXml)
+  const stillEditing = /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text/.test(finalXml)
   if (stillEditing) {
     log('   ⚠️ L\'éditeur semble encore ouvert — vérifie manuellement.')
     return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }
@@ -1037,10 +1185,42 @@ async function runWarmupActions(
   let likeCount = 0
   let followCount = 0
 
-  // Go to home feed
+  // ── Wake + unlock — sans ça, tous les taps/swipes partent dans le vide ─────
+  log('📱 Réveil de l\'écran…')
+  await shellExec(bearer, phoneId, 'input keyevent 224')
+  await sleep(800)
+  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400')
+  await sleep(1000)
+
+  // Dismiss permission / "Not now" popups that block all interaction
+  async function dismissPopups(xml: string): Promise<boolean> {
+    const pt =
+      findByText(xml, 'Not now', 'Plus tard', 'Not Now', 'Pas maintenant',
+        'Allow', 'Autoriser', 'Continue', 'Continuer', 'OK', 'Skip', 'Ignorer') ??
+      findByResourceId(xml, 'permission_allow_button', 'negative_button', 'primary_button_row')
+    if (pt) {
+      await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`)
+      await sleep(1500)
+      return true
+    }
+    return false
+  }
+
+  // ── Open Instagram and VERIFY it's actually in the foreground ──────────────
   log('📱 Ouverture du fil d\'actualité…')
-  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
-  await sleep(4000)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
+    await sleep(5000)
+    const xml = await dumpXml(bearer, phoneId)
+    if (await dismissPopups(xml)) continue   // popup éjectée → re-vérifier
+    if (/com\.instagram\.android/.test(xml)) { log('   ✅ Instagram ouvert'); break }
+    if (attempt === 2) { log('   ⚠️ Instagram ne semble pas au premier plan — on continue quand même') }
+    else {
+      log('   ↻ Instagram pas encore visible — nouvel essai…')
+      await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+      await sleep(2000)
+    }
+  }
 
   while (Date.now() < endTime && !abortSignal.abort) {
     // Scroll the feed
@@ -1055,14 +1235,24 @@ async function runWarmupActions(
     // Randomly like posts
     if (config.likePosts && Math.random() < 0.35) {
       const xml = await dumpXml(bearer, phoneId)
-      const likeBtn = findByResourceId(xml, 'row_feed_button_like') ??
-                      findByText(xml, 'Like', "J'aime")
+      // Une popup peut être apparue en plein scroll — l'éjecter d'abord
+      if (await dismissPopups(xml)) continue
+      // Resource-id uniquement : matcher le TEXTE « Like » tape sur les
+      // compteurs de likes (ouvre la liste des likers) — c'était le bug.
+      const likeBtn = findByResourceId(xml, 'row_feed_button_like', 'like_button')
       if (likeBtn) {
         await shellExec(bearer, phoneId, `input tap ${likeBtn[0]} ${likeBtn[1]}`)
         likeCount++
         log(`❤️ Like (${likeCount})`)
-        await sleep(800 + Math.floor(Math.random() * 500))
+      } else {
+        // Fallback humain : double-tap au centre du média = like Instagram.
+        // Les deux taps dans UNE commande shell (un aller-retour HTTP entre
+        // deux taps serait trop lent pour compter comme double-tap).
+        await shellExec(bearer, phoneId, 'input tap 540 760 && input tap 540 760')
+        likeCount++
+        log(`❤️ Like (double-tap) (${likeCount})`)
       }
+      await sleep(800 + Math.floor(Math.random() * 500))
     }
 
     // Randomly follow suggested accounts
@@ -1103,11 +1293,15 @@ async function runWarmupActions(
 }
 
 // Escape text for use inside an Android `input text "..."` shell command.
+// Rules: the string is passed as a double-quoted shell argument, so only
+// the chars special in that context need escaping.  Single quote ' is
+// NOT special inside double quotes — escaping it as \' would inject a
+// literal backslash which Android keyboards often map to / or other chars.
 function escapeForInputText(text: string): string {
   return text
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g,  '\\"')
-    .replace(/'/g,  "\\'")
+    .replace(/\\/g, '\\\\')  // \ → \\ (must be first)
+    .replace(/"/g,  '\\"')   // " → \"
+    // ' is literal inside "…" — no escaping needed
     .replace(/&/g,  '\\&')
     .replace(/</g,  '\\<')
     .replace(/>/g,  '\\>')

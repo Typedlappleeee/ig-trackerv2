@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { zipSync } from 'fflate'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
@@ -9,6 +9,8 @@ import { uploadVideoFromPath, uploadVideoFromBlob, deleteStorageObjects, type Up
 import { logActivity } from '@/lib/activityLog'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
 
 interface BankProps { user: User }
 
@@ -252,7 +254,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
       <div className="sf-modal w-96 anim-scale-in" onClick={e => e.stopPropagation()}>
         <div className="sf-modal-header">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)', color: '#6366F1' }}>
               <IconUpload size={16} />
             </div>
             <h3 className="sf-modal-title">{t('bankAddMedia')}</h3>
@@ -263,15 +265,16 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Drag-drop zone */}
+          {/* Drag-drop zone — dashed border upload area */}
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
-            className={`
-              border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 py-10 transition-all cursor-default
-              ${dragOver ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/50 bg-surface2/40'}
-            `}
+            className="border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 py-10 transition-all cursor-default"
+            style={{
+              borderColor: dragOver ? 'rgba(99,102,241,0.7)' : 'rgba(99,102,241,0.3)',
+              background: dragOver ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.02)',
+            }}
           >
             <span className={dragOver ? 'text-accent' : 'text-text3'}>
               {dragOver ? <IconFolderOpen size={44} /> : <IconClapperboard size={44} />}
@@ -316,6 +319,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
 
 export function Bank({ user }: BankProps) {
   const t = useT()
+  const toast = useToast()
   const { currentOrg, role, perms } = useOrg()
   const [personalMode, setPersonalMode] = useState(false)
   // true when we should show personal (user-scoped) items regardless of org
@@ -344,6 +348,14 @@ export function Bank({ user }: BankProps) {
   const [sqlCopied, setSqlCopied]           = useState(false)
   // Type filter (Python: Tous/Vidéo/Photo/GIF/Audio)
   const [typeFilter, setTypeFilter] = useState<'all' | 'video' | 'photo' | 'gif' | 'audio'>('all')
+  // Sort order
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'name' | 'duration'>('date-desc')
+  // Delete confirmations (single item / bulk selection)
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<ContentItem | null>(null)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  // Bulk ZIP download progress
+  const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null)
   // Empty folders — now stored in Supabase (sentinel rows) so all org members see them
   const [emptyFolders, setEmptyFolders] = useState<string[]>([])
 
@@ -364,26 +376,33 @@ export function Bank({ user }: BankProps) {
   }
   function exitSelection() { setSelectedIds(new Set()) }
 
-  async function deleteSelected() {
+  async function performDeleteSelected() {
     if (!selectedIds.size) return
-    if (!confirm(`${t('bankDeleteSelected')} ${selectedIds.size} video(s)? ${t('phoneDeleteMsg')}`)) return
+    setDeleteBusy(true)
     const ids = [...selectedIds]
     const toDelete = items.filter(i => ids.includes(i.id))
     let q = scopeQ(supabase.from('content_bank').delete().in('id', ids))
     const { error: err } = await q
+    setDeleteBusy(false)
+    setConfirmBulkDelete(false)
     if (err) {
-      setError('Deletion failed: ' + err.message)
+      toast.show({ title: 'Suppression échouée', body: err.message, kind: 'error' })
       return
     }
     deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
     setItems(prev => prev.filter(i => !ids.includes(i.id)))
     exitSelection()
+    toast.show({ title: `${ids.length} média${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`, kind: 'ok' })
   }
 
   async function moveSelected(folder: string | null) {
     if (!selectedIds.size) return
     const ids = [...selectedIds]
-    await supabase.from('content_bank').update({ folder }).in('id', ids)
+    const { error: err } = await supabase.from('content_bank').update({ folder }).in('id', ids)
+    if (err) {
+      toast.show({ title: 'Déplacement échoué', body: err.message, kind: 'error' })
+      return
+    }
     setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, folder: folder as unknown as string } : i))
     setShowBulkMove(false)
     exitSelection()
@@ -494,9 +513,9 @@ export function Bank({ user }: BankProps) {
   function uploadProgressLabels(phase: string): string {
     const labels: Record<string, string> = {
       'reading':          'Lecture du fichier…',
-      'uploading-video':  'Upload vers Supabase…',
-      'thumbnail':        'Generating thumbnail…',
-      'uploading-thumb':  'Upload de la miniature…',
+      'uploading-video':  'Envoi du fichier…',
+      'thumbnail':        'Génération de la miniature…',
+      'uploading-thumb':  'Envoi de la miniature…',
     }
     return labels[phase] ?? ''
   }
@@ -543,9 +562,9 @@ export function Bank({ user }: BankProps) {
       const { storagePath, thumbnailPath } = await uploadVideoFromPath(item.file_url, scope, phase => {
         const labels: Record<string, string> = {
           'reading':          'Lecture du fichier local…',
-          'uploading-video':  'Upload vers Supabase…',
-          'thumbnail':        'Miniature…',
-          'uploading-thumb':  'Upload miniature…',
+          'uploading-video':  'Envoi du fichier…',
+          'thumbnail':        'Génération de la miniature…',
+          'uploading-thumb':  'Envoi de la miniature…',
         }
         setUploadStatus(`${item.title} : ${labels[phase] ?? ''}`)
       })
@@ -565,12 +584,16 @@ export function Bank({ user }: BankProps) {
   }
 
   async function pickFile() {
-    if (!window.electronAPI?.pickVideoFile) return
-    const p = await window.electronAPI.pickVideoFile()
+    const api = window.electronAPI
+    if (!api) return
+    // Use pickAnyFile to support both videos and images; fall back to pickVideoFile
+    const picker = api.pickAnyFile ?? api.pickVideoFile
+    if (!picker) return
+    const p = await (api.pickAnyFile
+      ? api.pickAnyFile({ filters: [{ name: 'Médias', extensions: ['mp4','mov','avi','mkv','webm','m4v','jpg','jpeg','png','webp','gif','bmp','heic'] }] })
+      : api.pickVideoFile())
     if (!p) return
-    // In web mode, pickVideoFile returns a blob: URL. Fetching it via readFileBytes
-    // can fail ("Failed to fetch"). Get the original File from the in-memory store
-    // and upload it directly as a Blob — same path drag-drop uses.
+    // blob: URL from web mode — get the File object from in-memory store
     if (p.startsWith('blob:')) {
       const { getStoredFile } = await import('@/lib/webAPI')
       const file = getStoredFile(p)
@@ -602,36 +625,48 @@ export function Bank({ user }: BankProps) {
     for (const file of files) await addFromFile(file)
   }
 
-  async function deleteItem(id: string) {
-    const item = items.find(i => i.id === id)
-    let q = scopeQ(supabase.from('content_bank').delete().eq('id', id))
+  async function performDeleteItem(item: ContentItem) {
+    setDeleteBusy(true)
+    let q = scopeQ(supabase.from('content_bank').delete().eq('id', item.id))
     const { error: err } = await q
+    setDeleteBusy(false)
+    setConfirmDeleteItem(null)
     if (err) {
-      setError('Deletion failed: ' + err.message)
-    } else {
-      setItems(prev => prev.filter(i => i.id !== id))
-      if (item) {
-        deleteStorageObjects([item.storage_path, item.thumbnail_path])
-        logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_delete', details: { title: item.title, folder: item.folder } })
-      }
+      toast.show({ title: 'Suppression échouée', body: err.message, kind: 'error' })
+      return
     }
-    setCtxMenu(null)
+    setItems(prev => prev.filter(i => i.id !== item.id))
+    deleteStorageObjects([item.storage_path, item.thumbnail_path])
+    logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_delete', details: { title: item.title, folder: item.folder } })
+    toast.show({ title: 'Média supprimé', kind: 'ok' })
   }
 
   async function renameItemSave(id: string, newTitle: string) {
     if (!newTitle) return
     const { error: err } = await supabase.from('content_bank').update({ title: newTitle }).eq('id', id)
-    if (!err) setItems(prev => prev.map(i => i.id === id ? { ...i, title: newTitle } : i))
+    if (err) {
+      toast.show({ title: 'Renommage échoué', body: err.message, kind: 'error' })
+      return
+    }
+    setItems(prev => prev.map(i => i.id === id ? { ...i, title: newTitle } : i))
   }
 
   async function moveItemSave(id: string, folder: string | null) {
     const { error: err } = await supabase.from('content_bank').update({ folder }).eq('id', id)
-    if (!err) setItems(prev => prev.map(i => i.id === id ? { ...i, folder: folder as unknown as string } : i))
+    if (err) {
+      toast.show({ title: 'Déplacement échoué', body: err.message, kind: 'error' })
+      return
+    }
+    setItems(prev => prev.map(i => i.id === id ? { ...i, folder: folder as unknown as string } : i))
   }
 
   async function saveTagsSave(id: string, newTags: string[]) {
     const { error: err } = await supabase.from('content_bank').update({ tags: newTags }).eq('id', id)
-    if (!err) setItems(prev => prev.map(i => i.id === id ? { ...i, tags: newTags } : i))
+    if (err) {
+      toast.show({ title: 'Mise à jour des tags échouée', body: err.message, kind: 'error' })
+      return
+    }
+    setItems(prev => prev.map(i => i.id === id ? { ...i, tags: newTags } : i))
   }
 
   async function createFolder() {
@@ -697,10 +732,10 @@ export function Bank({ user }: BankProps) {
   }
 
   // Derived data — folders come from items + empty (newly-created) folders
-  const folders = [...new Set([
+  const folders = useMemo(() => [...new Set([
     ...items.map(i => (i as unknown as {folder?: string | null}).folder).filter((f): f is string => Boolean(f)),
     ...emptyFolders,
-  ])].sort()
+  ])].sort(), [items, emptyFolders])
 
   function inferType(filePath: string | null): 'video' | 'photo' | 'gif' | 'audio' {
     if (!filePath) return 'video'
@@ -711,7 +746,7 @@ export function Bank({ user }: BankProps) {
     return 'video'
   }
 
-  const visible = items.filter(item => {
+  const visible = useMemo(() => items.filter(item => {
     const folder = (item as unknown as {folder?: string | null}).folder
     const folderMatch = selectedFolder === null ? true : folder === selectedFolder
     if (!folderMatch) return false
@@ -719,7 +754,13 @@ export function Bank({ user }: BankProps) {
     if (!search) return true
     const q = search.toLowerCase()
     return item.title.toLowerCase().includes(q) || item.notes.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
-  })
+  }), [items, selectedFolder, typeFilter, search])
+
+  // Pagination — reset when filters/folder change
+  const PAGE_SIZE = 60
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [selectedFolder, typeFilter, search])
+  const visiblePage = useMemo(() => visible.slice(0, visibleCount), [visible, visibleCount])
 
   const openCtx = useCallback((e: React.MouseEvent, item: ContentItem) => {
     e.preventDefault()
@@ -746,8 +787,8 @@ export function Bank({ user }: BankProps) {
             className="flex flex-col items-center gap-4 px-20 py-14 rounded-3xl"
             style={{
               background: 'rgba(7,7,11,0.92)',
-              border: '2px dashed rgba(34,211,238,0.6)',
-              boxShadow: '0 0 60px -10px rgba(34,211,238,0.4)',
+              border: '2px dashed rgba(99,102,241,0.6)',
+              boxShadow: '0 0 60px -10px rgba(99,102,241,0.4)',
               backdropFilter: 'blur(24px)',
             }}
           >
@@ -760,17 +801,18 @@ export function Bank({ user }: BankProps) {
         </div>
       )}
 
-      {/* ── Premium page header ── */}
-      <header className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between gap-4" style={{ borderBottom: '1px solid rgba(34,211,238,0.1)' }}>
+      {/* ── Page header ── */}
+      <header className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between gap-4" style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
         {/* Icon + title */}
         <div className="flex items-center gap-3.5 min-w-0">
           <div
-            className="w-11 h-11 rounded-[13px] flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
+            className="sf-anim-scale-spring"
             style={{
-              background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
-              border: '1px solid rgba(34,211,238,0.3)',
-              boxShadow: '0 0 20px -6px rgba(34,211,238,0.4)',
-              color: '#22d3ee',
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.28)',
+              color: '#6366F1',
             }}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -779,10 +821,10 @@ export function Bank({ user }: BankProps) {
           </div>
           <div className="min-w-0 sf-anim-slide-up sf-d50">
             <div className="flex items-center gap-2.5">
-              <h1 className="text-[22px] font-black text-text leading-none tracking-tight" style={{ letterSpacing: '-0.025em' }}>{t('bankTitle')}</h1>
+              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('bankTitle')}</h1>
               <span className="sf-badge sf-badge-accent text-[11px]">{items.length}</span>
             </div>
-            <p className="text-[12px] mt-1 text-text3">{t('bankSubtitle')}</p>
+            <p className="sf-page-sub">{t('bankSubtitle')}</p>
           </div>
         </div>
 
@@ -882,7 +924,7 @@ export function Bank({ user }: BankProps) {
 
         <div className="w-px h-5 bg-border flex-shrink-0" />
 
-        {/* Type filter pills */}
+        {/* Sort/filter bar — sf-btn-ghost tab pills */}
         <div className="flex gap-1">
           {([
             { k: 'all',   l: t('bankTypeAll')   },
@@ -894,11 +936,15 @@ export function Bank({ user }: BankProps) {
             <button
               key={tf.k}
               onClick={() => setTypeFilter(tf.k)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`sf-btn sf-btn-ghost sf-btn-sm cursor-pointer px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
                 typeFilter === tf.k
-                  ? 'bg-accent/20 text-accent border border-accent/40'
-                  : 'bg-transparent text-text3 border border-transparent hover:text-text2'
+                  ? 'text-accent'
+                  : 'text-text3 hover:text-text2'
               }`}
+              style={typeFilter === tf.k ? {
+                background: 'rgba(99,102,241,0.15)',
+                border: '1px solid rgba(99,102,241,0.35)',
+              } : {}}
             >{tf.l}</button>
           ))}
         </div>
@@ -1022,36 +1068,56 @@ export function Bank({ user }: BankProps) {
 
               <button
                 onClick={async () => {
+                  if (zipProgress) return
                   const sel = items.filter(i => selectedIds.has(i.id))
                   if (!sel.length) return
                   if (sel.length <= 5) {
                     sel.forEach((it, i) => setTimeout(() => downloadItem(it), i * 600))
                   } else {
-                    // More than 5 → bundle into a ZIP
+                    // More than 5 → bundle into a ZIP.
+                    // Pool séquentiel de 3 téléchargements — évite de tout charger en RAM d'un coup.
                     const files: Record<string, Uint8Array> = {}
                     const seen = new Set<string>()
-                    await Promise.all(sel.map(async it => {
-                      let buf: ArrayBuffer | null = null
-                      if (it.storage_path) {
-                        const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(it.storage_path)
-                        if (data) buf = await data.arrayBuffer()
-                      } else if (it.file_url) {
-                        try { buf = await (await fetch(it.file_url)).arrayBuffer() } catch (_) {}
+                    let failed = 0
+                    let nextIdx = 0
+                    let done = 0
+                    setZipProgress({ done: 0, total: sel.length })
+                    const worker = async () => {
+                      while (nextIdx < sel.length) {
+                        const it = sel[nextIdx++]
+                        let buf: ArrayBuffer | null = null
+                        if (it.storage_path) {
+                          const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(it.storage_path)
+                          if (data) buf = await data.arrayBuffer()
+                        } else if (it.file_url) {
+                          try { buf = await (await fetch(it.file_url)).arrayBuffer() } catch (_) { /* compté ci-dessous */ }
+                        }
+                        done++
+                        setZipProgress({ done, total: sel.length })
+                        if (!buf) { failed++; continue }
+                        let name = getDownloadName(it)
+                        // Deduplicate filenames
+                        if (seen.has(name)) {
+                          const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '.mp4'
+                          const base = name.slice(0, name.lastIndexOf('.') || name.length)
+                          let n = 2
+                          while (seen.has(`${base}_${n}${ext}`)) n++
+                          name = `${base}_${n}${ext}`
+                        }
+                        seen.add(name)
+                        files[name] = new Uint8Array(buf)
                       }
-                      if (!buf) return
-                      let name = getDownloadName(it)
-                      // Deduplicate filenames
-                      if (seen.has(name)) {
-                        const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '.mp4'
-                        const base = name.slice(0, name.lastIndexOf('.') || name.length)
-                        let n = 2
-                        while (seen.has(`${base}_${n}${ext}`)) n++
-                        name = `${base}_${n}${ext}`
-                      }
-                      seen.add(name)
-                      files[name] = new Uint8Array(buf)
-                    }))
-                    if (!Object.keys(files).length) return
+                    }
+                    try {
+                      await Promise.all([worker(), worker(), worker()])
+                    } finally {
+                      setZipProgress(null)
+                    }
+                    if (!Object.keys(files).length) {
+                      toast.show({ title: 'Téléchargement impossible', body: 'Aucune vidéo n\u2019a pu être récupérée.', kind: 'error' })
+                      return
+                    }
+                    if (failed > 0) toast.show({ title: 'ZIP incomplet', body: `${failed} vidéo${failed > 1 ? 's' : ''} n\u2019a pas pu être incluse dans le ZIP.`, kind: 'warn' })
                     const zipped = zipSync(files, { level: 0 })
                     const blob = new Blob([zipped], { type: 'application/zip' })
                     const url = URL.createObjectURL(blob)
@@ -1063,14 +1129,17 @@ export function Bank({ user }: BankProps) {
                   }
                 }}
                 className="sf-btn sf-btn-sm cursor-pointer flex items-center gap-1.5"
-                style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}
+                style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)', opacity: zipProgress ? 0.7 : 1 }}
+                disabled={!!zipProgress}
               >
-                <IconDownload size={11} />
-                {selectedIds.size > 5 ? `ZIP (${selectedIds.size})` : `Télécharger (${selectedIds.size})`}
+                {zipProgress ? <span className="sf-spinner" /> : <IconDownload size={11} />}
+                {zipProgress
+                  ? `ZIP ${zipProgress.done}/${zipProgress.total}…`
+                  : selectedIds.size > 5 ? `ZIP (${selectedIds.size})` : `Télécharger (${selectedIds.size})`}
               </button>
 
               <button
-                onClick={deleteSelected}
+                onClick={() => setConfirmBulkDelete(true)}
                 className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer flex items-center gap-1.5"
               >
                 <IconTrash size={11} />
@@ -1139,20 +1208,28 @@ export function Bank({ user }: BankProps) {
               <div className="flex justify-center py-20"><Spinner size="lg" /></div>
 
             ) : items.length === 0 ? (
-              /* Empty state — no items at all */
-              <div className="sf-empty py-24">
-                <div className="sf-empty-icon sf-anim-scale-spring">
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                  </svg>
+              /* Empty state — upload CTA centered */
+              <div className="flex flex-col items-center justify-center py-24 gap-6">
+                <div
+                  className="w-24 h-24 rounded-3xl flex items-center justify-center sf-anim-scale-spring"
+                  style={{
+                    background: 'rgba(99,102,241,0.08)',
+                    border: '2px dashed rgba(99,102,241,0.3)',
+                    color: 'var(--accent)',
+                    boxShadow: '0 0 40px -10px rgba(99,102,241,0.3)',
+                  }}
+                >
+                  <IconUpload size={36} />
                 </div>
-                <p className="sf-empty-title">{t('bankEmptyTitle')}</p>
-                <p className="sf-empty-desc">{t('bankEmptyDesc')}</p>
+                <div className="text-center max-w-sm">
+                  <p className="text-[17px] font-bold text-text">{t('bankEmptyTitle')}</p>
+                  <p className="text-[13px] text-text2 mt-1.5 leading-relaxed">{t('bankEmptyDesc')}</p>
+                </div>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="sf-btn sf-btn-primary mt-4 cursor-pointer"
+                  className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
                 >
-                  <IconPlus size={13} />
+                  <IconPlus size={14} />
                   {t('bankAddMediaBtn')}
                 </button>
               </div>
@@ -1169,22 +1246,35 @@ export function Bank({ user }: BankProps) {
 
             ) : viewMode === 'grid' ? (
               /* ── Grid view ── */
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-                {visible.map(item => (
-                  <VideoCard
-                    key={item.id}
-                    item={item}
-                    onContextMenu={openCtx}
-                    onPlay={setPlayingItem}
-                    selectionMode={selectionMode}
-                    isSelected={selectedIds.has(item.id)}
-                    onToggleSelect={() => toggleSelection(item.id)}
-                  />
-                ))}
+              <div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 anim-stagger">
+                  {visiblePage.map(item => (
+                    <VideoCard
+                      key={item.id}
+                      item={item}
+                      onContextMenu={openCtx}
+                      onPlay={setPlayingItem}
+                      selectionMode={selectionMode}
+                      isSelected={selectedIds.has(item.id)}
+                      onToggleSelect={() => toggleSelection(item.id)}
+                    />
+                  ))}
+                </div>
+                {visibleCount < visible.length && (
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                      className="sf-btn sf-btn-secondary cursor-pointer"
+                    >
+                      Voir plus ({visible.length - visibleCount} restants)
+                    </button>
+                  </div>
+                )}
               </div>
 
             ) : (
               /* ── List view ── */
+              <div>
               <div className="sf-card overflow-hidden">
                 {/* List header */}
                 <div
@@ -1197,7 +1287,7 @@ export function Bank({ user }: BankProps) {
                   <span>{t('bankColTags')}</span>
                   <span />
                 </div>
-                {visible.map((item, idx) => (
+                {visiblePage.map((item, idx) => (
                   <div
                     key={item.id}
                     className="grid gap-3 px-4 py-2.5 items-center group cursor-default transition-colors"
@@ -1253,6 +1343,17 @@ export function Bank({ user }: BankProps) {
                     </button>
                   </div>
                 ))}
+              </div>
+              {visibleCount < visible.length && (
+                <div className="flex justify-center mt-4">
+                  <button
+                    onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                    className="sf-btn sf-btn-secondary cursor-pointer"
+                  >
+                    Voir plus ({visible.length - visibleCount} restants)
+                  </button>
+                </div>
+              )}
               </div>
             )}
           </div>
@@ -1314,7 +1415,7 @@ export function Bank({ user }: BankProps) {
           ))}
           <div className="h-px bg-border mx-2 my-1" />
           <button
-            onClick={() => deleteItem(ctxMenu.item.id)}
+            onClick={() => { setConfirmDeleteItem(ctxMenu.item); setCtxMenu(null) }}
             className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors cursor-pointer text-danger hover:bg-danger/10"
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -1433,7 +1534,7 @@ export function Bank({ user }: BankProps) {
       {showAddModal && (
         <AddMediaModal
           onFiles={async files => { for (const f of files) await addFromFile(f) }}
-          onElectronPick={window.electronAPI?.pickVideoFile ? pickFile : undefined}
+          onElectronPick={(window.electronAPI?.pickAnyFile || window.electronAPI?.pickVideoFile) ? pickFile : undefined}
           onClose={() => setShowAddModal(false)}
         />
       )}
@@ -1446,6 +1547,30 @@ export function Bank({ user }: BankProps) {
       {tagsItem && (
         <TagsModal item={tagsItem} onSave={saveTagsSave} onClose={() => setTagsItem(null)} />
       )}
+
+      {/* ── ConfirmDialog — single item delete ── */}
+      <ConfirmDialog
+        open={!!confirmDeleteItem}
+        title={t('bankCtxDelete')}
+        message={confirmDeleteItem ? `« ${confirmDeleteItem.title} » sera définitivement supprimé.` : ''}
+        confirmLabel={t('bankCtxDelete')}
+        danger
+        busy={deleteBusy}
+        onConfirm={() => { if (confirmDeleteItem) performDeleteItem(confirmDeleteItem) }}
+        onCancel={() => setConfirmDeleteItem(null)}
+      />
+
+      {/* ── ConfirmDialog — bulk delete ── */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title={`${t('bankDeleteSelected')} (${selectedIds.size})`}
+        message={`${selectedIds.size} éléments seront définitivement supprimés.`}
+        confirmLabel={t('bankDeleteSelected')}
+        danger
+        busy={deleteBusy}
+        onConfirm={performDeleteSelected}
+        onCancel={() => setConfirmBulkDelete(false)}
+      />
     </div>
   )
 
@@ -1574,15 +1699,16 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 }) {
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [failed,    setFailed]    = useState(false)
-  const [loading,   setLoading]   = useState(true)
-  const [thumbUrl,  setThumbUrl]  = useState<string | null>(null)
-  const [videoSrc,  setVideoSrc]  = useState<string | null>(null)
-  const [retryKey,  setRetryKey]  = useState(0)
+  const [failed,      setFailed]      = useState(false)
+  const [loading,     setLoading]     = useState(true)
+  const [thumbUrl,    setThumbUrl]    = useState<string | null>(null)
+  const [videoSrc,    setVideoSrc]    = useState<string | null>(null)
+  const [retryKey,    setRetryKey]    = useState(0)
+  const [tryAsImage,  setTryAsImage]  = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    setThumbUrl(null); setVideoSrc(null); setFailed(false); setLoading(true)
+    setThumbUrl(null); setVideoSrc(null); setFailed(false); setLoading(true); setTryAsImage(false)
     if (thumbnailPath) {
       getSignedUrl(thumbnailPath).then(u => {
         if (cancelled) return
@@ -1603,9 +1729,11 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
     return () => { cancelled = true }
   }, [thumbnailPath, storagePath, retryKey])
 
-  // Retry once on load error (URL may have expired mid-session)
+  // Retry once on URL expiry; then try rendering as <img> (handles PNG stored with .mp4 ext);
+  // only give up after both retries fail.
   const handleError = () => {
     if (retryKey === 0) setRetryKey(1)
+    else if (!tryAsImage) setTryAsImage(true)
     else setFailed(true)
   }
 
@@ -1629,11 +1757,12 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   // 2. Cloud asset (image or video)
   if (storagePath) {
     if (loading || !videoSrc) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-text2/40 animate-pulse"><IconClapperboard size={36} /></div>
-    if (isImagePath(storagePath)) {
+    // isImagePath covers normal uploads; tryAsImage covers PNG stored with wrong extension
+    if (isImagePath(storagePath) || tryAsImage) {
       return (
         <img src={videoSrc} alt=""
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          onError={handleError} />
+          onError={tryAsImage ? () => setFailed(true) : handleError} />
       )
     }
     return (
@@ -1678,9 +1807,10 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () => void }) {
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [cloudUrl, setCloudUrl] = useState<string | null>(null)
-  const [urlError, setUrlError] = useState(false)
-  const [retryKey, setRetryKey] = useState(0)
+  const [cloudUrl,    setCloudUrl]    = useState<string | null>(null)
+  const [urlError,    setUrlError]    = useState(false)
+  const [retryKey,    setRetryKey]    = useState(0)
+  const [tryAsImage,  setTryAsImage]  = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -1696,6 +1826,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
 
   const handleVideoError = () => {
     if (retryKey === 0) { setCloudUrl(null); setRetryKey(1) }
+    else if (!tryAsImage) setTryAsImage(true)
     else setUrlError(true)
   }
 
@@ -1760,8 +1891,16 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
           </div>
         )}
 
-        {/* Video fills the container */}
-        {localUrl && (
+        {/* Image or video fills the container */}
+        {localUrl && ((isImagePath(item.storage_path ?? item.file_url) || tryAsImage) ? (
+          <img
+            key={localUrl + '-img'}
+            src={localUrl}
+            alt={item.title}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            onError={() => setUrlError(true)}
+          />
+        ) : (
           <video
             key={localUrl}
             ref={videoRef}
@@ -1771,14 +1910,14 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
             onError={handleVideoError}
           />
-        )}
+        ))}
       </div>
     </div>
   )
 }
 
 // ── Video card ───────────────────────────────────────────────────────────────
-function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onToggleSelect }: {
+const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onToggleSelect }: {
   item: ContentItem
   onContextMenu: (e: React.MouseEvent, item: ContentItem) => void
   onPlay: (item: ContentItem) => void
@@ -1904,7 +2043,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
       )}
     </div>
   )
-}
+})
 
 // ── BankPicker (modal for Posting/MassPosting) ───────────────────────────────
 export interface BankPickerProps {

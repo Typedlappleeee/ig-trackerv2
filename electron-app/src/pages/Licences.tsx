@@ -3,6 +3,9 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
+import { useLicense } from '@/lib/license'
 import { useT, useLang } from '@/lib/i18n'
 
 interface LicenseKey {
@@ -27,10 +30,19 @@ const DURATIONS = [
   { label: 'À vie',     days: null },
 ]
 
+// Cryptographically secure 4-char hex segment (2 random bytes → 4 hex chars)
+function hexSegment(): string {
+  const bytes = new Uint8Array(2)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+
 function generateKey(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-  return `${seg()}-${seg()}-${seg()}-${seg()}`
+  return `${hexSegment()}-${hexSegment()}-${hexSegment()}-${hexSegment()}`
+}
+
+function generateCreditCode(): string {
+  return `CR-${hexSegment()}-${hexSegment()}`
 }
 
 function daysLeft(expiresAt: string | null, lang: string = 'fr'): string {
@@ -60,17 +72,15 @@ interface CreditCode {
   created_at: string
 }
 
-function generateCreditCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-  return `CR-${seg()}-${seg()}`
-}
-
 interface Props { user: User }
+
+type Filter = 'all' | 'active' | 'used' | 'expired' | 'revoked'
 
 export function Licences({ user: _user }: Props) {
   const t = useT()
   const { lang } = useLang()
+  const toast = useToast()
+  const license = useLicense()
   const [keys, setKeys]       = useState<LicenseKey[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -79,8 +89,10 @@ export function Licences({ user: _user }: Props) {
   const [plan, setPlan]       = useState('standard')
   const [notes, setNotes]     = useState('')
   const [search, setSearch]   = useState('')
-  const [filter, setFilter]   = useState<'all' | 'active' | 'used' | 'expired'>('all')
+  const [filter, setFilter]   = useState<Filter>('all')
   const [copied, setCopied]   = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<LicenseKey | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Credit codes
   const [creditCodes, setCreditCodes]   = useState<CreditCode[]>([])
@@ -90,6 +102,8 @@ export function Licences({ user: _user }: Props) {
   const [ccAmount, setCcAmount]         = useState(500)
   const [ccNotes, setCcNotes]           = useState('')
   const [ccCreateErr, setCcCreateErr]   = useState<string | null>(null)
+
+  const isSuperAdmin = license.isSuperAdmin
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -113,7 +127,7 @@ export function Licences({ user: _user }: Props) {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (isSuperAdmin) load() }, [load, isSuperAdmin])
 
   const loadCreditCodes = useCallback(async () => {
     setCcLoading(true)
@@ -125,7 +139,7 @@ export function Licences({ user: _user }: Props) {
     setCcLoading(false)
   }, [])
 
-  useEffect(() => { loadCreditCodes() }, [loadCreditCodes])
+  useEffect(() => { if (isSuperAdmin) loadCreditCodes() }, [loadCreditCodes, isSuperAdmin])
 
   async function createCreditCode() {
     setCcCreating(true)
@@ -139,6 +153,7 @@ export function Licences({ user: _user }: Props) {
     setCcCreating(false)
     if (error) {
       setCcCreateErr(error.message)
+      toast.show({ title: lang === 'en' ? 'Code creation failed' : 'Création du code échouée', body: error.message, kind: 'error' })
     } else {
       setCcGenCode(generateCreditCode())
       setCcNotes('')
@@ -147,7 +162,11 @@ export function Licences({ user: _user }: Props) {
   }
 
   async function revokeCreditCode(id: string) {
-    await supabase.from('credit_codes').update({ is_active: false }).eq('id', id)
+    const { error } = await supabase.from('credit_codes').update({ is_active: false }).eq('id', id)
+    if (error) {
+      toast.show({ title: lang === 'en' ? 'Revoke failed' : 'Révocation échouée', body: error.message, kind: 'error' })
+      return
+    }
     loadCreditCodes()
   }
 
@@ -163,7 +182,9 @@ export function Licences({ user: _user }: Props) {
       notes: notes || null,
     })
     setCreating(false)
-    if (!error) {
+    if (error) {
+      toast.show({ title: lang === 'en' ? 'Key creation failed' : 'Création de la clé échouée', body: error.message, kind: 'error' })
+    } else {
       setGenKey(generateKey())
       setNotes('')
       load()
@@ -171,12 +192,24 @@ export function Licences({ user: _user }: Props) {
   }
 
   async function revokeKey(id: string) {
-    await supabase.from('license_keys').update({ is_active: false }).eq('id', id)
+    const { error } = await supabase.from('license_keys').update({ is_active: false }).eq('id', id)
+    if (error) {
+      toast.show({ title: lang === 'en' ? 'Revoke failed' : 'Révocation échouée', body: error.message, kind: 'error' })
+      return
+    }
     load()
   }
 
-  async function deleteKey(id: string) {
-    await supabase.from('license_keys').delete().eq('id', id)
+  async function confirmDeleteKey() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    const { error } = await supabase.from('license_keys').delete().eq('id', deleteTarget.id)
+    setDeleting(false)
+    setDeleteTarget(null)
+    if (error) {
+      toast.show({ title: lang === 'en' ? 'Delete failed' : 'Suppression échouée', body: error.message, kind: 'error' })
+      return
+    }
     load()
   }
 
@@ -186,6 +219,11 @@ export function Licences({ user: _user }: Props) {
     setTimeout(() => setCopied(null), 1500)
   }
 
+  // Super-admin guard — this page is admin-only
+  if (!isSuperAdmin) return null
+
+  const isExpired = (k: LicenseKey) => !!k.expires_at && new Date(k.expires_at) < new Date()
+
   const filtered = keys.filter(k => {
     const q = search.toLowerCase()
     const matchSearch = !q || k.key.toLowerCase().includes(q) || (k.user_email ?? '').toLowerCase().includes(q)
@@ -193,7 +231,8 @@ export function Licences({ user: _user }: Props) {
       filter === 'all'     ? true :
       filter === 'active'  ? k.is_active && !k.user_id :
       filter === 'used'    ? k.is_active && !!k.user_id :
-      (!!k.expires_at && new Date(k.expires_at) < new Date()) || !k.is_active
+      filter === 'expired' ? isExpired(k) :
+      /* revoked */          !k.is_active
     return matchSearch && matchFilter
   })
 
@@ -201,26 +240,33 @@ export function Licences({ user: _user }: Props) {
     total:   keys.length,
     active:  keys.filter(k => k.is_active && !k.user_id).length,
     used:    keys.filter(k => k.is_active && !!k.user_id).length,
-    expired: keys.filter(k => !!k.expires_at && new Date(k.expires_at) < new Date()).length,
+    expired: keys.filter(isExpired).length,
   }
 
+  const ccAmountValid = Number.isInteger(ccAmount) && ccAmount >= 1
+
   return (
-    <div className="h-full flex flex-col overflow-y-auto anim-page">
+    <div className="sf-page anim-page">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d100"
-            style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 0 18px -6px rgba(139,92,246,0.45)' }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <div className="sf-page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+          <div className="sf-anim-scale-spring" style={{
+            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.28)',
+            color: '#6366F1',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
             </svg>
           </div>
-          <div>
-            <h1 className="text-[20px] font-black text-text leading-none">
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
               Admin — {t('licencesTitle')}
             </h1>
-            <p className="text-[13px] text-text2 mt-0.5">{t('licencesSub')}</p>
+            <p className="sf-page-sub">{t('licencesSub')}</p>
           </div>
         </div>
       </div>
@@ -229,11 +275,11 @@ export function Licences({ user: _user }: Props) {
       <div className="flex-1 px-8 pb-10">
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mt-6 anim-stagger">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 anim-stagger">
           {[
             { label: t('totalKeys'),     value: stats.total,   color: 'text-text',   icon: <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/> },
             { label: t('availableKeys'), value: stats.active,  color: 'text-ok',     icon: <><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></> },
-            { label: 'Used',             value: stats.used,    color: 'text-accent',  icon: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
+            { label: lang === 'en' ? 'Used' : 'Utilisées', value: stats.used, color: 'text-accent',  icon: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
             { label: t('expiredKeys'),   value: stats.expired, color: 'text-danger',  icon: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></> },
           ].map(s => (
             <div key={s.label} className="sf-card p-5 text-center">
@@ -251,14 +297,14 @@ export function Licences({ user: _user }: Props) {
         {/* Create key */}
         <div className="sf-card p-6 space-y-5 mt-6 sf-anim-slide-up sf-d150">
           <div className="flex items-center gap-2 mb-1">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14"/>
             </svg>
             <p className="text-[15px] font-bold text-text">{t('createKey')}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">Key generated</label>
+              <label className="text-[12px] text-text2 uppercase tracking-wide">{lang === 'en' ? 'Generated key' : 'Clé générée'}</label>
               <div className="flex gap-2">
                 <input
                   value={genKey}
@@ -268,7 +314,7 @@ export function Licences({ user: _user }: Props) {
                 <button
                   onClick={() => setGenKey(generateKey())}
                   className="sf-btn sf-btn-ghost cursor-pointer px-3"
-                  title="Regenerate"
+                  title={lang === 'en' ? 'Regenerate' : 'Régénérer'}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
@@ -284,7 +330,7 @@ export function Licences({ user: _user }: Props) {
                     key={d.label}
                     onClick={() => setDuration(d.days)}
                     className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
-                    style={duration === d.days ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={duration === d.days ? { background: 'linear-gradient(130deg,#6366F1,#6366F1)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     {d.label}
                   </button>
@@ -299,7 +345,7 @@ export function Licences({ user: _user }: Props) {
                     key={p}
                     onClick={() => setPlan(p)}
                     className={`px-3 py-1.5 rounded-lg text-[13px] font-medium capitalize transition-all cursor-pointer ${plan === p ? 'text-white' : 'text-text2 hover:text-text'}`}
-                    style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={plan === p ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     {p}
                   </button>
@@ -311,7 +357,7 @@ export function Licences({ user: _user }: Props) {
               <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="ex: Discord @pseudo" />
             </div>
           </div>
-          <Button onClick={createKey} disabled={creating} className="w-full">
+          <Button onClick={createKey} disabled={creating || !genKey.trim()} className="w-full">
             {creating ? t('loading') : t('createKeyBtn')}
           </Button>
         </div>
@@ -325,14 +371,18 @@ export function Licences({ user: _user }: Props) {
               placeholder={t('searchKeyOrEmail')}
               className="flex-1 min-w-[200px]"
             />
-            {(['all', 'active', 'used', 'expired'] as const).map(f => (
+            {(['all', 'active', 'used', 'expired', 'revoked'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg text-[13px] font-medium capitalize transition-all cursor-pointer ${filter === f ? 'text-white' : 'text-text2 hover:text-text'}`}
-                style={filter === f ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.4)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={filter === f ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.4)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
               >
-                {f === 'all' ? (lang === 'en' ? 'All' : 'Toutes') : f === 'active' ? t('keyAvailable') : f === 'used' ? t('keyActivated') : t('keyExpired')}
+                {f === 'all' ? (lang === 'en' ? 'All' : 'Toutes')
+                  : f === 'active' ? t('keyAvailable')
+                  : f === 'used' ? t('keyActivated')
+                  : f === 'expired' ? t('keyExpired')
+                  : t('keyRevoked')}
               </button>
             ))}
           </div>
@@ -358,7 +408,7 @@ export function Licences({ user: _user }: Props) {
                   <button
                     onClick={() => copyKey(k.key)}
                     className="font-mono text-[13px] text-text tracking-widest hover:text-accent transition-colors flex items-center gap-1.5 cursor-pointer"
-                    title="Copier"
+                    title={lang === 'en' ? 'Copy' : 'Copier'}
                   >
                     {k.key}
                     {copied === k.key ? (
@@ -408,7 +458,7 @@ export function Licences({ user: _user }: Props) {
                       </button>
                     )}
                     <button
-                      onClick={() => deleteKey(k.id)}
+                      onClick={() => setDeleteTarget(k)}
                       className="sf-btn sf-btn-ghost text-[12px] px-3 py-1.5 text-danger hover:bg-danger/10 cursor-pointer"
                     >
                       {t('delete')}
@@ -424,21 +474,21 @@ export function Licences({ user: _user }: Props) {
         <div className="mt-10 space-y-5 sf-reveal">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.1))', border: '1px solid rgba(139,92,246,0.2)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(6,182,212,0.1))', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>
               </svg>
             </div>
             <div>
-              <h2 className="text-[18px] font-black text-text leading-none">Credit codes</h2>
-              <p className="text-[13px] text-text2 mt-0.5">Generate codes that users can redeem for credits</p>
+              <h2 className="text-[18px] font-black text-text leading-none">{lang === 'en' ? 'Credit codes' : 'Codes de crédits'}</h2>
+              <p className="text-[13px] text-text2 mt-0.5">{lang === 'en' ? 'Generate codes that users can redeem for credits' : 'Génère des codes que les utilisateurs peuvent échanger contre des crédits'}</p>
             </div>
           </div>
 
           {/* Create form */}
           <div className="sf-card p-6 space-y-5">
             <p className="text-[15px] font-bold text-text mb-1">{lang === 'en' ? 'New code' : 'Nouveau code'}</p>
-            <div className="grid grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="space-y-2">
                 <p className="text-[12px] text-text2 uppercase tracking-wider">Code</p>
                 <Input value={ccGenCode} onChange={e => setCcGenCode(e.target.value.toUpperCase())}
@@ -448,22 +498,25 @@ export function Licences({ user: _user }: Props) {
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
                   </svg>
-                  Regenerate
+                  {lang === 'en' ? 'Regenerate' : 'Régénérer'}
                 </button>
               </div>
               <div className="space-y-2">
-                <p className="text-[12px] text-text2 uppercase tracking-wider">Amount (credits)</p>
+                <p className="text-[12px] text-text2 uppercase tracking-wider">{lang === 'en' ? 'Amount (credits)' : 'Montant (crédits)'}</p>
                 <Input type="number" value={ccAmount} onChange={e => setCcAmount(Number(e.target.value))}
-                  min={1} className="text-[13px]" />
+                  min={1} step={1} className="text-[13px]" />
+                {!ccAmountValid && (
+                  <p className="text-[12px] text-danger">{lang === 'en' ? 'Enter a whole number ≥ 1.' : 'Saisis un nombre entier ≥ 1.'}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <p className="text-[12px] text-text2 uppercase tracking-wider">{lang === 'en' ? 'Notes' : 'Notes'}</p>
+                <p className="text-[12px] text-text2 uppercase tracking-wider">Notes</p>
                 <Input value={ccNotes} onChange={e => setCcNotes(e.target.value)}
                   placeholder={lang === 'en' ? 'Optional…' : 'Optionnel…'} className="text-[13px]" />
               </div>
             </div>
-            <Button onClick={createCreditCode} disabled={ccCreating || !ccGenCode.trim() || ccAmount < 1}>
-              {ccCreating ? t('loading') : '+ Create code'}
+            <Button onClick={createCreditCode} disabled={ccCreating || !ccGenCode.trim() || !ccAmountValid}>
+              {ccCreating ? t('loading') : (lang === 'en' ? '+ Create code' : '+ Créer le code')}
             </Button>
             {ccCreateErr && (
               <p className="text-[13px] text-danger mt-2">{t('error')} : {ccCreateErr}</p>
@@ -482,20 +535,20 @@ export function Licences({ user: _user }: Props) {
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>
                 </svg>
-                <p>No codes created.</p>
+                <p>{lang === 'en' ? 'No codes created.' : 'Aucun code créé.'}</p>
               </div>
             ) : (
               <div className="divide-y divide-border">
                 {creditCodes.map(c => (
                   <div key={c.id} className="flex items-center gap-3 px-5 py-3.5">
                     <code className="flex-1 font-mono text-[13px] text-text">{c.code}</code>
-                    <span className="text-[13px] font-bold text-accent">+{c.amount} credits</span>
+                    <span className="text-[13px] font-bold text-accent">+{c.amount} {lang === 'en' ? 'credits' : 'crédits'}</span>
                     {c.used_by ? (
-                      <span className="sf-badge sf-badge-muted">Used</span>
+                      <span className="sf-badge sf-badge-muted">{lang === 'en' ? 'Used' : 'Utilisé'}</span>
                     ) : c.is_active ? (
                       <span className="sf-badge sf-badge-ok">{t('keyAvailable')}</span>
                     ) : (
-                      <span className="sf-badge sf-badge-danger">Revoked</span>
+                      <span className="sf-badge sf-badge-danger">{t('keyRevoked')}</span>
                     )}
                     {c.notes && <span className="text-[12px] text-text2 italic">{c.notes}</span>}
                     <button
@@ -524,6 +577,21 @@ export function Licences({ user: _user }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={lang === 'en' ? 'Delete this license key?' : 'Supprimer cette clé de licence ?'}
+        message={deleteTarget ? (lang === 'en'
+          ? `"${deleteTarget.key}" will be permanently deleted. This cannot be undone.`
+          : `« ${deleteTarget.key} » sera définitivement supprimée. Cette action est irréversible.`) : undefined}
+        confirmLabel={t('delete')}
+        cancelLabel={t('cancel')}
+        danger
+        busy={deleting}
+        onConfirm={confirmDeleteKey}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

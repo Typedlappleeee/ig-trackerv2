@@ -163,11 +163,11 @@ function VideoSourcePanel({
       </div>
 
       {loading && (
-        <div className="flex items-center gap-2 px-3.5 py-1.5 flex-shrink-0" style={{ background: 'rgba(167,139,250,0.05)' }}>
-          <svg className="sf-spinner" style={{ width: 11, height: 11, color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
+        <div className="flex items-center gap-2 px-3.5 py-1.5 flex-shrink-0" style={{ background: 'rgba(129,140,248,0.05)' }}>
+          <svg className="sf-spinner" style={{ width: 11, height: 11, color: '#818CF8' }} viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
           </svg>
-          <span className="text-[10px] font-semibold" style={{ color: '#a78bfa' }}>{t('massRemixLoadingSource')}</span>
+          <span className="text-[10px] font-semibold" style={{ color: '#818CF8' }}>{t('massRemixLoadingSource')}</span>
         </div>
       )}
 
@@ -206,14 +206,14 @@ function VideoSourcePanel({
         </button>
         <button onClick={onAddFolder}
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors"
-          style={{ background: 'rgba(167,139,250,0.08)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.15)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.08)')}>
+          style={{ background: 'rgba(129,140,248,0.08)', color: '#818CF8', border: '1px solid rgba(129,140,248,0.2)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(129,140,248,0.15)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(129,140,248,0.08)')}>
           <IconFolder size={12} /> {t('massRemixFolderSource')}
         </button>
         <button onClick={onAddPC}
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors"
-          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.45)', border: '1px solid rgba(255,255,255,0.07)' }}
+          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.45)', border: '1px solid rgba(255,255,255,0.07)' }}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}>
           <IconHardDrive size={12} /> {t('massRemixPCSource')}
@@ -865,10 +865,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           style={{ background: 'rgba(3,1,8,0.97)', backdropFilter: 'blur(14px)' }}>
           {/* Header */}
           <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border"
-            style={{ background: 'linear-gradient(90deg,rgba(124,58,237,0.08),transparent)' }}>
+            style={{ background: 'linear-gradient(90deg,rgba(99,102,241,0.08),transparent)' }}>
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
-                style={{ background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.3)' }}>
+                style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.3)' }}>
                 <IconClapperboard size={18} style={{ color: '#c084fc' }} />
               </div>
               <div>
@@ -886,7 +886,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <button
                 onClick={() => { setPreviewOpen(false); launch(plannedPairs) }}
                 className="sf-btn sf-btn-primary cursor-pointer"
-                style={{ boxShadow: '0 4px 16px rgba(124,58,237,0.4)' }}>
+                style={{ boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
                 <IconZap size={13} /> {t('massRemixLaunchBtn')} {plannedPairs.length} remix
               </button>
             </div>
@@ -901,14 +901,14 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   onClick={() => { setSelectedPairId(pair.id); setVidCurrentTime(0); setVidDuration(0) }}
                   className="w-full text-left px-4 py-3 flex items-start gap-3 transition-colors hover:bg-surface cursor-pointer"
                   style={{
-                    borderBottom: '1px solid rgba(139,92,246,0.07)',
+                    borderBottom: '1px solid rgba(99,102,241,0.07)',
                     borderLeft: selectedPairId === pair.id ? '3px solid var(--accent)' : '3px solid transparent',
-                    background: selectedPairId === pair.id ? 'rgba(139,92,246,0.1)' : 'transparent',
+                    background: selectedPairId === pair.id ? 'rgba(99,102,241,0.1)' : 'transparent',
                   }}>
                   <span className="text-[11px] font-black pt-0.5 flex-shrink-0 text-accent opacity-60">#{pair.id + 1}</span>
                   <div className="flex-1 min-w-0 space-y-0.5">
                     <p className="text-[11px] font-mono truncate text-text">{fileName(pair.originalPath)}</p>
-                    <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(236,72,153,0.7)' }}>{fileName(pair.secondaryPath)}</p>
+                    <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(99,102,241,0.7)' }}>{fileName(pair.secondaryPath)}</p>
                     {pair.cutSec != null
                       ? <p className="text-[10px] font-semibold text-warn">{pair.cutSec.toFixed(1)}s</p>
                       : <p className="text-[10px] text-text3">{splitMode === 'manual' ? `${manualSplitSec}s (global)` : 'auto'}</p>
@@ -967,12 +967,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.max(0, v.currentTime - 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Frame back">
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Image précédente">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" strokeWidth="2"/></svg>
                       </button>
                       {/* Play/pause */}
                       <button onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
-                        className="sf-btn sf-btn-secondary cursor-pointer" style={{ width: 36, height: 36, padding: 0 }} aria-label="Play/pause">
+                        className="sf-btn sf-btn-secondary cursor-pointer" style={{ width: 36, height: 36, padding: 0 }} aria-label="Lecture/pause">
                         {isPlaying
                           ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                           : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -983,7 +983,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.min(vidDuration, v.currentTime + 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Frame forward">
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Image suivante">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" strokeWidth="2"/></svg>
                       </button>
 
@@ -993,7 +993,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                           <button key={r} onClick={() => { setPlaybackRate(r); if (vidRef.current) vidRef.current.playbackRate = r }}
                             className="sf-btn sf-btn-sm cursor-pointer"
                             style={playbackRate === r
-                              ? { background: 'rgba(139,92,246,0.25)', border: '1px solid rgba(139,92,246,0.5)', color: 'var(--accent-glow)' }
+                              ? { background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', color: 'var(--accent-glow)' }
                               : { background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)' }}>
                             {r === 1 ? '1×' : `${r}×`}
                           </button>
@@ -1025,7 +1025,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                                   vidRef.current?.pause()
                                 }}
                                 className="sf-btn sf-btn-sm cursor-pointer"
-                                style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.4)', color: 'var(--accent-glow)' }}>
+                                style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-glow)' }}>
                                 {lang === 'en' ? 'Apply to all' : 'Appliquer à tout'}
                               </button>
                             )}
@@ -1050,13 +1050,13 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         </p>
                         <div className="flex gap-2 items-stretch">
                           {/* Phase 1 — secondary */}
-                          <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '2px solid rgba(236,72,153,0.45)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 180 }}>
+                          <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '2px solid rgba(99,102,241,0.45)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 180 }}>
                             {beforeFrameUrl
                               ? <img src={beforeFrameUrl} alt="phase1" className="w-full h-full object-contain" />
                               : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>{t('massRemixLoadingFrame')}</div>}
                             <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
-                              <p style={{ fontSize: 8, fontWeight: 800, color: '#ec4899', letterSpacing: '0.08em' }}>PHASE 1 — SECONDAIRE</p>
-                              <p style={{ fontSize: 7, color: 'rgba(236,72,153,0.7)', fontFamily: 'monospace' }}>up to {selectedPair.cutSec.toFixed(3)}s</p>
+                              <p style={{ fontSize: 8, fontWeight: 800, color: '#6366F1', letterSpacing: '0.08em' }}>PHASE 1 — SECONDAIRE</p>
+                              <p style={{ fontSize: 7, color: 'rgba(99,102,241,0.7)', fontFamily: 'monospace' }}>up to {selectedPair.cutSec.toFixed(3)}s</p>
                             </div>
                           </div>
 
@@ -1070,13 +1070,13 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                           </div>
 
                           {/* Phase 2 — original */}
-                          <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '2px solid rgba(139,92,246,0.45)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 180 }}>
+                          <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '2px solid rgba(99,102,241,0.45)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 180 }}>
                             {afterFrameUrl
                               ? <img src={afterFrameUrl} alt="phase2" className="w-full h-full object-contain" />
                               : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>{t('massRemixLoadingFrame')}</div>}
                             <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
-                              <p style={{ fontSize: 8, fontWeight: 800, color: '#a78bfa', letterSpacing: '0.08em' }}>PHASE 2 — ORIGINALE</p>
-                              <p style={{ fontSize: 7, color: 'rgba(167,139,250,0.7)', fontFamily: 'monospace' }}>resumes at {selectedPair.cutSec.toFixed(3)}s</p>
+                              <p style={{ fontSize: 8, fontWeight: 800, color: '#818CF8', letterSpacing: '0.08em' }}>PHASE 2 — ORIGINALE</p>
+                              <p style={{ fontSize: 7, color: 'rgba(129,140,248,0.7)', fontFamily: 'monospace' }}>resumes at {selectedPair.cutSec.toFixed(3)}s</p>
                             </div>
                           </div>
                         </div>
@@ -1090,7 +1090,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       style={{
                         height: 48,
                         background: 'rgba(12,8,28,0.8)',
-                        border: '1px solid rgba(139,92,246,0.25)',
+                        border: '1px solid rgba(99,102,241,0.25)',
                         borderRadius: 10,
                         cursor: vidDuration > 0 ? 'crosshair' : 'default',
                       }}
@@ -1119,16 +1119,16 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                       {vidDuration > 0 && (<>
                         <div className="absolute top-0 bottom-0 left-0 rounded-xl pointer-events-none"
-                          style={{ width: `${(vidCurrentTime / vidDuration) * 100}%`, background: 'rgba(139,92,246,0.18)', borderRadius: 9 }} />
+                          style={{ width: `${(vidCurrentTime / vidDuration) * 100}%`, background: 'rgba(99,102,241,0.18)', borderRadius: 9 }} />
                         {Array.from({ length: 9 }, (_, i) => i + 1).map(i => (
                           <div key={i} className="absolute top-2 bottom-2 w-px pointer-events-none"
                             style={{ left: `${(i / 10) * 100}%`, background: 'rgba(255,255,255,0.06)' }} />
                         ))}
                         {/* Playhead */}
                         <div className="absolute top-0 bottom-0 pointer-events-none"
-                          style={{ left: `${(vidCurrentTime / vidDuration) * 100}%`, width: 2, background: 'rgba(167,139,250,0.8)', borderRadius: 2 }}>
+                          style={{ left: `${(vidCurrentTime / vidDuration) * 100}%`, width: 2, background: 'rgba(129,140,248,0.8)', borderRadius: 2 }}>
                           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full"
-                            style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.9)' }} />
+                            style={{ background: '#818CF8', boxShadow: '0 0 6px rgba(129,140,248,0.9)' }} />
                         </div>
                         {/* Hover */}
                         {hoverTime != null && (
@@ -1219,7 +1219,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                             {/* Playhead in zoom */}
                             {vidCurrentTime >= lo && vidCurrentTime <= hi && (
                               <div className="absolute top-0 bottom-0 w-0.5 pointer-events-none"
-                                style={{ left: `${toFrac(vidCurrentTime) * 100}%`, background: 'rgba(167,139,250,0.9)' }} />
+                                style={{ left: `${toFrac(vidCurrentTime) * 100}%`, background: 'rgba(129,140,248,0.9)' }} />
                             )}
 
                             {/* Hover in zoom */}
@@ -1256,7 +1256,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   </div>
                 </>
               ) : (
-                <div className="text-center space-y-3 opacity-40 flex flex-col items-center" style={{ color: 'rgba(196,181,253,0.6)' }}>
+                <div className="text-center space-y-3 opacity-40 flex flex-col items-center" style={{ color: 'rgba(233,234,240,0.6)' }}>
                   <IconClapperboard size={60} />
                   <p className="text-[14px]">{t('massRemixSelectPreview')}</p>
                 </div>
@@ -1271,16 +1271,16 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
           style={{ background: 'rgba(3,1,8,0.92)', backdropFilter: 'blur(10px)' }}>
           <div className="anim-scale-in w-full max-w-md rounded-2xl overflow-hidden sf-card"
-            style={{ boxShadow: '0 0 60px rgba(124,58,237,0.22)', borderColor: 'rgba(139,92,246,0.3)' }}>
+            style={{ boxShadow: '0 0 60px rgba(99,102,241,0.22)', borderColor: 'rgba(99,102,241,0.3)' }}>
             {/* Modal header */}
             <div className="px-5 py-4 border-b border-border"
-              style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.05))' }}>
+              style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.12),rgba(99,102,241,0.05))' }}>
               <div className="flex items-center gap-3">
                 <div className="relative w-9 h-9 flex-shrink-0">
                   <div className="absolute inset-0 rounded-full animate-ping opacity-25"
-                    style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
+                    style={{ background: '#6366F1' }} />
                   <div className="w-9 h-9 rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.35)' }}>
+                    style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.35)' }}>
                     <Spinner size="sm" />
                   </div>
                 </div>
@@ -1312,7 +1312,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 </div>
               </div>
 
-              {/* Job rows */}
+              {/* Job rows with status badges */}
               <div className="flex flex-col gap-1 max-h-52 overflow-auto">
                 {jobs.map(job => (
                   <div key={job.id}
@@ -1324,24 +1324,26 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                           ? 'rgba(239,68,68,0.06)'
                           : job.status === 'pending'
                             ? 'transparent'
-                            : 'rgba(139,92,246,0.07)',
+                            : 'rgba(99,102,241,0.07)',
+                      border: `1px solid ${
+                        job.status === 'done' ? 'rgba(52,211,153,0.12)'
+                        : job.status === 'error' ? 'rgba(239,68,68,0.12)'
+                        : 'transparent'
+                      }`,
                     }}>
-                    <span className="text-[11px] font-black tabular-nums flex-shrink-0 text-text3 w-5 text-center">
+                    <span className="text-[11px] font-black tabular-nums flex-shrink-0 w-5 text-center"
+                      style={{ color: 'rgba(99,102,241,0.5)' }}>
                       #{job.id + 1}
                     </span>
-                    <span className="flex-1 text-[11px] font-mono truncate text-text2">
+                    <span className="flex-1 text-[11px] font-mono truncate" style={{ color: 'var(--ivory)', opacity: 0.7 }}>
                       {fileName(job.originalPath)}
                     </span>
-                    <span className="text-[10px] font-semibold flex-shrink-0"
-                      style={{
-                        color: job.status === 'done'
-                          ? 'var(--ok)'
-                          : job.status === 'error'
-                            ? 'var(--danger)'
-                            : job.status === 'pending'
-                              ? 'rgba(196,181,253,0.3)'
-                              : 'var(--accent)',
-                      }}>
+                    <span className={`sf-badge flex-shrink-0 ${
+                      job.status === 'done' ? 'sf-badge-green'
+                      : job.status === 'error' ? 'sf-badge-red'
+                      : job.status === 'pending' ? ''
+                      : 'sf-badge-violet'
+                    }`} style={{ fontSize: 9, padding: '2px 6px' }}>
                       {STATUS_LABEL[job.status]}
                     </span>
                   </div>
@@ -1431,7 +1433,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                               color: line.startsWith('❌') ? '#f87171'
                                 : line.startsWith('✅') ? '#34d399'
                                   : line.startsWith('⚠️') ? '#fbbf24'
-                                    : 'rgba(196,181,253,0.55)',
+                                    : 'rgba(233,234,240,0.55)',
                             }}>
                             {line}
                           </p>
@@ -1466,7 +1468,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
           onClick={() => setFolderTarget(null)}>
           <div className="anim-scale-in w-80 rounded-2xl overflow-hidden sf-card"
-            style={{ borderColor: 'rgba(139,92,246,0.28)' }}
+            style={{ borderColor: 'rgba(99,102,241,0.28)' }}
             onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="px-4 py-3.5 flex items-center justify-between border-b border-border">
@@ -1510,70 +1512,69 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       {/* ── MAIN PAGE ── */}
       <div className="anim-page flex flex-col overflow-hidden" style={{ height: '100%' }}>
 
-        {/* ── Premium Page Header ── */}
+        {/* ── Page header ── */}
         <div className="flex-shrink-0 flex items-center justify-between border-b border-border"
-          style={{
-            padding: isMobile ? '10px 14px' : '14px 24px',
-            background: 'linear-gradient(90deg,rgba(124,58,237,0.08) 0%,rgba(236,72,153,0.03) 50%,transparent 100%)',
-          }}>
+          style={{ padding: isMobile ? '10px 14px' : '14px 24px' }}>
           {/* Left: icon + title */}
-          <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
+          <div className="flex items-center gap-3.5 min-w-0">
             {!isMobile && (
-              <div className="flex-shrink-0 flex items-center justify-center rounded-xl"
+              <div
+                className="sf-anim-scale-spring"
                 style={{
-                  width: 42, height: 42,
-                  background: 'linear-gradient(135deg,rgba(124,58,237,0.22),rgba(236,72,153,0.10))',
-                  border: '1px solid rgba(124,58,237,0.32)',
-                  boxShadow: '0 0 18px -4px rgba(124,58,237,0.45)',
+                  width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(99,102,241,0.08)',
+                  border: '1px solid rgba(99,102,241,0.28)',
+                  color: '#6366F1',
                 }}>
-                <IconZap size={20} style={{ color: '#c084fc' }} />
+                <IconZap size={22} />
               </div>
             )}
-            <div>
-              <h1 className="font-black leading-none tracking-tight"
-                style={{
-                  fontSize: isMobile ? 16 : 22, margin: 0,
-                  background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.82) 100%)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                }}>
+            <div className="min-w-0 sf-anim-slide-up sf-d50">
+              <h1 className="sf-page-title" style={{ fontSize: isMobile ? 16 : 22, letterSpacing: '-0.03em' }}>
                 {t('massRemixTitle')}
               </h1>
               {!isMobile && (
-                <p className="text-[11px] text-text3 mt-0.5 font-medium">{t('massRemixSub')}</p>
+                <p className="sf-page-sub">{t('massRemixSub')}</p>
               )}
             </div>
           </div>
 
-          {/* Right: stats + actions */}
+          {/* Right: stats + credit cost + actions */}
           <div className="flex items-center gap-2 sf-anim-slide-up sf-d100">
             {/* Live stats badges */}
             {!isMobile && originals.length > 0 && (
-              <span className="sf-badge sf-badge-accent text-[10px] font-bold">
+              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, fontWeight: 700 }}>
                 {originals.length} orig.
               </span>
             )}
             {!isMobile && secondaries.length > 0 && (
-              <span className="sf-badge text-[10px] font-bold"
-                style={{ background: 'rgba(236,72,153,0.12)', color: '#ec4899', border: '1px solid rgba(236,72,153,0.25)' }}>
+              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, fontWeight: 700 }}>
                 {secondaries.length} phase 1
+              </span>
+            )}
+            {/* Credit cost indicator */}
+            {!isMobile && canLaunch && (
+              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                {copies * CREDIT_COSTS.remix} crédit{copies * CREDIT_COSTS.remix > 1 ? 's' : ''}
               </span>
             )}
             {!isMobile && (
               <button onClick={openPreview} disabled={!canLaunch}
-                className="sf-btn sf-btn-ghost text-[12px] cursor-pointer transition-all"
-                style={{ opacity: canLaunch ? 1 : 0.4, cursor: canLaunch ? 'pointer' : 'not-allowed' }}>
+                className="sf-btn sf-btn-ghost cursor-pointer transition-all"
+                style={{ fontSize: 12, opacity: canLaunch ? 1 : 0.4, cursor: canLaunch ? 'pointer' : 'not-allowed' }}>
                 <IconClapperboard size={13} />
                 {t('massRemixPlanBtn')}
               </button>
             )}
             <button
               onClick={() => launch()} disabled={!canLaunch}
-              className="sf-btn sf-btn-primary transition-all"
+              className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer transition-all"
               style={{
-                fontSize: isMobile ? 12 : 13, fontWeight: 800,
+                fontSize: isMobile ? 12 : 13,
                 opacity: canLaunch ? 1 : 0.45,
                 cursor: canLaunch ? 'pointer' : 'not-allowed',
-                boxShadow: canLaunch ? '0 4px 18px rgba(124,58,237,0.4)' : 'none',
               }}>
               <IconZap size={isMobile ? 13 : 14} />
               <span>
@@ -1598,7 +1599,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           <div className="flex-1 min-w-0 min-h-0 flex anim-stagger"
             style={{ flexDirection: isMobile ? 'column' : 'row', gap: 10 }}>
             <VideoSourcePanel
-              title={t('massRemixPanelOriginals')} phase="PHASE 2" accent="#8b5cf6"
+              title={t('massRemixPanelOriginals')} phase="PHASE 2" accent="#6366F1"
               paths={originals} loading={addingTarget === 'orig'}
               onAddBank={() => setShowBankOrig(true)}
               onAddFolder={() => openFolderPick('orig')}
@@ -1606,7 +1607,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
             />
             <VideoSourcePanel
-              title={t('massRemixPanelPhase1')} phase="PHASE 1" accent="#ec4899"
+              title={t('massRemixPanelPhase1')} phase="PHASE 1" accent="#6366F1"
               paths={secondaries} loading={addingTarget === 'sec'}
               onAddBank={() => setShowBankSec(true)}
               onAddFolder={() => openFolderPick('sec')}
@@ -1635,7 +1636,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   onClick={() => setCopies(c => Math.max(1, c - 1))}
                   className="flex-shrink-0 flex items-center justify-center rounded-lg text-[15px] font-black cursor-pointer transition-colors sf-press"
                   style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--accent)', transition: 'background-color 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.12)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.12)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
                   −
                 </button>
@@ -1648,7 +1649,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   onClick={() => setCopies(c => Math.min(200, c + 1))}
                   className="flex-shrink-0 flex items-center justify-center rounded-lg text-[15px] font-black cursor-pointer transition-colors sf-press"
                   style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--accent)', transition: 'background-color 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.12)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.12)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
                   +
                 </button>
@@ -1669,22 +1670,22 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
               className="sf-card sf-card-lift p-3 text-left cursor-pointer transition-all w-full"
               style={{
-                background: aiEnabled ? 'rgba(124,58,237,0.1)' : undefined,
-                borderColor: aiEnabled ? 'rgba(139,92,246,0.4)' : undefined,
-                boxShadow: aiEnabled ? '0 0 16px rgba(124,58,237,0.08)' : 'none',
+                background: aiEnabled ? 'rgba(99,102,241,0.1)' : undefined,
+                borderColor: aiEnabled ? 'rgba(99,102,241,0.4)' : undefined,
+                boxShadow: aiEnabled ? '0 0 16px rgba(99,102,241,0.08)' : 'none',
               }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-lg"
-                    style={{ background: aiEnabled ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.05)' }}>
+                    style={{ background: aiEnabled ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.05)' }}>
                     {/* Sparkle SVG icon */}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={aiEnabled ? '#c084fc' : 'rgba(196,181,253,0.45)'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={aiEnabled ? '#c084fc' : 'rgba(233,234,240,0.45)'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/>
                     </svg>
                   </div>
                   <div>
                     <p className="text-[12px] font-bold leading-tight"
-                      style={{ color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.45)' }}>
+                      style={{ color: aiEnabled ? '#818CF8' : 'rgba(233,234,240,0.45)' }}>
                       {t('massRemixAiLabel')}
                     </p>
                     <p className="text-[9px] text-text3 leading-tight">{t('massRemixAiSub')}</p>
@@ -1692,7 +1693,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 </div>
                 {/* Toggle pill */}
                 <div className="flex-shrink-0 relative rounded-full transition-all duration-200"
-                  style={{ width: 32, height: 18, background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}>
+                  style={{ width: 32, height: 18, background: aiEnabled ? 'linear-gradient(130deg,#6366F1,#6366F1)' : 'rgba(255,255,255,0.1)' }}>
                   <span className="absolute top-0.5 block rounded-full bg-white transition-transform duration-200"
                     style={{ width: 14, height: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transform: `translateX(${aiEnabled ? 16 : 2}px)` }} />
                 </div>
@@ -1710,9 +1711,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             {/* AI manual text */}
             {aiEnabled && (
               <div className="sf-card p-3 flex flex-col gap-2"
-                style={{ borderColor: 'rgba(139,92,246,0.22)' }}>
+                style={{ borderColor: 'rgba(99,102,241,0.22)' }}>
                 <p className="text-[9px] font-bold tracking-widest uppercase"
-                  style={{ color: 'rgba(139,92,246,0.6)' }}>
+                  style={{ color: 'rgba(99,102,241,0.6)' }}>
                   {t('massRemixManualTextLabel')}
                 </p>
                 <textarea
@@ -1737,9 +1738,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
                     style={{
                       border: 'none',
-                      background: splitMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
-                      color: splitMode === m ? '#fff' : 'rgba(196,181,253,0.4)',
-                      boxShadow: splitMode === m ? '0 2px 10px rgba(124,58,237,0.3)' : 'none',
+                      background: splitMode === m ? 'linear-gradient(130deg,#6366F1,#6366F1)' : 'rgba(255,255,255,0.05)',
+                      color: splitMode === m ? '#fff' : 'rgba(233,234,240,0.4)',
+                      boxShadow: splitMode === m ? '0 2px 10px rgba(99,102,241,0.3)' : 'none',
                       outline: splitMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)',
                     }}>
                     {m === 'auto' ? t('massRemixAutoMode') : t('massRemixManualMode')}
@@ -1762,9 +1763,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
                     style={{
                       border: 'none',
-                      background: preset === p ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
-                      color: preset === p ? '#fff' : 'rgba(196,181,253,0.4)',
-                      boxShadow: preset === p ? '0 2px 10px rgba(124,58,237,0.3)' : 'none',
+                      background: preset === p ? 'linear-gradient(130deg,#6366F1,#6366F1)' : 'rgba(255,255,255,0.05)',
+                      color: preset === p ? '#fff' : 'rgba(233,234,240,0.4)',
+                      boxShadow: preset === p ? '0 2px 10px rgba(99,102,241,0.3)' : 'none',
                       outline: preset === p ? 'none' : '1px solid rgba(255,255,255,0.07)',
                     }}>
                     {p}
@@ -1784,9 +1785,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
                     style={{
                       border: 'none',
-                      background: exportMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
-                      color: exportMode === m ? '#fff' : 'rgba(196,181,253,0.4)',
-                      boxShadow: exportMode === m ? '0 2px 10px rgba(124,58,237,0.3)' : 'none',
+                      background: exportMode === m ? 'linear-gradient(130deg,#6366F1,#6366F1)' : 'rgba(255,255,255,0.05)',
+                      color: exportMode === m ? '#fff' : 'rgba(233,234,240,0.4)',
+                      boxShadow: exportMode === m ? '0 2px 10px rgba(99,102,241,0.3)' : 'none',
                       outline: exportMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)',
                     }}>
                     {m === 'bank' ? t('massRemixBankDest') : t('massRemixFolderDest')}
@@ -1801,9 +1802,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       value={bankFolders.includes(bankFolder) ? bankFolder : ''}
                       onChange={e => setBankFolder(e.target.value)}
                       className="sf-input w-full text-[11px] cursor-pointer">
-                      <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>{t('massRemixRootFolder')}</option>
+                      <option value="" style={{ background: '#13141A', color: '#e2d9f3' }}>{t('massRemixRootFolder')}</option>
                       {bankFolders.map(f => (
-                        <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>{f}</option>
+                        <option key={f} value={f} style={{ background: '#13141A', color: '#e2d9f3' }}>{f}</option>
                       ))}
                     </select>
                   )}
@@ -1813,7 +1814,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     value={bankFolder}
                     onChange={e => setBankFolder(e.target.value)}
                     className="sf-input w-full text-[11px]"
-                    style={{ borderColor: bankFolder.trim() ? 'rgba(139,92,246,0.5)' : undefined }} />
+                    style={{ borderColor: bankFolder.trim() ? 'rgba(99,102,241,0.5)' : undefined }} />
                 </div>
               )}
 

@@ -1,6 +1,6 @@
-import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol, Tray, Menu, nativeImage } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync, readdirSync, rmSync, copyFileSync } from 'node:fs'
 import os from 'node:os'
 import { execFile, spawn } from 'node:child_process'
 import https from 'node:https'
@@ -44,6 +44,57 @@ export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 let win: BrowserWindow | null = null
+let tray: Tray | null = null
+let isMassPostingRunning = false
+
+// Resolve tray icon path — falls back gracefully if logo not found
+function getTrayIcon() {
+  const logoPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'logo.png')
+    : path.join(process.env.APP_ROOT!, 'public', 'logo.png')
+  try {
+    const img = nativeImage.createFromPath(logoPath)
+    if (!img.isEmpty()) return img.resize({ width: 16, height: 16 })
+  } catch { /* ignore */ }
+  return nativeImage.createEmpty()
+}
+
+function ensureTray() {
+  if (tray && !tray.isDestroyed()) return
+  tray = new Tray(getTrayIcon())
+  tray.setToolTip('Mass Posting en cours...')
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: 'Afficher l\'application',
+      click: () => { win?.show(); win?.focus() },
+    },
+    { type: 'separator' },
+    {
+      label: 'Arrêter et quitter',
+      click: () => { isMassPostingRunning = false; app.quit() },
+    },
+  ]))
+  tray.on('double-click', () => { win?.show(); win?.focus() })
+}
+
+function destroyTray() {
+  if (tray && !tray.isDestroyed()) tray.destroy()
+  tray = null
+}
+
+ipcMain.on('mass-posting-running', (_event, running: boolean) => {
+  isMassPostingRunning = running
+  if (running) {
+    ensureTray()
+  } else {
+    destroyTray()
+    // Re-show the window if it was hidden so the user can see the results
+    if (win && !win.isDestroyed() && !win.isVisible()) {
+      win.show()
+      win.focus()
+    }
+  }
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom protocol `localvideo://` for serving local video files to <video> tags.
@@ -173,6 +224,29 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
     const json = await callApi(csrf)
     if (json) return { ok: true, apiJson: json }
   }
+
+  // ── Attempt 3.5: API mobile (i.instagram.com) avec UA d'app Android ───────
+  // Souvent accessible sans cookies là où www.instagram.com renvoie 401.
+  // net.fetch (et non session.fetch) pour ne PAS attacher les cookies web.
+  try {
+    const res = await net.fetch(
+      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
+      {
+        headers: {
+          'User-Agent':      'Instagram 269.0.0.18.75 Android (33/13; 420dpi; 1080x2400; samsung; SM-S901B; r0s; exynos2200; fr_FR; 314665256)',
+          'X-IG-App-ID':     IG_APP_ID,
+          'Accept':          '*/*',
+          'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+        },
+      },
+    )
+    console.log(`[IG] mobile API ${username}: ${res.status}`)
+    if (res.ok) {
+      const json = await res.json() as Record<string, unknown>
+      const user = (json?.['data'] as Record<string, unknown> | undefined)?.['user']
+      if (user) return { ok: true, apiJson: json }
+    }
+  } catch (e) { console.log('[IG] mobile API error:', String(e)) }
 
   // ── Attempt 4: hidden browser fallback (handles consent walls) ────────────
   console.log('[IG] All fetch attempts failed — falling back to hidden browser')
@@ -712,6 +786,205 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
     execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: 'SIGKILL' }, (err) => {
       if (err) resolve({ ok: false, error: err.message, command })
       else     resolve({ ok: true, outputPath: opts.outputPath, command })
+    })
+  })
+})
+
+// ── IPC: run FFmpeg CloneVid repurpose (native, multi-variant) ───────────────
+// Uses the bundled native ffmpeg instead of WASM — far faster, handles every
+// codec/container, and always produces an Instagram-postable MP4
+// (H.264 + AAC, yuv420p, +faststart). One decode per variant.
+// `sourcePath` may be a local absolute path OR an http(s) URL (bank signed URL).
+ipcMain.handle('run-ffmpeg-repurpose', async (_event, opts: {
+  sourcePath: string
+  variants:   Array<{ vf: string; crf: number }>
+  format?:    '9:16' | '1:1' | '16:9' | 'keep'
+}) => {
+  const ffmpegBin = getFfmpegBin()
+  const dir = path.join(os.tmpdir(), 'ig-tracker-clonevid')
+  try { mkdirSync(dir, { recursive: true }) } catch { /* ignore */ }
+
+  // Resolve the source to a local file (download it first if it's a remote URL)
+  let srcPath = opts.sourcePath
+  let tempSrc: string | null = null
+  try {
+    if (srcPath.startsWith('http://') || srcPath.startsWith('https://')) {
+      const res = await net.fetch(srcPath)
+      if (!res.ok) return { ok: false, results: [], error: `Téléchargement source échoué: ${res.status}` }
+      const buf = Buffer.from(await res.arrayBuffer())
+      tempSrc = path.join(dir, `src-${Date.now()}.mp4`)
+      writeFileSync(tempSrc, buf)
+      srcPath = tempSrc
+    } else if (srcPath.startsWith('file://')) {
+      srcPath = fileURLToPath(srcPath)
+    }
+  } catch (err) {
+    return { ok: false, results: [], error: err instanceof Error ? err.message : String(err) }
+  }
+
+  if (!existsSync(srcPath)) return { ok: false, results: [], error: 'Fichier source introuvable' }
+
+  // Final scale to Instagram-recommended full-HD dimensions (appended to vf chain).
+  // The variant vf caps at 720p — the native path always outputs at 1080p so GéeLark
+  // and Instagram accept the file without complaints about resolution or bitrate.
+  const finalScale = opts.format === '9:16'  ? ',scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black,setsar=1,scale=trunc(iw/2)*2:trunc(ih/2)*2'
+                   : opts.format === '1:1'   ? ',scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:-1:-1:color=black,setsar=1,scale=trunc(iw/2)*2:trunc(ih/2)*2'
+                   : opts.format === '16:9'  ? ',scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1,scale=trunc(iw/2)*2:trunc(ih/2)*2'
+                   : ''  // 'keep' — don't force a specific resolution
+
+  const results: Array<{ ok: boolean; outputPath?: string; error?: string }> = []
+  for (let i = 0; i < opts.variants.length; i++) {
+    const v   = opts.variants[i]
+    const out = path.join(dir, `clonevid-${Date.now()}-${i}.mp4`)
+    const randomMs = Date.now() - Math.floor(Math.random() * 30 * 24 * 3600 * 1000)
+    const creationTime = new Date(randomMs).toISOString()
+    const args = [
+      '-nostdin', '-fflags', '+genpts', '-i', srcPath,
+      '-map', '0:v:0', '-map', '0:a?',
+      '-map_metadata', '-1',
+      '-map_chapters', '-1',
+      '-vf', v.vf + finalScale,
+      '-r', '30',
+      '-c:v', 'libx264', '-preset', 'fast',   // 'fast' > 'veryfast' — better quality/size
+      '-crf', '20',                             // fixed CRF 20 — 1080p Instagram-safe bitrate
+      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      '-g', '30', '-keyint_min', '15',          // keyframe every 1s — required by Instagram
+      '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+      '-metadata', `creation_time=${creationTime}`,
+      '-movflags', '+faststart',
+      '-y', out,
+    ]
+    const r = await new Promise<{ ok: boolean; outputPath?: string; error?: string }>(resolve => {
+      execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024, timeout: FFMPEG_REMIX_TIMEOUT, killSignal: 'SIGKILL' }, (err) => {
+        if (err) return resolve({ ok: false, error: err.message.split('\n').slice(-2).join(' ').slice(0, 200) })
+        try {
+          if (statSync(out).size < 5000) return resolve({ ok: false, error: 'Sortie vide' })
+        } catch { return resolve({ ok: false, error: 'Sortie manquante' }) }
+        resolve({ ok: true, outputPath: out })
+      })
+    })
+    results.push(r)
+  }
+
+  if (tempSrc) { try { rmSync(tempSrc) } catch { /* ignore */ } }
+  return { ok: true, results }
+})
+
+// ── IPC: copy a generated file to a user-chosen location (native "Save As") ──
+ipcMain.handle('save-file-as', async (_event, opts: { sourcePath: string; defaultName: string }) => {
+  try {
+    let src = opts.sourcePath
+    if (src.startsWith('file://')) src = fileURLToPath(src)
+    if (!existsSync(src)) return { ok: false, error: 'Fichier introuvable' }
+    const res = await dialog.showSaveDialog(win!, {
+      title: 'Enregistrer la vidéo',
+      defaultPath: opts.defaultName,
+      filters: [{ name: 'Vidéo MP4', extensions: ['mp4'] }],
+    })
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true }
+    copyFileSync(src, res.filePath)
+    return { ok: true, path: res.filePath }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// ── IPC: Mixer — burn caption text onto a video (native ffmpeg) ──────────────
+// Replaces the broken /api/mix-overlay Vercel fetch that doesn't work in
+// Electron. Source can be an http(s) signed URL or an absolute local path.
+ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
+  sourcePath: string
+  caption:    string
+  position:   'top' | 'middle' | 'bottom'
+  fontSize:   number
+  fontColor:  string
+}) => {
+  const ffmpegBin = getFfmpegBin()
+  const dir = path.join(os.tmpdir(), 'ig-tracker-mixer')
+  try { mkdirSync(dir, { recursive: true }) } catch { /* ignore */ }
+
+  // Download remote source to a temp file if needed
+  let srcPath = opts.sourcePath
+  let tempSrc: string | null = null
+  try {
+    if (srcPath.startsWith('http://') || srcPath.startsWith('https://')) {
+      const res = await net.fetch(srcPath)
+      if (!res.ok) return { ok: false, error: `Téléchargement source échoué: ${res.status}` }
+      const buf = Buffer.from(await res.arrayBuffer())
+      tempSrc = path.join(dir, `src-${Date.now()}.mp4`)
+      writeFileSync(tempSrc, buf)
+      srcPath = tempSrc
+    } else if (srcPath.startsWith('file://')) {
+      srcPath = fileURLToPath(srcPath)
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+  if (!existsSync(srcPath)) return { ok: false, error: 'Fichier source introuvable' }
+
+  // Resolve a font file cross-platform (bold for the chunky POV style)
+  const fontCandidates = process.platform === 'win32'
+    ? ['C:\\Windows\\Fonts\\arialbd.ttf', 'C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\segoeui.ttf']
+    : process.platform === 'darwin'
+      ? ['/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial Bold.ttf', '/Library/Fonts/Arial.ttf']
+      : ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+         '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+         '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf',
+         '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf']
+  const fontFile = fontCandidates.find(f => existsSync(f)) ?? null
+
+  function escText(t: string): string {
+    return t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:')
+             .replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/%/g, '%%')
+  }
+
+  // y position: bottom-anchored (text_h from bottom) or centred, or near top
+  const yExpr = opts.position === 'bottom'
+    ? '(h-text_h-60)'   // ~60px above the very bottom — matches the POV style
+    : opts.position === 'top'
+      ? '60'
+      : '(h/2-text_h/2)'
+
+  const borderPx = Math.max(3, Math.round(opts.fontSize * 0.08))
+  const dtParts = [`text='${escText(opts.caption)}'`]
+  if (fontFile) dtParts.push(`fontfile='${fontFile}'`)
+  dtParts.push(
+    `x=(w-text_w)/2`,              // horizontally centred
+    `y=${yExpr}`,
+    `fontsize=${opts.fontSize}`,
+    `fontcolor=${opts.fontColor}`,
+    `borderw=${borderPx}`, `bordercolor=black@1.0`,
+    `shadowx=3:shadowy=3:shadowcolor=black@0.7`,
+  )
+  const drawtext = `drawtext=${dtParts.join(':')}`
+  const vf = `scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black,setsar=1,${drawtext}`
+
+  const out = path.join(dir, `mixer-${Date.now()}.mp4`)
+  const args = [
+    '-nostdin', '-fflags', '+genpts', '-i', srcPath,
+    '-map', '0:v:0', '-map', '0:a?',
+    '-map_metadata', '-1', '-map_chapters', '-1',
+    '-vf', vf,
+    '-r', '30', '-fps_mode', 'cfr',
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '20',
+    '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+    '-g', '30', '-keyint_min', '15',
+    '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+    '-movflags', '+faststart',
+    '-y', out,
+  ]
+
+  return new Promise(resolve => {
+    execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024, timeout: FFMPEG_REMIX_TIMEOUT, killSignal: 'SIGKILL' }, (err, _stdout, stderr) => {
+      if (tempSrc) { try { rmSync(tempSrc) } catch { /* ignore */ } }
+      if (err) {
+        const detail = (stderr ?? '').split('\n').filter((l: string) => /error|invalid/i.test(l)).slice(-2).join(' ')
+        return resolve({ ok: false, error: err.message.split('\n')[0] + (detail ? ` — ${detail.slice(0, 160)}` : '') })
+      }
+      try {
+        if (statSync(out).size < 5000) return resolve({ ok: false, error: 'Sortie vide' })
+      } catch { return resolve({ ok: false, error: 'Sortie manquante' }) }
+      resolve({ ok: true, outputPath: out })
     })
   })
 })
@@ -1494,6 +1767,16 @@ function createWindow() {
 
   win.once('ready-to-show', () => { win?.show(); win?.maximize() })
 
+  // While a mass posting run is active: hide to tray instead of closing the app.
+  // The renderer process (and its timers/loops) keeps running; phones get stopped
+  // normally and results log as usual. The tray icon lets the user come back.
+  win.on('close', (event) => {
+    if (isMassPostingRunning) {
+      event.preventDefault()
+      win?.hide()
+    }
+  })
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
     win.webContents.openDevTools()
@@ -1598,7 +1881,8 @@ ipcMain.handle('write-temp-file', async (_event, opts: { name: string; bytes: Ar
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') { app.quit(); win = null }
+  // Don't quit while a mass posting run is in progress — the window is just hidden
+  if (process.platform !== 'darwin' && !isMassPostingRunning) { app.quit(); win = null }
 })
 
 app.on('activate', () => {

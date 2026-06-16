@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useAuth }           from '@/hooks/useAuth'
 import { supabase }          from '@/lib/supabase'
 import { AuthPage }          from '@/components/auth/AuthPage'
+import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary'
 import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
 import { OrgProvider, useOrg } from '@/lib/orgContext'
@@ -24,7 +25,7 @@ function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: b
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" overflow="visible" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="sp-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#60a5fa"/>
+          <stop offset="0%"   stopColor="#818CF8"/>
           <stop offset="45%"  stopColor="#818cf8"/>
           <stop offset="100%" stopColor="#a855f7"/>
         </linearGradient>
@@ -356,7 +357,7 @@ function BugScreen() {
       </div>
       <div className="text-center space-y-2 max-w-xs">
         <p className="text-xl font-black text-white">Bug rencontré</p>
-        <p className="text-sm" style={{ color: 'rgba(212,220,240,0.45)' }}>
+        <p className="text-sm" style={{ color: 'rgba(233,234,240,0.45)' }}>
           Cette section est temporairement indisponible.<br />Nous travaillons dessus.
         </p>
       </div>
@@ -547,28 +548,28 @@ function AiModelPopup({ onClose }: { onClose: () => void }) {
 import { LangProvider } from '@/lib/i18n'
 import { initPoller, stopPoller } from '@/lib/phonePoller'
 import { initIgStatsPoller } from '@/lib/igStatsPoller'
-import { Phones }            from '@/pages/Phones'
-import { Posting }           from '@/pages/Posting'
-import { BankHub }           from '@/pages/BankHub'
-import { Montage }           from '@/pages/Montage'
-import { Remix }             from '@/pages/Remix'
-import { AiTools }           from '@/pages/AiTools'
-import { Autocomment }       from '@/pages/Autocomment'
-import { Settings }          from '@/pages/Settings'
-import { MassPosting }       from '@/pages/MassPosting'
-import { Scheduler }         from '@/pages/Scheduler'
-import { Warmup }            from '@/pages/Warmup'
-import { VideoRepurpose }    from '@/pages/VideoRepurpose'
-import { Mixer }             from '@/pages/Mixer'
-import { Licences }          from '@/pages/Licences'
-
-import { Support }           from '@/pages/Support'
-import { Community }         from '@/pages/Community'
-import ScaleIA               from '@/pages/ScaleIA'
+// Pages are lazy-loaded so each route ships as its own chunk — the initial
+// bundle only carries the shell + Hub (default landing page after login).
 import Hub                   from '@/pages/Hub'
-import StoryLink             from '@/pages/StoryLink'
+const Phones         = lazy(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
+const Publish        = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
+const BankHub        = lazy(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
+const Montage        = lazy(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
+const Remix          = lazy(() => import('@/pages/Remix').then(m => ({ default: m.Remix })))
+const AiTools        = lazy(() => import('@/pages/AiTools').then(m => ({ default: m.AiTools })))
+const Settings       = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })))
+
+const Scheduler      = lazy(() => import('@/pages/Scheduler').then(m => ({ default: m.Scheduler })))
+const Warmup         = lazy(() => import('@/pages/Warmup').then(m => ({ default: m.Warmup })))
+const VideoRepurpose = lazy(() => import('@/pages/VideoRepurpose').then(m => ({ default: m.VideoRepurpose })))
+const Mixer          = lazy(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
+const Licences       = lazy(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
+const Support        = lazy(() => import('@/pages/Support').then(m => ({ default: m.Support })))
+const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
+const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
+const StoryLink      = lazy(() => import('@/pages/StoryLink'))
+const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
-import { Landing }           from '@/components/Landing'
 import { AppTour }           from '@/components/AppTour'
 
 const BETA_KEY  = 'scaleflow-v1-seen'
@@ -676,7 +677,10 @@ function AppContent({ user }: { user: User }) {
   // is not open. Uses the same atomic claimScheduledPost guard so it never
   // double-executes with the Scheduler page's own timers.
   useEffect(() => {
-    if (!window.electronAPI) return  // web mode has no GéeLark IPC — skip
+    // Runs on desktop AND web: main.tsx installs the webAPI shim as
+    // window.electronAPI in the browser, so GéeLark calls go through /api/*.
+    // The atomic claim prevents double-execution across tabs/devices.
+    if (!window.electronAPI) return
     const timers = new Map<string, ReturnType<typeof setTimeout>>()
     const running = new Set<string>()
 
@@ -689,6 +693,13 @@ function AppContent({ user }: { user: User }) {
       const ok = await executeScheduledPost(post, msg => logs.push(msg))
       await finishScheduledPost(post.id, ok, logs, ok ? undefined : logs[logs.length - 1])
       running.delete(post.id)
+      // Notify completion — the user may be on any page (or away)
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        const typeLabel = post.type === 'story' ? 'Stories' : post.type === 'mass_posting' ? 'Mass posting' : 'Posting'
+        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
+          body: `${post.phones?.length ?? 0} compte(s) — ScaleFlow`,
+        })
+      }
     }
 
     const schedule = (post: ScheduledPost) => {
@@ -813,8 +824,8 @@ function AppContent({ user }: { user: User }) {
   const content = (() => {
     switch (page) {
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-      case 'posting':      return <Posting     user={user} />
-      case 'massposting':  return <MassPosting user={user} />
+      case 'posting':      return <Publish     user={user} />
+      case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'storylink':    return <StoryLink   user={user} />
       case 'bank':         return <BankHub     user={user} initialTab="videos" />
@@ -848,7 +859,11 @@ function AppContent({ user }: { user: User }) {
         phoneCount={phoneCount}
         lastRefresh={lastRefresh}
       >
-        {content}
+        <ChunkErrorBoundary>
+          <Suspense fallback={<FullPageLoader />}>
+            {content}
+          </Suspense>
+        </ChunkErrorBoundary>
       </Layout>
     </CreditContext.Provider>
     </LicenseContext.Provider>
@@ -873,7 +888,7 @@ export default function App() {
   }, [])
 
   // Web: show landing when not logged in (Electron keeps the auth page directly)
-  if (!isElectron && !loading && !user) return <Landing />
+  if (!isElectron && !loading && !user) return <ChunkErrorBoundary><Suspense fallback={<FullPageLoader />}><Landing /></Suspense></ChunkErrorBoundary>
 
   return (
     <>

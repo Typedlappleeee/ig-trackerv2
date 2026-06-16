@@ -4,12 +4,14 @@
  */
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
+import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 const GOLD  = '#6366F1'
 const IVORY = '#E9EAF0'
@@ -28,12 +30,14 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
   const { currentOrg, role, perms } = useOrg()
   const conns = useConnections(user)
   const bearer = conns.bearer ?? ''
+  const credits = useCredits()
 
   const [phones, setPhones]             = useState<Phone[]>([])
   const [selPhones, setSelPhones]       = useState<Set<string>>(new Set())
   const [phoneSearch, setPhoneSearch]   = useState('')
   const [groups, setGroups]             = useState<string[]>(['Tous'])
-  const [groupFilter, setGroupFilter]   = useState('Tous')
+  const [groupFilter, _setGroupFilter]  = useState(loadLastGroup)
+  const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [videos, setVideos]             = useState<SelVideo[]>([])
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [caption, setCaption]           = useState('')
@@ -53,6 +57,8 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
+      if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
     })
   }, [currentOrg?.id, user.id])
 
@@ -81,8 +87,22 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
 
   async function submit() {
     if (!canSubmit) return
+    // GéeLark expire les fichiers uploadés après 30 jours
+    if (schedDate.getTime() > Date.now() + 25 * 24 * 60 * 60 * 1000) {
+      setError('Programmation limitée à 25 jours (les vidéos uploadées chez GéeLark expirent après 30 jours).')
+      return
+    }
     setSubmitting(true)
     setError(null)
+    // Crédits débités à la programmation — remboursés si échec avant création ou annulation
+    const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
+    const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
+    if (!creditRes.ok) {
+      setError(`${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost} crédits)`)
+      setSubmitting(false)
+      return
+    }
+    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
     try {
       // In sequential mode only the first min(phones, videos) videos are used
       const toUpload = mode === 'random' ? videos : videos.slice(0, Math.min(phoneList.length, videos.length))
@@ -110,7 +130,10 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
       })
       onCreated()
     } catch (e: any) {
-      setError(e?.message ?? String(e))
+      // Échec après déduction → remboursement
+      const refunded = await refundCredits(credits.ownerId, creditCost)
+      if (refunded) credits.refresh()
+      setError(`${e?.message ?? String(e)}${refunded ? ` — ${creditCost} crédits remboursés` : ''}`)
       setSubmitting(false)
       setProgress('')
     }

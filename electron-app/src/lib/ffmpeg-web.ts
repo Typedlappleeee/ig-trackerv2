@@ -1108,7 +1108,9 @@ function seededRng(seed: number) {
 }
 
 // ── runFfmpegRepurposeWeb — generate one unique variant ───────────────────────
-type RepurposeResult = { ok: boolean; outputPath?: string; storagePath?: string; thumbnailPath?: string | null; similarityPct?: number; transformSummary?: string[]; error?: string }
+// `localPath` is the real on-disk path (Electron native path) used for uploads
+// and "Save As"; `outputPath` is a URL the renderer can preview/fetch.
+type RepurposeResult = { ok: boolean; outputPath?: string; localPath?: string; storagePath?: string; thumbnailPath?: string | null; similarityPct?: number; transformSummary?: string[]; error?: string }
 
 // Build per-variant transforms from a seed + intensity settings
 export function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
@@ -1354,4 +1356,37 @@ export async function runRepurposeViaServer(opts: {
       error:            r.error,
     }))
   )
+}
+
+// Build a localvideo:// URL the renderer can play/fetch from an absolute fs path.
+// Mirrors the scheme registered in electron/main.ts (localvideo:///abs/path).
+function toLocalVideoUrl(absPath: string): string {
+  let n = absPath.replace(/\\/g, '/')
+  if (!n.startsWith('/')) n = '/' + n
+  return 'localvideo://' + n.split('/').map(encodeURIComponent).join('/')
+}
+
+// Native repurpose (Electron only) — runs the bundled ffmpeg via IPC.
+// Far faster and more robust than WASM, and the output is always a
+// standard Instagram-postable MP4. `sourcePath` is a local path or http(s) URL.
+export async function runRepurposeNative(opts: {
+  sourcePath: string
+  seeds:      number[]
+  intensity:  'subtle' | 'medium' | 'aggressive' | 'vener'
+  format:     '9:16' | '1:1' | '16:9' | 'keep'
+}): Promise<RepurposeResult[]> {
+  const api = (window as { electronAPI?: { runFfmpegRepurpose?: (o: { sourcePath: string; variants: Array<{ vf: string; crf: number }>; format?: string }) => Promise<{ ok: boolean; results: Array<{ ok: boolean; outputPath?: string; error?: string }>; error?: string }> } }).electronAPI
+  if (!api?.runFfmpegRepurpose) throw new Error('IPC native indisponible')
+
+  const built = opts.seeds.map(seed => buildRepurposeVariant(seed, opts.intensity, opts.format))
+  const resp  = await api.runFfmpegRepurpose({
+    sourcePath: opts.sourcePath,
+    variants:   built.map(b => ({ vf: b.vf, crf: b.crf })),
+    format:     opts.format,
+  })
+  if (!resp.ok) throw new Error(resp.error ?? 'Échec ffmpeg natif')
+
+  return resp.results.map((r, i) => r.ok && r.outputPath
+    ? { ok: true, outputPath: toLocalVideoUrl(r.outputPath), localPath: r.outputPath, transformSummary: built[i]?.transformSummary }
+    : { ok: false, error: r.error ?? 'Erreur', transformSummary: built[i]?.transformSummary })
 }

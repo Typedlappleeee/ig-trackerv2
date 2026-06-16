@@ -97,6 +97,13 @@ interface ElectronAPI {
     Promise<{ ok: boolean; text?: string; error?: string }>
   adspowerRequest: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) =>
     Promise<{ ok: boolean; data?: unknown; error?: string }>
+  setMassPostingRunning: (running: boolean) => void
+  runFfmpegRepurpose: (opts: { sourcePath: string; variants: Array<{ vf: string; crf: number }>; format?: string }) =>
+    Promise<{ ok: boolean; results: Array<{ ok: boolean; outputPath?: string; error?: string }>; error?: string }>
+  saveFileAs: (opts: { sourcePath: string; defaultName: string }) =>
+    Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>
+  runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) =>
+    Promise<{ ok: boolean; outputPath?: string; error?: string }>
 }
 
 declare global {

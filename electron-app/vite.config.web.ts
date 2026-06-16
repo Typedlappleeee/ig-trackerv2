@@ -21,6 +21,16 @@ export default defineConfig({
     target: 'es2022',
     rollupOptions: {
       external: [],
+      output: {
+        // Split heavy vendors into cacheable chunks so the main bundle stays small
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('@supabase'))                          return 'supabase'
+          if (id.includes('react-dom') || id.includes('/react/')) return 'react'
+          if (id.includes('@ffmpeg'))                            return 'ffmpeg'
+          return 'vendor'
+        },
+      },
     },
   },
 })

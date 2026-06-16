@@ -5,11 +5,17 @@ interface Props {
   phonesCount: number
   videosCount: number
   videoTitle?: string
+  /** Coût en crédits débité à la programmation (remboursé si annulation) */
+  creditCost?: number
   onConfirm:   (date: Date) => void
   onClose:     () => void
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
+
+// GeeLark expire les tâches planifiées à 30 j — garde de sécurité à 25 j
+const MAX_DAYS_AHEAD = 25
+const MAX_AHEAD_MS   = MAX_DAYS_AHEAD * 24 * 60 * 60 * 1000
 
 // Lucide-style icons (no emoji per UI/UX Pro Max rule)
 const MPATHS = {
@@ -18,6 +24,7 @@ const MPATHS = {
   video:    'm22 8-6 4 6 4V8Z M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z',
   clock:    'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
   warn:     'M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01',
+  coins:    'M12 8a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 8v8M8 12H4a4 4 0 1 0 4 4v-4M16 12h4a4 4 0 1 1-4 4v-4',
 }
 function MIcon({ d, size = 16, color = 'currentColor' }: { d: string; size?: number; color?: string }) {
   return (
@@ -33,8 +40,15 @@ function startOfDay(d: Date) {
   return r
 }
 
-export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onConfirm, onClose }: Props) {
-  const now      = new Date()
+export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, creditCost, onConfirm, onClose }: Props) {
+  // Ticker 30 s : garde le countdown et la validation à jour si le modal reste ouvert
+  const [nowTs, setNowTs] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNowTs(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const now      = new Date(nowTs)
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1)
 
   const QUICK_DATES = [
@@ -44,10 +58,12 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
     { label: 'Dans 3 jours', date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 3); return d })() },
   ]
 
-  const [selectedDay, setSelectedDay]  = useState<Date>(startOfDay(now))
+  // Défaut : heure actuelle +1 h ; si on passe minuit (23h+), basculer sur demain
+  const rollsToTomorrow = now.getHours() + 1 >= 24
+  const [selectedDay, setSelectedDay]  = useState<Date>(() => startOfDay(rollsToTomorrow ? tomorrow : now))
   const [customDate, setCustomDate]    = useState('')   // "YYYY-MM-DD" for custom
   const [useCustom, setUseCustom]      = useState(false)
-  const [hour, setHour]    = useState(now.getHours() + 1 >= 24 ? 0 : now.getHours() + 1)
+  const [hour, setHour]    = useState((now.getHours() + 1) % 24)
   const [minute, setMinute] = useState(0)
 
   const scheduled = (() => {
@@ -56,12 +72,15 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
     return base
   })()
 
-  const isInPast = scheduled <= now
   const diffMs   = scheduled.getTime() - now.getTime()
+  const isInPast = diffMs <= 0
+  const isTooFar = diffMs > MAX_AHEAD_MS
   const diffMin  = Math.round(diffMs / 60000)
+  const invalid  = isInPast || isTooFar
 
   function countdown() {
-    if (isInPast) return '⚠ Heure déjà passée'
+    if (isInPast) return 'Heure déjà passée'
+    if (isTooFar) return `Maximum ${MAX_DAYS_AHEAD} jours à l’avance — les tâches GeeLark expirent après 30 jours`
     if (diffMin < 60) return `dans ${diffMin} min`
     const h = Math.floor(diffMin / 60)
     const m = diffMin % 60
@@ -77,22 +96,38 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
     setMinute(m => (m + delta + 60) % 60)
   }
 
+  // Preset « Maintenant +30min » — calcul correct (pas de double arrondi d'heure),
+  // bascule sur demain si on passe minuit
+  function setNowPlus30() {
+    const n = new Date()
+    const total = n.getHours() * 60 + n.getMinutes() + 30
+    setHour(Math.floor(total / 60) % 24)
+    setMinute(total % 60)
+    setUseCustom(false)
+    if (total >= 24 * 60) {
+      const tmr = new Date(n); tmr.setDate(tmr.getDate() + 1)
+      setSelectedDay(startOfDay(tmr))
+    } else {
+      setSelectedDay(startOfDay(n))
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[9990] flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
 
       <div className="w-full max-w-[400px] mx-4 rounded-2xl overflow-hidden anim-scale-in"
-        style={{ background: '#0c0919', border: '1px solid rgba(37,99,235,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        style={{ background: '#13141A', border: '1px solid rgba(79,70,229,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
 
         {/* Header */}
-        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#2563eb,#6366F1)' }} />
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#4F46E5,#6366F1)' }} />
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,rgba(37,99,235,0.2),rgba(99,102,241,0.12))', border: '1px solid rgba(37,99,235,0.25)' }}>
-              <MIcon d={MPATHS.calendar} size={18} color="#93c5fd" />
+              style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.2),rgba(99,102,241,0.12))', border: '1px solid rgba(79,70,229,0.25)' }}>
+              <MIcon d={MPATHS.calendar} size={18} color="#818CF8" />
             </div>
             <div>
               <p className="font-black text-white text-[14px] leading-tight">Programmer ce post</p>
@@ -119,7 +154,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
 
           {/* Date selection */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] font-black mb-2.5" style={{ color: 'rgba(37,99,235,0.8)' }}>
+            <p className="text-[10px] uppercase tracking-[0.15em] font-black mb-2.5" style={{ color: 'rgba(79,70,229,0.8)' }}>
               Jour
             </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
@@ -130,7 +165,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
                     onClick={() => { setSelectedDay(q.date); setUseCustom(false) }}
                     className="py-2.5 rounded-xl text-[12px] font-bold transition-all"
                     style={active
-                      ? { background: 'linear-gradient(130deg,#2563eb,#6366F1)', color: 'white', boxShadow: '0 2px 12px rgba(37,99,235,0.35)' }
+                      ? { background: 'linear-gradient(130deg,#4F46E5,#6366F1)', color: 'white', boxShadow: '0 2px 12px rgba(79,70,229,0.35)' }
                       : { background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
                     {q.label}
                   </button>
@@ -142,7 +177,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
               onClick={() => setUseCustom(true)}
               className="w-full py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-2"
               style={useCustom
-                ? { background: 'linear-gradient(130deg,#2563eb,#6366F1)', color: 'white' }
+                ? { background: 'linear-gradient(130deg,#4F46E5,#6366F1)', color: 'white' }
                 : { background: 'rgba(255,255,255,0.03)', color: 'rgba(233,234,240,0.45)', border: '1px dashed rgba(255,255,255,0.1)' }}>
               <MIcon d={MPATHS.calendar} size={14} /> Choisir une date précise
             </button>
@@ -150,13 +185,14 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
               <input type="date" value={customDate}
                 onChange={e => setCustomDate(e.target.value)}
                 min={new Date().toISOString().slice(0, 10)}
+                max={new Date(Date.now() + MAX_AHEAD_MS).toISOString().slice(0, 10)}
                 className="w-full mt-2 rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input" />
             )}
           </div>
 
           {/* Time selection */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] font-black mb-2.5" style={{ color: 'rgba(37,99,235,0.8)' }}>
+            <p className="text-[10px] uppercase tracking-[0.15em] font-black mb-2.5" style={{ color: 'rgba(79,70,229,0.8)' }}>
               Heure locale
             </p>
             <div className="flex items-center justify-center gap-4">
@@ -166,7 +202,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
                   className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
                   style={{ color: 'rgba(233,234,240,0.5)', background: 'rgba(255,255,255,0.04)' }}>▲</button>
                 <div className="w-16 h-12 rounded-xl flex items-center justify-center font-black text-2xl text-white"
-                  style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.2)' }}>
+                  style={{ background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)' }}>
                   {pad(hour)}
                 </div>
                 <button onClick={() => adjustHour(-1)}
@@ -183,7 +219,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
                   className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
                   style={{ color: 'rgba(233,234,240,0.5)', background: 'rgba(255,255,255,0.04)' }}>▲</button>
                 <div className="w-16 h-12 rounded-xl flex items-center justify-center font-black text-2xl text-white"
-                  style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.2)' }}>
+                  style={{ background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)' }}>
                   {pad(minute)}
                 </div>
                 <button onClick={() => adjustMinute(-5)}
@@ -195,8 +231,13 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
 
             {/* Quick time presets */}
             <div className="flex gap-2 mt-3 flex-wrap">
+              <button
+                onClick={setNowPlus30}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                style={{ background: 'rgba(79,70,229,0.08)', color: 'rgba(147,197,253,0.7)', border: '1px solid rgba(79,70,229,0.12)' }}>
+                Maintenant +30min
+              </button>
               {[
-                { label: 'Maintenant +30min', h: (now.getHours() + Math.ceil((now.getMinutes() + 30) / 60)) % 24, m: (now.getMinutes() + 30) % 60 },
                 { label: '08:00', h: 8,  m: 0 },
                 { label: '12:00', h: 12, m: 0 },
                 { label: '18:00', h: 18, m: 0 },
@@ -205,7 +246,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
                 <button key={t.label}
                   onClick={() => { setHour(t.h); setMinute(t.m) }}
                   className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                  style={{ background: 'rgba(37,99,235,0.08)', color: 'rgba(147,197,253,0.7)', border: '1px solid rgba(37,99,235,0.12)' }}>
+                  style={{ background: 'rgba(79,70,229,0.08)', color: 'rgba(147,197,253,0.7)', border: '1px solid rgba(79,70,229,0.12)' }}>
                   {t.label}
                 </button>
               ))}
@@ -215,21 +256,35 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
           {/* Preview */}
           <div className="px-4 py-3 rounded-xl flex items-center gap-3"
             style={{
-              background: isInPast ? 'rgba(239,68,68,0.06)' : 'rgba(37,99,235,0.06)',
-              border: `1px solid ${isInPast ? 'rgba(239,68,68,0.2)' : 'rgba(37,99,235,0.15)'}`,
+              background: invalid ? 'rgba(239,68,68,0.06)' : 'rgba(79,70,229,0.06)',
+              border: `1px solid ${invalid ? 'rgba(239,68,68,0.2)' : 'rgba(79,70,229,0.15)'}`,
             }}>
-            <span className="flex-shrink-0" style={{ color: isInPast ? '#f87171' : '#93c5fd' }}>
-              {isInPast ? <MIcon d={MPATHS.warn} size={18} /> : <MIcon d={MPATHS.clock} size={18} />}
+            <span className="flex-shrink-0" style={{ color: invalid ? '#f87171' : '#818CF8' }}>
+              {invalid ? <MIcon d={MPATHS.warn} size={18} /> : <MIcon d={MPATHS.clock} size={18} />}
             </span>
             <div>
-              <p className="text-[13px] font-black" style={{ color: isInPast ? '#f87171' : 'white' }}>
+              <p className="text-[13px] font-black" style={{ color: invalid ? '#f87171' : 'white' }}>
                 {scheduled.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à {pad(hour)}h{pad(minute)}
               </p>
-              <p className="text-[10px] mt-0.5" style={{ color: isInPast ? 'rgba(248,113,113,0.7)' : 'rgba(147,197,253,0.6)' }}>
+              <p className="text-[10px] mt-0.5" style={{ color: invalid ? 'rgba(248,113,113,0.7)' : 'rgba(147,197,253,0.6)' }}>
                 {countdown()}
               </p>
             </div>
           </div>
+
+          {/* Credit cost */}
+          {typeof creditCost === 'number' && creditCost > 0 && (
+            <div className="px-4 py-2.5 rounded-xl flex items-center gap-2.5"
+              style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}>
+              <span className="flex-shrink-0" style={{ color: '#F59E0B' }}>
+                <MIcon d={MPATHS.coins} size={15} />
+              </span>
+              <p className="text-[11px] leading-snug" style={{ color: 'rgba(233,234,240,0.65)', margin: 0 }}>
+                <span style={{ color: '#F59E0B', fontWeight: 700 }}>{creditCost} crédit{creditCost > 1 ? 's' : ''}</span>
+                {' '}seront débités maintenant — remboursés si annulation
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -240,10 +295,10 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
             Annuler
           </button>
           <button
-            onClick={() => !isInPast && onConfirm(scheduled)}
-            disabled={isInPast || (useCustom && !customDate)}
+            onClick={() => !invalid && onConfirm(scheduled)}
+            disabled={invalid || (useCustom && !customDate)}
             className="flex-[2] py-2.5 rounded-xl text-[12px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center gap-1.5"
-            style={{ background: 'linear-gradient(130deg,#2563eb,#6366F1)', boxShadow: '0 4px 20px -4px rgba(37,99,235,0.5)' }}>
+            style={{ background: 'linear-gradient(130deg,#4F46E5,#6366F1)', boxShadow: '0 4px 20px -4px rgba(79,70,229,0.5)' }}>
             <MIcon d={MPATHS.calendar} size={15} color="#fff" /> Confirmer — {pad(hour)}h{pad(minute)}
           </button>
         </div>

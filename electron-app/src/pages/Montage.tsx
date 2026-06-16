@@ -4,7 +4,8 @@ import { supabase, type ContentItem } from '@/lib/supabase'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
-import { Button }  from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
 import { useOrg } from '@/lib/orgContext'
 import { uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
 import { logActivity } from '@/lib/activityLog'
@@ -28,6 +29,20 @@ const IconPalette      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) 
 const IconSliders      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></SfIcon>
 const IconScissors     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></SfIcon>
 const IconZap          = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></SfIcon>
+
+// Badge "Aperçu uniquement" — affiché sur les options visibles dans la preview
+// mais NON transmises à FFmpeg lors de l'export (vitesse, fade, filtres, textes).
+function PreviewOnlyBadge() {
+  return (
+    <span
+      className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0"
+      style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}
+      title="Cette option est visible dans l'aperçu mais n'est pas encore appliquée à l'export"
+    >
+      Aperçu uniquement
+    </span>
+  )
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────────────
 interface TimelineClip {
@@ -272,7 +287,7 @@ function PropertiesPanel({
 
       {/* Speed */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageSpeedLabel')} <span className="text-accent">{clip.speed}×</span></p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider flex items-center gap-1.5">{t('montageSpeedLabel')} <span className="text-accent">{clip.speed}×</span> <PreviewOnlyBadge /></p>
         <input type="range" min={0.25} max={4} step={0.25} value={clip.speed}
           onChange={e => onUpdate(clip.uid, { speed: parseFloat(e.target.value) })}
           className="w-full accent-accent h-1.5" />
@@ -283,7 +298,7 @@ function PropertiesPanel({
 
       {/* Fade */}
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageFadeInLabel')}</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider flex items-center gap-1.5">{t('montageFadeInLabel')} <PreviewOnlyBadge /></p>
         <button
           onClick={() => onUpdate(clip.uid, { fade: !clip.fade })}
           className={`w-8 h-4 rounded-full transition-colors ${clip.fade ? 'bg-accent' : 'bg-surface2'}`}
@@ -383,8 +398,11 @@ function DraggableText({ overlay, onMove }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────────────────────
+const DRAFT_KEY = 'sf-montage-draft'
+
 export function Montage({ user }: MontageProps) {
   const t = useT()
+  const toast = useToast()
   const { currentOrg } = useOrg()
   const credits = useCredits()
   const conns = useConnections(user)
@@ -427,6 +445,11 @@ export function Montage({ user }: MontageProps) {
   const [exporting, setExporting]   = useState(false)
   const [expResult, setExpResult]   = useState<{ ok: boolean; msg: string; command?: string } | null>(null)
 
+  // Clear-all confirmation + draft restore banner
+  const [confirmClear, setConfirmClear]   = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
+  const draftLoadedRef = useRef(false)
+
   // Refs
   const videoRef      = useRef<HTMLVideoElement>(null)
   const timelineRef   = useRef<HTMLDivElement>(null)
@@ -441,6 +464,35 @@ export function Montage({ user }: MontageProps) {
       .then(({ data }) => { setBankItems(data ?? []); setLL(false) })
       .catch((err: unknown) => { console.error('[Montage] bank load failed:', err); setLL(false) })
   }, [currentOrg?.id])
+
+  // ── Autosave draft (localStorage) ───────────────────────────────────────────
+  // Restore once on mount
+  useEffect(() => {
+    if (draftLoadedRef.current) return
+    draftLoadedRef.current = true
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (!raw) return
+      const d = JSON.parse(raw) as { clips?: TimelineClip[]; transitions?: Transition[]; textOverlays?: TextOverlay[]; projectName?: string }
+      if (Array.isArray(d.clips) && d.clips.length > 0) {
+        setClips(d.clips)
+        setTrans(Array.isArray(d.transitions) ? d.transitions : [])
+        setTexts(Array.isArray(d.textOverlays) ? d.textOverlays : [])
+        if (typeof d.projectName === 'string' && d.projectName) setProjName(d.projectName)
+        setDraftRestored(true)
+      }
+    } catch { /* brouillon corrompu — ignoré */ }
+  }, [])
+
+  // Persist on every project change
+  useEffect(() => {
+    if (!draftLoadedRef.current) return
+    try {
+      const manualTexts = textOverlays.filter(t => t.uid !== '__auto_caption__')
+      if (clips.length === 0 && manualTexts.length === 0) { localStorage.removeItem(DRAFT_KEY); return }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ clips, transitions, textOverlays: manualTexts, projectName }))
+    } catch { /* quota localStorage plein — autosave désactivé silencieusement */ }
+  }, [clips, transitions, textOverlays, projectName])
 
   // Sync auto-caption overlay → textOverlays
   useEffect(() => {
@@ -497,13 +549,16 @@ export function Montage({ user }: MontageProps) {
     const raw = clip.item.duration ?? 30
     const cutPoint = clip.trimStart + (playhead - offset) * clip.speed
     const clipEnd  = clip.trimEnd > 0 ? clip.trimEnd : raw
-    if (cutPoint <= clip.trimStart + 0.5 || cutPoint >= clipEnd - 0.5) return
+    if (cutPoint <= clip.trimStart + 0.5 || cutPoint >= clipEnd - 0.5) {
+      toast.show({ title: 'Impossible de couper ici', body: 'Place le curseur à au moins 0,5 s des bords du clip.', kind: 'warn' })
+      return
+    }
     const a: TimelineClip = { ...clip, uid: `${clip.uid}-a`, trimEnd: cutPoint }
     // Start the second half 0.3s after the cut to avoid showing the uncut frame on transition
     const b: TimelineClip = { ...clip, uid: `${clip.uid}-b`, trimStart: Math.min(cutPoint + 0.3, clipEnd - 0.1), trimEnd: clip.trimEnd }
     setClips(prev => { const next = [...prev]; const i = next.findIndex(c => c.uid === selectedUid); next.splice(i, 1, a, b); return next })
     setSelUid(a.uid)
-  }, [clips, selectedUid, playhead])
+  }, [clips, selectedUid, playhead, toast])
 
   // ── Transitions ────────────────────────────────────────────────────────────────────────────
   function getTransition(afterUid: string): Transition['type'] {
@@ -724,7 +779,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
       {osDragging && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-4 flex flex-col items-center text-accent sf-anim-scale-in">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' }}>
               <IconClapperboard size={32} />
             </div>
             <p className="text-xl font-semibold">{t('montageDropVideoHere')}</p>
@@ -733,16 +788,32 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
       )}
 
       {/* ── TOP TOOLBAR ───────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-b border-border bg-surface">
+      <div className="flex-shrink-0 border-b border-border" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
         <div className="flex items-center">
           {/* Project name + icon */}
-          <div className="w-56 flex-shrink-0 px-4 py-2.5 border-r border-border flex items-center gap-2 sf-anim-slide-up sf-d50">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.15)' }}>
-              <IconClapperboard size={12} style={{ color: '#a78bfa' }} />
+          <div className="w-60 flex-shrink-0 px-3.5 py-2.5 border-r border-border flex items-center gap-2.5">
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(99,102,241,0.06))',
+              border: '1px solid rgba(99,102,241,0.3)',
+              color: '#6366F1',
+              boxShadow: '0 0 16px -4px rgba(99,102,241,0.3)',
+            }}>
+              <IconClapperboard size={18} />
             </div>
-            <input value={projectName} onChange={e => setProjName(e.target.value)}
-              className="text-[13px] font-semibold text-text bg-transparent focus:outline-none w-full truncate"
-              placeholder={t('montageProjectName')} />
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0, flex: 1 }}>
+              <h1 className="sf-page-title" style={{ fontSize: 13, letterSpacing: '-0.02em' }}>
+                <input value={projectName} onChange={e => setProjName(e.target.value)}
+                  className="bg-transparent focus:outline-none w-full truncate"
+                  style={{ font: 'inherit', color: 'inherit' }}
+                  placeholder={t('montageProjectName')} />
+              </h1>
+              <p className="sf-page-sub" style={{ fontSize: 10, marginTop: 1 }}>
+                <span className="sf-badge sf-badge-violet" style={{ fontSize: 8, padding: '1px 5px', marginRight: 4 }}>{preset}</span>
+                {PRESET_DIMS[preset]} · {fmtTime(total)}
+              </p>
+            </div>
           </div>
 
           {/* Tab bar */}
@@ -759,21 +830,30 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
             ))}
           </div>
 
-          {/* Right controls */}
+          {/* Right controls: format selector + export */}
           <div className="flex items-center gap-2 px-4 flex-shrink-0 border-l border-border sf-anim-slide-up sf-d150">
-            <span className="text-[11px] text-text2">{t('montageFormat')}</span>
-            {(['9:16','1:1','16:9'] as Preset[]).map(p => (
-              <button key={p} onClick={() => setPreset(p)}
-                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all cursor-pointer ${preset === p ? 'text-white' : 'text-text2 hover:text-text'}`}
-                style={preset === p ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)' }}>
-                {p}
-              </button>
-            ))}
-            <span className="text-[10px] text-text2 ml-1">{PRESET_DIMS[preset]}</span>
-            <div className="w-px h-5 mx-1 bg-border" />
-            <Button size="sm" onClick={handleExport} loading={exporting} disabled={!clips.length}>
+            <div className="sf-card" style={{ display: 'flex', gap: 3, padding: '3px', borderRadius: 9 }}>
+              {(['9:16','1:1','16:9'] as Preset[]).map(p => (
+                <button key={p} onClick={() => setPreset(p)}
+                  className="cursor-pointer"
+                  style={{
+                    padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700,
+                    fontFamily: 'monospace', transition: 'all 0.15s',
+                    background: preset === p ? 'rgba(99,102,241,0.2)' : 'transparent',
+                    color: preset === p ? '#818CF8' : 'var(--text-3)',
+                    border: preset === p ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+                  }}>
+                  {p}
+                </button>
+              ))}
+            </div>
+            <button onClick={handleExport} disabled={!clips.length || exporting}
+              className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer"
+              style={(!clips.length || exporting) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+              {exporting && <Spinner size="sm" />}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               {t('montageExport')}
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -786,34 +866,43 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
 
           {/* Médias */}
           {activeTab === 'medias' && (<>
-            <div className="px-3 py-2 border-b border-border space-y-2">
-              <div className="flex gap-1">
-                <button onClick={async () => {
-                  const p = await window.electronAPI?.pickVideoFile?.()
-                  if (!p) return
-                  const title = p.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'Vidéo'
-                  const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
-                  try {
-                    const { storagePath, thumbnailPath } = await uploadVideoFromPath(p, scope)
-                    const { data } = await supabase.from('content_bank').insert({
-                      user_id: user.id, org_id: currentOrg?.id ?? null, title,
-                      file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
-                      tags: [], notes: '',
-                    }).select().single()
-                    if (data) {
-                      setBankItems(prev => [data, ...prev]); addClip(data)
-                      logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'montage_import' } })
-                    }
-                  } catch (err) {
-                    console.error('[Montage] upload failed', err)
+            <div className="px-3 py-2.5 border-b border-border space-y-2">
+              {/* Upload / import button — video card style */}
+              <button onClick={async () => {
+                const p = await window.electronAPI?.pickVideoFile?.()
+                if (!p) return
+                const title = p.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'Vidéo'
+                const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
+                try {
+                  const { storagePath, thumbnailPath } = await uploadVideoFromPath(p, scope)
+                  const { data } = await supabase.from('content_bank').insert({
+                    user_id: user.id, org_id: currentOrg?.id ?? null, title,
+                    file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
+                    tags: [], notes: '',
+                  }).select().single()
+                  if (data) {
+                    setBankItems(prev => [data, ...prev]); addClip(data)
+                    logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'montage_import' } })
                   }
-                }} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent/10 hover:bg-accent/20 text-accent text-xs font-semibold rounded-lg transition-colors">
-                  {t('montageImport')}
-                </button>
-              </div>
+                } catch (err) {
+                  console.error('[Montage] upload failed', err)
+                }
+              }}
+                className="w-full cursor-pointer"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600,
+                  border: '2px dashed rgba(99,102,241,0.3)',
+                  background: 'rgba(99,102,241,0.04)',
+                  color: '#6366F1', transition: 'all 0.15s',
+                }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                {t('montageImport')}
+              </button>
               <input type="text" placeholder={t('montageSearchBank')} value={bankSearch}
                 onChange={e => setBSearch(e.target.value)}
-                className="w-full bg-surface2 border border-border rounded px-2 py-1.5 text-[11px] text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
+                className="sf-input w-full"
+                style={{ fontSize: 11 }}
               />
             </div>
             <div className="flex-1 overflow-auto py-1">
@@ -823,15 +912,24 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                   <IconClapperboard size={24} />
                   <p>{bankItems.length === 0 ? t('montageBankEmpty') : t('montageBankNoResults')}</p>
                 </div>
-              ) : filteredBank.map(item => (
+              ) : filteredBank.map((item, idx) => (
                 <button key={item.id} onClick={() => addClip(item)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface2 group transition-colors">
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface2 group transition-colors cursor-pointer">
+                  {/* Numbered drag handle */}
+                  <div style={{
+                    flexShrink: 0, width: 20, height: 20, borderRadius: 6,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)',
+                    fontSize: 9, fontWeight: 800, color: 'rgba(99,102,241,0.6)',
+                  }}>
+                    {idx + 1}
+                  </div>
                   <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0"><VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-medium text-text truncate">{item.title}</p>
                     <p className="text-[9px] text-text2">{item.duration ? fmtTime(item.duration) : '?s'}</p>
                   </div>
-                  <span className="opacity-0 group-hover:opacity-100 text-accent text-sm flex-shrink-0">+</span>
+                  <span className="opacity-0 group-hover:opacity-100 flex-shrink-0" style={{ color: 'var(--accent)', fontSize: 16, fontWeight: 300, lineHeight: 1 }}>+</span>
                 </button>
               ))}
             </div>
@@ -959,7 +1057,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                     <div key={ov.uid} className="flex items-center gap-2 bg-surface2 rounded-lg px-2 py-1.5">
                       <input value={ov.text} onChange={e => setTexts(prev => prev.map(t => t.uid === ov.uid ? { ...t, text: e.target.value } : t))}
                         className="flex-1 bg-transparent text-[11px] text-text focus:outline-none" />
-                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label="Delete" className="text-text2 hover:text-danger inline-flex items-center sf-press"><IconX size={13} /></button>
+                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label="Supprimer" className="text-text2 hover:text-danger inline-flex items-center sf-press"><IconX size={13} /></button>
                     </div>
                   ))}
                 </div>
@@ -1072,8 +1170,8 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
             />
           ) : (
             <div className="text-center text-text2 space-y-3 flex flex-col items-center">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center sf-anim-scale-spring" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center sf-anim-scale-spring" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>
               </div>
@@ -1106,36 +1204,48 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
       {/* ── BOTTOM: Timeline ─────────────────────────────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-t border-border bg-surface sf-anim-slide-up sf-d200" style={{ height: 200 }}>
         {/* Timeline toolbar */}
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-surface2">
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border" style={{ background: 'var(--surface-2)' }}>
           {/* Edit tools */}
           <button onClick={cutAtPlayhead} disabled={!selectedUid} title="Cut clip at playhead"
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-text hover:bg-surface disabled:opacity-40 transition-all">
+            className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer disabled:opacity-40"
+            style={{ gap: 4 }}>
+            <IconScissors size={12} />
             {t('montageCut')}
           </button>
           <button onClick={() => selectedUid && deleteClip(selectedUid)} disabled={!selectedUid}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-danger disabled:opacity-40 transition-all">
+            className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer disabled:opacity-40"
+            style={{ gap: 4, color: !selectedUid ? undefined : 'var(--err)' }}>
+            <IconX size={12} />
             {t('montageDelete')}
           </button>
           <button onClick={() => setClips([])} disabled={!clips.length}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-danger disabled:opacity-40 transition-all">
+            className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer disabled:opacity-40"
+            style={{ gap: 4, color: !clips.length ? undefined : 'var(--err)' }}>
             {t('montageClearAll')}
           </button>
           <div className="w-px h-5 bg-border mx-1" />
 
-          {/* Time display */}
-          <span className="text-xs text-text2 font-mono">
-            {fmtTime(playhead)} / <span className="text-accent">{fmtTime(total)}</span>
-          </span>
+          {/* Time display + clip count */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="text-xs text-text2 font-mono">
+              {fmtTime(playhead)} / <span style={{ color: 'var(--accent)' }}>{fmtTime(total)}</span>
+            </span>
+            {clips.length > 0 && (
+              <span className="sf-badge sf-badge-violet" style={{ fontSize: 9, padding: '1px 5px' }}>
+                {clips.length} clip{clips.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
           <div className="w-px h-5 bg-border mx-1" />
 
           {/* Zoom */}
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setScale(s => Math.max(10, s - 10))} className="text-text2 hover:text-text text-base w-5 text-center sf-press">−</button>
-            <div className="w-16 h-1.5 bg-surface rounded-full relative cursor-pointer"
+            <button onClick={() => setScale(s => Math.max(10, s - 10))} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" style={{ width: 22, height: 22, minWidth: 0, fontSize: 14 }}>−</button>
+            <div className="w-16 h-1.5 rounded-full relative cursor-pointer" style={{ background: 'rgba(255,255,255,0.08)' }}
               onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setScale(Math.round(10 + ((e.clientX - r.left) / r.width) * 190)) }}>
-              <div className="h-full bg-accent rounded-full" style={{ width: `${((scale - 10) / 190) * 100}%` }} />
+              <div className="h-full rounded-full" style={{ width: `${((scale - 10) / 190) * 100}%`, background: 'var(--accent)' }} />
             </div>
-            <button onClick={() => setScale(s => Math.min(200, s + 10))} className="text-text2 hover:text-text text-base w-5 text-center sf-press">+</button>
+            <button onClick={() => setScale(s => Math.min(200, s + 10))} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" style={{ width: 22, height: 22, minWidth: 0, fontSize: 14 }}>+</button>
             <span className="text-[10px] text-text2 w-10">{scale}px/s</span>
           </div>
         </div>

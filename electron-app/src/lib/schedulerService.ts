@@ -7,6 +7,11 @@ export interface ScheduledPhoneRecord {
   geelark_id:  string
   phone_name:  string
   ig_username: string | null
+  // Story scheduling (type === 'story') — per-phone assignment frozen at creation
+  story_photo?:      string   // signed URL of the image (6-month TTL)
+  story_photo_name?: string
+  story_link?:       string
+  story_text?:       string
 }
 
 export interface ScheduledVideoRecord {
@@ -15,7 +20,7 @@ export interface ScheduledVideoRecord {
 }
 
 export type ScheduleStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
-export type PostingType    = 'posting' | 'mass_posting'
+export type PostingType    = 'posting' | 'mass_posting' | 'story'
 
 export interface ScheduledPost {
   id:              string
@@ -68,34 +73,117 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
     caption:          input.caption,
     delay_minutes:    input.delayMinutes,
     mode:             input.mode,
-    bearer_token:     input.bearerToken,
+    // Never persist the GeeLark token in the row — anyone with read access to
+    // scheduled_posts (org members) would see it. It is resolved at execution
+    // time from org_config / app_config instead.
+    bearer_token:     '',
     reels_trial:      input.reelsTrial,
   }).select().single()
   if (error) throw new Error(error.message)
   return data as ScheduledPost
 }
 
-export async function cancelScheduledPost(id: string): Promise<void> {
-  // 'running' included: a post stuck in running (app closed mid-execution) must be stoppable
-  await supabase.from('scheduled_posts')
-    .update({ status: 'cancelled' })
-    .eq('id', id).in('status', ['pending', 'running'])
+// Resolves the GeeLark bearer at execution time. Falls back to the token
+// stored in the row for posts created before this change.
+export async function resolveBearerToken(post: ScheduledPost): Promise<string> {
+  if (post.org_id) {
+    const { data } = await supabase.from('org_config')
+      .select('bearer_token').eq('org_id', post.org_id).maybeSingle()
+    if (data?.bearer_token) return data.bearer_token
+  }
+  const { data } = await supabase.from('app_config')
+    .select('bearer_token').eq('user_id', post.user_id).maybeSingle()
+  if (data?.bearer_token) return data.bearer_token
+  return post.bearer_token || ''
 }
 
-// Self-healing: a post claimed as 'running' whose execution started more than
-// maxAgeMin ago can't still be alive (executions cap at ~11 min) — the app was
-// closed mid-run. Mark those as failed so they stop showing as "en cours".
+// Cancels a post. Pending posts are refunded (credits were deducted at
+// scheduling time); running posts are stoppable but NOT refunded — the work
+// is already happening.
+export async function cancelScheduledPost(
+  id: string,
+  refundOwnerId?: string,
+): Promise<{ refunded: number }> {
+  // Phase 1: cancel while still pending → refund
+  const { data: pendingRows } = await supabase.from('scheduled_posts')
+    .update({ status: 'cancelled' })
+    .eq('id', id).eq('status', 'pending')
+    .select('type, phones')
+  if (pendingRows?.length) {
+    const row = pendingRows[0] as { type: string; phones: unknown }
+    const phones = (typeof row.phones === 'string' ? JSON.parse(row.phones) : row.phones) as unknown[]
+    if (refundOwnerId) {
+      const { scheduledPostCost, refundCredits } = await import('./credits')
+      const amount = scheduledPostCost(row.type, phones?.length ?? 0)
+      const ok = await refundCredits(refundOwnerId, amount)
+      return { refunded: ok ? amount : 0 }
+    }
+    return { refunded: 0 }
+  }
+  // Phase 2: post already running (stuck, app closed mid-run) — stop it, no refund
+  await supabase.from('scheduled_posts')
+    .update({ status: 'cancelled' })
+    .eq('id', id).eq('status', 'running')
+  return { refunded: 0 }
+}
+
+// Self-healing for posts stuck in 'running' (app closed mid-execution).
+// Primary signal: heartbeat — a live execution updates heartbeat_at every 60 s,
+// so anything without a beat for 5 min is dead, regardless of type or duration.
+// Fallback (heartbeat column not migrated, or pre-migration rows with null
+// heartbeat): fixed windows — 30 min for posts, 6 h for stories (sequential
+// UI automation with delays can legitimately run for hours).
 export async function failStaleRunningPosts(maxAgeMin = 30): Promise<number> {
-  const cutoff = new Date(Date.now() - maxAgeMin * 60_000).toISOString()
-  const { data } = await supabase.from('scheduled_posts')
-    .update({
-      status:    'failed',
-      error_msg: "Interrompu — l'application a été fermée pendant l'exécution",
-    })
-    .eq('status', 'running')
-    .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
-    .select('id')
-  return data?.length ?? 0
+  const errorMsg = "Interrompu — l'application a été fermée pendant l'exécution"
+  const beatCutoff = new Date(Date.now() - 5 * 60_000).toISOString()
+
+  // Heartbeat-based heal (precise) — ignore errors if the column doesn't exist yet
+  let healed = 0
+  try {
+    const { data, error } = await supabase.from('scheduled_posts')
+      .update({ status: 'failed', error_msg: errorMsg })
+      .eq('status', 'running')
+      .lt('heartbeat_at', beatCutoff)
+      .select('id')
+    if (!error) healed += data?.length ?? 0
+  } catch { /* column not migrated yet */ }
+
+  // Window-based fallback — only for rows WITHOUT a heartbeat (a live beat
+  // means the execution is alive no matter how long it runs). If the column
+  // isn't migrated yet, retry without the heartbeat filter (old behaviour).
+  const cutoff      = new Date(Date.now() - maxAgeMin * 60_000).toISOString()
+  const storyCutoff = new Date(Date.now() - 6 * 60 * 60_000).toISOString()
+  const windowHeal = async (storyType: boolean, c: string, withBeatFilter: boolean) => {
+    let q = supabase.from('scheduled_posts')
+      .update({ status: 'failed', error_msg: errorMsg })
+      .eq('status', 'running')
+    q = storyType ? q.eq('type', 'story') : q.neq('type', 'story')
+    if (withBeatFilter) q = q.is('heartbeat_at', null)
+    const { data, error } = await q
+      .or(`executed_at.lt.${c},and(executed_at.is.null,created_at.lt.${c})`)
+      .select('id')
+    if (error && withBeatFilter) return windowHeal(storyType, c, false)
+    return data?.length ?? 0
+  }
+  const [a, b] = await Promise.all([
+    windowHeal(false, cutoff, true),
+    windowHeal(true, storyCutoff, true),
+  ])
+  return healed + a + b
+}
+
+// Keeps a 'running' post visibly alive: updates heartbeat_at every 60 s.
+// Returns a stop() function. Failures are silent (column may not exist yet).
+export function startHeartbeat(postId: string): () => void {
+  const beat = () => {
+    supabase.from('scheduled_posts')
+      .update({ heartbeat_at: new Date().toISOString() })
+      .eq('id', postId).eq('status', 'running')
+      .then(() => {}, () => {})
+  }
+  beat()
+  const timer = setInterval(beat, 60_000)
+  return () => clearInterval(timer)
 }
 
 // Loads all posts visible to the user (RLS handles org filtering)
@@ -141,11 +229,76 @@ async function gPost(bearer: string, path: string, body: unknown) {
 
 function sleep(ms: number) { return new Promise<void>(r => setTimeout(r, ms)) }
 
+// Story execution: drives Instagram via UI automation, one phone at a time.
+// Runs only app-side (the edge function skips type='story' — ADB automation
+// takes ~2 min per phone, far beyond serverless time limits).
+async function executeScheduledStory(
+  post: ScheduledPost,
+  bearer: string,
+  onLog: (msg: string) => void,
+): Promise<boolean> {
+  const { postInstagramStory, stopPhone } = await import('./geelark')
+  const phones = (typeof post.phones === 'string'
+    ? JSON.parse(post.phones as unknown as string)
+    : post.phones) as ScheduledPhoneRecord[]
+
+  let okCount = 0
+  for (let i = 0; i < phones.length; i++) {
+    const phone = phones[i]
+    const name = phone.ig_username ?? phone.phone_name
+    if (!phone.story_photo || !phone.story_link) {
+      onLog(`⚠ ${name} : assignation incomplète (photo ou lien manquant) — ignoré`)
+      continue
+    }
+    if (i > 0 && post.delay_minutes > 0) {
+      onLog(`⏳ Délai ${post.delay_minutes} min avant le compte suivant…`)
+      await sleep(post.delay_minutes * 60_000)
+    }
+    onLog(`▶ Story sur ${name}…`)
+    try {
+      const res = await postInstagramStory(
+        bearer, phone.geelark_id,
+        { imageUrl: phone.story_photo, linkUrl: phone.story_link, linkText: phone.story_text || undefined },
+        m => onLog(`   ${m}`),
+      )
+      if (res.ok) { okCount++; onLog(`✅ Story publiée : ${name}`) }
+      else onLog(`❌ Échec (${name}) : ${res.error ?? 'inconnu'}`)
+    } catch (err) {
+      onLog(`❌ Erreur (${name}) : ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      await stopPhone(bearer, phone.geelark_id).catch(() => {})
+    }
+  }
+  onLog(okCount > 0
+    ? `✅ Terminé : ${okCount}/${phones.length} story(s) publiée(s)`
+    : '❌ Aucune story publiée')
+  return okCount > 0
+}
+
 export async function executeScheduledPost(
   post: ScheduledPost,
   onLog: (msg: string) => void,
 ): Promise<boolean> {
-  const { bearer_token: bearer, caption, delay_minutes, mode, reels_trial } = post
+  const stopBeat = startHeartbeat(post.id)
+  try {
+    return await executeScheduledPostInner(post, onLog)
+  } finally {
+    stopBeat()
+  }
+}
+
+async function executeScheduledPostInner(
+  post: ScheduledPost,
+  onLog: (msg: string) => void,
+): Promise<boolean> {
+  const { caption, delay_minutes, mode, reels_trial } = post
+  const bearer = await resolveBearerToken(post)
+  if (!bearer) {
+    onLog('❌ Aucun token GéeLark configuré — ajoute-le dans Paramètres → Connexions')
+    return false
+  }
+
+  if (post.type === 'story') return executeScheduledStory(post, bearer, onLog)
 
   // Supabase Realtime can deliver jsonb columns as strings — parse defensively
   const phones = (typeof post.phones === 'string'
@@ -249,7 +402,13 @@ export async function executeScheduledPost(
 
 // Format for display (local time)
 export function fmtScheduledTime(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  const d = new Date(iso)
+  // Décalage local lisible (« UTC+1 ») pour lever toute ambiguïté de fuseau
+  const offMin = -d.getTimezoneOffset()
+  const sign   = offMin >= 0 ? '+' : '−'
+  const hours  = Math.abs(offMin) / 60
+  const tz     = `UTC${sign}${Number.isInteger(hours) ? hours : hours.toFixed(1)}`
+  return `${d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} (${tz})`
 }
 
 // Default value for <input type="datetime-local"> (local time, N min from now)

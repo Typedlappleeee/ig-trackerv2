@@ -5,7 +5,7 @@
 @layer base {
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: 6rem;
+    scroll-padding-top: 5rem;
   }
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -14,104 +14,162 @@
     font-size: 16px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3 {
-    letter-spacing: -0.03em;
-  }
-  ::selection {
-    background: rgba(139, 92, 246, 0.35);
-    color: #F2F0FF;
-  }
-  :focus-visible {
-    outline: 2px solid rgba(34, 211, 238, 0.85);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
+  h1, h2, h3 { letter-spacing: -0.035em; }
+  ::selection { background: rgba(139,92,246,0.35); color: #F2F0FF; }
+  :focus-visible { outline: 2px solid rgba(34,211,238,0.85); outline-offset: 2px; border-radius: 4px; }
 }
 
 @layer components {
+
+  /* ── Gradients ─────────────────────────────────────────────────────────── */
   .gradient-text {
     background: linear-gradient(135deg, #22D3EE 0%, #818CF8 45%, #A855F7 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  .gradient-text-warm {
+    background: linear-gradient(135deg, #F472B6 0%, #A855F7 50%, #818CF8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 
+  /* ── Glass surfaces ─────────────────────────────────────────────────────── */
   .glass {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.08);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
-
   .glass-strong {
-    background: rgba(255, 255, 255, 0.055);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: rgba(255,255,255,0.055);
+    border: 1px solid rgba(255,255,255,0.10);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .glass-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.025) 100%);
+    border: 1px solid rgba(255,255,255,0.09);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition: all 0.25s ease;
+  }
+  .glass-card:hover {
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+    border-color: rgba(139,92,246,0.3);
+    box-shadow: 0 12px 40px -8px rgba(124,58,237,0.25);
+    transform: translateY(-2px);
   }
 
-  /* Gradient border wrapper (for highlighted pricing card) */
+  /* ── Gradient border (popular plan, featured cards) ────────────────────── */
   .gradient-ring {
     position: relative;
     background:
-      linear-gradient(#0a0a16, #0a0a16) padding-box,
+      linear-gradient(#09091A, #09091A) padding-box,
       linear-gradient(135deg, #22D3EE 0%, #818CF8 45%, #A855F7 100%) border-box;
     border: 1.5px solid transparent;
   }
 
+  /* ── Buttons ────────────────────────────────────────────────────────────── */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold cursor-pointer transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold cursor-pointer transition-all duration-200 select-none;
   }
-
   .btn-primary {
     @apply btn px-6 py-3 text-white;
-    background: linear-gradient(135deg, #22D3EE 0%, #818CF8 45%, #A855F7 100%);
-    box-shadow: 0 8px 30px -8px rgba(124, 58, 237, 0.55);
+    background: linear-gradient(135deg, #22D3EE 0%, #818CF8 50%, #A855F7 100%);
+    box-shadow: 0 8px 30px -8px rgba(124,58,237,0.6);
   }
   .btn-primary:hover {
-    box-shadow: 0 12px 40px -8px rgba(124, 58, 237, 0.75);
-    filter: brightness(1.06);
+    box-shadow: 0 14px 44px -8px rgba(124,58,237,0.8);
+    filter: brightness(1.08);
+    transform: translateY(-1px);
   }
+  .btn-primary:active { transform: translateY(0); }
 
   .btn-secondary {
     @apply btn px-6 py-3 text-text;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.12);
   }
   .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(34, 211, 238, 0.35);
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(34,211,238,0.4);
+    transform: translateY(-1px);
   }
 
+  .btn-ghost {
+    @apply btn px-5 py-2.5 text-text2 text-sm;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.05); color: #F2F0FF; }
+
+  /* ── Labels / eyebrows ──────────────────────────────────────────────────── */
   .eyebrow {
     @apply inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium text-text2;
-    background: rgba(139, 92, 246, 0.08);
-    border: 1px solid rgba(139, 92, 246, 0.22);
+    background: rgba(139,92,246,0.08);
+    border: 1px solid rgba(139,92,246,0.22);
   }
-}
-
-@layer utilities {
   .section-label {
-    @apply text-xs font-semibold uppercase tracking-[0.2em] gradient-text;
+    @apply inline-block text-xs font-bold uppercase tracking-[0.22em] gradient-text mb-3;
+  }
+
+  /* ── Shimmer loading effect ─────────────────────────────────────────────── */
+  .shimmer {
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2.5s linear infinite;
+  }
+
+  /* ── Scroll-triggered reveal ────────────────────────────────────────────── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.65s ease, transform 0.65s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: none;
+  }
+  .reveal-delay-1 { transition-delay: 0.1s; }
+  .reveal-delay-2 { transition-delay: 0.2s; }
+  .reveal-delay-3 { transition-delay: 0.3s; }
+  .reveal-delay-4 { transition-delay: 0.4s; }
+  .reveal-delay-5 { transition-delay: 0.5s; }
+
+  /* ── Noise texture overlay ──────────────────────────────────────────────── */
+  .noise::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.4;
+  }
+
+  /* ── Tag / badge ────────────────────────────────────────────────────────── */
+  .tag {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide;
+    border: 1px solid currentColor;
+    opacity: 0.85;
+  }
+
+  /* ── Stat counter ───────────────────────────────────────────────────────── */
+  .stat-value {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
   }
 }
 
-/* Respect reduced motion preferences */
+/* ── Respect reduced motion ───────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  *,
-  *::before,
-  *::after {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  *,*::before,*::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
-  .btn-primary:hover,
-  .btn-secondary:hover {
-    transform: none !important;
   }
 }

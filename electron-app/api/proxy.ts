@@ -4,6 +4,7 @@ const ALLOWED_HOSTS = [
   'instagram.com', 'www.instagram.com', 'i.instagram.com',
   'graph.instagram.com', 'api.instagram.com',
   'cdninstagram.com', 'scontent', // IG CDN subdomains
+  'supabase.co', // Supabase storage signed URLs
 ]
 
 function isAllowed(url: string): boolean {

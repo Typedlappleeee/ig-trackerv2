@@ -81,7 +81,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
       onClick={dismiss}
       className={`pointer-events-auto cursor-pointer min-w-[300px] max-w-[360px] rounded-2xl overflow-hidden relative ${exiting ? 'anim-toast-out' : 'anim-toast-in'}`}
       style={{
-        background: 'rgba(8,5,20,0.92)',
+        background: 'rgba(15,16,20,0.92)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         border: `1px solid ${c.border}`,

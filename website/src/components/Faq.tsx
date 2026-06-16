@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { IconPlus, IconTelegram } from './Icons'
 
 const QA = [
@@ -19,12 +19,12 @@ const QA = [
     a: "Les téléphones illimités arrivent dès le plan Organisation. La seule limite c'est ce que GeeLark accepte sur ton compte côté eux.",
   },
   {
-    q: 'C\'est risqué pour mes comptes Instagram ?',
+    q: "C'est risqué pour mes comptes Instagram ?",
     a: "ScaleFlow utilise GeeLark qui simule de vrais devices avec leurs propres IPs/sessions. Tant que tu respectes les rythmes humains (notre auto-warmup le fait pour toi), le risque est très faible. Aucune méthode n'est 100% sans risque.",
   },
   {
     q: 'Je peux annuler quand je veux ?',
-    a: 'Oui, depuis tes paramètres ou directement via Stripe. Tu gardes l\'accès jusqu\'à la fin de la période payée.',
+    a: "Oui, depuis tes paramètres ou directement via Stripe. Tu gardes l'accès jusqu'à la fin de la période payée.",
   },
   {
     q: 'Version web ou téléchargement ?',
@@ -32,11 +32,31 @@ const QA = [
   },
   {
     q: 'Comment je contacte le support ?',
-    a: 'Via Telegram en priorité (@justquentin), ou via le système de tickets directement dans l\'app.',
+    a: "Via Telegram en priorité (@justquentin), ou via le système de tickets directement dans l'app.",
   },
 ]
 
-function FaqItem({ item, isOpen, onToggle, index }: {
+function useReveal() {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add('visible')),
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    )
+    el.querySelectorAll('.reveal').forEach((n) => obs.observe(n))
+    return () => obs.disconnect()
+  }, [])
+  return ref
+}
+
+function FaqItem({
+  item,
+  isOpen,
+  onToggle,
+  index,
+}: {
   item: { q: string; a: string }
   isOpen: boolean
   onToggle: () => void
@@ -45,7 +65,13 @@ function FaqItem({ item, isOpen, onToggle, index }: {
   const panelId = `faq-panel-${index}`
   const btnId = `faq-button-${index}`
   return (
-    <div className="glass overflow-hidden rounded-2xl">
+    <div
+      className="glass overflow-hidden rounded-2xl transition-all duration-300"
+      style={{
+        borderLeft: isOpen ? '3px solid #818CF8' : '3px solid transparent',
+        background: isOpen ? 'rgba(139,92,246,0.06)' : undefined,
+      }}
+    >
       <h3>
         <button
           id={btnId}
@@ -55,13 +81,19 @@ function FaqItem({ item, isOpen, onToggle, index }: {
           aria-controls={panelId}
           className="flex w-full cursor-pointer items-center justify-between gap-3 px-5 py-4 text-left transition-colors duration-200 hover:bg-white/[0.03]"
         >
-          <span className="text-sm font-semibold text-text">{item.q}</span>
-          <IconPlus
-            width={18}
-            height={18}
-            className="shrink-0 text-text2 transition-transform duration-300"
-            style={{ transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)' }}
-          />
+          <span className={`text-[15px] font-semibold transition-colors duration-200 ${isOpen ? 'gradient-text' : 'text-text'}`}>
+            {item.q}
+          </span>
+          <span
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all duration-300"
+            style={{
+              background: isOpen ? 'rgba(129,140,248,0.16)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${isOpen ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
+            }}
+          >
+            <IconPlus width={15} height={15} className={isOpen ? 'text-indigo' : 'text-text2'} />
+          </span>
         </button>
       </h3>
       <div
@@ -72,7 +104,7 @@ function FaqItem({ item, isOpen, onToggle, index }: {
         style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">
-          <p className="px-5 pb-4 text-sm leading-relaxed text-text2">{item.a}</p>
+          <p className="px-5 pb-5 text-sm leading-relaxed text-text2">{item.a}</p>
         </div>
       </div>
     </div>
@@ -81,40 +113,53 @@ function FaqItem({ item, isOpen, onToggle, index }: {
 
 export function Faq() {
   const [open, setOpen] = useState<number | null>(0)
+  const ref = useReveal()
 
   return (
-    <section id="faq" className="relative px-5 py-24">
+    <section id="faq" className="relative px-5 py-28" ref={ref}>
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute right-1/4 top-1/4 h-[440px] w-[440px] rounded-full opacity-[0.05]"
+          style={{ background: 'radial-gradient(circle, #A855F7, transparent)', filter: 'blur(90px)' }}
+        />
+      </div>
+
       <div className="mx-auto max-w-3xl">
-        <div className="mb-12 text-center">
-          <p className="section-label">FAQ</p>
-          <h2 className="mt-3 text-3xl font-extrabold text-text sm:text-5xl">
+        <div className="mb-12 text-center reveal">
+          <span className="section-label">FAQ</span>
+          <h2 className="text-3xl font-black text-text sm:text-5xl">
             On répond à <span className="gradient-text">tout.</span>
           </h2>
+          <p className="mt-4 text-text2">Les questions qu'on nous pose le plus souvent avant de passer au mass posting.</p>
         </div>
 
         <div className="space-y-3">
           {QA.map((item, i) => (
-            <FaqItem
-              key={item.q}
-              item={item}
-              index={i}
-              isOpen={open === i}
-              onToggle={() => setOpen(open === i ? null : i)}
-            />
+            <div key={item.q} className="reveal" style={{ transitionDelay: `${Math.min(i, 5) * 0.06}s` }}>
+              <FaqItem item={item} index={i} isOpen={open === i} onToggle={() => setOpen(open === i ? null : i)} />
+            </div>
           ))}
         </div>
 
-        <div className="glass-strong mt-12 rounded-3xl p-8 text-center">
-          <h3 className="text-xl font-bold text-text">Une autre question ?</h3>
-          <p className="mb-6 mt-2 text-sm text-text2">
-            Réponse en moins d'1h sur Telegram, en moyenne.
+        {/* CTA card */}
+        <div className="reveal relative mt-14 overflow-hidden rounded-3xl glass-strong p-8 text-center sm:p-10">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-px"
+            style={{ background: 'linear-gradient(90deg, transparent, #818CF8, transparent)' }}
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute left-1/2 top-0 h-40 w-72 -translate-x-1/2 rounded-full opacity-20"
+            style={{ background: 'radial-gradient(ellipse, #818CF8, transparent)', filter: 'blur(40px)' }}
+            aria-hidden="true"
+          />
+          <h3 className="text-2xl font-extrabold text-text">
+            Encore une <span className="gradient-text">question ?</span>
+          </h3>
+          <p className="mx-auto mb-7 mt-2 max-w-sm text-sm text-text2">
+            Écris-nous directement sur Telegram. Réponse en moins d'une heure, en moyenne.
           </p>
-          <a
-            href="https://t.me/justquentin"
-            target="_blank"
-            rel="noreferrer"
-            className="btn-primary"
-          >
+          <a href="https://t.me/justquentin" target="_blank" rel="noreferrer" className="btn-primary cursor-pointer">
             <IconTelegram />
             Contacter sur Telegram
           </a>
