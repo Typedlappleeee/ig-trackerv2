@@ -886,19 +886,28 @@ export async function postInstagramStory(
   }
 
   if (imgBase64) {
-    // Push via base64 — base64 only uses A-Za-z0-9+/= which are safe inside single quotes
-    const CHUNK = 4000
-    const BATCH = 12
+    // Push via base64 — base64 only uses A-Za-z0-9+/= which are safe inside single quotes.
+    // CHUNK=2000 / BATCH=4 keeps each shell command under ~9 KB to stay within GeeLark limits.
+    const CHUNK = 2000
+    const BATCH = 4
     const chunks: string[] = []
     for (let i = 0; i < imgBase64.length; i += CHUNK) chunks.push(imgBase64.slice(i, i + CHUNK))
+    log(`   📤 Push base64: ${chunks.length} chunks (${Math.round(imgBase64.length / 1024)} KB)…`)
     await shellExec(bearer, phoneId,
       `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
     for (let b = 1; b < chunks.length; b += BATCH) {
       const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
       await shellExec(bearer, phoneId, cmd)
     }
+    // Verify .b64 file was written before decoding
+    const b64Check = await shellExec(bearer, phoneId, `wc -c < '${imgPath}.b64' 2>/dev/null || echo 0`)
+    const b64Bytes = parseInt(b64Check.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    log(`   📄 Fichier .b64: ${b64Bytes} octets (attendu ~${imgBase64.length})`)
+    // stdin redirect is more portable on Android Toybox/Busybox than filename argument
     await shellExec(bearer, phoneId,
-      `base64 -d '${imgPath}.b64' > '${imgPath}' 2>/dev/null && rm -f '${imgPath}.b64'`)
+      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || ` +
+      `base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; ` +
+      `rm -f '${imgPath}.b64'`)
   } else {
     log('   ⚠️ Fallback: téléchargement sur le téléphone (curl/wget)…')
     await shellExec(bearer, phoneId,
