@@ -953,10 +953,11 @@ export async function postInstagramStory(
     return { ok: false, error: 'Impossible de transférer l\'image sur le téléphone' }
   }
 
-  // Force media scanner so Instagram's gallery picker sees the new file
+  // Force media scanner so Instagram's gallery picker sees the new file.
+  // touch -m ensures the file has the current timestamp → appears FIRST in "Recents".
   await shellExec(bearer, phoneId,
-    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
-  await sleep(2500)
+    `touch -m '${imgPath}' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
+  await sleep(4000)
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
@@ -1035,11 +1036,24 @@ export async function postInstagramStory(
   await sleep(2500)
   await dismissPermissionDialog()
 
-  // Tap the first (most-recent) gallery image — the one we just downloaded.
+  // Tap the first (most-recent) gallery image — the one we just uploaded.
+  // Parse ALL grid items and pick the topmost-leftmost one (smallest y then x),
+  // because the XML order doesn't always match the visual left→right order.
   xml = await dumpXml(bearer, phoneId)
-  const firstThumb =
-    findByResourceId(xml, 'gallery_grid_item', 'media_picker_grid_item') ??
-    [Math.floor(sw * 0.17), Math.floor(sh * 0.28)] as [number, number]
+  const firstThumb = (() => {
+    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+    let best: [number, number] | null = null
+    let bestScore = Infinity
+    let m: RegExpExecArray | null
+    while ((m = re.exec(xml)) !== null) {
+      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
+      const score = y1 * 10000 + x1 // top row first, then leftmost
+      if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
+    }
+    // Fallback: top-left of the grid (below the gallery header)
+    return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)] as [number, number]
+  })()
+  log(`   👆 Tap galerie: ${firstThumb[0]},${firstThumb[1]}`)
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
 
