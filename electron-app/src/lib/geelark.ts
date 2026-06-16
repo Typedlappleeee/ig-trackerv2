@@ -911,36 +911,47 @@ export async function postInstagramStory(
     }
   }
 
-  // Resize + compress via Canvas API (browser + Electron) to keep push fast.
-  // A story image doesn't need more than 1080×1920 JPEG — Instagram resamples anyway.
-  if (imgBase64 && imgBase64.length > 300 * 1024) { // > ~225 KB binary → compress
+  // Resize + compress via Canvas API — always run so even small images use JPEG.
+  // Use Blob URL (not data: URL) to avoid the ~2MB data: URL size limit in browsers.
+  if (imgBase64) {
     try {
       const mimeIn = _imgExt === 'png' ? 'image/png' : _imgExt === 'gif' ? 'image/gif' : 'image/jpeg'
       const compressed = await new Promise<string | null>((resolve) => {
-        const img = new Image()
-        img.onload = () => {
-          const MAX_W = 1080, MAX_H = 1920
-          let w = img.naturalWidth, h = img.naturalHeight
-          if (w > MAX_W || h > MAX_H) {
-            const ratio = Math.min(MAX_W / w, MAX_H / h)
-            w = Math.round(w * ratio); h = Math.round(h * ratio)
+        // atob → Uint8Array → Blob → object URL avoids the data: URL size limit
+        try {
+          const binStr = atob(imgBase64!)
+          const u8 = new Uint8Array(binStr.length)
+          for (let i = 0; i < binStr.length; i++) u8[i] = binStr.charCodeAt(i)
+          const blob = new Blob([u8], { type: mimeIn })
+          const blobUrl = URL.createObjectURL(blob)
+          const img = new Image()
+          img.onload = () => {
+            URL.revokeObjectURL(blobUrl)
+            const MAX_W = 1080, MAX_H = 1920
+            let w = img.naturalWidth, h = img.naturalHeight
+            if (w > MAX_W || h > MAX_H) {
+              const ratio = Math.min(MAX_W / w, MAX_H / h)
+              w = Math.round(w * ratio); h = Math.round(h * ratio)
+            }
+            const canvas = document.createElement('canvas')
+            canvas.width = w; canvas.height = h
+            const ctx = canvas.getContext('2d')
+            if (!ctx) { resolve(null); return }
+            ctx.drawImage(img, 0, 0, w, h)
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+            const comma = dataUrl.indexOf(',')
+            resolve(comma !== -1 ? dataUrl.slice(comma + 1) : null)
           }
-          const canvas = document.createElement('canvas')
-          canvas.width = w; canvas.height = h
-          const ctx = canvas.getContext('2d')
-          if (!ctx) { resolve(null); return }
-          ctx.drawImage(img, 0, 0, w, h)
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-          const comma = dataUrl.indexOf(',')
-          resolve(comma !== -1 ? dataUrl.slice(comma + 1) : null)
-        }
-        img.onerror = () => resolve(null)
-        img.src = `data:${mimeIn};base64,${imgBase64}`
+          img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
+          img.src = blobUrl
+        } catch { resolve(null) }
       })
       if (compressed) {
         log(`   🗜️ Compression: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB JPEG`)
         imgBase64 = compressed
         imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
+      } else {
+        log('   ⚠️ Compression Canvas ignorée — push brut')
       }
     } catch (e) {
       log(`   ⚠️ Compression ignorée (${e instanceof Error ? e.message : String(e)})`)
@@ -1160,9 +1171,14 @@ export async function postInstagramStory(
 
   // ── 6. Drag the link sticker to the bottom-right ───────────────────────────
   log('↘️  Positionnement du sticker en bas à droite…')
-  // The sticker appears roughly centered after confirmation; drag it down-right.
+  // After "Done", IG places the sticker in the upper-center area (~25-35% down).
+  // A 1200ms swipe acts as long-press+drag which triggers the drag handle.
   await shellExec(bearer, phoneId,
-    `input swipe ${cx} ${Math.floor(sh * 0.5)} ${Math.floor(sw * 0.8)} ${Math.floor(sh * 0.82)} 700`)
+    `input swipe ${cx} ${Math.floor(sh * 0.28)} ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.85)} 1200`)
+  await sleep(800)
+  // Second pass in case the first swipe missed — try from a slightly lower start
+  await shellExec(bearer, phoneId,
+    `input swipe ${cx} ${Math.floor(sh * 0.38)} ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.85)} 1200`)
   await sleep(1500)
 
   // ── 7. Publish to "Your story" ─────────────────────────────────────────────
