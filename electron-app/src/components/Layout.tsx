@@ -479,7 +479,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   }
 
   const isVisibleTab = (id: Page): boolean => {
-    if (id === 'licences' || id === 'storylink') return license.isSuperAdmin
+    if (id === 'licences' || id === 'storylink') return license?.isSuperAdmin === true
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
@@ -647,7 +647,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             { section: NAV_SECTIONS[2], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
           ] as Array<{ section: typeof NAV_SECTIONS[0]; labelKey: string; defaultIcon: IconKey }>)
             .map(({ section, labelKey, defaultIcon }) => {
-              const items = section.items.filter(it => isVisibleTab(it.id))
+              const items = section.items.filter(it => isVisibleTab(it.id) && (!it.dev || license?.isSuperAdmin === true))
               if (items.length === 0) return null
               const isOpen = openSections[section.title] !== false
               return (
