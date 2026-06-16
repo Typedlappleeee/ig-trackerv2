@@ -836,7 +836,7 @@ export async function postInstagramStory(
     } catch { /* ignore */ }
     return 'jpg'
   })()
-  const imgPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
+  let imgPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
 
   // Download image as base64 — 3-tier strategy:
   // 1. /api/proxy server-side fetch (web; no CORS, always works)
@@ -908,6 +908,42 @@ export async function postInstagramStory(
       }
     } catch (e) {
       log(`   ⚠️ Electron IPC échoué (${e instanceof Error ? e.message : String(e)})`)
+    }
+  }
+
+  // Resize + compress via Canvas API (browser + Electron) to keep push fast.
+  // A story image doesn't need more than 1080×1920 JPEG — Instagram resamples anyway.
+  if (imgBase64 && imgBase64.length > 300 * 1024) { // > ~225 KB binary → compress
+    try {
+      const mimeIn = _imgExt === 'png' ? 'image/png' : _imgExt === 'gif' ? 'image/gif' : 'image/jpeg'
+      const compressed = await new Promise<string | null>((resolve) => {
+        const img = new Image()
+        img.onload = () => {
+          const MAX_W = 1080, MAX_H = 1920
+          let w = img.naturalWidth, h = img.naturalHeight
+          if (w > MAX_W || h > MAX_H) {
+            const ratio = Math.min(MAX_W / w, MAX_H / h)
+            w = Math.round(w * ratio); h = Math.round(h * ratio)
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = w; canvas.height = h
+          const ctx = canvas.getContext('2d')
+          if (!ctx) { resolve(null); return }
+          ctx.drawImage(img, 0, 0, w, h)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+          const comma = dataUrl.indexOf(',')
+          resolve(comma !== -1 ? dataUrl.slice(comma + 1) : null)
+        }
+        img.onerror = () => resolve(null)
+        img.src = `data:${mimeIn};base64,${imgBase64}`
+      })
+      if (compressed) {
+        log(`   🗜️ Compression: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB JPEG`)
+        imgBase64 = compressed
+        imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
+      }
+    } catch (e) {
+      log(`   ⚠️ Compression ignorée (${e instanceof Error ? e.message : String(e)})`)
     }
   }
 
