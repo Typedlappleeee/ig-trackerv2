@@ -828,7 +828,6 @@ export async function postInstagramStory(
 
   // ── 1. Download image into the phone gallery ───────────────────────────────
   log('🖼 Téléchargement de l\'image…')
-  // Detect real extension from the URL path (handles PNG, WEBP, etc.)
   const _imgExt = (() => {
     try {
       const p = new URL(config.imageUrl).pathname
@@ -838,14 +837,58 @@ export async function postInstagramStory(
     return 'jpg'
   })()
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
-  // Try curl first; fall back to wget if curl isn't available on the device
-  await shellExec(bearer, phoneId,
-    `mkdir -p /sdcard/DCIM/Camera && ` +
-    `(curl -fsSL --max-time 60 -o ${imgPath} "${config.imageUrl}" 2>/dev/null || ` +
-    ` wget -q --timeout=60 -O ${imgPath} "${config.imageUrl}" 2>/dev/null) ; echo DL_DONE`)
+
+  // Primary: download in Electron (guaranteed network/SSL access) then push via base64.
+  // This avoids curl/wget availability issues and SSL cert problems on Android.
+  let pushedViaBase64 = false
+  try {
+    const api = (window as { electronAPI?: { fetchIgVideo?: (o: { url: string }) => Promise<{ ok: boolean; path?: string }>; readFileBytes?: (p: string) => Promise<{ ok: boolean; bytes?: ArrayBuffer }> } }).electronAPI
+    const dlRes = await api?.fetchIgVideo?.({ url: config.imageUrl })
+    if (dlRes?.ok && dlRes?.path) {
+      const readRes = await api?.readFileBytes?.(dlRes.path)
+      if (readRes?.ok && readRes?.bytes) {
+        const u8 = new Uint8Array(readRes.bytes)
+        // Encode as base64 in 8 KB chunks to avoid stack overflow on large images
+        let b64 = ''
+        const CS = 8192
+        for (let i = 0; i < u8.length; i += CS) {
+          b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + CS, u8.length))))
+        }
+        log(`   📦 Push image via base64 (${Math.round(b64.length / 1024)} KB)…`)
+        // Write to phone: split base64 into chunks, batch into few shellExec calls
+        const CHUNK = 4000
+        const BATCH = 12
+        const chunks: string[] = []
+        for (let i = 0; i < b64.length; i += CHUNK) chunks.push(b64.slice(i, i + CHUNK))
+        // First chunk: create file
+        await shellExec(bearer, phoneId,
+          `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+        // Remaining chunks: append in batches (base64 only uses A-Za-z0-9+/= — safe in single quotes)
+        for (let b = 1; b < chunks.length; b += BATCH) {
+          const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+          await shellExec(bearer, phoneId, cmd)
+        }
+        // Decode and clean up
+        await shellExec(bearer, phoneId,
+          `base64 -d '${imgPath}.b64' > '${imgPath}' 2>/dev/null && rm -f '${imgPath}.b64'`)
+        pushedViaBase64 = true
+        log(`   ✅ Image poussée via Electron`)
+      }
+    }
+  } catch (e) {
+    log(`   ⚠️ Push Electron échoué (${e instanceof Error ? e.message : String(e)}) — fallback curl…`)
+  }
+
+  if (!pushedViaBase64) {
+    // Fallback: download directly on the phone (requires curl or wget + internet access)
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera && ` +
+      `(curl -fsSLk --max-time 60 -o '${imgPath}' '${config.imageUrl}' 2>/dev/null || ` +
+      ` wget -q --no-check-certificate --timeout=60 -O '${imgPath}' '${config.imageUrl}' 2>/dev/null)`)
+  }
+
   // Verify the file was actually written (anything > 2 KB is likely a real image)
-  const checkDl = await shellExec(bearer, phoneId,
-    `wc -c < ${imgPath} 2>/dev/null || echo 0`)
+  const checkDl = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
   const dlBytes = parseInt(checkDl.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
   log(`   📎 Image (${_imgExt}): ${dlBytes} octets`)
   if (dlBytes < 2000) {
@@ -1187,11 +1230,15 @@ async function runWarmupActions(
 }
 
 // Escape text for use inside an Android `input text "..."` shell command.
+// Rules: the string is passed as a double-quoted shell argument, so only
+// the chars special in that context need escaping.  Single quote ' is
+// NOT special inside double quotes — escaping it as \' would inject a
+// literal backslash which Android keyboards often map to / or other chars.
 function escapeForInputText(text: string): string {
   return text
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g,  '\\"')
-    .replace(/'/g,  "\\'")
+    .replace(/\\/g, '\\\\')  // \ → \\ (must be first)
+    .replace(/"/g,  '\\"')   // " → \"
+    // ' is literal inside "…" — no escaping needed
     .replace(/&/g,  '\\&')
     .replace(/</g,  '\\<')
     .replace(/>/g,  '\\>')
