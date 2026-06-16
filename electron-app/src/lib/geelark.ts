@@ -826,8 +826,8 @@ export async function postInstagramStory(
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
 
-  // ── 1. Download image into the phone gallery ───────────────────────────────
-  log('🖼 Téléchargement de l\'image…')
+  // ── 1. Push image to phone gallery ────────────────────────────────────────
+  log('🖼 Chargement de l\'image…')
   const _imgExt = (() => {
     try {
       const p = new URL(config.imageUrl).pathname
@@ -836,168 +836,124 @@ export async function postInstagramStory(
     } catch { /* ignore */ }
     return 'jpg'
   })()
-  let imgPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
+  // Always save as jpg on phone (Instagram accepts JPEG; avoids PNG classification issues)
+  const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
+  let imgOnPhone = false
 
-  // Download image as base64 — 3-tier strategy:
-  // 1. /api/proxy server-side fetch (web; no CORS, always works)
-  // 2. Direct browser fetch (Electron renderer; full network access)
-  // 3. Electron IPC (last resort for CSP-blocked renderer)
-  let imgBase64: string | null = null
-
-  // Helper: convert ArrayBuffer → base64 string
-  function bufToB64(buf: ArrayBuffer): string {
-    const u8 = new Uint8Array(buf)
-    let b64 = ''
-    const CS = 8192
-    for (let i = 0; i < u8.length; i += CS) {
-      b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + CS, u8.length))))
-    }
-    return b64
-  }
-
-  // Tier 1: server-side proxy (/api/proxy) — works on web, avoids CORS entirely
+  // PRIMARY: upload to GeeLark CDN server-side (Vercel → GeeLark S3), then wget on phone.
+  // Same mechanism as mass posting — CDN URLs are always reachable from GeeLark phones.
   try {
-    const proxyRes = await fetch('/api/proxy', {
+    log('   ☁️ Upload CDN GeeLark (côté serveur)…')
+    const upRes = await fetch('/api/geelark-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: config.imageUrl }),
+      body: JSON.stringify({ signedUrl: config.imageUrl, bearer }),
     })
-    if (proxyRes.ok) {
-      const data = await proxyRes.json()
-      if (data.ok && data.dataUrl) {
-        // data.dataUrl = "data:image/png;base64,XXXXXXX"
-        const comma = data.dataUrl.indexOf(',')
-        if (comma !== -1) {
-          imgBase64 = data.dataUrl.slice(comma + 1)
-          log(`   📥 Image via proxy serveur (${Math.round(imgBase64.length / 1024)} KB)`)
-        }
-      } else if (data.ok === false) {
-        log(`   ⚠️ Proxy: ${data.error ?? 'erreur inconnue'}`)
+    const upData: { ok: boolean; token?: string; error?: string } = upRes.ok
+      ? await upRes.json()
+      : { ok: false, error: `HTTP ${upRes.status}` }
+
+    if (upData.ok && upData.token) {
+      const cdnUrl = upData.token
+      log('   📲 Téléchargement depuis CDN GeeLark…')
+      await shellExec(bearer, phoneId,
+        `mkdir -p /sdcard/DCIM/Camera && ` +
+        `(curl -fsSLk --max-time 90 -o '${imgPath}' '${cdnUrl}' 2>/dev/null || ` +
+        ` wget -q --no-check-certificate --timeout=90 -O '${imgPath}' '${cdnUrl}' 2>/dev/null)`)
+      const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+      const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+      if (sz > 2000) {
+        log(`   ✅ Image via CDN GeeLark (${sz} octets)`)
+        imgOnPhone = true
+      } else {
+        log(`   ⚠️ CDN wget: ${sz} octets — passage au fallback base64`)
       }
+    } else {
+      log(`   ⚠️ CDN upload: ${upData.error ?? 'échec inconnu'}`)
     }
   } catch (e) {
-    log(`   ⚠️ Proxy échoué (${e instanceof Error ? e.message : String(e)})`)
+    log(`   ⚠️ CDN: ${e instanceof Error ? e.message : String(e)}`)
   }
 
-  // Tier 2: direct browser fetch (Electron renderer / CORS-friendly origins)
-  if (!imgBase64) {
+  // FALLBACK: download in browser, compress with OffscreenCanvas, push via base64 chunks.
+  if (!imgOnPhone) {
+    log('   🔄 Fallback base64…')
+    let imgBase64: string | null = null
+
+    const bufToB64 = (buf: ArrayBuffer): string => {
+      const u8 = new Uint8Array(buf)
+      let b64 = ''
+      for (let i = 0; i < u8.length; i += 8192)
+        b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + 8192, u8.length))))
+      return b64
+    }
+
+    // Download image client-side
     try {
       const resp = await fetch(config.imageUrl)
       if (resp.ok) {
         imgBase64 = bufToB64(await resp.arrayBuffer())
-        log(`   📥 Image via fetch direct (${Math.round(imgBase64.length / 1024)} KB)`)
-      } else {
-        log(`   ⚠️ fetch HTTP ${resp.status}`)
+        log(`   📥 Image téléchargée (${Math.round(imgBase64.length / 1024)} KB)`)
       }
-    } catch (e) {
-      log(`   ⚠️ fetch échoué (${e instanceof Error ? e.message : String(e)})`)
-    }
-  }
+    } catch { /* ignore */ }
 
-  // Tier 3: Electron IPC (if renderer blocked by CSP)
-  if (!imgBase64) {
-    try {
-      const api = (window as { electronAPI?: { fetchIgVideo?: (o: { url: string }) => Promise<{ ok: boolean; path?: string }>; readFileBytes?: (p: string) => Promise<{ ok: boolean; bytes?: ArrayBuffer }> } }).electronAPI
-      const dlRes = await api?.fetchIgVideo?.({ url: config.imageUrl })
-      if (dlRes?.ok && dlRes?.path) {
-        const readRes = await api?.readFileBytes?.(dlRes.path)
-        if (readRes?.ok && readRes?.bytes) {
-          imgBase64 = bufToB64(readRes.bytes)
-          log(`   📥 Image via Electron IPC (${Math.round(imgBase64.length / 1024)} KB)`)
+    // Compress via OffscreenCanvas (no DOM needed, no data: URL size limit)
+    if (imgBase64) {
+      try {
+        const mimeIn = _imgExt === 'png' ? 'image/png' : 'image/jpeg'
+        const binStr = atob(imgBase64)
+        const u8in = new Uint8Array(binStr.length)
+        for (let i = 0; i < binStr.length; i++) u8in[i] = binStr.charCodeAt(i)
+        const inBlob = new Blob([u8in], { type: mimeIn })
+        const bitmap = await createImageBitmap(inBlob)
+        const MAX_W = 1080, MAX_H = 1920
+        let w = bitmap.width, h = bitmap.height
+        if (w > MAX_W || h > MAX_H) {
+          const r = Math.min(MAX_W / w, MAX_H / h)
+          w = Math.round(w * r); h = Math.round(h * r)
         }
-      }
-    } catch (e) {
-      log(`   ⚠️ Electron IPC échoué (${e instanceof Error ? e.message : String(e)})`)
-    }
-  }
-
-  // Resize + compress via Canvas API — always run so even small images use JPEG.
-  // Use Blob URL (not data: URL) to avoid the ~2MB data: URL size limit in browsers.
-  if (imgBase64) {
-    try {
-      const mimeIn = _imgExt === 'png' ? 'image/png' : _imgExt === 'gif' ? 'image/gif' : 'image/jpeg'
-      const compressed = await new Promise<string | null>((resolve) => {
-        // atob → Uint8Array → Blob → object URL avoids the data: URL size limit
-        try {
-          const binStr = atob(imgBase64!)
-          const u8 = new Uint8Array(binStr.length)
-          for (let i = 0; i < binStr.length; i++) u8[i] = binStr.charCodeAt(i)
-          const blob = new Blob([u8], { type: mimeIn })
-          const blobUrl = URL.createObjectURL(blob)
-          const img = new Image()
-          img.onload = () => {
-            URL.revokeObjectURL(blobUrl)
-            const MAX_W = 1080, MAX_H = 1920
-            let w = img.naturalWidth, h = img.naturalHeight
-            if (w > MAX_W || h > MAX_H) {
-              const ratio = Math.min(MAX_W / w, MAX_H / h)
-              w = Math.round(w * ratio); h = Math.round(h * ratio)
-            }
-            const canvas = document.createElement('canvas')
-            canvas.width = w; canvas.height = h
-            const ctx = canvas.getContext('2d')
-            if (!ctx) { resolve(null); return }
-            ctx.drawImage(img, 0, 0, w, h)
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-            const comma = dataUrl.indexOf(',')
-            resolve(comma !== -1 ? dataUrl.slice(comma + 1) : null)
-          }
-          img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
-          img.src = blobUrl
-        } catch { resolve(null) }
-      })
-      if (compressed) {
+        const oc = new OffscreenCanvas(w, h)
+        const ctx = oc.getContext('2d')!
+        ctx.drawImage(bitmap, 0, 0, w, h)
+        const outBlob = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.85 })
+        const outBuf = await outBlob.arrayBuffer()
+        const compressed = bufToB64(outBuf)
         log(`   🗜️ Compression: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB JPEG`)
         imgBase64 = compressed
-        imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
-      } else {
-        log('   ⚠️ Compression Canvas ignorée — push brut')
+      } catch (e) {
+        log(`   ⚠️ Compression ignorée (${e instanceof Error ? e.message : String(e)})`)
       }
-    } catch (e) {
-      log(`   ⚠️ Compression ignorée (${e instanceof Error ? e.message : String(e)})`)
     }
+
+    // Push via base64 shell chunks
+    if (imgBase64) {
+      const CHUNK = 2000, BATCH = 6
+      const chunks: string[] = []
+      for (let i = 0; i < imgBase64.length; i += CHUNK) chunks.push(imgBase64.slice(i, i + CHUNK))
+      log(`   📤 Push base64: ${chunks.length} chunks…`)
+      await shellExec(bearer, phoneId,
+        `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+      for (let b = 1; b < chunks.length; b += BATCH) {
+        const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+        await shellExec(bearer, phoneId, cmd)
+      }
+      await shellExec(bearer, phoneId,
+        `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || ` +
+        `base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; ` +
+        `rm -f '${imgPath}.b64'`)
+    }
+
+    const ck2 = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+    const sz2 = parseInt(ck2.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    if (sz2 > 2000) { imgOnPhone = true; log(`   ✅ Image via base64 (${sz2} octets)`) }
+    else { log(`   ❌ Fallback base64: ${sz2} octets`) }
   }
 
-  if (imgBase64) {
-    // Push via base64 — base64 only uses A-Za-z0-9+/= which are safe inside single quotes.
-    // CHUNK=2000 / BATCH=4 keeps each shell command under ~9 KB to stay within GeeLark limits.
-    const CHUNK = 2000
-    const BATCH = 4
-    const chunks: string[] = []
-    for (let i = 0; i < imgBase64.length; i += CHUNK) chunks.push(imgBase64.slice(i, i + CHUNK))
-    log(`   📤 Push base64: ${chunks.length} chunks (${Math.round(imgBase64.length / 1024)} KB)…`)
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-    for (let b = 1; b < chunks.length; b += BATCH) {
-      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-      await shellExec(bearer, phoneId, cmd)
-    }
-    // Verify .b64 file was written before decoding
-    const b64Check = await shellExec(bearer, phoneId, `wc -c < '${imgPath}.b64' 2>/dev/null || echo 0`)
-    const b64Bytes = parseInt(b64Check.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    log(`   📄 Fichier .b64: ${b64Bytes} octets (attendu ~${imgBase64.length})`)
-    // stdin redirect is more portable on Android Toybox/Busybox than filename argument
-    await shellExec(bearer, phoneId,
-      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || ` +
-      `base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; ` +
-      `rm -f '${imgPath}.b64'`)
-  } else {
-    log('   ⚠️ Fallback: téléchargement sur le téléphone (curl/wget)…')
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera && ` +
-      `(curl -fsSLk --max-time 60 -o '${imgPath}' '${config.imageUrl}' 2>/dev/null || ` +
-      ` wget -q --no-check-certificate --timeout=60 -O '${imgPath}' '${config.imageUrl}' 2>/dev/null)`)
+  if (!imgOnPhone) {
+    return { ok: false, error: 'Impossible de transférer l\'image sur le téléphone' }
   }
 
-  // Verify the file was actually written (anything > 2 KB is likely a real image)
-  const checkDl = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-  const dlBytes = parseInt(checkDl.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-  log(`   📎 Image (${_imgExt}): ${dlBytes} octets`)
-  if (dlBytes < 2000) {
-    log(`   ❌ Échec téléchargement image (${dlBytes} octets)`)
-    return { ok: false, error: 'Impossible de télécharger l\'image sur le téléphone' }
-  }
-  // Force media scanner to index the file so Instagram's gallery picker sees it
+  // Force media scanner so Instagram's gallery picker sees the new file
   await shellExec(bearer, phoneId,
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
   await sleep(2500)
