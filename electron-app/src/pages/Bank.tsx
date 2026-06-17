@@ -2261,9 +2261,12 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                         {mode === 'multi' && !isItemSelected && (
                           <div className="absolute top-2 right-2 w-6 h-6 rounded-full border-2 border-white/50 bg-black/30" />
                         )}
-                        <p className="absolute bottom-2 left-2 right-2 text-[11px] font-semibold text-white truncate">
-                          {item.title}
-                        </p>
+                        <div className="absolute bottom-2 left-2 right-2 flex flex-col gap-0.5">
+                          {item.notes && (
+                            <p className="text-[9px] text-white/60 truncate">{item.notes}</p>
+                          )}
+                          <p className="text-[11px] font-semibold text-white truncate">{item.title}</p>
+                        </div>
                       </div>
                     </button>
                   )
