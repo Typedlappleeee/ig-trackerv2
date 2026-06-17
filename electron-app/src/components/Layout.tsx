@@ -247,6 +247,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     const v = localStorage.getItem('sf-sidebar')
     return v === 'reduite' || v === 'masquee'
   })
+  const [demoMode, setDemoMode] = useState(false)
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('sidebar-sections') ?? '{}')
@@ -478,10 +480,14 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     setShowAddAccount(true)
   }
 
+  const effectiveRole = demoMode ? 'member' : role
+  const effectivePerms = demoMode ? {} : perms
+  const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
+
   const isVisibleTab = (id: Page): boolean => {
-    if (id === 'licences' || id === 'storylink') return license?.isSuperAdmin === true
+    if (id === 'licences' || id === 'storylink') return effectiveSuperAdmin
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
-    return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
+    return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }
 
   // Auto-redirect to the hub when the current page isn’t accessible in this org
@@ -647,7 +653,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             { section: NAV_SECTIONS[2], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
           ] as Array<{ section: typeof NAV_SECTIONS[0]; labelKey: string; defaultIcon: IconKey }>)
             .map(({ section, labelKey, defaultIcon }) => {
-              const items = section.items.filter(it => isVisibleTab(it.id) && (!it.dev || license?.isSuperAdmin === true))
+              const items = section.items.filter(it => isVisibleTab(it.id) && (!it.dev || effectiveSuperAdmin))
               if (items.length === 0) return null
               const isOpen = openSections[section.title] !== false
               return (
@@ -918,6 +924,31 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               </div>
             )}
 
+            {/* Demo mode toggle — super admin only */}
+            {license?.isSuperAdmin === true && (
+              <button
+                onClick={() => setDemoMode(d => !d)}
+                title={demoMode ? 'Quitter le mode démo' : 'Activer la vue utilisateur (démo)'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '0 10px', height: 32, borderRadius: 8,
+                  border: demoMode ? '1px solid rgba(251,146,60,0.5)' : '1px solid rgba(255,255,255,0.07)',
+                  background: demoMode ? 'rgba(251,146,60,0.12)' : 'transparent',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  fontSize: 11, fontWeight: 600,
+                  color: demoMode ? '#FB923C' : 'rgba(233,234,240,0.42)',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = demoMode ? 'rgba(251,146,60,0.2)' : 'rgba(255,255,255,0.05)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = demoMode ? 'rgba(251,146,60,0.12)' : 'transparent' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                {demoMode ? 'Vue démo' : 'Démo'}
+              </button>
+            )}
+
             {/* Notification bell */}
             <div style={{ position: 'relative' }} ref={notifRef}>
               <button
@@ -1059,6 +1090,29 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
         {/* ── Scrollable content ────────────────────────────────────────── */}
         <main style={{ flex: 1, overflow: 'auto', position: 'relative', background: '#0A0B0E', zIndex: 0 }}>
+          {/* Demo mode banner */}
+          {demoMode && (
+            <div style={{
+              position: 'sticky', top: 0, zIndex: 40,
+              background: 'linear-gradient(90deg, rgba(251,146,60,0.15), rgba(251,146,60,0.08))',
+              borderBottom: '1px solid rgba(251,146,60,0.25)',
+              padding: '7px 16px',
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FB923C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#FB923C', flex: 1 }}>
+                Mode démo — vue utilisateur (membre)
+              </span>
+              <button
+                onClick={() => setDemoMode(false)}
+                style={{ fontSize: 11, color: 'rgba(251,146,60,0.7)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 8px', borderRadius: 6 }}
+              >
+                Quitter
+              </button>
+            </div>
+          )}
           {/* Org-switch loading overlay */}
           {orgLoading && (
             <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm flex items-center justify-center">
