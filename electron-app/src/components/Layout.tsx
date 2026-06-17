@@ -759,7 +759,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               <span style={{ color: 'rgba(233,234,240,0.42)', flexShrink: 0, display: 'flex' }}>
                 <NavIcon d={ICONS.building} size={14} />
               </span>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(241,240,247,0.8)', fontSize: 12 }}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(241,240,247,0.8)', fontSize: 12, filter: demoMode ? 'blur(6px)' : 'none', userSelect: demoMode ? 'none' : 'auto' }}>
                 {currentOrg?.name ?? 'Organisation'}
               </span>
               <span style={{ color: 'rgba(233,234,240,0.32)', flexShrink: 0, display: 'flex' }}>
@@ -789,15 +789,16 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               boxShadow: '0 0 8px rgba(99,102,241,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
+              filter: demoMode ? 'blur(5px)' : 'none',
             }}>
               {userInitial}
             </div>
             {!collapsed && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: '#F1F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#F1F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', filter: demoMode ? 'blur(6px)' : 'none', userSelect: demoMode ? 'none' : 'auto' }}>
                   {userName}
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', marginTop: 1 }}>
+                <div style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', marginTop: 1, filter: demoMode ? 'blur(4px)' : 'none', userSelect: demoMode ? 'none' : 'auto' }}>
                   {planLabel}
                 </div>
               </div>
