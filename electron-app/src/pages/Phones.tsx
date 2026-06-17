@@ -1826,7 +1826,7 @@ export function Phones({ user }: PhonesProps) {
             position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
             zIndex: 40, display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 14px', borderRadius: 14,
-            background: 'var(--surface2)', border: '1px solid rgba(99,102,241,0.35)',
+            background: 'var(--surface-2)', border: '1px solid rgba(99,102,241,0.35)',
             boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 24px -8px rgba(99,102,241,0.4)',
             whiteSpace: 'nowrap',
           }}>
