@@ -1186,17 +1186,6 @@ export function Phones({ user }: PhonesProps) {
               <h1 className="sf-page-title">{t('phonesHeading')}</h1>
               <p className="sf-page-sub">{t('phonesSubtitle')}</p>
             </div>
-            <h1 style={{ margin: 0, lineHeight: 1.05, letterSpacing: '-0.04em' }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 26, color: IVORY }}>
-                {headingMain}
-              </span>
-              {headingAccent && (
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 29, color: GOLD, marginLeft: '0.25em' }}>
-                  {headingAccent}
-                </span>
-              )}
-            </h1>
-            <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: '7px 0 0', lineHeight: 1.5 }}>{t('phonesSubtitle')}</p>
           </div>
 
           {/* Right: auto-refresh + sync */}
