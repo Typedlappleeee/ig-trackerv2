@@ -192,6 +192,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   useHubCSS()
 
   const [loading, setLoading] = useState(true)
+  const [displayName, setDisplayName] = useState<string | null>(null)
   const [phoneCount, setPhoneCount]   = useState(0)
   const [videoCount, setVideoCount]   = useState(0)
   const [weekPosts,  setWeekPosts]    = useState(0)
@@ -241,6 +242,11 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+      .then(({ data }) => { if (data?.display_name) setDisplayName(data.display_name) })
+  }, [user.id])
+
   // Live refresh: any change to scheduled_posts (post done, new schedule…)
   // reloads the dashboard so KPIs and lists stay current.
   useEffect(() => {
@@ -262,7 +268,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
   const { lang } = useLang()
   const locale = lang === 'en' ? 'en-US' : 'fr-FR'
-  const firstName = (user.email?.split('@')[0] ?? 'créateur').replace(/[._]/g, ' ')
+  const firstName = displayName ?? (user.email?.split('@')[0] ?? 'créateur').replace(/[._]/g, ' ')
   const greeting = (() => {
     const h = new Date().getHours()
     if (h < 6)  return t('hubGreetingNight')
