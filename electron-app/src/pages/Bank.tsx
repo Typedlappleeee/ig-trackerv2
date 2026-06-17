@@ -2072,6 +2072,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ data }) => {
       let rows = (data ?? []) as ContentItem[]
+      rows = rows.filter(i => !(i.notes === '__sf_folder__' && !i.storage_path && !i.file_url))
       if (role) rows = rows.filter(i => canAccessBankFolder(role, perms, i.folder ?? null))
       setItems(rows)
       setLoading(false)
