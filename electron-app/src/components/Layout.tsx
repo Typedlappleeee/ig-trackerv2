@@ -248,6 +248,12 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     return v === 'reduite' || v === 'masquee'
   })
   const [demoMode, setDemoMode] = useState(false)
+  const [displayName, setDisplayName] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+      .then(({ data }) => { if (data?.display_name) setDisplayName(data.display_name) })
+  }, [user.id])
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
@@ -514,8 +520,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     }
   }, [page])
 
-  const userInitial = user.email?.[0].toUpperCase() ?? '?'
-  const userName = user.email?.split('@')[0] ?? userInitial
+  const userDisplayName = displayName || user.email?.split('@')[0] || ''
+  const userInitial = userDisplayName?.[0]?.toUpperCase() ?? '?'
+  const userName = userDisplayName
   const planLabel = license.isSuperAdmin
     ? 'Super Admin'
     : license.plan === 'organisation' ? 'Organisation'
