@@ -163,96 +163,125 @@ async function resolveTaskVideoToken(bearer: string, video: TaskVideo): Promise<
 }
 
 async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
-  if (!bearer)             throw new Error('Aucun token GéeLark configuré')
-  if (!task.phones.length) throw new Error('Aucun téléphone dans la tâche')
-  if (!task.videos.length) throw new Error('Aucune vidéo dans la tâche')
-
-  const nowIso = new Date().toISOString()
+  const nowIso     = new Date().toISOString()
   const logs: string[] = []
-  const log = (msg: string) => logs.push(msg)
-
-  // 1. Résolution des tokens vidéo (upload vers GeeLark si URL Supabase)
-  log(`▶ [client] Résolution des tokens vidéo (${task.videos.length})…`)
-  const tokens: string[] = []
-  for (const v of task.videos) {
-    try {
-      tokens.push(await resolveTaskVideoToken(bearer, v))
-      log(`✅ Vidéo résolue : ${v.title || v.token.slice(-20)}`)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      log(`❌ Résolution vidéo échouée (${v.title || '?'}): ${msg}`)
-      throw new Error(`Impossible de résoudre la vidéo "${v.title || '?'}": ${msg}`)
-    }
-  }
-
-  // 2. Démarrage des téléphones
-  const phoneIds = task.phones.map(p => p.geelark_id)
-  log(`▶ [client] Démarrage de ${phoneIds.length} téléphone(s)…`)
-  const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
-  if (startRes['code'] !== 0) log(`⚠ Démarrage: ${startRes['msg'] ?? startRes['code']}`)
-  await new Promise(r => setTimeout(r, 30_000))
-
-  // 3. Création des tâches RPA (instagramPubReels)
-  const baseTs = Math.floor(Date.now() / 1000)
-  const rpaIds: string[] = []
-  let fails = 0
-  for (let i = 0; i < task.phones.length; i++) {
-    const phone  = task.phones[i]
-    const vidIdx = task.mode === 'random'
-      ? Math.floor(Math.random() * tokens.length)
-      : i % tokens.length
-    const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
-      id:          phone.geelark_id,
-      scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
-      description: task.caption,
-      video:       [tokens[vidIdx]],
-      ...(task.reels_trial ? { shareType: 2 } : {}),
-    })
-    if (res['code'] === 0) {
-      const tid = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
-      if (tid) rpaIds.push(tid)
-      log(`✅ ${phone.ig_username ?? phone.phone_name}`)
-    } else {
-      fails++
-      log(`❌ ${phone.ig_username ?? phone.phone_name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
-    }
-  }
-
-  // 4. Mise à jour Supabase (historique + prochain run)
+  const log = (msg: string) => { logs.push(msg); console.log('[Task]', msg) }
   const recurHours = Number(task.recur_hours) || 24
   const nextRunAt  = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
 
-  await supabase.from('scheduled_posts').insert({
-    user_id:         task.user_id,
-    org_id:          task.org_id ?? null,
-    created_by_name: task.name || 'Tâche auto',
-    type:            'mass_posting',
-    status:          fails < task.phones.length ? 'done' : 'failed',
-    scheduled_at:    nowIso,
-    executed_at:     new Date().toISOString(),
-    phones:          task.phones,
-    videos:          task.videos,
-    caption:         task.caption,
-    delay_minutes:   task.delay_minutes ?? 0,
-    mode:            task.mode ?? 'seq',
-    bearer_token:    '',
-    reels_trial:     task.reels_trial ?? false,
-    task_id:         task.id,
-    result:          { logs },
-    error_msg:       fails >= task.phones.length ? 'Toutes les tâches RPA ont échoué' : null,
-  }).then(() => {}, () => {})
+  // Toujours écrire l'historique + reset le timer, même en cas d'erreur
+  const saveResult = async (status: 'done' | 'failed', errorMsg?: string) => {
+    await supabase.from('scheduled_posts').insert({
+      user_id:         task.user_id,
+      org_id:          task.org_id ?? null,
+      created_by_name: task.name || 'Tâche auto',
+      type:            'mass_posting',
+      status,
+      scheduled_at:    nowIso,
+      executed_at:     new Date().toISOString(),
+      phones:          task.phones,
+      videos:          task.videos,
+      caption:         task.caption,
+      delay_minutes:   task.delay_minutes ?? 0,
+      mode:            task.mode ?? 'seq',
+      bearer_token:    '',
+      reels_trial:     task.reels_trial ?? false,
+      task_id:         task.id,
+      result:          { logs },
+      error_msg:       errorMsg ?? null,
+    }).then(() => {}, () => {})
+    await supabase.from('recurring_tasks').update({
+      next_run_at: nextRunAt,
+      last_run_at: nowIso,
+      run_count:   (Number(task.run_count) || 0) + 1,
+    }).eq('id', task.id)
+  }
 
-  await supabase.from('recurring_tasks').update({
-    next_run_at: nextRunAt,
-    last_run_at: nowIso,
-    run_count:   (Number(task.run_count) || 0) + 1,
-  }).eq('id', task.id)
+  if (!bearer) {
+    log('❌ Aucun token GéeLark configuré (bearer vide)')
+    await saveResult('failed', 'bearer vide')
+    return
+  }
+  if (!task.phones.length) {
+    log('❌ Aucun téléphone dans la tâche')
+    await saveResult('failed', 'aucun téléphone')
+    return
+  }
+  if (!task.videos.length) {
+    log('❌ Aucune vidéo dans la tâche')
+    await saveResult('failed', 'aucune vidéo')
+    return
+  }
 
-  log(`⏰ Prochain post dans ${recurHours}h`)
+  try {
+    // 1. Résolution des tokens vidéo
+    log(`▶ [client] Résolution des tokens vidéo (${task.videos.length})…`)
+    const tokens: string[] = []
+    for (const v of task.videos) {
+      try {
+        const tok = await resolveTaskVideoToken(bearer, v)
+        tokens.push(tok)
+        log(`✅ Vidéo OK : ${v.title || tok.slice(0, 40)}`)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        log(`❌ Token vidéo échoué (${v.title || '?'}): ${msg}`)
+        tokens.push('')  // placeholder — sera filtré avant l'appel RPA
+      }
+    }
 
-  // 5. Arrêt des téléphones (après 5 s pour laisser GeeLark prendre la tâche RPA)
-  await new Promise(r => setTimeout(r, 5_000))
-  await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+    const validTokens = tokens.filter(Boolean)
+    if (!validTokens.length) {
+      const errMsg = 'Résolution de tous les tokens vidéo a échoué — voir logs ci-dessus'
+      log(`❌ ${errMsg}`)
+      await saveResult('failed', errMsg)
+      return
+    }
+
+    // 2. Démarrage des téléphones
+    const phoneIds = task.phones.map(p => p.geelark_id)
+    log(`▶ [client] Démarrage de ${phoneIds.length} téléphone(s)…`)
+    const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
+    if (startRes['code'] !== 0) log(`⚠ Démarrage: ${startRes['msg'] ?? startRes['code']}`)
+    await new Promise(r => setTimeout(r, 30_000))
+
+    // 3. Tâches RPA
+    const baseTs = Math.floor(Date.now() / 1000)
+    const rpaIds: string[] = []
+    let fails = 0
+    for (let i = 0; i < task.phones.length; i++) {
+      const phone  = task.phones[i]
+      const vidIdx = task.mode === 'random'
+        ? Math.floor(Math.random() * validTokens.length)
+        : i % validTokens.length
+      const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
+        id:          phone.geelark_id,
+        scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
+        description: task.caption,
+        video:       [validTokens[vidIdx]],
+        ...(task.reels_trial ? { shareType: 2 } : {}),
+      })
+      if (res['code'] === 0) {
+        const tid = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+        if (tid) rpaIds.push(tid)
+        log(`✅ ${phone.ig_username ?? phone.phone_name}`)
+      } else {
+        fails++
+        log(`❌ ${phone.ig_username ?? phone.phone_name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
+      }
+    }
+
+    const errMsg = fails >= task.phones.length ? 'Toutes les tâches RPA ont échoué' : undefined
+    log(`⏰ Prochain post dans ${recurHours}h`)
+    await saveResult(fails < task.phones.length ? 'done' : 'failed', errMsg)
+
+    // 4. Arrêt des téléphones
+    await new Promise(r => setTimeout(r, 5_000))
+    await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    log(`❌ Erreur inattendue: ${msg}`)
+    await saveResult('failed', msg)
+  }
 }
 
 function formatInterval(hours: number): string {
