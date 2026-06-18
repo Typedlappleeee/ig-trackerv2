@@ -39,7 +39,7 @@ import { useOrg } from '@/lib/orgContext'
 import {
   loadScheduledPosts, cancelScheduledPost, claimScheduledPost,
   executeScheduledPost, finishScheduledPost, failStaleRunningPosts,
-  fmtScheduledTime, timeUntil,
+  createScheduledPost, fmtScheduledTime, timeUntil,
   type ScheduledPost, type ScheduleStatus,
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
@@ -461,6 +461,30 @@ export function Scheduler({ user, onNavigate }: Props) {
       await finishScheduledPost(post.id, ok, msgs, ok ? undefined : msgs[msgs.length - 1])
       setRunningPost(null)
       runningRef.current.delete(post.id)
+      // Auto-reschedule recurring posts
+      if (ok && post.recur_hours && post.recur_hours > 0) {
+        try {
+          const nextAt = new Date(Date.now() + post.recur_hours * 60 * 60 * 1000)
+          await createScheduledPost({
+            userId:        post.user_id,
+            orgId:         post.org_id,
+            createdByName: post.created_by_name,
+            type:          post.type,
+            scheduledAt:   nextAt,
+            phones:        post.phones,
+            videos:        post.videos,
+            caption:       post.caption,
+            delayMinutes:  post.delay_minutes,
+            mode:          post.mode,
+            bearerToken:   '',
+            reelsTrial:    post.reels_trial,
+            recurHours:    post.recur_hours,
+          })
+          onLog(`🔄 Prochain post récurrent programmé dans ${post.recur_hours}h`)
+        } catch (e) {
+          onLog(`⚠ Récurrence : impossible de créer le prochain post — ${e instanceof Error ? e.message : String(e)}`)
+        }
+      }
       // Notify completion (toast + system notification)
       const typeLabel = post.type === 'story' ? 'Stories' : post.type === 'mass_posting' ? 'Mass posting' : 'Posting'
       toast.show({
@@ -1036,6 +1060,16 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           <StatusPill status={post.status} />
           <TypeBadge type={post.type} />
+          {post.recur_hours && post.recur_hours > 0 ? (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              background: 'rgba(99,102,241,0.1)', color: '#818CF8',
+              border: '1px solid rgba(99,102,241,0.25)',
+              borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600,
+            }}>
+              ↺ {post.recur_hours}h
+            </span>
+          ) : null}
 
           {post.created_by_name && (
             <span style={{

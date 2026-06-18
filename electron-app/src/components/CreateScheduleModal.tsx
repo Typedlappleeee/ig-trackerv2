@@ -45,6 +45,8 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
   const [schedAt, setSchedAt]           = useState(defaultSchedValue(60))
   const [delayMin, setDelayMin]         = useState(0)
   const [reelsTrial, setReelsTrial]     = useState(false)
+  const [recurEnabled, setRecurEnabled] = useState(false)
+  const [recurHours, setRecurHours]     = useState(24)
   const [submitting, setSubmitting]     = useState(false)
   const [progress, setProgress]         = useState('')
   const [error, setError]               = useState<string | null>(null)
@@ -127,6 +129,7 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
         mode,
         bearerToken:   bearer,
         reelsTrial,
+        recurHours:    recurEnabled ? recurHours : null,
       })
       onCreated()
     } catch (e: any) {
@@ -331,6 +334,38 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
                 }}>
                 {reelsTrial ? 'Activé' : 'Désactivé'}
               </button>
+            </div>
+            <div>
+              <span style={labelStyle}>Récurrence</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => setRecurEnabled(v => !v)} className="cursor-pointer"
+                  style={{
+                    height: 34, padding: '0 16px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                    background: recurEnabled ? 'rgba(99,102,241,0.18)' : 'transparent',
+                    color: recurEnabled ? '#818CF8' : MUTED,
+                    border: recurEnabled ? '1px solid rgba(99,102,241,0.4)' : `1px solid ${HAIR}`, transition: 'all 0.18s',
+                  }}>
+                  {recurEnabled ? 'Activée' : 'Désactivée'}
+                </button>
+                {recurEnabled && (
+                  <>
+                    <span style={{ fontSize: 11, color: MUTED }}>toutes les</span>
+                    <input type="number" min={1} max={8760} value={recurHours}
+                      onChange={e => setRecurHours(Math.max(1, Number(e.target.value) || 24))}
+                      style={{
+                        width: 60, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center',
+                        background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, outline: 'none',
+                      }}
+                    />
+                    <span style={{ fontSize: 11, color: MUTED }}>h</span>
+                  </>
+                )}
+              </div>
+              {recurEnabled && (
+                <p style={{ fontSize: 10.5, color: 'rgba(129,140,248,0.7)', marginTop: 6 }}>
+                  ↺ Se répète automatiquement — 1 vidéo aléatoire du pool à chaque fois
+                </p>
+              )}
             </div>
           </section>
 
