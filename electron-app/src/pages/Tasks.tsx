@@ -211,9 +211,10 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   }
 
   try {
-    // 1. Résolution des tokens vidéo — en parallèle + démarrage phones simultané
+    // 1. Démarrage des téléphones IMMÉDIAT + uploads en parallèle
     const phoneIds = task.phones.map(p => p.geelark_id)
-    log(`▶ Upload de ${task.videos.length} vidéo(s) + démarrage de ${phoneIds.length} téléphone(s)…`)
+    log(`▶ Démarrage de ${phoneIds.length} téléphone(s) + upload de ${task.videos.length} vidéo(s)…`)
+    const phoneStartedAt = Date.now()
 
     const [tokenResults, startRes] = await Promise.all([
       Promise.allSettled(task.videos.map(v => resolveTaskVideoToken(bearer, v))),
@@ -242,9 +243,12 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     }
     if (startRes['code'] !== 0) log(`⚠ Démarrage téléphones: ${startRes['msg'] ?? startRes['code']}`)
 
-    // Boot wait — pendant que les uploads se faisaient, les téléphones ont déjà démarré
-    log('⏳ Attente boot (30s)…')
-    await new Promise(r => setTimeout(r, 30_000))
+    // Boot wait : attendre que 30s se soient écoulées depuis le démarrage (uploads comptent)
+    const bootRemaining = Math.max(0, 30_000 - (Date.now() - phoneStartedAt))
+    if (bootRemaining > 0) {
+      log(`⏳ Boot (${Math.round(bootRemaining / 1000)}s restantes)…`)
+      await new Promise(r => setTimeout(r, bootRemaining))
+    }
 
     // 3. Tâches RPA — toutes lancées en parallèle
     log(`▶ Lancement RPA sur ${task.phones.length} téléphone(s)…`)
