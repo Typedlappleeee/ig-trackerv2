@@ -140,13 +140,10 @@ async function resolveTaskVideoToken(bearer: string, video: TaskVideo): Promise<
     if (data?.signedUrl) signedUrl = data.signedUrl
   }
 
-  // Electron : télécharge + écrit en temp + upload via IPC
+  // Electron et Web : uploadVideoGeelark détecte https:// et route vers /api/geelark-upload (pas de CORS)
   if (window.electronAPI) {
-    const bytes = await fetch(signedUrl).then(r => r.arrayBuffer())
-    const tmp   = await window.electronAPI.writeTempFile({ name: 'task_video.mp4', bytes })
-    if (!tmp.ok || !tmp.path) throw new Error(`Erreur écriture temp: ${tmp.error ?? '?'}`)
-    const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: tmp.path })
-    if (!up.ok || !up.token) throw new Error(`Erreur upload GeeLark (Electron): ${up.error ?? '?'}`)
+    const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: signedUrl })
+    if (!up.ok || !up.token) throw new Error(`Erreur upload GeeLark: ${up.error ?? '?'}`)
     return up.token
   }
 
