@@ -131,36 +131,35 @@ async function glPost(bearer: string, path: string, body: unknown): Promise<Reco
 async function resolveTaskVideoToken(bearer: string, video: TaskVideo): Promise<string> {
   const t = video.token
   if (!t.includes('supabase.co')) return t  // déjà un token GeeLark
-  // Re-signe l'URL depuis le chemin de stockage
+
+  // Re-signe l'URL depuis le chemin de stockage Supabase
   let signedUrl = t
   const m = t.match(/\/storage\/v1\/object\/(?:sign|authenticated)\/content\/(.+?)(?:\?|$)/)
   if (m) {
     const { data } = await supabase.storage.from('content').createSignedUrl(m[1], 3600)
     if (data?.signedUrl) signedUrl = data.signedUrl
   }
+
   // Electron : télécharge + écrit en temp + upload via IPC
   if (window.electronAPI) {
-    try {
-      const bytes = await fetch(signedUrl).then(r => r.arrayBuffer())
-      const tmp = await window.electronAPI.writeTempFile({ name: 'task_video.mp4', bytes })
-      if (tmp.ok && tmp.path) {
-        const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: tmp.path })
-        if (up.ok && up.token) return up.token
-      }
-    } catch { /* fallback */ }
-    return t
+    const bytes = await fetch(signedUrl).then(r => r.arrayBuffer())
+    const tmp   = await window.electronAPI.writeTempFile({ name: 'task_video.mp4', bytes })
+    if (!tmp.ok || !tmp.path) throw new Error(`Erreur écriture temp: ${tmp.error ?? '?'}`)
+    const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: tmp.path })
+    if (!up.ok || !up.token) throw new Error(`Erreur upload GeeLark (Electron): ${up.error ?? '?'}`)
+    return up.token
   }
-  // Web : proxy Vercel geelark-upload
-  try {
-    const r = await fetch('/api/geelark-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ signedUrl, bearer }),
-    })
-    const j = await r.json() as { ok: boolean; token?: string }
-    if (j.ok && j.token) return j.token
-  } catch { /* fallback */ }
-  return t
+
+  // Web : proxy Vercel /api/geelark-upload (timeout 60s)
+  const r = await fetch('/api/geelark-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ signedUrl, bearer }),
+  })
+  if (!r.ok) throw new Error(`Proxy HTTP ${r.status}`)
+  const j = await r.json() as { ok: boolean; token?: string; error?: string }
+  if (!j.ok || !j.token) throw new Error(`Proxy upload échoué: ${j.error ?? 'no token'}`)
+  return j.token
 }
 
 async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
@@ -173,9 +172,18 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   const log = (msg: string) => logs.push(msg)
 
   // 1. Résolution des tokens vidéo (upload vers GeeLark si URL Supabase)
-  log(`▶ [client] Résolution des tokens vidéo…`)
+  log(`▶ [client] Résolution des tokens vidéo (${task.videos.length})…`)
   const tokens: string[] = []
-  for (const v of task.videos) tokens.push(await resolveTaskVideoToken(bearer, v))
+  for (const v of task.videos) {
+    try {
+      tokens.push(await resolveTaskVideoToken(bearer, v))
+      log(`✅ Vidéo résolue : ${v.title || v.token.slice(-20)}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      log(`❌ Résolution vidéo échouée (${v.title || '?'}): ${msg}`)
+      throw new Error(`Impossible de résoudre la vidéo "${v.title || '?'}": ${msg}`)
+    }
+  }
 
   // 2. Démarrage des téléphones
   const phoneIds = task.phones.map(p => p.geelark_id)

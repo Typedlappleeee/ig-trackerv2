@@ -3,6 +3,9 @@
 //       or POST { storagePath, bucket, bearer }    — Supabase service role key required
 // Returns: { ok, token } or { ok: false, error }
 
+// Vercel Hobby max = 60s (default is 10s — videos need more time)
+module.exports.config = { maxDuration: 60 }
+
 const { createClient } = require('@supabase/supabase-js')
 
 function getSupabaseAdmin() {
