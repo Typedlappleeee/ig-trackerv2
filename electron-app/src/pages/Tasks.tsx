@@ -1626,7 +1626,20 @@ export function Tasks({ user }: { user: User }) {
     }
   }, [currentOrg?.id, user.id])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load().then(() => {
+      // Déclenche immédiatement si des tâches sont déjà en retard à l'ouverture de la page
+      if (triggeringRef.current) return
+      const now = Date.now()
+      if (!tasksRef.current.some(t => t.status === 'active' && new Date(t.next_run_at).getTime() <= now)) return
+      triggeringRef.current = true
+      supabase.functions.invoke('run-scheduled-posts')
+        .then(() => new Promise(r => setTimeout(r, 3000)))
+        .then(() => load())
+        .catch(() => {})
+        .finally(() => { triggeringRef.current = false })
+    })
+  }, [load])
 
   // Countdown ticker — refresh every 30s.
   // Also auto-triggers the edge function when any active task is overdue,
