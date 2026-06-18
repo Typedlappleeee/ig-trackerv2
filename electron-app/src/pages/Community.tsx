@@ -81,6 +81,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Page } from '@/components/Layout'
 import { supabase }   from '@/lib/supabase'
 import { useT, useLang } from '@/lib/i18n'
+import { useToast }   from '@/components/Toast'
 import { useOrg }     from '@/lib/orgContext'
 import { useLicense } from '@/lib/license'
 import { Spinner }    from '@/components/ui/Spinner'
@@ -801,6 +802,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
   const t = useT()
   const { currentOrg } = useOrg()
   useLicense()
+  const toast = useToast()
 
   const [isAdmin, setIsAdmin]       = useState(false)
   const [tab, setTab]               = useState<Tab>('news')
@@ -1031,8 +1033,13 @@ export function Community({ user, onNavigate }: CommunityProps) {
     setMessages(prev => [...prev, opt])
     const video_url = videoFile ? await uploadVideo(videoFile) : null
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url }).select().single()
-    if (error) setMessages(prev => prev.filter(m => m.id !== optId))
-    else if (data) setMessages(prev => prev.map(m => m.id === optId ? data as Message : m))
+    if (error) {
+      setMessages(prev => prev.filter(m => m.id !== optId))
+      toast.show({ title: 'Erreur publication', body: error.message, kind: 'error' })
+      setNewsSend(false)
+      return
+    }
+    if (data) setMessages(prev => prev.map(m => m.id === optId ? data as Message : m))
     setNewsTitle(''); setNewsContent(''); setShowNewsForm(false)
     setNewsSend(false)
   }

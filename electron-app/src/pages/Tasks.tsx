@@ -275,7 +275,7 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     if (rpaIds.length > 0) {
       const pending   = new Set(rpaIds)
       const stopped   = new Set<string>()
-      const deadline  = Date.now() + 6 * 60 * 1000
+      const deadline  = Date.now() + 8 * 60 * 1000
       // Map taskId → geelarkId pour stopper individuellement
       const tidToGid  = new Map<string, string>()
       for (let i = 0; i < task.phones.length; i++) {
