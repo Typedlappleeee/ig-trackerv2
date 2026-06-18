@@ -260,6 +260,7 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     const taskIdByGid: Record<string, string> = {}
     const rpaIds: string[] = []
     let fails = 0
+    let rpaCreated = 0
     for (let i = 0; i < task.phones.length; i++) {
       const phone  = task.phones[i]
       const name   = phone.ig_username ?? phone.phone_name
@@ -274,20 +275,41 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
         ...(task.reels_trial ? { shareType: 2 } : {}),
       })
       if (res['code'] === 0) {
-        const tid = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+        rpaCreated++
+        // GeeLark peut renvoyer l'ID sous data directement (string) ou data.id / data.taskId
+        const d = res['data']
+        let tid: string | undefined
+        if (typeof d === 'string' && d) {
+          tid = d
+        } else if (d && typeof d === 'object') {
+          const dObj = d as Record<string, unknown>
+          const raw  = dObj['id'] ?? dObj['taskId'] ?? dObj['task_id']
+          if (raw != null) tid = String(raw)
+        }
+        console.log('[Task] instagramPubReels response data:', JSON.stringify(d))
         if (tid) { rpaIds.push(tid); taskIdByGid[phone.geelark_id] = tid }
-        log(`✅ Tâche créée : ${name}`)
+        log(`✅ Tâche créée : ${name}${tid ? '' : ' (ID non récupéré)'}`)
       } else {
         fails++
         log(`❌ ${name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
       }
     }
 
-    if (rpaIds.length === 0) {
+    if (rpaCreated === 0) {
       log('❌ Aucune tâche RPA créée')
       log(`⏰ Prochain post dans ${recurHours}h`)
       await saveResult('failed', 'Aucune tâche RPA créée')
       await new Promise(r => setTimeout(r, 5_000))
+      await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+      return
+    }
+
+    // Si tâches créées mais IDs non extraits → même logique qu'MassPosting : auto-stop 5 min
+    if (rpaIds.length === 0) {
+      log(`⏳ ${rpaCreated} tâche(s) RPA lancée(s) — arrêt auto dans 5 min (IDs non trackables)…`)
+      await new Promise(r => setTimeout(r, 5 * 60 * 1000))
+      log(`⏰ Prochain post dans ${recurHours}h`)
+      await saveResult('done')
       await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
       return
     }
