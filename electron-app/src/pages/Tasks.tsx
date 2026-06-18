@@ -267,16 +267,23 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
       }
     }
 
-    const errMsg = fails >= task.phones.length ? 'Toutes les tâches RPA ont échoué' : undefined
-    log(`⏰ Prochain post dans ${recurHours}h`)
-    await saveResult(fails < task.phones.length ? 'done' : 'failed', errMsg)
+    if (fails >= task.phones.length) {
+      log('❌ Toutes les tâches RPA ont échoué')
+      log(`⏰ Prochain post dans ${recurHours}h`)
+      await saveResult('failed', 'Toutes les tâches RPA ont échoué')
+      await new Promise(r => setTimeout(r, 5_000))
+      await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+      return
+    }
 
-    // 4. Poll task statuses jusqu'à complétion (max 6 min), puis arrêt
+    // 4. Poll task statuses jusqu'à complétion (max 8 min), puis arrêt + saveResult
+    let pollDone = 0
+    let pollFail = 0
     if (rpaIds.length > 0) {
+      log(`⏳ Suivi de ${rpaIds.length} tâche(s) RPA…`)
       const pending   = new Set(rpaIds)
       const stopped   = new Set<string>()
       const deadline  = Date.now() + 8 * 60 * 1000
-      // Map taskId → geelarkId pour stopper individuellement
       const tidToGid  = new Map<string, string>()
       for (let i = 0; i < task.phones.length; i++) {
         const tid = rpaIds[i]
@@ -294,9 +301,10 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
             const status = Number(item['status'])
             if ([3, 4, 7].includes(status)) {
               pending.delete(tid)
-              const gid = tidToGid.get(tid)
+              const gid  = tidToGid.get(tid)
               const fail = item['failDesc'] ? ` — ${item['failDesc']}` : ''
               log(`${STATUS[status] ?? status}${fail}`)
+              if (status === 3) pollDone++; else pollFail++
               if (gid && !stopped.has(gid)) {
                 stopped.add(gid)
                 await glPost(bearer, '/phone/stop', { ids: [gid] }).catch(() => {})
@@ -305,7 +313,7 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
           }
         } catch { /* retry next tick */ }
       }
-      // Arrêt des téléphones restants (timeout ou pas de taskId)
+      if (pending.size > 0) log(`⚠ ${pending.size} tâche(s) non terminée(s) après 8 min`)
       const remaining = phoneIds.filter(id => !stopped.has(id))
       if (remaining.length > 0) {
         await glPost(bearer, '/phone/stop', { ids: remaining }).catch(() => {})
@@ -314,6 +322,10 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
       await new Promise(r => setTimeout(r, 5_000))
       await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
     }
+
+    const finalStatus = pollDone > 0 ? 'done' : (fails + pollFail >= task.phones.length ? 'failed' : 'done')
+    log(`⏰ Prochain post dans ${recurHours}h`)
+    await saveResult(finalStatus, finalStatus === 'failed' ? 'Aucun posting réussi' : undefined)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     log(`❌ Erreur inattendue: ${msg}`)
