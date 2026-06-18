@@ -211,135 +211,131 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   }
 
   try {
-    // 1. Démarrage des téléphones IMMÉDIAT + uploads en parallèle
     const phoneIds = task.phones.map(p => p.geelark_id)
-    log(`▶ Démarrage de ${phoneIds.length} téléphone(s) + upload de ${task.videos.length} vidéo(s)…`)
-    const phoneStartedAt = Date.now()
 
-    const [tokenResults, startRes] = await Promise.all([
-      Promise.allSettled(task.videos.map(v => resolveTaskVideoToken(bearer, v))),
-      glPost(bearer, '/phone/start', { ids: phoneIds }),
-    ])
-
-    const validTokens: string[] = []
-    const tokenByIndex: (string | null)[] = tokenResults.map((r, i) => {
-      if (r.status === 'fulfilled') {
-        log(`✅ Vidéo OK : ${task.videos[i].title || r.value.slice(0, 40)}`)
-        validTokens.push(r.value)
-        return r.value
-      } else {
-        const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)
-        log(`❌ Vidéo échouée (${task.videos[i].title || '?'}): ${msg}`)
-        return null
+    // ── Step 1 : upload des vidéos vers GéeLark (séquentiel, AVANT le démarrage) ──
+    // Exactement comme MassPosting : on upload d'abord, on démarre les téléphones
+    // après. Sinon le téléphone reste inactif pendant l'upload et GéeLark l'éteint.
+    log(`▶ Upload de ${task.videos.length} vidéo(s) vers GéeLark…`)
+    const tokenByIndex: (string | null)[] = []
+    for (let i = 0; i < task.videos.length; i++) {
+      const v = task.videos[i]
+      try {
+        const tok = await resolveTaskVideoToken(bearer, v)
+        tokenByIndex.push(tok)
+        log(`✅ Vidéo ${i + 1}/${task.videos.length} prête : ${v.title || tok.slice(0, 30)}`)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        log(`❌ Vidéo échouée (${v.title || '?'}): ${msg}`)
+        tokenByIndex.push(null)
       }
-    })
-    void tokenByIndex
-
+    }
+    const validTokens = tokenByIndex.filter((t): t is string => Boolean(t))
     if (!validTokens.length) {
-      const errMsg = 'Résolution de tous les tokens vidéo a échoué'
+      const errMsg = 'Upload de toutes les vidéos a échoué'
       log(`❌ ${errMsg}`)
       await saveResult('failed', errMsg)
       return
     }
-    if (startRes['code'] !== 0) log(`⚠ Démarrage téléphones: ${startRes['msg'] ?? startRes['code']}`)
 
-    // Boot wait : attendre que 30s se soient écoulées depuis le démarrage (uploads comptent)
-    const bootRemaining = Math.max(0, 30_000 - (Date.now() - phoneStartedAt))
-    if (bootRemaining > 0) {
-      log(`⏳ Boot (${Math.round(bootRemaining / 1000)}s restantes)…`)
-      await new Promise(r => setTimeout(r, bootRemaining))
+    // ── Step 2 : démarrage des téléphones (après upload) ──────────────────────
+    log(`▶ Démarrage de ${phoneIds.length} téléphone(s)…`)
+    const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
+    const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
+    log(`  ${started} démarré(s)`)
+    if (started === 0) {
+      log('❌ Aucun téléphone démarré')
+      log(`⏰ Prochain post dans ${recurHours}h`)
+      await saveResult('failed', 'Aucun téléphone démarré')
+      return
     }
 
-    // 3. Tâches RPA — toutes lancées en parallèle
-    log(`▶ Lancement RPA sur ${task.phones.length} téléphone(s)…`)
-    const baseTs = Math.floor(Date.now() / 1000)
-    const rpaResults = await Promise.allSettled(
-      task.phones.map((phone, i) => {
-        const vidIdx = task.mode === 'random'
-          ? Math.floor(Math.random() * validTokens.length)
-          : i % validTokens.length
-        return glPost(bearer, '/rpa/task/instagramPubReels', {
-          id:          phone.geelark_id,
-          scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
-          description: task.caption,
-          video:       [validTokens[vidIdx]],
-          ...(task.reels_trial ? { shareType: 2 } : {}),
-        })
-      })
-    )
+    // ── Step 3 : attente boot 30s (téléphone frais, comme MassPosting) ────────
+    log('⏳ Attente 30s (boot)…')
+    await new Promise(r => setTimeout(r, 30_000))
 
+    // ── Step 4 : création des tâches RPA (séquentiel) ─────────────────────────
+    log(`▶ Lancement du posting sur ${task.phones.length} téléphone(s)…`)
+    const baseTs = Math.floor(Date.now() / 1000)
+    const taskIdByGid: Record<string, string> = {}
     const rpaIds: string[] = []
     let fails = 0
-    rpaResults.forEach((r, i) => {
-      const phone = task.phones[i]
-      const name  = phone.ig_username ?? phone.phone_name
-      if (r.status === 'fulfilled' && r.value['code'] === 0) {
-        const tid = (r.value['data'] as Record<string, unknown>)?.['id'] as string | undefined
-        if (tid) rpaIds.push(tid)
-        log(`✅ ${name}`)
+    for (let i = 0; i < task.phones.length; i++) {
+      const phone  = task.phones[i]
+      const name   = phone.ig_username ?? phone.phone_name
+      const vidIdx = task.mode === 'random'
+        ? Math.floor(Math.random() * validTokens.length)
+        : i % validTokens.length
+      const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
+        id:          phone.geelark_id,
+        scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
+        description: task.caption,
+        video:       [validTokens[vidIdx]],
+        ...(task.reels_trial ? { shareType: 2 } : {}),
+      })
+      if (res['code'] === 0) {
+        const tid = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+        if (tid) { rpaIds.push(tid); taskIdByGid[phone.geelark_id] = tid }
+        log(`✅ Tâche créée : ${name}`)
       } else {
         fails++
-        const detail = r.status === 'rejected'
-          ? (r.reason instanceof Error ? r.reason.message : String(r.reason))
-          : String(r.value['msg'] ?? 'code=' + String(r.value['code']))
-        log(`❌ ${name}: ${detail}`)
+        log(`❌ ${name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
       }
-    })
+    }
 
-    if (fails >= task.phones.length) {
-      log('❌ Toutes les tâches RPA ont échoué')
+    if (rpaIds.length === 0) {
+      log('❌ Aucune tâche RPA créée')
       log(`⏰ Prochain post dans ${recurHours}h`)
-      await saveResult('failed', 'Toutes les tâches RPA ont échoué')
+      await saveResult('failed', 'Aucune tâche RPA créée')
       await new Promise(r => setTimeout(r, 5_000))
       await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
       return
     }
 
-    // 4. Poll task statuses jusqu'à complétion (max 8 min), puis arrêt + saveResult
+    // ── Step 5 : poll jusqu'à complétion (max 8 min) — éteint chaque tél fini ──
+    log(`⏳ Suivi de ${rpaIds.length} tâche(s)…`)
     let pollDone = 0
     let pollFail = 0
-    if (rpaIds.length > 0) {
-      log(`⏳ Suivi de ${rpaIds.length} tâche(s) RPA…`)
-      const pending   = new Set(rpaIds)
-      const stopped   = new Set<string>()
-      const deadline  = Date.now() + 8 * 60 * 1000
-      const tidToGid  = new Map<string, string>()
-      for (let i = 0; i < task.phones.length; i++) {
-        const tid = rpaIds[i]
-        if (tid) tidToGid.set(tid, task.phones[i].geelark_id)
-      }
-      const STATUS: Record<number, string> = { 1: 'Pending', 2: 'En cours', 3: '✅ Done', 4: '❌ Failed', 7: 'Annulé' }
-      while (pending.size > 0 && Date.now() < deadline) {
-        await new Promise(r => setTimeout(r, 10_000))
-        try {
-          const qRes  = await glPost(bearer, '/task/query', { ids: [...pending] })
-          const d     = (qRes['data'] as Record<string, unknown>) ?? qRes
-          const items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
-          for (const item of (Array.isArray(items) ? items : [])) {
-            const tid    = (item['id'] ?? item['taskId']) as string
-            const status = Number(item['status'])
-            if ([3, 4, 7].includes(status)) {
-              pending.delete(tid)
-              const gid  = tidToGid.get(tid)
-              const fail = item['failDesc'] ? ` — ${item['failDesc']}` : ''
-              log(`${STATUS[status] ?? status}${fail}`)
-              if (status === 3) pollDone++; else pollFail++
-              if (gid && !stopped.has(gid)) {
-                stopped.add(gid)
-                await glPost(bearer, '/phone/stop', { ids: [gid] }).catch(() => {})
-              }
-            }
+    const pending  = new Set(rpaIds)
+    const stopped  = new Set<string>()
+    const deadline = Date.now() + 8 * 60 * 1000
+    const gidByTid = new Map<string, string>()
+    for (const [gid, tid] of Object.entries(taskIdByGid)) gidByTid.set(tid, gid)
+    const STATUS: Record<number, string> = { 1: 'Pending', 2: 'En cours', 3: '✅ Done', 4: '❌ Failed', 7: 'Annulé' }
+    while (pending.size > 0 && Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 10_000))
+      let qRes: Record<string, unknown>
+      try {
+        qRes = await glPost(bearer, '/task/query', { ids: [...pending] })
+      } catch { continue }
+      const d     = (qRes['data'] as Record<string, unknown>) ?? qRes
+      const items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
+      for (const item of (Array.isArray(items) ? items : [])) {
+        const tid    = (item['id'] ?? item['taskId']) as string
+        const status = Number(item['status'])
+        if ([3, 4, 7].includes(status)) {
+          pending.delete(tid)
+          const gid  = gidByTid.get(tid)
+          const phone = task.phones.find(p => p.geelark_id === gid)
+          const name  = phone?.ig_username ?? phone?.phone_name ?? tid
+          const fail  = item['failDesc'] ? ` — ${item['failDesc']}` : ''
+          log(`${STATUS[status] ?? status} ${name}${fail}`)
+          if (status === 3) pollDone++; else pollFail++
+          // Éteint ce téléphone dès que sa tâche est finie
+          if (gid && !stopped.has(gid)) {
+            stopped.add(gid)
+            await glPost(bearer, '/phone/stop', { ids: [gid] }).catch(() => {})
           }
-        } catch { /* retry next tick */ }
+        }
       }
-      if (pending.size > 0) log(`⚠ ${pending.size} tâche(s) non terminée(s) après 8 min`)
-      const remaining = phoneIds.filter(id => !stopped.has(id))
-      if (remaining.length > 0) {
-        await glPost(bearer, '/phone/stop', { ids: remaining }).catch(() => {})
-      }
-    } else {
-      await new Promise(r => setTimeout(r, 5_000))
-      await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+    }
+    if (pending.size > 0) log(`⚠ ${pending.size} tâche(s) non confirmée(s) après 8 min`)
+
+    // Arrêt des téléphones restants (timeout / pas de confirmation)
+    const remaining = phoneIds.filter(id => !stopped.has(id))
+    if (remaining.length > 0) {
+      log(`▶ Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
+      await glPost(bearer, '/phone/stop', { ids: remaining }).catch(() => {})
     }
 
     const finalStatus = pollDone > 0 ? 'done' : (fails + pollFail >= task.phones.length ? 'failed' : 'done')
