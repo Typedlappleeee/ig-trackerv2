@@ -604,31 +604,29 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
       }
 
-      // ── Server mode: hand off to edge function after upload ──────────────
-      if (postingOpts.serverMode) {
-        const videos = assignments
-          .map(a => ({ token: tokenMap.get(a.videoIndex) ?? '', title: a.video?.item.title ?? '' }))
-          .filter(v => v.token)
-        const uniqueVideos = [...new Map(videos.map(v => [v.token, v])).values()]
-        await createScheduledPost({
-          userId:        user.id,
-          orgId:         currentOrg?.id ?? null,
-          createdByName: user.email?.split('@')[0] ?? 'Moi',
-          type:          'mass_posting',
-          scheduledAt:   new Date(),
-          phones:        phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
-          videos:        uniqueVideos,
-          caption,
-          delayMinutes:  postingOpts.intervalMode !== 'none' ? postingOpts.intervalMin : 0,
-          mode,
-          bearerToken:   '',
-          reelsTrial:    postingOpts.reelsTrial,
-        })
-        await run.settle()
-        log('✅ Confié au serveur — tu peux fermer ScaleFlow. Le post partira dans moins d\'une minute.', 'ok')
-        setPosting(false)
-        return
-      }
+      // ── Hand off to edge function after upload ───────────────────────────
+      const videos = assignments
+        .map(a => ({ token: tokenMap.get(a.videoIndex) ?? '', title: a.video?.item.title ?? '' }))
+        .filter(v => v.token)
+      const uniqueVideos = [...new Map(videos.map(v => [v.token, v])).values()]
+      await createScheduledPost({
+        userId:        user.id,
+        orgId:         currentOrg?.id ?? null,
+        createdByName: user.email?.split('@')[0] ?? 'Moi',
+        type:          'mass_posting',
+        scheduledAt:   new Date(),
+        phones:        phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
+        videos:        uniqueVideos,
+        caption,
+        delayMinutes:  postingOpts.intervalMode !== 'none' ? postingOpts.intervalMin : 0,
+        mode,
+        bearerToken:   '',
+        reelsTrial:    postingOpts.reelsTrial,
+      })
+      await run.settle()
+      log('✅ Confié au serveur — tu peux fermer ScaleFlow. Le post partira dans moins d\'une minute.', 'ok')
+      setPosting(false)
+      return
 
       // ── Step 2: start phones ──────────────────────────────────────────────
       if (stopRef.current) { log('Run interrompu avant le démarrage des téléphones', 'warn'); return }

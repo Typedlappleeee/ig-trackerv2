@@ -88,24 +88,6 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         </p>
       )}
 
-      {/* Server mode toggle */}
-      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-        </span>
-        <div className="flex-1 min-w-0">
-          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Mode serveur</span>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Confie au serveur après upload — tu peux fermer ScaleFlow</p>
-        </div>
-        <button
-          onClick={() => set({ serverMode: !opts.serverMode })}
-          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-          style={{ background: opts.serverMode ? 'linear-gradient(130deg,#10B981,#34D399)' : 'rgba(255,255,255,0.08)' }}
-        >
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.serverMode ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
-      </div>
-
       {/* Reels Trial toggle */}
       <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
         <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
