@@ -48,7 +48,7 @@ interface TaskPhone {
 }
 
 interface TaskVideo {
-  token: string
+  token: string   // GeeLark resourceUrl token OR Supabase signed URL (edge fn uploads server-side)
   title: string
 }
 
@@ -66,6 +66,7 @@ interface RecurringTask {
   recur_hours: number
   next_run_at: string
   reels_trial: boolean
+  auto_remove_videos: boolean
   created_at: string
   last_run_at?: string | null
   run_count?: number | null
@@ -355,6 +356,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   )
   const [delayMin, setDelayMin]       = useState(editTask?.delay_minutes ?? 0)
   const [reelsTrial, setReelsTrial]   = useState(editTask?.reels_trial ?? false)
+  const [autoRemove, setAutoRemove]   = useState(editTask?.auto_remove_videos ?? false)
   const [submitting, setSubmitting]   = useState(false)
   const [progress, setProgress]       = useState('')
   const [error, setError]             = useState<string | null>(null)
@@ -415,9 +417,14 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
 
       for (let i = 0; i < videos.length; i++) {
         const v = videos[i]
-        setProgress(`Upload vidéo ${i + 1}/${videos.length}…`)
+        setProgress(`Préparation vidéo ${i + 1}/${videos.length}…`)
+        // Supabase signed URLs are stored as-is; the edge function uploads to GeeLark server-side.
+        if (v.filePath.startsWith('http://') || v.filePath.startsWith('https://')) {
+          uploadedVideos.push({ token: v.filePath, title: v.title })
+          continue
+        }
+        // Local file — upload to GeeLark now (Electron only)
         if (!bearer || !window.electronAPI) {
-          // No bearer or not in Electron: store filePath as token placeholder
           uploadedVideos.push({ token: v.filePath, title: v.title })
           continue
         }
@@ -446,9 +453,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         caption:       caption.trim(),
         mode,
         delay_minutes: delayMin,
-        recur_hours:   recurHours,
-        next_run_at:   nextRunDate.toISOString(),
-        reels_trial:   reelsTrial,
+        recur_hours:        recurHours,
+        next_run_at:        nextRunDate.toISOString(),
+        reels_trial:        reelsTrial,
+        auto_remove_videos: autoRemove,
       }
 
       if (isEdit && editTask) {
@@ -853,6 +861,26 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                   {reelsTrial ? 'Activé' : 'Désactivé'}
                 </button>
               </div>
+
+              {/* Auto-suppression des vidéos */}
+              <div>
+                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Vidéo → usage unique</p>
+                <button
+                  onClick={() => setAutoRemove(v => !v)}
+                  title="Supprime chaque vidéo de la pool après qu'elle a été postée"
+                  className="cursor-pointer"
+                  style={{
+                    height: 34, padding: '0 16px', fontSize: 10, fontWeight: 700,
+                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                    background: autoRemove ? '#F59E0B' : 'transparent',
+                    color: autoRemove ? '#0A0B0E' : MUTED,
+                    border: autoRemove ? 'none' : `1px solid ${HAIR}`,
+                    borderRadius: 7, transition: 'all 0.18s',
+                  }}
+                >
+                  {autoRemove ? 'Activé' : 'Désactivé'}
+                </button>
+              </div>
             </div>
           </section>
 
@@ -931,7 +959,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         <BankPicker
           user={user}
           mode="multi"
-          resolveMode="full"
+          resolveMode="signed-url"
           onSelect={(paths, titles) => {
             const pathArr = paths as string[]
             const newOnes = pathArr
@@ -957,6 +985,7 @@ function TaskCard({
   onToggle,
   onEdit,
   onDelete,
+  onOpenAddVideos,
   toggling,
   deleting,
 }: {
@@ -964,6 +993,7 @@ function TaskCard({
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
+  onOpenAddVideos: () => void
   toggling: boolean
   deleting: boolean
 }) {
@@ -1132,10 +1162,25 @@ function TaskCard({
           display: 'inline-flex', alignItems: 'center', gap: 5,
           background: 'rgba(255,255,255,0.04)', color: 'var(--muted)',
           border: '1px solid rgba(255,255,255,0.055)', borderRadius: 6,
-          padding: '3px 10px', fontSize: 11,
+          padding: '3px 6px 3px 10px', fontSize: 11,
         }}>
           <IconVideo size={11} color="rgba(233,234,240,0.6)" />
           {task.videos.length} vidéo{task.videos.length > 1 ? 's' : ''}
+          <button
+            onClick={e => { e.stopPropagation(); onOpenAddVideos() }}
+            title="Ajouter des vidéos à la pool"
+            className="cursor-pointer"
+            style={{
+              width: 18, height: 18, borderRadius: 5, border: 'none',
+              background: 'rgba(99,102,241,0.15)', color: '#818CF8',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 0.15s', flexShrink: 0,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.3)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.15)' }}
+          >
+            <IconPlus size={8} />
+          </button>
         </span>
         {task.mode === 'random' && (
           <span style={{
@@ -1155,6 +1200,16 @@ function TaskCard({
             padding: '3px 10px', fontSize: 11,
           }}>
             Essai Reels
+          </span>
+        )}
+        {task.auto_remove_videos && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            background: 'rgba(245,158,11,0.06)', color: '#F59E0B',
+            border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6,
+            padding: '3px 10px', fontSize: 11,
+          }}>
+            Usage unique
           </span>
         )}
       </div>
@@ -1510,8 +1565,9 @@ export function Tasks({ user }: { user: User }) {
   const [showCreate, setShowCreate] = useState(false)
   const [editTask, setEditTask]     = useState<RecurringTask | null>(null)
   const [deleteTask, setDeleteTask] = useState<RecurringTask | null>(null)
-  const [toggling, setToggling]     = useState<string | null>(null)
-  const [deleting, setDeleting]     = useState<string | null>(null)
+  const [toggling, setToggling]         = useState<string | null>(null)
+  const [deleting, setDeleting]         = useState<string | null>(null)
+  const [addVideosTaskId, setAddVideosTaskId] = useState<string | null>(null)
 
   // Countdown ticker — refresh every 30s
   const [, setTick] = useState(0)
@@ -1530,8 +1586,9 @@ export function Tasks({ user }: { user: User }) {
       if (!error && data) {
         setTasks(data.map((t: Record<string, unknown>) => ({
           ...t,
-          phones: typeof t.phones === 'string' ? JSON.parse(t.phones as string) : (t.phones ?? []),
-          videos: typeof t.videos === 'string' ? JSON.parse(t.videos as string) : (t.videos ?? []),
+          phones:             typeof t.phones === 'string' ? JSON.parse(t.phones as string) : (t.phones ?? []),
+          videos:             typeof t.videos === 'string' ? JSON.parse(t.videos as string) : (t.videos ?? []),
+          auto_remove_videos: (t.auto_remove_videos as boolean) ?? false,
         })) as RecurringTask[])
       }
 
@@ -1582,6 +1639,20 @@ export function Tasks({ user }: { user: User }) {
     } finally {
       setDeleting(null)
     }
+  }
+
+  async function addVideosToTask(taskId: string, newVids: SelVideo[]) {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+    const appended: TaskVideo[] = [
+      ...task.videos,
+      ...newVids
+        .filter(v => !task.videos.some(ev => ev.token === v.filePath))
+        .map(v => ({ token: v.filePath, title: v.title })),
+    ]
+    await supabase.from('recurring_tasks').update({ videos: appended }).eq('id', taskId)
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, videos: appended } : t))
+    setAddVideosTaskId(null)
   }
 
   const activeTasks  = tasks.filter(t => t.status === 'active')
@@ -1739,6 +1810,7 @@ export function Tasks({ user }: { user: User }) {
                   onToggle={() => void toggleTask(task)}
                   onEdit={() => { setEditTask(task); setShowCreate(true) }}
                   onDelete={() => setDeleteTask(task)}
+                  onOpenAddVideos={() => setAddVideosTaskId(task.id)}
                 />
               ))}
             </div>
@@ -1792,6 +1864,23 @@ export function Tasks({ user }: { user: User }) {
           busy={deleting === deleteTask.id}
           onConfirm={() => void deleteTaskById(deleteTask.id)}
           onCancel={() => setDeleteTask(null)}
+        />
+      )}
+
+      {/* ── Inline add videos to task ─────────────────────────────────────── */}
+      {addVideosTaskId && (
+        <BankPicker
+          user={user}
+          mode="multi"
+          resolveMode="signed-url"
+          onSelect={(paths, titles) => {
+            const newVids = (paths as string[]).map((p, i) => ({
+              filePath: p,
+              title: titles?.[i] ?? p.split('/').pop()?.split('?')[0] ?? p,
+            }))
+            void addVideosToTask(addVideosTaskId, newVids)
+          }}
+          onClose={() => setAddVideosTaskId(null)}
         />
       )}
     </div>

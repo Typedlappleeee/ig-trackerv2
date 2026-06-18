@@ -36,6 +36,49 @@ async function gPost(bearer: string, path: string, body: unknown): Promise<Recor
   return await r.json().catch(() => ({}))
 }
 
+// Upload a file URL to GeeLark and return the GeeLark resourceUrl token.
+// Used when a task video is stored as a Supabase signed URL instead of a pre-uploaded GeeLark token.
+async function uploadUrlToGeelark(bearer: string, fileUrl: string): Promise<string | null> {
+  try {
+    const urlRes = await gPost(bearer, '/upload/getUrl', { fileType: 'mp4' })
+    if (urlRes.code !== 0) return null
+    const uploadUrl   = urlRes.data?.uploadUrl   as string | undefined
+    const resourceUrl = urlRes.data?.resourceUrl as string | undefined
+    if (!uploadUrl || !resourceUrl) return null
+    const dlRes = await fetch(fileUrl)
+    if (!dlRes.ok) return null
+    const bytes = await dlRes.arrayBuffer()
+    const putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes })
+    if (!putRes.ok) return null
+    return resourceUrl
+  } catch { return null }
+}
+
+// If a video token is a Supabase URL, re-sign it (storage path extracted from URL)
+// and upload to GeeLark server-side. Returns a valid GeeLark token or the original.
+async function resolveVideoToken(
+  db: ReturnType<typeof import('npm:@supabase/supabase-js@2').createClient>,
+  bearer: string,
+  video: VideoRec,
+): Promise<string> {
+  const { token } = video
+  if (!token.includes('supabase.co')) return token  // already a GeeLark token or local path
+  // Extract storage_path from signed URL pattern:
+  // .../storage/v1/object/sign/content/<storage_path>?token=...
+  const match = token.match(/\/storage\/v1\/object\/(?:sign|authenticated)\/content\/(.+?)(?:\?|$)/)
+  if (match) {
+    const storagePath = match[1]
+    const { data } = await db.storage.from('content').createSignedUrl(storagePath, 3600)
+    if (data?.signedUrl) {
+      const glToken = await uploadUrlToGeelark(bearer, data.signedUrl)
+      if (glToken) return glToken
+    }
+  }
+  // Fallback: try uploading the original URL directly (may still be valid)
+  const glToken = await uploadUrlToGeelark(bearer, token)
+  return glToken ?? token
+}
+
 Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -162,16 +205,23 @@ Deno.serve(async (req) => {
       const taskIds: string[] = []
       let failedCount = 0
       const baseTs = Math.floor(Date.now() / 1000)
+      const usedVideoIndices = new Set<number>()
+      // Pre-resolve video tokens (upload Supabase URLs to GeeLark once, deduplicated)
+      const resolvedTokens: string[] = []
+      for (let vi = 0; vi < videos.length; vi++) {
+        resolvedTokens.push(await resolveVideoToken(db, bearer, videos[vi]))
+      }
       for (let i = 0; i < phones.length; i++) {
         const phone = phones[i]
         const videoIdx = post.mode === 'random'
           ? Math.floor(Math.random() * videos.length)
           : i % videos.length
+        usedVideoIndices.add(videoIdx)
         const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
           scheduleAt:  baseTs + i * delayMin * 60,
           description: post.caption,
-          video:       [videos[videoIdx].token],
+          video:       [resolvedTokens[videoIdx]],
           ...(post.reels_trial ? { shareType: 2 } : {}),
         })
         const taskId = res.data?.id ?? res.data?.taskId ?? null
@@ -217,6 +267,31 @@ Deno.serve(async (req) => {
       await db.from('scheduled_posts').update({
         status: 'done', result: { logs }, error_msg: null,
       }).eq('id', post.id)
+
+      // Auto-remove used videos from task pool (if enabled on parent task)
+      if (post.task_id) {
+        try {
+          const { data: parentTask } = await db.from('recurring_tasks')
+            .select('videos, auto_remove_videos, status')
+            .eq('id', post.task_id)
+            .maybeSingle()
+          if (parentTask?.auto_remove_videos) {
+            const pool = (parentTask.videos ?? []) as VideoRec[]
+            const remaining = pool.filter((_v, idx) => !usedVideoIndices.has(idx))
+            if (remaining.length === 0) {
+              await db.from('recurring_tasks')
+                .update({ videos: [], status: 'paused' })
+                .eq('id', post.task_id)
+              log('⏸ Pool de vidéos vide — tâche mise en pause.')
+            } else {
+              await db.from('recurring_tasks')
+                .update({ videos: remaining })
+                .eq('id', post.task_id)
+              log(`🗑 ${pool.length - remaining.length} vidéo(s) retirée(s) de la pool (${remaining.length} restante(s)).`)
+            }
+          }
+        } catch (_e) { /* best-effort */ }
+      }
 
       // Auto-reschedule si récurrent
       const recurHours: number | null = (post as any).recur_hours ?? null

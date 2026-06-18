@@ -41,3 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_recurring_tasks_due
 ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS task_id uuid;
 CREATE INDEX IF NOT EXISTS idx_scheduled_posts_task_id
   ON scheduled_posts (task_id) WHERE task_id IS NOT NULL;
+
+-- ── Options de la tâche ────────────────────────────────────────────────────────
+-- auto_remove_videos : supprime les vidéos de la pool après chaque exécution
+ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS auto_remove_videos boolean NOT NULL DEFAULT false;
