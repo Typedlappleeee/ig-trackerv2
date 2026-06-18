@@ -1173,15 +1173,36 @@ export async function postInstagramStory(
 
   // ── 6. Drag the link sticker to the bottom-right ───────────────────────────
   log('↘️  Positionnement du sticker en bas à droite…')
-  // After "Done", IG places the sticker in the upper-center area (~25-35% down).
-  // A 1200ms swipe acts as long-press+drag which triggers the drag handle.
-  await shellExec(bearer, phoneId,
-    `input swipe ${cx} ${Math.floor(sh * 0.28)} ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.85)} 1200`)
-  await sleep(800)
-  // Second pass in case the first swipe missed — try from a slightly lower start
-  await shellExec(bearer, phoneId,
-    `input swipe ${cx} ${Math.floor(sh * 0.38)} ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.85)} 1200`)
-  await sleep(1500)
+  // After "Done", IG places the sticker somewhere in the center of the canvas.
+  // The exact vertical position varies by IG version (25%–55% down the screen).
+  // We try multiple starting Y positions with a 1800ms hold (long-press + drag).
+  // The target is the bottom-right quadrant: 78% right, 82% down.
+  const _dragTX = Math.floor(sw * 0.78)
+  const _dragTY = Math.floor(sh * 0.82)
+  // First, try to find the sticker node in the XML (works on some IG builds).
+  {
+    const sxml = await dumpXml(bearer, phoneId)
+    // Link stickers carry text from linkText or "LINK" / "LIEN" resource ids.
+    const stickerNode =
+      findByResourceId(sxml, 'link_sticker_view', 'sticker_view', 'interactive_sticker') ??
+      (config.linkText ? findByText(sxml, config.linkText) : null) ??
+      findByText(sxml, 'LINK', 'LIEN', 'Open', 'Ouvrir')
+    if (stickerNode) {
+      log(`   🎯 Sticker trouvé via XML: ${stickerNode[0]},${stickerNode[1]}`)
+      await shellExec(bearer, phoneId,
+        `input swipe ${stickerNode[0]} ${stickerNode[1]} ${_dragTX} ${_dragTY} 1800`)
+      await sleep(1200)
+    } else {
+      // Fallback: sweep through likely vertical positions (25% → 55%)
+      for (const startFrac of [0.30, 0.40, 0.50, 0.25, 0.55]) {
+        const sy = Math.floor(sh * startFrac)
+        await shellExec(bearer, phoneId,
+          `input swipe ${cx} ${sy} ${_dragTX} ${_dragTY} 1800`)
+        await sleep(600)
+      }
+      await sleep(900)
+    }
+  }
 
   // ── 7. Publish to "Your story" ─────────────────────────────────────────────
   if (config.dryRun) {
