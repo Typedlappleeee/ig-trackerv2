@@ -271,9 +271,49 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     log(`⏰ Prochain post dans ${recurHours}h`)
     await saveResult(fails < task.phones.length ? 'done' : 'failed', errMsg)
 
-    // 4. Arrêt des téléphones
-    await new Promise(r => setTimeout(r, 5_000))
-    await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+    // 4. Poll task statuses jusqu'à complétion (max 6 min), puis arrêt
+    if (rpaIds.length > 0) {
+      const pending   = new Set(rpaIds)
+      const stopped   = new Set<string>()
+      const deadline  = Date.now() + 6 * 60 * 1000
+      // Map taskId → geelarkId pour stopper individuellement
+      const tidToGid  = new Map<string, string>()
+      for (let i = 0; i < task.phones.length; i++) {
+        const tid = rpaIds[i]
+        if (tid) tidToGid.set(tid, task.phones[i].geelark_id)
+      }
+      const STATUS: Record<number, string> = { 1: 'Pending', 2: 'En cours', 3: '✅ Done', 4: '❌ Failed', 7: 'Annulé' }
+      while (pending.size > 0 && Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 10_000))
+        try {
+          const qRes  = await glPost(bearer, '/task/query', { ids: [...pending] })
+          const d     = (qRes['data'] as Record<string, unknown>) ?? qRes
+          const items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
+          for (const item of (Array.isArray(items) ? items : [])) {
+            const tid    = (item['id'] ?? item['taskId']) as string
+            const status = Number(item['status'])
+            if ([3, 4, 7].includes(status)) {
+              pending.delete(tid)
+              const gid = tidToGid.get(tid)
+              const fail = item['failDesc'] ? ` — ${item['failDesc']}` : ''
+              log(`${STATUS[status] ?? status}${fail}`)
+              if (gid && !stopped.has(gid)) {
+                stopped.add(gid)
+                await glPost(bearer, '/phone/stop', { ids: [gid] }).catch(() => {})
+              }
+            }
+          }
+        } catch { /* retry next tick */ }
+      }
+      // Arrêt des téléphones restants (timeout ou pas de taskId)
+      const remaining = phoneIds.filter(id => !stopped.has(id))
+      if (remaining.length > 0) {
+        await glPost(bearer, '/phone/stop', { ids: remaining }).catch(() => {})
+      }
+    } else {
+      await new Promise(r => setTimeout(r, 5_000))
+      await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     log(`❌ Erreur inattendue: ${msg}`)
