@@ -27,6 +27,13 @@ export const CREDIT_COSTS = {
   posting:      1,    // per phone (Posting)
   mass_posting: 2,    // per phone (MassPosting)
   story:        1,    // per phone (Story / StoryLink)
+  // Tâches automatiques (recurring_tasks) :
+  //   task_daily  : 50 crédits/jour par tâche active, débités à minuit UTC.
+  //                 Le premier jour, débités au moment du premier posting (pas à minuit).
+  //   task_per_run: N téléphones × 2 crédits à chaque exécution (même logique que mass_posting).
+  //   Si les crédits sont insuffisants, la tâche est mise en pause automatiquement.
+  task_daily:   50,   // per active task per day
+  task_per_run: 2,    // per phone per run (same as mass_posting)
 } as const
 
 // Cost of a scheduled post, derived from its type — used for deduction at

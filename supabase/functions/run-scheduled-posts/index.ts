@@ -143,9 +143,46 @@ Deno.serve(async (req) => {
     summary['phone_stop_sweep'] = `error: ${err instanceof Error ? err.message : String(err)}`
   }
 
+  // 0-daily. Débit journalier des tâches actives (50 crédits/tâche/jour) à minuit UTC.
+  // La colonne credits_charged_date protège contre le double débit (cron toutes les minutes).
+  const nowUtc = new Date()
+  const todayStr = nowUtc.toISOString().slice(0, 10) // 'YYYY-MM-DD'
+  if (nowUtc.getUTCHours() === 0) {
+    try {
+      const { data: activeTasks } = await db.from('recurring_tasks')
+        .select('id, user_id, credits_charged_date')
+        .eq('status', 'active')
+      for (const task of activeTasks ?? []) {
+        if (task.credits_charged_date === todayStr) continue  // déjà débité aujourd'hui
+        const { data: creditRes } = await db.rpc('deduct_user_credits', {
+          p_user_id: task.user_id,
+          p_amount:  50,
+        })
+        if (creditRes?.ok) {
+          await db.from('recurring_tasks')
+            .update({ credits_charged_date: todayStr })
+            .eq('id', task.id)
+          summary[`daily:${task.id}`] = 'charged 50'
+        } else {
+          // Crédits insuffisants — on suspend la tâche
+          await db.from('recurring_tasks')
+            .update({ status: 'paused' })
+            .eq('id', task.id)
+          summary[`daily:${task.id}`] = `paused (${creditRes?.error ?? 'insufficient credits'})`
+        }
+      }
+    } catch (err) {
+      summary['daily_charge'] = `error: ${err instanceof Error ? err.message : String(err)}`
+    }
+  }
+
   // 1bis. Tâches automatiques (recurring_tasks) dues → génère un scheduled_post
   // « enfant » lié par task_id, puis reprogramme la prochaine occurrence.
   // Le scheduled_post créé est ramassé dans la même invocation (étape 2).
+  //
+  // Coût crédits :
+  //   - Premier jour (credits_charged_date IS NULL) : 50 crédits/jour + N téléphones × 2
+  //   - Jours suivants : N téléphones × 2 (les 50/jour sont débités à minuit par l'étape 0-daily)
   try {
     const { data: dueTasks } = await db.from('recurring_tasks')
       .select('*')
@@ -155,6 +192,33 @@ Deno.serve(async (req) => {
       .limit(5)
 
     for (const task of dueTasks ?? []) {
+      const phones: unknown[] = typeof task.phones === 'string' ? JSON.parse(task.phones) : (task.phones ?? [])
+      const phoneCount = phones.length
+      const perRunCost = phoneCount * 2  // même logique que mass_posting
+
+      // Premier jour : débiter aussi les 50 crédits/jour (pas encore débités à minuit)
+      const isFirstRun = !task.credits_charged_date
+      const dailyCost  = (isFirstRun && task.credits_charged_date !== todayStr) ? 50 : 0
+      const totalCost  = dailyCost + perRunCost
+
+      if (totalCost > 0) {
+        const { data: creditRes } = await db.rpc('deduct_user_credits', {
+          p_user_id: task.user_id,
+          p_amount:  totalCost,
+        })
+        if (!creditRes?.ok) {
+          await db.from('recurring_tasks').update({ status: 'paused' }).eq('id', task.id)
+          summary[`task:${task.id}`] = `paused — crédits insuffisants (${creditRes?.error ?? ''})`
+          continue
+        }
+        // Marque la date du débit journalier si on vient de le prendre
+        if (dailyCost > 0) {
+          await db.from('recurring_tasks')
+            .update({ credits_charged_date: todayStr })
+            .eq('id', task.id)
+        }
+      }
+
       const recurHours = Number(task.recur_hours) || 24
       const nextRun = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
       // Crée l'exécution (scheduled_post enfant)
@@ -180,7 +244,7 @@ Deno.serve(async (req) => {
         last_run_at: nowIso,
         run_count:   (Number(task.run_count) || 0) + 1,
       }).eq('id', task.id)
-      summary[`task:${task.id}`] = insErr ? `task insert failed: ${insErr.message}` : 'task queued'
+      summary[`task:${task.id}`] = insErr ? `task insert failed: ${insErr.message}` : `task queued (−${totalCost} crédits)`
     }
   } catch (err) {
     summary['recurring_tasks'] = `error: ${err instanceof Error ? err.message : String(err)}`
