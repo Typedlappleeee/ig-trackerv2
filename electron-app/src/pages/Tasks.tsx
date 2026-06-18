@@ -211,61 +211,76 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   }
 
   try {
-    // 1. Résolution des tokens vidéo
-    log(`▶ [client] Résolution des tokens vidéo (${task.videos.length})…`)
-    const tokens: string[] = []
-    for (const v of task.videos) {
-      try {
-        const tok = await resolveTaskVideoToken(bearer, v)
-        tokens.push(tok)
-        log(`✅ Vidéo OK : ${v.title || tok.slice(0, 40)}`)
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        log(`❌ Token vidéo échoué (${v.title || '?'}): ${msg}`)
-        tokens.push('')  // placeholder — sera filtré avant l'appel RPA
-      }
-    }
+    // 1. Résolution des tokens vidéo — en parallèle + démarrage phones simultané
+    const phoneIds = task.phones.map(p => p.geelark_id)
+    log(`▶ Upload de ${task.videos.length} vidéo(s) + démarrage de ${phoneIds.length} téléphone(s)…`)
 
-    const validTokens = tokens.filter(Boolean)
+    const [tokenResults, startRes] = await Promise.all([
+      Promise.allSettled(task.videos.map(v => resolveTaskVideoToken(bearer, v))),
+      glPost(bearer, '/phone/start', { ids: phoneIds }),
+    ])
+
+    const validTokens: string[] = []
+    const tokenByIndex: (string | null)[] = tokenResults.map((r, i) => {
+      if (r.status === 'fulfilled') {
+        log(`✅ Vidéo OK : ${task.videos[i].title || r.value.slice(0, 40)}`)
+        validTokens.push(r.value)
+        return r.value
+      } else {
+        const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)
+        log(`❌ Vidéo échouée (${task.videos[i].title || '?'}): ${msg}`)
+        return null
+      }
+    })
+    void tokenByIndex
+
     if (!validTokens.length) {
-      const errMsg = 'Résolution de tous les tokens vidéo a échoué — voir logs ci-dessus'
+      const errMsg = 'Résolution de tous les tokens vidéo a échoué'
       log(`❌ ${errMsg}`)
       await saveResult('failed', errMsg)
       return
     }
+    if (startRes['code'] !== 0) log(`⚠ Démarrage téléphones: ${startRes['msg'] ?? startRes['code']}`)
 
-    // 2. Démarrage des téléphones
-    const phoneIds = task.phones.map(p => p.geelark_id)
-    log(`▶ [client] Démarrage de ${phoneIds.length} téléphone(s)…`)
-    const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
-    if (startRes['code'] !== 0) log(`⚠ Démarrage: ${startRes['msg'] ?? startRes['code']}`)
+    // Boot wait — pendant que les uploads se faisaient, les téléphones ont déjà démarré
+    log('⏳ Attente boot (30s)…')
     await new Promise(r => setTimeout(r, 30_000))
 
-    // 3. Tâches RPA
+    // 3. Tâches RPA — toutes lancées en parallèle
+    log(`▶ Lancement RPA sur ${task.phones.length} téléphone(s)…`)
     const baseTs = Math.floor(Date.now() / 1000)
+    const rpaResults = await Promise.allSettled(
+      task.phones.map((phone, i) => {
+        const vidIdx = task.mode === 'random'
+          ? Math.floor(Math.random() * validTokens.length)
+          : i % validTokens.length
+        return glPost(bearer, '/rpa/task/instagramPubReels', {
+          id:          phone.geelark_id,
+          scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
+          description: task.caption,
+          video:       [validTokens[vidIdx]],
+          ...(task.reels_trial ? { shareType: 2 } : {}),
+        })
+      })
+    )
+
     const rpaIds: string[] = []
     let fails = 0
-    for (let i = 0; i < task.phones.length; i++) {
-      const phone  = task.phones[i]
-      const vidIdx = task.mode === 'random'
-        ? Math.floor(Math.random() * validTokens.length)
-        : i % validTokens.length
-      const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
-        id:          phone.geelark_id,
-        scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
-        description: task.caption,
-        video:       [validTokens[vidIdx]],
-        ...(task.reels_trial ? { shareType: 2 } : {}),
-      })
-      if (res['code'] === 0) {
-        const tid = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+    rpaResults.forEach((r, i) => {
+      const phone = task.phones[i]
+      const name  = phone.ig_username ?? phone.phone_name
+      if (r.status === 'fulfilled' && r.value['code'] === 0) {
+        const tid = (r.value['data'] as Record<string, unknown>)?.['id'] as string | undefined
         if (tid) rpaIds.push(tid)
-        log(`✅ ${phone.ig_username ?? phone.phone_name}`)
+        log(`✅ ${name}`)
       } else {
         fails++
-        log(`❌ ${phone.ig_username ?? phone.phone_name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
+        const detail = r.status === 'rejected'
+          ? (r.reason instanceof Error ? r.reason.message : String(r.reason))
+          : String(r.value['msg'] ?? 'code=' + String(r.value['code']))
+        log(`❌ ${name}: ${detail}`)
       }
-    }
+    })
 
     if (fails >= task.phones.length) {
       log('❌ Toutes les tâches RPA ont échoué')
