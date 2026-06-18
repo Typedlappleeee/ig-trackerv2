@@ -174,6 +174,30 @@ Deno.serve(async (req) => {
       await db.from('scheduled_posts').update({
         status: 'done', result: { logs }, error_msg: null,
       }).eq('id', post.id)
+
+      // Auto-reschedule si récurrent
+      const recurHours: number | null = (post as any).recur_hours ?? null
+      if (recurHours && recurHours > 0) {
+        const nextAt = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
+        await db.from('scheduled_posts').insert({
+          user_id:         post.user_id,
+          org_id:          post.org_id,
+          created_by_name: post.created_by_name,
+          type:            post.type,
+          status:          'pending',
+          scheduled_at:    nextAt,
+          phones:          post.phones,
+          videos:          post.videos,
+          caption:         post.caption,
+          delay_minutes:   post.delay_minutes,
+          mode:            post.mode,
+          bearer_token:    '',
+          reels_trial:     post.reels_trial,
+          recur_hours:     recurHours,
+        })
+        log(`🔄 Prochain post récurrent programmé dans ${recurHours}h`)
+      }
+
       summary[post.id] = 'done'
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
