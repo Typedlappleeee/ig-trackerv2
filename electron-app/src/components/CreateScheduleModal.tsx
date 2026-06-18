@@ -334,6 +334,11 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
             </div>
           </section>
 
+          <p style={{ fontSize: 11, color: MUTED, margin: 0, lineHeight: 1.6 }}>
+            Besoin d'un post qui se répète automatiquement ? Crée une{' '}
+            <span style={{ color: '#818CF8', fontWeight: 600 }}>Tâche automatique</span> depuis l'onglet Tâches.
+          </p>
+
           {error && (
             <div style={{ padding: '10px 14px', border: '1px solid rgba(240,160,171,0.4)', fontSize: 12, color: '#F0A0AB' }}>
               {error}

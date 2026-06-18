@@ -55,8 +55,8 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'hub'
   | 'phones'
-  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
-  | 'montage' | 'remix' | 'repurpose' | 'mixer'
+  | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
+  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles'
   | 'community' | 'support'
   | 'settings' | 'licences'
   | 'scaleia'
@@ -90,6 +90,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
+      { id: 'tasks',       label: 'navTasks',        icon: '⚡' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', dev: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
@@ -101,6 +102,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
       { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
+      { id: 'subtitles',   label: 'navSubtitles',   icon: '💬', isNew: true },
     ],
   },
 ]
@@ -147,11 +149,13 @@ const PAGE_ICON: Record<string, IconKey> = {
   posting:     'send',
   massposting: 'zap',
   scheduler:   'calendar',
+  tasks:       'zap',
   storylink:   'send',
   bank:        'video',
   captionbank: 'chat',
   warmup:      'flame',
   aitools:     'sparkles',
+  subtitles:   'chat',
   montage:     'scissors',
   remix:       'refresh',
   repurpose:   'zap',
@@ -247,6 +251,14 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     const v = localStorage.getItem('sf-sidebar')
     return v === 'reduite' || v === 'masquee'
   })
+  const [demoMode, setDemoMode] = useState(false)
+  const [displayName, setDisplayName] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+      .then(({ data }) => { if (data?.display_name) setDisplayName(data.display_name) })
+  }, [user.id])
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('sidebar-sections') ?? '{}')
@@ -478,10 +490,14 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     setShowAddAccount(true)
   }
 
+  const effectiveRole = demoMode ? 'member' : role
+  const effectivePerms = demoMode ? {} : perms
+  const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
+
   const isVisibleTab = (id: Page): boolean => {
-    if (id === 'licences')  return license.isSuperAdmin
+    if (id === 'licences' || id === 'storylink') return effectiveSuperAdmin
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
-    return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
+    return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }
 
   // Auto-redirect to the hub when the current page isn’t accessible in this org
@@ -508,8 +524,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     }
   }, [page])
 
-  const userInitial = user.email?.[0].toUpperCase() ?? '?'
-  const userName = user.email?.split('@')[0] ?? userInitial
+  const userDisplayName = displayName || user.email?.split('@')[0] || ''
+  const userInitial = userDisplayName?.[0]?.toUpperCase() ?? '?'
+  const userName = userDisplayName
   const planLabel = license.isSuperAdmin
     ? 'Super Admin'
     : license.plan === 'organisation' ? 'Organisation'
@@ -524,6 +541,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     posting:     t('pagePosting'),
     massposting: t('pageMassPosting'),
     scheduler:   t('pageScheduler'),
+    tasks:       t('navTasks'),
     storylink:   t('navStoryLink'),
     bank:        t('pageBank'),
     captionbank: t('navCaptionBank'),
@@ -533,6 +551,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     remix:       t('pageRemix'),
     repurpose:   t('navRepurpose'),
     mixer:       t('navMixer'),
+    subtitles:   t('navSubtitles'),
     textcopy:    t('pageTextcopy'),
     community:   t('pageCommunity'),
     support:     t('pageSupport'),
@@ -647,7 +666,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             { section: NAV_SECTIONS[2], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
           ] as Array<{ section: typeof NAV_SECTIONS[0]; labelKey: string; defaultIcon: IconKey }>)
             .map(({ section, labelKey, defaultIcon }) => {
-              const items = section.items.filter(it => isVisibleTab(it.id))
+              const items = section.items.filter(it => isVisibleTab(it.id) && (!it.dev || effectiveSuperAdmin))
               if (items.length === 0) return null
               const isOpen = openSections[section.title] !== false
               return (
@@ -753,7 +772,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               <span style={{ color: 'rgba(233,234,240,0.42)', flexShrink: 0, display: 'flex' }}>
                 <NavIcon d={ICONS.building} size={14} />
               </span>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(241,240,247,0.8)', fontSize: 12 }}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(241,240,247,0.8)', fontSize: 12, filter: demoMode ? 'blur(6px)' : 'none', userSelect: demoMode ? 'none' : 'auto' }}>
                 {currentOrg?.name ?? 'Organisation'}
               </span>
               <span style={{ color: 'rgba(233,234,240,0.32)', flexShrink: 0, display: 'flex' }}>
@@ -783,15 +802,16 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               boxShadow: '0 0 8px rgba(99,102,241,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
+              filter: demoMode ? 'blur(5px)' : 'none',
             }}>
               {userInitial}
             </div>
             {!collapsed && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: '#F1F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#F1F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', filter: demoMode ? 'blur(6px)' : 'none', userSelect: demoMode ? 'none' : 'auto' }}>
                   {userName}
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', marginTop: 1 }}>
+                <div style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', marginTop: 1, filter: demoMode ? 'blur(4px)' : 'none', userSelect: demoMode ? 'none' : 'auto' }}>
                   {planLabel}
                 </div>
               </div>
@@ -916,6 +936,31 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                   +
                 </button>
               </div>
+            )}
+
+            {/* Demo mode toggle — super admin only */}
+            {license?.isSuperAdmin === true && (
+              <button
+                onClick={() => setDemoMode(d => !d)}
+                title={demoMode ? 'Quitter le mode démo' : 'Activer la vue utilisateur (démo)'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '0 10px', height: 32, borderRadius: 8,
+                  border: demoMode ? '1px solid rgba(251,146,60,0.5)' : '1px solid rgba(255,255,255,0.07)',
+                  background: demoMode ? 'rgba(251,146,60,0.12)' : 'transparent',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  fontSize: 11, fontWeight: 600,
+                  color: demoMode ? '#FB923C' : 'rgba(233,234,240,0.42)',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = demoMode ? 'rgba(251,146,60,0.2)' : 'rgba(255,255,255,0.05)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = demoMode ? 'rgba(251,146,60,0.12)' : 'transparent' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                {demoMode ? 'Vue démo' : 'Démo'}
+              </button>
             )}
 
             {/* Notification bell */}
@@ -1059,6 +1104,29 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
         {/* ── Scrollable content ────────────────────────────────────────── */}
         <main style={{ flex: 1, overflow: 'auto', position: 'relative', background: '#0A0B0E', zIndex: 0 }}>
+          {/* Demo mode banner */}
+          {demoMode && (
+            <div style={{
+              position: 'sticky', top: 0, zIndex: 40,
+              background: 'linear-gradient(90deg, rgba(251,146,60,0.15), rgba(251,146,60,0.08))',
+              borderBottom: '1px solid rgba(251,146,60,0.25)',
+              padding: '7px 16px',
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FB923C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#FB923C', flex: 1 }}>
+                Mode démo — vue utilisateur (membre)
+              </span>
+              <button
+                onClick={() => setDemoMode(false)}
+                style={{ fontSize: 11, color: 'rgba(251,146,60,0.7)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 8px', borderRadius: 6 }}
+              >
+                Quitter
+              </button>
+            </div>
+          )}
           {/* Org-switch loading overlay */}
           {orgLoading && (
             <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm flex items-center justify-center">

@@ -1186,17 +1186,6 @@ export function Phones({ user }: PhonesProps) {
               <h1 className="sf-page-title">{t('phonesHeading')}</h1>
               <p className="sf-page-sub">{t('phonesSubtitle')}</p>
             </div>
-            <h1 style={{ margin: 0, lineHeight: 1.05, letterSpacing: '-0.04em' }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 26, color: IVORY }}>
-                {headingMain}
-              </span>
-              {headingAccent && (
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 29, color: GOLD, marginLeft: '0.25em' }}>
-                  {headingAccent}
-                </span>
-              )}
-            </h1>
-            <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: '7px 0 0', lineHeight: 1.5 }}>{t('phonesSubtitle')}</p>
           </div>
 
           {/* Right: auto-refresh + sync */}
@@ -1837,7 +1826,7 @@ export function Phones({ user }: PhonesProps) {
             position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
             zIndex: 40, display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 14px', borderRadius: 14,
-            background: 'var(--surface2)', border: '1px solid rgba(99,102,241,0.35)',
+            background: 'var(--surface-2)', border: '1px solid rgba(99,102,241,0.35)',
             boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 24px -8px rgba(99,102,241,0.4)',
             whiteSpace: 'nowrap',
           }}>

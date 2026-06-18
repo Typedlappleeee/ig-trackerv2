@@ -908,7 +908,7 @@ export function MassPosting({ user }: MassPostingProps) {
         flexShrink: 0,
         padding: '18px 28px 0',
         borderBottom: '1px solid rgba(233,234,240,0.07)',
-        background: 'var(--surface2)',
+        background: 'var(--surface-2)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingBottom: 16 }}>
 
@@ -1044,7 +1044,7 @@ export function MassPosting({ user }: MassPostingProps) {
         <aside style={{
           width: 292, flexShrink: 0, display: 'flex', flexDirection: 'column',
           borderRight: '1px solid rgba(233,234,240,0.07)',
-          background: 'var(--surface2)',
+          background: 'var(--surface-2)',
         }}>
           {/* Panel header */}
           <div style={{ flexShrink: 0, padding: '16px 16px 12px', borderBottom: '1px solid rgba(233,234,240,0.07)' }}>
@@ -1080,7 +1080,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
                     className="cursor-pointer sf-input"
                     style={{ height: 30, padding: '0 8px', fontSize: 12 }}>
-                    {groups.map(g => <option key={g} value={g} style={{ background: 'var(--surface2)', color: IVORY }}>{g}</option>)}
+                    {groups.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                 )}
                 <input
@@ -1355,7 +1355,7 @@ export function MassPosting({ user }: MassPostingProps) {
                         const fp = sv.localPath ?? sv.item.file_url
                         return (
                           <div key={sv.item.id} className="group"
-                            style={{ position: 'relative', aspectRatio: '9/16', maxHeight: 190, overflow: 'hidden', background: 'var(--surface2)' }}>
+                            style={{ position: 'relative', aspectRatio: '9/16', maxHeight: 190, overflow: 'hidden', background: 'var(--surface-2)' }}>
                             <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
                             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(6,6,8,0.9) 0%, transparent 50%)', pointerEvents: 'none' }} />
                             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 7 }}>

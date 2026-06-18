@@ -1105,6 +1105,15 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
   background: rgba(99,102,241,0.04);
 }
 .sf-input-lg { height: 40px; padding: 0 14px; font-size: 14px; border-radius: var(--r-lg); }
+select.sf-input,
+select.sf-input option {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+select.sf-input option:hover,
+select.sf-input option:checked {
+  background: var(--surface-3);
+}
 .sf-textarea {
   padding: 10px 11px;
   resize: vertical;

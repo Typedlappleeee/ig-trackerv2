@@ -158,4 +158,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Mixer — burn a caption onto a video with native ffmpeg
   runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) =>
     ipcRenderer.invoke('run-ffmpeg-mix-overlay', opts),
+
+  // Groq Whisper audio transcription (multipart, main-process, bypasses CORS)
+  groqTranscription: (opts: { apiKey: string; audioBytes: ArrayBuffer; filename: string; language?: string }) =>
+    ipcRenderer.invoke('groq-transcription', opts),
+
+  // Subtitles — burn timed subtitle segments onto a video
+  runFfmpegSubtitles: (opts: {
+    sourcePath: string
+    segments:   Array<{ text: string; start: number; end: number }>
+    fontSize:   number
+    fontColor:  string
+    position:   'top' | 'center' | 'bottom'
+    style:      'box' | 'outline' | 'shadow'
+    preset?:    '9:16' | '1:1' | '16:9' | 'keep'
+  }) => ipcRenderer.invoke('run-ffmpeg-subtitles', opts),
 })

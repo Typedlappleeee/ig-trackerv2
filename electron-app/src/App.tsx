@@ -560,6 +560,7 @@ const AiTools        = lazy(() => import('@/pages/AiTools').then(m => ({ default
 const Settings       = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })))
 
 const Scheduler      = lazy(() => import('@/pages/Scheduler').then(m => ({ default: m.Scheduler })))
+const Tasks          = lazy(() => import('@/pages/Tasks').then(m => ({ default: m.Tasks })))
 const Warmup         = lazy(() => import('@/pages/Warmup').then(m => ({ default: m.Warmup })))
 const VideoRepurpose = lazy(() => import('@/pages/VideoRepurpose').then(m => ({ default: m.VideoRepurpose })))
 const Mixer          = lazy(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
@@ -568,6 +569,7 @@ const Support        = lazy(() => import('@/pages/Support').then(m => ({ default
 const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazy(() => import('@/pages/StoryLink'))
+const Subtitles      = lazy(() => import('@/pages/Subtitles').then(m => ({ default: m.Subtitles })))
 const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { AppTour }           from '@/components/AppTour'
@@ -827,6 +829,7 @@ function AppContent({ user }: { user: User }) {
       case 'posting':      return <Publish     user={user} />
       case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
+      case 'tasks':        return <Tasks       user={user} />
       case 'storylink':    return <StoryLink   user={user} />
       case 'bank':         return <BankHub     user={user} initialTab="videos" />
       case 'warmup':       return <Warmup      user={user} />
@@ -835,6 +838,7 @@ function AppContent({ user }: { user: User }) {
       case 'repurpose':    return <VideoRepurpose user={user} />
       case 'captionbank':  return <BankHub      user={user} initialTab="captions" />
       case 'mixer':        return <Mixer        user={user} />
+      case 'subtitles':    return <Subtitles    user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />

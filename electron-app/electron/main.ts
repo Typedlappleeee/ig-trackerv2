@@ -1613,6 +1613,53 @@ ipcMain.handle('groq-request', async (_event, opts: {
   }
 })
 
+// ── IPC: Groq Whisper audio transcription (multipart, bypasses renderer CORS) ─
+ipcMain.handle('groq-transcription', async (_event, opts: {
+  apiKey:    string
+  audioBytes: ArrayBuffer
+  filename:  string
+  language?: string
+}) => {
+  try {
+    const boundary = `----GBoundary${Date.now()}`
+    const buf = Buffer.from(opts.audioBytes)
+    const ext = opts.filename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
+    const mime = ext === 'mp3' ? 'audio/mpeg' : ext === 'webm' ? 'audio/webm' : 'video/mp4'
+
+    const parts: Buffer[] = []
+    function addField(name: string, value: string) {
+      parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`))
+    }
+    addField('model', 'whisper-large-v3-turbo')
+    addField('response_format', 'verbose_json')
+    addField('timestamp_granularities[]', 'word')
+    if (opts.language) addField('language', opts.language)
+    // audio file part
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${opts.filename}"\r\nContent-Type: ${mime}\r\n\r\n`))
+    parts.push(buf)
+    parts.push(Buffer.from(`\r\n--${boundary}--\r\n`))
+
+    const body = Buffer.concat(parts)
+    const response = await net.fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${opts.apiKey}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      body,
+    } as Parameters<typeof net.fetch>[1])
+
+    if (!response.ok) {
+      const txt = await response.text().catch(() => '')
+      return { ok: false, error: `Groq ${response.status}: ${txt.slice(0, 300)}` }
+    }
+    const data = await response.json()
+    return { ok: true, data }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
 // ── IPC: fetch Instagram comments for a media ID ─────────────────────────────
 ipcMain.handle('fetch-ig-comments', async (_event, opts: { mediaId: string; sessionid: string; maxId?: string }) => {
   const extractComments = (data: Record<string, unknown>): Array<Record<string, unknown>> => {
@@ -1878,6 +1925,116 @@ ipcMain.handle('write-temp-file', async (_event, opts: { name: string; bytes: Ar
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
+})
+
+// ── IPC: burn timed subtitles into a video via native FFmpeg ─────────────────
+ipcMain.handle('run-ffmpeg-subtitles', async (_event, opts: {
+  sourcePath: string
+  segments:   Array<{ text: string; start: number; end: number }>
+  fontSize:   number
+  fontColor:  string
+  position:   'top' | 'center' | 'bottom'
+  style:      'box' | 'outline' | 'shadow'
+  preset?:    '9:16' | '1:1' | '16:9' | 'keep'
+}) => {
+  const ffmpegBin = getFfmpegBin()
+  const dir = path.join(os.tmpdir(), 'ig-tracker-subtitles')
+  try { mkdirSync(dir, { recursive: true }) } catch { /* ignore */ }
+
+  let srcPath = opts.sourcePath
+  let tempSrc: string | null = null
+  try {
+    if (srcPath.startsWith('http://') || srcPath.startsWith('https://')) {
+      const res = await net.fetch(srcPath)
+      if (!res.ok) return { ok: false, error: `Téléchargement source: ${res.status}` }
+      tempSrc = path.join(dir, `src-${Date.now()}.mp4`)
+      writeFileSync(tempSrc, Buffer.from(await res.arrayBuffer()))
+      srcPath = tempSrc
+    } else if (srcPath.startsWith('file://')) {
+      srcPath = fileURLToPath(srcPath)
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+  if (!existsSync(srcPath)) return { ok: false, error: 'Fichier source introuvable' }
+
+  const fontCandidates = process.platform === 'win32'
+    ? ['C:\\Windows\\Fonts\\arialbd.ttf', 'C:\\Windows\\Fonts\\arial.ttf']
+    : process.platform === 'darwin'
+      ? ['/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial Bold.ttf', '/Library/Fonts/Arial.ttf']
+      : ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+         '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+         '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf',
+         '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf']
+  const fontFile = fontCandidates.find(f => existsSync(f)) ?? null
+
+  function escText(t: string): string {
+    return t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:')
+             .replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/%/g, '%%')
+  }
+
+  const posYExpr = opts.position === 'top'
+    ? `(${opts.fontSize * 2})`
+    : opts.position === 'center'
+      ? `(h/2-text_h/2)`
+      : `(h-text_h-${Math.round(opts.fontSize * 1.5)})`
+
+  const borderPx = Math.max(3, Math.round(opts.fontSize * 0.08))
+
+  const drawtextChain = opts.segments.map(seg => {
+    const parts = [`text='${escText(seg.text)}'`]
+    if (fontFile) parts.push(`fontfile='${fontFile}'`)
+    parts.push(`x=(w-text_w)/2`, `y=${posYExpr}`)
+    parts.push(`fontsize=${opts.fontSize}`, `fontcolor=${opts.fontColor}`)
+    if (opts.style === 'box') {
+      parts.push(`box=1:boxcolor=black@0.82:boxborderw=${borderPx * 2}`)
+    } else {
+      parts.push(`borderw=${borderPx}:bordercolor=black@1.0`)
+      if (opts.style === 'shadow') parts.push(`shadowx=4:shadowy=4:shadowcolor=black@0.7`)
+    }
+    parts.push(`enable='between(t,${seg.start},${seg.end})'`)
+    return `drawtext=${parts.join(':')}`
+  }).join(',')
+
+  const preset = opts.preset ?? 'keep'
+  const scaleFilter = preset === 'keep'
+    ? 'setsar=1'
+    : preset === '9:16'
+      ? 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black,setsar=1'
+      : preset === '1:1'
+        ? 'scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:-1:-1:color=black,setsar=1'
+        : 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1'
+
+  const vf = opts.segments.length > 0
+    ? `${scaleFilter},${drawtextChain}`
+    : scaleFilter
+
+  const out = path.join(dir, `subs-${Date.now()}.mp4`)
+  const args = [
+    '-nostdin', '-i', srcPath,
+    '-vf', vf,
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '20',
+    '-r', '30', '-fps_mode', 'cfr',
+    '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+    '-g', '30', '-keyint_min', '15',
+    '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+    '-movflags', '+faststart',
+    '-y', out,
+  ]
+
+  return new Promise(resolve => {
+    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_REMIX_TIMEOUT, killSignal: 'SIGKILL' }, (err, _stdout, stderr) => {
+      if (tempSrc) { try { rmSync(tempSrc) } catch { /* ignore */ } }
+      if (err) {
+        const detail = (stderr ?? '').split('\n').filter((l: string) => /error|invalid/i.test(l)).slice(-2).join(' ')
+        return resolve({ ok: false, error: err.message.split('\n')[0] + (detail ? ` — ${detail.slice(0, 200)}` : '') })
+      }
+      try {
+        if (statSync(out).size < 5000) return resolve({ ok: false, error: 'Sortie vide' })
+      } catch { return resolve({ ok: false, error: 'Sortie manquante' }) }
+      resolve({ ok: true, outputPath: out })
+    })
+  })
 })
 
 app.on('window-all-closed', () => {

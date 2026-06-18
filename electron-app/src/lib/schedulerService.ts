@@ -37,6 +37,7 @@ export interface ScheduledPost {
   mode:            'seq' | 'random'
   bearer_token:    string
   reels_trial:     boolean
+  recur_hours:     number | null
   result:          { logs: string[] } | null
   error_msg:       string | null
   created_at:      string
@@ -56,6 +57,7 @@ export interface CreateScheduledPostInput {
   mode:            'seq' | 'random'
   bearerToken:     string
   reelsTrial:      boolean
+  recurHours?:     number | null
 }
 
 // ── DB operations ──────────────────────────────────────────────────────────────
@@ -78,6 +80,7 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
     // time from org_config / app_config instead.
     bearer_token:     '',
     reels_trial:      input.reelsTrial,
+    recur_hours:      input.recurHours ?? null,
   }).select().single()
   if (error) throw new Error(error.message)
   return data as ScheduledPost

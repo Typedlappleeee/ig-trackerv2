@@ -840,123 +840,135 @@ export async function postInstagramStory(
   const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
   let imgOnPhone = false
 
-  // PRIMARY: upload to GeeLark CDN server-side (Vercel → GeeLark S3), then wget on phone.
-  // Same mechanism as mass posting — CDN URLs are always reachable from GeeLark phones.
+  // Download the image server-side (via /api/proxy) to avoid CORS, then compress
+  // client-side and push as base64 chunks via shell. Target: < 200 KB JPEG so the
+  // push takes ~5 seconds instead of hanging with 2600+ chunks.
+  const bufToB64 = (buf: ArrayBuffer | Uint8Array): string => {
+    const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
+    let b64 = ''
+    for (let i = 0; i < u8.length; i += 8192)
+      b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + 8192, u8.length))))
+    return b64
+  }
+
+  let imgBase64: string | null = null
+
+  // Download: try /api/proxy (server-side, no CORS) then direct fetch
   try {
-    log('   ☁️ Upload CDN GeeLark (côté serveur)…')
-    const upRes = await fetch('/api/geelark-upload', {
+    const pr = await fetch('/api/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ signedUrl: config.imageUrl, bearer }),
+      body: JSON.stringify({ url: config.imageUrl }),
     })
-    const upData: { ok: boolean; token?: string; error?: string } = upRes.ok
-      ? await upRes.json()
-      : { ok: false, error: `HTTP ${upRes.status}` }
-
-    if (upData.ok && upData.token) {
-      const cdnUrl = upData.token
-      log('   📲 Téléchargement depuis CDN GeeLark…')
-      await shellExec(bearer, phoneId,
-        `mkdir -p /sdcard/DCIM/Camera && ` +
-        `(curl -fsSLk --max-time 90 -o '${imgPath}' '${cdnUrl}' 2>/dev/null || ` +
-        ` wget -q --no-check-certificate --timeout=90 -O '${imgPath}' '${cdnUrl}' 2>/dev/null)`)
-      const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-      const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-      if (sz > 2000) {
-        log(`   ✅ Image via CDN GeeLark (${sz} octets)`)
-        imgOnPhone = true
-      } else {
-        log(`   ⚠️ CDN wget: ${sz} octets — passage au fallback base64`)
+    if (pr.ok) {
+      const d = await pr.json()
+      if (d.ok && d.dataUrl) {
+        const comma = (d.dataUrl as string).indexOf(',')
+        if (comma !== -1) imgBase64 = (d.dataUrl as string).slice(comma + 1)
       }
-    } else {
-      log(`   ⚠️ CDN upload: ${upData.error ?? 'échec inconnu'}`)
     }
-  } catch (e) {
-    log(`   ⚠️ CDN: ${e instanceof Error ? e.message : String(e)}`)
-  }
-
-  // FALLBACK: download in browser, compress with OffscreenCanvas, push via base64 chunks.
-  if (!imgOnPhone) {
-    log('   🔄 Fallback base64…')
-    let imgBase64: string | null = null
-
-    const bufToB64 = (buf: ArrayBuffer): string => {
-      const u8 = new Uint8Array(buf)
-      let b64 = ''
-      for (let i = 0; i < u8.length; i += 8192)
-        b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + 8192, u8.length))))
-      return b64
-    }
-
-    // Download image client-side
+  } catch { /* fallthrough */ }
+  if (!imgBase64) {
     try {
       const resp = await fetch(config.imageUrl)
-      if (resp.ok) {
-        imgBase64 = bufToB64(await resp.arrayBuffer())
-        log(`   📥 Image téléchargée (${Math.round(imgBase64.length / 1024)} KB)`)
-      }
-    } catch { /* ignore */ }
+      if (resp.ok) imgBase64 = bufToB64(await resp.arrayBuffer())
+    } catch { /* fallthrough */ }
+  }
 
-    // Compress via OffscreenCanvas (no DOM needed, no data: URL size limit)
-    if (imgBase64) {
-      try {
-        const mimeIn = _imgExt === 'png' ? 'image/png' : 'image/jpeg'
-        const binStr = atob(imgBase64)
-        const u8in = new Uint8Array(binStr.length)
-        for (let i = 0; i < binStr.length; i++) u8in[i] = binStr.charCodeAt(i)
-        const inBlob = new Blob([u8in], { type: mimeIn })
-        const bitmap = await createImageBitmap(inBlob)
-        const MAX_W = 1080, MAX_H = 1920
-        let w = bitmap.width, h = bitmap.height
-        if (w > MAX_W || h > MAX_H) {
-          const r = Math.min(MAX_W / w, MAX_H / h)
-          w = Math.round(w * r); h = Math.round(h * r)
+  if (!imgBase64) {
+    return { ok: false, error: 'Impossible de télécharger l\'image (réseau)' }
+  }
+  log(`   📥 Image: ${Math.round(imgBase64.length / 1024)} KB`)
+
+  // Compress to JPEG ≤ 200 KB using OffscreenCanvas, then DOM Canvas as fallback.
+  // Target 720×1280 (enough for stories) at decreasing quality until small enough.
+  const MAX_W = 720, MAX_H = 1280
+  let compressed: string | null = null
+
+  // Attempt 1: OffscreenCanvas (no DOM dependency)
+  try {
+    const mimeIn = _imgExt === 'png' ? 'image/png' : 'image/jpeg'
+    const binStr = atob(imgBase64)
+    const u8in = new Uint8Array(binStr.length)
+    for (let i = 0; i < binStr.length; i++) u8in[i] = binStr.charCodeAt(i)
+    const bitmap = await createImageBitmap(new Blob([u8in], { type: mimeIn }))
+    let w = bitmap.width, h = bitmap.height
+    if (w > MAX_W || h > MAX_H) { const r = Math.min(MAX_W / w, MAX_H / h); w = Math.round(w * r); h = Math.round(h * r) }
+    const oc = new OffscreenCanvas(w, h)
+    oc.getContext('2d')!.drawImage(bitmap, 0, 0, w, h)
+    for (const q of [0.75, 0.60, 0.45]) {
+      const blob = await oc.convertToBlob({ type: 'image/jpeg', quality: q })
+      const b64 = bufToB64(await blob.arrayBuffer())
+      if (b64.length < 280 * 1024) { compressed = b64; break }
+      compressed = b64 // keep last attempt even if large
+    }
+    if (compressed) log(`   🗜️ OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB`)
+  } catch (e) {
+    log(`   ⚠️ OffscreenCanvas: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  // Attempt 2: DOM Canvas (if OffscreenCanvas unavailable or too large)
+  if (!compressed || compressed.length > 400 * 1024) {
+    try {
+      const mimeIn = _imgExt === 'png' ? 'image/png' : 'image/jpeg'
+      const c2 = await new Promise<string | null>((resolve) => {
+        const binStr = atob(imgBase64!)
+        const u8 = new Uint8Array(binStr.length)
+        for (let i = 0; i < binStr.length; i++) u8[i] = binStr.charCodeAt(i)
+        const blobUrl = URL.createObjectURL(new Blob([u8], { type: mimeIn }))
+        const img = new Image()
+        img.onload = () => {
+          URL.revokeObjectURL(blobUrl)
+          let w = img.naturalWidth, h = img.naturalHeight
+          if (w > MAX_W || h > MAX_H) { const r = Math.min(MAX_W / w, MAX_H / h); w = Math.round(w * r); h = Math.round(h * r) }
+          const cv = document.createElement('canvas')
+          cv.width = w; cv.height = h
+          cv.getContext('2d')!.drawImage(img, 0, 0, w, h)
+          for (const q of [0.75, 0.60, 0.45]) {
+            const dataUrl = cv.toDataURL('image/jpeg', q)
+            const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+            if (b64.length < 280 * 1024) { resolve(b64); return }
+          }
+          resolve(cv.toDataURL('image/jpeg', 0.45).split(',')[1] ?? null)
         }
-        const oc = new OffscreenCanvas(w, h)
-        const ctx = oc.getContext('2d')!
-        ctx.drawImage(bitmap, 0, 0, w, h)
-        const outBlob = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.85 })
-        const outBuf = await outBlob.arrayBuffer()
-        const compressed = bufToB64(outBuf)
-        log(`   🗜️ Compression: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB JPEG`)
-        imgBase64 = compressed
-      } catch (e) {
-        log(`   ⚠️ Compression ignorée (${e instanceof Error ? e.message : String(e)})`)
-      }
+        img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
+        img.src = blobUrl
+      })
+      if (c2) { compressed = c2; log(`   🗜️ Canvas DOM: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(c2.length / 1024)} KB`) }
+    } catch (e) {
+      log(`   ⚠️ Canvas DOM: ${e instanceof Error ? e.message : String(e)}`)
     }
-
-    // Push via base64 shell chunks
-    if (imgBase64) {
-      const CHUNK = 2000, BATCH = 6
-      const chunks: string[] = []
-      for (let i = 0; i < imgBase64.length; i += CHUNK) chunks.push(imgBase64.slice(i, i + CHUNK))
-      log(`   📤 Push base64: ${chunks.length} chunks…`)
-      await shellExec(bearer, phoneId,
-        `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-      for (let b = 1; b < chunks.length; b += BATCH) {
-        const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-        await shellExec(bearer, phoneId, cmd)
-      }
-      await shellExec(bearer, phoneId,
-        `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || ` +
-        `base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; ` +
-        `rm -f '${imgPath}.b64'`)
-    }
-
-    const ck2 = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-    const sz2 = parseInt(ck2.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    if (sz2 > 2000) { imgOnPhone = true; log(`   ✅ Image via base64 (${sz2} octets)`) }
-    else { log(`   ❌ Fallback base64: ${sz2} octets`) }
   }
 
-  if (!imgOnPhone) {
-    return { ok: false, error: 'Impossible de transférer l\'image sur le téléphone' }
-  }
+  const pushData = compressed ?? imgBase64
+  log(`   📤 Push: ${Math.round(pushData.length / 1024)} KB`)
 
-  // Force media scanner so Instagram's gallery picker sees the new file
+  // Push via base64 chunks (base64 chars A-Za-z0-9+/= are safe inside single quotes)
+  const CHUNK = 3000, BATCH = 20
+  const chunks: string[] = []
+  for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
+  log(`   📦 ${chunks.length} chunks × ${BATCH}…`)
   await shellExec(bearer, phoneId,
-    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
-  await sleep(2500)
+    `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+  for (let b = 1; b < chunks.length; b += BATCH) {
+    const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+    await shellExec(bearer, phoneId, cmd)
+  }
+  await shellExec(bearer, phoneId,
+    `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
+
+  const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+  const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+  log(`   📎 Fichier: ${sz} octets`)
+  if (sz < 2000) {
+    return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
+  }
+
+  // Force media scanner so Instagram's gallery picker sees the new file.
+  // touch -m ensures the file has the current timestamp → appears FIRST in "Recents".
+  await shellExec(bearer, phoneId,
+    `touch -m '${imgPath}' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
+  await sleep(4000)
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
@@ -1035,11 +1047,24 @@ export async function postInstagramStory(
   await sleep(2500)
   await dismissPermissionDialog()
 
-  // Tap the first (most-recent) gallery image — the one we just downloaded.
+  // Tap the first (most-recent) gallery image — the one we just uploaded.
+  // Parse ALL grid items and pick the topmost-leftmost one (smallest y then x),
+  // because the XML order doesn't always match the visual left→right order.
   xml = await dumpXml(bearer, phoneId)
-  const firstThumb =
-    findByResourceId(xml, 'gallery_grid_item', 'media_picker_grid_item') ??
-    [Math.floor(sw * 0.17), Math.floor(sh * 0.28)] as [number, number]
+  const firstThumb = (() => {
+    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+    let best: [number, number] | null = null
+    let bestScore = Infinity
+    let m: RegExpExecArray | null
+    while ((m = re.exec(xml)) !== null) {
+      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
+      const score = y1 * 10000 + x1 // top row first, then leftmost
+      if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
+    }
+    // Fallback: top-left of the grid (below the gallery header)
+    return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)] as [number, number]
+  })()
+  log(`   👆 Tap galerie: ${firstThumb[0]},${firstThumb[1]}`)
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
 
@@ -1052,37 +1077,58 @@ export async function postInstagramStory(
   if (stickerBtn) {
     await shellExec(bearer, phoneId, `input tap ${stickerBtn[0]} ${stickerBtn[1]}`)
   } else {
-    // Sticker icon lives in the top-right toolbar
-    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.06)}`)
+    // Sticker icon (smiley face) — top-right toolbar of the story editor
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.05)}`)
   }
-  await sleep(2500)
+  await sleep(3500) // extra time for tray to fully load
 
   xml = await dumpXml(bearer, phoneId)
   const linkSticker =
     findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
-    findByTextPartial(xml, 'link') ??
+    findByTextPartial(xml, 'link', 'lien') ??
     findByResourceId(xml, 'link_sticker', 'sticker_link')
   if (linkSticker) {
     await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
   } else {
-    // Search the sticker tray for "link" via its built-in search bar
+    // Search the sticker tray for "link"/"lien" via the built-in search bar
     const searchPt =
-      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box') ??
-      findByTextPartial(xml, 'search', 'recherch')
+      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input') ??
+      findByTextPartial(xml, 'search', 'recherch', 'cherch')
     if (searchPt) {
       await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
       await sleep(900)
-      await shellExec(bearer, phoneId, `input text "link"`)
-      await sleep(1800)
-      const xml2 = await dumpXml(bearer, phoneId)
-      const lk2 =
+      // Try "lien" first (French IG), then "link"
+      await shellExec(bearer, phoneId, `input text "lien"`)
+      await sleep(2000)
+      let xml2 = await dumpXml(bearer, phoneId)
+      let lk2 =
         findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
-        findByTextPartial(xml2, 'link') ??
+        findByTextPartial(xml2, 'link', 'lien') ??
         findByResourceId(xml2, 'link_sticker', 'sticker_link')
-      if (lk2) await shellExec(bearer, phoneId, `input tap ${lk2[0]} ${lk2[1]}`)
-      else { log('   ❌ Sticker lien introuvable après recherche'); return { ok: false, error: 'Sticker lien introuvable' } }
+      if (!lk2) {
+        // Clear and try English "link"
+        await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long del to clear
+        await sleep(400)
+        await shellExec(bearer, phoneId, `input text "link"`)
+        await sleep(2000)
+        xml2 = await dumpXml(bearer, phoneId)
+        lk2 =
+          findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
+          findByTextPartial(xml2, 'link', 'lien') ??
+          findByResourceId(xml2, 'link_sticker', 'sticker_link')
+      }
+      if (lk2) {
+        await shellExec(bearer, phoneId, `input tap ${lk2[0]} ${lk2[1]}`)
+      } else {
+        log('   ❌ Sticker lien introuvable après recherche')
+        return { ok: false, error: 'Sticker lien introuvable — le sticker "Lien" est peut-être absent de ce compte Instagram' }
+      }
     } else {
-      log('   ❌ Barre de recherche de stickers introuvable'); return { ok: false, error: 'Sticker lien introuvable' }
+      // No search bar found — try tapping top-left of the tray then searching
+      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.5)} ${Math.floor(sh * 0.35)}`)
+      await sleep(600)
+      log('   ❌ Barre de recherche de stickers introuvable')
+      return { ok: false, error: 'Sticker lien introuvable — barre de recherche non détectée' }
     }
   }
   await sleep(2500)
@@ -1127,15 +1173,36 @@ export async function postInstagramStory(
 
   // ── 6. Drag the link sticker to the bottom-right ───────────────────────────
   log('↘️  Positionnement du sticker en bas à droite…')
-  // After "Done", IG places the sticker in the upper-center area (~25-35% down).
-  // A 1200ms swipe acts as long-press+drag which triggers the drag handle.
-  await shellExec(bearer, phoneId,
-    `input swipe ${cx} ${Math.floor(sh * 0.28)} ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.85)} 1200`)
-  await sleep(800)
-  // Second pass in case the first swipe missed — try from a slightly lower start
-  await shellExec(bearer, phoneId,
-    `input swipe ${cx} ${Math.floor(sh * 0.38)} ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.85)} 1200`)
-  await sleep(1500)
+  // After "Done", IG places the sticker somewhere in the center of the canvas.
+  // The exact vertical position varies by IG version (25%–55% down the screen).
+  // We try multiple starting Y positions with a 1800ms hold (long-press + drag).
+  // The target is the bottom-right quadrant: 78% right, 82% down.
+  const _dragTX = Math.floor(sw * 0.78)
+  const _dragTY = Math.floor(sh * 0.82)
+  // First, try to find the sticker node in the XML (works on some IG builds).
+  {
+    const sxml = await dumpXml(bearer, phoneId)
+    // Link stickers carry text from linkText or "LINK" / "LIEN" resource ids.
+    const stickerNode =
+      findByResourceId(sxml, 'link_sticker_view', 'sticker_view', 'interactive_sticker') ??
+      (config.linkText ? findByText(sxml, config.linkText) : null) ??
+      findByText(sxml, 'LINK', 'LIEN', 'Open', 'Ouvrir')
+    if (stickerNode) {
+      log(`   🎯 Sticker trouvé via XML: ${stickerNode[0]},${stickerNode[1]}`)
+      await shellExec(bearer, phoneId,
+        `input swipe ${stickerNode[0]} ${stickerNode[1]} ${_dragTX} ${_dragTY} 1800`)
+      await sleep(1200)
+    } else {
+      // Fallback: sweep through likely vertical positions (25% → 55%)
+      for (const startFrac of [0.30, 0.40, 0.50, 0.25, 0.55]) {
+        const sy = Math.floor(sh * startFrac)
+        await shellExec(bearer, phoneId,
+          `input swipe ${cx} ${sy} ${_dragTX} ${_dragTY} 1800`)
+        await sleep(600)
+      }
+      await sleep(900)
+    }
+  }
 
   // ── 7. Publish to "Your story" ─────────────────────────────────────────────
   if (config.dryRun) {
