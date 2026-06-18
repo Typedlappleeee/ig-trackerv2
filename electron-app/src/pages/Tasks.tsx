@@ -108,6 +108,7 @@ function formatCountdown(nextRunAt: string): string {
 }
 
 function formatInterval(hours: number): string {
+  if (hours < 1) return `toutes les ${Math.round(hours * 60)} min`
   if (hours >= 24 && hours % 24 === 0) return `toutes les ${hours / 24}j`
   return `toutes les ${hours}h`
 }
@@ -337,12 +338,16 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   const [name, setName]               = useState(editTask?.name ?? '')
   const [caption, setCaption]         = useState(editTask?.caption ?? '')
   const [mode, setMode]               = useState<'seq' | 'random'>(editTask?.mode ?? 'seq')
-  const [recurUnit, setRecurUnit]     = useState<'heures' | 'jours'>(
-    editTask ? (editTask.recur_hours % 24 === 0 && editTask.recur_hours >= 24 ? 'jours' : 'heures') : 'heures'
+  const [recurUnit, setRecurUnit]     = useState<'minutes' | 'heures' | 'jours'>(
+    editTask
+      ? (editTask.recur_hours < 1 ? 'minutes'
+        : editTask.recur_hours % 24 === 0 && editTask.recur_hours >= 24 ? 'jours' : 'heures')
+      : 'heures'
   )
   const [recurValue, setRecurValue]   = useState(
     editTask
-      ? (editTask.recur_hours % 24 === 0 && editTask.recur_hours >= 24 ? editTask.recur_hours / 24 : editTask.recur_hours)
+      ? (editTask.recur_hours < 1 ? Math.round(editTask.recur_hours * 60)
+        : editTask.recur_hours % 24 === 0 && editTask.recur_hours >= 24 ? editTask.recur_hours / 24 : editTask.recur_hours)
       : 24
   )
   const [nextRunAt, setNextRunAt]     = useState(
@@ -354,7 +359,9 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   const [progress, setProgress]       = useState('')
   const [error, setError]             = useState<string | null>(null)
 
-  const recurHours = recurUnit === 'jours' ? recurValue * 24 : recurValue
+  const recurHours = recurUnit === 'jours' ? recurValue * 24
+    : recurUnit === 'minutes' ? recurValue / 60
+    : recurValue
 
   useEffect(() => {
     let q = supabase.from('phones').select('*').order('phone_name')
@@ -390,7 +397,8 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   }
 
   const isEdit = !!editTask
-  const canSubmit = !submitting && name.trim().length > 0 && phoneList.length > 0 && videos.length > 0
+  // Le nom est optionnel — un nom est généré automatiquement s'il est vide.
+  const canSubmit = !submitting && phoneList.length > 0 && videos.length > 0
 
   const labelStyle: React.CSSProperties = {
     fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
@@ -424,10 +432,11 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       setProgress('Sauvegarde de la tâche…')
 
       const nextRunDate = new Date(nextRunAt)
+      const autoName = `Tâche du ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}`
       const taskData = {
         user_id:       user.id,
         org_id:        currentOrg?.id ?? null,
-        name:          name.trim(),
+        name:          name.trim() || autoName,
         status:        (editTask?.status ?? 'active') as 'active' | 'paused',
         phones:        phoneList.map(p => ({
           id: p.id, geelark_id: p.geelark_id,
@@ -525,7 +534,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
 
           {/* ── Nom ── */}
           <section>
-            <span style={labelStyle}>Nom de la tâche</span>
+            <span style={labelStyle}>
+              Nom de la tâche
+              <span style={{ color: MUTED, letterSpacing: 'normal', fontSize: 10, textTransform: 'none', fontWeight: 500 }}> — optionnel</span>
+            </span>
             <input
               type="text"
               className="sf-input"
@@ -590,53 +602,76 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 Aucun
               </button>
             </div>
-            <div style={{
-              maxHeight: 180, overflowY: 'auto',
-              border: `1px solid ${HAIR}`, borderRadius: 8, scrollbarWidth: 'thin',
-            }}>
-              {visiblePhones.length === 0 ? (
-                <p style={{ padding: '20px 16px', fontSize: 12, color: MUTED, textAlign: 'center' }}>
-                  Aucun téléphone
-                </p>
-              ) : visiblePhones.map(phone => {
-                const checked = selPhones.has(phone.id)
-                return (
-                  <button
-                    key={phone.id}
-                    onClick={() => togglePhone(phone.id)}
-                    className="cursor-pointer"
-                    style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '7px 12px', textAlign: 'left', border: 'none',
-                      borderBottom: '1px solid rgba(233,234,240,0.04)',
-                      background: checked ? 'rgba(99,102,241,0.06)' : 'transparent',
-                      transition: 'background 0.15s',
-                    }}
-                  >
-                    <div style={{
-                      width: 13, height: 13, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: checked ? GOLD : 'transparent',
-                      border: checked ? 'none' : '1px solid rgba(233,234,240,0.18)',
-                      borderRadius: 3,
-                    }}>
-                      {checked && <IconCheck />}
-                    </div>
-                    <span style={{
-                      fontSize: 12, fontWeight: 600, color: checked ? IVORY : 'rgba(233,234,240,0.6)',
-                      flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
-                      {phone.phone_name}
-                    </span>
-                    {phone.ig_username && (
-                      <span style={{ fontSize: 10.5, color: checked ? 'rgba(99,102,241,0.7)' : MUTED }}>
-                        @{phone.ig_username}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+            {visiblePhones.length === 0 ? (
+              <div style={{
+                padding: '24px 16px', fontSize: 12, color: MUTED, textAlign: 'center',
+                border: `1px solid ${HAIR}`, borderRadius: 10,
+              }}>
+                Aucun téléphone
+              </div>
+            ) : (
+              <div style={{
+                maxHeight: 224, overflowY: 'auto', scrollbarWidth: 'thin',
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7,
+                padding: 2,
+              }}>
+                {visiblePhones.map(phone => {
+                  const checked = selPhones.has(phone.id)
+                  const initial = (phone.ig_username ?? phone.phone_name ?? '?').charAt(0).toUpperCase()
+                  return (
+                    <button
+                      key={phone.id}
+                      onClick={() => togglePhone(phone.id)}
+                      className="cursor-pointer"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 9,
+                        padding: '8px 10px', textAlign: 'left', borderRadius: 10,
+                        border: `1px solid ${checked ? 'rgba(99,102,241,0.5)' : HAIR}`,
+                        background: checked ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {/* Avatar */}
+                      <div style={{
+                        width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: checked ? GOLD : 'rgba(255,255,255,0.05)',
+                        color: checked ? '#fff' : 'rgba(233,234,240,0.55)',
+                        fontSize: 13, fontWeight: 700,
+                      }}>
+                        {initial}
+                      </div>
+                      {/* Text */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{
+                          margin: 0, fontSize: 12, fontWeight: 600,
+                          color: checked ? IVORY : 'rgba(233,234,240,0.7)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {phone.phone_name}
+                        </p>
+                        <p style={{
+                          margin: 0, fontSize: 10.5,
+                          color: checked ? 'rgba(129,140,248,0.8)' : MUTED,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {phone.ig_username ? `@${phone.ig_username}` : (phone.group_name || 'sans groupe')}
+                        </p>
+                      </div>
+                      {/* Check indicator */}
+                      <div style={{
+                        width: 16, height: 16, flexShrink: 0, borderRadius: 5,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: checked ? GOLD : 'transparent',
+                        border: checked ? 'none' : '1px solid rgba(233,234,240,0.18)',
+                      }}>
+                        {checked && <IconCheck />}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </section>
 
           {/* ── Vidéos ── */}
@@ -751,13 +786,14 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                   />
                   <select
                     value={recurUnit}
-                    onChange={e => setRecurUnit(e.target.value as 'heures' | 'jours')}
+                    onChange={e => setRecurUnit(e.target.value as 'minutes' | 'heures' | 'jours')}
                     style={{
                       height: 34, padding: '0 8px', fontSize: 12,
                       background: '#0F1014', color: IVORY,
                       border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none',
                     }}
                   >
+                    <option value="minutes">minutes</option>
                     <option value="heures">heures</option>
                     <option value="jours">jours</option>
                   </select>
