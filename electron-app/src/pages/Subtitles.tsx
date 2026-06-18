@@ -147,25 +147,19 @@ export function Subtitles({ user: _user }: SubtitlesProps) {
         throw new Error('Aucun fichier source')
       }
 
-      // ── Step 2: Groq Whisper transcription ───────────────────────────────────
-      const form = new FormData()
-      form.append('file', audioBlob, videoName || 'video.mp4')
-      form.append('model', 'whisper-large-v3-turbo')
-      form.append('response_format', 'verbose_json')
-      form.append('timestamp_granularities[]', 'word')
-      if (lang !== 'auto') form.append('language', lang)
-
-      const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${groqKey}` },
-        body: form,
-      })
-      if (!resp.ok) {
-        const txt = await resp.text().catch(() => '')
-        throw new Error(`Groq ${resp.status}: ${txt.slice(0, 200)}`)
+      // ── Step 2: Groq Whisper transcription (via main process, no CORS) ────────
+      if (!window.electronAPI?.groqTranscription) {
+        throw new Error('groqTranscription IPC non disponible')
       }
-
-      const data = await resp.json() as { words?: WordToken[]; text?: string }
+      const audioBytes = await audioBlob.arrayBuffer()
+      const transcriptRes = await window.electronAPI.groqTranscription({
+        apiKey: groqKey,
+        audioBytes,
+        filename: videoName || 'video.mp4',
+        language: lang !== 'auto' ? lang : undefined,
+      })
+      if (!transcriptRes.ok || !transcriptRes.data) throw new Error(transcriptRes.error ?? 'Transcription échouée')
+      const data = transcriptRes.data as { words?: WordToken[]; text?: string }
       if (!data.words || data.words.length === 0) {
         throw new Error('Aucun mot détecté dans la vidéo')
       }
@@ -184,16 +178,16 @@ export function Subtitles({ user: _user }: SubtitlesProps) {
       }
 
       const src = videoPath!
-      const res = await window.electronAPI.runFfmpegSubtitles({
+      const ffRes = await window.electronAPI.runFfmpegSubtitles({
         sourcePath: src,
         segments:   segs,
         fontSize, fontColor, position, style, preset,
       })
-      if (!res.ok || !res.outputPath) throw new Error(res.error ?? 'FFmpeg échoué')
+      if (!ffRes.ok || !ffRes.outputPath) throw new Error(ffRes.error ?? 'FFmpeg échoué')
 
       // Load output as blob for preview
-      const { ok: rok, dataUrl } = await window.electronAPI.readLocalVideo(res.outputPath)
-      setOutputPath(res.outputPath)
+      const { ok: rok, dataUrl } = await window.electronAPI.readLocalVideo(ffRes.outputPath)
+      setOutputPath(ffRes.outputPath)
       if (rok && dataUrl) setOutputUrl(dataUrl)
       setPhase('done')
       setStatus(`Terminé — ${segs.length} sous-titres incrustés`)

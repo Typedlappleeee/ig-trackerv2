@@ -1613,6 +1613,53 @@ ipcMain.handle('groq-request', async (_event, opts: {
   }
 })
 
+// ── IPC: Groq Whisper audio transcription (multipart, bypasses renderer CORS) ─
+ipcMain.handle('groq-transcription', async (_event, opts: {
+  apiKey:    string
+  audioBytes: ArrayBuffer
+  filename:  string
+  language?: string
+}) => {
+  try {
+    const boundary = `----GBoundary${Date.now()}`
+    const buf = Buffer.from(opts.audioBytes)
+    const ext = opts.filename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
+    const mime = ext === 'mp3' ? 'audio/mpeg' : ext === 'webm' ? 'audio/webm' : 'video/mp4'
+
+    const parts: Buffer[] = []
+    function addField(name: string, value: string) {
+      parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`))
+    }
+    addField('model', 'whisper-large-v3-turbo')
+    addField('response_format', 'verbose_json')
+    addField('timestamp_granularities[]', 'word')
+    if (opts.language) addField('language', opts.language)
+    // audio file part
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${opts.filename}"\r\nContent-Type: ${mime}\r\n\r\n`))
+    parts.push(buf)
+    parts.push(Buffer.from(`\r\n--${boundary}--\r\n`))
+
+    const body = Buffer.concat(parts)
+    const response = await net.fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${opts.apiKey}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      body,
+    } as Parameters<typeof net.fetch>[1])
+
+    if (!response.ok) {
+      const txt = await response.text().catch(() => '')
+      return { ok: false, error: `Groq ${response.status}: ${txt.slice(0, 300)}` }
+    }
+    const data = await response.json()
+    return { ok: true, data }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
 // ── IPC: fetch Instagram comments for a media ID ─────────────────────────────
 ipcMain.handle('fetch-ig-comments', async (_event, opts: { mediaId: string; sessionid: string; maxId?: string }) => {
   const extractComments = (data: Record<string, unknown>): Array<Record<string, unknown>> => {

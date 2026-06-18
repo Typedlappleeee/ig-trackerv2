@@ -20,7 +20,7 @@ const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   member: {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true, mixer: true, subtitles: true,
+    remix: true, repurpose: true, montage: true, mixer: true, subtitles: false,
     settings: false,
   },
   viewer: {
