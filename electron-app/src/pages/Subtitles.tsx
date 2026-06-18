@@ -44,11 +44,12 @@ export function Subtitles({ user }: SubtitlesProps) {
   const conns   = useConnections(user)
   const groqKey = conns.groq
 
-  // Video source — either a local path (Electron) or a URL (web/bank)
-  const [videoSrc,  setVideoSrc]  = useState<string | null>(null)  // path or URL
-  const [videoName, setVideoName] = useState('')
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [dragging,  setDragging]  = useState(false)
+  // Video source
+  const [videoSrc,    setVideoSrc]    = useState<string | null>(null)  // path or URL
+  const [isBankUrl,   setIsBankUrl]   = useState(false)  // true = from bank, skip client fetch
+  const [videoName,   setVideoName]   = useState('')
+  const [previewUrl,  setPreviewUrl]  = useState<string | null>(null)
+  const [dragging,    setDragging]    = useState(false)
   const [showBankPicker, setShowBankPicker] = useState(false)
 
   // Dropped file ref (web only — keep the File object to avoid re-fetching)
@@ -85,19 +86,15 @@ export function Subtitles({ user }: SubtitlesProps) {
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
     fileRef.current = file
     const url = URL.createObjectURL(file)
-    setVideoSrc(url)
-    setPreviewUrl(url)
-    setVideoName(file.name)
-    reset()
+    setVideoSrc(url); setPreviewUrl(url); setVideoName(file.name)
+    setIsBankUrl(false); reset()
   }
 
-  function loadUrl(url: string, name: string) {
+  function loadUrl(url: string, name: string, fromBank = false) {
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
     fileRef.current = null
-    setVideoSrc(url)
-    setPreviewUrl(url)
-    setVideoName(name)
-    reset()
+    setVideoSrc(url); setPreviewUrl(url); setVideoName(name)
+    setIsBankUrl(fromBank); reset()
   }
 
   // ── Drag & drop ─────────────────────────────────────────────────────────────
@@ -135,7 +132,7 @@ export function Subtitles({ user }: SubtitlesProps) {
   function onBankPick(paths: string[], titles?: string[]) {
     setShowBankPicker(false)
     if (!paths.length) return
-    loadUrl(paths[0], titles?.[0] || paths[0].split('/').pop() || 'video.mp4')
+    loadUrl(paths[0], titles?.[0] || paths[0].split('/').pop() || 'video.mp4', true)
   }
 
   // ── Main generation ──────────────────────────────────────────────────────────
@@ -144,49 +141,58 @@ export function Subtitles({ user }: SubtitlesProps) {
     if (!groqKey) { setError('Clé API Groq manquante — configure-la dans Paramètres'); return }
     if (!videoSrc) { setError('Sélectionne une vidéo'); return }
 
-    setPhase('fetching')
-    setStatus('Lecture de la vidéo…')
+    setPhase('transcribing')
+    setStatus('Préparation…')
     setError('')
     setSegments([])
 
     try {
-      // ── Step 1: get audio bytes ──────────────────────────────────────────────
-      let audioBytes: ArrayBuffer
-      let filename = videoName || 'video.mp4'
-
-      if (fileRef.current) {
-        // Dropped/picked local file — read directly
-        audioBytes = await fileRef.current.arrayBuffer()
-      } else if (videoSrc) {
-        // URL (bank signed URL or blob URL) — fetch it
-        setStatus('Téléchargement de la vidéo…')
-        const r = await fetch(videoSrc)
-        if (!r.ok) throw new Error(`Téléchargement échoué (${r.status})`)
-        audioBytes = await r.arrayBuffer()
-      } else {
-        throw new Error('Aucune source vidéo')
-      }
-
-      if (audioBytes.byteLength > 24 * 1024 * 1024) {
-        // Groq limit is 25MB — warn but try anyway (audio is smaller than video)
-        console.warn('[subtitles] fichier > 24MB, Groq peut rejeter')
-      }
-
-      // ── Step 2: Groq Whisper transcription ───────────────────────────────────
+      // ── Step 1 + 2: transcription ────────────────────────────────────────────
+      // Bank URL → pass URL to server proxy (no bytes sent from client)
+      // Local file → read bytes here and send as base64 through proxy
       setPhase('transcribing')
       setStatus('Transcription de l\'audio…')
 
-      const transcriptRes = await window.electronAPI!.groqTranscription({
-        apiKey:     groqKey,
-        audioBytes,
-        filename,
-        language:   lang !== 'auto' ? lang : undefined,
-      })
+      const filename = videoName || 'video.mp4'
+      let transcriptRes: { ok: boolean; data?: unknown; error?: string }
+
+      if (isBankUrl && videoSrc && isWeb) {
+        // Web + bank URL: server fetches the video directly — 0 bytes from client
+        transcriptRes = await (window.electronAPI as any).groqTranscription({
+          apiKey:   groqKey,
+          videoUrl: videoSrc,
+          filename,
+          language: lang !== 'auto' ? lang : undefined,
+        })
+      } else {
+        // Local file or Electron: read bytes first
+        let audioBytes: ArrayBuffer
+        if (fileRef.current) {
+          audioBytes = await fileRef.current.arrayBuffer()
+        } else if (videoSrc) {
+          setStatus('Lecture de la vidéo…')
+          if (window.electronAPI && !isWeb) {
+            const r = await window.electronAPI.readFileBytes(videoSrc)
+            if (!r.ok || !r.bytes) throw new Error((r as any).error ?? 'Lecture échouée')
+            audioBytes = r.bytes as ArrayBuffer
+          } else {
+            const r = await fetch(videoSrc)
+            if (!r.ok) throw new Error(`Téléchargement échoué (${r.status})`)
+            audioBytes = await r.arrayBuffer()
+          }
+          setStatus('Transcription de l\'audio…')
+        } else {
+          throw new Error('Aucune source vidéo')
+        }
+        transcriptRes = await window.electronAPI!.groqTranscription({
+          apiKey: groqKey, audioBytes, filename,
+          language: lang !== 'auto' ? lang : undefined,
+        })
+      }
       if (!transcriptRes.ok || !transcriptRes.data) {
         throw new Error(transcriptRes.error ?? 'Transcription échouée')
       }
-
-      const words = (transcriptRes.data as { words?: WordToken[] }).words ?? []
+      const words = ((transcriptRes.data as Record<string, unknown>).words as WordToken[] | undefined) ?? []
       if (words.length === 0) throw new Error('Aucun mot détecté dans la vidéo')
 
       const segs = groupWords(words, perGroup)

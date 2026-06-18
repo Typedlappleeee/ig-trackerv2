@@ -363,30 +363,36 @@ export function buildWebAPI() {
       })
     },
 
-    // ── Groq Whisper audio transcription (direct browser fetch — Groq allows CORS) ─
+    // ── Groq Whisper audio transcription (server-side proxy — avoids CORS) ──────
     async groqTranscription(opts: {
-      apiKey: string; audioBytes: ArrayBuffer; filename: string; language?: string
+      apiKey: string
+      audioBytes?: ArrayBuffer  // local file bytes
+      videoUrl?:   string       // bank signed URL (fetched server-side, no bytes sent)
+      filename: string
+      language?: string
     }) {
       try {
-        const ext = opts.filename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
-        const mime = ext === 'mp3' ? 'audio/mpeg' : ext === 'webm' ? 'audio/webm' : 'video/mp4'
-        const blob = new Blob([opts.audioBytes], { type: mime })
-        const form = new FormData()
-        form.append('file', blob, opts.filename)
-        form.append('model', 'whisper-large-v3-turbo')
-        form.append('response_format', 'verbose_json')
-        form.append('timestamp_granularities[]', 'word')
-        if (opts.language) form.append('language', opts.language)
-        const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${opts.apiKey}` },
-          body: form,
-        })
-        if (!r.ok) {
-          const txt = await r.text().catch(() => '')
-          return { ok: false, error: `Groq ${r.status}: ${txt.slice(0, 200)}` }
+        let body: Record<string, unknown>
+        if (opts.videoUrl) {
+          // URL path: server fetches video directly — no bytes sent from client
+          body = { apiKey: opts.apiKey, videoUrl: opts.videoUrl, filename: opts.filename, language: opts.language }
+        } else if (opts.audioBytes) {
+          // Local file: encode as base64 (limited to ~18MB raw / ~25MB base64)
+          const u8 = new Uint8Array(opts.audioBytes)
+          let bin = ''
+          for (let i = 0; i < u8.length; i += 8192)
+            bin += String.fromCharCode(...u8.subarray(i, Math.min(i + 8192, u8.length)))
+          body = { apiKey: opts.apiKey, audioBase64: btoa(bin), filename: opts.filename, language: opts.language }
+        } else {
+          return { ok: false, error: 'Aucune source audio' }
         }
-        return { ok: true, data: await r.json() }
+
+        const r = await fetch('/api/groq-transcription', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        })
+        try { return await r.json() } catch { return { ok: false, error: `Proxy HTTP ${r.status}` } }
       } catch (err) {
         return { ok: false, error: String(err) }
       }
