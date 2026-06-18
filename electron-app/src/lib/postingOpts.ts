@@ -8,6 +8,7 @@ export interface PostingOpts {
   intervalMin:  number   // minutes
   intervalMax:  number   // minutes (random upper bound)
   reelsTrial:   boolean  // post as Instagram Reels Trial (non-followers only)
+  serverMode:   boolean  // hand off to server after upload so app can be closed
 }
 
 const KEY = 'sf_posting_opts'
@@ -17,6 +18,7 @@ const DEFAULTS: PostingOpts = {
   intervalMin:  1,
   intervalMax:  5,
   reelsTrial:   false,
+  serverMode:   false,
 }
 
 export function loadPostingOpts(): PostingOpts {
@@ -27,6 +29,7 @@ export function loadPostingOpts(): PostingOpts {
       ...DEFAULTS,
       intervalMin:  saved.intervalMin  ?? DEFAULTS.intervalMin,
       intervalMax:  saved.intervalMax  ?? DEFAULTS.intervalMax,
+      serverMode:   saved.serverMode   ?? DEFAULTS.serverMode,
       intervalMode: 'none',
     }
   } catch { return { ...DEFAULTS } }
