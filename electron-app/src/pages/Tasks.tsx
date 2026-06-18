@@ -108,6 +108,145 @@ function formatCountdown(nextRunAt: string): string {
   return `dans ${m}m`
 }
 
+// ── Client-side task execution (même logique que MassPosting) ──────────────────
+
+const GL_BASE = 'https://openapi.geelark.com/open/v1'
+
+async function glPost(bearer: string, path: string, body: unknown): Promise<Record<string, unknown>> {
+  const url  = `${GL_BASE}${path}`
+  const hdrs = { Authorization: `Bearer ${bearer}` }
+  if (window.electronAPI?.geelarkRequest) {
+    const r = await window.electronAPI.geelarkRequest({ method: 'POST', url, headers: hdrs, body })
+    return (r?.data ?? {}) as Record<string, unknown>
+  }
+  const res = await fetch('/api/geelark', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method: 'POST', url, headers: hdrs, body }),
+  })
+  const r = await res.json() as { data?: unknown }
+  return (r.data ?? {}) as Record<string, unknown>
+}
+
+async function resolveTaskVideoToken(bearer: string, video: TaskVideo): Promise<string> {
+  const t = video.token
+  if (!t.includes('supabase.co')) return t  // déjà un token GeeLark
+  // Re-signe l'URL depuis le chemin de stockage
+  let signedUrl = t
+  const m = t.match(/\/storage\/v1\/object\/(?:sign|authenticated)\/content\/(.+?)(?:\?|$)/)
+  if (m) {
+    const { data } = await supabase.storage.from('content').createSignedUrl(m[1], 3600)
+    if (data?.signedUrl) signedUrl = data.signedUrl
+  }
+  // Electron : télécharge + écrit en temp + upload via IPC
+  if (window.electronAPI) {
+    try {
+      const bytes = await fetch(signedUrl).then(r => r.arrayBuffer())
+      const tmp = await window.electronAPI.writeTempFile({ name: 'task_video.mp4', bytes })
+      if (tmp.ok && tmp.path) {
+        const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: tmp.path })
+        if (up.ok && up.token) return up.token
+      }
+    } catch { /* fallback */ }
+    return t
+  }
+  // Web : proxy Vercel geelark-upload
+  try {
+    const r = await fetch('/api/geelark-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signedUrl, bearer }),
+    })
+    const j = await r.json() as { ok: boolean; token?: string }
+    if (j.ok && j.token) return j.token
+  } catch { /* fallback */ }
+  return t
+}
+
+async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
+  if (!bearer)             throw new Error('Aucun token GéeLark configuré')
+  if (!task.phones.length) throw new Error('Aucun téléphone dans la tâche')
+  if (!task.videos.length) throw new Error('Aucune vidéo dans la tâche')
+
+  const nowIso = new Date().toISOString()
+  const logs: string[] = []
+  const log = (msg: string) => logs.push(msg)
+
+  // 1. Résolution des tokens vidéo (upload vers GeeLark si URL Supabase)
+  log(`▶ [client] Résolution des tokens vidéo…`)
+  const tokens: string[] = []
+  for (const v of task.videos) tokens.push(await resolveTaskVideoToken(bearer, v))
+
+  // 2. Démarrage des téléphones
+  const phoneIds = task.phones.map(p => p.geelark_id)
+  log(`▶ [client] Démarrage de ${phoneIds.length} téléphone(s)…`)
+  const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
+  if (startRes['code'] !== 0) log(`⚠ Démarrage: ${startRes['msg'] ?? startRes['code']}`)
+  await new Promise(r => setTimeout(r, 30_000))
+
+  // 3. Création des tâches RPA (instagramPubReels)
+  const baseTs = Math.floor(Date.now() / 1000)
+  const rpaIds: string[] = []
+  let fails = 0
+  for (let i = 0; i < task.phones.length; i++) {
+    const phone  = task.phones[i]
+    const vidIdx = task.mode === 'random'
+      ? Math.floor(Math.random() * tokens.length)
+      : i % tokens.length
+    const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
+      id:          phone.geelark_id,
+      scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
+      description: task.caption,
+      video:       [tokens[vidIdx]],
+      ...(task.reels_trial ? { shareType: 2 } : {}),
+    })
+    if (res['code'] === 0) {
+      const tid = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (tid) rpaIds.push(tid)
+      log(`✅ ${phone.ig_username ?? phone.phone_name}`)
+    } else {
+      fails++
+      log(`❌ ${phone.ig_username ?? phone.phone_name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
+    }
+  }
+
+  // 4. Mise à jour Supabase (historique + prochain run)
+  const recurHours = Number(task.recur_hours) || 24
+  const nextRunAt  = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
+
+  await supabase.from('scheduled_posts').insert({
+    user_id:         task.user_id,
+    org_id:          task.org_id ?? null,
+    created_by_name: task.name || 'Tâche auto',
+    type:            'mass_posting',
+    status:          fails < task.phones.length ? 'done' : 'failed',
+    scheduled_at:    nowIso,
+    executed_at:     new Date().toISOString(),
+    phones:          task.phones,
+    videos:          task.videos,
+    caption:         task.caption,
+    delay_minutes:   task.delay_minutes ?? 0,
+    mode:            task.mode ?? 'seq',
+    bearer_token:    '',
+    reels_trial:     task.reels_trial ?? false,
+    task_id:         task.id,
+    result:          { logs },
+    error_msg:       fails >= task.phones.length ? 'Toutes les tâches RPA ont échoué' : null,
+  }).then(() => {}, () => {})
+
+  await supabase.from('recurring_tasks').update({
+    next_run_at: nextRunAt,
+    last_run_at: nowIso,
+    run_count:   (Number(task.run_count) || 0) + 1,
+  }).eq('id', task.id)
+
+  log(`⏰ Prochain post dans ${recurHours}h`)
+
+  // 5. Arrêt des téléphones (après 5 s pour laisser GeeLark prendre la tâche RPA)
+  await new Promise(r => setTimeout(r, 5_000))
+  await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+}
+
 function formatInterval(hours: number): string {
   if (hours < 1) return `toutes les ${Math.round(hours * 60)} min`
   if (hours >= 24 && hours % 24 === 0) return `toutes les ${hours / 24}j`
@@ -1572,6 +1711,7 @@ type TaskTab = 'upcoming' | 'tasks' | 'history'
 
 export function Tasks({ user }: { user: User }) {
   const { currentOrg } = useOrg()
+  const conns = useConnections(user)
 
   const [tasks, setTasks]           = useState<RecurringTask[]>([])
   const [history, setHistory]       = useState<TaskRun[]>([])
@@ -1588,7 +1728,9 @@ export function Tasks({ user }: { user: User }) {
   const [, setTick] = useState(0)
   const tasksRef      = useRef<RecurringTask[]>([])
   const triggeringRef = useRef(false)
+  const bearerRef     = useRef('')
   useEffect(() => { tasksRef.current = tasks }, [tasks])
+  useEffect(() => { if (conns.bearer) bearerRef.current = conns.bearer }, [conns.bearer])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1630,13 +1772,14 @@ export function Tasks({ user }: { user: User }) {
     void load().then(() => {
       // Déclenche immédiatement si des tâches sont déjà en retard à l'ouverture de la page
       if (triggeringRef.current) return
-      const now = Date.now()
-      if (!tasksRef.current.some(t => t.status === 'active' && new Date(t.next_run_at).getTime() <= now)) return
+      const now     = Date.now()
+      const overdue = tasksRef.current.filter(
+        t => t.status === 'active' && new Date(t.next_run_at).getTime() <= now,
+      )
+      if (!overdue.length) return
       triggeringRef.current = true
-      supabase.functions.invoke('run-scheduled-posts')
-        .then(() => new Promise(r => setTimeout(r, 3000)))
+      Promise.all(overdue.map(t => runTaskNow(t, bearerRef.current).catch(() => {})))
         .then(() => load())
-        .catch(() => {})
         .finally(() => { triggeringRef.current = false })
     })
   }, [load])
@@ -1655,10 +1798,12 @@ export function Tasks({ user }: { user: User }) {
       if (!hasOverdue) return
       triggeringRef.current = true
       try {
-        await supabase.functions.invoke('run-scheduled-posts')
-        await new Promise(r => setTimeout(r, 3000))
+        const overdue = tasksRef.current.filter(
+          t => t.status === 'active' && new Date(t.next_run_at).getTime() <= Date.now(),
+        )
+        await Promise.all(overdue.map(t => runTaskNow(t, bearerRef.current).catch(() => {})))
         await load()
-      } catch { /* silent — pg_cron handles it when app is closed */ }
+      } catch { /* silent */ }
       finally { triggeringRef.current = false }
     }, 30_000)
     return () => clearInterval(id)
