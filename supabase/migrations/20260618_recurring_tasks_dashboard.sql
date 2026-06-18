@@ -45,3 +45,6 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_posts_task_id
 -- ── Options de la tâche ────────────────────────────────────────────────────────
 -- auto_remove_videos : supprime les vidéos de la pool après chaque exécution
 ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS auto_remove_videos boolean NOT NULL DEFAULT false;
+
+-- recur_hours doit être numeric (pas integer) pour supporter les intervalles en minutes (ex: 0.25 = 15 min)
+ALTER TABLE recurring_tasks ALTER COLUMN recur_hours TYPE numeric USING recur_hours::numeric;

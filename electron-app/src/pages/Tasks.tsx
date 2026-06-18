@@ -469,9 +469,16 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       }
 
       let { error: err } = await saveTask(taskData)
+      // Rétro-compat : colonne auto_remove_videos manquante (migration non appliquée)
       if (err && /auto_remove_videos/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
         const { auto_remove_videos: _omit, ...fallback } = taskData
         ;({ error: err } = await saveTask(fallback))
+      }
+      // Rétro-compat : colonne recur_hours est integer au lieu de numeric → arrondir à l'heure la plus proche
+      if (err && /recur_hours/i.test(err.message) && /integer/i.test(err.message)) {
+        const rounded = { ...taskData, recur_hours: Math.max(1, Math.round(taskData.recur_hours as number)) }
+        ;({ error: err } = await saveTask(rounded))
+        if (!err) setError('⚠ Intervalles en minutes non supportés tant que la migration SQL n\'est pas appliquée — sauvegardé en heures.')
       }
       if (err) throw err
 
