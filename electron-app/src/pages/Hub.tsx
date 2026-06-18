@@ -5,6 +5,8 @@ import { playNav, playTick } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { useCredits } from '@/lib/credits'
 import { useOrg } from '@/lib/orgContext'
+import { canSeeTab } from '@/lib/permissions'
+import { useLicense } from '@/lib/license'
 import { timeUntil, fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import type { Page } from '@/components/Layout'
@@ -188,7 +190,8 @@ function SectionHead({ title, action, onAction }: { title: string; action?: stri
 export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: Page) => void }) {
   const t = useT()
   const { balance, loading: credLoading } = useCredits()
-  const { currentOrg } = useOrg()
+  const { currentOrg, role, perms } = useOrg()
+  const license = useLicense()
   useHubCSS()
 
   const [loading, setLoading] = useState(true)
@@ -278,19 +281,27 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   })().replace(/,\s*$/, '')
   const dateLabel = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
 
-  const TOOL_SHORTCUTS: { id: Page; label: string; icon: string }[] = [
+  const isSuperAdmin = license?.isSuperAdmin === true
+  const allToolShortcuts: { id: Page; label: string; icon: string; superAdminOnly?: boolean; dev?: boolean }[] = [
     { id: 'phones',      label: t('navPhones'),      icon: 'phone' },
     { id: 'posting',     label: t('navPosting'),     icon: 'send' },
     { id: 'massposting', label: t('navMassPosting'), icon: 'zap' },
     { id: 'scheduler',   label: t('navScheduler'),   icon: 'calendar' },
     { id: 'bank',        label: t('navBank'),        icon: 'video' },
-    { id: 'warmup',      label: t('navWarmup'),      icon: 'flame' },
+    { id: 'warmup',      label: t('navWarmup'),      icon: 'flame',    dev: true },
     { id: 'repurpose',   label: t('navRepurpose'),   icon: 'refresh' },
     { id: 'remix',       label: t('navRemix'),       icon: 'layers' },
     { id: 'aitools',     label: t('navAiTools'),     icon: 'sparkles' },
-    { id: 'storylink',   label: t('navStoryLink'),   icon: 'link' },
+    { id: 'storylink',   label: t('navStoryLink'),   icon: 'link',     superAdminOnly: true },
     { id: 'community',   label: t('navCommunity'),   icon: 'chat' },
   ]
+  const TOOL_SHORTCUTS = allToolShortcuts.filter(tool => {
+    if (tool.superAdminOnly && !isSuperAdmin) return false
+    if (tool.dev && !isSuperAdmin) return false
+    if (tool.id === 'licences') return false
+    if (role && !canSeeTab(role, perms, tool.id as import('@/lib/supabase').PageKey)) return false
+    return true
+  })
 
   return (
     <div style={{ minHeight: '100%', background: BG, padding: '40px 48px 80px', boxSizing: 'border-box' }}>
