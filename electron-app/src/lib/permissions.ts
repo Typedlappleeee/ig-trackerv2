@@ -7,25 +7,25 @@ import type { OrgRole, PermOverrides, PageKey, ActionKey } from './supabase'
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
     phones: true,
-    posting: true, massposting: true, scheduler: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
+    posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true,
     settings: true,
   },
   admin: {
     phones: true,
-    posting: true, massposting: true, scheduler: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
+    posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true,
     settings: true,
   },
   member: {
     phones: true,
-    posting: true, massposting: true, scheduler: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
+    posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true,
     settings: false,
   },
   viewer: {
     phones: true,
-    posting: false, massposting: false, scheduler: false, storylink: false, bank: true, captionbank: true, warmup: false, aitools: false,
+    posting: false, massposting: false, scheduler: false, tasks: false, storylink: false, bank: true, captionbank: true, warmup: false, aitools: false,
     remix: false, repurpose: false, montage: false, mixer: false,
     settings: false,
   },

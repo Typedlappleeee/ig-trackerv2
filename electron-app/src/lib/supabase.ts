@@ -37,7 +37,7 @@ export type OrgRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 export type PageKey =
   | 'phones'
-  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'captionbank' | 'warmup' | 'aitools' | 'storylink'
+  | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'warmup' | 'aitools' | 'storylink'
   | 'remix' | 'repurpose' | 'montage' | 'mixer'
   | 'settings'
 
