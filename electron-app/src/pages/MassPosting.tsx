@@ -264,6 +264,59 @@ export function MassPosting({ user }: MassPostingProps) {
     setTaskStatuses(prev => new Map(prev).set(phoneId, status))
   }
 
+  // Suit l'exécution serveur d'un scheduled_post : recopie ses logs dans le
+  // journal en direct, jusqu'à done/failed/cancelled (ou timeout ~12 min).
+  async function followServerExecution(postId: string) {
+    const deadline = Date.now() + 12 * 60_000
+    let shownLogs = 0
+    let lastStatus = ''
+    while (Date.now() < deadline) {
+      if (stopRef.current) return
+      await new Promise(r => setTimeout(r, 4000))
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .select('status, result, error_msg')
+        .eq('id', postId)
+        .maybeSingle()
+      if (error || !data) continue
+
+      const status = data.status as string
+      const result = (typeof data.result === 'string' ? JSON.parse(data.result) : data.result) as { logs?: string[] } | null
+      const serverLogs = result?.logs ?? []
+
+      // Nouveaux logs serveur → journal
+      for (let i = shownLogs; i < serverLogs.length; i++) {
+        const l = serverLogs[i]
+        const lvl: TaskLog['level'] = l.startsWith('❌') ? 'error' : l.startsWith('✅') ? 'ok' : l.startsWith('⚠') ? 'warn' : 'info'
+        log(`[serveur] ${l}`, lvl)
+      }
+      shownLogs = serverLogs.length
+
+      if (status !== lastStatus) {
+        if (status === 'running') log('⚙️ Le serveur exécute le posting…', 'info')
+        lastStatus = status
+      }
+
+      if (status === 'done') {
+        log('✅ Posting terminé côté serveur.', 'ok')
+        setPosting(false)
+        return
+      }
+      if (status === 'failed') {
+        log(`❌ Échec serveur : ${data.error_msg ?? 'erreur inconnue'}`, 'error')
+        setPosting(false)
+        return
+      }
+      if (status === 'cancelled') {
+        log('Posting annulé.', 'warn')
+        setPosting(false)
+        return
+      }
+    }
+    log('⏳ Suivi arrêté (12 min) — le serveur peut continuer en arrière-plan. Vérifie dans Programmation.', 'warn')
+    setPosting(false)
+  }
+
   // Stable pour React.memo(PhoneRow) — ne dépend que de setters fonctionnels
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const togglePhone = useCallback((id: string) => {
@@ -612,7 +665,7 @@ export function MassPosting({ user }: MassPostingProps) {
           .map(a => ({ token: tokenMap.get(a.videoIndex) ?? '', title: a.video?.item.title ?? '' }))
           .filter(v => v.token)
         const uniqueVideos = [...new Map(videos.map(v => [v.token, v])).values()]
-        await createScheduledPost({
+        const createdPost = await createScheduledPost({
           userId:        user.id,
           orgId:         currentOrg?.id ?? null,
           createdByName: user.email?.split('@')[0] ?? 'Moi',
@@ -627,8 +680,10 @@ export function MassPosting({ user }: MassPostingProps) {
           reelsTrial:    postingOpts.reelsTrial,
         })
         await run.settle()
-        log('✅ Confié au serveur — tu peux fermer ScaleFlow. Le post partira dans moins d\'une minute.', 'ok')
-        setPosting(false)
+        log('✅ Confié au serveur — tu peux fermer ScaleFlow, le posting continuera tout seul.', 'ok')
+        log('⏳ Le serveur démarre les téléphones puis poste (≈30s de boot). Suivi en direct…', 'info')
+        // Suivi live : poll le scheduled_post et recopie les logs du serveur.
+        void followServerExecution(createdPost.id)
         return
       }
 

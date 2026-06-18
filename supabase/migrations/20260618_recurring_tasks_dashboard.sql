@@ -48,3 +48,13 @@ ALTER TABLE recurring_tasks ADD COLUMN IF NOT EXISTS auto_remove_videos boolean 
 
 -- recur_hours doit être numeric (pas integer) pour supporter les intervalles en minutes (ex: 0.25 = 15 min)
 ALTER TABLE recurring_tasks ALTER COLUMN recur_hours TYPE numeric USING recur_hours::numeric;
+
+-- ── Arrêt différé des téléphones ───────────────────────────────────────────────
+-- Quand un post part avec un délai entre comptes, les tâches RPA sont planifiées
+-- chez GeeLark et les téléphones doivent rester allumés. On enregistre quand les
+-- arrêter (stop_phones_at) + lesquels (stop_phone_ids) : un balayage du cron les
+-- éteint dès l'échéance passée, au lieu de les laisser allumés indéfiniment.
+ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS stop_phones_at timestamptz;
+ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS stop_phone_ids jsonb;
+CREATE INDEX IF NOT EXISTS idx_scheduled_posts_stop_phones
+  ON scheduled_posts (stop_phones_at) WHERE stop_phones_at IS NOT NULL;

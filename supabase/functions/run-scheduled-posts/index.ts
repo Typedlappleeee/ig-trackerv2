@@ -109,6 +109,40 @@ Deno.serve(async (req) => {
     .eq('type', 'story')
     .or(`executed_at.lt.${storyCutoff},and(executed_at.is.null,created_at.lt.${storyCutoff})`)
 
+  // 1ter. Balayage d'arrêt des téléphones — éteint les téléphones laissés allumés
+  // par des posts à délai (tâches RPA planifiées chez GeeLark) dont l'échéance
+  // d'arrêt est passée. Évite que les téléphones restent allumés indéfiniment.
+  try {
+    const { data: toStop } = await db.from('scheduled_posts')
+      .select('id, user_id, org_id, stop_phone_ids')
+      .not('stop_phones_at', 'is', null)
+      .lte('stop_phones_at', nowIso)
+      .limit(10)
+    for (const row of toStop ?? []) {
+      const ids: string[] = Array.isArray(row.stop_phone_ids)
+        ? row.stop_phone_ids
+        : (typeof row.stop_phone_ids === 'string' ? JSON.parse(row.stop_phone_ids) : [])
+      if (ids.length > 0) {
+        // Résolution du bearer (org puis user)
+        let bearer = ''
+        if (row.org_id) {
+          const { data } = await db.from('org_config').select('bearer_token').eq('org_id', row.org_id).maybeSingle()
+          bearer = data?.bearer_token ?? ''
+        }
+        if (!bearer) {
+          const { data } = await db.from('app_config').select('bearer_token').eq('user_id', row.user_id).maybeSingle()
+          bearer = data?.bearer_token ?? ''
+        }
+        if (bearer) await gPost(bearer, '/phone/stop', { ids }).catch(() => {})
+      }
+      // Marque comme traité (évite de réessayer chaque minute)
+      await db.from('scheduled_posts').update({ stop_phones_at: null, stop_phone_ids: null }).eq('id', row.id)
+      summary[`stop:${row.id}`] = `stopped ${ids.length} phone(s)`
+    }
+  } catch (err) {
+    summary['phone_stop_sweep'] = `error: ${err instanceof Error ? err.message : String(err)}`
+  }
+
   // 1bis. Tâches automatiques (recurring_tasks) dues → génère un scheduled_post
   // « enfant » lié par task_id, puis reprogramme la prochaine occurrence.
   // Le scheduled_post créé est ramassé dans la même invocation (étape 2).
@@ -239,10 +273,17 @@ Deno.serve(async (req) => {
         throw new Error(`Toutes les tâches ont été refusées (${failedCount}/${phones.length})`)
       }
 
+      let stopPhonesAt: string | null = null
+      let stopPhoneIds: string[] | null = null
       if (delayMin > 0 && phones.length > 1) {
-        // Tâches planifiées chez GeeLark — on ne peut pas attendre des heures ici
+        // Tâches planifiées chez GeeLark — on ne peut pas attendre des heures ici.
+        // On programme l'arrêt des téléphones après la dernière tâche planifiée
+        // (+ 5 min de marge), ramassé par le balayage 1ter d'une prochaine invocation.
+        const lastOffsetMs = (phones.length - 1) * delayMin * 60_000
+        stopPhonesAt = new Date(Date.now() + lastOffsetMs + 5 * 60_000).toISOString()
+        stopPhoneIds = geelarkIds
         log(`⏳ ${taskIds.length} tâche(s) planifiée(s) chez GeelarK avec ${delayMin} min d'écart.`)
-        log('ℹ Les téléphones restent allumés le temps de l\'exécution des tâches.')
+        log(`⏰ Arrêt automatique des téléphones programmé après la dernière tâche (+5 min).`)
       } else {
         // 7. Polling court (3 min max) puis arrêt des téléphones
         let elapsed = 0
@@ -264,9 +305,19 @@ Deno.serve(async (req) => {
       }
 
       log('✅ Post programmé exécuté par le serveur.')
-      await db.from('scheduled_posts').update({
+      // Marque done + planifie l'arrêt différé des téléphones. Si les colonnes
+      // stop_phones_at/stop_phone_ids n'existent pas (migration non appliquée),
+      // on retombe sur un arrêt immédiat pour ne pas laisser les téléphones allumés.
+      const doneUpd = await db.from('scheduled_posts').update({
         status: 'done', result: { logs }, error_msg: null,
+        stop_phones_at: stopPhonesAt, stop_phone_ids: stopPhoneIds,
       }).eq('id', post.id)
+      if (doneUpd.error && /stop_phones?_(at|ids)/i.test(doneUpd.error.message)) {
+        if (stopPhoneIds) await gPost(bearer, '/phone/stop', { ids: stopPhoneIds }).catch(() => {})
+        await db.from('scheduled_posts').update({
+          status: 'done', result: { logs }, error_msg: null,
+        }).eq('id', post.id)
+      }
 
       // Auto-remove used videos from task pool (if enabled on parent task)
       if (post.task_id) {
