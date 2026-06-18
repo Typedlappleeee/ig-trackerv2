@@ -362,6 +362,83 @@ export function buildWebAPI() {
         return runFfmpegTextOverlayWeb(opts as Parameters<typeof runFfmpegTextOverlayWeb>[0])
       })
     },
+
+    // ── Groq Whisper audio transcription (direct browser fetch — Groq allows CORS) ─
+    async groqTranscription(opts: {
+      apiKey: string; audioBytes: ArrayBuffer; filename: string; language?: string
+    }) {
+      try {
+        const ext = opts.filename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
+        const mime = ext === 'mp3' ? 'audio/mpeg' : ext === 'webm' ? 'audio/webm' : 'video/mp4'
+        const blob = new Blob([opts.audioBytes], { type: mime })
+        const form = new FormData()
+        form.append('file', blob, opts.filename)
+        form.append('model', 'whisper-large-v3-turbo')
+        form.append('response_format', 'verbose_json')
+        form.append('timestamp_granularities[]', 'word')
+        if (opts.language) form.append('language', opts.language)
+        const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${opts.apiKey}` },
+          body: form,
+        })
+        if (!r.ok) {
+          const txt = await r.text().catch(() => '')
+          return { ok: false, error: `Groq ${r.status}: ${txt.slice(0, 200)}` }
+        }
+        return { ok: true, data: await r.json() }
+      } catch (err) {
+        return { ok: false, error: String(err) }
+      }
+    },
+
+    // ── Subtitle burn via WASM FFmpeg (web fallback) ─────────────────────────
+    async runFfmpegSubtitles(opts: {
+      sourcePath: string
+      segments:   Array<{ text: string; start: number; end: number }>
+      fontSize:   number; fontColor: string
+      position:   'top' | 'center' | 'bottom'
+      style:      'box' | 'outline' | 'shadow'
+      preset?:    string
+    }) {
+      return wasmQueue(async () => {
+        const { runFfmpegRemixAIWeb } = await import('./ffmpeg-web')
+        const yFrac = opts.position === 'top' ? 0.12 : opts.position === 'center' ? 0.50 : 0.87
+        const textOverlays = opts.segments.map(seg => ({
+          text:      seg.text,
+          x:         '(w-text_w)/2',
+          y:         `h*${yFrac}`,
+          fontSize:  opts.fontSize,
+          fontColor: opts.fontColor,
+          startTime: seg.start,
+          endTime:   seg.end,
+          bold:      true,
+          shadow:    opts.style !== 'box',
+        }))
+        const preset = (opts.preset && opts.preset !== 'keep') ? opts.preset as '9:16' | '1:1' | '16:9' : '9:16'
+        return runFfmpegRemixAIWeb({
+          newPhase1Path: opts.sourcePath,
+          originalPath:  opts.sourcePath,
+          splitTime:     0,
+          outputPath:    `subs-${Date.now()}.mp4`,
+          preset,
+          textOverlays,
+        })
+      })
+    },
+
+    // ── Save file (web: browser download) ────────────────────────────────────
+    async saveFileAs(opts: { sourcePath: string; defaultName: string }) {
+      try {
+        const a = document.createElement('a')
+        a.href     = opts.sourcePath
+        a.download = opts.defaultName
+        a.click()
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: String(err) }
+      }
+    },
   }
 }
 
