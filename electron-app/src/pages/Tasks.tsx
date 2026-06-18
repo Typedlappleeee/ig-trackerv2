@@ -17,10 +17,17 @@
  *   recur_hours   numeric NOT NULL DEFAULT 24,
  *   next_run_at   timestamptz NOT NULL DEFAULT now(),
  *   reels_trial   boolean NOT NULL DEFAULT false,
+ *   last_run_at   timestamptz,
+ *   run_count     integer NOT NULL DEFAULT 0,
  *   created_at    timestamptz DEFAULT now()
  * );
  * ALTER TABLE recurring_tasks ENABLE ROW LEVEL SECURITY;
  * CREATE POLICY "tasks_own" ON recurring_tasks FOR ALL USING (auth.uid() = user_id);
+ *
+ * -- Lien exécution → tâche (alimente l'onglet Historique) :
+ * ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS task_id uuid;
+ *
+ * Migration complète : supabase/migrations/20260618_recurring_tasks_dashboard.sql
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -60,6 +67,23 @@ interface RecurringTask {
   next_run_at: string
   reels_trial: boolean
   created_at: string
+  last_run_at?: string | null
+  run_count?: number | null
+}
+
+// A single execution of a task (a child scheduled_post linked by task_id)
+interface TaskRun {
+  id: string
+  task_id: string | null
+  created_by_name: string
+  status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
+  scheduled_at: string
+  executed_at: string | null
+  phones: TaskPhone[]
+  videos: TaskVideo[]
+  caption: string
+  result: { logs: string[] } | null
+  error_msg: string | null
 }
 
 interface SelVideo {
@@ -86,6 +110,23 @@ function formatCountdown(nextRunAt: string): string {
 function formatInterval(hours: number): string {
   if (hours >= 24 && hours % 24 === 0) return `toutes les ${hours / 24}j`
   return `toutes les ${hours}h`
+}
+
+function formatAbsolute(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+function formatRelativePast(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  if (diff < 0) return 'à venir'
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return "à l'instant"
+  if (m < 60) return `il y a ${m} min`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `il y a ${h}h`
+  const d = Math.floor(h / 24)
+  return `il y a ${d}j`
 }
 
 // ── SVG Icons ──────────────────────────────────────────────────────────────────
@@ -1183,13 +1224,253 @@ function EmptyState({ onNew }: { onNew: () => void }) {
   )
 }
 
+// ── KPI Stat Card ────────────────────────────────────────────────────────────
+
+function StatCard({
+  label, value, sub, accent, icon, pulse,
+}: {
+  label: string
+  value: string | number
+  sub?: string
+  accent: string
+  icon: React.ReactNode
+  pulse?: boolean
+}) {
+  return (
+    <div style={{
+      flex: '1 1 180px', minWidth: 160,
+      background: 'linear-gradient(135deg, rgba(17,17,32,0.9), rgba(12,12,21,0.9))',
+      border: '1px solid rgba(233,234,240,0.07)',
+      borderRadius: 14, padding: '16px 18px',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{
+        position: 'absolute', top: -24, right: -24, width: 90, height: 90,
+        borderRadius: '50%', background: accent, opacity: 0.07,
+        filter: 'blur(18px)', pointerEvents: 'none',
+      }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{
+          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: `${accent}1a`, border: `1px solid ${accent}33`, color: accent,
+        }}>
+          {icon}
+        </span>
+        <span style={{
+          fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+          color: 'var(--muted)',
+        }}>
+          {label}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{
+          fontSize: 26, fontWeight: 800, color: 'var(--ivory)', letterSpacing: '-0.03em',
+          fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+        }}>
+          {value}
+        </span>
+        {pulse && (
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%', background: accent,
+            boxShadow: `0 0 6px ${accent}`, display: 'inline-block',
+            animation: 'pulse 1.4s ease-in-out infinite',
+          }} />
+        )}
+      </div>
+      {sub && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--muted)' }}>{sub}</p>}
+    </div>
+  )
+}
+
+// ── Upcoming run row ───────────────────────────────────────────────────────────
+
+function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
+  const diff = new Date(task.next_run_at).getTime() - Date.now()
+  const imminent = diff <= 60 * 60 * 1000 // within 1h
+  const accent = imminent ? '#34d399' : '#818CF8'
+
+  return (
+    <div
+      className="sf-reveal"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        padding: '14px 16px', borderRadius: 12,
+        background: 'linear-gradient(135deg, rgba(17,17,32,0.85), rgba(12,12,21,0.85))',
+        border: '1px solid rgba(233,234,240,0.07)',
+        animationDelay: `${index * 40}ms`,
+      }}
+    >
+      {/* Timeline dot + countdown */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        width: 84, flexShrink: 0, gap: 4,
+      }}>
+        <span style={{
+          fontSize: 13, fontWeight: 800, color: accent, letterSpacing: '-0.02em',
+          fontVariantNumeric: 'tabular-nums', textAlign: 'center', lineHeight: 1.1,
+        }}>
+          {formatCountdown(task.next_run_at).replace('dans ', '')}
+        </span>
+        <span style={{ fontSize: 10, color: 'var(--muted)' }}>{formatAbsolute(task.next_run_at)}</span>
+      </div>
+
+      {/* Vertical divider with glow dot */}
+      <div style={{ position: 'relative', alignSelf: 'stretch', width: 2, background: 'rgba(233,234,240,0.07)', flexShrink: 0 }}>
+        <span style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          width: 8, height: 8, borderRadius: '50%', background: accent,
+          boxShadow: imminent ? `0 0 8px ${accent}` : 'none',
+          animation: imminent ? 'pulse 1.4s ease-in-out infinite' : 'none',
+        }} />
+      </div>
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{
+          margin: '0 0 5px', fontSize: 14, fontWeight: 700, color: 'var(--ivory)',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {task.name || 'Tâche sans nom'}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
+            <IconPhone size={11} color="rgba(233,234,240,0.5)" /> {task.phones.length}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
+            <IconVideo size={11} color="rgba(233,234,240,0.5)" /> {task.videos.length}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#818CF8' }}>
+            <IconRepeat size={11} color="#818CF8" /> {formatInterval(task.recur_hours)}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── History run row ────────────────────────────────────────────────────────────
+
+function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
+  const [showLogs, setShowLogs] = useState(false)
+  const logs = run.result?.logs ?? []
+
+  const cfg = {
+    done:      { color: '#34d399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.25)', label: 'Réussi' },
+    failed:    { color: '#F87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)', label: 'Échoué' },
+    running:   { color: '#818CF8', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.25)', label: 'En cours' },
+    pending:   { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', label: 'En attente' },
+    cancelled: { color: 'rgba(148,163,184,0.7)', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)', label: 'Annulé' },
+  }[run.status] ?? { color: 'var(--muted)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)', label: run.status }
+
+  const when = run.executed_at ?? run.scheduled_at
+
+  return (
+    <div
+      className="sf-reveal"
+      style={{
+        borderRadius: 12, overflow: 'hidden',
+        background: 'linear-gradient(135deg, rgba(17,17,32,0.85), rgba(12,12,21,0.85))',
+        border: '1px solid rgba(233,234,240,0.07)',
+        borderLeft: `3px solid ${cfg.color}`,
+        animationDelay: `${index * 40}ms`,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px' }}>
+        {/* Status icon */}
+        <span style={{
+          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
+        }}>
+          {run.status === 'done' ? <IconCheck size={12} />
+            : run.status === 'failed' ? <IconX size={11} />
+            : <IconClock size={13} color={cfg.color} />}
+        </span>
+
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{
+            margin: '0 0 4px', fontSize: 13.5, fontWeight: 700, color: 'var(--ivory)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {run.created_by_name || 'Tâche'}
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 10.5, fontWeight: 700, color: cfg.color,
+              background: cfg.bg, border: `1px solid ${cfg.border}`,
+              borderRadius: 20, padding: '2px 9px',
+            }}>
+              {cfg.label}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>{formatAbsolute(when)}</span>
+            <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)' }}>· {formatRelativePast(when)}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
+              <IconPhone size={10} color="rgba(233,234,240,0.5)" /> {run.phones.length}
+            </span>
+          </div>
+        </div>
+
+        {/* Logs toggle */}
+        {logs.length > 0 && (
+          <button
+            onClick={() => setShowLogs(v => !v)}
+            className="cursor-pointer"
+            style={{
+              flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#818CF8',
+              background: 'none', border: 'none', padding: '4px 8px',
+            }}
+          >
+            {showLogs ? 'Masquer' : `Logs (${logs.length})`}
+          </button>
+        )}
+      </div>
+
+      {/* Error message */}
+      {run.error_msg && run.status === 'failed' && !showLogs && (
+        <p style={{
+          margin: 0, padding: '0 16px 12px 60px',
+          fontSize: 11.5, color: '#F0A0AB', fontFamily: 'ui-monospace, monospace',
+        }}>
+          {run.error_msg}
+        </p>
+      )}
+
+      {/* Expanded logs */}
+      {showLogs && logs.length > 0 && (
+        <div style={{
+          margin: '0 16px 14px', padding: '12px 14px',
+          background: '#050508', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10,
+          maxHeight: 220, overflowY: 'auto', scrollbarWidth: 'thin',
+        }}>
+          {logs.map((l, i) => (
+            <div key={i} style={{
+              fontFamily: 'ui-monospace, monospace', fontSize: 11.5, lineHeight: 1.7,
+              color: l.startsWith('❌') ? '#F0A0AB' : l.startsWith('✅') ? '#34d399' : 'rgba(148,163,184,0.7)',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            }}>
+              {l}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Tasks page ────────────────────────────────────────────────────────────
+
+type TaskTab = 'upcoming' | 'tasks' | 'history'
 
 export function Tasks({ user }: { user: User }) {
   const { currentOrg } = useOrg()
 
   const [tasks, setTasks]           = useState<RecurringTask[]>([])
+  const [history, setHistory]       = useState<TaskRun[]>([])
   const [loading, setLoading]       = useState(true)
+  const [tab, setTab]               = useState<TaskTab>('upcoming')
   const [showCreate, setShowCreate] = useState(false)
   const [editTask, setEditTask]     = useState<RecurringTask | null>(null)
   const [deleteTask, setDeleteTask] = useState<RecurringTask | null>(null)
@@ -1206,12 +1487,9 @@ export function Tasks({ user }: { user: User }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      // Tasks
       let q = supabase.from('recurring_tasks').select('*').order('created_at', { ascending: false })
-      if (currentOrg) {
-        q = q.eq('org_id', currentOrg.id)
-      } else {
-        q = q.eq('user_id', user.id).is('org_id', null)
-      }
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
       const { data, error } = await q
       if (!error && data) {
         setTasks(data.map((t: Record<string, unknown>) => ({
@@ -1219,6 +1497,22 @@ export function Tasks({ user }: { user: User }) {
           phones: typeof t.phones === 'string' ? JSON.parse(t.phones as string) : (t.phones ?? []),
           videos: typeof t.videos === 'string' ? JSON.parse(t.videos as string) : (t.videos ?? []),
         })) as RecurringTask[])
+      }
+
+      // History — child scheduled_posts linked by task_id
+      let hq = supabase.from('scheduled_posts').select('*')
+        .not('task_id', 'is', null)
+        .order('scheduled_at', { ascending: false })
+        .limit(100)
+      hq = currentOrg ? hq.eq('org_id', currentOrg.id) : hq.eq('user_id', user.id).is('org_id', null)
+      const { data: hData, error: hErr } = await hq
+      if (!hErr && hData) {
+        setHistory(hData.map((r: Record<string, unknown>) => ({
+          ...r,
+          phones: typeof r.phones === 'string' ? JSON.parse(r.phones as string) : (r.phones ?? []),
+          videos: typeof r.videos === 'string' ? JSON.parse(r.videos as string) : (r.videos ?? []),
+          result: typeof r.result === 'string' ? JSON.parse(r.result as string) : r.result,
+        })) as TaskRun[])
       }
     } finally {
       setLoading(false)
@@ -1232,13 +1526,10 @@ export function Tasks({ user }: { user: User }) {
     try {
       const newStatus = task.status === 'active' ? 'paused' : 'active'
       const updates: Partial<RecurringTask> = { status: newStatus }
-
       if (newStatus === 'active') {
-        // Resuming: schedule next run from now + interval (don't post immediately)
         const next = new Date(Date.now() + task.recur_hours * 60 * 60 * 1000)
         updates.next_run_at = next.toISOString()
       }
-
       await supabase.from('recurring_tasks').update(updates).eq('id', task.id)
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...updates } : t))
     } finally {
@@ -1257,7 +1548,19 @@ export function Tasks({ user }: { user: User }) {
     }
   }
 
-  const activeTasks = tasks.filter(t => t.status === 'active')
+  const activeTasks  = tasks.filter(t => t.status === 'active')
+  const pausedTasks  = tasks.filter(t => t.status === 'paused')
+  const upcoming     = [...activeTasks].sort(
+    (a, b) => new Date(a.next_run_at).getTime() - new Date(b.next_run_at).getTime()
+  )
+  const totalRuns    = history.filter(r => r.status === 'done').length
+  const nextRun      = upcoming[0]?.next_run_at
+
+  const TABS: { id: TaskTab; label: string; count: number }[] = [
+    { id: 'upcoming', label: 'À venir',    count: upcoming.length },
+    { id: 'tasks',    label: 'Tâches',     count: tasks.length },
+    { id: 'history',  label: 'Historique', count: history.length },
+  ]
 
   return (
     <div className="sf-page anim-page">
@@ -1265,15 +1568,14 @@ export function Tasks({ user }: { user: User }) {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="sf-page-header" style={{
         flexDirection: 'column', alignItems: 'stretch', gap: 0,
-        padding: '24px 28px 18px', borderBottom: 'none',
+        padding: '24px 28px 0', borderBottom: 'none',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div className="sf-anim-scale-spring" style={{
               width: 46, height: 46, borderRadius: 12, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.28)',
+              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)',
             }}>
               <IconBolt size={22} color="var(--accent)" />
             </div>
@@ -1282,27 +1584,12 @@ export function Tasks({ user }: { user: User }) {
                 Tâches automatiques
               </h1>
               <p className="sf-page-sub">
-                {tasks.length} tâche{tasks.length !== 1 ? 's' : ''} configurée{tasks.length !== 1 ? 's' : ''}
+                Tableau de bord de tes publications récurrentes
               </p>
             </div>
           </div>
 
-          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {activeTasks.length > 0 && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: 'rgba(52,211,153,0.08)', color: '#34d399',
-                border: '1px solid rgba(52,211,153,0.2)',
-                borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700,
-              }}>
-                <span style={{
-                  width: 5, height: 5, borderRadius: '50%', background: '#34d399',
-                  boxShadow: '0 0 6px #34d399', display: 'inline-block',
-                  animation: 'pulse 1.4s ease-in-out infinite',
-                }} />
-                {activeTasks.length} active{activeTasks.length > 1 ? 's' : ''}
-              </span>
-            )}
+          <div className="sf-anim-slide-up sf-d100">
             <button
               onClick={() => { setEditTask(null); setShowCreate(true) }}
               className="sf-btn sf-btn-primary cursor-pointer"
@@ -1313,34 +1600,126 @@ export function Tasks({ user }: { user: User }) {
             </button>
           </div>
         </div>
+
+        {/* ── KPI stat cards ──────────────────────────────────────────────── */}
+        <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+          <StatCard
+            label="Actives" value={activeTasks.length}
+            accent="#34d399" pulse={activeTasks.length > 0}
+            sub={activeTasks.length > 0 ? 'en cours d\'exécution' : 'aucune active'}
+            icon={<IconBolt size={15} color="#34d399" />}
+          />
+          <StatCard
+            label="En pause" value={pausedTasks.length}
+            accent="#F59E0B"
+            sub={pausedTasks.length > 0 ? 'mises en pause' : '—'}
+            icon={<IconPause size={13} />}
+          />
+          <StatCard
+            label="Publications" value={totalRuns}
+            accent="#818CF8"
+            sub="exécutées avec succès"
+            icon={<IconCheck size={13} />}
+          />
+          <StatCard
+            label="Prochaine" value={nextRun ? formatCountdown(nextRun).replace('dans ', '') : '—'}
+            accent="#6366F1"
+            sub={nextRun ? formatAbsolute(nextRun) : 'aucune prévue'}
+            icon={<IconClock size={14} color="#6366F1" />}
+          />
+        </div>
+
+        {/* ── Tabs ────────────────────────────────────────────────────────── */}
+        <div className="sf-anim-slide-up sf-d200" style={{
+          display: 'flex', gap: 0, borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          {TABS.map(tabItem => (
+            <button
+              key={tabItem.id}
+              onClick={() => setTab(tabItem.id)}
+              className="cursor-pointer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px', background: 'transparent', border: 'none',
+                borderBottom: tab === tabItem.id ? '2px solid var(--accent)' : '2px solid transparent',
+                color: tab === tabItem.id ? 'var(--ivory)' : 'rgba(148,163,184,0.45)',
+                fontSize: 13, fontWeight: tab === tabItem.id ? 600 : 500,
+                transition: 'color 0.15s, border-color 0.15s', marginBottom: -1, outline: 'none',
+              }}
+            >
+              {tabItem.label}
+              {tabItem.count > 0 && (
+                <span style={{
+                  background: tab === tabItem.id ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)',
+                  color: tab === tabItem.id ? 'var(--accent)' : 'rgba(148,163,184,0.4)',
+                  borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+                }}>
+                  {tabItem.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div className="sf-page-body">
         {loading ? (
           <TaskSkeleton />
-        ) : tasks.length === 0 ? (
+        ) : tasks.length === 0 && history.length === 0 ? (
           <div className="sf-card" style={{ marginTop: 8 }}>
             <EmptyState onNew={() => { setEditTask(null); setShowCreate(true) }} />
           </div>
+        ) : tab === 'upcoming' ? (
+          /* ── À venir ──────────────────────────────────────────────────── */
+          upcoming.length === 0 ? (
+            <EmptyTab
+              icon={<IconClock size={34} color="rgba(99,102,241,0.55)" />}
+              title="Aucune exécution prévue"
+              text="Active une tâche pour voir ses prochaines publications ici."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {upcoming.map((task, i) => <UpcomingRow key={task.id} task={task} index={i} />)}
+            </div>
+          )
+        ) : tab === 'tasks' ? (
+          /* ── Tâches (management) ──────────────────────────────────────── */
+          tasks.length === 0 ? (
+            <EmptyTab
+              icon={<IconBolt size={34} color="rgba(99,102,241,0.55)" />}
+              title="Aucune tâche"
+              text="Crée ta première tâche automatique."
+              onNew={() => { setEditTask(null); setShowCreate(true) }}
+            />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+              {tasks.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  toggling={toggling === task.id}
+                  deleting={deleting === task.id}
+                  onToggle={() => void toggleTask(task)}
+                  onEdit={() => { setEditTask(task); setShowCreate(true) }}
+                  onDelete={() => setDeleteTask(task)}
+                />
+              ))}
+            </div>
+          )
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: 16,
-          }}>
-            {tasks.map(task => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                toggling={toggling === task.id}
-                deleting={deleting === task.id}
-                onToggle={() => void toggleTask(task)}
-                onEdit={() => { setEditTask(task); setShowCreate(true) }}
-                onDelete={() => setDeleteTask(task)}
-              />
-            ))}
-          </div>
+          /* ── Historique ───────────────────────────────────────────────── */
+          history.length === 0 ? (
+            <EmptyTab
+              icon={<IconCheck size={30} />}
+              title="Aucun historique"
+              text="Les publications exécutées par tes tâches apparaîtront ici."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {history.map((run, i) => <HistoryRow key={run.id} run={run} index={i} />)}
+            </div>
+          )
         )}
 
         {/* Info banner */}
@@ -1348,14 +1727,14 @@ export function Tasks({ user }: { user: User }) {
           marginTop: 28,
           display: 'flex', alignItems: 'flex-start', gap: 10,
           padding: '12px 16px',
-          background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)',
+          background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.14)',
           borderRadius: 11,
         }}>
           <span style={{ flexShrink: 0, marginTop: 1 }}>
-            <IconRepeat size={14} color="rgba(99,102,241,0.7)" />
+            <IconRepeat size={14} color="rgba(52,211,153,0.7)" />
           </span>
           <p style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
-            Les tâches automatiques s'exécutent depuis cette application. Garde-la ouverte pour que les publications se déclenchent à l'heure prévue. Pour des posts ponctuels, utilise le Programmateur.
+            Les tâches s'exécutent automatiquement sur le serveur, <strong style={{ color: 'rgba(233,234,240,0.7)' }}>même ScaleFlow fermé</strong>. Chaque publication apparaît dans l'historique.
           </p>
         </div>
       </div>
@@ -1378,6 +1757,39 @@ export function Tasks({ user }: { user: User }) {
           onConfirm={() => void deleteTaskById(deleteTask.id)}
           onCancel={() => setDeleteTask(null)}
         />
+      )}
+    </div>
+  )
+}
+
+// ── Empty tab placeholder ──────────────────────────────────────────────────────
+
+function EmptyTab({ icon, title, text, onNew }: {
+  icon: React.ReactNode
+  title: string
+  text: string
+  onNew?: () => void
+}) {
+  return (
+    <div className="sf-card" style={{
+      marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: '56px 32px', textAlign: 'center',
+    }}>
+      <div style={{
+        width: 76, height: 76, borderRadius: 20, marginBottom: 18,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)',
+        boxShadow: '0 0 40px -12px rgba(99,102,241,0.35)',
+      }}>
+        {icon}
+      </div>
+      <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--ivory)', margin: '0 0 8px' }}>{title}</p>
+      <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--muted)', margin: '0 0 20px', maxWidth: 340 }}>{text}</p>
+      {onNew && (
+        <button onClick={onNew} className="sf-btn sf-btn-primary cursor-pointer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <IconPlus size={11} /> Nouvelle tâche
+        </button>
       )}
     </div>
   )

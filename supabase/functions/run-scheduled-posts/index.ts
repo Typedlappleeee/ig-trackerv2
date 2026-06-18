@@ -66,6 +66,49 @@ Deno.serve(async (req) => {
     .eq('type', 'story')
     .or(`executed_at.lt.${storyCutoff},and(executed_at.is.null,created_at.lt.${storyCutoff})`)
 
+  // 1bis. Tâches automatiques (recurring_tasks) dues → génère un scheduled_post
+  // « enfant » lié par task_id, puis reprogramme la prochaine occurrence.
+  // Le scheduled_post créé est ramassé dans la même invocation (étape 2).
+  try {
+    const { data: dueTasks } = await db.from('recurring_tasks')
+      .select('*')
+      .eq('status', 'active')
+      .lte('next_run_at', nowIso)
+      .order('next_run_at', { ascending: true })
+      .limit(5)
+
+    for (const task of dueTasks ?? []) {
+      const recurHours = Number(task.recur_hours) || 24
+      const nextRun = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
+      // Crée l'exécution (scheduled_post enfant)
+      const { error: insErr } = await db.from('scheduled_posts').insert({
+        user_id:         task.user_id,
+        org_id:          task.org_id,
+        created_by_name: task.name || 'Tâche auto',
+        type:            'mass_posting',
+        status:          'pending',
+        scheduled_at:    nowIso,
+        phones:          task.phones,
+        videos:          task.videos,
+        caption:         task.caption,
+        delay_minutes:   task.delay_minutes ?? 0,
+        mode:            task.mode ?? 'seq',
+        bearer_token:    '',
+        reels_trial:     task.reels_trial ?? false,
+        task_id:         task.id,
+      })
+      // Reprogramme la prochaine occurrence + compteurs (best-effort)
+      await db.from('recurring_tasks').update({
+        next_run_at: nextRun,
+        last_run_at: nowIso,
+        run_count:   (Number(task.run_count) || 0) + 1,
+      }).eq('id', task.id)
+      summary[`task:${task.id}`] = insErr ? `task insert failed: ${insErr.message}` : 'task queued'
+    }
+  } catch (err) {
+    summary['recurring_tasks'] = `error: ${err instanceof Error ? err.message : String(err)}`
+  }
+
   // 2. Posts dus (limite 2 par invocation pour rester sous la limite de temps)
   // type='story' exclu : les stories passent par de l'automation UI (~2 min par
   // téléphone) qui dépasse les limites serverless — elles s'exécutent côté app.
