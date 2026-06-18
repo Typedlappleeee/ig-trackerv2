@@ -459,20 +459,28 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         auto_remove_videos: autoRemove,
       }
 
-      if (isEdit && editTask) {
-        const { error: err } = await supabase
-          .from('recurring_tasks')
-          .update(taskData)
-          .eq('id', editTask.id)
-        if (err) throw err
-      } else {
-        const { error: err } = await supabase.from('recurring_tasks').insert(taskData)
-        if (err) throw err
+      // Rétro-compat : si la colonne auto_remove_videos n'existe pas encore
+      // (migration non appliquée), on réessaie sans elle.
+      const saveTask = async (payload: Record<string, unknown>) => {
+        if (isEdit && editTask) {
+          return supabase.from('recurring_tasks').update(payload).eq('id', editTask.id)
+        }
+        return supabase.from('recurring_tasks').insert(payload)
       }
+
+      let { error: err } = await saveTask(taskData)
+      if (err && /auto_remove_videos/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
+        const { auto_remove_videos: _omit, ...fallback } = taskData
+        ;({ error: err } = await saveTask(fallback))
+      }
+      if (err) throw err
 
       onSaved()
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
+      const msg =
+        e instanceof Error ? e.message
+        : typeof e === 'object' && e !== null && 'message' in e ? String((e as { message: unknown }).message)
+        : String(e)
       setError(msg)
       setSubmitting(false)
       setProgress('')
