@@ -387,7 +387,7 @@ export function buildWebAPI() {
           return { ok: false, error: 'Aucune source audio' }
         }
 
-        const r = await fetch('/api/groq-transcription', {
+        const r = await fetch('/api/groq', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(body),
