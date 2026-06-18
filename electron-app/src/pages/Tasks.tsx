@@ -30,7 +30,7 @@
  * Migration complète : supabase/migrations/20260618_recurring_tasks_dashboard.sql
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -1584,12 +1584,11 @@ export function Tasks({ user }: { user: User }) {
   const [deleting, setDeleting]         = useState<string | null>(null)
   const [addVideosTaskId, setAddVideosTaskId] = useState<string | null>(null)
 
-  // Countdown ticker — refresh every 30s
+  // Countdown ticker state + refs (effect that uses `load` is declared after load below)
   const [, setTick] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 30_000)
-    return () => clearInterval(id)
-  }, [])
+  const tasksRef      = useRef<RecurringTask[]>([])
+  const triggeringRef = useRef(false)
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1628,6 +1627,29 @@ export function Tasks({ user }: { user: User }) {
   }, [currentOrg?.id, user.id])
 
   useEffect(() => { void load() }, [load])
+
+  // Countdown ticker — refresh every 30s.
+  // Also auto-triggers the edge function when any active task is overdue,
+  // so tasks run even if pg_cron hasn't been set up.
+  useEffect(() => {
+    const id = setInterval(async () => {
+      setTick(t => t + 1)
+      if (triggeringRef.current) return
+      const now = Date.now()
+      const hasOverdue = tasksRef.current.some(
+        t => t.status === 'active' && new Date(t.next_run_at).getTime() <= now,
+      )
+      if (!hasOverdue) return
+      triggeringRef.current = true
+      try {
+        await supabase.functions.invoke('run-scheduled-posts')
+        await new Promise(r => setTimeout(r, 3000))
+        await load()
+      } catch { /* silent — pg_cron handles it when app is closed */ }
+      finally { triggeringRef.current = false }
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [load])
 
   async function toggleTask(task: RecurringTask) {
     setToggling(task.id)

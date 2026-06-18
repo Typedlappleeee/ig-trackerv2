@@ -84,10 +84,27 @@ Deno.serve(async (req) => {
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const cronSecret  = Deno.env.get('CRON_SECRET') ?? ''
 
-  // Auth : secret cron OU service_role
+  // Auth : secret cron OU service_role OU JWT utilisateur authentifié
   const gotSecret = req.headers.get('x-cron-secret') ?? ''
   const gotAuth   = req.headers.get('authorization') ?? ''
-  const authorized = (cronSecret && gotSecret === cronSecret) || gotAuth.includes(serviceKey)
+  let authorized   = (cronSecret && gotSecret === cronSecret) || gotAuth.includes(serviceKey)
+  // filterUserId : non-null quand appelé par un client authentifié (JWT) — limite le
+  // traitement aux tâches/posts de cet utilisateur pour la sécurité.
+  let filterUserId: string | null = null
+
+  if (!authorized && gotAuth.startsWith('Bearer ')) {
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    if (anonKey) {
+      try {
+        const tempClient = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: gotAuth } },
+        })
+        const { data: { user } } = await tempClient.auth.getUser()
+        if (user?.id) { authorized = true; filterUserId = user.id }
+      } catch { /* ignore */ }
+    }
+  }
+
   if (!authorized) return new Response('Unauthorized', { status: 401 })
 
   const db = createClient(supabaseUrl, serviceKey)
@@ -147,7 +164,7 @@ Deno.serve(async (req) => {
   // La colonne credits_charged_date protège contre le double débit (cron toutes les minutes).
   const nowUtc = new Date()
   const todayStr = nowUtc.toISOString().slice(0, 10) // 'YYYY-MM-DD'
-  if (nowUtc.getUTCHours() === 0) {
+  if (nowUtc.getUTCHours() === 0 && !filterUserId) {
     try {
       const { data: activeTasks } = await db.from('recurring_tasks')
         .select('id, user_id, credits_charged_date')
@@ -184,12 +201,14 @@ Deno.serve(async (req) => {
   //   - Premier jour (credits_charged_date IS NULL) : 50 crédits/jour + N téléphones × 2
   //   - Jours suivants : N téléphones × 2 (les 50/jour sont débités à minuit par l'étape 0-daily)
   try {
-    const { data: dueTasks } = await db.from('recurring_tasks')
+    let dueTasksQuery = db.from('recurring_tasks')
       .select('*')
       .eq('status', 'active')
       .lte('next_run_at', nowIso)
       .order('next_run_at', { ascending: true })
       .limit(5)
+    if (filterUserId) dueTasksQuery = dueTasksQuery.eq('user_id', filterUserId)
+    const { data: dueTasks } = await dueTasksQuery
 
     for (const task of dueTasks ?? []) {
       const phones: unknown[] = typeof task.phones === 'string' ? JSON.parse(task.phones) : (task.phones ?? [])
@@ -253,13 +272,15 @@ Deno.serve(async (req) => {
   // 2. Posts dus (limite 2 par invocation pour rester sous la limite de temps)
   // type='story' exclu : les stories passent par de l'automation UI (~2 min par
   // téléphone) qui dépasse les limites serverless — elles s'exécutent côté app.
-  const { data: due } = await db.from('scheduled_posts')
+  let duePostsQuery = db.from('scheduled_posts')
     .select('*')
     .eq('status', 'pending')
     .neq('type', 'story')
     .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(2)
+  if (filterUserId) duePostsQuery = duePostsQuery.eq('user_id', filterUserId)
+  const { data: due } = await duePostsQuery
 
   for (const post of due ?? []) {
     // 3. Claim atomique — évite la double exécution si l'app du client est ouverte
