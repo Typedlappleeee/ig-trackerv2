@@ -38,7 +38,7 @@ export type OrgRole = 'owner' | 'admin' | 'member' | 'viewer'
 export type PageKey =
   | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'warmup' | 'aitools' | 'storylink'
-  | 'remix' | 'repurpose' | 'montage' | 'mixer'
+  | 'remix' | 'repurpose' | 'montage' | 'mixer' | 'subtitles'
   | 'settings'
 
 // Granular action permissions (on top of tab visibility).

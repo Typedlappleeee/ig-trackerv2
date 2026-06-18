@@ -104,6 +104,15 @@ interface ElectronAPI {
     Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>
   runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) =>
     Promise<{ ok: boolean; outputPath?: string; error?: string }>
+  runFfmpegSubtitles: (opts: {
+    sourcePath: string
+    segments:   Array<{ text: string; start: number; end: number }>
+    fontSize:   number
+    fontColor:  string
+    position:   'top' | 'center' | 'bottom'
+    style:      'box' | 'outline' | 'shadow'
+    preset?:    '9:16' | '1:1' | '16:9' | 'keep'
+  }) => Promise<{ ok: boolean; outputPath?: string; error?: string }>
 }
 
 declare global {

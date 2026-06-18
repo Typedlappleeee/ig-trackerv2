@@ -56,7 +56,7 @@ export type Page =
   | 'hub'
   | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
-  | 'montage' | 'remix' | 'repurpose' | 'mixer'
+  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles'
   | 'community' | 'support'
   | 'settings' | 'licences'
   | 'scaleia'
@@ -102,6 +102,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
       { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
+      { id: 'subtitles',   label: 'navSubtitles',   icon: '💬', isNew: true },
     ],
   },
 ]
@@ -154,6 +155,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   captionbank: 'chat',
   warmup:      'flame',
   aitools:     'sparkles',
+  subtitles:   'chat',
   montage:     'scissors',
   remix:       'refresh',
   repurpose:   'zap',
@@ -549,6 +551,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     remix:       t('pageRemix'),
     repurpose:   t('navRepurpose'),
     mixer:       t('navMixer'),
+    subtitles:   t('navSubtitles'),
     textcopy:    t('pageTextcopy'),
     community:   t('pageCommunity'),
     support:     t('pageSupport'),

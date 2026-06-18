@@ -569,6 +569,7 @@ const Support        = lazy(() => import('@/pages/Support').then(m => ({ default
 const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazy(() => import('@/pages/StoryLink'))
+const Subtitles      = lazy(() => import('@/pages/Subtitles').then(m => ({ default: m.Subtitles })))
 const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { AppTour }           from '@/components/AppTour'
@@ -837,6 +838,7 @@ function AppContent({ user }: { user: User }) {
       case 'repurpose':    return <VideoRepurpose user={user} />
       case 'captionbank':  return <BankHub      user={user} initialTab="captions" />
       case 'mixer':        return <Mixer        user={user} />
+      case 'subtitles':    return <Subtitles    user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
