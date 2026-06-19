@@ -37,6 +37,9 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
+import { postInstagramStory, stopPhone } from '@/lib/geelark'
+
+type TaskType = 'publication' | 'story'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -45,6 +48,7 @@ interface TaskPhone {
   geelark_id: string
   phone_name: string
   ig_username: string | null
+  link?: string   // Story : lien du sticker pour ce compte
 }
 
 interface TaskVideo {
@@ -58,9 +62,11 @@ interface RecurringTask {
   org_id: string | null
   name: string
   status: 'active' | 'paused'
+  task_type: TaskType
   phones: TaskPhone[]
   videos: TaskVideo[]
   caption: string
+  story_texts: string[]
   mode: 'seq' | 'random'
   delay_minutes: number
   recur_hours: number
@@ -159,6 +165,18 @@ async function resolveTaskVideoToken(bearer: string, video: TaskVideo): Promise<
   return j.token
 }
 
+// Story : on a juste besoin d'une URL https fraîche (pas d'upload GeeLark).
+// Re-signe l'URL Supabase si nécessaire pour qu'elle ne soit pas expirée.
+async function resolveTaskMediaUrl(media: TaskVideo): Promise<string> {
+  const t = media.token
+  const m = t.match(/\/storage\/v1\/object\/(?:sign|authenticated)\/content\/(.+?)(?:\?|$)/)
+  if (m) {
+    const { data } = await supabase.storage.from('content').createSignedUrl(m[1], 3600)
+    if (data?.signedUrl) return data.signedUrl
+  }
+  return t
+}
+
 async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   const nowIso     = new Date().toISOString()
   const logs: string[] = []
@@ -172,7 +190,7 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
       user_id:         task.user_id,
       org_id:          task.org_id ?? null,
       created_by_name: task.name || 'Tâche auto',
-      type:            'mass_posting',
+      type:            task.task_type === 'story' ? 'story' : 'mass_posting',
       status,
       scheduled_at:    nowIso,
       executed_at:     new Date().toISOString(),
@@ -205,8 +223,78 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     return
   }
   if (!task.videos.length) {
-    log('❌ Aucune vidéo dans la tâche')
-    await saveResult('failed', 'aucune vidéo')
+    log(task.task_type === 'story' ? '❌ Aucune image dans la tâche' : '❌ Aucune vidéo dans la tâche')
+    await saveResult('failed', task.task_type === 'story' ? 'aucune image' : 'aucune vidéo')
+    return
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STORY : flow comme l'onglet Story (image + lien sticker par compte).
+  // Pas d'upload GeeLark ni de RPA Reels : postInstagramStory pilote le téléphone.
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (task.task_type === 'story') {
+    try {
+      const texts = Array.isArray(task.story_texts) ? task.story_texts.filter(Boolean) : []
+
+      // Résolution des URLs d'images (re-signe les URLs Supabase)
+      log(`▶ Préparation de ${task.videos.length} image(s)…`)
+      const imageUrls: (string | null)[] = []
+      for (let i = 0; i < task.videos.length; i++) {
+        try {
+          imageUrls.push(await resolveTaskMediaUrl(task.videos[i]))
+        } catch (err) {
+          log(`❌ Image échouée (${task.videos[i].title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
+          imageUrls.push(null)
+        }
+      }
+      const validImages = imageUrls.filter((u): u is string => Boolean(u))
+      if (!validImages.length) {
+        log('❌ Aucune image exploitable')
+        await saveResult('failed', 'Aucune image exploitable')
+        return
+      }
+
+      let okN = 0
+      let failN = 0
+      for (let i = 0; i < task.phones.length; i++) {
+        const phone = task.phones[i]
+        const name  = phone.ig_username ?? phone.phone_name
+        const link  = (phone.link ?? '').trim()
+        if (!link) {
+          failN++
+          log(`❌ ${name} : aucun lien configuré`)
+          continue
+        }
+        const imageUrl = task.mode === 'random'
+          ? validImages[Math.floor(Math.random() * validImages.length)]
+          : validImages[i % validImages.length]
+        const linkText = texts.length
+          ? (task.mode === 'random' ? texts[Math.floor(Math.random() * texts.length)] : texts[i % texts.length])
+          : undefined
+        log(`▶ Story ${name}…`)
+        try {
+          const res = await postInstagramStory(
+            bearer, phone.geelark_id,
+            { imageUrl, linkUrl: link, linkText },
+            m => log(`  ${name}: ${m}`),
+          )
+          if (res.ok) { okN++; log(`✅ ${name} — story publiée`) }
+          else { failN++; log(`❌ ${name} : ${res.error ?? 'échec'}`) }
+        } catch (err) {
+          failN++
+          log(`❌ ${name} : ${err instanceof Error ? err.message : String(err)}`)
+        } finally {
+          try { await stopPhone(bearer, phone.geelark_id) } catch { /* ignore */ }
+        }
+      }
+
+      log(`⏰ Prochaine story dans ${recurHours}h`)
+      await saveResult(okN > 0 ? 'done' : 'failed', okN > 0 ? undefined : 'Aucune story publiée')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      log(`❌ Erreur inattendue: ${msg}`)
+      await saveResult('failed', msg)
+    }
     return
   }
 
@@ -479,6 +567,15 @@ function IconVideo({ size = 12, color = 'currentColor' }: { size?: number; color
   )
 }
 
+function IconLinkType({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+    </svg>
+  )
+}
+
 function IconClock({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
@@ -600,6 +697,15 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [name, setName]               = useState(editTask?.name ?? '')
   const [caption, setCaption]         = useState(editTask?.caption ?? '')
+  const [taskType, setTaskType]       = useState<TaskType>(editTask?.task_type ?? 'publication')
+  const [storyTexts, setStoryTexts]   = useState<string[]>(editTask?.story_texts ?? [])
+  const [storyTextDraft, setStoryTextDraft] = useState('')
+  // Liens par compte (Story) — pré-remplis depuis la tâche éditée, sinon depuis l'onglet Story (localStorage)
+  const [phoneLinks, setPhoneLinks]   = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {}
+    editTask?.phones.forEach(p => { if (p.link) init[p.id] = p.link })
+    return init
+  })
   const [mode, setMode]               = useState<'seq' | 'random'>(editTask?.mode ?? 'seq')
   const [recurUnit, setRecurUnit]     = useState<'minutes' | 'heures' | 'jours'>(
     editTask
@@ -660,9 +766,30 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     })
   }
 
+  // Story : lien d'un compte (état local, sinon valeur sauvée dans l'onglet Story)
+  const getPhoneLink = (id: string): string => {
+    if (id in phoneLinks) return phoneLinks[id]
+    return localStorage.getItem(`sf-story-link-${id}`) ?? ''
+  }
+  const setPhoneLink = (id: string, link: string) => {
+    setPhoneLinks(prev => ({ ...prev, [id]: link }))
+    if (link.trim()) localStorage.setItem(`sf-story-link-${id}`, link.trim())
+    else localStorage.removeItem(`sf-story-link-${id}`)
+  }
+  function addStoryText() {
+    const v = storyTextDraft.trim()
+    if (!v) return
+    setStoryTexts(prev => [...prev, v])
+    setStoryTextDraft('')
+  }
+
+  const isStory = taskType === 'story'
+  const phonesWithLink = phoneList.filter(p => getPhoneLink(p.id).trim()).length
+
   const isEdit = !!editTask
   // Le nom est optionnel — un nom est généré automatiquement s'il est vide.
   const canSubmit = !submitting && phoneList.length > 0 && videos.length > 0
+    && (!isStory || phonesWithLink === phoneList.length)
 
   const labelStyle: React.CSSProperties = {
     fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
@@ -679,9 +806,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
 
       for (let i = 0; i < videos.length; i++) {
         const v = videos[i]
-        setProgress(`Préparation vidéo ${i + 1}/${videos.length}…`)
-        // Supabase signed URLs are stored as-is; the edge function uploads to GeeLark server-side.
-        if (v.filePath.startsWith('http://') || v.filePath.startsWith('https://')) {
+        setProgress(isStory ? `Préparation image ${i + 1}/${videos.length}…` : `Préparation vidéo ${i + 1}/${videos.length}…`)
+        // Story : on ne fait pas d'upload GeeLark — l'URL signée suffit (postInstagramStory la lit).
+        // Publication : URLs https stockées telles quelles (l'upload se fait à l'exécution).
+        if (isStory || v.filePath.startsWith('http://') || v.filePath.startsWith('https://')) {
           uploadedVideos.push({ token: v.filePath, title: v.title })
           continue
         }
@@ -707,17 +835,20 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         org_id:        currentOrg?.id ?? null,
         name:          name.trim() || autoName,
         status:        (editTask?.status ?? 'active') as 'active' | 'paused',
+        task_type:     taskType,
         phones:        phoneList.map(p => ({
           id: p.id, geelark_id: p.geelark_id,
           phone_name: p.phone_name, ig_username: p.ig_username ?? null,
+          ...(isStory ? { link: getPhoneLink(p.id).trim() } : {}),
         })),
         videos:        uploadedVideos,
         caption:       caption.trim(),
+        story_texts:   isStory ? storyTexts.filter(Boolean) : [],
         mode,
         delay_minutes: delayMin,
         recur_hours:        recurHours,
         next_run_at:        nextRunDate.toISOString(),
-        reels_trial:        reelsTrial,
+        reels_trial:        isStory ? false : reelsTrial,
         auto_remove_videos: autoRemove,
       }
 
@@ -731,6 +862,12 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       }
 
       let { error: err } = await saveTask(taskData)
+      // Rétro-compat : colonnes task_type / story_texts manquantes (migration non appliquée)
+      if (err && /(task_type|story_texts)/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
+        const { task_type: _t, story_texts: _s, ...fallback } = taskData
+        ;({ error: err } = await saveTask(fallback))
+        if (!err && isStory) setError('⚠ Type « Story » non supporté tant que la migration SQL n\'est pas appliquée — sauvegardé en publication.')
+      }
       // Rétro-compat : colonne auto_remove_videos manquante (migration non appliquée)
       if (err && /auto_remove_videos/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
         const { auto_remove_videos: _omit, ...fallback } = taskData
@@ -816,6 +953,46 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               Token GéeLark manquant — configure-le dans Paramètres → Connexions.
             </div>
           )}
+
+          {/* ── Type de tâche ── */}
+          <section>
+            <span style={labelStyle}>Type de tâche</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {([
+                { k: 'publication' as const, title: 'Publication', desc: 'Reels / posts vidéo', icon: <IconVideo size={16} /> },
+                { k: 'story' as const,       title: 'Story',       desc: 'Image + lien par compte', icon: <IconLinkType size={16} /> },
+              ]).map(opt => {
+                const active = taskType === opt.k
+                return (
+                  <button
+                    key={opt.k}
+                    onClick={() => setTaskType(opt.k)}
+                    className="cursor-pointer"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left',
+                      padding: '12px 14px', borderRadius: 11,
+                      border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : HAIR}`,
+                      background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: active ? GOLD : 'rgba(255,255,255,0.05)',
+                      color: active ? '#fff' : 'rgba(233,234,240,0.55)',
+                    }}>
+                      {opt.icon}
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.72)' }}>{opt.title}</p>
+                      <p style={{ margin: 0, fontSize: 10.5, color: active ? 'rgba(129,140,248,0.85)' : MUTED }}>{opt.desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
 
           {/* ── Nom ── */}
           <section>
@@ -959,10 +1136,55 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             )}
           </section>
 
-          {/* ── Vidéos ── */}
+          {/* ── Liens par compte (Story) ── */}
+          {isStory && phoneList.length > 0 && (
+            <section>
+              <span style={labelStyle}>
+                Lien par compte
+                <span style={{ color: phonesWithLink === phoneList.length ? '#34D399' : '#F59E0B', letterSpacing: 'normal', fontSize: 11, textTransform: 'none', fontWeight: 600 }}>
+                  {' '}— {phonesWithLink}/{phoneList.length}
+                </span>
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 220, overflowY: 'auto', scrollbarWidth: 'thin', padding: 2 }}>
+                {phoneList.map(p => {
+                  const link = getPhoneLink(p.id)
+                  const filled = !!link.trim()
+                  return (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                      <div style={{
+                        width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(255,255,255,0.05)', color: 'rgba(233,234,240,0.6)',
+                        fontSize: 12, fontWeight: 700,
+                      }}>
+                        {(p.ig_username ?? p.phone_name ?? '?').charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: 11.5, color: 'rgba(233,234,240,0.7)', width: 120, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {p.ig_username ? `@${p.ig_username}` : p.phone_name}
+                      </span>
+                      <input
+                        type="url"
+                        value={link}
+                        onChange={e => setPhoneLink(p.id, e.target.value)}
+                        placeholder="https://lien-de-ce-compte…"
+                        style={{
+                          flex: 1, height: 32, padding: '0 10px', fontSize: 12,
+                          background: 'rgba(233,234,240,0.02)', color: IVORY,
+                          border: `1px solid ${filled ? 'rgba(52,211,153,0.4)' : 'rgba(245,158,11,0.4)'}`,
+                          borderRadius: 7, outline: 'none',
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* ── Vidéos / Images ── */}
           <section>
             <span style={labelStyle}>
-              Vidéos{videos.length > 0 && (
+              {isStory ? 'Images' : 'Vidéos'}{videos.length > 0 && (
                 <span style={{ color: IVORY, letterSpacing: 'normal', fontSize: 11, textTransform: 'none', fontWeight: 500 }}>
                   {' '}— {videos.length}
                 </span>
@@ -1004,26 +1226,87 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             </div>
           </section>
 
-          {/* ── Légende ── */}
-          <section>
-            <span style={labelStyle}>Légende</span>
-            <textarea
-              value={caption}
-              onChange={e => setCaption(e.target.value)}
-              rows={3}
-              placeholder="Description Instagram…"
-              style={{
-                width: '100%', minHeight: 72, padding: '10px 12px',
-                fontSize: 13, lineHeight: 1.6,
-                background: 'rgba(233,234,240,0.02)', color: IVORY,
-                resize: 'vertical', border: `1px solid ${HAIR}`,
-                borderRadius: 8, outline: 'none', fontFamily: 'inherit',
-                transition: 'border-color 0.2s', boxSizing: 'border-box',
-              }}
-              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)' }}
-              onBlur={e => { e.currentTarget.style.borderColor = HAIR }}
-            />
-          </section>
+          {/* ── Légende (Publication) ── */}
+          {!isStory && (
+            <section>
+              <span style={labelStyle}>Légende</span>
+              <textarea
+                value={caption}
+                onChange={e => setCaption(e.target.value)}
+                rows={3}
+                placeholder="Description Instagram…"
+                style={{
+                  width: '100%', minHeight: 72, padding: '10px 12px',
+                  fontSize: 13, lineHeight: 1.6,
+                  background: 'rgba(233,234,240,0.02)', color: IVORY,
+                  resize: 'vertical', border: `1px solid ${HAIR}`,
+                  borderRadius: 8, outline: 'none', fontFamily: 'inherit',
+                  transition: 'border-color 0.2s', boxSizing: 'border-box',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = HAIR }}
+              />
+            </section>
+          )}
+
+          {/* ── Textes du sticker (Story) ── */}
+          {isStory && (
+            <section>
+              <span style={labelStyle}>
+                Texte du sticker
+                <span style={{ color: MUTED, letterSpacing: 'normal', fontSize: 10, textTransform: 'none', fontWeight: 500 }}> — optionnel, distribué par compte</span>
+              </span>
+              <div style={{ display: 'flex', gap: 8, marginBottom: storyTexts.length ? 10 : 0 }}>
+                <input
+                  type="text"
+                  value={storyTextDraft}
+                  onChange={e => setStoryTextDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStoryText() } }}
+                  placeholder="Ex : Voir le lien 👆"
+                  style={{
+                    flex: 1, height: 36, padding: '0 12px', fontSize: 13,
+                    background: 'rgba(233,234,240,0.02)', color: IVORY,
+                    border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={addStoryText}
+                  disabled={!storyTextDraft.trim()}
+                  className="cursor-pointer"
+                  style={{
+                    padding: '0 16px', fontSize: 10, fontWeight: 700,
+                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                    background: storyTextDraft.trim() ? GOLD : 'rgba(233,234,240,0.08)',
+                    color: storyTextDraft.trim() ? '#fff' : MUTED,
+                    border: 'none', borderRadius: 7,
+                  }}
+                >
+                  Ajouter
+                </button>
+              </div>
+              {storyTexts.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {storyTexts.map((txt, i) => (
+                    <span key={i} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 7,
+                      padding: '5px 9px', borderRadius: 7,
+                      border: `1px solid ${HAIR}`, fontSize: 11.5,
+                      color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
+                    }}>
+                      {txt.length > 32 ? txt.slice(0, 32) + '…' : txt}
+                      <button
+                        onClick={() => setStoryTexts(prev => prev.filter((_, j) => j !== i))}
+                        className="cursor-pointer"
+                        style={{ background: 'none', border: 'none', color: '#F0A0AB', display: 'flex', padding: 0 }}
+                      >
+                        <IconX size={8} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* ── Paramètres ── */}
           <section>
@@ -1100,7 +1383,8 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 />
               </div>
 
-              {/* Délai entre comptes */}
+              {/* Délai entre comptes (Publication uniquement) */}
+              {!isStory && (
               <div>
                 <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Délai / compte</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1119,8 +1403,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                   <span style={{ fontSize: 11, color: MUTED }}>min</span>
                 </div>
               </div>
+              )}
 
-              {/* Essai Reels */}
+              {/* Essai Reels (Publication uniquement) */}
+              {!isStory && (
               <div>
                 <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Essai Reels</p>
                 <button
@@ -1138,10 +1424,11 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                   {reelsTrial ? 'Activé' : 'Désactivé'}
                 </button>
               </div>
+              )}
 
-              {/* Auto-suppression des vidéos */}
+              {/* Auto-suppression des médias */}
               <div>
-                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Vidéo → usage unique</p>
+                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{isStory ? 'Image' : 'Vidéo'} → usage unique</p>
                 <button
                   onClick={() => setAutoRemove(v => !v)}
                   title="Supprime chaque vidéo de la pool après qu'elle a été postée"
@@ -1183,8 +1470,13 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               <span style={{ fontSize: 16, color: phoneList.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{phoneList.length}</span> tél.
             </span>
             <span style={{ fontSize: 11, color: MUTED }}>
-              <span style={{ fontSize: 16, color: videos.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{videos.length}</span> vidéos
+              <span style={{ fontSize: 16, color: videos.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{videos.length}</span> {isStory ? 'images' : 'vidéos'}
             </span>
+            {isStory && phoneList.length > 0 && phonesWithLink < phoneList.length && (
+              <span style={{ fontSize: 11, color: '#F59E0B' }}>
+                {phoneList.length - phonesWithLink} lien(s) manquant(s)
+              </span>
+            )}
             {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
           </div>
           <button
@@ -1426,6 +1718,21 @@ function TaskCard({
 
       {/* Row 2: stats chips */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        {(() => {
+          const story = task.task_type === 'story'
+          return (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: story ? 'rgba(236,72,153,0.1)' : 'rgba(99,102,241,0.1)',
+              color: story ? '#F472B6' : '#818CF8',
+              border: `1px solid ${story ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
+              borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700,
+            }}>
+              {story ? <IconLinkType size={11} /> : <IconVideo size={11} />}
+              {story ? 'Story' : 'Publication'}
+            </span>
+          )
+        })()}
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           background: 'rgba(255,255,255,0.04)', color: 'var(--muted)',
@@ -1442,7 +1749,7 @@ function TaskCard({
           padding: '3px 6px 3px 10px', fontSize: 11,
         }}>
           <IconVideo size={11} color="rgba(233,234,240,0.6)" />
-          {task.videos.length} vidéo{task.videos.length > 1 ? 's' : ''}
+          {task.videos.length} {task.task_type === 'story' ? 'image' : 'vidéo'}{task.videos.length > 1 ? 's' : ''}
           <button
             onClick={e => { e.stopPropagation(); onOpenAddVideos() }}
             title="Ajouter des vidéos à la pool"
@@ -1699,15 +2006,19 @@ function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
         <p style={{
           margin: '0 0 5px', fontSize: 14, fontWeight: 700, color: 'var(--ivory)',
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          {task.name || 'Tâche sans nom'}
+          {task.task_type === 'story' && (
+            <span style={{ display: 'inline-flex', color: '#F472B6' }} title="Story"><IconLinkType size={13} /></span>
+          )}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.name || 'Tâche sans nom'}</span>
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
             <IconPhone size={11} color="rgba(233,234,240,0.5)" /> {task.phones.length}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
-            <IconVideo size={11} color="rgba(233,234,240,0.5)" /> {task.videos.length}
+            {task.task_type === 'story' ? <IconLinkType size={11} color="rgba(233,234,240,0.5)" /> : <IconVideo size={11} color="rgba(233,234,240,0.5)" />} {task.videos.length}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#818CF8' }}>
             <IconRepeat size={11} color="#818CF8" /> {formatInterval(task.recur_hours)}
@@ -1867,6 +2178,8 @@ export function Tasks({ user }: { user: User }) {
           ...t,
           phones:             typeof t.phones === 'string' ? JSON.parse(t.phones as string) : (t.phones ?? []),
           videos:             typeof t.videos === 'string' ? JSON.parse(t.videos as string) : (t.videos ?? []),
+          story_texts:        typeof t.story_texts === 'string' ? JSON.parse(t.story_texts as string) : (t.story_texts ?? []),
+          task_type:          (t.task_type as TaskType) ?? 'publication',
           auto_remove_videos: (t.auto_remove_videos as boolean) ?? false,
         })) as RecurringTask[])
       }

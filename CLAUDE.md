@@ -30,6 +30,14 @@
 - **`supabase/migrations/20260618b_task_credits.sql`** : ajoute la colonne `credits_charged_date` à `recurring_tasks`.
 - **`electron-app/src/lib/credits.ts`** : constantes `task_daily` (50) et `task_per_run` (2) dans `CREDIT_COSTS`.
 
+## Tâches automatiques — type Publication vs Story
+
+- À la création d'une tâche (`recurring_tasks`), choix du **type** : `publication` (Reels, défaut) ou `story`.
+- **Publication** : flow identique à Mass Posting (upload vidéos → start téléphones → boot 30s → RPA `instagramPubReels` → poll `/task/query`).
+- **Story** : flow identique à l'onglet Story — pour chaque compte, image (rotation séquentielle/aléatoire) + **lien sticker propre au compte** + texte sticker optionnel (pool distribué). Utilise `postInstagramStory` (pas d'upload GeeLark ni de RPA Reels). Le lien par compte est stocké dans `phones[].link` et pré-rempli depuis l'onglet Story (localStorage `sf-story-link-<phoneId>`).
+- Colonnes ajoutées par **`supabase/migrations/20260619_task_story.sql`** : `task_type` (text, défaut `publication`) et `story_texts` (jsonb, pool de textes).
+- Implémentation : `electron-app/src/pages/Tasks.tsx` — `runTaskNow` branche sur le flow Story si `task_type === 'story'` ; le formulaire `CreateTaskModal` adapte ses champs (images, liens par compte, pool de textes).
+
 ## Sous-titres automatiques (Groq Whisper)
 
 - Onglet accessible aux **owner et admin uniquement** (pas member/viewer).
