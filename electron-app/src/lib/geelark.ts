@@ -846,8 +846,9 @@ export async function postInstagramStory(
   const bufToB64 = (buf: ArrayBuffer | Uint8Array): string => {
     const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
     let b64 = ''
-    for (let i = 0; i < u8.length; i += 8192)
-      b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + 8192, u8.length))))
+    // chunk size MUST be a multiple of 3 so btoa segments concatenate without mid-string '=' padding
+    for (let i = 0; i < u8.length; i += 8190)
+      b64 += btoa(String.fromCharCode(...u8.subarray(i, Math.min(i + 8190, u8.length))))
     return b64
   }
 
