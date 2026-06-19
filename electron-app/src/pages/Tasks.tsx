@@ -251,6 +251,10 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   // ─────────────────────────────────────────────────────────────────────────────
   if (task.steps && task.steps.length > 0) {
     try {
+      // Clone des steps pour appliquer l'usage unique (retrait des médias utilisés)
+      const updatedSteps: TaskStep[] = task.steps.map(s => ({ ...s }))
+      let stepsChanged = false
+
       for (let si = 0; si < task.steps.length; si++) {
         const step = task.steps[si]
         log(`▶ Étape ${si + 1}/${task.steps.length} : ${step.type}`)
@@ -269,15 +273,19 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
             log(`❌ Étape ${si + 1} : aucune image`)
           } else {
             const imageUrls: (string | null)[] = []
+            const validImageIdx: number[] = []  // mapping position dans validImages → index dans stepImages
             for (let i = 0; i < stepImages.length; i++) {
               try {
-                imageUrls.push(await resolveTaskMediaUrl(stepImages[i]))
+                const u = await resolveTaskMediaUrl(stepImages[i])
+                imageUrls.push(u)
               } catch (err) {
                 log(`❌ Image échouée (${stepImages[i].title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
                 imageUrls.push(null)
               }
             }
+            imageUrls.forEach((u, idx) => { if (u) validImageIdx.push(idx) })
             const validImages = imageUrls.filter((u): u is string => Boolean(u))
+            const usedImageOriginalIdx = new Set<number>()
             if (!validImages.length) {
               log(`❌ Étape ${si + 1} : aucune image exploitable`)
             } else {
@@ -289,9 +297,11 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
                   log(`❌ ${name} : aucun lien configuré`)
                   continue
                 }
-                const imageUrl = stepMode === 'random'
-                  ? validImages[Math.floor(Math.random() * validImages.length)]
-                  : validImages[i % validImages.length]
+                const imgPick = stepMode === 'random'
+                  ? Math.floor(Math.random() * validImages.length)
+                  : i % validImages.length
+                const imageUrl = validImages[imgPick]
+                usedImageOriginalIdx.add(validImageIdx[imgPick])
                 const linkText = stepTexts.length
                   ? (stepMode === 'random' ? stepTexts[Math.floor(Math.random() * stepTexts.length)] : stepTexts[i % stepTexts.length])
                   : undefined
@@ -310,6 +320,13 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
                   try { await stopPhone(bearer, phone.geelark_id) } catch { /* ignore */ }
                 }
               }
+              // Usage unique : retire les images utilisées de la pool de l'étape
+              if (step.auto_remove_videos && usedImageOriginalIdx.size > 0) {
+                const remaining = stepImages.filter((_, idx) => !usedImageOriginalIdx.has(idx))
+                updatedSteps[si] = { ...updatedSteps[si], images: remaining }
+                stepsChanged = true
+                log(`🗑 ${stepImages.length - remaining.length} image(s) retirée(s) (${remaining.length} restante(s)).`)
+              }
             }
           }
         } else {
@@ -325,6 +342,7 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
           } else {
             log(`▶ Upload de ${stepVideos.length} vidéo(s) vers GéeLark…`)
             const tokenByIndex: (string | null)[] = []
+            const validVideoIdx: number[] = []  // mapping position dans validTokens → index dans stepVideos
             for (let i = 0; i < stepVideos.length; i++) {
               const v = stepVideos[i]
               try {
@@ -337,7 +355,9 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
                 tokenByIndex.push(null)
               }
             }
+            tokenByIndex.forEach((t, idx) => { if (t) validVideoIdx.push(idx) })
             const validTokens = tokenByIndex.filter((t): t is string => Boolean(t))
+            const usedVideoOriginalIdx = new Set<number>()
             if (!validTokens.length) {
               log(`❌ Étape ${si + 1} : upload de toutes les vidéos a échoué`)
             } else {
@@ -358,6 +378,7 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
                   const vidIdx = stepMode === 'random'
                     ? Math.floor(Math.random() * validTokens.length)
                     : i % validTokens.length
+                  usedVideoOriginalIdx.add(validVideoIdx[vidIdx])
                   const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
                     id: phone.geelark_id,
                     scheduleAt: baseTs + i * stepDelay * 60,
@@ -421,6 +442,13 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
                 }
               }
             }
+            // Usage unique : retire les vidéos utilisées de la pool de l'étape
+            if (step.auto_remove_videos && usedVideoOriginalIdx.size > 0) {
+              const remaining = stepVideos.filter((_, idx) => !usedVideoOriginalIdx.has(idx))
+              updatedSteps[si] = { ...updatedSteps[si], videos: remaining }
+              stepsChanged = true
+              log(`🗑 ${stepVideos.length - remaining.length} vidéo(s) retirée(s) (${remaining.length} restante(s)).`)
+            }
           }
         }
 
@@ -429,6 +457,18 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
           log(`⏳ Attente ${step.delay_after_minutes} min avant l'étape suivante…`)
           await new Promise(r => setTimeout(r, step.delay_after_minutes! * 60 * 1000))
         }
+      }
+
+      // Persiste les steps modifiés (usage unique) — met en pause si une pool est vidée
+      if (stepsChanged) {
+        const anyEmptied = updatedSteps.some(s =>
+          (s.type === 'publication' && (s.videos?.length ?? 0) === 0) ||
+          (s.type === 'story' && (s.images?.length ?? 0) === 0)
+        )
+        await supabase.from('recurring_tasks')
+          .update({ steps: updatedSteps, ...(anyEmptied ? { status: 'paused' } : {}) })
+          .eq('id', task.id)
+        if (anyEmptied) log('⏸ Pool d\'une étape vidée — tâche mise en pause.')
       }
 
       log(`⏰ Prochain post dans ${recurHours}h`)
@@ -1187,146 +1227,6 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             </div>
           )}
 
-          {/* ── Mode séquence toggle ── */}
-          <section>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button
-                onClick={() => setSequenceMode(v => !v)}
-                className="cursor-pointer"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '11px 14px', borderRadius: 10, width: '100%', textAlign: 'left',
-                  border: `1px solid ${sequenceMode ? 'rgba(99,102,241,0.5)' : HAIR}`,
-                  background: sequenceMode ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.02)',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{
-                  width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: sequenceMode ? GOLD : 'rgba(255,255,255,0.05)',
-                  color: sequenceMode ? '#fff' : 'rgba(233,234,240,0.55)',
-                }}>
-                  <IconRepeat size={16} />
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: sequenceMode ? IVORY : 'rgba(233,234,240,0.72)' }}>
-                    Mode séquence
-                  </p>
-                  <p style={{ margin: 0, fontSize: 10.5, color: sequenceMode ? 'rgba(129,140,248,0.85)' : MUTED }}>
-                    Enchaîner plusieurs actions (publication, story, warmup…)
-                  </p>
-                </div>
-                <div style={{
-                  marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0,
-                  background: sequenceMode ? GOLD : 'rgba(233,234,240,0.12)',
-                  position: 'relative', transition: 'background 0.2s',
-                }}>
-                  <div style={{
-                    position: 'absolute', top: 3, left: sequenceMode ? 18 : 3, width: 14, height: 14,
-                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                  }} />
-                </div>
-              </button>
-            </div>
-          </section>
-
-          {/* ── Séquence builder ── */}
-          {sequenceMode && (
-            <section>
-              <span style={labelStyle}>Séquence d'actions</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {steps.map((step, idx) => (
-                  <StepEditor
-                    key={step.id}
-                    step={step}
-                    index={idx}
-                    total={steps.length}
-                    phones={phoneList}
-                    getPhoneLink={getPhoneLink}
-                    setPhoneLink={setPhoneLink}
-                    onChange={updated => setSteps(prev => prev.map((s, i) => i === idx ? updated : s))}
-                    onDelete={() => setSteps(prev => prev.filter((_, i) => i !== idx))}
-                    onMoveUp={() => {
-                      if (idx === 0) return
-                      setSteps(prev => {
-                        const next = [...prev]
-                        ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
-                        return next
-                      })
-                    }}
-                    onMoveDown={() => {
-                      if (idx === steps.length - 1) return
-                      setSteps(prev => {
-                        const next = [...prev]
-                        ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
-                        return next
-                      })
-                    }}
-                    onShowBankPicker={field => setBankPickerTarget({ stepIdx: idx, field })}
-                  />
-                ))}
-                <button
-                  onClick={() => setSteps(prev => [
-                    ...prev,
-                    { id: Math.random().toString(36).slice(2), type: 'publication', videos: [], caption: '' },
-                  ])}
-                  className="cursor-pointer"
-                  style={{
-                    padding: '10px 16px', fontSize: 10.5, fontWeight: 700,
-                    letterSpacing: '0.04em', textTransform: 'uppercase',
-                    background: 'transparent', color: GOLD,
-                    border: `1px dashed rgba(99,102,241,0.4)`, borderRadius: 9,
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  + Ajouter une étape
-                </button>
-              </div>
-            </section>
-          )}
-
-          {/* ── Type de tâche ── */}
-          {!sequenceMode && <section>
-            <span style={labelStyle}>Type de tâche</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {([
-                { k: 'publication' as const, title: 'Publication', desc: 'Reels / posts vidéo', icon: <IconVideo size={16} /> },
-                { k: 'story' as const,       title: 'Story',       desc: 'Image + lien par compte', icon: <IconLinkType size={16} /> },
-              ]).map(opt => {
-                const active = taskType === opt.k
-                return (
-                  <button
-                    key={opt.k}
-                    onClick={() => setTaskType(opt.k)}
-                    className="cursor-pointer"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left',
-                      padding: '12px 14px', borderRadius: 11,
-                      border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : HAIR}`,
-                      background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{
-                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: active ? GOLD : 'rgba(255,255,255,0.05)',
-                      color: active ? '#fff' : 'rgba(233,234,240,0.55)',
-                    }}>
-                      {opt.icon}
-                    </div>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.72)' }}>{opt.title}</p>
-                      <p style={{ margin: 0, fontSize: 10.5, color: active ? 'rgba(129,140,248,0.85)' : MUTED }}>{opt.desc}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </section>}
-
           {/* ── Nom ── */}
           <section>
             <span style={labelStyle}>
@@ -1468,6 +1368,146 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               </div>
             )}
           </section>
+
+          {/* ── Mode séquence toggle ── */}
+          <section>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={() => setSequenceMode(v => !v)}
+                className="cursor-pointer"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '11px 14px', borderRadius: 10, width: '100%', textAlign: 'left',
+                  border: `1px solid ${sequenceMode ? 'rgba(99,102,241,0.5)' : HAIR}`,
+                  background: sequenceMode ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.02)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <div style={{
+                  width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: sequenceMode ? GOLD : 'rgba(255,255,255,0.05)',
+                  color: sequenceMode ? '#fff' : 'rgba(233,234,240,0.55)',
+                }}>
+                  <IconRepeat size={16} />
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: sequenceMode ? IVORY : 'rgba(233,234,240,0.72)' }}>
+                    Mode séquence
+                  </p>
+                  <p style={{ margin: 0, fontSize: 10.5, color: sequenceMode ? 'rgba(129,140,248,0.85)' : MUTED }}>
+                    Enchaîner plusieurs actions (publication, story, warmup…)
+                  </p>
+                </div>
+                <div style={{
+                  marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0,
+                  background: sequenceMode ? GOLD : 'rgba(233,234,240,0.12)',
+                  position: 'relative', transition: 'background 0.2s',
+                }}>
+                  <div style={{
+                    position: 'absolute', top: 3, left: sequenceMode ? 18 : 3, width: 14, height: 14,
+                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  }} />
+                </div>
+              </button>
+            </div>
+          </section>
+
+          {/* ── Séquence builder ── */}
+          {sequenceMode && (
+            <section>
+              <span style={labelStyle}>Séquence d'actions</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {steps.map((step, idx) => (
+                  <StepEditor
+                    key={step.id}
+                    step={step}
+                    index={idx}
+                    total={steps.length}
+                    phones={phoneList}
+                    getPhoneLink={getPhoneLink}
+                    setPhoneLink={setPhoneLink}
+                    onChange={updated => setSteps(prev => prev.map((s, i) => i === idx ? updated : s))}
+                    onDelete={() => setSteps(prev => prev.filter((_, i) => i !== idx))}
+                    onMoveUp={() => {
+                      if (idx === 0) return
+                      setSteps(prev => {
+                        const next = [...prev]
+                        ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                        return next
+                      })
+                    }}
+                    onMoveDown={() => {
+                      if (idx === steps.length - 1) return
+                      setSteps(prev => {
+                        const next = [...prev]
+                        ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+                        return next
+                      })
+                    }}
+                    onShowBankPicker={field => setBankPickerTarget({ stepIdx: idx, field })}
+                  />
+                ))}
+                <button
+                  onClick={() => setSteps(prev => [
+                    ...prev,
+                    { id: Math.random().toString(36).slice(2), type: 'publication', videos: [], caption: '' },
+                  ])}
+                  className="cursor-pointer"
+                  style={{
+                    padding: '10px 16px', fontSize: 10.5, fontWeight: 700,
+                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                    background: 'transparent', color: GOLD,
+                    border: `1px dashed rgba(99,102,241,0.4)`, borderRadius: 9,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  + Ajouter une étape
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* ── Type de tâche ── */}
+          {!sequenceMode && <section>
+            <span style={labelStyle}>Type de tâche</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {([
+                { k: 'publication' as const, title: 'Publication', desc: 'Reels / posts vidéo', icon: <IconVideo size={16} /> },
+                { k: 'story' as const,       title: 'Story',       desc: 'Image + lien par compte', icon: <IconLinkType size={16} /> },
+              ]).map(opt => {
+                const active = taskType === opt.k
+                return (
+                  <button
+                    key={opt.k}
+                    onClick={() => setTaskType(opt.k)}
+                    className="cursor-pointer"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left',
+                      padding: '12px 14px', borderRadius: 11,
+                      border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : HAIR}`,
+                      background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: active ? GOLD : 'rgba(255,255,255,0.05)',
+                      color: active ? '#fff' : 'rgba(233,234,240,0.55)',
+                    }}>
+                      {opt.icon}
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.72)' }}>{opt.title}</p>
+                      <p style={{ margin: 0, fontSize: 10.5, color: active ? 'rgba(129,140,248,0.85)' : MUTED }}>{opt.desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>}
 
           {/* ── Liens par compte (Story) ── */}
           {isStory && !sequenceMode && phoneList.length > 0 && (
@@ -2087,6 +2127,51 @@ function StepEditor({
               }}
             >
               + Banque
+            </button>
+          </div>
+
+          {/* Mode de distribution (séquentiel / aléatoire) + usage unique */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10.5, color: MUTED }}>Distribution :</span>
+            {(['seq', 'random'] as const).map(m => {
+              const active = (step.mode ?? 'seq') === m
+              return (
+                <button
+                  key={m}
+                  onClick={() => onChange({ ...step, mode: m })}
+                  className="cursor-pointer"
+                  style={{
+                    padding: '4px 10px', fontSize: 10, fontWeight: 700,
+                    borderRadius: 6, border: `1px solid ${active ? 'rgba(99,102,241,0.5)' : HAIR}`,
+                    background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
+                    color: active ? '#818CF8' : MUTED,
+                  }}
+                >
+                  {m === 'seq' ? 'Séquentiel' : 'Aléatoire'}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => onChange({ ...step, auto_remove_videos: !step.auto_remove_videos })}
+              className="cursor-pointer"
+              title="Retire les médias utilisés de la pool après chaque exécution"
+              style={{
+                marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px', fontSize: 10, fontWeight: 700,
+                borderRadius: 6, border: `1px solid ${step.auto_remove_videos ? 'rgba(245,158,11,0.45)' : HAIR}`,
+                background: step.auto_remove_videos ? 'rgba(245,158,11,0.12)' : 'transparent',
+                color: step.auto_remove_videos ? '#F59E0B' : MUTED,
+              }}
+            >
+              <span style={{
+                width: 13, height: 13, borderRadius: 4, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: step.auto_remove_videos ? '#F59E0B' : 'transparent',
+                border: step.auto_remove_videos ? 'none' : '1px solid rgba(233,234,240,0.25)',
+              }}>
+                {step.auto_remove_videos && <IconCheck size={7} />}
+              </span>
+              Usage unique
             </button>
           </div>
         </div>
