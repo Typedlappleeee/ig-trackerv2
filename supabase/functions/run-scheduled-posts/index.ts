@@ -25,6 +25,23 @@ const GEELARK = 'https://openapi.geelark.com/open/v1'
 interface PhoneRec { geelark_id: string; phone_name: string; ig_username: string | null }
 interface VideoRec { token: string; title: string }
 
+type StepType = 'publication' | 'story' | 'warmup'
+interface TaskStep {
+  id: string
+  type: StepType
+  videos?: VideoRec[]
+  caption?: string
+  reels_trial?: boolean
+  auto_remove_videos?: boolean
+  images?: VideoRec[]
+  story_texts?: string[]
+  phone_links?: Record<string, string>
+  mode?: 'seq' | 'random'
+  delay_minutes?: number
+  delay_after_minutes?: number
+  warmup_minutes?: number
+}
+
 function sleep(ms: number) { return new Promise<void>(r => setTimeout(r, ms)) }
 
 async function gPost(bearer: string, path: string, body: unknown): Promise<Record<string, any>> {
@@ -240,22 +257,57 @@ Deno.serve(async (req) => {
 
       const recurHours = Number(task.recur_hours) || 24
       const nextRun = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
-      // Crée l'exécution (scheduled_post enfant)
+
+      // Tâches multi-étapes (steps) vs legacy (flat fields)
+      const stepsRaw = task.steps
+      const steps: TaskStep[] = Array.isArray(stepsRaw) ? stepsRaw
+        : (typeof stepsRaw === 'string' && stepsRaw ? JSON.parse(stepsRaw) : [])
+
+      // Déterminer si cette tâche peut s'exécuter entièrement côté serveur.
+      // Les steps story/warmup nécessitent l'automation UI côté client (ADB).
+      // Si tous les steps sont 'publication' (ou pas de steps et task_type='publication'),
+      // la tâche est entièrement serveur.
+      const hasClientOnlySteps = steps.length > 0
+        ? steps.some(s => s.type === 'story' || s.type === 'warmup')
+        : (task.task_type === 'story')
+
+      // Créer l'exécution (scheduled_post enfant)
+      // Pour les tâches mixtes (publication + story), on crée quand même un scheduled_post
+      // de type mass_posting pour les steps publication. Les steps story/warmup seront
+      // exécutés côté client quand l'app est ouverte.
+      const effectiveType = steps.length > 0
+        ? (steps.some(s => s.type === 'publication') ? 'mass_posting' : 'story')
+        : (task.task_type === 'story' ? 'story' : 'mass_posting')
+
+      // Pour les tâches qui nécessitent le client (story pure), marquer comme pending
+      // pour que le client les détecte et exécute. La logique d'exécution serveur
+      // (étape 2) va les ignorer (neq type='story').
       const { error: insErr } = await db.from('scheduled_posts').insert({
         user_id:         task.user_id,
         org_id:          task.org_id,
         created_by_name: task.name || 'Tâche auto',
-        type:            'mass_posting',
+        type:            effectiveType,
         status:          'pending',
         scheduled_at:    nowIso,
         phones:          task.phones,
-        videos:          task.videos,
-        caption:         task.caption,
+        videos:          steps.length > 0
+          ? (steps.find(s => s.type === 'publication')?.videos ?? task.videos ?? [])
+          : task.videos,
+        caption:         steps.length > 0
+          ? (steps.find(s => s.type === 'publication')?.caption ?? task.caption ?? '')
+          : task.caption,
         delay_minutes:   task.delay_minutes ?? 0,
         mode:            task.mode ?? 'seq',
         bearer_token:    '',
-        reels_trial:     task.reels_trial ?? false,
+        reels_trial:     steps.length > 0
+          ? !!(steps.find(s => s.type === 'publication')?.reels_trial)
+          : (task.reels_trial ?? false),
         task_id:         task.id,
+        // Embed the full steps array so the executor has all the data it needs.
+        // This is stored in the result field temporarily and read back by the executor.
+        // Using a custom column isn't possible without a migration, so we embed in videos
+        // only for non-steps tasks. Steps tasks store steps in result.steps.
+        result:          steps.length > 0 ? { steps, has_client_only: hasClientOnlySteps } : null,
       })
       // Reprogramme la prochaine occurrence + compteurs (best-effort)
       await db.from('recurring_tasks').update({
@@ -263,7 +315,7 @@ Deno.serve(async (req) => {
         last_run_at: nowIso,
         run_count:   (Number(task.run_count) || 0) + 1,
       }).eq('id', task.id)
-      summary[`task:${task.id}`] = insErr ? `task insert failed: ${insErr.message}` : `task queued (−${totalCost} crédits)`
+      summary[`task:${task.id}`] = insErr ? `task insert failed: ${insErr.message}` : `task queued (−${totalCost} crédits, type=${effectiveType})`
     }
   } catch (err) {
     summary['recurring_tasks'] = `error: ${err instanceof Error ? err.message : String(err)}`
