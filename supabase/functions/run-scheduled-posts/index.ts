@@ -11,8 +11,13 @@
 //   supabase secrets set CRON_SECRET=<un-uuid-aléatoire>
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { postStoryServer } from './geelark-story.ts'
 
 const GEELARK = 'https://openapi.geelark.com/open/v1'
+
+// Budget temps global d'une invocation (le cron a un timeout de 5 min).
+// On garde une marge pour ne pas être tué en plein milieu d'un post.
+const FN_BUDGET_MS = 230_000
 
 // Une exécution d'edge function est limitée en temps (~150-400 s). Stratégie :
 // - démarrage des téléphones + 30 s de boot                            → ok
@@ -96,6 +101,21 @@ async function resolveVideoToken(
   return glToken ?? token
 }
 
+// Story : on a juste besoin d'une URL https fraîche (pas d'upload GeeLark).
+// Re-signe l'URL Supabase si nécessaire pour qu'elle ne soit pas expirée.
+async function resolveImageUrl(
+  db: ReturnType<typeof createClient>,
+  image: VideoRec,
+): Promise<string> {
+  const t = image.token
+  const match = t.match(/\/storage\/v1\/object\/(?:sign|authenticated)\/content\/(.+?)(?:\?|$)/)
+  if (match) {
+    const { data } = await db.storage.from('content').createSignedUrl(match[1], 3600)
+    if (data?.signedUrl) return data.signedUrl
+  }
+  return t
+}
+
 Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -126,10 +146,10 @@ Deno.serve(async (req) => {
 
   const db = createClient(supabaseUrl, serviceKey)
   const nowIso = new Date().toISOString()
+  const fnStart = Date.now()
   const summary: Record<string, string> = {}
 
   // 1. Auto-heal : posts "running" trop vieux (> 30 min) → failed
-  // Les stories ont une fenêtre de 6 h (automation séquentielle avec délais).
   const cutoff      = new Date(Date.now() - 30 * 60_000).toISOString()
   const storyCutoff = new Date(Date.now() - 6 * 60 * 60_000).toISOString()
   await db.from('scheduled_posts')
@@ -137,11 +157,22 @@ Deno.serve(async (req) => {
     .eq('status', 'running')
     .neq('type', 'story')
     .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
+  // Stories : l'exécution serveur se fait par téléphone, sur plusieurs invocations.
+  // Un post "running" bloqué > 15 min (invocation crashée) est REMIS en file (pending)
+  // pour reprendre là où il s'était arrêté (la progression est dans result.story_progress).
+  // Seules les stories vraiment anciennes (> 6 h) sont marquées échouées.
+  const storyStale = new Date(Date.now() - 15 * 60_000).toISOString()
   await db.from('scheduled_posts')
-    .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
+    .update({ status: 'failed', error_msg: 'Interrompu — story abandonnée (timeout serveur)' })
     .eq('status', 'running')
     .eq('type', 'story')
     .or(`executed_at.lt.${storyCutoff},and(executed_at.is.null,created_at.lt.${storyCutoff})`)
+  await db.from('scheduled_posts')
+    .update({ status: 'pending' })
+    .eq('status', 'running')
+    .eq('type', 'story')
+    .lt('executed_at', storyStale)
+    .gte('executed_at', storyCutoff)
 
   // 1ter. Balayage d'arrêt des téléphones — éteint les téléphones laissés allumés
   // par des posts à délai (tâches RPA planifiées chez GeeLark) dont l'échéance
@@ -303,11 +334,12 @@ Deno.serve(async (req) => {
           ? !!(steps.find(s => s.type === 'publication')?.reels_trial)
           : (task.reels_trial ?? false),
         task_id:         task.id,
-        // Embed the full steps array so the executor has all the data it needs.
-        // This is stored in the result field temporarily and read back by the executor.
-        // Using a custom column isn't possible without a migration, so we embed in videos
-        // only for non-steps tasks. Steps tasks store steps in result.steps.
-        result:          steps.length > 0 ? { steps, has_client_only: hasClientOnlySteps } : null,
+        // result embarque les données dont l'exécuteur a besoin :
+        //  - tâches multi-étapes : { steps, has_client_only } (exécution côté client)
+        //  - tâche story plate    : { story_texts } (exécution serveur, par téléphone)
+        result:          steps.length > 0
+          ? { steps, has_client_only: hasClientOnlySteps }
+          : (task.task_type === 'story' ? { story_texts: task.story_texts ?? [] } : null),
       })
       // Reprogramme la prochaine occurrence + compteurs (best-effort)
       await db.from('recurring_tasks').update({
@@ -513,6 +545,144 @@ Deno.serve(async (req) => {
       }).eq('id', post.id)
       summary[post.id] = `failed: ${msg}`
     }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 8. STORIES — exécution serveur, par téléphone, sur plusieurs invocations.
+  //
+  // Une story prend ~2 min d'automation UI par téléphone (trop long pour traiter
+  // tous les comptes dans une seule invocation serverless). On traite donc les
+  // téléphones un par un dans le budget de temps de l'invocation, on enregistre
+  // la progression (result.story_progress.done), puis on remet le post en
+  // « pending » pour que le prochain tick du cron reprenne là où on s'est arrêté.
+  // Quand tous les téléphones sont traités → status 'done' + reprogrammation.
+  //
+  // On ne traite que les stories « plates » (pas de result.steps : celles-ci
+  // restent gérées côté client). filterUserId limite au client authentifié.
+  // ───────────────────────────────────────────────────────────────────────────
+  try {
+    let storyQuery = db.from('scheduled_posts')
+      .select('*')
+      .eq('status', 'pending')
+      .eq('type', 'story')
+      .lte('scheduled_at', nowIso)
+      .order('scheduled_at', { ascending: true })
+      .limit(3)
+    if (filterUserId) storyQuery = storyQuery.eq('user_id', filterUserId)
+    const { data: dueStories } = await storyQuery
+
+    for (const post of dueStories ?? []) {
+      if (Date.now() - fnStart > FN_BUDGET_MS - 130_000) break  // plus assez de temps pour un téléphone
+
+      // Les stories multi-étapes (result.steps) restent côté client
+      const existingResult = (typeof post.result === 'string'
+        ? JSON.parse(post.result) : post.result) as Record<string, any> | null
+      if (existingResult?.steps) { summary[`story:${post.id}`] = 'skipped (steps → client)'; continue }
+
+      // Claim atomique
+      const { data: claimed } = await db.from('scheduled_posts')
+        .update({ status: 'running', executed_at: new Date().toISOString() })
+        .eq('id', post.id).eq('status', 'pending')
+        .select('id')
+      if (!claimed?.length) { summary[`story:${post.id}`] = 'skipped (claimed elsewhere)'; continue }
+
+      const progress = (existingResult?.story_progress ?? {}) as { done?: string[]; logs?: string[] }
+      const doneSet = new Set<string>(progress.done ?? [])
+      const logs: string[] = progress.logs ?? []
+      const log = (m: string) => logs.push(m)
+
+      try {
+        // Bearer
+        let bearer = ''
+        if (post.org_id) {
+          const { data } = await db.from('org_config').select('bearer_token').eq('org_id', post.org_id).maybeSingle()
+          bearer = data?.bearer_token ?? ''
+        }
+        if (!bearer) {
+          const { data } = await db.from('app_config').select('bearer_token').eq('user_id', post.user_id).maybeSingle()
+          bearer = data?.bearer_token ?? ''
+        }
+        if (!bearer) bearer = post.bearer_token || ''
+        if (!bearer) throw new Error('Aucun token GéeLark configuré')
+
+        const phones: Array<PhoneRec & { link?: string }> =
+          typeof post.phones === 'string' ? JSON.parse(post.phones) : post.phones
+        const images: VideoRec[] = typeof post.videos === 'string' ? JSON.parse(post.videos) : (post.videos ?? [])
+        const storyTexts: string[] = Array.isArray(existingResult?.story_texts) ? existingResult!.story_texts : []
+        const mode: string = post.mode ?? 'seq'
+
+        if (!images.length) throw new Error('Aucune image dans la story')
+
+        // Traite UN téléphone par invocation : le boot du téléphone (~30-60s) +
+        // l'automation story (~2 min) tiennent dans le budget serverless pour un
+        // seul compte. Les autres comptes sont repris aux ticks suivants du cron.
+        let processedThisRun = 0
+        for (let i = 0; i < phones.length; i++) {
+          const phone = phones[i]
+          if (doneSet.has(phone.geelark_id)) continue
+          if (processedThisRun >= 1) break  // un seul téléphone par invocation
+
+          const name = phone.ig_username ?? phone.phone_name
+          const link = (phone.link ?? '').trim()
+          if (!link) { log(`❌ ${name} : aucun lien configuré`); doneSet.add(phone.geelark_id); continue }
+
+          const imgIdx = mode === 'random' ? Math.floor(Math.random() * images.length) : i % images.length
+          const imageUrl = await resolveImageUrl(db, images[imgIdx])
+          const linkText = storyTexts.length
+            ? (mode === 'random' ? storyTexts[Math.floor(Math.random() * storyTexts.length)] : storyTexts[i % storyTexts.length])
+            : undefined
+
+          log(`▶ [serveur] Story ${name}…`)
+          try {
+            const res = await postStoryServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText }, m => log(`  ${name}: ${m}`))
+            if (res.ok) log(`✅ ${name} — story publiée`)
+            else log(`❌ ${name} : ${res.error ?? 'échec'}`)
+          } catch (e) {
+            log(`❌ ${name} : ${e instanceof Error ? e.message : String(e)}`)
+          } finally {
+            await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] }).catch(() => {})
+          }
+          doneSet.add(phone.geelark_id)
+          processedThisRun++
+        }
+
+        const allDone = phones.every(p => doneSet.has(p.geelark_id))
+        if (allDone) {
+          await db.from('scheduled_posts').update({
+            status: 'done', error_msg: null,
+            result: { logs, story_progress: { done: [...doneSet], logs } },
+          }).eq('id', post.id)
+
+          // Reprogrammation récurrente (si applicable)
+          const recurHours: number | null = (post as any).recur_hours ?? null
+          if (recurHours && recurHours > 0) {
+            const nextAt = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
+            await db.from('scheduled_posts').insert({
+              user_id: post.user_id, org_id: post.org_id, created_by_name: post.created_by_name,
+              type: 'story', status: 'pending', scheduled_at: nextAt,
+              phones: post.phones, videos: post.videos, caption: post.caption,
+              delay_minutes: post.delay_minutes, mode: post.mode, bearer_token: '',
+              recur_hours: recurHours, result: { story_texts: storyTexts },
+            })
+          }
+          summary[`story:${post.id}`] = `done (${doneSet.size}/${phones.length} téléphones)`
+        } else {
+          // Reste des téléphones → remet en pending pour le prochain tick
+          await db.from('scheduled_posts').update({
+            status: 'pending',
+            result: { logs, story_progress: { done: [...doneSet], logs }, story_texts: storyTexts },
+          }).eq('id', post.id)
+          summary[`story:${post.id}`] = `in progress (${doneSet.size}/${phones.length}, +${processedThisRun} ce tick)`
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        logs.push(`❌ Erreur : ${msg}`)
+        await db.from('scheduled_posts').update({ status: 'failed', result: { logs }, error_msg: msg }).eq('id', post.id)
+        summary[`story:${post.id}`] = `failed: ${msg}`
+      }
+    }
+  } catch (err) {
+    summary['stories'] = `error: ${err instanceof Error ? err.message : String(err)}`
   }
 
   return new Response(JSON.stringify({ processed: Object.keys(summary).length, summary }), {
