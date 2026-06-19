@@ -313,7 +313,7 @@ Deno.serve(async (req) => {
       // Pour les tâches qui nécessitent le client (story pure), marquer comme pending
       // pour que le client les détecte et exécute. La logique d'exécution serveur
       // (étape 2) va les ignorer (neq type='story').
-      const { error: insErr } = await db.from('scheduled_posts').insert({
+      const postPayload: Record<string, unknown> = {
         user_id:         task.user_id,
         org_id:          task.org_id,
         created_by_name: task.name || 'Tâche auto',
@@ -334,13 +334,16 @@ Deno.serve(async (req) => {
           ? !!(steps.find(s => s.type === 'publication')?.reels_trial)
           : (task.reels_trial ?? false),
         task_id:         task.id,
-        // result embarque les données dont l'exécuteur a besoin :
-        //  - tâches multi-étapes : { steps, has_client_only } (exécution côté client)
-        //  - tâche story plate    : { story_texts } (exécution serveur, par téléphone)
         result:          steps.length > 0
           ? { steps, has_client_only: hasClientOnlySteps }
           : (task.task_type === 'story' ? { story_texts: task.story_texts ?? [] } : null),
-      })
+      }
+      let { error: insErr } = await db.from('scheduled_posts').insert(postPayload)
+      // Retry without optional columns that might not exist yet (e.g. task_id if migration not applied)
+      if (insErr && /task_id|column|schema|cache/i.test(insErr.message)) {
+        const { task_id: _tid, ...fallbackPayload } = postPayload
+        ;({ error: insErr } = await db.from('scheduled_posts').insert(fallbackPayload))
+      }
       // Reprogramme la prochaine occurrence + compteurs (best-effort)
       await db.from('recurring_tasks').update({
         next_run_at: nextRun,
