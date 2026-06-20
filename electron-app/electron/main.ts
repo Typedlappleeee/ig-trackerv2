@@ -1615,14 +1615,24 @@ ipcMain.handle('groq-request', async (_event, opts: {
 
 // ── IPC: Groq Whisper audio transcription (multipart, bypasses renderer CORS) ─
 ipcMain.handle('groq-transcription', async (_event, opts: {
-  apiKey:    string
-  audioBytes: ArrayBuffer
-  filename:  string
-  language?: string
+  apiKey:     string
+  audioBytes?: ArrayBuffer
+  videoUrl?:  string    // bank URL — main process downloads it (avoids renderer CORS)
+  filename:   string
+  language?:  string
 }) => {
   try {
+    let buf: Buffer
+    if (opts.videoUrl) {
+      const res = await net.fetch(opts.videoUrl)
+      if (!res.ok) return { ok: false, error: `Téléchargement vidéo échoué (${res.status})` }
+      buf = Buffer.from(await res.arrayBuffer())
+    } else if (opts.audioBytes) {
+      buf = Buffer.from(opts.audioBytes)
+    } else {
+      return { ok: false, error: 'Aucune source audio (audioBytes ou videoUrl requis)' }
+    }
     const boundary = `----GBoundary${Date.now()}`
-    const buf = Buffer.from(opts.audioBytes)
     const ext = opts.filename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
     const mime = ext === 'mp3' ? 'audio/mpeg' : ext === 'webm' ? 'audio/webm' : 'video/mp4'
 

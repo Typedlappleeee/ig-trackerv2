@@ -349,12 +349,15 @@ export function Mixer({ user }: MixerProps) {
         })
         if (!res.ok || !res.outputPath) throw new Error(res.error ?? 'Échec ffmpeg')
 
-        // Make the output URL playable in the renderer via localvideo://
-        const localUrl = (() => {
-          let n = res.outputPath.replace(/\\/g, '/')
-          if (!n.startsWith('/')) n = '/' + n
-          return 'localvideo://' + n.split('/').map(encodeURIComponent).join('/')
-        })()
+        // Web: outputPath is a Supabase URL → use directly.
+        // Electron: outputPath is a local path → wrap in localvideo://.
+        const localUrl = res.outputPath.startsWith('http')
+          ? res.outputPath
+          : (() => {
+              let n = res.outputPath.replace(/\\/g, '/')
+              if (!n.startsWith('/')) n = '/' + n
+              return 'localvideo://' + n.split('/').map(encodeURIComponent).join('/')
+            })()
 
         updateJob(job.id, { status: 'done', outputUrl: localUrl, localPath: res.outputPath })
         supabase.from('caption_bank').update({ used_count: (job.caption.used_count ?? 0) + 1 }).eq('id', job.caption.id).then(() => {})

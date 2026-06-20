@@ -363,6 +363,28 @@ export function buildWebAPI() {
       })
     },
 
+    // ── Mixer — burn caption text onto video (web: Vercel /api/mix-overlay) ──────
+    async runFfmpegMixOverlay(opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) {
+      try {
+        const r = await fetch('/api/mix-overlay', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            videoUrl:  opts.sourcePath,
+            caption:   opts.caption,
+            position:  opts.position,
+            fontSize:  opts.fontSize,
+            fontColor: opts.fontColor,
+          }),
+        })
+        const data = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }))
+        if (!data.ok) return { ok: false as const, error: data.error ?? 'Erreur serveur mix-overlay' }
+        return { ok: true as const, outputPath: (data.url ?? data.storagePath) as string }
+      } catch (err) {
+        return { ok: false as const, error: String(err) }
+      }
+    },
+
     // ── Groq Whisper audio transcription (server-side proxy — avoids CORS) ──────
     async groqTranscription(opts: {
       apiKey: string

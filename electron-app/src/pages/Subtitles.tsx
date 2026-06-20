@@ -156,8 +156,9 @@ export function Subtitles({ user }: SubtitlesProps) {
       const filename = videoName || 'video.mp4'
       let transcriptRes: { ok: boolean; data?: unknown; error?: string }
 
-      if (isBankUrl && videoSrc && isWeb) {
-        // Web + bank URL: server fetches the video directly — 0 bytes from client
+      if (isBankUrl && videoSrc) {
+        // Bank URL (web or Electron): let the proxy/IPC download it server-side.
+        // Avoids sending large video bytes over the network from the client.
         transcriptRes = await (window.electronAPI as any).groqTranscription({
           apiKey:   groqKey,
           videoUrl: videoSrc,
@@ -165,13 +166,14 @@ export function Subtitles({ user }: SubtitlesProps) {
           language: lang !== 'auto' ? lang : undefined,
         })
       } else {
-        // Local file or Electron: read bytes first
+        // Local file: read bytes then send
         let audioBytes: ArrayBuffer
         if (fileRef.current) {
           audioBytes = await fileRef.current.arrayBuffer()
         } else if (videoSrc) {
           setStatus('Lecture de la vidéo…')
-          if (window.electronAPI && !isWeb) {
+          // readFileBytes only works for local paths, not for URLs
+          if (window.electronAPI && !isWeb && !videoSrc.startsWith('http')) {
             const r = await window.electronAPI.readFileBytes(videoSrc)
             if (!r.ok || !r.bytes) throw new Error((r as any).error ?? 'Lecture échouée')
             audioBytes = r.bytes as ArrayBuffer
