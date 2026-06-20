@@ -156,9 +156,20 @@ export function Subtitles({ user }: SubtitlesProps) {
       const filename = videoName || 'video.mp4'
       let transcriptRes: { ok: boolean; data?: unknown; error?: string }
 
+      // ── Diagnostic logs (remove once 413 is resolved) ───────────────────────
+      console.log('[Subtitles] generate() —', {
+        isBankUrl,
+        videoSrc: videoSrc?.slice(0, 120),
+        fileRef: fileRef.current ? `File(${fileRef.current.name}, ${(fileRef.current.size / 1024 / 1024).toFixed(1)}MB)` : null,
+        isWeb,
+        hasElectronAPI: !!window.electronAPI,
+      })
+
       if (isBankUrl && videoSrc) {
         // Bank URL (web or Electron): let the proxy/IPC download it server-side.
         // Avoids sending large video bytes over the network from the client.
+        console.log('[Subtitles] → chemin videoUrl (bank URL, aucun octet envoyé côté client)')
+        setStatus('Transcription via URL banque…')
         transcriptRes = await (window.electronAPI as any).groqTranscription({
           apiKey:   groqKey,
           videoUrl: videoSrc,
@@ -167,9 +178,11 @@ export function Subtitles({ user }: SubtitlesProps) {
         })
       } else {
         // Local file: read bytes then send
+        console.log('[Subtitles] → chemin audioBytes (fichier local ou blob URL)')
         let audioBytes: ArrayBuffer
         if (fileRef.current) {
           audioBytes = await fileRef.current.arrayBuffer()
+          console.log('[Subtitles] audioBytes depuis fileRef.current:', (audioBytes.byteLength / 1024 / 1024).toFixed(1), 'MB')
         } else if (videoSrc) {
           setStatus('Lecture de la vidéo…')
           // readFileBytes only works for local paths, not for URLs
