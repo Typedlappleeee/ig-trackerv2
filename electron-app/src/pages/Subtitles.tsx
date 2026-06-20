@@ -156,8 +156,20 @@ export function Subtitles({ user }: SubtitlesProps) {
       const filename = videoName || 'video.mp4'
       let transcriptRes: { ok: boolean; data?: unknown; error?: string }
 
-      if (isBankUrl && videoSrc && isWeb) {
-        // Web + bank URL: server fetches the video directly — 0 bytes from client
+      // ── Diagnostic logs (remove once 413 is resolved) ───────────────────────
+      console.log('[Subtitles] generate() —', {
+        isBankUrl,
+        videoSrc: videoSrc?.slice(0, 120),
+        fileRef: fileRef.current ? `File(${fileRef.current.name}, ${(fileRef.current.size / 1024 / 1024).toFixed(1)}MB)` : null,
+        isWeb,
+        hasElectronAPI: !!window.electronAPI,
+      })
+
+      if (isBankUrl && videoSrc) {
+        // Bank URL (web or Electron): let the proxy/IPC download it server-side.
+        // Avoids sending large video bytes over the network from the client.
+        console.log('[Subtitles] → chemin videoUrl (bank URL, aucun octet envoyé côté client)')
+        setStatus('Transcription via URL banque…')
         transcriptRes = await (window.electronAPI as any).groqTranscription({
           apiKey:   groqKey,
           videoUrl: videoSrc,
@@ -165,13 +177,16 @@ export function Subtitles({ user }: SubtitlesProps) {
           language: lang !== 'auto' ? lang : undefined,
         })
       } else {
-        // Local file or Electron: read bytes first
+        // Local file: read bytes then send
+        console.log('[Subtitles] → chemin audioBytes (fichier local ou blob URL)')
         let audioBytes: ArrayBuffer
         if (fileRef.current) {
           audioBytes = await fileRef.current.arrayBuffer()
+          console.log('[Subtitles] audioBytes depuis fileRef.current:', (audioBytes.byteLength / 1024 / 1024).toFixed(1), 'MB')
         } else if (videoSrc) {
           setStatus('Lecture de la vidéo…')
-          if (window.electronAPI && !isWeb) {
+          // readFileBytes only works for local paths, not for URLs
+          if (window.electronAPI && !isWeb && !videoSrc.startsWith('http')) {
             const r = await window.electronAPI.readFileBytes(videoSrc)
             if (!r.ok || !r.bytes) throw new Error((r as any).error ?? 'Lecture échouée')
             audioBytes = r.bytes as ArrayBuffer

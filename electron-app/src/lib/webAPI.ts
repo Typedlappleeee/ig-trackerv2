@@ -363,6 +363,28 @@ export function buildWebAPI() {
       })
     },
 
+    // ── Mixer — burn caption text onto video (web: Vercel /api/mix-overlay) ──────
+    async runFfmpegMixOverlay(opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) {
+      try {
+        const r = await fetch('/api/mix-overlay', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            videoUrl:  opts.sourcePath,
+            caption:   opts.caption,
+            position:  opts.position,
+            fontSize:  opts.fontSize,
+            fontColor: opts.fontColor,
+          }),
+        })
+        const data = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }))
+        if (!data.ok) return { ok: false as const, error: data.error ?? 'Erreur serveur mix-overlay' }
+        return { ok: true as const, outputPath: (data.url ?? data.storagePath) as string }
+      } catch (err) {
+        return { ok: false as const, error: String(err) }
+      }
+    },
+
     // ── Groq Whisper audio transcription (server-side proxy — avoids CORS) ──────
     async groqTranscription(opts: {
       apiKey: string
@@ -375,9 +397,11 @@ export function buildWebAPI() {
         let body: Record<string, unknown>
         if (opts.videoUrl) {
           // URL path: server fetches video directly — no bytes sent from client
+          console.log('[webAPI] groqTranscription → videoUrl path:', opts.videoUrl.slice(0, 100))
           body = { apiKey: opts.apiKey, videoUrl: opts.videoUrl, filename: opts.filename, language: opts.language }
         } else if (opts.audioBytes) {
           // Local file: encode as base64 (limited to ~18MB raw / ~25MB base64)
+          console.log('[webAPI] groqTranscription → audioBytes path:', (opts.audioBytes.byteLength / 1024 / 1024).toFixed(1), 'MB')
           const u8 = new Uint8Array(opts.audioBytes)
           let bin = ''
           for (let i = 0; i < u8.length; i += 8192)
@@ -387,11 +411,19 @@ export function buildWebAPI() {
           return { ok: false, error: 'Aucune source audio' }
         }
 
+        const bodyStr = JSON.stringify(body)
+        console.log('[webAPI] groqTranscription → POST /api/groq, body size:', (bodyStr.length / 1024).toFixed(1), 'KB')
         const r = await fetch('/api/groq', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(body),
+          body:    bodyStr,
         })
+        console.log('[webAPI] groqTranscription → réponse HTTP', r.status, r.ok ? 'OK' : 'ERROR')
+        if (!r.ok) {
+          const txt = await r.text().catch(() => '')
+          console.error('[webAPI] groqTranscription → corps réponse erreur:', txt.slice(0, 500))
+          return { ok: false, error: `Proxy HTTP ${r.status}` }
+        }
         try { return await r.json() } catch { return { ok: false, error: `Proxy HTTP ${r.status}` } }
       } catch (err) {
         return { ok: false, error: String(err) }

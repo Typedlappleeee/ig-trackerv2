@@ -30,7 +30,7 @@
  * Migration complète : supabase/migrations/20260618_recurring_tasks_dashboard.sql
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -73,6 +73,7 @@ interface RecurringTask {
   next_run_at: string
   reels_trial: boolean
   auto_remove_videos: boolean
+  steps: TaskStep[]
   created_at: string
   last_run_at?: string | null
   run_count?: number | null
@@ -91,6 +92,28 @@ interface TaskRun {
   caption: string
   result: { logs: string[] } | null
   error_msg: string | null
+}
+
+type StepType = 'publication' | 'story' | 'warmup'
+
+interface TaskStep {
+  id: string
+  type: StepType
+  // Publication-specific
+  videos?: TaskVideo[]
+  caption?: string
+  reels_trial?: boolean
+  auto_remove_videos?: boolean
+  // Story-specific
+  images?: TaskVideo[]
+  story_texts?: string[]
+  phone_links?: Record<string, string>
+  // Warmup-specific
+  warmup_minutes?: number
+  // Common
+  mode?: 'seq' | 'random'
+  delay_minutes?: number
+  delay_after_minutes?: number
 }
 
 interface SelVideo {
@@ -222,6 +245,242 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     await saveResult('failed', 'aucun téléphone')
     return
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEPS MODE : enchaîner plusieurs actions (publication, story, warmup)
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (task.steps && task.steps.length > 0) {
+    try {
+      // Clone des steps pour appliquer l'usage unique (retrait des médias utilisés)
+      const updatedSteps: TaskStep[] = task.steps.map(s => ({ ...s }))
+      let stepsChanged = false
+
+      for (let si = 0; si < task.steps.length; si++) {
+        const step = task.steps[si]
+        log(`▶ Étape ${si + 1}/${task.steps.length} : ${step.type}`)
+
+        if (step.type === 'warmup') {
+          const wMin = step.warmup_minutes ?? 5
+          log(`⏳ Warmup ${wMin} min — bientôt disponible`)
+          await new Promise(r => setTimeout(r, wMin * 60 * 1000))
+        } else if (step.type === 'story') {
+          const stepImages = step.images ?? []
+          const stepTexts = Array.isArray(step.story_texts) ? step.story_texts.filter(Boolean) : []
+          const stepMode = step.mode ?? task.mode ?? 'seq'
+          const phoneLinks = step.phone_links ?? {}
+
+          if (!stepImages.length) {
+            log(`❌ Étape ${si + 1} : aucune image`)
+          } else {
+            const imageUrls: (string | null)[] = []
+            const validImageIdx: number[] = []  // mapping position dans validImages → index dans stepImages
+            for (let i = 0; i < stepImages.length; i++) {
+              try {
+                const u = await resolveTaskMediaUrl(stepImages[i])
+                imageUrls.push(u)
+              } catch (err) {
+                log(`❌ Image échouée (${stepImages[i].title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
+                imageUrls.push(null)
+              }
+            }
+            imageUrls.forEach((u, idx) => { if (u) validImageIdx.push(idx) })
+            const validImages = imageUrls.filter((u): u is string => Boolean(u))
+            const usedImageOriginalIdx = new Set<number>()
+            if (!validImages.length) {
+              log(`❌ Étape ${si + 1} : aucune image exploitable`)
+            } else {
+              for (let i = 0; i < task.phones.length; i++) {
+                const phone = task.phones[i]
+                const name = phone.ig_username ?? phone.phone_name
+                const link = (phoneLinks[phone.id] ?? phone.link ?? '').trim()
+                if (!link) {
+                  log(`❌ ${name} : aucun lien configuré`)
+                  continue
+                }
+                const imgPick = stepMode === 'random'
+                  ? Math.floor(Math.random() * validImages.length)
+                  : i % validImages.length
+                const imageUrl = validImages[imgPick]
+                usedImageOriginalIdx.add(validImageIdx[imgPick])
+                const linkText = stepTexts.length
+                  ? (stepMode === 'random' ? stepTexts[Math.floor(Math.random() * stepTexts.length)] : stepTexts[i % stepTexts.length])
+                  : undefined
+                log(`▶ Story ${name}…`)
+                try {
+                  const res = await postInstagramStory(
+                    bearer, phone.geelark_id,
+                    { imageUrl, linkUrl: link, linkText },
+                    m => log(`  ${name}: ${m}`),
+                  )
+                  if (res.ok) log(`✅ ${name} — story publiée`)
+                  else log(`❌ ${name} : ${res.error ?? 'échec'}`)
+                } catch (err) {
+                  log(`❌ ${name} : ${err instanceof Error ? err.message : String(err)}`)
+                } finally {
+                  try { await stopPhone(bearer, phone.geelark_id) } catch { /* ignore */ }
+                }
+              }
+              // Usage unique : retire les images utilisées de la pool de l'étape
+              if (step.auto_remove_videos && usedImageOriginalIdx.size > 0) {
+                const remaining = stepImages.filter((_, idx) => !usedImageOriginalIdx.has(idx))
+                updatedSteps[si] = { ...updatedSteps[si], images: remaining }
+                stepsChanged = true
+                log(`🗑 ${stepImages.length - remaining.length} image(s) retirée(s) (${remaining.length} restante(s)).`)
+              }
+            }
+          }
+        } else {
+          // publication step
+          const stepVideos = step.videos ?? []
+          const stepCaption = step.caption ?? ''
+          const stepMode = step.mode ?? task.mode ?? 'seq'
+          const stepDelay = step.delay_minutes ?? task.delay_minutes ?? 0
+          const stepReelsTrial = step.reels_trial ?? task.reels_trial ?? false
+
+          if (!stepVideos.length) {
+            log(`❌ Étape ${si + 1} : aucune vidéo`)
+          } else {
+            log(`▶ Upload de ${stepVideos.length} vidéo(s) vers GéeLark…`)
+            const tokenByIndex: (string | null)[] = []
+            const validVideoIdx: number[] = []  // mapping position dans validTokens → index dans stepVideos
+            for (let i = 0; i < stepVideos.length; i++) {
+              const v = stepVideos[i]
+              try {
+                const tok = await resolveTaskVideoToken(bearer, v)
+                tokenByIndex.push(tok)
+                log(`✅ Vidéo ${i + 1}/${stepVideos.length} prête : ${v.title || tok.slice(0, 30)}`)
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err)
+                log(`❌ Vidéo échouée (${v.title || '?'}): ${msg}`)
+                tokenByIndex.push(null)
+              }
+            }
+            tokenByIndex.forEach((t, idx) => { if (t) validVideoIdx.push(idx) })
+            const validTokens = tokenByIndex.filter((t): t is string => Boolean(t))
+            const usedVideoOriginalIdx = new Set<number>()
+            if (!validTokens.length) {
+              log(`❌ Étape ${si + 1} : upload de toutes les vidéos a échoué`)
+            } else {
+              const phoneIds = task.phones.map(p => p.geelark_id)
+              log(`▶ Démarrage de ${phoneIds.length} téléphone(s)…`)
+              const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
+              const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
+              log(`  ${started} démarré(s)`)
+              if (started > 0) {
+                log('⏳ Attente 30s (boot)…')
+                await new Promise(r => setTimeout(r, 30_000))
+                const baseTs = Math.floor(Date.now() / 1000)
+                const taskIdByGid: Record<string, string> = {}
+                const rpaIds: string[] = []
+                for (let i = 0; i < task.phones.length; i++) {
+                  const phone = task.phones[i]
+                  const name = phone.ig_username ?? phone.phone_name
+                  const vidIdx = stepMode === 'random'
+                    ? Math.floor(Math.random() * validTokens.length)
+                    : i % validTokens.length
+                  usedVideoOriginalIdx.add(validVideoIdx[vidIdx])
+                  const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
+                    id: phone.geelark_id,
+                    scheduleAt: baseTs + i * stepDelay * 60,
+                    description: stepCaption,
+                    video: [validTokens[vidIdx]],
+                    ...(stepReelsTrial ? { shareType: 2 } : {}),
+                  })
+                  if (res['code'] === 0) {
+                    const d = res['data']
+                    let tid: string | undefined
+                    if (typeof d === 'string' && d) { tid = d }
+                    else if (d && typeof d === 'object') {
+                      const dObj = d as Record<string, unknown>
+                      const raw = dObj['id'] ?? dObj['taskId'] ?? dObj['task_id']
+                      if (raw != null) tid = String(raw)
+                    }
+                    if (tid) { rpaIds.push(tid); taskIdByGid[phone.geelark_id] = tid }
+                    log(`✅ Tâche créée : ${name}`)
+                  } else {
+                    log(`❌ ${name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
+                  }
+                }
+                if (rpaIds.length > 0) {
+                  log(`⏳ Suivi de ${rpaIds.length} tâche(s)…`)
+                  const pending = new Set(rpaIds)
+                  const stopped = new Set<string>()
+                  const deadline = Date.now() + 8 * 60 * 1000
+                  const gidByTid = new Map<string, string>()
+                  for (const [gid, tid] of Object.entries(taskIdByGid)) gidByTid.set(tid, gid)
+                  const STATUS: Record<number, string> = { 1: 'Pending', 2: 'En cours', 3: '✅ Done', 4: '❌ Failed', 7: 'Annulé' }
+                  while (pending.size > 0 && Date.now() < deadline) {
+                    await new Promise(r => setTimeout(r, 10_000))
+                    let qRes: Record<string, unknown>
+                    try { qRes = await glPost(bearer, '/task/query', { ids: [...pending] }) } catch { continue }
+                    const d = (qRes['data'] as Record<string, unknown>) ?? qRes
+                    const items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
+                    for (const item of (Array.isArray(items) ? items : [])) {
+                      const tid = (item['id'] ?? item['taskId']) as string
+                      const status = Number(item['status'])
+                      if ([3, 4, 7].includes(status)) {
+                        pending.delete(tid)
+                        const gid = gidByTid.get(tid)
+                        const phone = task.phones.find(p => p.geelark_id === gid)
+                        const name = phone?.ig_username ?? phone?.phone_name ?? tid
+                        const fail = item['failDesc'] ? ` — ${item['failDesc']}` : ''
+                        log(`${STATUS[status] ?? status} ${name}${fail}`)
+                        if (gid && !stopped.has(gid)) {
+                          stopped.add(gid)
+                          await glPost(bearer, '/phone/stop', { ids: [gid] }).catch(() => {})
+                        }
+                      }
+                    }
+                  }
+                  const remaining = phoneIds.filter(id => !stopped.has(id))
+                  if (remaining.length > 0) {
+                    await glPost(bearer, '/phone/stop', { ids: remaining }).catch(() => {})
+                  }
+                } else {
+                  await new Promise(r => setTimeout(r, 5 * 60 * 1000))
+                  await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
+                }
+              }
+            }
+            // Usage unique : retire les vidéos utilisées de la pool de l'étape
+            if (step.auto_remove_videos && usedVideoOriginalIdx.size > 0) {
+              const remaining = stepVideos.filter((_, idx) => !usedVideoOriginalIdx.has(idx))
+              updatedSteps[si] = { ...updatedSteps[si], videos: remaining }
+              stepsChanged = true
+              log(`🗑 ${stepVideos.length - remaining.length} vidéo(s) retirée(s) (${remaining.length} restante(s)).`)
+            }
+          }
+        }
+
+        // Wait between steps
+        if (step.delay_after_minutes && si < task.steps.length - 1) {
+          log(`⏳ Attente ${step.delay_after_minutes} min avant l'étape suivante…`)
+          await new Promise(r => setTimeout(r, step.delay_after_minutes! * 60 * 1000))
+        }
+      }
+
+      // Persiste les steps modifiés (usage unique) — met en pause si une pool est vidée
+      if (stepsChanged) {
+        const anyEmptied = updatedSteps.some(s =>
+          (s.type === 'publication' && (s.videos?.length ?? 0) === 0) ||
+          (s.type === 'story' && (s.images?.length ?? 0) === 0)
+        )
+        await supabase.from('recurring_tasks')
+          .update({ steps: updatedSteps, ...(anyEmptied ? { status: 'paused' } : {}) })
+          .eq('id', task.id)
+        if (anyEmptied) log('⏸ Pool d\'une étape vidée — tâche mise en pause.')
+      }
+
+      log(`⏰ Prochain post dans ${recurHours}h`)
+      await saveResult('done')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      log(`❌ Erreur inattendue (steps): ${msg}`)
+      await saveResult('failed', msg)
+    }
+    return
+  }
+
   if (!task.videos.length) {
     log(task.task_type === 'story' ? '❌ Aucune image dans la tâche' : '❌ Aucune vidéo dans la tâche')
     await saveResult('failed', task.task_type === 'story' ? 'aucune image' : 'aucune vidéo')
@@ -728,6 +987,12 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   const [submitting, setSubmitting]   = useState(false)
   const [progress, setProgress]       = useState('')
   const [error, setError]             = useState<string | null>(null)
+  const [sequenceMode, setSequenceMode] = useState(editTask ? (editTask.steps?.length ?? 0) > 0 : false)
+  const [steps, setSteps]             = useState<TaskStep[]>(() => {
+    if (editTask?.steps?.length) return editTask.steps
+    return []
+  })
+  const [bankPickerTarget, setBankPickerTarget] = useState<{ stepIdx: number; field: 'videos' | 'images' } | null>(null)
 
   const recurHours = recurUnit === 'jours' ? recurValue * 24
     : recurUnit === 'minutes' ? recurValue / 60
@@ -788,8 +1053,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
 
   const isEdit = !!editTask
   // Le nom est optionnel — un nom est généré automatiquement s'il est vide.
-  const canSubmit = !submitting && phoneList.length > 0 && videos.length > 0
-    && (!isStory || phonesWithLink === phoneList.length)
+  const canSubmit = !submitting && phoneList.length > 0
+    && (sequenceMode
+      ? steps.length > 0 && steps.some(s => s.type === 'warmup' || (s.type === 'story' ? (s.images ?? []).length > 0 : (s.videos ?? []).length > 0))
+      : videos.length > 0 && (!isStory || phonesWithLink === phoneList.length))
 
   const labelStyle: React.CSSProperties = {
     fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
@@ -835,21 +1102,22 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         org_id:        currentOrg?.id ?? null,
         name:          name.trim() || autoName,
         status:        (editTask?.status ?? 'active') as 'active' | 'paused',
-        task_type:     taskType,
+        task_type:     sequenceMode ? 'publication' : taskType,
         phones:        phoneList.map(p => ({
           id: p.id, geelark_id: p.geelark_id,
           phone_name: p.phone_name, ig_username: p.ig_username ?? null,
-          ...(isStory ? { link: getPhoneLink(p.id).trim() } : {}),
+          ...(isStory && !sequenceMode ? { link: getPhoneLink(p.id).trim() } : {}),
         })),
-        videos:        uploadedVideos,
-        caption:       caption.trim(),
-        story_texts:   isStory ? storyTexts.filter(Boolean) : [],
+        videos:        sequenceMode ? [] : uploadedVideos,
+        caption:       sequenceMode ? '' : caption.trim(),
+        story_texts:   isStory && !sequenceMode ? storyTexts.filter(Boolean) : [],
         mode,
         delay_minutes: delayMin,
         recur_hours:        recurHours,
         next_run_at:        nextRunDate.toISOString(),
-        reels_trial:        isStory ? false : reelsTrial,
+        reels_trial:        isStory && !sequenceMode ? false : reelsTrial,
         auto_remove_videos: autoRemove,
+        steps:         sequenceMode ? steps : [],
       }
 
       // Rétro-compat : si la colonne auto_remove_videos n'existe pas encore
@@ -878,6 +1146,11 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         const rounded = { ...taskData, recur_hours: Math.max(1, Math.round(taskData.recur_hours as number)) }
         ;({ error: err } = await saveTask(rounded))
         if (!err) setError('⚠ Intervalles en minutes non supportés tant que la migration SQL n\'est pas appliquée — sauvegardé en heures.')
+      }
+      // Rétro-compat : colonne steps manquante
+      if (err && /steps/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
+        const { steps: _omit, ...fallback } = taskData
+        ;({ error: err } = await saveTask(fallback))
       }
       if (err) throw err
 
@@ -953,46 +1226,6 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               Token GéeLark manquant — configure-le dans Paramètres → Connexions.
             </div>
           )}
-
-          {/* ── Type de tâche ── */}
-          <section>
-            <span style={labelStyle}>Type de tâche</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {([
-                { k: 'publication' as const, title: 'Publication', desc: 'Reels / posts vidéo', icon: <IconVideo size={16} /> },
-                { k: 'story' as const,       title: 'Story',       desc: 'Image + lien par compte', icon: <IconLinkType size={16} /> },
-              ]).map(opt => {
-                const active = taskType === opt.k
-                return (
-                  <button
-                    key={opt.k}
-                    onClick={() => setTaskType(opt.k)}
-                    className="cursor-pointer"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left',
-                      padding: '12px 14px', borderRadius: 11,
-                      border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : HAIR}`,
-                      background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{
-                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: active ? GOLD : 'rgba(255,255,255,0.05)',
-                      color: active ? '#fff' : 'rgba(233,234,240,0.55)',
-                    }}>
-                      {opt.icon}
-                    </div>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.72)' }}>{opt.title}</p>
-                      <p style={{ margin: 0, fontSize: 10.5, color: active ? 'rgba(129,140,248,0.85)' : MUTED }}>{opt.desc}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </section>
 
           {/* ── Nom ── */}
           <section>
@@ -1136,8 +1369,148 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             )}
           </section>
 
+          {/* ── Mode séquence toggle ── */}
+          <section>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={() => setSequenceMode(v => !v)}
+                className="cursor-pointer"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '11px 14px', borderRadius: 10, width: '100%', textAlign: 'left',
+                  border: `1px solid ${sequenceMode ? 'rgba(99,102,241,0.5)' : HAIR}`,
+                  background: sequenceMode ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.02)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <div style={{
+                  width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: sequenceMode ? GOLD : 'rgba(255,255,255,0.05)',
+                  color: sequenceMode ? '#fff' : 'rgba(233,234,240,0.55)',
+                }}>
+                  <IconRepeat size={16} />
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: sequenceMode ? IVORY : 'rgba(233,234,240,0.72)' }}>
+                    Mode séquence
+                  </p>
+                  <p style={{ margin: 0, fontSize: 10.5, color: sequenceMode ? 'rgba(129,140,248,0.85)' : MUTED }}>
+                    Enchaîner plusieurs actions (publication, story, warmup…)
+                  </p>
+                </div>
+                <div style={{
+                  marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0,
+                  background: sequenceMode ? GOLD : 'rgba(233,234,240,0.12)',
+                  position: 'relative', transition: 'background 0.2s',
+                }}>
+                  <div style={{
+                    position: 'absolute', top: 3, left: sequenceMode ? 18 : 3, width: 14, height: 14,
+                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  }} />
+                </div>
+              </button>
+            </div>
+          </section>
+
+          {/* ── Séquence builder ── */}
+          {sequenceMode && (
+            <section>
+              <span style={labelStyle}>Séquence d'actions</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {steps.map((step, idx) => (
+                  <StepEditor
+                    key={step.id}
+                    step={step}
+                    index={idx}
+                    total={steps.length}
+                    phones={phoneList}
+                    getPhoneLink={getPhoneLink}
+                    setPhoneLink={setPhoneLink}
+                    onChange={updated => setSteps(prev => prev.map((s, i) => i === idx ? updated : s))}
+                    onDelete={() => setSteps(prev => prev.filter((_, i) => i !== idx))}
+                    onMoveUp={() => {
+                      if (idx === 0) return
+                      setSteps(prev => {
+                        const next = [...prev]
+                        ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                        return next
+                      })
+                    }}
+                    onMoveDown={() => {
+                      if (idx === steps.length - 1) return
+                      setSteps(prev => {
+                        const next = [...prev]
+                        ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+                        return next
+                      })
+                    }}
+                    onShowBankPicker={field => setBankPickerTarget({ stepIdx: idx, field })}
+                  />
+                ))}
+                <button
+                  onClick={() => setSteps(prev => [
+                    ...prev,
+                    { id: Math.random().toString(36).slice(2), type: 'publication', videos: [], caption: '' },
+                  ])}
+                  className="cursor-pointer"
+                  style={{
+                    padding: '10px 16px', fontSize: 10.5, fontWeight: 700,
+                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                    background: 'transparent', color: GOLD,
+                    border: `1px dashed rgba(99,102,241,0.4)`, borderRadius: 9,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  + Ajouter une étape
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* ── Type de tâche ── */}
+          {!sequenceMode && <section>
+            <span style={labelStyle}>Type de tâche</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {([
+                { k: 'publication' as const, title: 'Publication', desc: 'Reels / posts vidéo', icon: <IconVideo size={16} /> },
+                { k: 'story' as const,       title: 'Story',       desc: 'Image + lien par compte', icon: <IconLinkType size={16} /> },
+              ]).map(opt => {
+                const active = taskType === opt.k
+                return (
+                  <button
+                    key={opt.k}
+                    onClick={() => setTaskType(opt.k)}
+                    className="cursor-pointer"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left',
+                      padding: '12px 14px', borderRadius: 11,
+                      border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : HAIR}`,
+                      background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: active ? GOLD : 'rgba(255,255,255,0.05)',
+                      color: active ? '#fff' : 'rgba(233,234,240,0.55)',
+                    }}>
+                      {opt.icon}
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.72)' }}>{opt.title}</p>
+                      <p style={{ margin: 0, fontSize: 10.5, color: active ? 'rgba(129,140,248,0.85)' : MUTED }}>{opt.desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>}
+
           {/* ── Liens par compte (Story) ── */}
-          {isStory && phoneList.length > 0 && (
+          {isStory && !sequenceMode && phoneList.length > 0 && (
             <section>
               <span style={labelStyle}>
                 Lien par compte
@@ -1182,7 +1555,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           )}
 
           {/* ── Vidéos / Images ── */}
-          <section>
+          {!sequenceMode && <section>
             <span style={labelStyle}>
               {isStory ? 'Images' : 'Vidéos'}{videos.length > 0 && (
                 <span style={{ color: IVORY, letterSpacing: 'normal', fontSize: 11, textTransform: 'none', fontWeight: 500 }}>
@@ -1224,10 +1597,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 + Depuis la banque
               </button>
             </div>
-          </section>
+          </section>}
 
           {/* ── Légende (Publication) ── */}
-          {!isStory && (
+          {!isStory && !sequenceMode && (
             <section>
               <span style={labelStyle}>Légende</span>
               <textarea
@@ -1250,7 +1623,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           )}
 
           {/* ── Textes du sticker (Story) ── */}
-          {isStory && (
+          {isStory && !sequenceMode && (
             <section>
               <span style={labelStyle}>
                 Texte du sticker
@@ -1469,10 +1842,17 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             <span style={{ fontSize: 11, color: MUTED }}>
               <span style={{ fontSize: 16, color: phoneList.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{phoneList.length}</span> tél.
             </span>
+            {!sequenceMode && (
             <span style={{ fontSize: 11, color: MUTED }}>
               <span style={{ fontSize: 16, color: videos.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{videos.length}</span> {isStory ? 'images' : 'vidéos'}
             </span>
-            {isStory && phoneList.length > 0 && phonesWithLink < phoneList.length && (
+            )}
+            {sequenceMode && (
+            <span style={{ fontSize: 11, color: MUTED }}>
+              <span style={{ fontSize: 16, color: steps.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{steps.length}</span> étape{steps.length > 1 ? 's' : ''}
+            </span>
+            )}
+            {isStory && !sequenceMode && phoneList.length > 0 && phonesWithLink < phoneList.length && (
               <span style={{ fontSize: 11, color: '#F59E0B' }}>
                 {phoneList.length - phonesWithLink} lien(s) manquant(s)
               </span>
@@ -1542,6 +1922,394 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           }}
           onClose={() => setShowBankPicker(false)}
         />
+      )}
+
+      {/* Bank picker for step builder */}
+      {bankPickerTarget !== null && (
+        <BankPicker
+          user={user}
+          mode="multi"
+          resolveMode="signed-url"
+          onSelect={(paths, titles) => {
+            const pathArr = paths as string[]
+            const newItems = pathArr.map((p, i) => ({
+              token: p,
+              title: titles?.[i] ?? p.replace(/\\/g, '/').split('/').pop()?.split('?')[0] ?? p,
+            }))
+            const { stepIdx, field } = bankPickerTarget
+            setSteps(prev => prev.map((s, i) => {
+              if (i !== stepIdx) return s
+              if (field === 'images') {
+                const existing = s.images ?? []
+                return { ...s, images: [...existing, ...newItems.filter(n => !existing.some(e => e.token === n.token))] }
+              } else {
+                const existing = s.videos ?? []
+                return { ...s, videos: [...existing, ...newItems.filter(n => !existing.some(e => e.token === n.token))] }
+              }
+            }))
+            setBankPickerTarget(null)
+          }}
+          onClose={() => setBankPickerTarget(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Step Editor ────────────────────────────────────────────────────────────────
+
+function StepEditor({
+  step,
+  index,
+  total,
+  phones,
+  getPhoneLink,
+  setPhoneLink,
+  onChange,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  onShowBankPicker,
+}: {
+  step: TaskStep
+  index: number
+  total: number
+  phones: Phone[]
+  getPhoneLink: (id: string) => string
+  setPhoneLink: (id: string, link: string) => void
+  onChange: (s: TaskStep) => void
+  onDelete: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onShowBankPicker: (target: 'images' | 'videos') => void
+}) {
+  const [storyTextDraft, setStoryTextDraft] = useState('')
+
+  function addStoryText() {
+    const v = storyTextDraft.trim()
+    if (!v) return
+    onChange({ ...step, story_texts: [...(step.story_texts ?? []), v] })
+    setStoryTextDraft('')
+  }
+
+  const mediaList = step.type === 'story' ? (step.images ?? []) : (step.videos ?? [])
+
+  return (
+    <div style={{
+      border: `1px solid ${
+        step.type === 'publication' ? 'rgba(99,102,241,0.25)'
+        : step.type === 'story' ? 'rgba(236,72,153,0.25)'
+        : 'rgba(245,158,11,0.25)'}`,
+      borderRadius: 12,
+      padding: '14px 16px',
+      background: step.type === 'publication' ? 'rgba(99,102,241,0.04)'
+        : step.type === 'story' ? 'rgba(236,72,153,0.04)'
+        : 'rgba(245,158,11,0.04)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 12,
+    }}>
+      {/* Step header: number badge + type chips + move/delete buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{
+          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(233,234,240,0.08)', fontSize: 11, fontWeight: 800, color: MUTED,
+        }}>
+          {index + 1}
+        </span>
+        {/* Type chips */}
+        <div style={{ display: 'flex', gap: 6, flex: 1 }}>
+          {(['publication', 'story', 'warmup'] as StepType[]).map(t => (
+            <button
+              key={t}
+              onClick={() => onChange({ ...step, type: t })}
+              className="cursor-pointer"
+              style={{
+                padding: '4px 10px', fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+                borderRadius: 6, border: '1px solid',
+                borderColor: step.type === t
+                  ? (t === 'publication' ? 'rgba(99,102,241,0.55)' : t === 'story' ? 'rgba(236,72,153,0.55)' : 'rgba(245,158,11,0.55)')
+                  : 'rgba(233,234,240,0.1)',
+                background: step.type === t
+                  ? (t === 'publication' ? 'rgba(99,102,241,0.18)' : t === 'story' ? 'rgba(236,72,153,0.18)' : 'rgba(245,158,11,0.18)')
+                  : 'transparent',
+                color: step.type === t
+                  ? (t === 'publication' ? '#818CF8' : t === 'story' ? '#F472B6' : '#F59E0B')
+                  : MUTED,
+              }}
+            >
+              {t === 'publication' ? 'Publication' : t === 'story' ? 'Story' : 'Warmup'}
+            </button>
+          ))}
+        </div>
+        {/* Move / delete */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button onClick={onMoveUp} disabled={index === 0} className="cursor-pointer"
+            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === 0 ? 0.3 : 1 }}>
+            ↑
+          </button>
+          <button onClick={onMoveDown} disabled={index === total - 1} className="cursor-pointer"
+            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === total - 1 ? 0.3 : 1 }}>
+            ↓
+          </button>
+          <button onClick={onDelete} className="cursor-pointer"
+            style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.06)', color: '#F87171', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IconX size={8} />
+          </button>
+        </div>
+      </div>
+
+      {/* Warmup */}
+      {step.type === 'warmup' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11.5, color: MUTED }}>Durée :</span>
+            <input
+              type="number"
+              min={1}
+              max={120}
+              value={step.warmup_minutes ?? 5}
+              onChange={e => onChange({ ...step, warmup_minutes: Math.max(1, Number(e.target.value) || 5) })}
+              style={{
+                width: 64, height: 30, padding: '0 10px', fontSize: 12,
+                textAlign: 'center', background: 'rgba(233,234,240,0.03)', color: IVORY,
+                border: `1px solid ${HAIR}`, borderRadius: 6, outline: 'none',
+              }}
+            />
+            <span style={{ fontSize: 11, color: MUTED }}>min</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 11, color: 'rgba(245,158,11,0.7)', fontStyle: 'italic' }}>
+            Bientôt disponible — pause entre les étapes.
+          </p>
+        </div>
+      )}
+
+      {/* Publication or Story: media list */}
+      {step.type !== 'warmup' && (
+        <div>
+          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>
+            {step.type === 'story' ? 'Images' : 'Vidéos'}
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+            {mediaList.map((v, i) => (
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '3px 7px', borderRadius: 6,
+                border: `1px solid ${HAIR}`, fontSize: 11,
+                color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
+              }}>
+                <span style={{ fontWeight: 600, color: GOLD }}>{i + 1}</span>
+                {v.title.length > 22 ? v.title.slice(0, 22) + '…' : v.title}
+                <button
+                  onClick={() => {
+                    if (step.type === 'story') {
+                      onChange({ ...step, images: (step.images ?? []).filter((_, j) => j !== i) })
+                    } else {
+                      onChange({ ...step, videos: (step.videos ?? []).filter((_, j) => j !== i) })
+                    }
+                  }}
+                  className="cursor-pointer"
+                  style={{ background: 'none', border: 'none', color: '#F0A0AB', display: 'flex', padding: 0 }}
+                >
+                  <IconX size={7} />
+                </button>
+              </span>
+            ))}
+            <button
+              onClick={() => onShowBankPicker(step.type === 'story' ? 'images' : 'videos')}
+              className="cursor-pointer"
+              style={{
+                padding: '4px 10px', fontSize: 9.5, fontWeight: 700,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+                background: GOLD, color: '#fff', border: 'none', borderRadius: 5,
+              }}
+            >
+              + Banque
+            </button>
+          </div>
+
+          {/* Mode de distribution (séquentiel / aléatoire) + usage unique */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10.5, color: MUTED }}>Distribution :</span>
+            {(['seq', 'random'] as const).map(m => {
+              const active = (step.mode ?? 'seq') === m
+              return (
+                <button
+                  key={m}
+                  onClick={() => onChange({ ...step, mode: m })}
+                  className="cursor-pointer"
+                  style={{
+                    padding: '4px 10px', fontSize: 10, fontWeight: 700,
+                    borderRadius: 6, border: `1px solid ${active ? 'rgba(99,102,241,0.5)' : HAIR}`,
+                    background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
+                    color: active ? '#818CF8' : MUTED,
+                  }}
+                >
+                  {m === 'seq' ? 'Séquentiel' : 'Aléatoire'}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => onChange({ ...step, auto_remove_videos: !step.auto_remove_videos })}
+              className="cursor-pointer"
+              title="Retire les médias utilisés de la pool après chaque exécution"
+              style={{
+                marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px', fontSize: 10, fontWeight: 700,
+                borderRadius: 6, border: `1px solid ${step.auto_remove_videos ? 'rgba(245,158,11,0.45)' : HAIR}`,
+                background: step.auto_remove_videos ? 'rgba(245,158,11,0.12)' : 'transparent',
+                color: step.auto_remove_videos ? '#F59E0B' : MUTED,
+              }}
+            >
+              <span style={{
+                width: 13, height: 13, borderRadius: 4, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: step.auto_remove_videos ? '#F59E0B' : 'transparent',
+                border: step.auto_remove_videos ? 'none' : '1px solid rgba(233,234,240,0.25)',
+              }}>
+                {step.auto_remove_videos && <IconCheck size={7} />}
+              </span>
+              Usage unique
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Publication: caption */}
+      {step.type === 'publication' && (
+        <div>
+          <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>Légende</p>
+          <textarea
+            value={step.caption ?? ''}
+            onChange={e => onChange({ ...step, caption: e.target.value })}
+            rows={2}
+            placeholder="Description Instagram…"
+            style={{
+              width: '100%', padding: '8px 10px',
+              fontSize: 12, lineHeight: 1.5,
+              background: 'rgba(233,234,240,0.02)', color: IVORY,
+              resize: 'vertical', border: `1px solid ${HAIR}`,
+              borderRadius: 7, outline: 'none', fontFamily: 'inherit',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Story: per-phone links */}
+      {step.type === 'story' && phones.length > 0 && (
+        <div>
+          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>Liens par compte</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 160, overflowY: 'auto', scrollbarWidth: 'thin' }}>
+            {phones.map(p => {
+              const link = (step.phone_links ?? {})[p.id] ?? getPhoneLink(p.id)
+              const filled = !!link.trim()
+              return (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.7)', width: 100, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {p.ig_username ? `@${p.ig_username}` : p.phone_name}
+                  </span>
+                  <input
+                    type="url"
+                    value={link}
+                    onChange={e => {
+                      const newLinks = { ...(step.phone_links ?? {}), [p.id]: e.target.value }
+                      onChange({ ...step, phone_links: newLinks })
+                      setPhoneLink(p.id, e.target.value)
+                    }}
+                    placeholder="https://…"
+                    style={{
+                      flex: 1, height: 28, padding: '0 8px', fontSize: 11,
+                      background: 'rgba(233,234,240,0.02)', color: IVORY,
+                      border: `1px solid ${filled ? 'rgba(52,211,153,0.4)' : 'rgba(245,158,11,0.4)'}`,
+                      borderRadius: 6, outline: 'none',
+                    }}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Story: sticker texts */}
+      {step.type === 'story' && (
+        <div>
+          <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>
+            Textes du sticker <span style={{ color: MUTED, fontWeight: 400, textTransform: 'none' }}>— optionnel</span>
+          </p>
+          <div style={{ display: 'flex', gap: 6, marginBottom: (step.story_texts ?? []).length ? 7 : 0 }}>
+            <input
+              type="text"
+              value={storyTextDraft}
+              onChange={e => setStoryTextDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStoryText() } }}
+              placeholder="Ex : Voir le lien 👆"
+              style={{
+                flex: 1, height: 30, padding: '0 10px', fontSize: 12,
+                background: 'rgba(233,234,240,0.02)', color: IVORY,
+                border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none',
+              }}
+            />
+            <button
+              onClick={addStoryText}
+              disabled={!storyTextDraft.trim()}
+              className="cursor-pointer"
+              style={{
+                padding: '0 12px', fontSize: 9.5, fontWeight: 700,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+                background: storyTextDraft.trim() ? GOLD : 'rgba(233,234,240,0.08)',
+                color: storyTextDraft.trim() ? '#fff' : MUTED,
+                border: 'none', borderRadius: 6,
+              }}
+            >
+              +
+            </button>
+          </div>
+          {(step.story_texts ?? []).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {(step.story_texts ?? []).map((txt, i) => (
+                <span key={i} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '3px 7px', borderRadius: 6,
+                  border: `1px solid ${HAIR}`, fontSize: 11,
+                  color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
+                }}>
+                  {txt.length > 28 ? txt.slice(0, 28) + '…' : txt}
+                  <button
+                    onClick={() => onChange({ ...step, story_texts: (step.story_texts ?? []).filter((_, j) => j !== i) })}
+                    className="cursor-pointer"
+                    style={{ background: 'none', border: 'none', color: '#F0A0AB', display: 'flex', padding: 0 }}
+                  >
+                    <IconX size={7} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Delay after step (not last) */}
+      {index < total - 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: MUTED }}>Attendre</span>
+          <input
+            type="number"
+            min={0}
+            max={120}
+            value={step.delay_after_minutes ?? 0}
+            onChange={e => onChange({ ...step, delay_after_minutes: Math.max(0, Number(e.target.value) || 0) })}
+            style={{
+              width: 56, height: 28, padding: '0 8px', fontSize: 12,
+              textAlign: 'center', background: 'rgba(233,234,240,0.03)', color: IVORY,
+              border: `1px solid ${HAIR}`, borderRadius: 6, outline: 'none',
+            }}
+          />
+          <span style={{ fontSize: 11, color: MUTED }}>min avant l'étape suivante</span>
+        </div>
       )}
     </div>
   )
@@ -1797,6 +2565,40 @@ function TaskCard({
           </span>
         )}
       </div>
+
+      {/* Step sequence */}
+      {task.steps && task.steps.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          {task.steps.map((step, idx) => (
+            <React.Fragment key={step.id}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
+                background: step.type === 'publication' ? 'rgba(99,102,241,0.12)'
+                  : step.type === 'story' ? 'rgba(236,72,153,0.1)'
+                  : 'rgba(245,158,11,0.1)',
+                color: step.type === 'publication' ? '#818CF8'
+                  : step.type === 'story' ? '#F472B6'
+                  : '#F59E0B',
+                border: `1px solid ${step.type === 'publication' ? 'rgba(99,102,241,0.25)'
+                  : step.type === 'story' ? 'rgba(236,72,153,0.25)'
+                  : 'rgba(245,158,11,0.25)'}`,
+              }}>
+                {step.type === 'publication' ? '📹' : step.type === 'story' ? '📸' : '🔥'}
+                {' '}{step.type === 'publication' ? 'Publication' : step.type === 'story' ? 'Story' : 'Warmup'}
+              </span>
+              {idx < task.steps!.length - 1 && (
+                <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>→</span>
+              )}
+            </React.Fragment>
+          ))}
+          {task.steps[0]?.delay_after_minutes && (
+            <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.5)', marginLeft: 4 }}>
+              (délais configurés)
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Row 3: next run */}
       <div style={{
@@ -2181,6 +2983,12 @@ export function Tasks({ user }: { user: User }) {
           story_texts:        typeof t.story_texts === 'string' ? JSON.parse(t.story_texts as string) : (t.story_texts ?? []),
           task_type:          (t.task_type as TaskType) ?? 'publication',
           auto_remove_videos: (t.auto_remove_videos as boolean) ?? false,
+          steps: (() => {
+            const raw = t.steps
+            if (!raw) return []
+            const parsed = typeof raw === 'string' ? JSON.parse(raw as string) : raw
+            return Array.isArray(parsed) ? parsed : []
+          })(),
         })) as RecurringTask[])
       }
 
