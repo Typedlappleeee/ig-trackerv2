@@ -26,7 +26,9 @@ export default async function handler(req, res) {
       }
 
       const boundary = `----GBoundary${Date.now()}`
-      const ext  = filename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
+      // Strip query-string and fragment so Groq can parse the extension correctly
+      const cleanFilename = (filename || 'video.mp4').split('?')[0].split('#')[0]
+      const ext  = cleanFilename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
       const mime = ext === 'mp3' ? 'audio/mpeg' : ext === 'webm' ? 'audio/webm' : 'video/mp4'
 
       const parts = []
@@ -40,7 +42,7 @@ export default async function handler(req, res) {
       addField('timestamp_granularities[]', 'word')
       if (language) addField('language', language)
       parts.push(Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`,
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${cleanFilename}"\r\nContent-Type: ${mime}\r\n\r\n`,
       ))
       parts.push(buffer)
       parts.push(Buffer.from(`\r\n--${boundary}--\r\n`))

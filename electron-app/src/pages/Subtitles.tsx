@@ -132,7 +132,7 @@ export function Subtitles({ user }: SubtitlesProps) {
   function onBankPick(paths: string[], titles?: string[]) {
     setShowBankPicker(false)
     if (!paths.length) return
-    loadUrl(paths[0], titles?.[0] || paths[0].split('/').pop() || 'video.mp4', true)
+    loadUrl(paths[0], titles?.[0] || paths[0].split('/').pop()?.split('?')[0] || 'video.mp4', true)
   }
 
   // ── Main generation ──────────────────────────────────────────────────────────
