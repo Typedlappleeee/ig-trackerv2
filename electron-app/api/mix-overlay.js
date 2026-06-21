@@ -39,13 +39,15 @@ function escapeXml(s) {
     .replace(/'/g, '&apos;')
 }
 
-// Wrap text to lines of at most maxLen chars
-function wrapText(text, maxLen = 32) {
+// Wrap text so no line exceeds maxPx pixels wide (estimated at ~0.55× fontSize per char for bold Arial)
+function wrapText(text, fontSize, maxPx) {
+  const charW = fontSize * 0.55
+  const maxChars = Math.max(8, Math.floor(maxPx / charW))
   const words = text.split(' ')
   const lines = []
   let current = ''
   for (const word of words) {
-    if (current.length + word.length + 1 > maxLen && current) {
+    if (current.length + word.length + 1 > maxChars && current) {
       lines.push(current)
       current = word
     } else {
@@ -56,27 +58,40 @@ function wrapText(text, maxLen = 32) {
   return lines
 }
 
-// Build a text overlay PNG via SVG → sharp
-async function buildOverlayPng(lines, fontSize, fontColor, bgOpacity) {
-  const lineH   = Math.round(fontSize * 1.45)
-  const padH    = Math.round(fontSize * 0.55)
-  const padW    = Math.round(fontSize * 0.7)
-  const svgW    = 720
-  const svgH    = lines.length * lineH + padH * 2
-  const radius  = Math.round(fontSize * 0.3)
+// Build a tight text overlay PNG via SVG → sharp
+// The box width adapts to the longest line (not the full video width).
+async function buildOverlayPng(lines, fontSize, fontColor, bgOpacity, fontPath) {
+  const charW  = fontSize * 0.55                        // per-char width estimate
+  const lineH  = Math.round(fontSize * 1.38)
+  const padH   = Math.round(fontSize * 0.42)            // vertical inner padding
+  const padW   = Math.round(fontSize * 0.65)            // horizontal inner padding
+  const radius = Math.round(fontSize * 0.18)
+
+  // Size SVG to the longest line + padding
+  const maxLineW = Math.max(...lines.map(l => l.length)) * charW
+  const svgW  = Math.ceil(maxLineW + padW * 2)
+  const svgH  = Math.ceil(lines.length * lineH + padH * 2)
+  const midX  = svgW / 2
+
+  // Use the bundled font file if available so librsvg picks it up
+  const fontFaceDecl = fontPath
+    ? `<defs><style>@font-face{font-family:'SF';src:url('${fontPath}');font-weight:bold;}</style></defs>`
+    : ''
+  const fontFamily = fontPath ? 'SF, Arial, sans-serif' : 'Arial, Helvetica, sans-serif'
 
   const textEls = lines.map((line, i) => {
-    const y = padH + lineH * 0.72 + i * lineH
-    return `<text x="${svgW / 2}" y="${y}"
-      text-anchor="middle" dominant-baseline="auto"
-      font-family="Arial, Helvetica, sans-serif"
+    const y = padH + lineH * 0.78 + i * lineH
+    return `<text x="${midX}" y="${y}"
+      text-anchor="middle"
+      font-family="${escapeXml(fontFamily)}"
       font-size="${fontSize}"
       font-weight="bold"
       fill="${escapeXml(fontColor)}">${escapeXml(line)}</text>`
   }).join('\n')
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">
-  <rect x="${padW / 2}" y="0" width="${svgW - padW}" height="${svgH}"
+  ${fontFaceDecl}
+  <rect x="0" y="0" width="${svgW}" height="${svgH}"
     rx="${radius}" ry="${radius}"
     fill="rgba(0,0,0,${bgOpacity})"/>
   ${textEls}
@@ -122,12 +137,18 @@ module.exports = async (req, res) => {
     }
 
     // ── Build text overlay PNG ───────────────────────────────────────────────
-    const lines = wrapText(String(caption))
-    const { buf: overlayBuf } = await buildOverlayPng(lines, fontSize, fontColor, bgOpacity)
+    // Target ~85% of typical 9:16 video width (720px) so text wraps naturally
+    const TARGET_TEXT_W = 620
+    const lines = wrapText(String(caption), fontSize, TARGET_TEXT_W)
+    const fontPath = (() => {
+      const p = path.join(__dirname, 'fonts', 'font-bold.ttf')
+      return fs.existsSync(p) ? p.replace(/\\/g, '/') : null
+    })()
+    const { buf: overlayBuf } = await buildOverlayPng(lines, fontSize, fontColor, bgOpacity, fontPath)
     fs.writeFileSync(overlayPath, overlayBuf)
 
     // ── Y position expression for FFmpeg overlay filter ─────────────────────
-    const pad = fontSize * 2
+    const pad = Math.round(fontSize * 1.5)
     const yExpr = position === 'top'
       ? `${pad}`
       : position === 'center'
