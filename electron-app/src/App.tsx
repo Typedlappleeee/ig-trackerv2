@@ -805,6 +805,7 @@ function AppContent({ user }: { user: User }) {
       <LicenseGate
         userId={user.id}
         email={user.email ?? null}
+        initialStep={license.expired ? 'expired' : undefined}
         onActivated={() => checkLicense(user.id, currentOrg?.id ?? null).then(setLicense)}
       />
     )

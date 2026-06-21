@@ -90,7 +90,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'tasks',       label: 'navTasks',        icon: '⚡' },
+      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', dev: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],

@@ -10,7 +10,7 @@ interface Props {
   initialStep?: Step
 }
 
-type Step = 'gate' | 'create_org'
+type Step = 'gate' | 'create_org' | 'expired'
 
 const TELEGRAM_HANDLE = '@justquentin'
 const TELEGRAM_URL    = 'https://t.me/justquentin'
@@ -172,6 +172,86 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
       Se déconnecter →
     </button>
   )
+
+  // ── Expired license step ─────────────────────────────────────────────────────
+  if (step === 'expired') {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#030307]">
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'radial-gradient(ellipse 60% 50% at 50% 45%, #2a0b0b44 0%, transparent 70%)' }} />
+        <div className="relative z-10 w-full max-w-sm mx-4">
+          <div className="flex flex-col items-center mb-8">
+            <Logo gradId="exp" />
+            <h1 className="text-2xl font-black text-white tracking-tight">
+              Scale<span style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+            </h1>
+            <p className="text-[11px] text-[#7a3f3f] uppercase tracking-widest mt-1">Abonnement expiré</p>
+          </div>
+
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <div className="p-6 space-y-5">
+              {/* Status banner */}
+              <div className="rounded-xl px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <div>
+                  <p className="text-white text-sm font-bold">Votre clé a expiré</p>
+                  <p className="text-[11px] text-[#9a6060] mt-0.5">Renouvelez votre abonnement pour continuer</p>
+                </div>
+              </div>
+
+              {/* Renew via Telegram */}
+              <a
+                href={TELEGRAM_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-3 rounded-xl p-4 transition-all hover:scale-[1.01] no-underline"
+                style={{ background: 'rgba(33,150,243,0.12)', border: '1px solid rgba(33,150,243,0.35)', textDecoration: 'none' }}>
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 flex-shrink-0" style={{ color: '#29b6f6' }}>
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
+                </svg>
+                <div>
+                  <div className="text-white text-sm font-bold">Renouveler via Telegram</div>
+                  <div className="text-[11px]" style={{ color: '#29b6f6' }}>Contacte {TELEGRAM_HANDLE} pour renouveler</div>
+                </div>
+                <div className="ml-auto text-[#29b6f6] text-lg">→</div>
+              </a>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.15)' }} />
+                <span className="text-[10px] text-[#4a3f7a]">déjà une nouvelle clé ?</span>
+                <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.15)' }} />
+              </div>
+
+              {/* Activate new key */}
+              <form onSubmit={handleLicense} className="space-y-3">
+                <input
+                  name="license-key"
+                  value={key}
+                  onChange={e => setKey(e.target.value)}
+                  placeholder="XXXX-XXXX-XXXX-XXXX"
+                  className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono tracking-widest placeholder:text-[#3a2f58] focus:outline-none focus:border-[#6366F1] transition-colors text-center uppercase"
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+                {keyErr && <p className="text-xs text-red-400 text-center">{keyErr}</p>}
+                <button
+                  type="submit"
+                  disabled={keyLoading || !key.trim()}
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
+                  style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>
+                  {keyLoading ? 'Vérification…' : 'Activer la clé →'}
+                </button>
+              </form>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#2a1f48] text-center mt-4">ScaleFlow — Accès restreint aux comptes autorisés</p>
+        </div>
+        <SignOutButton />
+      </div>
+    )
+  }
 
   // ── Create org step ──────────────────────────────────────────────────────────
   if (step === 'create_org') {
