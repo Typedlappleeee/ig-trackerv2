@@ -366,20 +366,25 @@ export function buildWebAPI() {
     // ── Mixer — burn caption text onto video (web: Vercel /api/mix-overlay) ──────
     async runFfmpegMixOverlay(opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) {
       try {
+        // Pass user's auth token so the server can upload to Supabase as the user
+        const { data: { session } } = await (await import('@/lib/supabase')).supabase.auth.getSession()
         const r = await fetch('/api/mix-overlay', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
-            videoUrl:  opts.sourcePath,
-            caption:   opts.caption,
-            position:  opts.position,
-            fontSize:  opts.fontSize,
-            fontColor: opts.fontColor,
+            videoUrl:         opts.sourcePath,
+            caption:          opts.caption,
+            position:         opts.position,
+            fontSize:         opts.fontSize,
+            fontColor:        opts.fontColor,
+            userId:           session?.user?.id,
+            supabaseToken:    session?.access_token,
+            supabaseAnonKey:  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY,
           }),
         })
         const data = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }))
         if (!data.ok) return { ok: false as const, error: data.error ?? 'Erreur serveur mix-overlay' }
-        return { ok: true as const, outputPath: (data.url ?? data.storagePath) as string }
+        return { ok: true as const, outputPath: (data.url ?? data.storagePath) as string, storagePath: data.storagePath as string | undefined }
       } catch (err) {
         return { ok: false as const, error: String(err) }
       }

@@ -14,11 +14,20 @@ const os   = require('os')
 
 const execFileAsync = promisify(execFile)
 
-function getSupabaseAdmin() {
+function getSupabaseAdmin({ supabaseToken, supabaseAnonKey } = {}) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase env vars missing')
-  return createClient(url, key, { auth: { persistSession: false } })
+  // Prefer service role key (bypasses RLS); fall back to user JWT passed from client
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (serviceKey) {
+    return createClient(url, serviceKey, { auth: { persistSession: false } })
+  }
+  if (supabaseToken && supabaseAnonKey) {
+    return createClient(url, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${supabaseToken}` } },
+      auth: { persistSession: false },
+    })
+  }
+  throw new Error('Supabase non authentifié — définir SUPABASE_SERVICE_ROLE_KEY dans Vercel')
 }
 
 function escapeXml(s) {
@@ -82,17 +91,18 @@ module.exports = async (req, res) => {
 
   const {
     videoUrl, storagePath, caption, userId,
-    bucket     = 'content',
-    position   = 'bottom',
-    fontSize   = 36,
-    fontColor  = '#ffffff',
-    bgOpacity  = 0.45,
+    bucket         = 'content',
+    position       = 'bottom',
+    fontSize       = 36,
+    fontColor      = '#ffffff',
+    bgOpacity      = 0.45,
+    supabaseToken, supabaseAnonKey,
   } = req.body ?? {}
 
   if ((!videoUrl && !storagePath) || !caption)
     return res.status(400).json({ ok: false, error: 'Missing videoUrl/storagePath or caption' })
 
-  const supabase = getSupabaseAdmin()
+  const supabase = getSupabaseAdmin({ supabaseToken, supabaseAnonKey })
   const ts       = Date.now()
   const tmpDir   = os.tmpdir()
   const inputPath  = path.join(tmpDir, `mix_in_${ts}.mp4`)

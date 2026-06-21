@@ -103,7 +103,7 @@ interface ElectronAPI {
   saveFileAs: (opts: { sourcePath: string; defaultName: string }) =>
     Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>
   runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) =>
-    Promise<{ ok: boolean; outputPath?: string; error?: string }>
+    Promise<{ ok: boolean; outputPath?: string; storagePath?: string; error?: string }>
   groqTranscription: (opts: { apiKey: string; audioBytes?: ArrayBuffer; videoUrl?: string; filename: string; language?: string }) =>
     Promise<{ ok: boolean; data?: { words?: Array<{ word: string; start: number; end: number }>; text?: string }; error?: string }>
   runFfmpegSubtitles: (opts: {
