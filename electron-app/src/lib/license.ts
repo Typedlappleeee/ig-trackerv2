@@ -99,7 +99,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
         const plan = (ownKey.plan as LicenseStatus['plan']) ?? 'standard'
         return { valid: true, expired: false, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan, orgOwnerPlan }
       }
-      // Key exists but expired — surface this so UI can show a specific "expired" page
+      // Key is active but past expiry date
       return { valid: false, expired: true, expiresAt: expiresAt ?? null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
     }
 
@@ -107,11 +107,22 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
     if (orgOwnerPlan) {
       return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan }
     }
+
+    // No active key found — check if user ever had one (active or deactivated) to distinguish
+    // "key expired/deactivated" from "never subscribed"
+    const { data: anyKey } = await supabase
+      .from('license_keys')
+      .select('expires_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const hadKey = !!anyKey
+    return { valid: false, expired: hadKey, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
   } catch {
     return FAIL_OPEN
   }
-
-  return { valid: false, expired: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
 }
 
 export async function activateKey(key: string, userId: string): Promise<{ success: boolean; error?: string }> {
