@@ -115,22 +115,27 @@ module.exports = async (req, res) => {
       `fontcolor=${fontColor}`,
       `x=(w-text_w)/2`,
       `y=${yExpr}`,
-      `line_spacing=8`,
       `box=1`,
       `boxcolor=black@${bgOpacity}`,
       `boxborderw=${Math.round(fontSize * 0.4)}`,
     ].join(':')
 
-    await execFileAsync(ffmpegPath, [
-      '-nostdin', '-threads', '0', '-i', inputPath,
-      '-vf', drawtextFilter,
-      '-c:v', 'libx264', '-preset', 'ultrafast',
-      '-crf', '28',
-      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-      '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
-      '-movflags', '+faststart',
-      '-y', outPath,
-    ], { maxBuffer: 100 * 1024 * 1024 })
+    try {
+      await execFileAsync(ffmpegPath, [
+        '-nostdin', '-threads', '0', '-i', inputPath,
+        '-vf', drawtextFilter,
+        '-c:v', 'libx264', '-preset', 'ultrafast',
+        '-crf', '28',
+        '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+        '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+        '-movflags', '+faststart',
+        '-y', outPath,
+      ], { maxBuffer: 100 * 1024 * 1024 })
+    } catch (ffErr) {
+      // Expose actual FFmpeg stderr so we can diagnose the root cause
+      const stderr = (ffErr.stderr ?? '').slice(-800)
+      throw new Error(`FFmpeg: ${stderr || ffErr.message}`)
+    }
 
     const resultPath = userId
       ? `videos/users/${userId}/mix-out-${ts}_${Math.random().toString(36).slice(2)}.mp4`
@@ -145,7 +150,7 @@ module.exports = async (req, res) => {
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
     res.json({ ok: true, url: publicUrl, storagePath: resultPath })
   } catch (err) {
-    res.status(500).json({ ok: false, error: String(err).slice(0, 400) })
+    res.status(500).json({ ok: false, error: (err instanceof Error ? err.message : String(err)).slice(0, 1000) })
   } finally {
     fs.rmSync(inputPath, { force: true })
     fs.rmSync(outPath, { force: true })
