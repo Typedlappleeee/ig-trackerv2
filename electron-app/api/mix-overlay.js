@@ -59,25 +59,27 @@ function wrapText(text, fontSize, maxPx) {
 }
 
 // Build a tight text overlay PNG via SVG → sharp
-// The box width adapts to the longest line (not the full video width).
+// Embeds the font as a base64 data URI so librsvg doesn't need system fonts.
 async function buildOverlayPng(lines, fontSize, fontColor, bgOpacity, fontPath) {
-  const charW  = fontSize * 0.55                        // per-char width estimate
+  const charW  = fontSize * 0.55
   const lineH  = Math.round(fontSize * 1.38)
-  const padH   = Math.round(fontSize * 0.42)            // vertical inner padding
-  const padW   = Math.round(fontSize * 0.65)            // horizontal inner padding
+  const padH   = Math.round(fontSize * 0.42)
+  const padW   = Math.round(fontSize * 0.65)
   const radius = Math.round(fontSize * 0.18)
 
-  // Size SVG to the longest line + padding
   const maxLineW = Math.max(...lines.map(l => l.length)) * charW
   const svgW  = Math.ceil(maxLineW + padW * 2)
   const svgH  = Math.ceil(lines.length * lineH + padH * 2)
   const midX  = svgW / 2
 
-  // Use the bundled font file if available so librsvg picks it up
-  const fontFaceDecl = fontPath
-    ? `<defs><style>@font-face{font-family:'SF';src:url('${fontPath}');font-weight:bold;}</style></defs>`
-    : ''
-  const fontFamily = fontPath ? 'SF, Arial, sans-serif' : 'Arial, Helvetica, sans-serif'
+  // Embed font as base64 data URI so librsvg finds it without system font access
+  let fontFaceDecl = ''
+  let fontFamily   = 'Arial, Helvetica, sans-serif'
+  if (fontPath && fs.existsSync(fontPath)) {
+    const b64 = fs.readFileSync(fontPath).toString('base64')
+    fontFaceDecl = `<defs><style>@font-face{font-family:'SF';src:url('data:font/truetype;base64,${b64}');font-weight:bold;}</style></defs>`
+    fontFamily   = "'SF', Arial, sans-serif"
+  }
 
   const textEls = lines.map((line, i) => {
     const y = padH + lineH * 0.78 + i * lineH
