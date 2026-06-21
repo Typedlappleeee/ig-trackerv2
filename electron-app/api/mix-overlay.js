@@ -1,14 +1,16 @@
-// Server-side video + caption overlay using native FFmpeg drawtext.
+// Server-side video + caption overlay using sharp (SVG→PNG) + FFmpeg overlay filter.
+// Avoids drawtext/libfreetype dependency that isn't compiled in ffmpeg-static on Vercel.
 // Accepts: POST { videoUrl|storagePath, caption, userId, bucket?, position?, fontSize?, fontColor?, bgOpacity? }
 // Returns: { ok, url, storagePath }
 
 const ffmpegPath = require('ffmpeg-static')
+const sharp      = require('sharp')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { createClient } = require('@supabase/supabase-js')
-const fs = require('fs')
+const fs   = require('fs')
 const path = require('path')
-const os = require('os')
+const os   = require('os')
 
 const execFileAsync = promisify(execFile)
 
@@ -19,32 +21,17 @@ function getSupabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-// Find a usable font file
-function findFont() {
-  const candidates = [
-    path.join(__dirname, 'fonts', 'font-bold.ttf'),
-    path.join(process.cwd(), 'public', 'ffmpeg', 'font-bold.ttf'),
-    path.join(__dirname, '..', 'public', 'ffmpeg', 'font-bold.ttf'),
-    '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-    '/usr/share/fonts/liberation/LiberationSans-Bold.ttf',
-  ]
-  return candidates.find(p => fs.existsSync(p)) ?? null
+function escapeXml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
 }
 
-// Escape special chars for FFmpeg drawtext
-function escapeDrawtext(s) {
-  return s
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/:/g, '\\:')
-    .replace(/\[/g, '\\[')
-    .replace(/\]/g, '\\]')
-    .replace(/,/g, '\\,')
-    .replace(/;/g, '\\;')
-}
-
-// Wrap long text to multiple lines (max ~35 chars per line)
-function wrapText(text, maxLen = 35) {
+// Wrap text to lines of at most maxLen chars
+function wrapText(text, maxLen = 32) {
   const words = text.split(' ')
   const lines = []
   let current = ''
@@ -57,7 +44,37 @@ function wrapText(text, maxLen = 35) {
     }
   }
   if (current) lines.push(current)
-  return lines.join('\n')
+  return lines
+}
+
+// Build a text overlay PNG via SVG → sharp
+async function buildOverlayPng(lines, fontSize, fontColor, bgOpacity) {
+  const lineH   = Math.round(fontSize * 1.45)
+  const padH    = Math.round(fontSize * 0.55)
+  const padW    = Math.round(fontSize * 0.7)
+  const svgW    = 720
+  const svgH    = lines.length * lineH + padH * 2
+  const radius  = Math.round(fontSize * 0.3)
+
+  const textEls = lines.map((line, i) => {
+    const y = padH + lineH * 0.72 + i * lineH
+    return `<text x="${svgW / 2}" y="${y}"
+      text-anchor="middle" dominant-baseline="auto"
+      font-family="Arial, Helvetica, sans-serif"
+      font-size="${fontSize}"
+      font-weight="bold"
+      fill="${escapeXml(fontColor)}">${escapeXml(line)}</text>`
+  }).join('\n')
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">
+  <rect x="${padW / 2}" y="0" width="${svgW - padW}" height="${svgH}"
+    rx="${radius}" ry="${radius}"
+    fill="rgba(0,0,0,${bgOpacity})"/>
+  ${textEls}
+</svg>`
+
+  const buf = await sharp(Buffer.from(svg)).png().toBuffer()
+  return { buf, w: svgW, h: svgH }
 }
 
 module.exports = async (req, res) => {
@@ -65,27 +82,25 @@ module.exports = async (req, res) => {
 
   const {
     videoUrl, storagePath, caption, userId,
-    bucket = 'content',
-    position = 'bottom',   // 'top' | 'center' | 'bottom'
-    fontSize = 36,
-    fontColor = 'white',
-    bgOpacity = 0.45,
+    bucket     = 'content',
+    position   = 'bottom',
+    fontSize   = 36,
+    fontColor  = '#ffffff',
+    bgOpacity  = 0.45,
   } = req.body ?? {}
 
   if ((!videoUrl && !storagePath) || !caption)
     return res.status(400).json({ ok: false, error: 'Missing videoUrl/storagePath or caption' })
 
   const supabase = getSupabaseAdmin()
-  const fontFile = findFont()
-  if (!fontFile) return res.status(500).json({ ok: false, error: 'No font file found on server' })
-
-  const ts = Date.now()
-  const tmpDir = os.tmpdir()
-  const inputPath = path.join(tmpDir, `mix_in_${ts}.mp4`)
-  const outPath   = path.join(tmpDir, `mix_out_${ts}.mp4`)
+  const ts       = Date.now()
+  const tmpDir   = os.tmpdir()
+  const inputPath  = path.join(tmpDir, `mix_in_${ts}.mp4`)
+  const overlayPath = path.join(tmpDir, `mix_ov_${ts}.png`)
+  const outPath    = path.join(tmpDir, `mix_out_${ts}.mp4`)
 
   try {
-    // Download source
+    // ── Download source video ────────────────────────────────────────────────
     if (videoUrl) {
       const resp = await fetch(videoUrl)
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch video: ${resp.status}` })
@@ -96,47 +111,38 @@ module.exports = async (req, res) => {
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
     }
 
-    const wrappedText = wrapText(String(caption))
-    const escapedText = escapeDrawtext(wrappedText)
-    const escapedFont = fontFile.replace(/\\/g, '/').replace(/:/g, '\\:')
+    // ── Build text overlay PNG ───────────────────────────────────────────────
+    const lines = wrapText(String(caption))
+    const { buf: overlayBuf } = await buildOverlayPng(lines, fontSize, fontColor, bgOpacity)
+    fs.writeFileSync(overlayPath, overlayBuf)
 
-    // Y position based on placement
+    // ── Y position expression for FFmpeg overlay filter ─────────────────────
+    const pad = fontSize * 2
     const yExpr = position === 'top'
-      ? `${fontSize * 2}`
+      ? `${pad}`
       : position === 'center'
-        ? '(h-text_h)/2'
-        : `h-text_h-${fontSize * 2}`
+        ? '(main_h-overlay_h)/2'
+        : `main_h-overlay_h-${pad}`
 
-    // drawtext: semi-transparent bg box + white text
-    const drawtextFilter = [
-      `drawtext=fontfile='${escapedFont}'`,
-      `text='${escapedText}'`,
-      `fontsize=${fontSize}`,
-      `fontcolor=${fontColor}`,
-      `x=(w-text_w)/2`,
-      `y=${yExpr}`,
-      `box=1`,
-      `boxcolor=black@${bgOpacity}`,
-      `boxborderw=${Math.round(fontSize * 0.4)}`,
-    ].join(':')
-
+    // ── FFmpeg: composite overlay onto video ─────────────────────────────────
     try {
       await execFileAsync(ffmpegPath, [
-        '-nostdin', '-threads', '0', '-i', inputPath,
-        '-vf', drawtextFilter,
-        '-c:v', 'libx264', '-preset', 'ultrafast',
-        '-crf', '28',
+        '-nostdin', '-threads', '0',
+        '-i', inputPath,
+        '-i', overlayPath,
+        '-filter_complex', `[0:v][1:v]overlay=(main_w-overlay_w)/2:${yExpr}`,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
         '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-        '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+        '-c:a', 'copy',
         '-movflags', '+faststart',
         '-y', outPath,
       ], { maxBuffer: 100 * 1024 * 1024 })
     } catch (ffErr) {
-      // Expose actual FFmpeg stderr so we can diagnose the root cause
       const stderr = (ffErr.stderr ?? '').slice(-800)
       throw new Error(`FFmpeg: ${stderr || ffErr.message}`)
     }
 
+    // ── Upload result ────────────────────────────────────────────────────────
     const resultPath = userId
       ? `videos/users/${userId}/mix-out-${ts}_${Math.random().toString(36).slice(2)}.mp4`
       : `mix-results/${ts}_${Math.random().toString(36).slice(2)}.mp4`
@@ -152,8 +158,9 @@ module.exports = async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: (err instanceof Error ? err.message : String(err)).slice(0, 1000) })
   } finally {
-    fs.rmSync(inputPath, { force: true })
-    fs.rmSync(outPath, { force: true })
+    fs.rmSync(inputPath,   { force: true })
+    fs.rmSync(overlayPath, { force: true })
+    fs.rmSync(outPath,     { force: true })
   }
 }
 

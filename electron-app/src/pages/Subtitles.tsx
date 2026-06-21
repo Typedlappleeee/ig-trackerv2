@@ -19,16 +19,33 @@ const LANG_LABELS: Record<Lang, string> = {
   zh: '中文', pt: 'Português', ar: 'العربية',
 }
 
+const PAUSE_THRESHOLD = 0.65 // seconds of silence → force new segment
+
 function groupWords(words: WordToken[], perGroup: number): Segment[] {
   const segs: Segment[] = []
-  for (let i = 0; i < words.length; i += perGroup) {
-    const chunk = words.slice(i, i + perGroup)
+  if (!words.length) return segs
+
+  let current: WordToken[] = [words[0]]
+
+  const flush = () => {
     segs.push({
-      text:  chunk.map(w => w.word.trim()).join(' ').trim(),
-      start: chunk[0].start,
-      end:   chunk[chunk.length - 1].end,
+      text:  current.map(w => w.word.trim()).join(' ').trim(),
+      start: current[0].start,
+      end:   current[current.length - 1].end,
     })
+    current = []
   }
+
+  for (let i = 1; i < words.length; i++) {
+    const gap = words[i].start - words[i - 1].end
+    // Split on silence OR when word-count limit is reached
+    if (gap >= PAUSE_THRESHOLD || current.length >= perGroup) {
+      flush()
+    }
+    current.push(words[i])
+  }
+  if (current.length) flush()
+
   return segs
 }
 
