@@ -810,7 +810,7 @@ function AppContent({ user }: { user: User }) {
     )
   }
 
-  // License valid but no org yet (e.g. just paid via Stripe) — show create org step.
+  // License valid but no org yet — show create org step.
   // Skip if the org query failed (Supabase 500) — fail open rather than blocking the user.
   if (myOrgs.length === 0 && !license.isSuperAdmin && !orgLoadError) {
     return (

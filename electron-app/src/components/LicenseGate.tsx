@@ -83,13 +83,22 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
     setOrgCreateLoading(true)
     setOrgCreateErr(null)
     const { data, error } = await supabase.rpc('create_org', { p_name: orgName.trim() })
-    setOrgCreateLoading(false)
     if (error) {
+      setOrgCreateLoading(false)
       setOrgCreateErr(error.message)
-    } else {
-      if (data) localStorage.setItem('ig-tracker-current-org', data as string)
-      onActivated()
+      return
     }
+    const orgId = data as string
+    if (orgId) {
+      // Ensure the creator has an organization_members row (the RPC may have missed it on older DB versions)
+      await supabase.from('organization_members').upsert(
+        { org_id: orgId, user_id: userId, role: 'owner', perm_overrides: {} },
+        { onConflict: 'org_id,user_id', ignoreDuplicates: true }
+      )
+      localStorage.setItem('ig-tracker-current-org', orgId)
+    }
+    setOrgCreateLoading(false)
+    onActivated()
   }
 
   // License key
