@@ -19,7 +19,11 @@ const LANG_LABELS: Record<Lang, string> = {
   zh: '中文', pt: 'Português', ar: 'العربية',
 }
 
-const PAUSE_THRESHOLD = 0.65 // seconds of silence → force new segment
+// Gap between words that signals a new speaker or a clear phrase break.
+// Whisper doesn't return speaker labels, so silence is the only proxy.
+// 0.9s covers most inter-speaker pauses; 0.4s splits after reaching perGroup.
+const PAUSE_SPEAKER = 0.9  // definite break — likely speaker change
+const PAUSE_PHRASE  = 0.4  // soft break — only flush when current segment has ≥2 words
 
 function groupWords(words: WordToken[], perGroup: number): Segment[] {
   const segs: Segment[] = []
@@ -38,10 +42,11 @@ function groupWords(words: WordToken[], perGroup: number): Segment[] {
 
   for (let i = 1; i < words.length; i++) {
     const gap = words[i].start - words[i - 1].end
-    // Split on silence OR when word-count limit is reached
-    if (gap >= PAUSE_THRESHOLD || current.length >= perGroup) {
-      flush()
-    }
+    const hardBreak = gap >= PAUSE_SPEAKER                             // speaker change / long silence
+    const softBreak = gap >= PAUSE_PHRASE && current.length >= 2      // phrase pause + enough words
+    const wordLimit = current.length >= perGroup                       // hit the word-count cap
+
+    if (hardBreak || softBreak || wordLimit) flush()
     current.push(words[i])
   }
   if (current.length) flush()
