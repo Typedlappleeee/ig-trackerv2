@@ -560,6 +560,13 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   try {
     const phoneIds = task.phones.map(p => p.geelark_id)
 
+    // Fetch fresh reels_trial_unsupported flags so we respect per-phone eligibility
+    const { data: phoneFlagsRaw } = await supabase
+      .from('phones').select('geelark_id, reels_trial_unsupported').in('geelark_id', phoneIds)
+    const phoneFlags = new Map<string, boolean>(
+      (phoneFlagsRaw ?? []).map(r => [r.geelark_id, r.reels_trial_unsupported ?? false])
+    )
+
     // ── Step 1 : upload des vidéos vers GéeLark (séquentiel, AVANT le démarrage) ──
     // Exactement comme MassPosting : on upload d'abord, on démarre les téléphones
     // après. Sinon le téléphone reste inactif pendant l'upload et GéeLark l'éteint.
@@ -606,6 +613,7 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     const baseTs = Math.floor(Date.now() / 1000)
     const taskIdByGid: Record<string, string> = {}
     const rpaIds: string[] = []
+    const trialReelsActive = new Set<string>()  // geelark_ids where shareType:2 was sent
     let fails = 0
     let rpaCreated = 0
     for (let i = 0; i < task.phones.length; i++) {
@@ -614,12 +622,16 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
       const vidIdx = task.mode === 'random'
         ? Math.floor(Math.random() * validTokens.length)
         : i % validTokens.length
+      const trialUnsupported = phoneFlags.get(phone.geelark_id) ?? false
+      const useTrialReels = task.reels_trial && !trialUnsupported
+      if (task.reels_trial && trialUnsupported)
+        log(`⚠ Trial Reels désactivé pour ${name} (compte non éligible)`)
       const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
         id:          phone.geelark_id,
         scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
         description: task.caption,
         video:       [validTokens[vidIdx]],
-        ...(task.reels_trial ? { shareType: 2 } : {}),
+        ...(useTrialReels ? { shareType: 2 } : {}),
       })
       if (res['code'] === 0) {
         rpaCreated++
@@ -635,10 +647,17 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
         }
         console.log('[Task] instagramPubReels response data:', JSON.stringify(d))
         if (tid) { rpaIds.push(tid); taskIdByGid[phone.geelark_id] = tid }
+        if (useTrialReels) trialReelsActive.add(phone.geelark_id)
         log(`✅ Tâche créée : ${name}${tid ? '' : ' (ID non récupéré)'}`)
       } else {
         fails++
         log(`❌ ${name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
+        // Task refused while trial reels was active → mark phone
+        if (useTrialReels) {
+          await supabase.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', phone.geelark_id)
+          log(`🔕 ${name} marqué : Trial Reels non supporté`)
+          phoneFlags.set(phone.geelark_id, true)
+        }
       }
     }
 
@@ -689,7 +708,17 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
           const name  = phone?.ig_username ?? phone?.phone_name ?? tid
           const fail  = item['failDesc'] ? ` — ${item['failDesc']}` : ''
           log(`${STATUS[status] ?? status} ${name}${fail}`)
-          if (status === 3) pollDone++; else pollFail++
+          if (status === 3) {
+            pollDone++
+          } else {
+            pollFail++
+            // If trial reels was used for this phone and it failed → mark as unsupported
+            if (gid && trialReelsActive.has(gid) && !(phoneFlags.get(gid) ?? false)) {
+              await supabase.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', gid)
+              log(`🔕 ${name} marqué : Trial Reels non supporté`)
+              phoneFlags.set(gid, true)
+            }
+          }
           // Éteint ce téléphone dès que sa tâche est finie
           if (gid && !stopped.has(gid)) {
             stopped.add(gid)
