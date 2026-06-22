@@ -27,7 +27,7 @@ const FN_BUDGET_MS = 230_000
 //   post "done" avec un log explicite — les téléphones restent allumés
 //   le temps que GeeLark exécute les tâches.
 
-interface PhoneRec { geelark_id: string; phone_name: string; ig_username: string | null }
+interface PhoneRec { geelark_id: string; phone_name: string; ig_username: string | null; reels_trial_unsupported?: boolean }
 interface VideoRec { token: string; title: string }
 
 type StepType = 'publication' | 'story' | 'warmup'
@@ -409,9 +409,21 @@ Deno.serve(async (req) => {
 
       // 6. Tâches RPA — scheduleAt décalé au lieu de sleep entre comptes
       const taskIds: string[] = []
+      const taskPhoneMap = new Map<string, PhoneRec>()  // taskId → phone
       let failedCount = 0
       const baseTs = Math.floor(Date.now() / 1000)
       const usedVideoIndices = new Set<number>()
+
+      // Fetch fresh reels_trial_unsupported flags for phones
+      const geelarkIds = phones.map(p => p.geelark_id)
+      const { data: phoneFlagsRaw } = await db.from('phones')
+        .select('geelark_id, reels_trial_unsupported')
+        .in('geelark_id', geelarkIds)
+      const phoneFlags = new Map<string, boolean>(
+        (phoneFlagsRaw ?? []).map((r: { geelark_id: string; reels_trial_unsupported: boolean }) =>
+          [r.geelark_id, r.reels_trial_unsupported ?? false])
+      )
+
       // Pre-resolve video tokens (upload Supabase URLs to GeeLark once, deduplicated)
       const resolvedTokens: string[] = []
       for (let vi = 0; vi < videos.length; vi++) {
@@ -423,20 +435,30 @@ Deno.serve(async (req) => {
           ? Math.floor(Math.random() * videos.length)
           : i % videos.length
         usedVideoIndices.add(videoIdx)
+        const trialUnsupported = phoneFlags.get(phone.geelark_id) ?? false
+        const useTrialReels = post.reels_trial && !trialUnsupported
+        if (post.reels_trial && trialUnsupported) {
+          log(`⚠ Trial Reels désactivé pour ${phone.ig_username ?? phone.phone_name} (compte non éligible)`)
+        }
         const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
           scheduleAt:  baseTs + i * delayMin * 60,
           description: post.caption,
           video:       [resolvedTokens[videoIdx]],
-          ...(post.reels_trial ? { shareType: 2 } : {}),
+          ...(useTrialReels ? { shareType: 2 } : {}),
         })
         const taskId = res.data?.id ?? res.data?.taskId ?? null
         if (res.code === 0) {
-          if (taskId) taskIds.push(taskId)
+          if (taskId) { taskIds.push(taskId); taskPhoneMap.set(taskId, phone) }
           log(`✅ Tâche créée : ${phone.ig_username ?? phone.phone_name}${delayMin && i ? ` (départ +${i * delayMin} min)` : ''}`)
         } else {
           failedCount++
           log(`❌ Tâche refusée (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'}`)
+          // If trial reels was active for this phone and the task was refused, mark it
+          if (useTrialReels) {
+            await db.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', phone.geelark_id)
+            log(`🔕 ${phone.ig_username ?? phone.phone_name} marqué : Trial Reels non supporté`)
+          }
         }
       }
 
@@ -468,7 +490,16 @@ Deno.serve(async (req) => {
             const tid = it.id ?? it.taskId
             const st = Number(it.status)
             if (st === 3) { log(`✅ Succès : ${tid}`); pending.delete(tid) }
-            else if ([4, 7, 8].includes(st)) { log(`❌ Échec/annulé : ${it.failDesc ?? tid}`); pending.delete(tid) }
+            else if ([4, 7, 8].includes(st)) {
+              const failedPhone = taskPhoneMap.get(tid)
+              log(`❌ Échec/annulé (${failedPhone?.ig_username ?? tid}): ${it.failDesc ?? '?'}`)
+              // If trial reels was used for this phone and it failed, mark it as unsupported
+              if (failedPhone && post.reels_trial && !(phoneFlags.get(failedPhone.geelark_id) ?? false)) {
+                await db.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', failedPhone.geelark_id)
+                log(`🔕 ${failedPhone.ig_username ?? failedPhone.phone_name} marqué : Trial Reels non supporté`)
+              }
+              pending.delete(tid)
+            }
           }
         }
         if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) encore en cours après 3 min — GeelarK continue en arrière-plan.`)

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { zipSync } from 'fflate'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
@@ -11,6 +12,7 @@ import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/Toast'
+import { DriveConnectionsModal } from '@/components/DriveConnections'
 
 interface BankProps { user: User }
 
@@ -341,6 +343,7 @@ export function Bank({ user }: BankProps) {
   const [error, setError]         = useState<string | null>(null)
   const [dragging, setDragging]   = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showDriveModal, setShowDriveModal] = useState(false)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [newFolderName, setNewFolderName]   = useState('')
   const [showNewFolder, setShowNewFolder]   = useState(false)
@@ -358,6 +361,8 @@ export function Bank({ user }: BankProps) {
   const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null)
   // Empty folders — now stored in Supabase (sentinel rows) so all org members see them
   const [emptyFolders, setEmptyFolders] = useState<string[]>([])
+  // Drive-sourced folders — show a Drive icon in the sidebar
+  const [driveFolders, setDriveFolders] = useState<Set<string>>(new Set())
 
   // Context menu
   const [ctxMenu, setCtxMenu]       = useState<CtxMenu | null>(null)
@@ -444,10 +449,17 @@ export function Bank({ user }: BankProps) {
       from += PAGE
     }
     {
-      // Sentinel rows mark empty folders so all org members can see them.
-      // They are identified by notes === '__sf_folder__' and no storage_path.
-      const isSentinel = (i: ContentItem) => i.notes === '__sf_folder__' && !i.storage_path && !i.file_url
+      // Sentinel rows : __sf_folder__ (normal) ou __sf_drive_folder__ (Drive).
+      const isSentinel = (i: ContentItem) =>
+        (i.notes === '__sf_folder__' || i.notes === '__sf_drive_folder__') && !i.storage_path && !i.file_url
       const sentinelFolders = allRows.filter(isSentinel).map(i => i.title).filter(Boolean)
+
+      // Dossiers Drive = sentinel Drive + items avec source 'drive'
+      const driveSet = new Set<string>()
+      allRows.filter(isSentinel).filter(i => i.notes === '__sf_drive_folder__').forEach(i => { if (i.folder) driveSet.add(i.folder) })
+      allRows.filter(i => (i as any).source === 'drive' && i.folder).forEach(i => { driveSet.add(i.folder!) })
+      setDriveFolders(driveSet)
+
       let rows = allRows.filter(i => !isSentinel(i))
 
       // Migrate legacy localStorage folders to Supabase (one-time, per org)
@@ -877,6 +889,15 @@ export function Bank({ user }: BankProps) {
           </button>
 
           <button
+            onClick={() => setShowDriveModal(true)}
+            className="sf-btn sf-btn-ghost cursor-pointer"
+            title={t('bankDriveTitle')}
+          >
+            <SfIcon size={14}><path d="M7.71 3.5 1.15 15l3.42 6 6.56-11.5zM22.85 15 16.29 3.5H9.43L16 15zM5.43 16.5 2 22.5h13.14l3.43-6z"/></SfIcon>
+            {t('bankDrive')}
+          </button>
+
+          <button
             onClick={() => setShowAddModal(true)}
             className="sf-btn sf-btn-primary cursor-pointer"
           >
@@ -1029,6 +1050,7 @@ export function Bank({ user }: BankProps) {
                 name={f}
                 count={items.filter(i => (i as unknown as {folder?: string}).folder === f).length}
                 active={selectedFolder === f}
+                isDrive={driveFolders.has(f)}
                 onClick={() => setSelectedFolder(f)}
                 onRename={(newName) => renameFolder(f, newName)}
                 onDelete={() => setFolderModal({ name: f, mode: 'delete' })}
@@ -1538,6 +1560,16 @@ export function Bank({ user }: BankProps) {
           onClose={() => setShowAddModal(false)}
         />
       )}
+      {showDriveModal && (
+        <DriveConnectionsModal
+          user={user}
+          orgId={isPersonal ? null : (currentOrg?.id ?? null)}
+          folders={folders}
+          serviceEmail="scaleflow@starify-agencies.iam.gserviceaccount.com"
+          onClose={() => setShowDriveModal(false)}
+          onSynced={() => loadItems()}
+        />
+      )}
       {renameItem && (
         <RenameModal item={renameItem} onSave={renameItemSave} onClose={() => setRenameItem(null)} />
       )}
@@ -1578,10 +1610,11 @@ export function Bank({ user }: BankProps) {
 }
 
 // ── Folder row with inline rename ────────────────────────────────────────────
-function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, onDropItem }: {
+function FolderRow({ name, count, active, isDrive, onClick, onRename, onDelete, onMerge, onDropItem }: {
   name: string
   count: number
   active: boolean
+  isDrive?: boolean
   onClick: () => void
   onRename: (newName: string) => void
   onDelete: () => void
@@ -1639,7 +1672,10 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
       }}
     >
       <span style={{ color: active || dragOver ? 'var(--accent-lt)' : 'var(--text-3)' }} className="flex-shrink-0">
-        {dragOver ? <IconFolderOpen size={13} /> : <IconFolder size={13} />}
+        {isDrive && !dragOver
+          ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M7.71 3.5 1.15 15l3.42 6 6.56-11.5zM22.85 15 16.29 3.5H9.43L16 15zM5.43 16.5 2 22.5h13.14l3.43-6z"/></svg>
+          : dragOver ? <IconFolderOpen size={13} /> : <IconFolder size={13} />
+        }
       </span>
       <span
         className="text-[12px] font-medium flex-1 truncate"
@@ -1851,7 +1887,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
 
   const loading = item.storage_path && !cloudUrl && !urlError
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm"
       onClick={onClose}
@@ -1912,7 +1948,8 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
           />
         ))}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -2030,9 +2067,23 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
         </div>
       </div>
 
+      {/* Footer: title + ⋮ menu button */}
+      {!selectionMode && (
+        <div className="flex items-center gap-1 px-2 py-1.5" style={{ borderTop: '1px solid var(--border)' }}>
+          <p className="flex-1 text-[11px] font-medium text-text2 truncate">{item.title}</p>
+          <button
+            className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-text2 hover:text-text hover:bg-surface2 transition-colors"
+            onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
+            title="Options"
+          >
+            <IconMoreVert size={13} />
+          </button>
+        </div>
+      )}
+
       {/* Tags row */}
       {item.tags.length > 0 && (
-        <div className="px-2.5 py-2 flex flex-wrap gap-1" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="px-2.5 py-1.5 flex flex-wrap gap-1" style={{ borderTop: '1px solid var(--border)' }}>
           {item.tags.slice(0, 3).map(tag => (
             <span key={tag} className="sf-badge sf-badge-accent text-[9px]">#{tag}</span>
           ))}

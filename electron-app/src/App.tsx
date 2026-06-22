@@ -551,7 +551,9 @@ import { initIgStatsPoller } from '@/lib/igStatsPoller'
 // Pages are lazy-loaded so each route ships as its own chunk — the initial
 // bundle only carries the shell + Hub (default landing page after login).
 import Hub                   from '@/pages/Hub'
-const Phones         = lazy(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
+const Phones          = lazy(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
+const AccountCreator  = lazy(() => import('@/pages/AccountCreator'))
+const TikTokPosting   = lazy(() => import('@/pages/TikTokPosting'))
 const Publish        = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
 const BankHub        = lazy(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
 const Montage        = lazy(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
@@ -566,6 +568,7 @@ const VideoRepurpose = lazy(() => import('@/pages/VideoRepurpose').then(m => ({ 
 const Mixer          = lazy(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
 const Licences       = lazy(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
 const Support        = lazy(() => import('@/pages/Support').then(m => ({ default: m.Support })))
+const History        = lazy(() => import('@/pages/History').then(m => ({ default: m.History })))
 const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazy(() => import('@/pages/StoryLink'))
@@ -573,12 +576,14 @@ const Subtitles      = lazy(() => import('@/pages/Subtitles').then(m => ({ defau
 const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { AppTour }           from '@/components/AppTour'
+import { canSeeTab }         from '@/lib/permissions'
+import type { PageKey }      from '@/lib/supabase'
 
 const BETA_KEY  = 'scaleflow-v1-seen'
 const TOUR_KEY  = 'scaleflow-show-tour'
 
 function AppContent({ user }: { user: User }) {
-  const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError } = useOrg()
+  const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError, role, perms } = useOrg()
   const conns = useConnections(user)
   const [page, setPage]                     = useState<Page>('hub')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
@@ -637,7 +642,7 @@ function AppContent({ user }: { user: User }) {
     let cancelled = false
     // 8s timeout — if checkLicense hangs, fail open so the user isn't locked out
     const fallback = setTimeout(() => {
-      if (!cancelled) { setLicense({ valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
     }, 8000)
     Promise.resolve(checkLicense(user.id, currentOrg?.id ?? null)).then(async l => {
       clearTimeout(fallback)
@@ -657,7 +662,7 @@ function AppContent({ user }: { user: User }) {
       if (!cancelled) { setCreditBalance(bal); setCreditLoading(false) }
     }).catch(() => {
       clearTimeout(fallback)
-      if (!cancelled) { setLicense({ valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
     })
     return () => { cancelled = true; clearTimeout(fallback) }
   }, [user.id, currentOrg?.id, currentOrg?.owner_id])
@@ -805,12 +810,13 @@ function AppContent({ user }: { user: User }) {
       <LicenseGate
         userId={user.id}
         email={user.email ?? null}
+        initialStep={license.expired ? 'expired' : undefined}
         onActivated={() => checkLicense(user.id, currentOrg?.id ?? null).then(setLicense)}
       />
     )
   }
 
-  // License valid but no org yet (e.g. just paid via Stripe) — show create org step.
+  // License valid but no org yet — show create org step.
   // Skip if the org query failed (Supabase 500) — fail open rather than blocking the user.
   if (myOrgs.length === 0 && !license.isSuperAdmin && !orgLoadError) {
     return (
@@ -825,7 +831,9 @@ function AppContent({ user }: { user: User }) {
 
   const content = (() => {
     switch (page) {
-      case 'phones':       return <Phones      user={user} key={refreshTick} />
+      case 'phones':          return <Phones          user={user} key={refreshTick} />
+      case 'accountcreator':  return <AccountCreator  user={user} />
+      case 'tiktokposting':   return <TikTokPosting   user={user} />
       case 'posting':      return <Publish     user={user} />
       case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
@@ -846,6 +854,7 @@ function AppContent({ user }: { user: User }) {
       case 'scaleia':      return <ScaleIA />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
+      case 'history':      return <History     user={user} />
 
     }
   })()
@@ -854,7 +863,11 @@ function AppContent({ user }: { user: User }) {
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
-      {showTour && <AppTour onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }} onNavigate={p => { setPage(p as Page); }} />}
+      {showTour && <AppTour
+        onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }}
+        onNavigate={p => { setPage(p as Page) }}
+        canSeePage={role ? (p) => canSeeTab(role, perms, p as PageKey) : undefined}
+      />}
       <Layout
         user={user}
         page={page}

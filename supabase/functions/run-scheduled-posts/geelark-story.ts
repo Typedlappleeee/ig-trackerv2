@@ -289,7 +289,7 @@ export async function postStoryServer(
   // ── 1. Push image to phone gallery ────────────────────────────────────────
   log('🖼 Chargement de l\'image…')
   // Always save as jpg on phone (Instagram accepts JPEG; avoids PNG classification issues)
-  const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
+  const imgPath = '/sdcard/DCIM/Camera/sf_story.png'
 
   // Download the image directly (no CORS in Deno), then resize/compress with
   // ImageScript. Target: small JPEG so the base64 push is fast.
@@ -316,9 +316,9 @@ export async function postStoryServer(
       const r = Math.min(MAX / w, MAX / h)
       img.resize(Math.round(w * r), Math.round(h * r))
     }
-    const jpeg = await img.encodeJPEG(70)
-    pushData = base64Encode(jpeg)
-    log(`   🗜️ ImageScript: ${Math.round(originalBytes.length / 1024)} KB → ${Math.round((pushData.length * 3) / 4 / 1024)} KB (JPEG)`)
+    const png = await img.encodePNG()
+    pushData = base64Encode(png)
+    log(`   🗜️ ImageScript: ${Math.round(originalBytes.length / 1024)} KB → ${Math.round((pushData.length * 3) / 4 / 1024)} KB (PNG)`)
   } catch (e) {
     // Fallback: push the raw downloaded bytes without resize
     log(`   ⚠️ ImageScript: ${e instanceof Error ? e.message : String(e)} — push brut sans redimensionnement`)

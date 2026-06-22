@@ -44,7 +44,7 @@ module.exports = async (req, res) => {
     }
 
     // ── Build one FFmpeg call for all variants (single decode pass) ────────
-    const outPaths = variants.map((_, i) => path.join(tmpDir, `rp_out_${ts}_${i}.mp4`))
+    const outPaths = variants.map((_, i) => path.join(tmpDir, `rp_out_${ts}_${i}.mov`))
 
     // filter_complex: each variant gets its own named output [v0], [v1], …
     const filterComplex = variants.map((v, i) => `[0:v:0]${v.vf}[v${i}]`).join(';')
@@ -76,12 +76,12 @@ module.exports = async (req, res) => {
       try {
         const rand = Math.random().toString(36).slice(2)
         const resultPath = userId
-          ? `videos/users/${userId}/rp-out-${ts}_${i}_${rand}.mp4`
-          : `repurpose-results/${ts}_${i}_${rand}.mp4`
+          ? `videos/users/${userId}/rp-out-${ts}_${i}_${rand}.mov`
+          : `repurpose-results/${ts}_${i}_${rand}.mov`
 
         const outBuf = fs.readFileSync(outPaths[i])
         const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
-          contentType: 'video/mp4', upsert: true,
+          contentType: 'video/quicktime', upsert: true,
         })
         if (upErr) throw new Error(upErr.message)
 

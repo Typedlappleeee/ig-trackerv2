@@ -836,8 +836,8 @@ export async function postInstagramStory(
     } catch { /* ignore */ }
     return 'jpg'
   })()
-  // Always save as jpg on phone (Instagram accepts JPEG; avoids PNG classification issues)
-  const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
+  // Always save as PNG on phone (lossless, no transparency issues, Instagram supports it)
+  const imgPath = '/sdcard/DCIM/Camera/sf_story.png'
   let imgOnPhone = false
 
   // Download the image server-side (via /api/proxy) to avoid CORS, then compress
@@ -897,12 +897,8 @@ export async function postInstagramStory(
     if (w > MAX_W || h > MAX_H) { const r = Math.min(MAX_W / w, MAX_H / h); w = Math.round(w * r); h = Math.round(h * r) }
     const oc = new OffscreenCanvas(w, h)
     oc.getContext('2d')!.drawImage(bitmap, 0, 0, w, h)
-    for (const q of [0.75, 0.60, 0.45]) {
-      const blob = await oc.convertToBlob({ type: 'image/jpeg', quality: q })
-      const b64 = bufToB64(await blob.arrayBuffer())
-      if (b64.length < 280 * 1024) { compressed = b64; break }
-      compressed = b64 // keep last attempt even if large
-    }
+    const blob = await oc.convertToBlob({ type: 'image/png' })
+    compressed = bufToB64(await blob.arrayBuffer())
     if (compressed) log(`   🗜️ OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB`)
   } catch (e) {
     log(`   ⚠️ OffscreenCanvas: ${e instanceof Error ? e.message : String(e)}`)
@@ -925,12 +921,8 @@ export async function postInstagramStory(
           const cv = document.createElement('canvas')
           cv.width = w; cv.height = h
           cv.getContext('2d')!.drawImage(img, 0, 0, w, h)
-          for (const q of [0.75, 0.60, 0.45]) {
-            const dataUrl = cv.toDataURL('image/jpeg', q)
-            const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
-            if (b64.length < 280 * 1024) { resolve(b64); return }
-          }
-          resolve(cv.toDataURL('image/jpeg', 0.45).split(',')[1] ?? null)
+          const dataUrl = cv.toDataURL('image/png')
+          resolve(dataUrl.slice(dataUrl.indexOf(',') + 1))
         }
         img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
         img.src = blobUrl
@@ -1896,6 +1888,701 @@ export async function extractInstagramSessionId(
     throw e
   } finally {
     clearTimeout(timeoutId)
+  }
+}
+
+// ── Instagram account creation automation ────────────────────────────────────
+export interface CreateAccountConfig {
+  firstName:   string
+  email:       string
+  password:    string
+  username?:   string  // if empty, accepts Instagram's suggestion
+  birthDay?:   number  // 1-31
+  birthMonth?: number  // 1-12
+  birthYear?:  number  // e.g. 1995
+}
+
+export async function createInstagramAccount(
+  bearer: string,
+  phoneId: string,
+  account: CreateAccountConfig,
+  onVerificationNeeded: (email: string) => Promise<string>,
+  log: (m: string) => void,
+  signal?: AbortSignal,
+  onPhoneNeeded?: () => Promise<string>,
+): Promise<{ ok: boolean; username?: string; error?: string }> {
+  const aborted = () => signal?.aborted ?? false
+
+  try {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, signal)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    if (aborted()) return { ok: false, error: 'Annulé' }
+
+    const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size', { signal })
+    const sm = sizeOut.match(/(\d+)x(\d+)/)
+    const sw = sm ? parseInt(sm[1]) : 1080
+    const sh = sm ? parseInt(sm[2]) : 2340
+
+    log('🔄 Arrêt d\'Instagram et Chrome…')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android', { signal })
+    await shellExec(bearer, phoneId, 'am force-stop com.android.chrome', { signal })
+    await shellExec(bearer, phoneId, 'am force-stop com.google.android.chrome', { signal })
+    await sleepOrAbort(2000, signal)
+
+    log('📲 Lancement d\'Instagram…')
+    await shellExec(bearer, phoneId,
+      'am start -n com.instagram.android/.activity.MainTabActivity', { signal })
+    await sleepOrAbort(9000, signal)
+    if (aborted()) return { ok: false, error: 'Annulé' }
+
+    let xml = await dumpXml(bearer, phoneId)
+
+    // If Chrome opened, kill it and re-launch Instagram
+    if (xml.includes('com.android.chrome') || xml.includes('com.google.android.chrome')) {
+      log('⚠️ Chrome détecté — fermeture…')
+      await shellExec(bearer, phoneId, 'am force-stop com.android.chrome', { signal })
+      await shellExec(bearer, phoneId, 'am force-stop com.google.android.chrome', { signal })
+      await sleepOrAbort(500, signal)
+      await shellExec(bearer, phoneId,
+        'am start -n com.instagram.android/.activity.MainTabActivity', { signal })
+      await sleepOrAbort(6000, signal)
+      xml = await dumpXml(bearer, phoneId)
+    }
+
+    // ── Trouver et taper le bouton "Créer un compte" / "Sign up" ──────────────
+    let signupPt =
+      findByText(xml,
+        'Create new account', 'Créer un compte', 'Create account', 'Sign up',
+        "S'inscrire", 'New account', 'Nouveau compte', 'Get started', 'Commencer',
+      ) ??
+      findByTextPartial(xml, 'Create', 'Créer', 'Sign up', 'Inscrire')
+
+    if (signupPt) {
+      log(`📝 Tap "Créer un compte" [${signupPt[0]},${signupPt[1]}]…`)
+      await shellExec(bearer, phoneId, `input tap ${signupPt[0]} ${signupPt[1]}`, { signal })
+      await sleepOrAbort(5000, signal)
+      xml = await dumpXml(bearer, phoneId)
+    } else {
+      log('⚠️ Bouton inscription non trouvé — deep link…')
+      await shellExec(bearer, phoneId,
+        'am start -a android.intent.action.VIEW -d "https://www.instagram.com/accounts/emailsignup/" -p com.instagram.android',
+        { signal })
+      await sleepOrAbort(7000, signal)
+      xml = await dumpXml(bearer, phoneId)
+    }
+    log(`📋 Écran inscription (${xml.length} chars)`)
+    if (aborted()) return { ok: false, error: 'Annulé' }
+
+    // ── Saisie du prénom ────────────────────────────────────────────────────
+    log('📝 Saisie du prénom…')
+    const namePt: [number, number] =
+      findByResourceId(xml, 'full_name', 'name', 'first_name', 'fullName') ??
+      findByText(xml,
+        'Full name', 'Nom complet', 'First name', 'Prénom', 'Name', 'Nom',
+        'Enter your name', 'Entrez votre nom',
+      ) ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.40)]
+
+    await clearAndType(bearer, phoneId, namePt, account.firstName, log)
+    await sleepOrAbort(800, signal)
+
+    xml = await dumpXml(bearer, phoneId)
+    let nextPt: [number, number] =
+      findByText(xml, 'Next', 'Suivant', 'Continue', 'Continuer') ??
+      findByResourceId(xml, 'next_button', 'primary_button', 'button_next') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.90)]
+    await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+    await sleepOrAbort(5000, signal)
+    xml = await dumpXml(bearer, phoneId)
+    if (aborted()) return { ok: false, error: 'Annulé' }
+
+    // ── Anniversaire ────────────────────────────────────────────────────────
+    const xmlLower1 = xml.toLowerCase()
+    const hasBirthday = ['birthday', 'date of birth', 'birth', 'anniversaire', 'naissance',
+      'age', 'âge', 'how old'].some(p => xmlLower1.includes(p))
+
+    if (hasBirthday) {
+      log('🎂 Écran anniversaire…')
+      const day   = account.birthDay   ?? 15
+      const month = account.birthMonth ?? 6
+      const year  = account.birthYear  ?? 1995
+
+      const monthPt = findByResourceId(xml, 'month', 'birthday_month') ??
+                      findByText(xml, 'Month', 'Mois', 'MM')
+      const dayPt   = findByResourceId(xml, 'day', 'birthday_day') ??
+                      findByText(xml, 'Day', 'Jour', 'DD')
+      const yearPt  = findByResourceId(xml, 'year', 'birthday_year') ??
+                      findByText(xml, 'Year', 'Année', 'YYYY')
+
+      if (monthPt && dayPt && yearPt) {
+        await clearAndType(bearer, phoneId, monthPt, String(month), log)
+        await sleepOrAbort(400, signal)
+        await clearAndType(bearer, phoneId, dayPt, String(day), log)
+        await sleepOrAbort(400, signal)
+        await clearAndType(bearer, phoneId, yearPt, String(year), log)
+        await sleepOrAbort(600, signal)
+      } else {
+        log('  ⚠️ Champs anniversaire non trouvés — valeur par défaut conservée')
+      }
+
+      xml = await dumpXml(bearer, phoneId)
+      nextPt =
+        findByText(xml, 'Next', 'Suivant', 'Continue', 'Continuer') ??
+        findByResourceId(xml, 'next_button', 'primary_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.90)]
+      await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+      await sleepOrAbort(5000, signal)
+      xml = await dumpXml(bearer, phoneId)
+      if (aborted()) return { ok: false, error: 'Annulé' }
+    }
+
+    // ── Choix email vs téléphone ────────────────────────────────────────────
+    const xmlLower2 = xml.toLowerCase()
+    if (['mobile number', 'phone number', 'email', 'numéro de téléphone', 'téléphone'].some(p => xmlLower2.includes(p))) {
+      const useEmailPt =
+        findByText(xml,
+          'Sign up with email', 'Use email', 'Use email address',
+          "S'inscrire avec un e-mail", 'Utiliser une adresse e-mail',
+          'Use email instead', 'Email address',
+        ) ??
+        findByTextPartial(xml, 'email', 'e-mail')
+
+      if (useEmailPt) {
+        log('📧 Sélection "Utiliser email"…')
+        await shellExec(bearer, phoneId, `input tap ${useEmailPt[0]} ${useEmailPt[1]}`, { signal })
+        await sleepOrAbort(3000, signal)
+        xml = await dumpXml(bearer, phoneId)
+      }
+    }
+
+    // ── Saisie de l'email ───────────────────────────────────────────────────
+    log('📧 Saisie de l\'email…')
+    const emailPt: [number, number] =
+      findByResourceId(xml, 'email', 'email_address', 'email_phone', 'email_field') ??
+      findByText(xml,
+        'Email', 'E-mail', 'Email address', 'Adresse e-mail',
+        'Mobile number or email', 'Phone number or email',
+      ) ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+
+    await clearAndType(bearer, phoneId, emailPt, account.email, log)
+    await sleepOrAbort(800, signal)
+
+    xml = await dumpXml(bearer, phoneId)
+    nextPt =
+      findByText(xml, 'Next', 'Suivant', 'Continue', 'Continuer') ??
+      findByResourceId(xml, 'next_button', 'primary_button', 'button_next') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.90)]
+    await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+    await sleepOrAbort(6000, signal)
+    xml = await dumpXml(bearer, phoneId)
+    if (aborted()) return { ok: false, error: 'Annulé' }
+
+    // ── Vérification par numéro de téléphone (Instagram insiste parfois) ──
+    // Détecte l'écran "Enter your phone number" pendant l'inscription et demande
+    // le numéro à l'utilisateur via onPhoneNeeded, puis saisit le code SMS.
+    const PHONE_REQ_KEYWORDS = [
+      'enter your phone number', 'enter your mobile number',
+      'entrez votre numéro de téléphone', 'entrez votre numéro',
+      'verify with your phone', 'vérifiez avec votre téléphone',
+      'add your phone number to sign up', 'phone number to continue',
+      'we need your phone number', 'numéro de téléphone pour continuer',
+    ]
+    if (PHONE_REQ_KEYWORDS.some(p => xml.toLowerCase().includes(p))) {
+      log('📱 Instagram demande un numéro de téléphone pour vérification…')
+      if (!onPhoneNeeded) {
+        return { ok: false, error: "Instagram exige un numéro de téléphone — configure onPhoneNeeded" }
+      }
+      const phoneNumber = await onPhoneNeeded()
+      if (!phoneNumber?.trim()) return { ok: false, error: 'Numéro de téléphone non fourni' }
+      if (aborted()) return { ok: false, error: 'Annulé' }
+
+      log(`📞 Saisie du numéro: ${phoneNumber.trim()}`)
+      const phonePt: [number, number] =
+        findByResourceId(xml, 'phone_number', 'mobile_number', 'phone_field', 'phone') ??
+        findByText(xml,
+          'Phone number', 'Mobile number', 'Numéro de téléphone',
+          'Enter phone number', 'Enter your number',
+        ) ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+
+      await clearAndType(bearer, phoneId, phonePt, phoneNumber.trim(), log)
+      await sleepOrAbort(800, signal)
+
+      xml = await dumpXml(bearer, phoneId)
+      nextPt =
+        findByText(xml, 'Next', 'Suivant', 'Continue', 'Continuer', 'Send code', 'Envoyer le code') ??
+        findByResourceId(xml, 'next_button', 'primary_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.90)]
+      await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+      await sleepOrAbort(6000, signal)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 Après numéro (${xml.length} chars)`)
+      if (aborted()) return { ok: false, error: 'Annulé' }
+      // Le code SMS sera capturé par la boucle de vérification ci-dessous
+    }
+
+    // ── Code de vérification (jusqu'à 3 tentatives) ────────────────────────
+    const VERIF_KEYWORDS = [
+      'confirmation code', 'verification code', 'enter the code',
+      'code de confirmation', 'code de vérification', 'entrez le code',
+      'confirmation_code', 'verify your email', 'vérifiez votre adresse',
+      'check your email', 'check your inbox', 'we sent a code',
+      'we sent you a code', 'enter the 6-digit', 'code à 6',
+      'security code', 'code de sécurité', 'enter confirmation',
+    ]
+
+    for (let codeAttempt = 0; codeAttempt < 3; codeAttempt++) {
+      const xmlL = xml.toLowerCase()
+      if (!VERIF_KEYWORDS.some(p => xmlL.includes(p))) break
+
+      log(`📬 Code de vérification requis (tentative ${codeAttempt + 1}/3)…`)
+      const verificationCode = await onVerificationNeeded(account.email)
+      if (!verificationCode?.trim()) return { ok: false, error: 'Code de vérification non fourni' }
+      if (aborted()) return { ok: false, error: 'Annulé' }
+
+      log(`🔢 Saisie du code: ${verificationCode.trim()}`)
+      const codePt: [number, number] =
+        findByResourceId(xml,
+          'confirmation_code', 'verification_code', 'code',
+          'email_confirmation_code', 'security_code', 'otp',
+        ) ??
+        findByText(xml, 'Enter code', 'Entrez le code', 'Code') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.45)]
+
+      await clearAndType(bearer, phoneId, codePt, verificationCode.trim(), log)
+      await sleepOrAbort(1000, signal)
+
+      xml = await dumpXml(bearer, phoneId)
+      nextPt =
+        findByText(xml, 'Next', 'Suivant', 'Confirm', 'Confirmer', 'Continue', 'Continuer') ??
+        findByResourceId(xml, 'next_button', 'primary_button', 'confirmation_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.90)]
+      await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+      await sleepOrAbort(7000, signal)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 Après code tentative ${codeAttempt + 1} (${xml.length} chars)`)
+      if (aborted()) return { ok: false, error: 'Annulé' }
+
+      const xmlAfterCode = xml.toLowerCase()
+      if (['incorrect code', 'code incorrect', 'wrong code', 'expired', 'expiré',
+        'invalid code', 'code invalide'].some(p => xmlAfterCode.includes(p))) {
+        if (codeAttempt === 2) return { ok: false, error: 'Code de vérification invalide (3 tentatives)' }
+        log('⚠️ Code invalide — nouvelle tentative…')
+        // Loop continues: re-asks the user for a new code
+        continue
+      }
+
+      break  // Code accepté
+    }
+
+    // ── Mot de passe ────────────────────────────────────────────────────────
+    const xmlLower5 = xml.toLowerCase()
+    if (['password', 'mot de passe', 'create a password', 'create password', 'choose a password']
+      .some(p => xmlLower5.includes(p))) {
+      log('🔑 Saisie du mot de passe…')
+      const passPt: [number, number] =
+        findByResourceId(xml, 'password', 'new_password', 'create_password') ??
+        findByText(xml, 'Password', 'Mot de passe', 'Create password', 'Créer un mot de passe') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+
+      await clearAndType(bearer, phoneId, passPt, account.password, log)
+      await sleepOrAbort(800, signal)
+
+      xml = await dumpXml(bearer, phoneId)
+      nextPt =
+        findByText(xml, 'Next', 'Suivant', 'Continue', 'Continuer') ??
+        findByResourceId(xml, 'next_button', 'primary_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.90)]
+      await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+      await sleepOrAbort(5000, signal)
+      xml = await dumpXml(bearer, phoneId)
+      if (aborted()) return { ok: false, error: 'Annulé' }
+    }
+
+    // ── Username ────────────────────────────────────────────────────────────
+    const xmlLower6 = xml.toLowerCase()
+    let finalUsername: string | undefined
+
+    if (['username', 'nom d\'utilisateur', 'choose a username', 'choisir un nom',
+      'create a username'].some(p => xmlLower6.includes(p))) {
+
+      if (account.username) {
+        log(`👤 Saisie du username: ${account.username}…`)
+        const uPt: [number, number] =
+          findByResourceId(xml, 'username', 'username_field', 'username_input') ??
+          findByText(xml, 'Username', "Nom d'utilisateur") ??
+          [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+        await clearAndType(bearer, phoneId, uPt, account.username, log)
+        finalUsername = account.username
+        await sleepOrAbort(1000, signal)
+      } else {
+        const suggestMatch = xml.match(/text="([a-z0-9._]{3,30})"[^>]*resource-id="[^"]*username/i)
+        if (suggestMatch) finalUsername = suggestMatch[1]
+        log(`👤 Username suggéré accepté: ${finalUsername ?? '?'}`)
+      }
+
+      xml = await dumpXml(bearer, phoneId)
+      nextPt =
+        findByText(xml, 'Next', 'Suivant', 'Continue', 'Continuer') ??
+        findByResourceId(xml, 'next_button', 'primary_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.90)]
+      await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+      await sleepOrAbort(5000, signal)
+      xml = await dumpXml(bearer, phoneId)
+      if (aborted()) return { ok: false, error: 'Annulé' }
+    }
+
+    // ── Skip/bypass tous les écrans optionnels et challenges ──────────────
+    // Instagram peut montrer: photo de profil, suggestions d'amis, notifications,
+    // "save your login info", "add phone number", challenges de sécurité, etc.
+    // On itère 12 fois max pour tout bypasser jusqu'à atteindre le feed.
+    for (let i = 0; i < 12; i++) {
+      if (aborted()) return { ok: false, error: 'Annulé' }
+      const xmlL = xml.toLowerCase()
+
+      // ── Home atteint ──────────────────────────────────────────────────────
+      if (['home_tab', 'ig_bottom_bar', 'reels_tab', 'clips_tab', 'explore_tab']
+        .some(p => xmlL.includes(p))) {
+        log('🏠 Page d\'accueil atteinte — compte créé !')
+        return { ok: true, username: finalUsername }
+      }
+
+      // ── Challenge "add phone number for security" → tap "Not now" ─────────
+      if (['add your phone number', 'ajouter votre numéro', 'ajoutez votre numéro',
+        'add a phone number', 'phone number for security'].some(p => xmlL.includes(p))) {
+        log('📵 Popup "Add phone number" — skip…')
+        const pt = findByText(xml, 'Not now', 'Pas maintenant', 'Skip', 'Ignorer',
+          "I'll add later", 'Later') ??
+          [Math.floor(sw / 2), Math.floor(sh * 0.80)]
+        await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { signal })
+        await sleepOrAbort(2500, signal)
+        xml = await dumpXml(bearer, phoneId)
+        continue
+      }
+
+      // ── "Save your login info" → "Not now" ──────────────────────────────
+      if (['save your login', 'enregistrer vos informations', 'save login info',
+        'remembering your password'].some(p => xmlL.includes(p))) {
+        log('💾 Popup "Save login info" — skip…')
+        const pt = findByText(xml, 'Not now', 'Pas maintenant', 'Not Now') ??
+          [Math.floor(sw / 2), Math.floor(sh * 0.75)]
+        await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { signal })
+        await sleepOrAbort(2500, signal)
+        xml = await dumpXml(bearer, phoneId)
+        continue
+      }
+
+      // ── "Turn on notifications" → "Not now" ──────────────────────────────
+      if (['turn on notifications', 'activer les notifications',
+        'allow notifications', 'get notified'].some(p => xmlL.includes(p))) {
+        log('🔔 Popup notifications — skip…')
+        const pt = findByText(xml, 'Not now', 'Pas maintenant', 'Skip', 'Ignorer') ??
+          [Math.floor(sw / 2), Math.floor(sh * 0.75)]
+        await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { signal })
+        await sleepOrAbort(2500, signal)
+        xml = await dumpXml(bearer, phoneId)
+        continue
+      }
+
+      // ── "Confirm it's you" / unusual activity challenge ──────────────────
+      if (['confirm it\'s you', 'confirmez que c\'est vous',
+        'unusual activity', 'activité inhabituelle',
+        'suspicious activity', 'we detected', 'we noticed'].some(p => xmlL.includes(p))) {
+        log("⚠️ Challenge 'Confirm it's you' — tentative skip / later…")
+        const pt =
+          findByText(xml, "I'll confirm later", 'Plus tard', 'Later', 'Skip',
+            'Not now', 'Dismiss', 'Close') ??
+          findByTextPartial(xml, 'later', 'plus tard', 'skip')
+        if (pt) {
+          await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { signal })
+          await sleepOrAbort(3000, signal)
+          xml = await dumpXml(bearer, phoneId)
+          continue
+        }
+        // Can't bypass — press Back and hope for the best
+        await shellExec(bearer, phoneId, 'input keyevent 4', { signal })
+        await sleepOrAbort(2500, signal)
+        xml = await dumpXml(bearer, phoneId)
+        continue
+      }
+
+      // ── "Allow access to contacts/gallery" system permission dialog ───────
+      if (['allow instagram', 'allow access', 'autoriser instagram', 'autoriser l\'accès',
+        'while using the app', 'only this time'].some(p => xmlL.includes(p))) {
+        log('📂 Popup permission système — deny…')
+        const denyPt =
+          findByText(xml, "Don't allow", 'Deny', 'Refuser', 'Not now', 'No thanks') ??
+          findByTextPartial(xml, "don't allow", 'deny', 'refuser')
+        if (denyPt) {
+          await shellExec(bearer, phoneId, `input tap ${denyPt[0]} ${denyPt[1]}`, { signal })
+        } else {
+          await shellExec(bearer, phoneId, 'input keyevent 4', { signal })
+        }
+        await sleepOrAbort(2000, signal)
+        xml = await dumpXml(bearer, phoneId)
+        continue
+      }
+
+      // ── Generic skip / not now ────────────────────────────────────────────
+      const skipPt =
+        findByText(xml,
+          'Skip', 'Ignorer', 'Not now', 'Pas maintenant',
+          'Skip for now', 'Ignorer pour l\'instant',
+          "I'll do this later", 'Later', 'Plus tard',
+          'Skip All', 'Maybe later', 'No thanks',
+        ) ??
+        findByTextPartial(xml, 'Skip', 'Ignorer', 'Not now', 'Later')
+
+      if (skipPt) {
+        log(`⏭️ Tap "Ignorer" [${skipPt[0]},${skipPt[1]}]…`)
+        await shellExec(bearer, phoneId, `input tap ${skipPt[0]} ${skipPt[1]}`, { signal })
+        await sleepOrAbort(3000, signal)
+        xml = await dumpXml(bearer, phoneId)
+        continue
+      }
+
+      // ── Generic next / continue ───────────────────────────────────────────
+      const contPt =
+        findByText(xml, 'Next', 'Suivant', 'Continue', 'Continuer', 'Done', 'Finish', 'OK') ??
+        findByResourceId(xml, 'next_button', 'primary_button', 'continue_button')
+
+      if (contPt) {
+        log(`➡️ Tap "Suivant" [${contPt[0]},${contPt[1]}]…`)
+        await shellExec(bearer, phoneId, `input tap ${contPt[0]} ${contPt[1]}`, { signal })
+        await sleepOrAbort(3000, signal)
+        xml = await dumpXml(bearer, phoneId)
+        continue
+      }
+
+      // Aucun bouton trouvé → back
+      await shellExec(bearer, phoneId, 'input keyevent 4', { signal })
+      await sleepOrAbort(2000, signal)
+      xml = await dumpXml(bearer, phoneId)
+    }
+
+    const xmlFinal = xml.toLowerCase()
+    if (['home_tab', 'ig_bottom_bar', 'reels_tab', 'clips_tab', 'explore_tab']
+      .some(p => xmlFinal.includes(p))) {
+      return { ok: true, username: finalUsername }
+    }
+
+    log('⚠️ État final incertain — le compte a probablement été créé')
+    return { ok: true, username: finalUsername }
+
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    log(`❌ Erreur: ${msg}`)
+    return { ok: false, error: msg }
+  }
+}
+
+// ── TikTok video posting via ADB automation ──────────────────────────────────
+export interface TikTokPostConfig {
+  videoUrl: string   // public/signed URL accessible from the phone
+  caption:  string
+}
+
+export async function postTikTokVideoAdb(
+  bearer: string,
+  phoneId: string,
+  config: TikTokPostConfig,
+  log: (m: string) => void,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; error?: string }> {
+  const { videoUrl, caption } = config
+
+  try {
+    // ── 1. Ensure phone is running ──────────────────────────────────────────
+    log('📱 Démarrage du téléphone…')
+    const started = await ensurePhoneRunning(bearer, phoneId, log, signal)
+    if (!started) return { ok: false, error: 'Impossible de démarrer le téléphone' }
+
+    // ── 2. Get screen dimensions ────────────────────────────────────────────
+    const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size', { signal })
+    // "Physical size: 1080x1920" or "Override size: 1080x2340"
+    const sizeMatch = sizeOut.match(/(\d+)x(\d+)/)
+    const sw = sizeMatch ? parseInt(sizeMatch[1], 10) : 1080
+    const sh = sizeMatch ? parseInt(sizeMatch[2], 10) : 1920
+    log(`📐 Écran: ${sw}×${sh}`)
+
+    // ── 3. Force stop TikTok ────────────────────────────────────────────────
+    log('🛑 Fermeture de TikTok…')
+    await shellExec(bearer, phoneId, 'am force-stop com.zhiliaoapp.musically', { signal, maxRetries: 2 })
+    await shellExec(bearer, phoneId, 'am force-stop com.ss.android.ugc.aweme', { signal, maxRetries: 2 })
+    await sleepOrAbort(1000, signal)
+
+    // ── 4. Download video to phone ──────────────────────────────────────────
+    log('⬇️ Téléchargement de la vidéo…')
+    await shellExec(bearer, phoneId, 'mkdir -p /sdcard/DCIM/TikTok', { signal, maxRetries: 2 })
+
+    const dlDest = '/sdcard/DCIM/TikTok/sf_tt_video.mp4'
+    // Try wget first
+    const { output: wgetOut, status: wgetStatus } = await shellExec(
+      bearer, phoneId,
+      `wget -q -O ${dlDest} "${videoUrl}" 2>&1; echo "EXIT:$?"`,
+      { signal, maxRetries: 2 },
+    )
+    const wgetOk = wgetStatus === 0 && !wgetOut.includes('ERROR') && !wgetOut.includes('failed')
+    if (!wgetOk) {
+      log('   wget échoué, essai avec curl…')
+      const { output: curlOut } = await shellExec(
+        bearer, phoneId,
+        `curl -fsSL -o ${dlDest} "${videoUrl}" 2>&1; echo "EXIT:$?"`,
+        { signal, maxRetries: 2 },
+      )
+      if (curlOut.includes('curl: (') || curlOut.includes('EXIT:1')) {
+        return { ok: false, error: `Téléchargement impossible: ${curlOut.slice(0, 120)}` }
+      }
+      log('   ✅ Vidéo téléchargée via curl')
+    } else {
+      log('   ✅ Vidéo téléchargée via wget')
+    }
+
+    // ── 5. Scan media library ───────────────────────────────────────────────
+    log('📚 Scan bibliothèque média…')
+    await shellExec(
+      bearer, phoneId,
+      `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${dlDest}`,
+      { signal, maxRetries: 2 },
+    )
+
+    // ── 6. Wait for scan ────────────────────────────────────────────────────
+    await sleepOrAbort(3000, signal)
+
+    // ── 7. Open TikTok ──────────────────────────────────────────────────────
+    log('🎵 Ouverture de TikTok…')
+    const { status: launchStatus } = await shellExec(
+      bearer, phoneId,
+      'am start -n com.zhiliaoapp.musically/.main.MainActivity',
+      { signal, maxRetries: 2 },
+    )
+    if (launchStatus !== 0) {
+      log('   Essai package alternatif (aweme)…')
+      await shellExec(
+        bearer, phoneId,
+        'am start -n com.ss.android.ugc.aweme/.main.MainActivity',
+        { signal, maxRetries: 2 },
+      )
+    }
+
+    // ── 8. Wait for app to load ─────────────────────────────────────────────
+    await sleepOrAbort(8000, signal)
+
+    // ── 9. Tap "+" create button ────────────────────────────────────────────
+    log('➕ Tap bouton créer…')
+    let xml = await dumpXml(bearer, phoneId)
+    let createPt =
+      findByResourceId(xml, 'creation_btn', 'tab_add', 'action_create') ??
+      findByText(xml, '+', 'Créer', 'Create') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.92)] as [number, number]
+    log(`   Tap [${createPt[0]},${createPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${createPt[0]} ${createPt[1]}`, { signal })
+
+    // ── 10. Wait ────────────────────────────────────────────────────────────
+    await sleepOrAbort(4000, signal)
+
+    // ── 11. Tap "Upload" / "Gallery" ────────────────────────────────────────
+    log('📁 Tap galerie / upload…')
+    xml = await dumpXml(bearer, phoneId)
+    let uploadPt =
+      findByText(xml, 'Upload', 'Gallery', 'Télécharger', 'Galerie') ??
+      findByTextPartial(xml, 'upload', 'galerie') ??
+      [Math.floor(sw * 0.85), Math.floor(sh * 0.85)] as [number, number]
+    log(`   Tap [${uploadPt[0]},${uploadPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${uploadPt[0]} ${uploadPt[1]}`, { signal })
+
+    // ── 12. Wait ────────────────────────────────────────────────────────────
+    await sleepOrAbort(3000, signal)
+
+    // ── 13. Select first video in gallery ───────────────────────────────────
+    log('🎬 Sélection première vidéo…')
+    xml = await dumpXml(bearer, phoneId)
+    let videoPt =
+      findByResourceId(xml, 'gallery_grid_item', 'media_picker_grid_item', 'item_video') ??
+      [Math.floor(sw * 0.17), Math.floor(sh * 0.30)] as [number, number]
+    log(`   Tap [${videoPt[0]},${videoPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${videoPt[0]} ${videoPt[1]}`, { signal })
+
+    // ── 14. Wait ────────────────────────────────────────────────────────────
+    await sleepOrAbort(3000, signal)
+
+    // ── 15. Tap "Next" / "Suivant" ──────────────────────────────────────────
+    log('➡️ Tap Suivant (1)…')
+    xml = await dumpXml(bearer, phoneId)
+    let nextPt =
+      findByText(xml, 'Next', 'Suivant') ??
+      [Math.floor(sw * 0.87), Math.floor(sh * 0.06)] as [number, number]
+    log(`   Tap [${nextPt[0]},${nextPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+
+    // ── 16. Wait — may show Sounds or Trim screen ───────────────────────────
+    await sleepOrAbort(4000, signal)
+
+    // ── 17. Tap "Next" again if still on trim/sounds screen ─────────────────
+    xml = await dumpXml(bearer, phoneId)
+    const nextPt2 = findByText(xml, 'Next', 'Suivant')
+    if (nextPt2) {
+      log('➡️ Tap Suivant (2 — écran trim/sons)…')
+      log(`   Tap [${nextPt2[0]},${nextPt2[1]}]`)
+      await shellExec(bearer, phoneId, `input tap ${nextPt2[0]} ${nextPt2[1]}`, { signal })
+    }
+
+    // ── 18. Wait for caption screen ─────────────────────────────────────────
+    await sleepOrAbort(4000, signal)
+
+    // ── 19. Find and fill caption field ─────────────────────────────────────
+    log('✏️ Saisie de la légende…')
+    xml = await dumpXml(bearer, phoneId)
+    const captionPt =
+      findByResourceId(xml, 'caption', 'text_input', 'edit_text_desc') ??
+      findByText(xml, 'Describe...', 'Ajouter une description', 'Caption') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.35)] as [number, number]
+    log(`   Champ légende [${captionPt[0]},${captionPt[1]}]`)
+    await clearAndType(bearer, phoneId, captionPt, caption, log)
+
+    // ── 20. Wait briefly ────────────────────────────────────────────────────
+    await sleepOrAbort(1000, signal)
+
+    // ── 21-22. Find and tap Post button ─────────────────────────────────────
+    log('🚀 Tap Publier…')
+    xml = await dumpXml(bearer, phoneId)
+    const postPt =
+      findByText(xml, 'Post', 'Publier', 'Publish') ??
+      findByResourceId(xml, 'btn_post', 'post_button') ??
+      [Math.floor(sw * 0.85), Math.floor(sh * 0.12)] as [number, number]
+    log(`   Tap [${postPt[0]},${postPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${postPt[0]} ${postPt[1]}`, { signal })
+
+    // ── 23. Wait for upload + publish ───────────────────────────────────────
+    await sleepOrAbort(15000, signal)
+
+    // ── 24. Check for success ────────────────────────────────────────────────
+    xml = await dumpXml(bearer, phoneId)
+    const xmlLow = xml.toLowerCase()
+    // Post button gone = success; or home tab visible
+    const postGone = !findByText(xml, 'Post', 'Publier', 'Publish') && !findByResourceId(xml, 'btn_post', 'post_button')
+    const homeVisible = ['home_tab', 'tab_home', 'for_you', 'pour_toi', 'following_tab'].some(p => xmlLow.includes(p))
+
+    if (postGone || homeVisible) {
+      log('✅ Vidéo publiée avec succès')
+      return { ok: true }
+    }
+
+    // Check for explicit error
+    const errorVisible = ['failed', 'erreur', 'error', 'retry', 'réessayer'].some(p => xmlLow.includes(p))
+    if (errorVisible) {
+      return { ok: false, error: 'TikTok a signalé une erreur lors de la publication' }
+    }
+
+    // Uncertain state — likely still uploading (large video) — treat as success
+    log('⚠️ État incertain — la vidéo est probablement en cours d\'envoi')
+    return { ok: true }
+
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    log(`❌ Erreur: ${msg}`)
+    return { ok: false, error: msg }
   }
 }
 

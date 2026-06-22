@@ -1,55 +1,53 @@
-// Server-side video + caption overlay using native FFmpeg drawtext.
+// Server-side video + caption overlay using sharp (SVG→PNG) + FFmpeg overlay filter.
+// Avoids drawtext/libfreetype dependency that isn't compiled in ffmpeg-static on Vercel.
 // Accepts: POST { videoUrl|storagePath, caption, userId, bucket?, position?, fontSize?, fontColor?, bgOpacity? }
 // Returns: { ok, url, storagePath }
 
 const ffmpegPath = require('ffmpeg-static')
+const sharp      = require('sharp')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { createClient } = require('@supabase/supabase-js')
-const fs = require('fs')
+const fs   = require('fs')
 const path = require('path')
-const os = require('os')
+const os   = require('os')
 
 const execFileAsync = promisify(execFile)
 
-function getSupabaseAdmin() {
+function getSupabaseAdmin({ supabaseToken, supabaseAnonKey } = {}) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase env vars missing')
-  return createClient(url, key, { auth: { persistSession: false } })
+  // Prefer service role key (bypasses RLS); fall back to user JWT passed from client
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (serviceKey) {
+    return createClient(url, serviceKey, { auth: { persistSession: false } })
+  }
+  if (supabaseToken && supabaseAnonKey) {
+    return createClient(url, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${supabaseToken}` } },
+      auth: { persistSession: false },
+    })
+  }
+  throw new Error('Supabase non authentifié — définir SUPABASE_SERVICE_ROLE_KEY dans Vercel')
 }
 
-// Find a usable font file
-function findFont() {
-  const candidates = [
-    path.join(__dirname, 'fonts', 'font-bold.ttf'),
-    path.join(process.cwd(), 'public', 'ffmpeg', 'font-bold.ttf'),
-    path.join(__dirname, '..', 'public', 'ffmpeg', 'font-bold.ttf'),
-    '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-    '/usr/share/fonts/liberation/LiberationSans-Bold.ttf',
-  ]
-  return candidates.find(p => fs.existsSync(p)) ?? null
+function escapeXml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
 }
 
-// Escape special chars for FFmpeg drawtext
-function escapeDrawtext(s) {
-  return s
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/:/g, '\\:')
-    .replace(/\[/g, '\\[')
-    .replace(/\]/g, '\\]')
-    .replace(/,/g, '\\,')
-    .replace(/;/g, '\\;')
-}
-
-// Wrap long text to multiple lines (max ~35 chars per line)
-function wrapText(text, maxLen = 35) {
+// Wrap text so no line exceeds maxPx pixels wide (estimated at ~0.55× fontSize per char for bold Arial)
+function wrapText(text, fontSize, maxPx) {
+  const charW = fontSize * 0.55
+  const maxChars = Math.max(8, Math.floor(maxPx / charW))
   const words = text.split(' ')
   const lines = []
   let current = ''
   for (const word of words) {
-    if (current.length + word.length + 1 > maxLen && current) {
+    if (current.length + word.length + 1 > maxChars && current) {
       lines.push(current)
       current = word
     } else {
@@ -57,7 +55,52 @@ function wrapText(text, maxLen = 35) {
     }
   }
   if (current) lines.push(current)
-  return lines.join('\n')
+  return lines
+}
+
+// Build a tight text overlay PNG via SVG → sharp
+// Embeds the font as a base64 data URI so librsvg doesn't need system fonts.
+async function buildOverlayPng(lines, fontSize, fontColor, bgOpacity, fontPath) {
+  const charW  = fontSize * 0.55
+  const lineH  = Math.round(fontSize * 1.38)
+  const padH   = Math.round(fontSize * 0.42)
+  const padW   = Math.round(fontSize * 0.65)
+  const radius = Math.round(fontSize * 0.18)
+
+  const maxLineW = Math.max(...lines.map(l => l.length)) * charW
+  const svgW  = Math.ceil(maxLineW + padW * 2)
+  const svgH  = Math.ceil(lines.length * lineH + padH * 2)
+  const midX  = svgW / 2
+
+  // Embed font as base64 data URI so librsvg finds it without system font access
+  let fontFaceDecl = ''
+  let fontFamily   = 'Arial, Helvetica, sans-serif'
+  if (fontPath && fs.existsSync(fontPath)) {
+    const b64 = fs.readFileSync(fontPath).toString('base64')
+    fontFaceDecl = `<defs><style>@font-face{font-family:'SF';src:url('data:font/truetype;base64,${b64}');font-weight:bold;}</style></defs>`
+    fontFamily   = "'SF', Arial, sans-serif"
+  }
+
+  const textEls = lines.map((line, i) => {
+    const y = padH + lineH * 0.78 + i * lineH
+    return `<text x="${midX}" y="${y}"
+      text-anchor="middle"
+      font-family="${escapeXml(fontFamily)}"
+      font-size="${fontSize}"
+      font-weight="bold"
+      fill="${escapeXml(fontColor)}">${escapeXml(line)}</text>`
+  }).join('\n')
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">
+  ${fontFaceDecl}
+  <rect x="0" y="0" width="${svgW}" height="${svgH}"
+    rx="${radius}" ry="${radius}"
+    fill="rgba(0,0,0,${bgOpacity})"/>
+  ${textEls}
+</svg>`
+
+  const buf = await sharp(Buffer.from(svg)).png().toBuffer()
+  return { buf, w: svgW, h: svgH }
 }
 
 module.exports = async (req, res) => {
@@ -65,27 +108,26 @@ module.exports = async (req, res) => {
 
   const {
     videoUrl, storagePath, caption, userId,
-    bucket = 'content',
-    position = 'bottom',   // 'top' | 'center' | 'bottom'
-    fontSize = 36,
-    fontColor = 'white',
-    bgOpacity = 0.45,
+    bucket         = 'content',
+    position       = 'bottom',
+    fontSize       = 36,
+    fontColor      = '#ffffff',
+    bgOpacity      = 0.45,
+    supabaseToken, supabaseAnonKey,
   } = req.body ?? {}
 
   if ((!videoUrl && !storagePath) || !caption)
     return res.status(400).json({ ok: false, error: 'Missing videoUrl/storagePath or caption' })
 
-  const supabase = getSupabaseAdmin()
-  const fontFile = findFont()
-  if (!fontFile) return res.status(500).json({ ok: false, error: 'No font file found on server' })
-
-  const ts = Date.now()
-  const tmpDir = os.tmpdir()
-  const inputPath = path.join(tmpDir, `mix_in_${ts}.mp4`)
-  const outPath   = path.join(tmpDir, `mix_out_${ts}.mp4`)
+  const supabase = getSupabaseAdmin({ supabaseToken, supabaseAnonKey })
+  const ts       = Date.now()
+  const tmpDir   = os.tmpdir()
+  const inputPath  = path.join(tmpDir, `mix_in_${ts}.mp4`)
+  const overlayPath = path.join(tmpDir, `mix_ov_${ts}.png`)
+  const outPath    = path.join(tmpDir, `mix_out_${ts}.mp4`)
 
   try {
-    // Download source
+    // ── Download source video ────────────────────────────────────────────────
     if (videoUrl) {
       const resp = await fetch(videoUrl)
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch video: ${resp.status}` })
@@ -96,42 +138,44 @@ module.exports = async (req, res) => {
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
     }
 
-    const wrappedText = wrapText(String(caption))
-    const escapedText = escapeDrawtext(wrappedText)
-    const escapedFont = fontFile.replace(/\\/g, '/').replace(/:/g, '\\:')
+    // ── Build text overlay PNG ───────────────────────────────────────────────
+    // Target ~85% of typical 9:16 video width (720px) so text wraps naturally
+    const TARGET_TEXT_W = 620
+    const lines = wrapText(String(caption), fontSize, TARGET_TEXT_W)
+    const fontPath = (() => {
+      const p = path.join(__dirname, 'fonts', 'font-bold.ttf')
+      return fs.existsSync(p) ? p.replace(/\\/g, '/') : null
+    })()
+    const { buf: overlayBuf } = await buildOverlayPng(lines, fontSize, fontColor, bgOpacity, fontPath)
+    fs.writeFileSync(overlayPath, overlayBuf)
 
-    // Y position based on placement
+    // ── Y position expression for FFmpeg overlay filter ─────────────────────
+    const pad = Math.round(fontSize * 1.5)
     const yExpr = position === 'top'
-      ? `${fontSize * 2}`
+      ? `${pad}`
       : position === 'center'
-        ? '(h-text_h)/2'
-        : `h-text_h-${fontSize * 2}`
+        ? '(main_h-overlay_h)/2'
+        : `main_h-overlay_h-${pad}`
 
-    // drawtext: semi-transparent bg box + white text
-    const drawtextFilter = [
-      `drawtext=fontfile='${escapedFont}'`,
-      `text='${escapedText}'`,
-      `fontsize=${fontSize}`,
-      `fontcolor=${fontColor}`,
-      `x=(w-text_w)/2`,
-      `y=${yExpr}`,
-      `line_spacing=8`,
-      `box=1`,
-      `boxcolor=black@${bgOpacity}`,
-      `boxborderw=${Math.round(fontSize * 0.4)}`,
-    ].join(':')
+    // ── FFmpeg: composite overlay onto video ─────────────────────────────────
+    try {
+      await execFileAsync(ffmpegPath, [
+        '-nostdin', '-threads', '0',
+        '-i', inputPath,
+        '-i', overlayPath,
+        '-filter_complex', `[0:v][1:v]overlay=(main_w-overlay_w)/2:${yExpr}`,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
+        '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+        '-c:a', 'copy',
+        '-movflags', '+faststart',
+        '-y', outPath,
+      ], { maxBuffer: 100 * 1024 * 1024 })
+    } catch (ffErr) {
+      const stderr = (ffErr.stderr ?? '').slice(-800)
+      throw new Error(`FFmpeg: ${stderr || ffErr.message}`)
+    }
 
-    await execFileAsync(ffmpegPath, [
-      '-nostdin', '-threads', '0', '-i', inputPath,
-      '-vf', drawtextFilter,
-      '-c:v', 'libx264', '-preset', 'ultrafast',
-      '-crf', '28',
-      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-      '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
-      '-movflags', '+faststart',
-      '-y', outPath,
-    ], { maxBuffer: 100 * 1024 * 1024 })
-
+    // ── Upload result ────────────────────────────────────────────────────────
     const resultPath = userId
       ? `videos/users/${userId}/mix-out-${ts}_${Math.random().toString(36).slice(2)}.mp4`
       : `mix-results/${ts}_${Math.random().toString(36).slice(2)}.mp4`
@@ -145,10 +189,11 @@ module.exports = async (req, res) => {
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
     res.json({ ok: true, url: publicUrl, storagePath: resultPath })
   } catch (err) {
-    res.status(500).json({ ok: false, error: String(err).slice(0, 400) })
+    res.status(500).json({ ok: false, error: (err instanceof Error ? err.message : String(err)).slice(0, 1000) })
   } finally {
-    fs.rmSync(inputPath, { force: true })
-    fs.rmSync(outPath, { force: true })
+    fs.rmSync(inputPath,   { force: true })
+    fs.rmSync(overlayPath, { force: true })
+    fs.rmSync(outPath,     { force: true })
   }
 }
 

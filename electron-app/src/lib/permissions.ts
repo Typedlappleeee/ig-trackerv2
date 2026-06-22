@@ -92,22 +92,33 @@ export function canDoAction(role: OrgRole, overrides: PermOverrides | undefined,
   return ROLE_ACTIONS[role][action]
 }
 
-// Tabs shown in the per-member permission editor.
-// `settings` represents the *Connexions sub-panel* (API keys), not the whole page.
-export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
-  { key: 'phones',      label: 'Téléphones',                          icon: '📱' },
-  { key: 'posting',     label: 'Posting',                             icon: '🚀' },
-  { key: 'massposting', label: 'Mass Posting',                        icon: '⚡' },
-  { key: 'scheduler',   label: 'Programmation',                       icon: '📅' },
-  { key: 'bank',        label: 'Banque',                              icon: '🗂' },
-  { key: 'captionbank', label: 'Banque de Captions',                  icon: '💬' },
-  { key: 'warmup',      label: 'Warmup',                              icon: '🔥' },
-  { key: 'aitools',     label: 'Outils IA',                           icon: '🔧' },
-  { key: 'remix',       label: 'Remix',                               icon: '🔀' },
-  { key: 'repurpose',   label: 'CloneVid',                            icon: '⚡' },
-  { key: 'mixer',       label: 'Mixer',                               icon: '🎞️' },
-  { key: 'settings',    label: 'Paramètres → Connexions (clés API)', icon: '🔑' },
+// Tabs shown in the per-member permission editor — grouped to mirror the sidebar.
+// IMPORTANT: this must list EVERY tab a member can access. `settings` represents
+// the *Connexions sub-panel* (API keys), not the whole page.
+export const ALL_TABS: { key: PageKey; label: string; icon: string; group: string }[] = [
+  // Principal
+  { key: 'phones',      label: 'Téléphones',      icon: '📱', group: 'Principal' },
+  { key: 'bank',        label: 'Banque vidéos',   icon: '🗂', group: 'Principal' },
+  { key: 'captionbank', label: 'Banque captions', icon: '💬', group: 'Principal' },
+  // Instagram
+  { key: 'storylink',   label: 'Story / Link',    icon: '🔗', group: 'Instagram' },
+  { key: 'posting',     label: 'Posting',         icon: '🚀', group: 'Instagram' },
+  { key: 'massposting', label: 'Mass Posting',    icon: '⚡', group: 'Instagram' },
+  { key: 'scheduler',   label: 'Programmation',   icon: '📅', group: 'Instagram' },
+  { key: 'tasks',       label: 'Tâches auto',     icon: '⚙️', group: 'Instagram' },
+  { key: 'warmup',      label: 'Warmup',          icon: '🔥', group: 'Instagram' },
+  { key: 'aitools',     label: 'Outils IA',       icon: '🔧', group: 'Instagram' },
+  // Outils vidéo
+  { key: 'remix',       label: 'Remix',           icon: '🔀', group: 'Outils vidéo' },
+  { key: 'repurpose',   label: 'CloneVid',        icon: '🎬', group: 'Outils vidéo' },
+  { key: 'mixer',       label: 'Mixer',           icon: '🎞️', group: 'Outils vidéo' },
+  { key: 'subtitles',   label: 'Sous-titres',     icon: '💬', group: 'Outils vidéo' },
+  // Paramètres
+  { key: 'settings',    label: 'Connexions (clés API)', icon: '🔑', group: 'Paramètres' },
 ]
+
+// Ordered list of tab groups for rendering the permission matrix.
+export const TAB_GROUPS = ['Principal', 'Instagram', 'Outils vidéo', 'Paramètres'] as const
 
 export const ALL_ACTIONS: { key: ActionKey; label: string; icon: string; group: string }[] = [
   { key: 'bank_upload',        label: 'Upload dans la banque',    icon: '⬆️', group: 'Banque' },

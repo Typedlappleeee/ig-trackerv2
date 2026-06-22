@@ -835,7 +835,7 @@ ipcMain.handle('run-ffmpeg-repurpose', async (_event, opts: {
   const results: Array<{ ok: boolean; outputPath?: string; error?: string }> = []
   for (let i = 0; i < opts.variants.length; i++) {
     const v   = opts.variants[i]
-    const out = path.join(dir, `clonevid-${Date.now()}-${i}.mp4`)
+    const out = path.join(dir, `clonevid-${Date.now()}-${i}.mov`)
     const randomMs = Date.now() - Math.floor(Math.random() * 30 * 24 * 3600 * 1000)
     const creationTime = new Date(randomMs).toISOString()
     const args = [
@@ -879,7 +879,7 @@ ipcMain.handle('save-file-as', async (_event, opts: { sourcePath: string; defaul
     const res = await dialog.showSaveDialog(win!, {
       title: 'Enregistrer la vidéo',
       defaultPath: opts.defaultName,
-      filters: [{ name: 'Vidéo MP4', extensions: ['mp4'] }],
+      filters: [{ name: 'Vidéo MOV', extensions: ['mov'] }],
     })
     if (res.canceled || !res.filePath) return { ok: false, canceled: true }
     copyFileSync(src, res.filePath)

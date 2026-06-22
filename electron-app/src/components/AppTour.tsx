@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 interface AppTourProps {
   onClose: () => void
   onNavigate: (page: string) => void
+  /** If provided, tour steps that target a page not passing this check are hidden */
+  canSeePage?: (page: string) => boolean
 }
 
 interface TourStep {
@@ -74,14 +76,18 @@ const STEPS: TourStep[] = [
   },
 ]
 
-export function AppTour({ onClose, onNavigate }: AppTourProps) {
+export function AppTour({ onClose, onNavigate, canSeePage }: AppTourProps) {
+  // Filter steps so pages the user can't access are skipped.
+  // Steps without a `page` (welcome / finale) are always included.
+  const steps = STEPS.filter(s => !s.page || !canSeePage || canSeePage(s.page))
+
   const [step, setStep] = useState(0)
-  const current = STEPS[step]
-  const isLast  = step === STEPS.length - 1
+  const current = steps[step]
+  const isLast  = step === steps.length - 1
   const isFirst = step === 0
 
   useEffect(() => {
-    if (current.page) onNavigate(current.page)
+    if (current?.page) onNavigate(current.page)
   }, [step])
 
   function next() {
@@ -89,6 +95,9 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
     setStep(s => s + 1)
   }
   function back() { if (!isFirst) setStep(s => s - 1) }
+
+  // Safety: if all feature steps were filtered out (extreme restriction), close immediately.
+  if (!current) { onClose(); return null }
 
   return (
     <div style={{
@@ -109,7 +118,7 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
         <div style={{ height: 3, background: 'rgba(255,255,255,0.06)' }}>
           <div style={{
             height: '100%',
-            width: `${((step + 1) / STEPS.length) * 100}%`,
+            width: `${((step + 1) / steps.length) * 100}%`,
             background: `linear-gradient(90deg, ${current.color}, #a855f7)`,
             transition: 'width 0.3s ease',
           }} />
@@ -129,7 +138,7 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
 
           {/* Step counter */}
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'rgba(99,102,241,0.6)', marginBottom: 6, textTransform: 'uppercase' }}>
-            Étape {step + 1} / {STEPS.length}
+            Étape {step + 1} / {steps.length}
           </div>
 
           <h2 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 10px', lineHeight: 1.2 }}>
@@ -141,7 +150,7 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
 
           {/* Dot indicators */}
           <div style={{ display: 'flex', gap: 5, marginTop: 24 }}>
-            {STEPS.map((_, i) => (
+            {steps.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setStep(i)}
