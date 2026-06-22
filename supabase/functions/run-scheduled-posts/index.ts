@@ -568,9 +568,26 @@ Deno.serve(async (req) => {
       // tuée (budget serverless dépassé) avant de marquer le post "done", l'auto-heal
       // d'une prochaine invocation pourra ré-interroger GeeLark pour vérifier le vrai
       // statut — au lieu de marquer un faux "timeout serveur" alors que le post est passé.
-      await db.from('scheduled_posts').update({
+      //
+      // FILET DE SÉCURITÉ : on programme aussi l'arrêt des téléphones (stop_phones_at)
+      // dès maintenant. Ainsi, même si l'invocation crashe avant l'arrêt normal, le
+      // balayage 1ter d'une prochaine invocation éteindra les téléphones → ils ne
+      // tournent jamais à l'infini. Pour delay=0 : +15 min ; pour delay>0 : 15 min
+      // après la dernière tâche planifiée. Ce filet sera écrasé (plus tôt) par l'arrêt
+      // normal une fois le post terminé.
+      const safetyOffsetMs = delayMin > 0 ? (phones.length - 1) * delayMin * 60_000 : 0
+      const safetyStopAt = new Date(Date.now() + safetyOffsetMs + 15 * 60_000).toISOString()
+      const safetyUpd = await db.from('scheduled_posts').update({
         result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds },
-      }).eq('id', post.id).then(() => {}, () => {})
+        stop_phones_at: safetyStopAt, stop_phone_ids: geelarkIds,
+      }).eq('id', post.id)
+      if (safetyUpd.error && /stop_phones?_(at|ids)/i.test(safetyUpd.error.message)) {
+        // Colonnes stop_phones_at/stop_phone_ids absentes (migration non appliquée) :
+        // on persiste au moins les task_ids pour la vérification anti-faux-timeout.
+        await db.from('scheduled_posts').update({
+          result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds },
+        }).eq('id', post.id)
+      }
 
       let stopPhonesAt: string | null = null
       let stopPhoneIds: string[] | null = null
