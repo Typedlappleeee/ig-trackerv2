@@ -5,7 +5,14 @@ import { Input }  from '@/components/ui/Input'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { supabase } from '@/lib/supabase'
-import { postTikTokVideoAdb, stopPhone } from '@/lib/geelark'
+import { postTikTokVideoAdb } from '@/lib/geelark'
+import { BankPicker, VideoThumbnail } from '@/pages/Bank'
+
+// ── Selected video (from the content bank) ──────────────────────────────────
+interface SelectedVideo {
+  url:   string  // signed URL, ready for download on the phone
+  title: string
+}
 
 // ── Local phone shape from Supabase ─────────────────────────────────────────
 interface Phone {
@@ -44,6 +51,7 @@ const ICONS = {
   x:       'M18 6 6 18M6 6l12 12',
   refresh: 'M4 4v5h5M20 20v-5h-5M4.93 14A8 8 0 1 0 6.93 5.93',
   chevron: 'M19 9l-7 7-7-7',
+  video:   'M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z',
   tiktok:  'M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75a4.85 4.85 0 0 1-1.01-.06z',
 }
 
@@ -124,7 +132,8 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
   const [selected, setSelected]       = useState<Set<string>>(new Set())
 
   // ── Form state ───────────────────────────────────────────────────────────
-  const [videoUrl,  setVideoUrl]  = useState('')
+  const [video,     setVideo]     = useState<SelectedVideo | null>(null)
+  const [showBankPicker, setShowBankPicker] = useState(false)
   const [caption,   setCaption]   = useState('')
   const [hashtags,  setHashtags]  = useState('')
 
@@ -192,7 +201,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
   // ── Launch automation ────────────────────────────────────────────────────
   async function handleLaunch() {
     if (!bearer) return
-    if (!videoUrl.trim()) return
+    if (!video) return
     const toRun = phones.filter(p => selected.has(p.id))
     if (toRun.length === 0) return
 
@@ -214,7 +223,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
         const { ok, error } = await postTikTokVideoAdb(
           bearer,
           phone.geelark_id,
-          { videoUrl: videoUrl.trim(), caption: fullCaption },
+          { videoUrl: video.url, caption: fullCaption },
           (msg) => appendLog(phone.id, msg),
           ac.signal,
         )
@@ -243,7 +252,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
   }
 
   // ── Can launch ───────────────────────────────────────────────────────────
-  const canLaunch = !running && bearer && videoUrl.trim() && selected.size > 0
+  const canLaunch = !running && !!bearer && !!video && selected.size > 0
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -400,12 +409,76 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
             </h2>
 
             <div style={{ marginBottom: 14 }}>
-              <Input
-                label="URL de la vidéo"
-                placeholder="https://… (URL directe ou URL signée Supabase)"
-                value={videoUrl}
-                onChange={e => setVideoUrl(e.target.value)}
-              />
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 6 }}>
+                Vidéo
+              </label>
+
+              {!video ? (
+                <button
+                  onClick={() => setShowBankPicker(true)}
+                  style={{
+                    width: '100%', padding: '28px 20px', textAlign: 'center', cursor: 'pointer',
+                    borderRadius: 12, border: '1px dashed rgba(99,102,241,0.35)',
+                    background: 'rgba(99,102,241,0.04)', transition: 'background 0.18s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.04)' }}
+                >
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10, margin: '0 auto 10px',
+                    background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818CF8',
+                  }}>
+                    <Icon d={ICONS.video} size={18} />
+                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 3px' }}>
+                    Choisir depuis la banque
+                  </p>
+                  <p style={{ fontSize: 11.5, color: 'var(--text2)', margin: 0 }}>
+                    Sélectionnez une vidéo de votre banque de contenu
+                  </p>
+                </button>
+              ) : (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: 10, borderRadius: 12,
+                  border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)',
+                }}>
+                  <div style={{
+                    width: 54, height: 72, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+                    background: 'var(--surface-2)',
+                  }}>
+                    <VideoThumbnail filePath={video.url} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{
+                      fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {video.title}
+                    </p>
+                    <button
+                      onClick={() => setShowBankPicker(true)}
+                      style={{
+                        fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 8,
+                        border: '1px solid var(--border)', background: 'transparent',
+                        color: 'var(--text2)', cursor: 'pointer',
+                      }}
+                    >
+                      Changer
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setVideo(null)}
+                    title="Retirer"
+                    style={{
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: 'var(--text2)', padding: 4, display: 'flex',
+                    }}
+                  >
+                    <Icon d={ICONS.x} size={15} />
+                  </button>
+                </div>
+              )}
             </div>
 
             <div style={{ marginBottom: 14 }}>
@@ -538,6 +611,26 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
           )}
         </div>
       </div>
+
+      {/* Bank picker modal — pick a single video from the content bank */}
+      {showBankPicker && (
+        <BankPicker
+          user={user}
+          mode="single"
+          resolveMode="signed-url"
+          onSelect={(paths, titles) => {
+            const url = paths[0]
+            if (url) {
+              setVideo({
+                url,
+                title: titles?.[0] ?? url.split('/').pop()?.split('?')[0] ?? 'Vidéo',
+              })
+            }
+            setShowBankPicker(false)
+          }}
+          onClose={() => setShowBankPicker(false)}
+        />
+      )}
     </div>
   )
 }

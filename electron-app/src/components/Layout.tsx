@@ -99,6 +99,13 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: 'TikTok',
+    defaultOpen: true,
+    items: [
+      { id: 'tiktokposting', label: 'navTikTokPosting', icon: '🎵', isNew: true },
+    ],
+  },
+  {
     title: 'Outils vidéo',
     defaultOpen: true,
     items: [
@@ -106,13 +113,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
       { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
       { id: 'subtitles',   label: 'navSubtitles',   icon: '💬', isNew: true },
-    ],
-  },
-  {
-    title: 'TikTok',
-    defaultOpen: true,
-    items: [
-      { id: 'tiktokposting', label: 'navTikTokPosting', icon: '🎵', isNew: true },
     ],
   },
 ]
@@ -769,8 +769,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           {([
             { section: NAV_SECTIONS[0], labelKey: 'sectionPrincipal',  defaultIcon: 'phone'  as IconKey },
             { section: NAV_SECTIONS[1], labelKey: 'sectionInstagram',  defaultIcon: 'send'   as IconKey },
-            { section: NAV_SECTIONS[2], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
-            { section: NAV_SECTIONS[3], labelKey: 'sectionTikTok',     defaultIcon: 'zap'    as IconKey },
+            { section: NAV_SECTIONS[2], labelKey: 'sectionTikTok',     defaultIcon: 'zap'    as IconKey },
+            { section: NAV_SECTIONS[3], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
           ] as Array<{ section: typeof NAV_SECTIONS[0]; labelKey: string; defaultIcon: IconKey }>)
             .map(({ section, labelKey, defaultIcon }) => {
               const items = section.items.filter(it => isVisibleTab(it.id) && (!it.dev || effectiveSuperAdmin))
