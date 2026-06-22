@@ -1,6 +1,10 @@
-// Server-side video + caption overlay using sharp (SVG→PNG) + FFmpeg overlay filter.
-// Avoids drawtext/libfreetype dependency that isn't compiled in ffmpeg-static on Vercel.
-// Accepts: POST { videoUrl|storagePath, caption, userId, bucket?, position?, fontSize?, fontColor?, bgOpacity? }
+// Server-side video + caption overlay.
+// ffmpeg-static on Vercel has NO drawtext (no libfreetype), so we render the
+// caption to a transparent PNG with sharp's native text mode (Pango + the
+// bundled font file — reliable, unlike SVG @font-face which silently fails and
+// produces an empty box), then composite that PNG onto the video with ffmpeg.
+// Style: bold white text + black outline, word-wrapped, centered (POV style).
+// Accepts: POST { videoUrl|storagePath, caption, userId, bucket?, position?, fontSize?, fontColor? }
 // Returns: { ok, url, storagePath }
 
 const ffmpegPath = require('ffmpeg-static')
@@ -14,9 +18,12 @@ const os   = require('os')
 
 const execFileAsync = promisify(execFile)
 
+// Output canvas (video is scaled+padded to this before overlay).
+const VW = 1080, VH = 1920
+const TEXT_MAX_W = 960  // ~89% of width → comfortable side margins
+
 function getSupabaseAdmin({ supabaseToken, supabaseAnonKey } = {}) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  // Prefer service role key (bypasses RLS); fall back to user JWT passed from client
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (serviceKey) {
     return createClient(url, serviceKey, { auth: { persistSession: false } })
@@ -30,78 +37,92 @@ function getSupabaseAdmin({ supabaseToken, supabaseAnonKey } = {}) {
   throw new Error('Supabase non authentifié — définir SUPABASE_SERVICE_ROLE_KEY dans Vercel')
 }
 
-function escapeXml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
+// Escape for Pango markup (sharp text mode).
+function escapePango(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// Wrap text into lines ≤ maxChars. Respects existing newlines.
-function wrapText(text, maxChars) {
-  const lines = []
-  for (const segment of String(text).split(/\r?\n/)) {
-    const words = segment.split(' ')
-    let current = ''
-    for (const word of words) {
-      if (!word) continue
-      if (current.length + word.length + (current ? 1 : 0) > maxChars && current) {
-        lines.push(current)
-        current = word
-      } else {
-        current = current ? `${current} ${word}` : word
+// Read the font's family name (name table, nameID=1) so Pango selects it.
+function fontFamilyName(buf) {
+  try {
+    const numTables = buf.readUInt16BE(4)
+    let nameOff = 0
+    for (let i = 0; i < numTables; i++) {
+      const o = 12 + i * 16
+      if (buf.toString('ascii', o, o + 4) === 'name') { nameOff = buf.readUInt32BE(o + 8); break }
+    }
+    if (!nameOff) return null
+    const count = buf.readUInt16BE(nameOff + 2)
+    const strOff = nameOff + buf.readUInt16BE(nameOff + 4)
+    for (let i = 0; i < count; i++) {
+      const r = nameOff + 6 + i * 12
+      const platformID = buf.readUInt16BE(r)
+      const nameID = buf.readUInt16BE(r + 6)
+      const len = buf.readUInt16BE(r + 8)
+      const off = buf.readUInt16BE(r + 10)
+      if (nameID === 1) {
+        const slice = buf.slice(strOff + off, strOff + off + len)
+        if (platformID === 1) return slice.toString('latin1')
+        // Unicode/MS platforms store UTF-16BE → swap to LE for Node decoding
+        const swapped = Buffer.from(slice)
+        for (let j = 0; j + 1 < swapped.length; j += 2) { const t = swapped[j]; swapped[j] = swapped[j + 1]; swapped[j + 1] = t }
+        return swapped.toString('utf16le')
       }
     }
-    if (current) lines.push(current)
-  }
-  return lines.length ? lines : ['']
+  } catch { /* ignore */ }
+  return null
 }
 
-// Build a tight text overlay PNG via SVG → sharp
-// Embeds the font as a base64 data URI so librsvg doesn't need system fonts.
-async function buildOverlayPng(lines, fontSize, fontColor, bgOpacity, fontPath) {
-  const charW  = fontSize * 0.55
-  const lineH  = Math.round(fontSize * 1.38)
-  const padH   = Math.round(fontSize * 0.42)
-  const padW   = Math.round(fontSize * 0.65)
-  const radius = Math.round(fontSize * 0.18)
+// Relative luminance of a #rrggbb / #rgb color (0=dark, 1=light).
+function luminance(hex) {
+  let h = String(hex).replace('#', '')
+  if (h.length === 3) h = h.split('').map(c => c + c).join('')
+  const r = parseInt(h.slice(0, 2), 16) / 255
+  const g = parseInt(h.slice(2, 4), 16) / 255
+  const b = parseInt(h.slice(4, 6), 16) / 255
+  return (0.2126 * r + 0.7152 * g + 0.4152 * b)
+}
 
-  const maxLineW = Math.max(...lines.map(l => l.length)) * charW
-  const svgW  = Math.ceil(maxLineW + padW * 2)
-  const svgH  = Math.ceil(lines.length * lineH + padH * 2)
-  const midX  = svgW / 2
+// Render one solid-color text PNG via sharp's Pango text mode.
+async function renderTextLayer(caption, family, fontPath, fontSize, color) {
+  const fontDesc = family ? `${family} ${fontSize}` : `Sans Bold ${fontSize}`
+  return sharp({
+    text: {
+      text: `<span weight="bold" foreground="${color}">${escapePango(caption)}</span>`,
+      font: fontDesc,
+      ...(fontPath ? { fontfile: fontPath } : {}),
+      rgba: true,
+      align: 'centre',
+      width: TEXT_MAX_W,
+      spacing: Math.round(fontSize * 0.22),
+    },
+  }).png().toBuffer({ resolveWithObject: true })
+}
 
-  // Embed font as base64 data URI so librsvg finds it without system font access
-  let fontFaceDecl = ''
-  let fontFamily   = 'Arial, Helvetica, sans-serif'
-  if (fontPath && fs.existsSync(fontPath)) {
-    const b64 = fs.readFileSync(fontPath).toString('base64')
-    fontFaceDecl = `<defs><style>@font-face{font-family:'SF';src:url('data:font/truetype;base64,${b64}');font-weight:bold;}</style></defs>`
-    fontFamily   = "'SF', Arial, sans-serif"
-  }
+// Build the caption overlay PNG: colored text with a contrasting outline.
+async function buildCaptionOverlay(caption, fontSize, fontColor, fontPath, family) {
+  const outlineColor = luminance(fontColor) > 0.55 ? '#000000' : '#ffffff'
+  const fill    = await renderTextLayer(caption, family, fontPath, fontSize, fontColor)
+  const outline = await renderTextLayer(caption, family, fontPath, fontSize, outlineColor)
 
-  const textEls = lines.map((line, i) => {
-    const y = padH + lineH * 0.78 + i * lineH
-    return `<text x="${midX}" y="${y}"
-      text-anchor="middle"
-      font-family="${escapeXml(fontFamily)}"
-      font-size="${fontSize}"
-      font-weight="bold"
-      fill="${escapeXml(fontColor)}">${escapeXml(line)}</text>`
-  }).join('\n')
+  const W = fill.info.width, H = fill.info.height
+  const OFF = Math.max(2, Math.round(fontSize * 0.07))
+  const canvasW = W + OFF * 2, canvasH = H + OFF * 2
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">
-  ${fontFaceDecl}
-  <rect x="0" y="0" width="${svgW}" height="${svgH}"
-    rx="${radius}" ry="${radius}"
-    fill="rgba(0,0,0,${bgOpacity})"/>
-  ${textEls}
-</svg>`
+  // 8-direction outline, then the colored fill on top.
+  const offsets = [
+    [0, 0], [OFF, 0], [2 * OFF, 0],
+    [0, OFF],          [2 * OFF, OFF],
+    [0, 2 * OFF], [OFF, 2 * OFF], [2 * OFF, 2 * OFF],
+  ]
+  const composites = offsets.map(([x, y]) => ({ input: outline.data, left: x, top: y }))
+  composites.push({ input: fill.data, left: OFF, top: OFF })
 
-  const buf = await sharp(Buffer.from(svg)).png().toBuffer()
-  return { buf, w: svgW, h: svgH }
+  const buf = await sharp({
+    create: { width: canvasW, height: canvasH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  }).composite(composites).png().toBuffer()
+
+  return { buf, w: canvasW, h: canvasH }
 }
 
 module.exports = async (req, res) => {
@@ -109,11 +130,10 @@ module.exports = async (req, res) => {
 
   const {
     videoUrl, storagePath, caption, userId,
-    bucket         = 'content',
-    position       = 'bottom',
-    fontSize       = 36,
-    fontColor      = '#ffffff',
-    bgOpacity      = 0.45,
+    bucket    = 'content',
+    position  = 'bottom',
+    fontSize  = 52,
+    fontColor = '#ffffff',
     supabaseToken, supabaseAnonKey,
   } = req.body ?? {}
 
@@ -123,9 +143,9 @@ module.exports = async (req, res) => {
   const supabase = getSupabaseAdmin({ supabaseToken, supabaseAnonKey })
   const ts       = Date.now()
   const tmpDir   = os.tmpdir()
-  const inputPath  = path.join(tmpDir, `mix_in_${ts}.mp4`)
+  const inputPath   = path.join(tmpDir, `mix_in_${ts}.mp4`)
   const overlayPath = path.join(tmpDir, `mix_ov_${ts}.png`)
-  const outPath    = path.join(tmpDir, `mix_out_${ts}.mp4`)
+  const outPath     = path.join(tmpDir, `mix_out_${ts}.mp4`)
 
   try {
     // ── Download source video ────────────────────────────────────────────────
@@ -139,35 +159,39 @@ module.exports = async (req, res) => {
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
     }
 
-    // ── Build text overlay PNG ───────────────────────────────────────────────
-    // 90% of 1080px width / ~0.58× fontSize per char (bold sans-serif estimate)
-    const maxChars = Math.max(10, Math.floor(1080 * 0.9 / (fontSize * 0.58)))
-    const lines = wrapText(String(caption), maxChars)
+    // ── Build caption overlay PNG (sharp text mode) ──────────────────────────
     const fontPath = (() => {
       const p = path.join(__dirname, 'fonts', 'font-bold.ttf')
-      return fs.existsSync(p) ? p.replace(/\\/g, '/') : null
+      return fs.existsSync(p) ? p : null
     })()
-    const { buf: overlayBuf } = await buildOverlayPng(lines, fontSize, fontColor, bgOpacity, fontPath)
+    const family = fontPath ? fontFamilyName(fs.readFileSync(fontPath)) : null
+    const { buf: overlayBuf, w: ovW, h: ovH } =
+      await buildCaptionOverlay(String(caption), fontSize, fontColor, fontPath, family)
     fs.writeFileSync(overlayPath, overlayBuf)
 
-    // ── Y position expression for FFmpeg overlay filter ─────────────────────
-    const pad = Math.round(fontSize * 1.5)
-    const yExpr = position === 'top'
-      ? `${pad}`
-      : position === 'center'
-        ? '(main_h-overlay_h)/2'
-        : `main_h-overlay_h-${pad}`
+    // ── Position (exact pixels, video pre-scaled to VW×VH) ───────────────────
+    const ox = Math.round((VW - ovW) / 2)
+    const oy = position === 'top'
+      ? 120
+      : position === 'center' || position === 'middle'
+        ? Math.round((VH - ovH) / 2)
+        : VH - ovH - 130   // bottom
 
-    // ── FFmpeg: composite overlay onto video ─────────────────────────────────
+    // ── FFmpeg: scale+pad to VW×VH, then composite overlay ───────────────────
+    const filter =
+      `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,` +
+      `pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg];` +
+      `[bg][1:v]overlay=${ox}:${oy}`
+
     try {
       await execFileAsync(ffmpegPath, [
         '-nostdin', '-threads', '0',
         '-i', inputPath,
         '-i', overlayPath,
-        '-filter_complex', `[0:v][1:v]overlay=(main_w-overlay_w)/2:${yExpr}`,
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
+        '-filter_complex', filter,
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
         '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-        '-c:a', 'copy',
+        '-c:a', 'aac', '-b:a', '128k',
         '-movflags', '+faststart',
         '-y', outPath,
       ], { maxBuffer: 100 * 1024 * 1024 })
