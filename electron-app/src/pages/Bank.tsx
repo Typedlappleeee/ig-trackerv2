@@ -1555,7 +1555,7 @@ export function Bank({ user }: BankProps) {
           user={user}
           orgId={isPersonal ? null : (currentOrg?.id ?? null)}
           folders={folders}
-          serviceEmail={import.meta.env.VITE_DRIVE_SERVICE_EMAIL}
+          serviceEmail="scaleflow@starify-agencies.iam.gserviceaccount.com"
           onClose={() => setShowDriveModal(false)}
           onSynced={() => loadItems()}
         />
