@@ -835,6 +835,23 @@ export async function postInstagramStory(
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
 
+  // ── 0. Wipe the gallery ────────────────────────────────────────────────────
+  // Stale photos/videos make Instagram's story picker grab the wrong (old) media
+  // — exactly like the post flow, we start from an empty gallery so the only
+  // file present is the one we push next. This is the main story-bug fix.
+  log('🧹 Nettoyage de la galerie…')
+  await shellExec(bearer, phoneId,
+    `find /sdcard/DCIM /sdcard/Pictures /sdcard/Download /sdcard/Movies -type f ` +
+    `\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' ` +
+    `-o -iname '*.gif' -o -iname '*.heic' -o -iname '*.mp4' -o -iname '*.mov' \\) ` +
+    `-delete 2>/dev/null; ` +
+    `rm -rf /sdcard/DCIM/Camera/* 2>/dev/null; true`)
+  // Rescan so the media store forgets the deleted files before we add the new one.
+  await shellExec(bearer, phoneId,
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; ` +
+    `am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard 2>/dev/null; true`)
+  await sleep(1500)
+
   // ── 1. Push image to phone gallery ────────────────────────────────────────
   log('🖼 Chargement de l\'image…')
   const _imgExt = (() => {

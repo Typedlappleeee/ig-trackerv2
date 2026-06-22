@@ -87,6 +87,7 @@ export function Spoof({ user }: { user: User }) {
   const [vignette, setVignette]           = useState(false)
   const [flipH, setFlipH]                 = useState(false)
   const [zoomPct, setZoomPct]             = useState(0)
+  const [copies, setCopies]               = useState(1)
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
 
@@ -123,7 +124,8 @@ export function Spoof({ user }: { user: User }) {
   async function runSpoof() {
     if (!selectedVideos.length || running) return
 
-    const creditCost = selectedVideos.length * CREDIT_COSTS.clone_vid
+    const totalOutputs = selectedVideos.length * copies
+    const creditCost = totalOutputs * CREDIT_COSTS.clone_vid
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
       const balance = creditRes.balance ?? credits.balance
@@ -132,12 +134,16 @@ export function Spoof({ user }: { user: User }) {
     }
     if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
 
-    const initialJobs: SpoofJob[] = selectedVideos.map((v, i) => ({
-      id: `${Date.now()}_${i}`,
-      name: v.name,
-      url: v.url,
-      status: 'queued',
-    }))
+    // Each source video produces `copies` independent spoofed outputs — every
+    // copy gets its own unique metadata (GPS, date, camera id, encoding…).
+    const initialJobs: SpoofJob[] = selectedVideos.flatMap((v, vi) =>
+      Array.from({ length: copies }, (_, c) => ({
+        id: `${Date.now()}_${vi}_${c}`,
+        name: copies > 1 ? `${v.name} (copie ${c + 1}/${copies})` : v.name,
+        url: v.url,
+        status: 'queued' as JobStatus,
+      })),
+    )
     setJobs(initialJobs)
     setRunning(true)
 
@@ -188,7 +194,8 @@ export function Spoof({ user }: { user: User }) {
   }
 
   const doneCount = jobs.filter(j => j.status === 'done').length
-  const creditCost = selectedVideos.length * CREDIT_COSTS.clone_vid
+  const totalOutputs = selectedVideos.length * copies
+  const creditCost = totalOutputs * CREDIT_COSTS.clone_vid
 
   return (
     <div className="sf-page anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--base)' }}>
@@ -346,6 +353,36 @@ export function Spoof({ user }: { user: User }) {
 
             <div className="sf-divider" style={{ margin: '14px 0' }} />
 
+            {/* Copies per video */}
+            <div style={{ padding: '0 14px' }}>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>
+                Copies par vidéo
+                <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>chaque copie = métadonnées uniques</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() => setCopies(c => Math.max(1, c - 1))}
+                  disabled={running || copies <= 1}
+                  className="sf-btn cursor-pointer"
+                  style={{ width: 34, height: 34, fontSize: 18, lineHeight: 1, borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: copies <= 1 ? 0.5 : 1 }}
+                >−</button>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#818CF8' }}>{copies}</div>
+                <button
+                  onClick={() => setCopies(c => Math.min(20, c + 1))}
+                  disabled={running || copies >= 20}
+                  className="sf-btn cursor-pointer"
+                  style={{ width: 34, height: 34, fontSize: 18, lineHeight: 1, borderRadius: 8, background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: copies >= 20 ? 0.5 : 1 }}
+                >+</button>
+              </div>
+              {selectedVideos.length > 0 && (
+                <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 6, textAlign: 'center' }}>
+                  {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> export{totalOutputs > 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+
+            <div className="sf-divider" style={{ margin: '14px 0' }} />
+
             {/* Visual adjustments collapsible */}
             <div style={{ padding: '0 14px' }}>
               <button
@@ -429,7 +466,7 @@ export function Spoof({ user }: { user: User }) {
               {selectedVideos.length > 0 && !running && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   <span className="sf-badge sf-badge-violet" style={{ fontSize: 10 }}>
-                    {creditCost} crédit{creditCost > 1 ? 's' : ''} · {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''}
+                    {creditCost} crédit{creditCost > 1 ? 's' : ''} · {totalOutputs} export{totalOutputs > 1 ? 's' : ''}
                   </span>
                 </div>
               )}
@@ -450,12 +487,12 @@ export function Spoof({ user }: { user: User }) {
                 {running ? (
                   <>
                     <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(248,113,113,0.3)', borderTopColor: '#f87171', animation: 'spin 0.9s linear infinite' }} />
-                    Traitement {doneCount}/{selectedVideos.length}…
+                    Traitement {doneCount}/{totalOutputs}…
                   </>
                 ) : (
                   <>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    Spoofing {selectedVideos.length > 0 ? `(${selectedVideos.length})` : ''}
+                    Spoofing {totalOutputs > 0 ? `(${totalOutputs})` : ''}
                   </>
                 )}
               </button>
