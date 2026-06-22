@@ -149,14 +149,111 @@ Deno.serve(async (req) => {
   const fnStart = Date.now()
   const summary: Record<string, string> = {}
 
-  // 1. Auto-heal : posts "running" trop vieux (> 30 min) → failed
+  // 1. Auto-heal : posts "running" trop vieux (> 30 min).
+  // Avant de marquer "failed", on RE-INTERROGE GeeLark avec les task_ids persistés :
+  // l'invocation qui a lancé le post a souvent été tuée (budget serverless) AVANT de
+  // pouvoir écrire "done", alors que GeeLark a bel et bien posté. On évite ainsi les
+  // faux "timeout serveur".
   const cutoff      = new Date(Date.now() - 30 * 60_000).toISOString()
+  const hardCutoff  = new Date(Date.now() - 90 * 60_000).toISOString()  // après 1h30 on abandonne même si "en cours"
   const storyCutoff = new Date(Date.now() - 6 * 60 * 60_000).toISOString()
-  await db.from('scheduled_posts')
-    .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
-    .eq('status', 'running')
-    .neq('type', 'story')
-    .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
+  try {
+    let staleQuery = db.from('scheduled_posts')
+      .select('id, user_id, org_id, executed_at, created_at, result, bearer_token')
+      .eq('status', 'running')
+      .neq('type', 'story')
+      .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
+      .limit(10)
+    if (filterUserId) staleQuery = staleQuery.eq('user_id', filterUserId)
+    const { data: stalePosts } = await staleQuery
+
+    for (const sp of stalePosts ?? []) {
+      const res = (sp.result ?? {}) as Record<string, any>
+      const taskIds: string[] = Array.isArray(res.geelark_task_ids) ? res.geelark_task_ids : []
+      const geelarkIds: string[] = Array.isArray(res.geelark_ids) ? res.geelark_ids : []
+      const ref = sp.executed_at ?? sp.created_at
+      const veryOld = ref ? ref < hardCutoff : true
+
+      // Pas de task_ids connus → on ne peut pas vérifier : ancien comportement (failed).
+      if (taskIds.length === 0) {
+        await db.from('scheduled_posts')
+          .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
+          .eq('id', sp.id)
+        continue
+      }
+
+      // Résolution du bearer (org puis user, puis rétro-compat)
+      let bearer = ''
+      if (sp.org_id) {
+        const { data } = await db.from('org_config').select('bearer_token').eq('org_id', sp.org_id).maybeSingle()
+        bearer = data?.bearer_token ?? ''
+      }
+      if (!bearer) {
+        const { data } = await db.from('app_config').select('bearer_token').eq('user_id', sp.user_id).maybeSingle()
+        bearer = data?.bearer_token ?? ''
+      }
+      if (!bearer) bearer = sp.bearer_token || ''
+      if (!bearer) {
+        // Impossible de vérifier sans bearer → on tranche selon l'âge.
+        if (veryOld) {
+          await db.from('scheduled_posts')
+            .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
+            .eq('id', sp.id)
+        }
+        continue
+      }
+
+      // Interroge GeeLark pour le vrai statut des tâches RPA.
+      const q = await gPost(bearer, '/task/query', { ids: taskIds }).catch(() => ({} as Record<string, any>))
+      const items: any[] = q.data?.items ?? q.data?.list ?? []
+      let success = 0, failed = 0, pending = 0
+      for (const it of items) {
+        const st = Number(it.status)
+        if (st === 3) success++
+        else if ([4, 7, 8].includes(st)) failed++
+        else pending++
+      }
+      const seen = success + failed + pending
+      // GeeLark ne renvoie rien d'exploitable → on tranche selon l'âge.
+      if (seen === 0) {
+        if (veryOld) {
+          await db.from('scheduled_posts')
+            .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
+            .eq('id', sp.id)
+        }
+        continue
+      }
+
+      if (pending > 0 && !veryOld) {
+        // Encore en cours chez GeeLark → on laisse "running", on revérifiera au prochain tick.
+        summary[`heal:${sp.id}`] = `still running (${pending} pending)`
+        continue
+      }
+
+      if (success > 0 && failed === 0) {
+        // Au moins une réussite, aucun échec → le post est passé. On le marque "done".
+        if (geelarkIds.length > 0) await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
+        await db.from('scheduled_posts')
+          .update({ status: 'done', error_msg: null })
+          .eq('id', sp.id)
+        summary[`heal:${sp.id}`] = `recovered → done (${success} ok)`
+      } else if (failed > 0 && pending === 0) {
+        if (geelarkIds.length > 0) await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
+        await db.from('scheduled_posts')
+          .update({ status: 'failed', error_msg: `Échec GeeLark (${failed}/${seen} tâche(s) échouée(s))` })
+          .eq('id', sp.id)
+        summary[`heal:${sp.id}`] = `failed (${failed} ko)`
+      } else if (veryOld) {
+        // Trop vieux et toujours indéterminé → abandon.
+        if (geelarkIds.length > 0) await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
+        await db.from('scheduled_posts')
+          .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
+          .eq('id', sp.id)
+      }
+    }
+  } catch (err) {
+    summary['auto_heal'] = `error: ${err instanceof Error ? err.message : String(err)}`
+  }
   // Stories : l'exécution serveur se fait par téléphone, sur plusieurs invocations.
   // Un post "running" bloqué > 15 min (invocation crashée) est REMIS en file (pending)
   // pour reprendre là où il s'était arrêté (la progression est dans result.story_progress).
@@ -465,6 +562,31 @@ Deno.serve(async (req) => {
       if (failedCount >= phones.length) {
         await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
         throw new Error(`Toutes les tâches ont été refusées (${failedCount}/${phones.length})`)
+      }
+
+      // Persiste les task_ids GeeLark AVANT le polling. Si cette invocation est
+      // tuée (budget serverless dépassé) avant de marquer le post "done", l'auto-heal
+      // d'une prochaine invocation pourra ré-interroger GeeLark pour vérifier le vrai
+      // statut — au lieu de marquer un faux "timeout serveur" alors que le post est passé.
+      //
+      // FILET DE SÉCURITÉ : on programme aussi l'arrêt des téléphones (stop_phones_at)
+      // dès maintenant. Ainsi, même si l'invocation crashe avant l'arrêt normal, le
+      // balayage 1ter d'une prochaine invocation éteindra les téléphones → ils ne
+      // tournent jamais à l'infini. Pour delay=0 : +15 min ; pour delay>0 : 15 min
+      // après la dernière tâche planifiée. Ce filet sera écrasé (plus tôt) par l'arrêt
+      // normal une fois le post terminé.
+      const safetyOffsetMs = delayMin > 0 ? (phones.length - 1) * delayMin * 60_000 : 0
+      const safetyStopAt = new Date(Date.now() + safetyOffsetMs + 15 * 60_000).toISOString()
+      const safetyUpd = await db.from('scheduled_posts').update({
+        result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds },
+        stop_phones_at: safetyStopAt, stop_phone_ids: geelarkIds,
+      }).eq('id', post.id)
+      if (safetyUpd.error && /stop_phones?_(at|ids)/i.test(safetyUpd.error.message)) {
+        // Colonnes stop_phones_at/stop_phone_ids absentes (migration non appliquée) :
+        // on persiste au moins les task_ids pour la vérification anti-faux-timeout.
+        await db.from('scheduled_posts').update({
+          result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds },
+        }).eq('id', post.id)
       }
 
       let stopPhonesAt: string | null = null

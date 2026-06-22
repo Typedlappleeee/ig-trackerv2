@@ -488,6 +488,10 @@ export function Subtitles({ user }: SubtitlesProps) {
                 ))}
               </div>
             </Row>
+
+            <div style={{ marginTop: 4, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de destination" />
+            </div>
           </SectionCard>
         </div>
       </div>
@@ -537,15 +541,16 @@ export function Subtitles({ user }: SubtitlesProps) {
           </div>
 
           {/* Save to bank */}
-          <div className="rounded-xl p-3.5 flex items-end gap-3 flex-wrap"
+          <div className="rounded-xl p-3.5 flex items-center gap-3 flex-wrap"
             style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)' }}>
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="📁 Enregistrer la vidéo dans la banque" />
+            <div style={{ flex: 1, fontSize: 12, color: 'var(--text-3)' }}>
+              <span style={{ color: 'var(--text-4)' }}>Dossier : </span>
+              <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
             </div>
             {savedToBank ? (
               <span className="flex items-center gap-2 px-4 rounded-lg text-sm font-bold"
                 style={{ height: 36, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
-                <CheckIcon /> Enregistré
+                <CheckIcon /> Enregistré dans la banque
               </span>
             ) : (
               <button onClick={saveToBank} disabled={saving}

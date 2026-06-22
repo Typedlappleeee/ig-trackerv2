@@ -271,9 +271,11 @@ async function handleSpoof(req, res) {
       exposure:     exposureMs,
       aperture:     `f/${apertureF}`,
       focal:        `${focalLen}mm`,
+      encoder:      meta.encoder,
       crf,
       audioBitrate: `${audioBitrate}k`,
-      gop:          gopSize,
+      gopSize,
+      colorSpace:   'yuv420p',
     }
     res.json({ ok: true, url: publicUrl, storagePath: resultPath, appliedMeta })
   } catch (err) {

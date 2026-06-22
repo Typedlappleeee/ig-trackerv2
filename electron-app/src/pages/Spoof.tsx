@@ -40,6 +40,7 @@ const GPS_GROUPS: { country: string; cities: Record<string, string> }[] = [
 ]
 
 const GPS_CITY_KEYS = GPS_GROUPS.flatMap(g => Object.keys(g.cities))
+const FRANCE_CITY_KEYS = Object.keys(GPS_GROUPS[0].cities) // GPS_GROUPS[0] is France
 
 type JobStatus = 'queued' | 'processing' | 'done' | 'error'
 
@@ -47,7 +48,7 @@ interface AppliedMeta {
   make: string; model: string; software: string; city: string
   gps: string; altitude: string; creationDate: string; timezone: string
   cameraId: string; lens: string; iso: number; exposure: string; aperture: string; focal: string
-  crf?: number; audioBitrate?: string; gop?: number
+  encoder: string; crf: number; audioBitrate: string; gopSize: number; colorSpace: string
 }
 
 interface SpoofJob {
@@ -155,6 +156,8 @@ export function Spoof({ user }: { user: User }) {
 
         const resolvedCity = gpsCity === 'random'
           ? GPS_CITY_KEYS[Math.floor(Math.random() * GPS_CITY_KEYS.length)]
+          : gpsCity === 'random_france'
+          ? FRANCE_CITY_KEYS[Math.floor(Math.random() * FRANCE_CITY_KEYS.length)]
           : gpsCity
 
         try {
@@ -326,6 +329,7 @@ export function Spoof({ user }: { user: User }) {
                 style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
               >
                 <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>🎲 Aléatoire (tous pays)</option>
+                <option value="random_france" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>🇫🇷 Aléatoire France uniquement</option>
                 {GPS_GROUPS.map(group => (
                   <optgroup key={group.country} label={group.country} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
                     {Object.entries(group.cities).map(([key, label]) => (
@@ -379,6 +383,13 @@ export function Spoof({ user }: { user: User }) {
                   {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> export{totalOutputs > 1 ? 's' : ''}
                 </div>
               )}
+            </div>
+
+            <div className="sf-divider" style={{ margin: '14px 0' }} />
+
+            {/* Bank destination */}
+            <div style={{ padding: '0 14px' }}>
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de destination" />
             </div>
 
             <div className="sf-divider" style={{ margin: '14px 0' }} />
@@ -527,27 +538,27 @@ export function Spoof({ user }: { user: User }) {
                 {/* Save-to-bank bar */}
                 {doneCount > 0 && (
                   <div className="sf-card" style={{
-                    padding: '12px 14px', borderRadius: 12, display: 'flex', alignItems: 'flex-end', gap: 12,
-                    flexWrap: 'wrap', borderColor: 'rgba(99,102,241,0.22)', background: 'rgba(99,102,241,0.05)',
+                    padding: '10px 14px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10,
+                    flexWrap: 'wrap', borderColor: 'rgba(99,102,241,0.18)', background: 'rgba(99,102,241,0.04)',
                   }}>
-                    <div style={{ flex: 1, minWidth: 200 }}>
-                      <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="📁 Enregistrer les vidéos dans la banque" />
+                    <div style={{ flex: 1, fontSize: 11, color: 'var(--text-3)' }}>
+                      Dossier : <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
                     </div>
                     <button
                       onClick={saveAllToBank}
                       disabled={savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')}
                       className="sf-btn cursor-pointer"
                       style={{
-                        height: 36, padding: '0 16px', fontSize: 12, fontWeight: 700, borderRadius: 8,
+                        height: 32, padding: '0 14px', fontSize: 11, fontWeight: 700, borderRadius: 8,
                         background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
                         color: '#818CF8', border: '1px solid rgba(99,102,241,0.32)',
-                        display: 'inline-flex', alignItems: 'center', gap: 7,
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
                         opacity: (savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')) ? 0.5 : 1,
                       }}
                     >
                       {savingAll
-                        ? <><div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} /> Enregistrement…</>
-                        : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> Tout enregistrer ({doneCount})</>
+                        ? <><div style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} /> Enregistrement…</>
+                        : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> Tout enregistrer ({doneCount})</>
                       }
                     </button>
                   </div>
@@ -592,22 +603,25 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
   }
 
   const META_ROWS: { label: string; key: keyof AppliedMeta }[] = [
-    { label: 'Appareil',   key: 'model' },
-    { label: 'Logiciel',   key: 'software' },
-    { label: 'Localisation', key: 'city' },
-    { label: 'GPS',        key: 'gps' },
-    { label: 'Altitude',   key: 'altitude' },
-    { label: 'Date',       key: 'creationDate' },
-    { label: 'Fuseau',     key: 'timezone' },
-    { label: 'Objectif',   key: 'lens' },
-    { label: 'Focale',     key: 'focal' },
-    { label: 'Ouverture',  key: 'aperture' },
-    { label: 'ISO',        key: 'iso' },
-    { label: 'Exposition', key: 'exposure' },
-    { label: 'ID Caméra',  key: 'cameraId' },
-    { label: 'CRF vidéo',  key: 'crf' },
-    { label: 'Audio',      key: 'audioBitrate' },
-    { label: 'GOP',        key: 'gop' },
+    { label: 'Appareil',    key: 'model' },
+    { label: 'Marque',      key: 'make' },
+    { label: 'Logiciel',    key: 'software' },
+    { label: 'Objectif',    key: 'lens' },
+    { label: 'Localisation',key: 'city' },
+    { label: 'GPS',         key: 'gps' },
+    { label: 'Altitude',    key: 'altitude' },
+    { label: 'Date',        key: 'creationDate' },
+    { label: 'Fuseau',      key: 'timezone' },
+    { label: 'ID Caméra',   key: 'cameraId' },
+    { label: 'ISO',         key: 'iso' },
+    { label: 'Exposition',  key: 'exposure' },
+    { label: 'Ouverture',   key: 'aperture' },
+    { label: 'Focale',      key: 'focal' },
+    { label: 'Encodeur',    key: 'encoder' },
+    { label: 'CRF',         key: 'crf' },
+    { label: 'Audio',       key: 'audioBitrate' },
+    { label: 'GOP',         key: 'gopSize' },
+    { label: 'Colorimétrie',key: 'colorSpace' },
   ]
 
   return (
@@ -718,20 +732,22 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
 
 const COMPARE_ROWS: { label: string; key: keyof AppliedMeta; unique?: boolean }[] = [
   { label: 'Appareil',    key: 'model' },
-  { label: 'Logiciel',   key: 'software' },
+  { label: 'Logiciel',    key: 'software' },
   { label: 'Localisation', key: 'city',        unique: true },
   { label: 'GPS',         key: 'gps',          unique: true },
   { label: 'Altitude',    key: 'altitude',     unique: true },
   { label: 'Date / heure', key: 'creationDate', unique: true },
   { label: 'Fuseau',      key: 'timezone' },
-  { label: 'Objectif',   key: 'lens' },
+  { label: 'Objectif',    key: 'lens' },
   { label: 'ISO',         key: 'iso',          unique: true },
   { label: 'Exposition',  key: 'exposure',     unique: true },
   { label: 'Ouverture',   key: 'aperture' },
   { label: 'ID Caméra',   key: 'cameraId',     unique: true },
-  { label: 'CRF vidéo',   key: 'crf',          unique: true },
+  { label: 'Encodeur',    key: 'encoder' },
+  { label: 'CRF',         key: 'crf',          unique: true },
   { label: 'Audio',       key: 'audioBitrate', unique: true },
-  { label: 'GOP',         key: 'gop',          unique: true },
+  { label: 'GOP',         key: 'gopSize',      unique: true },
+  { label: 'Colorimétrie', key: 'colorSpace' },
 ]
 
 function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {

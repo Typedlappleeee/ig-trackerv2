@@ -361,9 +361,22 @@ export default function StoryLink({ user }: { user: User }) {
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
       if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
+      // Prefer DB link column (set from Phones tab) over localStorage fallback.
+      const { data: dbPhones } = await supabase.from('phones').select('geelark_id,link').in(
+        'geelark_id', list.map(p => p.id),
+      )
+      const dbLinkMap = new Map(
+        (dbPhones ?? []).map(r => [r.geelark_id as string, (r.link as string | null) ?? ''])
+      )
       setPhoneLinks(prev => {
         const n = { ...prev }
-        list.forEach(p => { if (n[p.id] === undefined) { const v = loadPhoneLink(p.id); if (v) n[p.id] = v } })
+        list.forEach(p => {
+          if (n[p.id] === undefined) {
+            const dbVal = dbLinkMap.get(p.id)
+            const v = dbVal || loadPhoneLink(p.id)
+            if (v) n[p.id] = v
+          }
+        })
         return n
       })
     } catch (_) { /* ignore */ }
