@@ -8,25 +8,25 @@ const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true, mixer: true, subtitles: true,
+    remix: true, repurpose: true, montage: true, mixer: true, subtitles: true, spoof: true,
     settings: true,
   },
   admin: {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true, mixer: true, subtitles: true,
+    remix: true, repurpose: true, montage: true, mixer: true, subtitles: true, spoof: true,
     settings: true,
   },
   member: {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true, mixer: true, subtitles: false,
+    remix: true, repurpose: true, montage: true, mixer: true, subtitles: false, spoof: true,
     settings: false,
   },
   viewer: {
     phones: true,
     posting: false, massposting: false, scheduler: false, tasks: false, storylink: false, bank: true, captionbank: true, warmup: false, aitools: false,
-    remix: false, repurpose: false, montage: false, mixer: false, subtitles: false,
+    remix: false, repurpose: false, montage: false, mixer: false, subtitles: false, spoof: false,
     settings: false,
   },
 }
@@ -113,6 +113,7 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string; group: strin
   { key: 'repurpose',   label: 'CloneVid',        icon: '🎬', group: 'Outils vidéo' },
   { key: 'mixer',       label: 'Mixer',           icon: '🎞️', group: 'Outils vidéo' },
   { key: 'subtitles',   label: 'Sous-titres',     icon: '💬', group: 'Outils vidéo' },
+  { key: 'spoof',       label: 'Spoofing',        icon: '🛡️', group: 'Outils vidéo' },
   // Paramètres
   { key: 'settings',    label: 'Connexions (clés API)', icon: '🔑', group: 'Paramètres' },
 ]

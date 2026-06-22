@@ -566,6 +566,7 @@ const Tasks          = lazy(() => import('@/pages/Tasks').then(m => ({ default: 
 const Warmup         = lazy(() => import('@/pages/Warmup').then(m => ({ default: m.Warmup })))
 const VideoRepurpose = lazy(() => import('@/pages/VideoRepurpose').then(m => ({ default: m.VideoRepurpose })))
 const Mixer          = lazy(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
+const Spoof          = lazy(() => import('@/pages/Spoof').then(m => ({ default: m.Spoof })))
 const Licences       = lazy(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
 const Support        = lazy(() => import('@/pages/Support').then(m => ({ default: m.Support })))
 const History        = lazy(() => import('@/pages/History').then(m => ({ default: m.History })))
@@ -847,6 +848,7 @@ function AppContent({ user }: { user: User }) {
       case 'captionbank':  return <BankHub      user={user} initialTab="captions" />
       case 'mixer':        return <Mixer        user={user} />
       case 'subtitles':    return <Subtitles    user={user} />
+      case 'spoof':        return <Spoof        user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />

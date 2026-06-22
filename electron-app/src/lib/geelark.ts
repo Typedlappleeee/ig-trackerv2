@@ -952,34 +952,55 @@ export async function postInstagramStory(
   const pushData = compressed ?? imgBase64
   if (compressed) { outExt = 'jpg' } else { outExt = _imgExt }
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
-  log(`   📤 Push: ${Math.round(pushData.length / 1024)} KB (.${outExt})`)
+  // Strategy 1: direct download on the phone via curl/wget — faster and more reliable
+  // than base64 chunks, but requires the phone to reach the Supabase URL directly.
+  let sz = 0
+  log('   📥 Téléchargement direct sur le téléphone…')
+  try {
+    const escapedUrl = config.imageUrl.replace(/\\/g, '\\\\').replace(/'/g, "'\\''")
+    const dlCmd =
+      `mkdir -p /sdcard/DCIM/Camera && ` +
+      `(curl -L --connect-timeout 30 --max-time 120 -s -o '${imgPath}' '${escapedUrl}' 2>/dev/null || ` +
+      ` wget -q -O '${imgPath}' '${escapedUrl}' 2>/dev/null) && ` +
+      `wc -c < '${imgPath}' 2>/dev/null || echo 0`
+    const dlResult = await shellExec(bearer, phoneId, dlCmd)
+    sz = parseInt(dlResult.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    if (sz > 2000) log(`   ✅ Download direct: ${sz} octets`)
+  } catch { /* fallthrough to base64 */ }
 
-  // Push via base64 chunks (base64 chars A-Za-z0-9+/= are safe inside single quotes)
-  const CHUNK = 3000, BATCH = 20
-  const chunks: string[] = []
-  for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
-  log(`   📦 ${chunks.length} chunks × ${BATCH}…`)
-  await shellExec(bearer, phoneId,
-    `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-  for (let b = 1; b < chunks.length; b += BATCH) {
-    const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-    await shellExec(bearer, phoneId, cmd)
+  // Strategy 2: base64 chunk push (fallback when direct download fails)
+  if (sz < 2000) {
+    log(`   📤 Fallback base64: ${Math.round(pushData.length / 1024)} KB (.${outExt})`)
+    const CHUNK = 3000, BATCH = 20
+    const chunks: string[] = []
+    for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
+    log(`   📦 ${chunks.length} chunks × ${BATCH}…`)
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+    for (let b = 1; b < chunks.length; b += BATCH) {
+      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+      await shellExec(bearer, phoneId, cmd)
+    }
+    await shellExec(bearer, phoneId,
+      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
+
+    const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    log(`   📎 Fichier: ${sz} octets`)
   }
-  await shellExec(bearer, phoneId,
-    `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
 
-  const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-  const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-  log(`   📎 Fichier: ${sz} octets`)
   if (sz < 2000) {
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
   }
 
   // Force media scanner so Instagram's gallery picker sees the new file.
-  // touch -m ensures the file has the current timestamp → appears FIRST in "Recents".
+  // touch -m sets current timestamp → file appears FIRST in "Recents".
+  // Two scan methods for compatibility across Android versions.
   await shellExec(bearer, phoneId,
-    `touch -m '${imgPath}' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
-  await sleep(4000)
+    `touch -m '${imgPath}' && ` +
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath} 2>/dev/null; ` +
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null`)
+  await sleep(6000)
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
