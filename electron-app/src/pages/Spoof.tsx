@@ -114,13 +114,13 @@ export function Spoof({ user }: { user: User }) {
           : gpsCity
 
         try {
-          const res = await fetch('/api/spoof', {
+          const res = await fetch('/api/repurpose', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               sourceUrl: job.url,
               userId: user.id,
-              mode: 'video',
+              mode: 'spoof',
               preset,
               gpsCity: resolvedCity,
               customDate: customDate.replace(/-/g, ':'),
