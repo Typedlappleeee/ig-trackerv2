@@ -261,6 +261,13 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       .then(({ data }) => { if (data?.display_name) setDisplayName(data.display_name) })
   }, [user.id])
 
+  // Ask for desktop notification permission once, app-wide
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
+  }, [])
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('sidebar-sections') ?? '{}')
@@ -421,6 +428,92 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
+
+  // ── Centralized completion notifier for scheduled posts & automatic tasks ──
+  // Covers posts executed client-side (Scheduler / Tasks) AND server-side
+  // (edge function while the PC is off — caught up when the app reopens).
+  useEffect(() => {
+    const scopeKey = currentOrg?.id ?? user.id
+    const lastSeenKey = `sf-notif-lastseen-${scopeKey}`
+    const processed = new Set<string>()
+
+    const inScope = (row: any) =>
+      currentOrg ? row.org_id === currentOrg.id : (row.user_id === user.id && !row.org_id)
+
+    const parsePhones = (p: unknown): unknown[] => {
+      if (Array.isArray(p)) return p
+      if (typeof p === 'string') { try { const v = JSON.parse(p); return Array.isArray(v) ? v : [] } catch { return [] } }
+      return []
+    }
+
+    const notifyForPost = (row: any) => {
+      if (!row || processed.has(row.id)) return
+      processed.add(row.id)
+      const n = parsePhones(row.phones).length
+      const ok = row.status === 'done'
+      const isTask = !!row.task_id
+      const typeLabel = isTask ? 'Tâche automatique'
+        : row.type === 'story'        ? 'Story programmée'
+        : row.type === 'mass_posting' ? 'Mass posting programmé'
+        :                               'Publication programmée'
+      const accounts = `${n} compte${n > 1 ? 's' : ''}`
+      pushNotification({
+        title: ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`,
+        body:  `${accounts}${row.created_by_name ? ' · ' + row.created_by_name : ''}`,
+        level: ok ? 'ok' : 'error',
+        page:  isTask ? 'tasks' : 'scheduler',
+      })
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
+          body: `${accounts} — ScaleFlow`,
+        })
+      }
+      // Advance the last-seen marker so we don't re-notify on next reopen
+      if (row.executed_at) {
+        const prev = localStorage.getItem(lastSeenKey)
+        if (!prev || row.executed_at > prev) localStorage.setItem(lastSeenKey, row.executed_at)
+      }
+    }
+
+    // 1) Catch-up: posts that finished server-side while the app was closed
+    ;(async () => {
+      const lastSeen = localStorage.getItem(lastSeenKey)
+      // First ever load for this scope: just set the marker, don't dump history
+      if (!lastSeen) {
+        localStorage.setItem(lastSeenKey, new Date().toISOString())
+        return
+      }
+      let q = supabase.from('scheduled_posts')
+        .select('id,type,status,phones,executed_at,task_id,created_by_name')
+        .in('status', ['done', 'failed'])
+        .gt('executed_at', lastSeen)
+        .order('executed_at', { ascending: true })
+        .limit(15)
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      const { data } = await q
+      for (const row of (data ?? []) as any[]) notifyForPost(row)
+    })()
+
+    // 2) Realtime: live completions (client- or server-executed)
+    const ch = supabase.channel(`layout-posts-notif-${scopeKey}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'scheduled_posts' }, payload => {
+        const row = payload.new as any
+        const old = payload.old as any
+        if (!inScope(row)) return
+        if ((row.status === 'done' || row.status === 'failed') && old?.status !== row.status) {
+          notifyForPost(row)
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scheduled_posts' }, payload => {
+        const row = payload.new as any
+        if (!inScope(row)) return
+        // Recurring tasks insert their row already finished (status done/failed)
+        if (row.status === 'done' || row.status === 'failed') notifyForPost(row)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(ch) }
+  }, [currentOrg?.id, user.id])
 
   // Close the notif panel (marks everything as read on close, not on open,
   // so the unread badge stays meaningful while the panel is visible)

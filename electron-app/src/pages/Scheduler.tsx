@@ -461,18 +461,15 @@ export function Scheduler({ user, onNavigate }: Props) {
       await finishScheduledPost(post.id, ok, msgs, ok ? undefined : msgs[msgs.length - 1])
       setRunningPost(null)
       runningRef.current.delete(post.id)
-      // Notify completion (toast + system notification)
+      // In-page toast for immediate feedback. The persistent bell + desktop
+      // notification are handled centrally in Layout (covers server-executed
+      // runs too), so we don't fire a duplicate system Notification here.
       const typeLabel = post.type === 'story' ? 'Stories' : post.type === 'mass_posting' ? 'Mass posting' : 'Posting'
       toast.show({
         title: ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`,
         body: `${post.phones.length} compte${post.phones.length > 1 ? 's' : ''}`,
         kind: ok ? 'ok' : 'error',
       })
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
-          body: `${post.phones.length} compte${post.phones.length > 1 ? 's' : ''} — ScaleFlow`,
-        })
-      }
       reload()
     }
 
