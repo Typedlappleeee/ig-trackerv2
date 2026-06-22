@@ -655,11 +655,8 @@ export function Mixer({ user }: MixerProps) {
             {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok">{doneJobs.length}/{jobs.length} terminés</span>}
             {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger">{errorJobs.length} erreur{errorJobs.length > 1 ? 's' : ''}</span>}
             {doneJobs.length > 0 && (
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, minWidth: 260 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-4)', whiteSpace: 'nowrap' }}>Enregistrer dans :</span>
-                <div style={{ flex: 1 }}>
-                  <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="" compact />
-                </div>
+              <div style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-4)', whiteSpace: 'nowrap' }}>
+                Dossier : <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
               </div>
             )}
           </div>
