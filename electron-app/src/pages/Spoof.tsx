@@ -45,6 +45,7 @@ interface AppliedMeta {
   make: string; model: string; software: string; city: string
   gps: string; altitude: string; creationDate: string; timezone: string
   cameraId: string; lens: string; iso: number; exposure: string; aperture: string; focal: string
+  crf?: number; audioBitrate?: string; gop?: number
 }
 
 interface SpoofJob {
@@ -283,13 +284,13 @@ export function Spoof({ user }: { user: User }) {
                 onChange={e => setGpsCity(e.target.value)}
                 disabled={running}
                 className="sf-input"
-                style={{ width: '100%', fontSize: 12 }}
+                style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
               >
-                <option value="random">🎲 Aléatoire (tous pays)</option>
+                <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>🎲 Aléatoire (tous pays)</option>
                 {GPS_GROUPS.map(group => (
-                  <optgroup key={group.country} label={group.country}>
+                  <optgroup key={group.country} label={group.country} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
                     {Object.entries(group.cities).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
+                      <option key={key} value={key} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{label}</option>
                     ))}
                   </optgroup>
                 ))}
@@ -454,20 +455,10 @@ export function Spoof({ user }: { user: User }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {doneCount >= 2 && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderRadius: 9,
-                    background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)', marginBottom: 2,
-                  }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                    <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
-                      {doneCount} vidéos spoofées — compare les métadonnées : chaque vidéo a un GPS, une date, un ID caméra <b>différents</b>.
-                    </span>
-                  </div>
-                )}
                 {jobs.map(job => (
                   <SpoofJobCard key={job.id} job={job} />
                 ))}
+                {doneCount >= 2 && <ComparePanel jobs={jobs} />}
               </div>
             )}
           </div>
@@ -517,6 +508,9 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
     { label: 'ISO',        key: 'iso' },
     { label: 'Exposition', key: 'exposure' },
     { label: 'ID Caméra',  key: 'cameraId' },
+    { label: 'CRF vidéo',  key: 'crf' },
+    { label: 'Audio',      key: 'audioBitrate' },
+    { label: 'GOP',        key: 'gop' },
   ]
 
   return (
@@ -598,6 +592,84 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+const COMPARE_ROWS: { label: string; key: keyof AppliedMeta; unique?: boolean }[] = [
+  { label: 'Appareil',    key: 'model' },
+  { label: 'Logiciel',   key: 'software' },
+  { label: 'Localisation', key: 'city',        unique: true },
+  { label: 'GPS',         key: 'gps',          unique: true },
+  { label: 'Altitude',    key: 'altitude',     unique: true },
+  { label: 'Date / heure', key: 'creationDate', unique: true },
+  { label: 'Fuseau',      key: 'timezone' },
+  { label: 'Objectif',   key: 'lens' },
+  { label: 'ISO',         key: 'iso',          unique: true },
+  { label: 'Exposition',  key: 'exposure',     unique: true },
+  { label: 'Ouverture',   key: 'aperture' },
+  { label: 'ID Caméra',   key: 'cameraId',     unique: true },
+  { label: 'CRF vidéo',   key: 'crf',          unique: true },
+  { label: 'Audio',       key: 'audioBitrate', unique: true },
+  { label: 'GOP',         key: 'gop',          unique: true },
+]
+
+function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
+  const done = jobs.filter(j => j.status === 'done' && j.meta)
+  if (done.length < 2) return null
+
+  return (
+    <div style={{
+      borderRadius: 12, padding: '14px 16px',
+      background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.18)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
+          Comparaison — {done.length} vidéos spoofées avec des métadonnées différentes
+        </span>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', color: 'var(--text-4)', fontWeight: 600, paddingBottom: 8, paddingRight: 12, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Champ</th>
+              {done.map((j, i) => (
+                <th key={j.id} style={{ textAlign: 'left', color: '#6366F1', fontWeight: 700, paddingBottom: 8, paddingLeft: 8, fontSize: 10, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                  Vidéo {i + 1} — {j.name.slice(0, 18)}{j.name.length > 18 ? '…' : ''}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {COMPARE_ROWS.map(({ label, key, unique }) => {
+              const vals = done.map(j => String(j.meta![key] ?? '—'))
+              const allSame = vals.every(v => v === vals[0])
+              return (
+                <tr key={key} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td style={{ padding: '5px 12px 5px 0', color: 'var(--text-4)', fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'top' }}>
+                    {label}
+                  </td>
+                  {vals.map((val, i) => (
+                    <td key={i} style={{
+                      padding: '5px 8px', verticalAlign: 'top',
+                      color: unique && !allSame ? '#22c55e' : 'var(--ivory)',
+                      fontWeight: unique && !allSame ? 700 : 400,
+                      maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }} title={val}>
+                      {unique && !allSame && <span style={{ marginRight: 4, fontSize: 9 }}>✓</span>}
+                      {val}
+                    </td>
+                  ))}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: 12, fontSize: 10, color: 'var(--text-4)', fontStyle: 'italic' }}>
+        Les champs en vert <span style={{ color: '#22c55e' }}>✓</span> sont différents entre chaque vidéo — GPS, horodatage, ID caméra, encodage vidéo, etc.
+      </div>
     </div>
   )
 }
