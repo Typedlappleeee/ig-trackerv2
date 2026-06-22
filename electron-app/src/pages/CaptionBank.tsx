@@ -298,14 +298,37 @@ export function CaptionBank({ user }: CaptionBankProps) {
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <aside className="w-52 flex-shrink-0 border-r border-border flex flex-col bg-surface overflow-hidden">
         {/* Sidebar header */}
-        <div className="px-4 pt-5 pb-3 flex-shrink-0 border-b border-border sf-anim-slide-up sf-d50">
-          <div className="flex items-center gap-2">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-border sf-anim-slide-up sf-d50">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-text3">Dossiers</span>
+          <button
+            onClick={() => { setShowNewFolder(v => !v); setNewFolderInput('') }}
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
+            title="Nouveau dossier"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"/>
             </svg>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-text2">Dossiers</p>
-          </div>
+          </button>
         </div>
+
+        {/* New folder inline input */}
+        {showNewFolder && (
+          <div className="px-3 py-2 flex gap-1.5 flex-shrink-0 border-b border-border">
+            <input
+              ref={newFolderRef}
+              autoFocus
+              placeholder="Nom du dossier…"
+              className="sf-input flex-1 text-[12px]"
+              value={newFolderInput}
+              onChange={e => setNewFolderInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitNewFolder()
+                if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderInput('') }
+              }}
+            />
+            <button onClick={commitNewFolder} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">OK</button>
+          </div>
+        )}
 
         {/* Folder list */}
         <div className="flex-1 overflow-y-auto py-2 px-2 anim-stagger">
@@ -366,35 +389,6 @@ export function CaptionBank({ user }: CaptionBankProps) {
             )
           })}
 
-          {/* New folder */}
-          <div className="pt-1 px-1">
-            {showNewFolder ? (
-              <input
-                ref={newFolderRef}
-                autoFocus
-                value={newFolderInput}
-                onChange={e => setNewFolderInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') commitNewFolder()
-                  if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderInput('') }
-                }}
-                onBlur={() => { if (newFolderInput.trim()) commitNewFolder(); else setShowNewFolder(false) }}
-                placeholder="Nom du dossier…"
-                className="sf-input w-full text-[11px] px-2.5 py-1.5"
-              />
-            ) : (
-              <button
-                onClick={() => { setShowNewFolder(true); setTimeout(() => newFolderRef.current?.focus(), 50) }}
-                className="w-full px-3 py-1.5 rounded-lg text-[11px] text-accent/60 hover:text-accent transition-all cursor-pointer flex items-center gap-1.5"
-                style={{ border: '1px dashed rgba(99,102,241,0.2)' }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14"/>
-                </svg>
-                Nouveau dossier
-              </button>
-            )}
-          </div>
         </div>
       </aside>
 
