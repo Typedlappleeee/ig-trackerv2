@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { getSignedUrl } from '@/lib/storage'
+import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { Spinner } from '@/components/ui/Spinner'
 import type { CaptionItem } from './CaptionBank'
 
@@ -293,6 +294,7 @@ export function Mixer({ user }: MixerProps) {
   const [running, setRunning] = useState(false)
   const [error,   setError]   = useState('')
   const [devNoticeOpen, setDevNoticeOpen] = useState(true)
+  const [saveFolder, setSaveFolder] = useState<string | null>(null)
 
   const removeVideo   = (id: string) => setSelVideos(p => p.filter(v => v.id !== id))
   const removeCaption = (id: string) => setSelCaptions(p => p.filter(c => c.id !== id))
@@ -647,6 +649,14 @@ export function Mixer({ user }: MixerProps) {
             {running && <div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />}
             {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok">{doneJobs.length}/{jobs.length} terminés</span>}
             {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger">{errorJobs.length} erreur{errorJobs.length > 1 ? 's' : ''}</span>}
+            {doneJobs.length > 0 && (
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, minWidth: 260 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-4)', whiteSpace: 'nowrap' }}>Enregistrer dans :</span>
+                <div style={{ flex: 1 }}>
+                  <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="" compact />
+                </div>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 10, height: 165 }}>
             {jobs.map(job => (
@@ -678,7 +688,7 @@ export function Mixer({ user }: MixerProps) {
                               file_url: null,
                               storage_path: job.storagePath,
                               thumbnail_path: null,
-                              folder: null, tags: [], notes: '',
+                              folder: saveFolder, tags: [], notes: '',
                             })
                             if (!error) updateJob(job.id, { savedToBank: true })
                           }}

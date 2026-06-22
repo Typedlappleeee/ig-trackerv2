@@ -163,11 +163,17 @@ async function handleSpoof(req, res) {
       noise = 0, vignette = false, flipH = false, zoomPct = 0,
     } = adjustments
 
-    const hasVisual = brightness !== 0 || saturation !== 0 || contrast !== 0 ||
-      noise > 0 || vignette || flipH || zoomPct > 0
+    // Per-export encoding variation — every file has a different CRF, audio bitrate,
+    // GOP size, and a tiny sub-pixel noise so the compressed bitstream differs.
+    const crf         = 18 + Math.floor(Math.random() * 5)           // 18–22
+    const audioBitrate = [128, 160, 192][Math.floor(Math.random() * 3)]
+    const gopSize     = 30 + Math.floor(Math.random() * 30)          // 30–59
+    const bframes     = [0, 1, 2][Math.floor(Math.random() * 3)]
+    const encoderNoise = (Math.random() * 0.002).toFixed(4)          // imperceptible
 
     const ffArgs = ['-nostdin', '-threads', '0', '-i', inputPath]
 
+    // Container-level (moov-level) metadata
     ffArgs.push(
       '-metadata', `make=${meta.make}`,
       '-metadata', `model=${meta.model}`,
@@ -184,44 +190,55 @@ async function handleSpoof(req, res) {
       '-metadata', `com.apple.quicktime.camera.identifier=${cameraId}`,
       '-metadata', `com.apple.quicktime.camera.lens_model=${meta.lens}`,
       '-metadata', `com.apple.quicktime.camera.focal_length.35mm_equivalent=${focalLen}`,
+      '-metadata', `com.apple.quicktime.camera.aperture=${apertureF}`,
+      '-metadata', `com.apple.quicktime.camera.exposure_time=1/${exposureMs.split('/')[1] || 60}`,
+      '-metadata', `com.apple.quicktime.camera.iso=${iso}`,
       '-metadata', `creation_time=${creationTime}`,
       '-metadata', `date=${dateDash}`,
       '-metadata', `comment=${gps.city}`,
+      '-metadata', `description=Shot on ${meta.model}`,
+      '-metadata', `copyright=© ${dateDash.slice(0, 4)} ${meta.make}`,
     )
 
-    if (hasVisual) {
-      const filters = []
-      const eqParts = []
-      if (brightness !== 0) eqParts.push(`brightness=${(brightness / 100).toFixed(3)}`)
-      if (saturation !== 0) eqParts.push(`saturation=${((saturation + 50) / 50).toFixed(3)}`)
-      if (contrast !== 0) eqParts.push(`contrast=${(1.0 + contrast / 100).toFixed(3)}`)
-      if (eqParts.length > 0) filters.push(`eq=${eqParts.join(':')}`)
+    // Build video filter chain — always re-encode for true binary uniqueness
+    const filters = []
+    const eqParts = []
+    if (brightness !== 0) eqParts.push(`brightness=${(brightness / 100).toFixed(3)}`)
+    if (saturation !== 0) eqParts.push(`saturation=${((saturation + 50) / 50).toFixed(3)}`)
+    if (contrast !== 0) eqParts.push(`contrast=${(1.0 + contrast / 100).toFixed(3)}`)
+    if (eqParts.length > 0) filters.push(`eq=${eqParts.join(':')}`)
 
-      if (noise > 0) {
-        const strength = Math.round((noise / 100) * 50)
-        const seed = Math.floor(Math.random() * 65536)
-        filters.push(`noise=all_seed=${seed}:all_strength=${strength}`)
-      }
-      if (zoomPct > 0) {
-        const factor = (zoomPct / 100).toFixed(4)
-        filters.push(`crop=in_w*(1-${factor}):in_h*(1-${factor}),scale=in_w/(1-${factor}):in_h/(1-${factor})`)
-      }
-      if (flipH) filters.push('hflip')
-      if (vignette) filters.push('vignette=PI/5')
-
-      // Force even dimensions — libx264 + yuv420p reject odd width/height
-      // (the zoom crop/scale can produce an odd value).
-      filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
-
-      ffArgs.push(
-        '-vf', filters.join(','),
-        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-        '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
-      )
+    if (noise > 0) {
+      const strength = Math.round((noise / 100) * 50)
+      const seed = Math.floor(Math.random() * 65536)
+      filters.push(`noise=all_seed=${seed}:all_strength=${strength}`)
     } else {
-      ffArgs.push('-codec', 'copy')
+      // Imperceptible noise to make every export binary-unique even without adjustments
+      const seed = Math.floor(Math.random() * 65536)
+      filters.push(`noise=all_seed=${seed}:all_strength=1`)
     }
+    if (zoomPct > 0) {
+      const factor = (zoomPct / 100).toFixed(4)
+      filters.push(`crop=in_w*(1-${factor}):in_h*(1-${factor}),scale=in_w/(1-${factor}):in_h/(1-${factor})`)
+    }
+    if (flipH) filters.push('hflip')
+    if (vignette) filters.push('vignette=PI/5')
+
+    // Force even dimensions — libx264 + yuv420p reject odd width/height
+    filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
+
+    ffArgs.push(
+      '-vf', filters.join(','),
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', String(crf),
+      '-g', String(gopSize), '-bf', String(bframes),
+      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      // Stream-level metadata (video track)
+      '-metadata:s:v:0', `handler_name=${meta.make} Video Media Handler`,
+      '-metadata:s:v:0', `encoder=${meta.encoder}`,
+      '-c:a', 'aac', `-b:a`, `${audioBitrate}k`, '-ar', '44100',
+      // Stream-level metadata (audio track)
+      '-metadata:s:a:0', `handler_name=${meta.make} Sound Media Handler`,
+    )
 
     // use_metadata_tags forces the MP4 muxer to write arbitrary keys
     // (make/model/software + com.apple.quicktime.*) instead of dropping them.
@@ -254,6 +271,9 @@ async function handleSpoof(req, res) {
       exposure:     exposureMs,
       aperture:     `f/${apertureF}`,
       focal:        `${focalLen}mm`,
+      crf,
+      audioBitrate: `${audioBitrate}k`,
+      gop:          gopSize,
     }
     res.json({ ok: true, url: publicUrl, storagePath: resultPath, appliedMeta })
   } catch (err) {

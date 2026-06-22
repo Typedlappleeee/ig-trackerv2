@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
+import { useOrg } from '@/lib/orgContext'
+import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 const PRESETS: Record<string, string> = {
@@ -45,6 +47,7 @@ interface AppliedMeta {
   make: string; model: string; software: string; city: string
   gps: string; altitude: string; creationDate: string; timezone: string
   cameraId: string; lens: string; iso: number; exposure: string; aperture: string; focal: string
+  crf?: number; audioBitrate?: string; gop?: number
 }
 
 interface SpoofJob {
@@ -56,6 +59,7 @@ interface SpoofJob {
   storagePath?: string
   error?: string
   meta?: AppliedMeta
+  savedToBank?: boolean
 }
 
 interface SelectedVideo { url: string; name: string }
@@ -66,8 +70,11 @@ function todayStr() {
 
 export function Spoof({ user }: { user: User }) {
   const credits = useCredits()
+  const { currentOrg } = useOrg()
 
   const [showBank, setShowBank]           = useState(false)
+  const [saveFolder, setSaveFolder]       = useState<string | null>(null)
+  const [savingAll, setSavingAll]         = useState(false)
   const [selectedVideos, setSelectedVideos] = useState<SelectedVideo[]>([])
   const [preset, setPreset]               = useState('iphone17pro')
   const [gpsCity, setGpsCity]             = useState('random')
@@ -80,6 +87,7 @@ export function Spoof({ user }: { user: User }) {
   const [vignette, setVignette]           = useState(false)
   const [flipH, setFlipH]                 = useState(false)
   const [zoomPct, setZoomPct]             = useState(0)
+  const [copies, setCopies]               = useState(1)
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
 
@@ -87,10 +95,37 @@ export function Spoof({ user }: { user: User }) {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
   }
 
+  async function saveJobToBank(job: SpoofJob): Promise<boolean> {
+    if (!job.storagePath || job.savedToBank) return false
+    const { error } = await supabase.from('content_bank').insert({
+      user_id: user.id, org_id: currentOrg?.id ?? null,
+      title: `Spoof — ${job.name}`,
+      file_url: null,
+      storage_path: job.storagePath,
+      thumbnail_path: null,
+      folder: saveFolder, tags: ['spoof'], notes: job.meta ? `${job.meta.model} · ${job.meta.city}` : '',
+    })
+    if (error) { alert('Échec de l\'enregistrement : ' + error.message); return false }
+    updateJob(job.id, { savedToBank: true })
+    return true
+  }
+
+  async function saveAllToBank() {
+    setSavingAll(true)
+    try {
+      for (const job of jobs.filter(j => j.status === 'done' && j.storagePath && !j.savedToBank)) {
+        await saveJobToBank(job)
+      }
+    } finally {
+      setSavingAll(false)
+    }
+  }
+
   async function runSpoof() {
     if (!selectedVideos.length || running) return
 
-    const creditCost = selectedVideos.length * CREDIT_COSTS.clone_vid
+    const totalOutputs = selectedVideos.length * copies
+    const creditCost = totalOutputs * CREDIT_COSTS.clone_vid
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
       const balance = creditRes.balance ?? credits.balance
@@ -99,12 +134,16 @@ export function Spoof({ user }: { user: User }) {
     }
     if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
 
-    const initialJobs: SpoofJob[] = selectedVideos.map((v, i) => ({
-      id: `${Date.now()}_${i}`,
-      name: v.name,
-      url: v.url,
-      status: 'queued',
-    }))
+    // Each source video produces `copies` independent spoofed outputs — every
+    // copy gets its own unique metadata (GPS, date, camera id, encoding…).
+    const initialJobs: SpoofJob[] = selectedVideos.flatMap((v, vi) =>
+      Array.from({ length: copies }, (_, c) => ({
+        id: `${Date.now()}_${vi}_${c}`,
+        name: copies > 1 ? `${v.name} (copie ${c + 1}/${copies})` : v.name,
+        url: v.url,
+        status: 'queued' as JobStatus,
+      })),
+    )
     setJobs(initialJobs)
     setRunning(true)
 
@@ -155,7 +194,8 @@ export function Spoof({ user }: { user: User }) {
   }
 
   const doneCount = jobs.filter(j => j.status === 'done').length
-  const creditCost = selectedVideos.length * CREDIT_COSTS.clone_vid
+  const totalOutputs = selectedVideos.length * copies
+  const creditCost = totalOutputs * CREDIT_COSTS.clone_vid
 
   return (
     <div className="sf-page anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--base)' }}>
@@ -283,13 +323,13 @@ export function Spoof({ user }: { user: User }) {
                 onChange={e => setGpsCity(e.target.value)}
                 disabled={running}
                 className="sf-input"
-                style={{ width: '100%', fontSize: 12 }}
+                style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
               >
-                <option value="random">🎲 Aléatoire (tous pays)</option>
+                <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>🎲 Aléatoire (tous pays)</option>
                 {GPS_GROUPS.map(group => (
-                  <optgroup key={group.country} label={group.country}>
+                  <optgroup key={group.country} label={group.country} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
                     {Object.entries(group.cities).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
+                      <option key={key} value={key} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{label}</option>
                     ))}
                   </optgroup>
                 ))}
@@ -309,6 +349,36 @@ export function Spoof({ user }: { user: User }) {
                 className="sf-input"
                 style={{ width: '100%', fontSize: 12 }}
               />
+            </div>
+
+            <div className="sf-divider" style={{ margin: '14px 0' }} />
+
+            {/* Copies per video */}
+            <div style={{ padding: '0 14px' }}>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>
+                Copies par vidéo
+                <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>chaque copie = métadonnées uniques</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() => setCopies(c => Math.max(1, c - 1))}
+                  disabled={running || copies <= 1}
+                  className="sf-btn cursor-pointer"
+                  style={{ width: 34, height: 34, fontSize: 18, lineHeight: 1, borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: copies <= 1 ? 0.5 : 1 }}
+                >−</button>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#818CF8' }}>{copies}</div>
+                <button
+                  onClick={() => setCopies(c => Math.min(20, c + 1))}
+                  disabled={running || copies >= 20}
+                  className="sf-btn cursor-pointer"
+                  style={{ width: 34, height: 34, fontSize: 18, lineHeight: 1, borderRadius: 8, background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: copies >= 20 ? 0.5 : 1 }}
+                >+</button>
+              </div>
+              {selectedVideos.length > 0 && (
+                <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 6, textAlign: 'center' }}>
+                  {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> export{totalOutputs > 1 ? 's' : ''}
+                </div>
+              )}
             </div>
 
             <div className="sf-divider" style={{ margin: '14px 0' }} />
@@ -396,7 +466,7 @@ export function Spoof({ user }: { user: User }) {
               {selectedVideos.length > 0 && !running && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   <span className="sf-badge sf-badge-violet" style={{ fontSize: 10 }}>
-                    {creditCost} crédit{creditCost > 1 ? 's' : ''} · {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''}
+                    {creditCost} crédit{creditCost > 1 ? 's' : ''} · {totalOutputs} export{totalOutputs > 1 ? 's' : ''}
                   </span>
                 </div>
               )}
@@ -417,12 +487,12 @@ export function Spoof({ user }: { user: User }) {
                 {running ? (
                   <>
                     <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(248,113,113,0.3)', borderTopColor: '#f87171', animation: 'spin 0.9s linear infinite' }} />
-                    Traitement {doneCount}/{selectedVideos.length}…
+                    Traitement {doneCount}/{totalOutputs}…
                   </>
                 ) : (
                   <>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    Spoofing {selectedVideos.length > 0 ? `(${selectedVideos.length})` : ''}
+                    Spoofing {totalOutputs > 0 ? `(${totalOutputs})` : ''}
                   </>
                 )}
               </button>
@@ -454,20 +524,38 @@ export function Spoof({ user }: { user: User }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {doneCount >= 2 && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderRadius: 9,
-                    background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)', marginBottom: 2,
+                {/* Save-to-bank bar */}
+                {doneCount > 0 && (
+                  <div className="sf-card" style={{
+                    padding: '12px 14px', borderRadius: 12, display: 'flex', alignItems: 'flex-end', gap: 12,
+                    flexWrap: 'wrap', borderColor: 'rgba(99,102,241,0.22)', background: 'rgba(99,102,241,0.05)',
                   }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                    <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
-                      {doneCount} vidéos spoofées — compare les métadonnées : chaque vidéo a un GPS, une date, un ID caméra <b>différents</b>.
-                    </span>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="📁 Enregistrer les vidéos dans la banque" />
+                    </div>
+                    <button
+                      onClick={saveAllToBank}
+                      disabled={savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')}
+                      className="sf-btn cursor-pointer"
+                      style={{
+                        height: 36, padding: '0 16px', fontSize: 12, fontWeight: 700, borderRadius: 8,
+                        background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
+                        color: '#818CF8', border: '1px solid rgba(99,102,241,0.32)',
+                        display: 'inline-flex', alignItems: 'center', gap: 7,
+                        opacity: (savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')) ? 0.5 : 1,
+                      }}
+                    >
+                      {savingAll
+                        ? <><div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} /> Enregistrement…</>
+                        : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> Tout enregistrer ({doneCount})</>
+                      }
+                    </button>
                   </div>
                 )}
                 {jobs.map(job => (
-                  <SpoofJobCard key={job.id} job={job} />
+                  <SpoofJobCard key={job.id} job={job} onSave={() => saveJobToBank(job)} />
                 ))}
+                {doneCount >= 2 && <ComparePanel jobs={jobs} />}
               </div>
             )}
           </div>
@@ -479,7 +567,7 @@ export function Spoof({ user }: { user: User }) {
   )
 }
 
-function SpoofJobCard({ job }: { job: SpoofJob }) {
+function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
   const isDone = job.status === 'done'
   const isErr  = job.status === 'error'
   const isProc = job.status === 'processing'
@@ -517,6 +605,9 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
     { label: 'ISO',        key: 'iso' },
     { label: 'Exposition', key: 'exposure' },
     { label: 'ID Caméra',  key: 'cameraId' },
+    { label: 'CRF vidéo',  key: 'crf' },
+    { label: 'Audio',      key: 'audioBitrate' },
+    { label: 'GOP',        key: 'gop' },
   ]
 
   return (
@@ -530,18 +621,32 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* Status icon */}
-        <div style={{
-          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: isDone ? 'rgba(99,102,241,0.12)' : isErr ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${isDone ? 'rgba(99,102,241,0.25)' : isErr ? 'rgba(239,68,68,0.2)' : 'var(--border)'}`,
-        }}>
-          {isQ && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
-          {isProc && <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1', animation: 'spin 0.9s linear infinite' }} />}
-          {isDone && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
-          {isErr && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
-        </div>
+        {/* Status icon / video preview */}
+        {isDone && job.outputUrl ? (
+          <div style={{ width: 44, height: 60, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: '#000', border: '1px solid rgba(99,102,241,0.25)', position: 'relative' }}>
+            <video
+              src={job.outputUrl}
+              muted loop playsInline
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onMouseEnter={e => (e.target as HTMLVideoElement).play().catch(() => {})}
+              onMouseLeave={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+            />
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)" stroke="none"><polygon points="6,4 20,12 6,20"/></svg>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isErr ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${isErr ? 'rgba(239,68,68,0.2)' : 'var(--border)'}`,
+          }}>
+            {isQ && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
+            {isProc && <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1', animation: 'spin 0.9s linear infinite' }} />}
+            {isErr && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
+          </div>
+        )}
 
         {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -568,15 +673,24 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
               Télécharger
             </button>
             {job.storagePath && (
-              <a
-                href="#"
-                onClick={e => { e.preventDefault(); window.location.hash = '#bank' }}
-                className="sf-btn cursor-pointer"
-                style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 7, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8"/></svg>
-                Banque
-              </a>
+              job.savedToBank ? (
+                <span
+                  className="sf-btn"
+                  style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Enregistré
+                </span>
+              ) : (
+                <button
+                  onClick={onSave}
+                  className="sf-btn cursor-pointer"
+                  style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Enregistrer
+                </button>
+              )
             )}
           </div>
         )}
@@ -598,6 +712,84 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+const COMPARE_ROWS: { label: string; key: keyof AppliedMeta; unique?: boolean }[] = [
+  { label: 'Appareil',    key: 'model' },
+  { label: 'Logiciel',   key: 'software' },
+  { label: 'Localisation', key: 'city',        unique: true },
+  { label: 'GPS',         key: 'gps',          unique: true },
+  { label: 'Altitude',    key: 'altitude',     unique: true },
+  { label: 'Date / heure', key: 'creationDate', unique: true },
+  { label: 'Fuseau',      key: 'timezone' },
+  { label: 'Objectif',   key: 'lens' },
+  { label: 'ISO',         key: 'iso',          unique: true },
+  { label: 'Exposition',  key: 'exposure',     unique: true },
+  { label: 'Ouverture',   key: 'aperture' },
+  { label: 'ID Caméra',   key: 'cameraId',     unique: true },
+  { label: 'CRF vidéo',   key: 'crf',          unique: true },
+  { label: 'Audio',       key: 'audioBitrate', unique: true },
+  { label: 'GOP',         key: 'gop',          unique: true },
+]
+
+function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
+  const done = jobs.filter(j => j.status === 'done' && j.meta)
+  if (done.length < 2) return null
+
+  return (
+    <div style={{
+      borderRadius: 12, padding: '14px 16px',
+      background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.18)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
+          Comparaison — {done.length} vidéos spoofées avec des métadonnées différentes
+        </span>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', color: 'var(--text-4)', fontWeight: 600, paddingBottom: 8, paddingRight: 12, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Champ</th>
+              {done.map((j, i) => (
+                <th key={j.id} style={{ textAlign: 'left', color: '#6366F1', fontWeight: 700, paddingBottom: 8, paddingLeft: 8, fontSize: 10, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                  Vidéo {i + 1} — {j.name.slice(0, 18)}{j.name.length > 18 ? '…' : ''}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {COMPARE_ROWS.map(({ label, key, unique }) => {
+              const vals = done.map(j => String(j.meta![key] ?? '—'))
+              const allSame = vals.every(v => v === vals[0])
+              return (
+                <tr key={key} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td style={{ padding: '5px 12px 5px 0', color: 'var(--text-4)', fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'top' }}>
+                    {label}
+                  </td>
+                  {vals.map((val, i) => (
+                    <td key={i} style={{
+                      padding: '5px 8px', verticalAlign: 'top',
+                      color: unique && !allSame ? '#22c55e' : 'var(--ivory)',
+                      fontWeight: unique && !allSame ? 700 : 400,
+                      maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }} title={val}>
+                      {unique && !allSame && <span style={{ marginRight: 4, fontSize: 9 }}>✓</span>}
+                      {val}
+                    </td>
+                  ))}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: 12, fontSize: 10, color: 'var(--text-4)', fontStyle: 'italic' }}>
+        Les champs en vert <span style={{ color: '#22c55e' }}>✓</span> sont différents entre chaque vidéo — GPS, horodatage, ID caméra, encodage vidéo, etc.
+      </div>
     </div>
   )
 }
