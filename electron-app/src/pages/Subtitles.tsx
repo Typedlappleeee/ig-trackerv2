@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useConnections } from '@/lib/connections'
+import { useOrg } from '@/lib/orgContext'
+import { supabase } from '@/lib/supabase'
+import { uploadVideoFromBlob } from '@/lib/storage'
+import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { BankPicker } from '@/pages/Bank'
 
 interface SubtitlesProps { user: User }
@@ -65,6 +69,12 @@ const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI
 export function Subtitles({ user }: SubtitlesProps) {
   const conns   = useConnections(user)
   const groqKey = conns.groq
+  const { currentOrg } = useOrg()
+
+  // Save-to-bank
+  const [saveFolder,  setSaveFolder]  = useState<string | null>(null)
+  const [savedToBank, setSavedToBank] = useState(false)
+  const [saving,      setSaving]      = useState(false)
 
   // Video source
   const [videoSrc,    setVideoSrc]    = useState<string | null>(null)  // path or URL
@@ -101,7 +111,7 @@ export function Subtitles({ user }: SubtitlesProps) {
   function reset() {
     setPhase('idle'); setStatus(''); setSegments([]); setError('')
     if (outputUrl?.startsWith('blob:')) URL.revokeObjectURL(outputUrl)
-    setOutputUrl(null); setOutputPath(null)
+    setOutputUrl(null); setOutputPath(null); setSavedToBank(false)
   }
 
   function loadFile(file: File) {
@@ -264,11 +274,51 @@ export function Subtitles({ user }: SubtitlesProps) {
   }
 
   async function download() {
+    // Web: outputUrl is a blob/data/http URL → trigger a browser download.
+    if (isWeb || !window.electronAPI?.saveFileAs) {
+      const src = outputUrl ?? outputPath
+      if (!src) return
+      const a = document.createElement('a')
+      a.href = src
+      a.download = videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mp4'
+      a.click()
+      return
+    }
     if (!outputPath) return
-    await window.electronAPI?.saveFileAs?.({
+    await window.electronAPI.saveFileAs({
       sourcePath:  outputPath,
       defaultName: videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mp4',
     })
+  }
+
+  async function saveToBank() {
+    const src = outputUrl ?? outputPath
+    if (!src || saving || savedToBank) return
+    setSaving(true)
+    try {
+      const resp = await fetch(src)
+      if (!resp.ok) throw new Error(`Lecture du résultat échouée (${resp.status})`)
+      const blob = await resp.blob()
+      const title = videoName.replace(/\.[^.]+$/, '') + '_sous-titres'
+      const scope = currentOrg?.id
+        ? { mode: 'org' as const, id: currentOrg.id }
+        : { mode: 'user' as const, id: user.id }
+      const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, `${title}.mp4`, scope)
+      const { error } = await supabase.from('content_bank').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        title: `Sous-titres — ${title}`,
+        file_url: null,
+        storage_path: storagePath,
+        thumbnail_path: thumbnailPath,
+        folder: saveFolder, tags: ['sous-titres'], notes: '',
+      })
+      if (error) throw new Error(error.message)
+      setSavedToBank(true)
+    } catch (err) {
+      setError('Enregistrement dans la banque : ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const canGenerate = !!videoSrc && !!groqKey && ['idle', 'error', 'done'].includes(phase)
@@ -486,6 +536,29 @@ export function Subtitles({ user }: SubtitlesProps) {
             </button>
           </div>
 
+          {/* Save to bank */}
+          <div className="rounded-xl p-3.5 flex items-end gap-3 flex-wrap"
+            style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="📁 Enregistrer la vidéo dans la banque" />
+            </div>
+            {savedToBank ? (
+              <span className="flex items-center gap-2 px-4 rounded-lg text-sm font-bold"
+                style={{ height: 36, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
+                <CheckIcon /> Enregistré
+              </span>
+            ) : (
+              <button onClick={saveToBank} disabled={saving}
+                className="flex items-center gap-2 px-4 rounded-lg text-sm font-bold cursor-pointer transition-all"
+                style={{ height: 36, background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))', color: '#818cf8', border: '1px solid rgba(99,102,241,0.32)', opacity: saving ? 0.6 : 1 }}>
+                {saving
+                  ? <><span style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818cf8', animation: 'spin 0.9s linear infinite', display: 'inline-block' }} /> Enregistrement…</>
+                  : <><SaveIcon /> Enregistrer dans la banque</>
+                }
+              </button>
+            )}
+          </div>
+
           <div className="grid gap-4" style={{ gridTemplateColumns: outputUrl ? '1fr 1fr' : '1fr' }}>
             {outputUrl && (
               <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(99,102,241,0.15)' }}>
@@ -579,6 +652,18 @@ function WarningIcon() {
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
       <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
     </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+  )
+}
+
+function SaveIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
   )
 }
 

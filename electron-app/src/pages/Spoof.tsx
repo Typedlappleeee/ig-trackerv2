@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
+import { useOrg } from '@/lib/orgContext'
+import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 const PRESETS: Record<string, string> = {
@@ -57,6 +59,7 @@ interface SpoofJob {
   storagePath?: string
   error?: string
   meta?: AppliedMeta
+  savedToBank?: boolean
 }
 
 interface SelectedVideo { url: string; name: string }
@@ -67,8 +70,11 @@ function todayStr() {
 
 export function Spoof({ user }: { user: User }) {
   const credits = useCredits()
+  const { currentOrg } = useOrg()
 
   const [showBank, setShowBank]           = useState(false)
+  const [saveFolder, setSaveFolder]       = useState<string | null>(null)
+  const [savingAll, setSavingAll]         = useState(false)
   const [selectedVideos, setSelectedVideos] = useState<SelectedVideo[]>([])
   const [preset, setPreset]               = useState('iphone17pro')
   const [gpsCity, setGpsCity]             = useState('random')
@@ -86,6 +92,32 @@ export function Spoof({ user }: { user: User }) {
 
   function updateJob(id: string, patch: Partial<SpoofJob>) {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
+  }
+
+  async function saveJobToBank(job: SpoofJob): Promise<boolean> {
+    if (!job.storagePath || job.savedToBank) return false
+    const { error } = await supabase.from('content_bank').insert({
+      user_id: user.id, org_id: currentOrg?.id ?? null,
+      title: `Spoof — ${job.name}`,
+      file_url: null,
+      storage_path: job.storagePath,
+      thumbnail_path: null,
+      folder: saveFolder, tags: ['spoof'], notes: job.meta ? `${job.meta.model} · ${job.meta.city}` : '',
+    })
+    if (error) { alert('Échec de l\'enregistrement : ' + error.message); return false }
+    updateJob(job.id, { savedToBank: true })
+    return true
+  }
+
+  async function saveAllToBank() {
+    setSavingAll(true)
+    try {
+      for (const job of jobs.filter(j => j.status === 'done' && j.storagePath && !j.savedToBank)) {
+        await saveJobToBank(job)
+      }
+    } finally {
+      setSavingAll(false)
+    }
   }
 
   async function runSpoof() {
@@ -455,8 +487,36 @@ export function Spoof({ user }: { user: User }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Save-to-bank bar */}
+                {doneCount > 0 && (
+                  <div className="sf-card" style={{
+                    padding: '12px 14px', borderRadius: 12, display: 'flex', alignItems: 'flex-end', gap: 12,
+                    flexWrap: 'wrap', borderColor: 'rgba(99,102,241,0.22)', background: 'rgba(99,102,241,0.05)',
+                  }}>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="📁 Enregistrer les vidéos dans la banque" />
+                    </div>
+                    <button
+                      onClick={saveAllToBank}
+                      disabled={savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')}
+                      className="sf-btn cursor-pointer"
+                      style={{
+                        height: 36, padding: '0 16px', fontSize: 12, fontWeight: 700, borderRadius: 8,
+                        background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
+                        color: '#818CF8', border: '1px solid rgba(99,102,241,0.32)',
+                        display: 'inline-flex', alignItems: 'center', gap: 7,
+                        opacity: (savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')) ? 0.5 : 1,
+                      }}
+                    >
+                      {savingAll
+                        ? <><div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} /> Enregistrement…</>
+                        : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> Tout enregistrer ({doneCount})</>
+                      }
+                    </button>
+                  </div>
+                )}
                 {jobs.map(job => (
-                  <SpoofJobCard key={job.id} job={job} />
+                  <SpoofJobCard key={job.id} job={job} onSave={() => saveJobToBank(job)} />
                 ))}
                 {doneCount >= 2 && <ComparePanel jobs={jobs} />}
               </div>
@@ -470,7 +530,7 @@ export function Spoof({ user }: { user: User }) {
   )
 }
 
-function SpoofJobCard({ job }: { job: SpoofJob }) {
+function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
   const isDone = job.status === 'done'
   const isErr  = job.status === 'error'
   const isProc = job.status === 'processing'
@@ -524,18 +584,32 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* Status icon */}
-        <div style={{
-          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: isDone ? 'rgba(99,102,241,0.12)' : isErr ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${isDone ? 'rgba(99,102,241,0.25)' : isErr ? 'rgba(239,68,68,0.2)' : 'var(--border)'}`,
-        }}>
-          {isQ && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
-          {isProc && <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1', animation: 'spin 0.9s linear infinite' }} />}
-          {isDone && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
-          {isErr && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
-        </div>
+        {/* Status icon / video preview */}
+        {isDone && job.outputUrl ? (
+          <div style={{ width: 44, height: 60, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: '#000', border: '1px solid rgba(99,102,241,0.25)', position: 'relative' }}>
+            <video
+              src={job.outputUrl}
+              muted loop playsInline
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onMouseEnter={e => (e.target as HTMLVideoElement).play().catch(() => {})}
+              onMouseLeave={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+            />
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)" stroke="none"><polygon points="6,4 20,12 6,20"/></svg>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isErr ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${isErr ? 'rgba(239,68,68,0.2)' : 'var(--border)'}`,
+          }}>
+            {isQ && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
+            {isProc && <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1', animation: 'spin 0.9s linear infinite' }} />}
+            {isErr && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
+          </div>
+        )}
 
         {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -562,15 +636,24 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
               Télécharger
             </button>
             {job.storagePath && (
-              <a
-                href="#"
-                onClick={e => { e.preventDefault(); window.location.hash = '#bank' }}
-                className="sf-btn cursor-pointer"
-                style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 7, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8"/></svg>
-                Banque
-              </a>
+              job.savedToBank ? (
+                <span
+                  className="sf-btn"
+                  style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Enregistré
+                </span>
+              ) : (
+                <button
+                  onClick={onSave}
+                  className="sf-btn cursor-pointer"
+                  style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Enregistrer
+                </button>
+              )
             )}
           </div>
         )}
