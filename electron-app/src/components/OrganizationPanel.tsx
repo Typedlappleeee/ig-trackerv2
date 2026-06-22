@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Organization, type OrgMember, type OrgInvite, type OrgRole, type OrgRoleTemplate, type PermOverrides, type PageKey, type ActionKey } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -187,13 +187,24 @@ function RoleDropdown({ value, systemRole, templates, onSystemRole, onTemplate }
   onSystemRole: (r: Exclude<OrgRole, 'owner'>) => void; onTemplate: (t: OrgRoleTemplate) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
   const activeTemplate = templates.find(t => t.id === value)
   const displayRole = activeTemplate ? 'member' as OrgRole : value as OrgRole
+
+  function openDropdown() {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    }
+    setOpen(o => !o)
+  }
 
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={openDropdown}
         className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
       >
         <RoleChip role={displayRole} template={activeTemplate} />
@@ -202,7 +213,10 @@ function RoleDropdown({ value, systemRole, templates, onSystemRole, onTemplate }
       {open && (
         <>
           <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-[9991] bg-card border border-border rounded-xl shadow-2xl min-w-[180px] overflow-hidden py-1">
+          <div
+            className="fixed z-[9991] bg-card border border-border rounded-xl shadow-2xl min-w-[180px] overflow-hidden py-1"
+            style={{ top: pos.top, right: pos.right }}
+          >
             <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold text-text2 uppercase tracking-wider">Rôles système</p>
             {(['admin', 'member', 'viewer'] as const).map(r => (
               <button key={r} onClick={() => { onSystemRole(r); setOpen(false) }}
@@ -211,17 +225,15 @@ function RoleDropdown({ value, systemRole, templates, onSystemRole, onTemplate }
               </button>
             ))}
             {templates.length > 0 && (
-              <>
-                <div className="border-t border-border mt-1 pt-1">
-                  <p className="px-3 pb-1 text-[10px] font-bold text-text2 uppercase tracking-wider">Personnalisés</p>
-                  {templates.map(t => (
-                    <button key={t.id} onClick={() => { onTemplate(t); setOpen(false) }}
-                      className={`w-full flex items-center px-3 py-1.5 text-left hover:bg-surface transition-colors ${value === t.id ? 'bg-surface' : ''}`}>
-                      <RoleChip role="member" template={t} />
-                    </button>
-                  ))}
-                </div>
-              </>
+              <div className="border-t border-border mt-1 pt-1">
+                <p className="px-3 pb-1 text-[10px] font-bold text-text2 uppercase tracking-wider">Personnalisés</p>
+                {templates.map(t => (
+                  <button key={t.id} onClick={() => { onTemplate(t); setOpen(false) }}
+                    className={`w-full flex items-center px-3 py-1.5 text-left hover:bg-surface transition-colors ${value === t.id ? 'bg-surface' : ''}`}>
+                    <RoleChip role="member" template={t} />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </>

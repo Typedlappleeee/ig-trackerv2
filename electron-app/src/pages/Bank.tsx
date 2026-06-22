@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { zipSync } from 'fflate'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
@@ -1851,7 +1852,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
 
   const loading = item.storage_path && !cloudUrl && !urlError
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm"
       onClick={onClose}
@@ -1912,7 +1913,8 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
           />
         ))}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -2030,9 +2032,23 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
         </div>
       </div>
 
+      {/* Footer: title + ⋮ menu button */}
+      {!selectionMode && (
+        <div className="flex items-center gap-1 px-2 py-1.5" style={{ borderTop: '1px solid var(--border)' }}>
+          <p className="flex-1 text-[11px] font-medium text-text2 truncate">{item.title}</p>
+          <button
+            className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-text2 hover:text-text hover:bg-surface2 transition-colors"
+            onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
+            title="Options"
+          >
+            <IconMoreVert size={13} />
+          </button>
+        </div>
+      )}
+
       {/* Tags row */}
       {item.tags.length > 0 && (
-        <div className="px-2.5 py-2 flex flex-wrap gap-1" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="px-2.5 py-1.5 flex flex-wrap gap-1" style={{ borderTop: '1px solid var(--border)' }}>
           {item.tags.slice(0, 3).map(tag => (
             <span key={tag} className="sf-badge sf-badge-accent text-[9px]">#{tag}</span>
           ))}
