@@ -551,7 +551,8 @@ import { initIgStatsPoller } from '@/lib/igStatsPoller'
 // Pages are lazy-loaded so each route ships as its own chunk — the initial
 // bundle only carries the shell + Hub (default landing page after login).
 import Hub                   from '@/pages/Hub'
-const Phones         = lazy(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
+const Phones          = lazy(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
+const AccountCreator  = lazy(() => import('@/pages/AccountCreator'))
 const Publish        = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
 const BankHub        = lazy(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
 const Montage        = lazy(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
@@ -829,7 +830,8 @@ function AppContent({ user }: { user: User }) {
 
   const content = (() => {
     switch (page) {
-      case 'phones':       return <Phones      user={user} key={refreshTick} />
+      case 'phones':          return <Phones          user={user} key={refreshTick} />
+      case 'accountcreator':  return <AccountCreator  user={user} />
       case 'posting':      return <Publish     user={user} />
       case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />

@@ -54,7 +54,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 
 export type Page =
   | 'hub'
-  | 'phones'
+  | 'phones' | 'accountcreator'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
   | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles'
   | 'community' | 'support'
@@ -80,8 +80,9 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Principal',
     defaultOpen: true,
     items: [
-      { id: 'phones',      label: 'navPhones',      icon: '📱' },
-      { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'phones',         label: 'navPhones',         icon: '📱' },
+      { id: 'accountcreator', label: 'navAccountCreator',  icon: '✨', isNew: true },
+      { id: 'bank',           label: 'navBank',            icon: '🗂' },
     ],
   },
   {
