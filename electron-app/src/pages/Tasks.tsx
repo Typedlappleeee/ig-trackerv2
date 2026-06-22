@@ -38,6 +38,7 @@ import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { postInstagramStory, stopPhone } from '@/lib/geelark'
+import { pushNotification } from '@/lib/notificationStore'
 
 type TaskType = 'publication' | 'story'
 
@@ -233,6 +234,19 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
       last_run_at: nowIso,
       run_count:   (Number(task.run_count) || 0) + 1,
     }).eq('id', task.id)
+    const n = task.phones.length
+    pushNotification({
+      title: status === 'done' ? `Tâche "${task.name || 'Auto'}" terminée ✓` : `Tâche "${task.name || 'Auto'}" échouée`,
+      body:  `${n} compte${n > 1 ? 's' : ''}${errorMsg ? ' · ' + errorMsg : ''}`,
+      level: status === 'done' ? 'ok' : 'error',
+      page:  'tasks',
+    })
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification(
+        status === 'done' ? `Tâche "${task.name || 'Auto'}" terminée ✓` : `Tâche "${task.name || 'Auto'}" échouée`,
+        { body: `${n} compte${n > 1 ? 's' : ''} — ScaleFlow` },
+      )
+    }
   }
 
   if (!bearer) {
