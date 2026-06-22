@@ -836,8 +836,8 @@ export async function postInstagramStory(
     } catch { /* ignore */ }
     return 'jpg'
   })()
-  // Always save as jpg on phone (Instagram accepts JPEG; avoids PNG classification issues)
-  const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
+  // Always save as PNG on phone (lossless, no transparency issues, Instagram supports it)
+  const imgPath = '/sdcard/DCIM/Camera/sf_story.png'
   let imgOnPhone = false
 
   // Download the image server-side (via /api/proxy) to avoid CORS, then compress
@@ -897,12 +897,8 @@ export async function postInstagramStory(
     if (w > MAX_W || h > MAX_H) { const r = Math.min(MAX_W / w, MAX_H / h); w = Math.round(w * r); h = Math.round(h * r) }
     const oc = new OffscreenCanvas(w, h)
     oc.getContext('2d')!.drawImage(bitmap, 0, 0, w, h)
-    for (const q of [0.75, 0.60, 0.45]) {
-      const blob = await oc.convertToBlob({ type: 'image/jpeg', quality: q })
-      const b64 = bufToB64(await blob.arrayBuffer())
-      if (b64.length < 280 * 1024) { compressed = b64; break }
-      compressed = b64 // keep last attempt even if large
-    }
+    const blob = await oc.convertToBlob({ type: 'image/png' })
+    compressed = bufToB64(await blob.arrayBuffer())
     if (compressed) log(`   🗜️ OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB`)
   } catch (e) {
     log(`   ⚠️ OffscreenCanvas: ${e instanceof Error ? e.message : String(e)}`)
@@ -925,12 +921,8 @@ export async function postInstagramStory(
           const cv = document.createElement('canvas')
           cv.width = w; cv.height = h
           cv.getContext('2d')!.drawImage(img, 0, 0, w, h)
-          for (const q of [0.75, 0.60, 0.45]) {
-            const dataUrl = cv.toDataURL('image/jpeg', q)
-            const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
-            if (b64.length < 280 * 1024) { resolve(b64); return }
-          }
-          resolve(cv.toDataURL('image/jpeg', 0.45).split(',')[1] ?? null)
+          const dataUrl = cv.toDataURL('image/png')
+          resolve(dataUrl.slice(dataUrl.indexOf(',') + 1))
         }
         img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
         img.src = blobUrl
