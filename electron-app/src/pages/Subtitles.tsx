@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useConnections } from '@/lib/connections'
+import { useOrg } from '@/lib/orgContext'
+import { supabase } from '@/lib/supabase'
+import { uploadVideoFromBlob } from '@/lib/storage'
+import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { BankPicker } from '@/pages/Bank'
 
 interface SubtitlesProps { user: User }
@@ -19,16 +23,38 @@ const LANG_LABELS: Record<Lang, string> = {
   zh: '中文', pt: 'Português', ar: 'العربية',
 }
 
+// Gap between words that signals a new speaker or a clear phrase break.
+// Whisper doesn't return speaker labels, so silence is the only proxy.
+// 0.9s covers most inter-speaker pauses; 0.4s splits after reaching perGroup.
+const PAUSE_SPEAKER = 0.9  // definite break — likely speaker change
+const PAUSE_PHRASE  = 0.4  // soft break — only flush when current segment has ≥2 words
+
 function groupWords(words: WordToken[], perGroup: number): Segment[] {
   const segs: Segment[] = []
-  for (let i = 0; i < words.length; i += perGroup) {
-    const chunk = words.slice(i, i + perGroup)
+  if (!words.length) return segs
+
+  let current: WordToken[] = [words[0]]
+
+  const flush = () => {
     segs.push({
-      text:  chunk.map(w => w.word.trim()).join(' ').trim(),
-      start: chunk[0].start,
-      end:   chunk[chunk.length - 1].end,
+      text:  current.map(w => w.word.trim()).join(' ').trim(),
+      start: current[0].start,
+      end:   current[current.length - 1].end,
     })
+    current = []
   }
+
+  for (let i = 1; i < words.length; i++) {
+    const gap = words[i].start - words[i - 1].end
+    const hardBreak = gap >= PAUSE_SPEAKER                             // speaker change / long silence
+    const softBreak = gap >= PAUSE_PHRASE && current.length >= 2      // phrase pause + enough words
+    const wordLimit = current.length >= perGroup                       // hit the word-count cap
+
+    if (hardBreak || softBreak || wordLimit) flush()
+    current.push(words[i])
+  }
+  if (current.length) flush()
+
   return segs
 }
 
@@ -43,6 +69,12 @@ const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI
 export function Subtitles({ user }: SubtitlesProps) {
   const conns   = useConnections(user)
   const groqKey = conns.groq
+  const { currentOrg } = useOrg()
+
+  // Save-to-bank
+  const [saveFolder,  setSaveFolder]  = useState<string | null>(null)
+  const [savedToBank, setSavedToBank] = useState(false)
+  const [saving,      setSaving]      = useState(false)
 
   // Video source
   const [videoSrc,    setVideoSrc]    = useState<string | null>(null)  // path or URL
@@ -79,7 +111,7 @@ export function Subtitles({ user }: SubtitlesProps) {
   function reset() {
     setPhase('idle'); setStatus(''); setSegments([]); setError('')
     if (outputUrl?.startsWith('blob:')) URL.revokeObjectURL(outputUrl)
-    setOutputUrl(null); setOutputPath(null)
+    setOutputUrl(null); setOutputPath(null); setSavedToBank(false)
   }
 
   function loadFile(file: File) {
@@ -132,7 +164,7 @@ export function Subtitles({ user }: SubtitlesProps) {
   function onBankPick(paths: string[], titles?: string[]) {
     setShowBankPicker(false)
     if (!paths.length) return
-    loadUrl(paths[0], titles?.[0] || paths[0].split('/').pop() || 'video.mp4', true)
+    loadUrl(paths[0], titles?.[0] || paths[0].split('/').pop()?.split('?')[0] || 'video.mp4', true)
   }
 
   // ── Main generation ──────────────────────────────────────────────────────────
@@ -156,8 +188,20 @@ export function Subtitles({ user }: SubtitlesProps) {
       const filename = videoName || 'video.mp4'
       let transcriptRes: { ok: boolean; data?: unknown; error?: string }
 
-      if (isBankUrl && videoSrc && isWeb) {
-        // Web + bank URL: server fetches the video directly — 0 bytes from client
+      // ── Diagnostic logs (remove once 413 is resolved) ───────────────────────
+      console.log('[Subtitles] generate() —', {
+        isBankUrl,
+        videoSrc: videoSrc?.slice(0, 120),
+        fileRef: fileRef.current ? `File(${fileRef.current.name}, ${(fileRef.current.size / 1024 / 1024).toFixed(1)}MB)` : null,
+        isWeb,
+        hasElectronAPI: !!window.electronAPI,
+      })
+
+      if (isBankUrl && videoSrc) {
+        // Bank URL (web or Electron): let the proxy/IPC download it server-side.
+        // Avoids sending large video bytes over the network from the client.
+        console.log('[Subtitles] → chemin videoUrl (bank URL, aucun octet envoyé côté client)')
+        setStatus('Transcription via URL banque…')
         transcriptRes = await (window.electronAPI as any).groqTranscription({
           apiKey:   groqKey,
           videoUrl: videoSrc,
@@ -165,13 +209,16 @@ export function Subtitles({ user }: SubtitlesProps) {
           language: lang !== 'auto' ? lang : undefined,
         })
       } else {
-        // Local file or Electron: read bytes first
+        // Local file: read bytes then send
+        console.log('[Subtitles] → chemin audioBytes (fichier local ou blob URL)')
         let audioBytes: ArrayBuffer
         if (fileRef.current) {
           audioBytes = await fileRef.current.arrayBuffer()
+          console.log('[Subtitles] audioBytes depuis fileRef.current:', (audioBytes.byteLength / 1024 / 1024).toFixed(1), 'MB')
         } else if (videoSrc) {
           setStatus('Lecture de la vidéo…')
-          if (window.electronAPI && !isWeb) {
+          // readFileBytes only works for local paths, not for URLs
+          if (window.electronAPI && !isWeb && !videoSrc.startsWith('http')) {
             const r = await window.electronAPI.readFileBytes(videoSrc)
             if (!r.ok || !r.bytes) throw new Error((r as any).error ?? 'Lecture échouée')
             audioBytes = r.bytes as ArrayBuffer
@@ -227,11 +274,51 @@ export function Subtitles({ user }: SubtitlesProps) {
   }
 
   async function download() {
+    // Web: outputUrl is a blob/data/http URL → trigger a browser download.
+    if (isWeb || !window.electronAPI?.saveFileAs) {
+      const src = outputUrl ?? outputPath
+      if (!src) return
+      const a = document.createElement('a')
+      a.href = src
+      a.download = videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mp4'
+      a.click()
+      return
+    }
     if (!outputPath) return
-    await window.electronAPI?.saveFileAs?.({
+    await window.electronAPI.saveFileAs({
       sourcePath:  outputPath,
       defaultName: videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mp4',
     })
+  }
+
+  async function saveToBank() {
+    const src = outputUrl ?? outputPath
+    if (!src || saving || savedToBank) return
+    setSaving(true)
+    try {
+      const resp = await fetch(src)
+      if (!resp.ok) throw new Error(`Lecture du résultat échouée (${resp.status})`)
+      const blob = await resp.blob()
+      const title = videoName.replace(/\.[^.]+$/, '') + '_sous-titres'
+      const scope = currentOrg?.id
+        ? { mode: 'org' as const, id: currentOrg.id }
+        : { mode: 'user' as const, id: user.id }
+      const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, `${title}.mp4`, scope)
+      const { error } = await supabase.from('content_bank').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        title: `Sous-titres — ${title}`,
+        file_url: null,
+        storage_path: storagePath,
+        thumbnail_path: thumbnailPath,
+        folder: saveFolder, tags: ['sous-titres'], notes: '',
+      })
+      if (error) throw new Error(error.message)
+      setSavedToBank(true)
+    } catch (err) {
+      setError('Enregistrement dans la banque : ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const canGenerate = !!videoSrc && !!groqKey && ['idle', 'error', 'done'].includes(phase)
@@ -401,6 +488,10 @@ export function Subtitles({ user }: SubtitlesProps) {
                 ))}
               </div>
             </Row>
+
+            <div style={{ marginTop: 4, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de destination" />
+            </div>
           </SectionCard>
         </div>
       </div>
@@ -447,6 +538,30 @@ export function Subtitles({ user }: SubtitlesProps) {
               style={{ background: '#22c55e', color: '#fff', boxShadow: '0 4px 14px rgba(34,197,94,0.3)' }}>
               <DownloadIcon /> Télécharger
             </button>
+          </div>
+
+          {/* Save to bank */}
+          <div className="rounded-xl p-3.5 flex items-center gap-3 flex-wrap"
+            style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <div style={{ flex: 1, fontSize: 12, color: 'var(--text-3)' }}>
+              <span style={{ color: 'var(--text-4)' }}>Dossier : </span>
+              <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
+            </div>
+            {savedToBank ? (
+              <span className="flex items-center gap-2 px-4 rounded-lg text-sm font-bold"
+                style={{ height: 36, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
+                <CheckIcon /> Enregistré dans la banque
+              </span>
+            ) : (
+              <button onClick={saveToBank} disabled={saving}
+                className="flex items-center gap-2 px-4 rounded-lg text-sm font-bold cursor-pointer transition-all"
+                style={{ height: 36, background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))', color: '#818cf8', border: '1px solid rgba(99,102,241,0.32)', opacity: saving ? 0.6 : 1 }}>
+                {saving
+                  ? <><span style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818cf8', animation: 'spin 0.9s linear infinite', display: 'inline-block' }} /> Enregistrement…</>
+                  : <><SaveIcon /> Enregistrer dans la banque</>
+                }
+              </button>
+            )}
           </div>
 
           <div className="grid gap-4" style={{ gridTemplateColumns: outputUrl ? '1fr 1fr' : '1fr' }}>
@@ -542,6 +657,18 @@ function WarningIcon() {
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
       <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
     </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+  )
+}
+
+function SaveIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
   )
 }
 
