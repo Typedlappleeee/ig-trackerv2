@@ -72,6 +72,15 @@ export async function stopPhone(bearer: string, phoneId: string): Promise<void> 
   } catch { /* ignore */ }
 }
 
+// Stop several phones in one call. Returns how many GéeLark reported stopped.
+export async function stopPhones(bearer: string, phoneIds: string[]): Promise<number> {
+  if (phoneIds.length === 0) return 0
+  const res = await geelarkFetch('POST', '/phone/stop', { ids: phoneIds }, bearer)
+  const data = (res?.data ?? res) as Record<string, unknown>
+  const success = Number((data?.successAmount ?? data?.successDetails ?? phoneIds.length))
+  return Number.isFinite(success) ? success : phoneIds.length
+}
+
 // Lightweight: fetch only the status of all phones (same endpoint, minimal processing)
 export async function fetchPhoneStatuses(bearer: string): Promise<Map<string, string>> {
   const phones = await fetchAllPhones(bearer)
@@ -836,9 +845,12 @@ export async function postInstagramStory(
     } catch { /* ignore */ }
     return 'jpg'
   })()
-  // Always save as PNG on phone (lossless, no transparency issues, Instagram supports it)
-  const imgPath = '/sdcard/DCIM/Camera/sf_story.png'
-  let imgOnPhone = false
+  // The file extension on the phone MUST match the actual bytes we push.
+  // We convert to PNG (preferred) via canvas below; if that fails we fall back
+  // to the original bytes and keep their real extension. A png-named file that
+  // actually contains jpg bytes (or vice-versa) makes Android's media scanner
+  // mis-classify it → Instagram's gallery can't open it → "image n'upload pas".
+  let outExt = 'png'
 
   // Download the image server-side (via /api/proxy) to avoid CORS, then compress
   // client-side and push as base64 chunks via shell. Target: < 200 KB JPEG so the
@@ -882,7 +894,10 @@ export async function postInstagramStory(
   log(`   📥 Image: ${Math.round(imgBase64.length / 1024)} KB`)
 
   // Compress to JPEG ≤ 200 KB using OffscreenCanvas, then DOM Canvas as fallback.
-  // Target 720×1280 (enough for stories) at decreasing quality until small enough.
+  // Target 720×1280 (enough for stories). Output JPEG ~0.75 quality ≈ 300-500 KB
+  // (PNG would be 3-5 MB → 1000+ shell chunks → corruption/timeout).
+  // outExt stays 'jpg' when canvas succeeds; falls back to original extension
+  // if both canvas methods fail so the file bytes always match the file name.
   const MAX_W = 720, MAX_H = 1280
   let compressed: string | null = null
 
@@ -897,15 +912,15 @@ export async function postInstagramStory(
     if (w > MAX_W || h > MAX_H) { const r = Math.min(MAX_W / w, MAX_H / h); w = Math.round(w * r); h = Math.round(h * r) }
     const oc = new OffscreenCanvas(w, h)
     oc.getContext('2d')!.drawImage(bitmap, 0, 0, w, h)
-    const blob = await oc.convertToBlob({ type: 'image/png' })
+    const blob = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.82 })
     compressed = bufToB64(await blob.arrayBuffer())
-    if (compressed) log(`   🗜️ OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB`)
+    if (compressed) log(`   🗜️ OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB (JPEG)`)
   } catch (e) {
     log(`   ⚠️ OffscreenCanvas: ${e instanceof Error ? e.message : String(e)}`)
   }
 
-  // Attempt 2: DOM Canvas (if OffscreenCanvas unavailable or too large)
-  if (!compressed || compressed.length > 400 * 1024) {
+  // Attempt 2: DOM Canvas (fallback)
+  if (!compressed) {
     try {
       const mimeIn = _imgExt === 'png' ? 'image/png' : 'image/jpeg'
       const c2 = await new Promise<string | null>((resolve) => {
@@ -921,47 +936,71 @@ export async function postInstagramStory(
           const cv = document.createElement('canvas')
           cv.width = w; cv.height = h
           cv.getContext('2d')!.drawImage(img, 0, 0, w, h)
-          const dataUrl = cv.toDataURL('image/png')
+          const dataUrl = cv.toDataURL('image/jpeg', 0.82)
           resolve(dataUrl.slice(dataUrl.indexOf(',') + 1))
         }
         img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
         img.src = blobUrl
       })
-      if (c2) { compressed = c2; log(`   🗜️ Canvas DOM: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(c2.length / 1024)} KB`) }
+      if (c2) { compressed = c2; log(`   🗜️ Canvas DOM: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(c2.length / 1024)} KB (JPEG)`) }
     } catch (e) {
       log(`   ⚠️ Canvas DOM: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
+  // Canvas produced JPEG → use .jpg. Fallback = raw original bytes → original extension.
   const pushData = compressed ?? imgBase64
-  log(`   📤 Push: ${Math.round(pushData.length / 1024)} KB`)
+  if (compressed) { outExt = 'jpg' } else { outExt = _imgExt }
+  const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
+  // Strategy 1: direct download on the phone via curl/wget — faster and more reliable
+  // than base64 chunks, but requires the phone to reach the Supabase URL directly.
+  let sz = 0
+  log('   📥 Téléchargement direct sur le téléphone…')
+  try {
+    const escapedUrl = config.imageUrl.replace(/\\/g, '\\\\').replace(/'/g, "'\\''")
+    const dlCmd =
+      `mkdir -p /sdcard/DCIM/Camera && ` +
+      `(curl -L --connect-timeout 30 --max-time 120 -s -o '${imgPath}' '${escapedUrl}' 2>/dev/null || ` +
+      ` wget -q -O '${imgPath}' '${escapedUrl}' 2>/dev/null) && ` +
+      `wc -c < '${imgPath}' 2>/dev/null || echo 0`
+    const dlResult = await shellExec(bearer, phoneId, dlCmd)
+    sz = parseInt(dlResult.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    if (sz > 2000) log(`   ✅ Download direct: ${sz} octets`)
+  } catch { /* fallthrough to base64 */ }
 
-  // Push via base64 chunks (base64 chars A-Za-z0-9+/= are safe inside single quotes)
-  const CHUNK = 3000, BATCH = 20
-  const chunks: string[] = []
-  for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
-  log(`   📦 ${chunks.length} chunks × ${BATCH}…`)
-  await shellExec(bearer, phoneId,
-    `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-  for (let b = 1; b < chunks.length; b += BATCH) {
-    const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-    await shellExec(bearer, phoneId, cmd)
+  // Strategy 2: base64 chunk push (fallback when direct download fails)
+  if (sz < 2000) {
+    log(`   📤 Fallback base64: ${Math.round(pushData.length / 1024)} KB (.${outExt})`)
+    const CHUNK = 3000, BATCH = 20
+    const chunks: string[] = []
+    for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
+    log(`   📦 ${chunks.length} chunks × ${BATCH}…`)
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+    for (let b = 1; b < chunks.length; b += BATCH) {
+      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+      await shellExec(bearer, phoneId, cmd)
+    }
+    await shellExec(bearer, phoneId,
+      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
+
+    const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    log(`   📎 Fichier: ${sz} octets`)
   }
-  await shellExec(bearer, phoneId,
-    `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
 
-  const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-  const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-  log(`   📎 Fichier: ${sz} octets`)
   if (sz < 2000) {
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
   }
 
   // Force media scanner so Instagram's gallery picker sees the new file.
-  // touch -m ensures the file has the current timestamp → appears FIRST in "Recents".
+  // touch -m sets current timestamp → file appears FIRST in "Recents".
+  // Two scan methods for compatibility across Android versions.
   await shellExec(bearer, phoneId,
-    `touch -m '${imgPath}' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
-  await sleep(4000)
+    `touch -m '${imgPath}' && ` +
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath} 2>/dev/null; ` +
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null`)
+  await sleep(6000)
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
@@ -1138,18 +1177,31 @@ export async function postInstagramStory(
   await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkUrl)}"`)
   await sleep(1200)
 
-  // Optional custom sticker text
+  // Optional custom sticker text — replaces the default "LINK"/"LIEN" label.
   if (config.linkText?.trim()) {
+    log('   ✏️  Texte du sticker…')
+    await sleep(600)
     xml = await dumpXml(bearer, phoneId)
     const customPt =
-      findByText(xml, 'Customize sticker text', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
-      findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit')
+      findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
+      findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
+      findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
     if (customPt) {
+      log(`   ✓ Champ texte trouvé: ${customPt[0]},${customPt[1]}`)
       await shellExec(bearer, phoneId, `input tap ${customPt[0]} ${customPt[1]}`)
       await sleep(900)
-      await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
-      await sleep(1000)
+    } else {
+      // Fallback: the "Customize sticker text" field sits just below the URL
+      // input. Tap a bit under the URL field, then select-all + clear before typing.
+      log('   ↩︎ Champ « personnaliser le texte » non détecté — tap sous l\'URL')
+      await shellExec(bearer, phoneId, `input tap ${urlField[0]} ${urlField[1] + Math.floor(sh * 0.07)}`)
+      await sleep(900)
     }
+    // Clear any existing placeholder then type the custom label.
+    await shellExec(bearer, phoneId, 'input keyevent --longpress KEYCODE_DEL')
+    await sleep(300)
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
+    await sleep(1000)
   }
 
   // Confirm the link (Done / Terminé / checkmark in top-right)

@@ -56,7 +56,7 @@ export type Page =
   | 'hub'
   | 'phones' | 'accountcreator'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
-  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles'
+  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof'
   | 'community' | 'support'
   | 'settings' | 'licences'
   | 'scaleia'
@@ -110,7 +110,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
-      { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
+      { id: 'spoof',       label: 'navSpoof',       icon: '🛡️', isNew: true },
       { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
       { id: 'subtitles',   label: 'navSubtitles',   icon: '💬', isNew: true },
     ],
@@ -171,6 +171,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   remix:           'refresh',
   repurpose:       'zap',
   mixer:           'edit',
+  spoof:           'shield',
   textcopy:        'edit',
   scaleia:         'sparkles',
   hub:             'grid',
