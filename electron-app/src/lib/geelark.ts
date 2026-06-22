@@ -2385,6 +2385,215 @@ export async function createInstagramAccount(
   }
 }
 
+// ── TikTok video posting via ADB automation ──────────────────────────────────
+export interface TikTokPostConfig {
+  videoUrl: string   // public/signed URL accessible from the phone
+  caption:  string
+}
+
+export async function postTikTokVideoAdb(
+  bearer: string,
+  phoneId: string,
+  config: TikTokPostConfig,
+  log: (m: string) => void,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; error?: string }> {
+  const { videoUrl, caption } = config
+
+  try {
+    // ── 1. Ensure phone is running ──────────────────────────────────────────
+    log('📱 Démarrage du téléphone…')
+    const started = await ensurePhoneRunning(bearer, phoneId, log, signal)
+    if (!started) return { ok: false, error: 'Impossible de démarrer le téléphone' }
+
+    // ── 2. Get screen dimensions ────────────────────────────────────────────
+    const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size', { signal })
+    // "Physical size: 1080x1920" or "Override size: 1080x2340"
+    const sizeMatch = sizeOut.match(/(\d+)x(\d+)/)
+    const sw = sizeMatch ? parseInt(sizeMatch[1], 10) : 1080
+    const sh = sizeMatch ? parseInt(sizeMatch[2], 10) : 1920
+    log(`📐 Écran: ${sw}×${sh}`)
+
+    // ── 3. Force stop TikTok ────────────────────────────────────────────────
+    log('🛑 Fermeture de TikTok…')
+    await shellExec(bearer, phoneId, 'am force-stop com.zhiliaoapp.musically', { signal, maxRetries: 2 })
+    await shellExec(bearer, phoneId, 'am force-stop com.ss.android.ugc.aweme', { signal, maxRetries: 2 })
+    await sleepOrAbort(1000, signal)
+
+    // ── 4. Download video to phone ──────────────────────────────────────────
+    log('⬇️ Téléchargement de la vidéo…')
+    await shellExec(bearer, phoneId, 'mkdir -p /sdcard/DCIM/TikTok', { signal, maxRetries: 2 })
+
+    const dlDest = '/sdcard/DCIM/TikTok/sf_tt_video.mp4'
+    // Try wget first
+    const { output: wgetOut, status: wgetStatus } = await shellExec(
+      bearer, phoneId,
+      `wget -q -O ${dlDest} "${videoUrl}" 2>&1; echo "EXIT:$?"`,
+      { signal, maxRetries: 2 },
+    )
+    const wgetOk = wgetStatus === 0 && !wgetOut.includes('ERROR') && !wgetOut.includes('failed')
+    if (!wgetOk) {
+      log('   wget échoué, essai avec curl…')
+      const { output: curlOut } = await shellExec(
+        bearer, phoneId,
+        `curl -fsSL -o ${dlDest} "${videoUrl}" 2>&1; echo "EXIT:$?"`,
+        { signal, maxRetries: 2 },
+      )
+      if (curlOut.includes('curl: (') || curlOut.includes('EXIT:1')) {
+        return { ok: false, error: `Téléchargement impossible: ${curlOut.slice(0, 120)}` }
+      }
+      log('   ✅ Vidéo téléchargée via curl')
+    } else {
+      log('   ✅ Vidéo téléchargée via wget')
+    }
+
+    // ── 5. Scan media library ───────────────────────────────────────────────
+    log('📚 Scan bibliothèque média…')
+    await shellExec(
+      bearer, phoneId,
+      `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${dlDest}`,
+      { signal, maxRetries: 2 },
+    )
+
+    // ── 6. Wait for scan ────────────────────────────────────────────────────
+    await sleepOrAbort(3000, signal)
+
+    // ── 7. Open TikTok ──────────────────────────────────────────────────────
+    log('🎵 Ouverture de TikTok…')
+    const { status: launchStatus } = await shellExec(
+      bearer, phoneId,
+      'am start -n com.zhiliaoapp.musically/.main.MainActivity',
+      { signal, maxRetries: 2 },
+    )
+    if (launchStatus !== 0) {
+      log('   Essai package alternatif (aweme)…')
+      await shellExec(
+        bearer, phoneId,
+        'am start -n com.ss.android.ugc.aweme/.main.MainActivity',
+        { signal, maxRetries: 2 },
+      )
+    }
+
+    // ── 8. Wait for app to load ─────────────────────────────────────────────
+    await sleepOrAbort(8000, signal)
+
+    // ── 9. Tap "+" create button ────────────────────────────────────────────
+    log('➕ Tap bouton créer…')
+    let xml = await dumpXml(bearer, phoneId)
+    let createPt =
+      findByResourceId(xml, 'creation_btn', 'tab_add', 'action_create') ??
+      findByText(xml, '+', 'Créer', 'Create') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.92)] as [number, number]
+    log(`   Tap [${createPt[0]},${createPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${createPt[0]} ${createPt[1]}`, { signal })
+
+    // ── 10. Wait ────────────────────────────────────────────────────────────
+    await sleepOrAbort(4000, signal)
+
+    // ── 11. Tap "Upload" / "Gallery" ────────────────────────────────────────
+    log('📁 Tap galerie / upload…')
+    xml = await dumpXml(bearer, phoneId)
+    let uploadPt =
+      findByText(xml, 'Upload', 'Gallery', 'Télécharger', 'Galerie') ??
+      findByTextPartial(xml, 'upload', 'galerie') ??
+      [Math.floor(sw * 0.85), Math.floor(sh * 0.85)] as [number, number]
+    log(`   Tap [${uploadPt[0]},${uploadPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${uploadPt[0]} ${uploadPt[1]}`, { signal })
+
+    // ── 12. Wait ────────────────────────────────────────────────────────────
+    await sleepOrAbort(3000, signal)
+
+    // ── 13. Select first video in gallery ───────────────────────────────────
+    log('🎬 Sélection première vidéo…')
+    xml = await dumpXml(bearer, phoneId)
+    let videoPt =
+      findByResourceId(xml, 'gallery_grid_item', 'media_picker_grid_item', 'item_video') ??
+      [Math.floor(sw * 0.17), Math.floor(sh * 0.30)] as [number, number]
+    log(`   Tap [${videoPt[0]},${videoPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${videoPt[0]} ${videoPt[1]}`, { signal })
+
+    // ── 14. Wait ────────────────────────────────────────────────────────────
+    await sleepOrAbort(3000, signal)
+
+    // ── 15. Tap "Next" / "Suivant" ──────────────────────────────────────────
+    log('➡️ Tap Suivant (1)…')
+    xml = await dumpXml(bearer, phoneId)
+    let nextPt =
+      findByText(xml, 'Next', 'Suivant') ??
+      [Math.floor(sw * 0.87), Math.floor(sh * 0.06)] as [number, number]
+    log(`   Tap [${nextPt[0]},${nextPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+
+    // ── 16. Wait — may show Sounds or Trim screen ───────────────────────────
+    await sleepOrAbort(4000, signal)
+
+    // ── 17. Tap "Next" again if still on trim/sounds screen ─────────────────
+    xml = await dumpXml(bearer, phoneId)
+    const nextPt2 = findByText(xml, 'Next', 'Suivant')
+    if (nextPt2) {
+      log('➡️ Tap Suivant (2 — écran trim/sons)…')
+      log(`   Tap [${nextPt2[0]},${nextPt2[1]}]`)
+      await shellExec(bearer, phoneId, `input tap ${nextPt2[0]} ${nextPt2[1]}`, { signal })
+    }
+
+    // ── 18. Wait for caption screen ─────────────────────────────────────────
+    await sleepOrAbort(4000, signal)
+
+    // ── 19. Find and fill caption field ─────────────────────────────────────
+    log('✏️ Saisie de la légende…')
+    xml = await dumpXml(bearer, phoneId)
+    const captionPt =
+      findByResourceId(xml, 'caption', 'text_input', 'edit_text_desc') ??
+      findByText(xml, 'Describe...', 'Ajouter une description', 'Caption') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.35)] as [number, number]
+    log(`   Champ légende [${captionPt[0]},${captionPt[1]}]`)
+    await clearAndType(bearer, phoneId, captionPt, caption, log)
+
+    // ── 20. Wait briefly ────────────────────────────────────────────────────
+    await sleepOrAbort(1000, signal)
+
+    // ── 21-22. Find and tap Post button ─────────────────────────────────────
+    log('🚀 Tap Publier…')
+    xml = await dumpXml(bearer, phoneId)
+    const postPt =
+      findByText(xml, 'Post', 'Publier', 'Publish') ??
+      findByResourceId(xml, 'btn_post', 'post_button') ??
+      [Math.floor(sw * 0.85), Math.floor(sh * 0.12)] as [number, number]
+    log(`   Tap [${postPt[0]},${postPt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${postPt[0]} ${postPt[1]}`, { signal })
+
+    // ── 23. Wait for upload + publish ───────────────────────────────────────
+    await sleepOrAbort(15000, signal)
+
+    // ── 24. Check for success ────────────────────────────────────────────────
+    xml = await dumpXml(bearer, phoneId)
+    const xmlLow = xml.toLowerCase()
+    // Post button gone = success; or home tab visible
+    const postGone = !findByText(xml, 'Post', 'Publier', 'Publish') && !findByResourceId(xml, 'btn_post', 'post_button')
+    const homeVisible = ['home_tab', 'tab_home', 'for_you', 'pour_toi', 'following_tab'].some(p => xmlLow.includes(p))
+
+    if (postGone || homeVisible) {
+      log('✅ Vidéo publiée avec succès')
+      return { ok: true }
+    }
+
+    // Check for explicit error
+    const errorVisible = ['failed', 'erreur', 'error', 'retry', 'réessayer'].some(p => xmlLow.includes(p))
+    if (errorVisible) {
+      return { ok: false, error: 'TikTok a signalé une erreur lors de la publication' }
+    }
+
+    // Uncertain state — likely still uploading (large video) — treat as success
+    log('⚠️ État incertain — la vidéo est probablement en cours d\'envoi')
+    return { ok: true }
+
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    log(`❌ Erreur: ${msg}`)
+    return { ok: false, error: msg }
+  }
+}
+
 // ── Live screenshot ───────────────────────────────────────────────────────────
 // Takes a screenshot of the phone screen and returns it as a base64 PNG data URL.
 // Uses screencap + base64 via shell. Returns null on failure.

@@ -34,6 +34,7 @@ export const EN = {
   navHub: 'Hub',
   navPhones: 'Phones',
   navAccountCreator: 'Account Creator',
+  navTikTokPosting: 'TikTok Posting',
   navMonitor: 'Monitor Live',
   // ── Hub page ──
   hubGreetingMorning: 'Good morning,',
@@ -1574,6 +1575,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   navHub: 'Accueil',
   navPhones: 'Téléphones',
   navAccountCreator: 'Créer des comptes',
+  navTikTokPosting: 'TikTok Posting',
   navMonitor: 'Monitor Live',
   // ── Hub page ──
   hubGreetingMorning: 'Bonjour,',
