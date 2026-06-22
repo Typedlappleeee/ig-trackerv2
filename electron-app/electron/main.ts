@@ -47,6 +47,13 @@ let win: BrowserWindow | null = null
 let tray: Tray | null = null
 let isMassPostingRunning = false
 
+// ── GeeLark phone lifecycle tracking ─────────────────────────────────────────
+// Every /phone/start call is intercepted in the geelark-request IPC handler below
+// and the phone IDs are registered here. On app quit we stop any that are still
+// running so the user is never charged for idle cloud phones.
+let geelarkBearer = ''
+const geelarkRunningPhones = new Set<string>()
+
 // Resolve tray icon path — falls back gracefully if logo not found
 function getTrayIcon() {
   const logoPath = app.isPackaged
@@ -71,7 +78,7 @@ function ensureTray() {
     { type: 'separator' },
     {
       label: 'Arrêter et quitter',
-      click: () => { isMassPostingRunning = false; app.quit() },
+      click: () => { isMassPostingRunning = false; geelarkQuitInProgress = false; app.quit() },
     },
   ]))
   tray.on('double-click', () => { win?.show(); win?.focus() })
@@ -579,6 +586,19 @@ ipcMain.handle('geelark-request', async (_event, opts: {
         data = null
       }
     }
+    // ── Phone lifecycle tracking (stop phones on quit) ──────────────────────
+    if (opts.url.includes('/phone/start') || opts.url.includes('/phone/stop')) {
+      const bearer = (opts.headers?.Authorization ?? opts.headers?.authorization ?? '')
+        .replace(/^Bearer\s+/i, '')
+      const ids: string[] = (opts.body as { ids?: string[] })?.ids ?? []
+      if (bearer) geelarkBearer = bearer
+      if (opts.url.includes('/phone/start')) {
+        for (const id of ids) geelarkRunningPhones.add(id)
+      } else {
+        for (const id of ids) geelarkRunningPhones.delete(id)
+      }
+    }
+
     return { ok: true, status: response.status, data }
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -2086,6 +2106,25 @@ ipcMain.handle('run-ffmpeg-subtitles', async (_event, opts: {
       resolve({ ok: true, outputPath: out })
     })
   })
+})
+
+// Stop any GeeLark phones still running when the app quits (prevents billing for idle phones).
+// Uses a sync-like pattern: preventDefault → async stop → re-quit.
+let geelarkQuitInProgress = false
+app.on('before-quit', async (e) => {
+  if (geelarkQuitInProgress || geelarkRunningPhones.size === 0 || !geelarkBearer) return
+  e.preventDefault()
+  geelarkQuitInProgress = true
+  const ids = [...geelarkRunningPhones]
+  geelarkRunningPhones.clear()
+  try {
+    await net.fetch('https://openapi.geelark.com/open/v1/phone/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${geelarkBearer}` },
+      body: JSON.stringify({ ids }),
+    })
+  } catch { /* ignore — best-effort */ }
+  app.quit()
 })
 
 app.on('window-all-closed', () => {
