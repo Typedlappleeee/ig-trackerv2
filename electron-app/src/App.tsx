@@ -638,7 +638,7 @@ function AppContent({ user }: { user: User }) {
     let cancelled = false
     // 8s timeout — if checkLicense hangs, fail open so the user isn't locked out
     const fallback = setTimeout(() => {
-      if (!cancelled) { setLicense({ valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
     }, 8000)
     Promise.resolve(checkLicense(user.id, currentOrg?.id ?? null)).then(async l => {
       clearTimeout(fallback)
@@ -658,7 +658,7 @@ function AppContent({ user }: { user: User }) {
       if (!cancelled) { setCreditBalance(bal); setCreditLoading(false) }
     }).catch(() => {
       clearTimeout(fallback)
-      if (!cancelled) { setLicense({ valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
     })
     return () => { cancelled = true; clearTimeout(fallback) }
   }, [user.id, currentOrg?.id, currentOrg?.owner_id])

@@ -212,8 +212,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     const bankQ = currentOrg
       ? supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
       : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
-    const spQ  = (q: ReturnType<typeof supabase.from>) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const prQ  = (q: ReturnType<typeof supabase.from>) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    const spQ  = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    const prQ  = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes, directRunsRes] = await Promise.all([
       phonesQ,
       bankQ,
