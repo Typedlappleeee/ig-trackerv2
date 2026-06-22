@@ -60,6 +60,48 @@ function wasmQueue<T>(fn: () => Promise<T>): Promise<T> {
   )
 }
 
+// ── GéeLark phone lifecycle safety net (web) ─────────────────────────────────
+// On web there is no app-quit hook: if the user closes the tab mid-posting the
+// JS just dies and the cloud phones keep running (and billing). We track every
+// /phone/start and /phone/stop that flows through geelarkRequest, and on tab
+// close we fire a sendBeacon to stop any phone still marked as running.
+const _runningPhones = new Set<string>()
+let _geelarkBearer = ''
+let _unloadGuardInstalled = false
+
+function _ensureUnloadGuard() {
+  if (_unloadGuardInstalled || typeof window === 'undefined') return
+  _unloadGuardInstalled = true
+  const stopOnUnload = () => {
+    if (_runningPhones.size === 0 || !_geelarkBearer) return
+    const payload = JSON.stringify({
+      method: 'POST',
+      url: 'https://openapi.geelark.com/open/v1/phone/stop',
+      headers: { Authorization: `Bearer ${_geelarkBearer}` },
+      body: { ids: [..._runningPhones] },
+    })
+    try {
+      navigator.sendBeacon('/api/gx', new Blob([payload], { type: 'application/json' }))
+    } catch { /* best-effort */ }
+  }
+  // pagehide is the reliable one (fires on tab close + bfcache); keep beforeunload too
+  window.addEventListener('pagehide', stopOnUnload)
+  window.addEventListener('beforeunload', stopOnUnload)
+}
+
+function _trackPhoneCall(url: string, headers: Record<string, string> | undefined, body: unknown) {
+  try {
+    const isStart = url.includes('/phone/start')
+    const isStop  = url.includes('/phone/stop')
+    if (!isStart && !isStop) return
+    const bearer = (headers?.Authorization ?? headers?.authorization ?? '').replace(/^Bearer\s+/i, '')
+    if (bearer) _geelarkBearer = bearer
+    const ids: string[] = ((body as { ids?: string[] })?.ids) ?? []
+    if (isStart) { ids.forEach(id => _runningPhones.add(id)); _ensureUnloadGuard() }
+    else         { ids.forEach(id => _runningPhones.delete(id)) }
+  } catch { /* ignore */ }
+}
+
 // ── Build the web electronAPI object ────────────────────────────────────────
 export function buildWebAPI() {
   console.log('[webAPI] v4f213a5 — upload via SDK Supabase, pas de proxy serveur')
@@ -70,6 +112,7 @@ export function buildWebAPI() {
       method: string; url: string; headers?: Record<string, string>
       body?: unknown; isText?: boolean
     }) {
+      _trackPhoneCall(opts.url, opts.headers, opts.body)
       let r: Response
       try {
         r = await fetch('/api/gx', {

@@ -72,6 +72,15 @@ export async function stopPhone(bearer: string, phoneId: string): Promise<void> 
   } catch { /* ignore */ }
 }
 
+// Stop several phones in one call. Returns how many GéeLark reported stopped.
+export async function stopPhones(bearer: string, phoneIds: string[]): Promise<number> {
+  if (phoneIds.length === 0) return 0
+  const res = await geelarkFetch('POST', '/phone/stop', { ids: phoneIds }, bearer)
+  const data = (res?.data ?? res) as Record<string, unknown>
+  const success = Number((data?.successAmount ?? data?.successDetails ?? phoneIds.length))
+  return Number.isFinite(success) ? success : phoneIds.length
+}
+
 // Lightweight: fetch only the status of all phones (same endpoint, minimal processing)
 export async function fetchPhoneStatuses(bearer: string): Promise<Map<string, string>> {
   const phones = await fetchAllPhones(bearer)

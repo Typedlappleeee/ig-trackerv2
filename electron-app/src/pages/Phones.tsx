@@ -5,7 +5,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { useT, useLang } from '@/lib/i18n'
 import { canAccessPhoneGroup } from '@/lib/permissions'
-import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId } from '@/lib/geelark'
+import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId, stopPhones } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -1139,6 +1139,44 @@ export function Phones({ user }: PhonesProps) {
     setBulkBusy(false)
   }
 
+  async function stopSelectedPhones() {
+    if (!bearer || selectedIds.size === 0) return
+    setBulkBusy(true)
+    // Map selected row ids → GéeLark phone ids
+    const geelarkIds = phones
+      .filter(p => selectedIds.has(p.id) && p.geelark_id)
+      .map(p => p.geelark_id as string)
+    try {
+      const n = await stopPhones(bearer, geelarkIds)
+      toast.show({ kind: 'ok', title: fr(`${n || geelarkIds.length} téléphone(s) éteint(s)`, `${n || geelarkIds.length} phone(s) stopped`) })
+      setSelectedIds(new Set())
+      poller.pollNow()
+    } catch (e) {
+      toast.show({ kind: 'error', title: fr('Échec de l\'extinction', 'Failed to stop phones'), body: e instanceof Error ? e.message : String(e) })
+    }
+    setBulkBusy(false)
+  }
+
+  async function stopAllOnlinePhones() {
+    if (!bearer) return
+    const onlineIds = phones
+      .filter(p => (p.status === 'online' || p.status === 'warming') && p.geelark_id)
+      .map(p => p.geelark_id as string)
+    if (onlineIds.length === 0) {
+      toast.show({ kind: 'info', title: fr('Aucun téléphone allumé', 'No phones running') })
+      return
+    }
+    setBulkBusy(true)
+    try {
+      const n = await stopPhones(bearer, onlineIds)
+      toast.show({ kind: 'ok', title: fr(`${n || onlineIds.length} téléphone(s) éteint(s)`, `${n || onlineIds.length} phone(s) stopped`) })
+      poller.pollNow()
+    } catch (e) {
+      toast.show({ kind: 'error', title: fr('Échec de l\'extinction', 'Failed to stop phones'), body: e instanceof Error ? e.message : String(e) })
+    }
+    setBulkBusy(false)
+  }
+
   async function bulkChangeGroup(group: string) {
     if (selectedIds.size === 0) return
     setBulkBusy(true)
@@ -1409,6 +1447,21 @@ export function Phones({ user }: PhonesProps) {
               )}
               <CountdownTicker enabled={autoRefresh && !!bearer} />
             </div>
+
+            {/* Stop all running phones — safety against runaway billing */}
+            {onlineCount > 0 && (
+              <button
+                onClick={stopAllOnlinePhones} disabled={!bearer || bulkBusy}
+                className="sf-btn sf-btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: (!bearer || bulkBusy) ? 'not-allowed' : 'pointer', opacity: (!bearer || bulkBusy) ? 0.5 : 1, borderColor: 'rgba(248,113,113,0.4)', color: '#f87171' }}
+                title={fr('Éteindre tous les téléphones allumés', 'Power off all running phones')}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" />
+                </svg>
+                {fr(`Éteindre tout (${onlineCount})`, `Stop all (${onlineCount})`)}
+              </button>
+            )}
 
             {/* Sync button */}
             <button
@@ -2059,6 +2112,20 @@ export function Phones({ user }: PhonesProps) {
             </span>
 
             <div style={{ width: 1, height: 20, background: HAIR }} />
+
+            {/* Stop / power off selected */}
+            <button
+              onClick={stopSelectedPhones}
+              disabled={bulkBusy}
+              className="sf-btn sf-btn-secondary sf-btn-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: bulkBusy ? 'wait' : 'pointer' }}
+              title={fr('Éteindre les téléphones sélectionnés', 'Power off selected phones')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" />
+              </svg>
+              {fr('Éteindre', 'Power off')}
+            </button>
 
             {/* Delete bulk */}
             {canDelete && (
