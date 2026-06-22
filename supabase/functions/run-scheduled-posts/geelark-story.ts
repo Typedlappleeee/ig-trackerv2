@@ -317,7 +317,7 @@ export async function postStoryServer(
 
   // Resize so longest side <= 1280 (enough for stories), keep aspect, encode PNG.
   let pushData: string // base64
-  let outExt = 'png'
+  let outExt = 'jpg'
   try {
     const img = await decode(originalBytes)
     const MAX = 1280
@@ -327,9 +327,10 @@ export async function postStoryServer(
       const r = Math.min(MAX / w, MAX / h)
       img.resize(Math.round(w * r), Math.round(h * r))
     }
-    const png = await img.encodePNG()
-    pushData = base64Encode(png)
-    log(`   🗜️ ImageScript: ${Math.round(originalBytes.length / 1024)} KB → ${Math.round((pushData.length * 3) / 4 / 1024)} KB (PNG)`)
+    // JPEG ~q82 ≈ 300-500 KB (PNG would be 3-5 MB → 1000+ shell chunks → corruption)
+    const jpeg = await img.encodeJPEG(82)
+    pushData = base64Encode(jpeg)
+    log(`   🗜️ ImageScript: ${Math.round(originalBytes.length / 1024)} KB → ${Math.round((pushData.length * 3) / 4 / 1024)} KB (JPEG)`)
   } catch (e) {
     // Fallback: push the raw downloaded bytes, keep their real extension.
     log(`   ⚠️ ImageScript: ${e instanceof Error ? e.message : String(e)} — push brut (.${origExt})`)

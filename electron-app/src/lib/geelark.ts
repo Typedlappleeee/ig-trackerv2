@@ -885,7 +885,10 @@ export async function postInstagramStory(
   log(`   📥 Image: ${Math.round(imgBase64.length / 1024)} KB`)
 
   // Compress to JPEG ≤ 200 KB using OffscreenCanvas, then DOM Canvas as fallback.
-  // Target 720×1280 (enough for stories) at decreasing quality until small enough.
+  // Target 720×1280 (enough for stories). Output JPEG ~0.75 quality ≈ 300-500 KB
+  // (PNG would be 3-5 MB → 1000+ shell chunks → corruption/timeout).
+  // outExt stays 'jpg' when canvas succeeds; falls back to original extension
+  // if both canvas methods fail so the file bytes always match the file name.
   const MAX_W = 720, MAX_H = 1280
   let compressed: string | null = null
 
@@ -900,15 +903,15 @@ export async function postInstagramStory(
     if (w > MAX_W || h > MAX_H) { const r = Math.min(MAX_W / w, MAX_H / h); w = Math.round(w * r); h = Math.round(h * r) }
     const oc = new OffscreenCanvas(w, h)
     oc.getContext('2d')!.drawImage(bitmap, 0, 0, w, h)
-    const blob = await oc.convertToBlob({ type: 'image/png' })
+    const blob = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.82 })
     compressed = bufToB64(await blob.arrayBuffer())
-    if (compressed) log(`   🗜️ OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB`)
+    if (compressed) log(`   🗜️ OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB (JPEG)`)
   } catch (e) {
     log(`   ⚠️ OffscreenCanvas: ${e instanceof Error ? e.message : String(e)}`)
   }
 
-  // Attempt 2: DOM Canvas (if OffscreenCanvas unavailable or too large)
-  if (!compressed || compressed.length > 400 * 1024) {
+  // Attempt 2: DOM Canvas (fallback)
+  if (!compressed) {
     try {
       const mimeIn = _imgExt === 'png' ? 'image/png' : 'image/jpeg'
       const c2 = await new Promise<string | null>((resolve) => {
@@ -924,22 +927,21 @@ export async function postInstagramStory(
           const cv = document.createElement('canvas')
           cv.width = w; cv.height = h
           cv.getContext('2d')!.drawImage(img, 0, 0, w, h)
-          const dataUrl = cv.toDataURL('image/png')
+          const dataUrl = cv.toDataURL('image/jpeg', 0.82)
           resolve(dataUrl.slice(dataUrl.indexOf(',') + 1))
         }
         img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
         img.src = blobUrl
       })
-      if (c2) { compressed = c2; log(`   🗜️ Canvas DOM: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(c2.length / 1024)} KB`) }
+      if (c2) { compressed = c2; log(`   🗜️ Canvas DOM: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(c2.length / 1024)} KB (JPEG)`) }
     } catch (e) {
       log(`   ⚠️ Canvas DOM: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
-  // If PNG conversion succeeded, push PNG. Otherwise push the original bytes
-  // under their real extension so file content matches the file name.
+  // Canvas produced JPEG → use .jpg. Fallback = raw original bytes → original extension.
   const pushData = compressed ?? imgBase64
-  if (!compressed) outExt = _imgExt
+  if (compressed) { outExt = 'jpg' } else { outExt = _imgExt }
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
   log(`   📤 Push: ${Math.round(pushData.length / 1024)} KB (.${outExt})`)
 
