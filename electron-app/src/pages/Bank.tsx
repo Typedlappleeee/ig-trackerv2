@@ -361,6 +361,8 @@ export function Bank({ user }: BankProps) {
   const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null)
   // Empty folders — now stored in Supabase (sentinel rows) so all org members see them
   const [emptyFolders, setEmptyFolders] = useState<string[]>([])
+  // Drive-sourced folders — show a Drive icon in the sidebar
+  const [driveFolders, setDriveFolders] = useState<Set<string>>(new Set())
 
   // Context menu
   const [ctxMenu, setCtxMenu]       = useState<CtxMenu | null>(null)
@@ -447,10 +449,17 @@ export function Bank({ user }: BankProps) {
       from += PAGE
     }
     {
-      // Sentinel rows mark empty folders so all org members can see them.
-      // They are identified by notes === '__sf_folder__' and no storage_path.
-      const isSentinel = (i: ContentItem) => i.notes === '__sf_folder__' && !i.storage_path && !i.file_url
+      // Sentinel rows : __sf_folder__ (normal) ou __sf_drive_folder__ (Drive).
+      const isSentinel = (i: ContentItem) =>
+        (i.notes === '__sf_folder__' || i.notes === '__sf_drive_folder__') && !i.storage_path && !i.file_url
       const sentinelFolders = allRows.filter(isSentinel).map(i => i.title).filter(Boolean)
+
+      // Dossiers Drive = sentinel Drive + items avec source 'drive'
+      const driveSet = new Set<string>()
+      allRows.filter(isSentinel).filter(i => i.notes === '__sf_drive_folder__').forEach(i => { if (i.folder) driveSet.add(i.folder) })
+      allRows.filter(i => (i as any).source === 'drive' && i.folder).forEach(i => { driveSet.add(i.folder!) })
+      setDriveFolders(driveSet)
+
       let rows = allRows.filter(i => !isSentinel(i))
 
       // Migrate legacy localStorage folders to Supabase (one-time, per org)
@@ -1041,6 +1050,7 @@ export function Bank({ user }: BankProps) {
                 name={f}
                 count={items.filter(i => (i as unknown as {folder?: string}).folder === f).length}
                 active={selectedFolder === f}
+                isDrive={driveFolders.has(f)}
                 onClick={() => setSelectedFolder(f)}
                 onRename={(newName) => renameFolder(f, newName)}
                 onDelete={() => setFolderModal({ name: f, mode: 'delete' })}
@@ -1600,10 +1610,11 @@ export function Bank({ user }: BankProps) {
 }
 
 // ── Folder row with inline rename ────────────────────────────────────────────
-function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, onDropItem }: {
+function FolderRow({ name, count, active, isDrive, onClick, onRename, onDelete, onMerge, onDropItem }: {
   name: string
   count: number
   active: boolean
+  isDrive?: boolean
   onClick: () => void
   onRename: (newName: string) => void
   onDelete: () => void
@@ -1661,7 +1672,10 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
       }}
     >
       <span style={{ color: active || dragOver ? 'var(--accent-lt)' : 'var(--text-3)' }} className="flex-shrink-0">
-        {dragOver ? <IconFolderOpen size={13} /> : <IconFolder size={13} />}
+        {isDrive && !dragOver
+          ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M7.71 3.5 1.15 15l3.42 6 6.56-11.5zM22.85 15 16.29 3.5H9.43L16 15zM5.43 16.5 2 22.5h13.14l3.43-6z"/></svg>
+          : dragOver ? <IconFolderOpen size={13} /> : <IconFolder size={13} />
+        }
       </span>
       <span
         className="text-[12px] font-medium flex-1 truncate"

@@ -1,32 +1,24 @@
 // Supabase Edge Function — synchronise les dossiers Google Drive vers la banque.
 //
-// Appelée toutes les heures par pg_cron (voir supabase/migrations/20260622b_drive_sync_cron.sql),
-// ou à la demande par un utilisateur authentifié (bouton « Synchroniser »).
-//
-// Modèle COMPTE DE SERVICE : l'utilisateur partage son dossier Drive avec
-// l'email du compte de service. La clé JSON du compte de service est stockée en
-// secret côté serveur (GOOGLE_SERVICE_ACCOUNT_JSON). Aucun OAuth / refresh token.
-//
-// Déploiement :
-//   supabase functions deploy sync-drive --no-verify-jwt
-//   supabase secrets set CRON_SECRET=<uuid>
-//   supabase secrets set GOOGLE_SERVICE_ACCOUNT_JSON='<contenu du fichier .json>'
+// Crée automatiquement la structure de dossiers Drive dans la banque :
+// - Un dossier racine au nom de la connexion (ex. "Mon Drive Marketing")
+// - Les sous-dossiers Drive apparaissent comme "Mon Drive Marketing / NomSousDossier"
+// - Les vidéos sont rangées dans le bon dossier de banque selon leur emplacement dans Drive
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const FN_BUDGET_MS = 230_000
-// Nombre max de fichiers téléchargés/uploadés par invocation (budget serverless).
+const FN_BUDGET_MS  = 230_000
 const MAX_FILES_PER_RUN = 6
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
 
 interface DriveFile {
-  id: string
-  name: string
+  id:       string
+  name:     string
   mimeType: string
-  size?: string
+  parentId: string   // ID du dossier Drive parent
 }
 
-// ── Auth compte de service : signe un JWT RS256 → access_token Drive ─────────
+// ── Auth compte de service JWT RS256 ────────────────────────────────────────
 function b64url(data: ArrayBuffer | string): string {
   const bytes = typeof data === 'string'
     ? new TextEncoder().encode(data)
@@ -50,81 +42,85 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
 async function getDriveAccessToken(clientEmail: string, privateKeyPem: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
-  const claim = b64url(JSON.stringify({
-    iss: clientEmail,
+  const claim  = b64url(JSON.stringify({
+    iss:   clientEmail,
     scope: 'https://www.googleapis.com/auth/drive.readonly',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
+    aud:   'https://oauth2.googleapis.com/token',
+    iat:   now,
+    exp:   now + 3600,
   }))
   const unsigned = `${header}.${claim}`
-
   const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToArrayBuffer(privateKeyPem),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
+    'pkcs8', pemToArrayBuffer(privateKeyPem),
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign'],
   )
-  const sig = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    new TextEncoder().encode(unsigned),
-  )
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned))
   const jwt = `${unsigned}.${b64url(sig)}`
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
+  const res  = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }),
   })
   const json = await res.json()
-  if (!json.access_token) {
-    throw new Error(`Auth Drive échouée : ${JSON.stringify(json).slice(0, 200)}`)
-  }
+  if (!json.access_token) throw new Error(`Auth Drive échouée : ${JSON.stringify(json).slice(0, 200)}`)
   return json.access_token as string
 }
 
-// ── Liste récursive des vidéos d'un dossier Drive ────────────────────────────
-async function listVideos(token: string, folderId: string, recursive: boolean): Promise<DriveFile[]> {
-  const out: DriveFile[] = []
-  const folders = [folderId]
-  const seen = new Set<string>()
+// ── Explore la structure du dossier Drive ────────────────────────────────────
+// Retourne :
+//   videos     — fichiers vidéo avec leur parentId
+//   folderNames — map folderId → nom Drive (sauf rootFolderId dont le nom = conn.name)
+async function listDriveStructure(
+  token: string,
+  rootFolderId: string,
+  recursive: boolean,
+): Promise<{ videos: DriveFile[]; folderNames: Map<string, string> }> {
+  const videos: DriveFile[] = []
+  const folderNames = new Map<string, string>()
+  folderNames.set(rootFolderId, '')   // '' = racine → bank folder = conn.name
 
-  while (folders.length) {
-    const fid = folders.shift()!
-    if (seen.has(fid)) continue
-    seen.add(fid)
+  const queue   = [rootFolderId]
+  const visited = new Set<string>()
+
+  while (queue.length) {
+    const fid = queue.shift()!
+    if (visited.has(fid)) continue
+    visited.add(fid)
 
     let pageToken: string | undefined
     do {
       const params = new URLSearchParams({
-        q: `'${fid}' in parents and trashed = false`,
-        fields: 'nextPageToken, files(id, name, mimeType, size)',
-        pageSize: '1000',
-        supportsAllDrives: 'true',
+        q:                         `'${fid}' in parents and trashed = false`,
+        fields:                    'nextPageToken, files(id, name, mimeType)',
+        pageSize:                  '1000',
+        supportsAllDrives:         'true',
         includeItemsFromAllDrives: 'true',
       })
       if (pageToken) params.set('pageToken', pageToken)
-      const res = await fetch(`${DRIVE_API}/files?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res  = await fetch(`${DRIVE_API}/files?${params}`, { headers: { Authorization: `Bearer ${token}` } })
       const json = await res.json()
       if (json.error) throw new Error(`Drive list : ${json.error.message}`)
-      for (const f of (json.files ?? []) as DriveFile[]) {
+
+      for (const f of (json.files ?? []) as Array<{ id: string; name: string; mimeType: string }>) {
         if (f.mimeType === 'application/vnd.google-apps.folder') {
-          if (recursive) folders.push(f.id)
+          folderNames.set(f.id, f.name)
+          if (recursive) queue.push(f.id)
         } else if (f.mimeType?.startsWith('video/')) {
-          out.push(f)
+          videos.push({ id: f.id, name: f.name, mimeType: f.mimeType, parentId: fid })
         }
       }
       pageToken = json.nextPageToken
     } while (pageToken)
   }
-  return out
+  return { videos, folderNames }
+}
+
+// Nom du dossier de banque pour un fichier Drive donné.
+// Racine  → conn.name (ex. "Mon Drive Marketing")
+// Sous-d. → "Mon Drive Marketing / Reels"
+function bankFolderName(connName: string, parentId: string, rootId: string, folderNames: Map<string, string>): string {
+  const driveName = folderNames.get(parentId) ?? ''
+  return driveName === '' ? connName : `${connName} / ${driveName}`
 }
 
 async function downloadDriveFile(token: string, fileId: string): Promise<ArrayBuffer> {
@@ -146,7 +142,6 @@ Deno.serve(async (req) => {
   const cronSecret  = Deno.env.get('CRON_SECRET') ?? ''
   const saJsonRaw   = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') ?? ''
 
-  // Auth : secret cron OU service_role OU JWT utilisateur authentifié
   const gotSecret = req.headers.get('x-cron-secret') ?? ''
   const gotAuth   = req.headers.get('authorization') ?? ''
   let authorized   = (cronSecret && gotSecret === cronSecret) || gotAuth.includes(serviceKey)
@@ -181,11 +176,10 @@ Deno.serve(async (req) => {
     })
   }
 
-  const db = createClient(supabaseUrl, serviceKey)
-  const fnStart = Date.now()
-  const summary: Record<string, unknown> = { connections: 0, imported: 0, errors: [] as string[] }
+  const db       = createClient(supabaseUrl, serviceKey)
+  const fnStart  = Date.now()
+  const summary: Record<string, unknown> = { connections: 0, imported: 0, folders_created: 0, errors: [] as string[] }
 
-  // Connexions actives à traiter
   let q = db.from('drive_connections').select('*').eq('status', 'active')
   if (filterUserId) q = q.eq('user_id', filterUserId)
   const { data: conns, error: connErr } = await q
@@ -211,25 +205,60 @@ Deno.serve(async (req) => {
     summary.connections = (summary.connections as number) + 1
 
     try {
-      const files = await listVideos(token, conn.folder_id, conn.recursive !== false)
+      // ── 1. Explorer la structure Drive ──────────────────────────────────
+      const { videos, folderNames } = await listDriveStructure(token, conn.folder_id, conn.recursive !== false)
 
-      // Quels fichiers sont déjà importés pour cette connexion ?
+      // ── 2. Créer les dossiers de banque (sentinel rows) ─────────────────
+      // Collecte tous les dossiers de banque nécessaires pour cette connexion
+      const neededFolders = new Set<string>()
+      neededFolders.add(conn.name)  // toujours le dossier racine
+      for (const [fid, fname] of folderNames) {
+        if (fid === conn.folder_id) continue  // racine déjà ajoutée
+        neededFolders.add(`${conn.name} / ${fname}`)
+      }
+
+      // Dossiers sentinel déjà existants pour cette connexion
+      const { data: existingSentinels } = await db.from('content_bank')
+        .select('folder')
+        .eq('drive_connection_id', conn.id)
+        .eq('notes', '__sf_drive_folder__')
+      const existingFolderSet = new Set((existingSentinels ?? []).map((r: { folder: string }) => r.folder))
+
+      let foldersCreated = 0
+      for (const folderName of neededFolders) {
+        if (existingFolderSet.has(folderName)) continue
+        await db.from('content_bank').insert({
+          user_id:             conn.user_id,
+          org_id:              conn.org_id,
+          title:               folderName,
+          folder:              folderName,
+          notes:               '__sf_drive_folder__',
+          file_url:            null,
+          storage_path:        null,
+          thumbnail_path:      null,
+          tags:                [],
+          source:              'drive',
+          drive_connection_id: conn.id,
+        }).then(() => { foldersCreated++ }).catch(() => {})
+      }
+      summary.folders_created = (summary.folders_created as number) + foldersCreated
+
+      // ── 3. Importer les vidéos manquantes ────────────────────────────────
       const { data: existing } = await db.from('content_bank')
         .select('drive_file_id')
         .eq('drive_connection_id', conn.id)
         .not('drive_file_id', 'is', null)
-      const have = new Set((existing ?? []).map((r: { drive_file_id: string }) => r.drive_file_id))
+      const have    = new Set((existing ?? []).map((r: { drive_file_id: string }) => r.drive_file_id))
+      const pending = videos.filter(f => !have.has(f.id))
 
-      const pending = files.filter(f => !have.has(f.id))
-      const scope = conn.org_id
-        ? `orgs/${conn.org_id}`
-        : `users/${conn.user_id}`
+      const scope = conn.org_id ? `orgs/${conn.org_id}` : `users/${conn.user_id}`
 
       for (const file of pending) {
         if (Date.now() - fnStart > FN_BUDGET_MS || importedTotal >= MAX_FILES_PER_RUN) break
 
-        const ext = extFromName(file.name)
-        const uuid = crypto.randomUUID()
+        const folder      = bankFolderName(conn.name, file.parentId, conn.folder_id, folderNames)
+        const ext         = extFromName(file.name)
+        const uuid        = crypto.randomUUID()
         const storagePath = `videos/${scope}/${uuid}.${ext}`
 
         const bytes = await downloadDriveFile(token, file.id)
@@ -246,7 +275,7 @@ Deno.serve(async (req) => {
           storage_path:        storagePath,
           thumbnail_path:      null,
           file_url:            null,
-          folder:              conn.target_folder ?? null,
+          folder,
           tags:                [],
           notes:               '',
           source:              'drive',
@@ -254,20 +283,21 @@ Deno.serve(async (req) => {
           drive_connection_id: conn.id,
         })
         if (insErr) {
-          // Nettoyage best-effort si l'insert échoue
           await db.storage.from('content').remove([storagePath]).catch(() => {})
           throw new Error(`Insert ${file.name} : ${insErr.message}`)
         }
         importedTotal++
       }
 
+      // ── 4. Mettre à jour la connexion ────────────────────────────────────
       await db.from('drive_connections').update({
         last_sync_at: new Date().toISOString(),
         last_error:   null,
         status:       'active',
-        synced_count: (conn.synced_count ?? 0) + (pending.length > 0 ? Math.min(pending.length, importedTotal) : 0),
+        synced_count: (conn.synced_count ?? 0) + importedTotal,
         updated_at:   new Date().toISOString(),
       }).eq('id', conn.id)
+
     } catch (e) {
       const msg = String(e).slice(0, 400)
       ;(summary.errors as string[]).push(`${conn.name}: ${msg}`)
