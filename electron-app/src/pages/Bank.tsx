@@ -12,6 +12,7 @@ import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/Toast'
+import { DriveConnectionsModal } from '@/components/DriveConnections'
 
 interface BankProps { user: User }
 
@@ -342,6 +343,7 @@ export function Bank({ user }: BankProps) {
   const [error, setError]         = useState<string | null>(null)
   const [dragging, setDragging]   = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showDriveModal, setShowDriveModal] = useState(false)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [newFolderName, setNewFolderName]   = useState('')
   const [showNewFolder, setShowNewFolder]   = useState(false)
@@ -875,6 +877,15 @@ export function Bank({ user }: BankProps) {
             title={t('refresh')}
           >
             <IconRefresh size={14} />
+          </button>
+
+          <button
+            onClick={() => setShowDriveModal(true)}
+            className="sf-btn sf-btn-ghost cursor-pointer"
+            title={t('bankDriveTitle')}
+          >
+            <SfIcon size={14}><path d="M7.71 3.5 1.15 15l3.42 6 6.56-11.5zM22.85 15 16.29 3.5H9.43L16 15zM5.43 16.5 2 22.5h13.14l3.43-6z"/></SfIcon>
+            {t('bankDrive')}
           </button>
 
           <button
@@ -1537,6 +1548,16 @@ export function Bank({ user }: BankProps) {
           onFiles={async files => { for (const f of files) await addFromFile(f) }}
           onElectronPick={(window.electronAPI?.pickAnyFile || window.electronAPI?.pickVideoFile) ? pickFile : undefined}
           onClose={() => setShowAddModal(false)}
+        />
+      )}
+      {showDriveModal && (
+        <DriveConnectionsModal
+          user={user}
+          orgId={isPersonal ? null : (currentOrg?.id ?? null)}
+          folders={folders}
+          serviceEmail={import.meta.env.VITE_DRIVE_SERVICE_EMAIL}
+          onClose={() => setShowDriveModal(false)}
+          onSynced={() => loadItems()}
         />
       )}
       {renameItem && (
