@@ -599,7 +599,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
 
   const isVisibleTab = (id: Page): boolean => {
-    if (id === 'licences' || id === 'storylink' || id === 'accountcreator' || id === 'tiktokposting') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'storylink' || id === 'accountcreator') return effectiveSuperAdmin
+    if (id === 'tiktokposting') return effectiveSuperAdmin || effectiveRole === 'owner' || effectiveRole === 'admin'
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
     return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }
