@@ -110,7 +110,6 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
-      { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
       { id: 'spoof',       label: 'navSpoof',       icon: '🛡️', isNew: true },
       { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
       { id: 'subtitles',   label: 'navSubtitles',   icon: '💬', isNew: true },

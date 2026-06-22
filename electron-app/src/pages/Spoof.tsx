@@ -3,9 +3,6 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
-import { VideoRepurpose } from '@/pages/VideoRepurpose'
-
-const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI?.isElectron
 
 const PRESETS: Record<string, string> = {
   iphone17pro: 'iPhone 17 Pro',
@@ -15,32 +12,40 @@ const PRESETS: Record<string, string> = {
   iphone15:    'iPhone 15',
 }
 
-const GPS_CITIES: Record<string, string> = {
-  newyork:      'New York, NY',
-  losangeles:   'Los Angeles, CA',
-  chicago:      'Chicago, IL',
-  miami:        'Miami, FL',
-  houston:      'Houston, TX',
-  phoenix:      'Phoenix, AZ',
-  philadelphia: 'Philadelphia, PA',
-  sanantonio:   'San Antonio, TX',
-  sandiego:     'San Diego, CA',
-  dallas:       'Dallas, TX',
-  boston:       'Boston, MA',
-  seattle:      'Seattle, WA',
-  denver:       'Denver, CO',
-  nashville:    'Nashville, TN',
-  atlanta:      'Atlanta, GA',
-  portland:     'Portland, OR',
-  lasvegas:     'Las Vegas, NV',
-  austin:       'Austin, TX',
-  minneapolis:  'Minneapolis, MN',
-  sanfrancisco: 'San Francisco, CA',
-}
+// International locations grouped by country (label includes a flag).
+const GPS_GROUPS: { country: string; cities: Record<string, string> }[] = [
+  { country: '🇫🇷 France', cities: {
+    paris: 'Paris', marseille: 'Marseille', lyon: 'Lyon', toulouse: 'Toulouse', nice: 'Nice', bordeaux: 'Bordeaux',
+  }},
+  { country: '🇬🇧 Royaume-Uni / 🇮🇪 Irlande', cities: {
+    london: 'Londres', manchester: 'Manchester', dublin: 'Dublin',
+  }},
+  { country: '🇪🇸 Espagne / 🇵🇹 Portugal', cities: {
+    madrid: 'Madrid', barcelona: 'Barcelone', lisbon: 'Lisbonne',
+  }},
+  { country: '🇮🇹 Italie', cities: {
+    rome: 'Rome', milan: 'Milan',
+  }},
+  { country: '🇩🇪 Europe centrale', cities: {
+    berlin: 'Berlin', munich: 'Munich', amsterdam: 'Amsterdam', brussels: 'Bruxelles', zurich: 'Zurich', geneva: 'Genève',
+  }},
+  { country: '🌎 Amériques', cities: {
+    newyork: 'New York', losangeles: 'Los Angeles', miami: 'Miami', toronto: 'Toronto', montreal: 'Montréal', mexico: 'Mexico', saopaulo: 'São Paulo',
+  }},
+  { country: '🌏 Asie / Moyen-Orient / Océanie', cities: {
+    dubai: 'Dubaï', istanbul: 'Istanbul', tokyo: 'Tokyo', singapore: 'Singapour', sydney: 'Sydney',
+  }},
+]
 
-const GPS_CITY_KEYS = Object.keys(GPS_CITIES)
+const GPS_CITY_KEYS = GPS_GROUPS.flatMap(g => Object.keys(g.cities))
 
 type JobStatus = 'queued' | 'processing' | 'done' | 'error'
+
+interface AppliedMeta {
+  make: string; model: string; software: string; city: string
+  gps: string; altitude: string; creationDate: string; timezone: string
+  cameraId: string; lens: string; iso: number; exposure: string; aperture: string; focal: string
+}
 
 interface SpoofJob {
   id: string
@@ -50,6 +55,7 @@ interface SpoofJob {
   outputUrl?: string
   storagePath?: string
   error?: string
+  meta?: AppliedMeta
 }
 
 interface SelectedVideo { url: string; name: string }
@@ -61,7 +67,6 @@ function todayStr() {
 export function Spoof({ user }: { user: User }) {
   const credits = useCredits()
 
-  const [activeTab, setActiveTab]         = useState<'spoof' | 'clone'>('spoof')
   const [showBank, setShowBank]           = useState(false)
   const [selectedVideos, setSelectedVideos] = useState<SelectedVideo[]>([])
   const [preset, setPreset]               = useState('iphone17pro')
@@ -131,7 +136,7 @@ export function Spoof({ user }: { user: User }) {
           })
           const data = await res.json()
           if (data.ok) {
-            updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath })
+            updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta })
           } else {
             updateJob(job.id, { status: 'error', error: data.error ?? 'Erreur inconnue' })
           }
@@ -193,40 +198,13 @@ export function Spoof({ user }: { user: User }) {
                 </span>
               )}
             </div>
-            <p className="sf-page-sub">Métadonnées iPhone + ajustements visuels · contournement détection IA</p>
+            <p className="sf-page-sub">Métadonnées iPhone authentiques + GPS multi-pays · chaque export est unique</p>
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, border: '1px solid var(--border)' }}>
-          {(['spoof', 'clone'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className="cursor-pointer"
-              style={{
-                padding: '6px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none',
-                background: activeTab === tab ? 'rgba(99,102,241,0.18)' : 'transparent',
-                color: activeTab === tab ? '#6366F1' : 'var(--text-3)',
-                outline: activeTab === tab ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-                cursor: 'pointer', transition: 'all 0.15s',
-              }}
-            >
-              {tab === 'spoof' ? 'Spoofing' : 'CloneVid'}
-            </button>
-          ))}
         </div>
       </header>
 
-      {/* ── CloneVid tab ── */}
-      {activeTab === 'clone' && (
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <VideoRepurpose user={user} />
-        </div>
-      )}
-
-      {/* ── Spoof tab ── */}
-      {activeTab === 'spoof' && (
+      {/* ── Spoof body ── */}
+      {(
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
 
           {/* ── Left panel ── */}
@@ -307,9 +285,13 @@ export function Spoof({ user }: { user: User }) {
                 className="sf-input"
                 style={{ width: '100%', fontSize: 12 }}
               >
-                <option value="random">🎲 Aléatoire</option>
-                {Object.entries(GPS_CITIES).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
+                <option value="random">🎲 Aléatoire (tous pays)</option>
+                {GPS_GROUPS.map(group => (
+                  <optgroup key={group.country} label={group.country}>
+                    {Object.entries(group.cities).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -461,9 +443,9 @@ export function Spoof({ user }: { user: User }) {
                   </div>
                 </div>
                 <p className="sf-empty-title">Aucune vidéo traitée</p>
-                <p className="sf-empty-desc">Sélectionne des vidéos depuis la banque,<br />configure les métadonnées puis lance le spoofing.</p>
+                <p className="sf-empty-desc">Sélectionne <b>2 vidéos ou plus</b> depuis la banque pour les spoofer<br />et comparer les métadonnées injectées côte à côte.</p>
                 <div style={{ display: 'flex', gap: 7, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {['Métadonnées iPhone', 'GPS aléatoire', 'Date custom', 'Grain + filtre'].map(pill => (
+                  {['Métadonnées iPhone', 'GPS multi-pays', 'Altitude + objectif', 'ID caméra unique'].map(pill => (
                     <span key={pill} className="sf-badge" style={{ padding: '4px 10px', background: 'rgba(99,102,241,0.05)', color: 'rgba(99,102,241,0.65)', border: '1px solid rgba(99,102,241,0.12)', fontSize: 10 }}>
                       {pill}
                     </span>
@@ -472,6 +454,17 @@ export function Spoof({ user }: { user: User }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {doneCount >= 2 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderRadius: 9,
+                    background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)', marginBottom: 2,
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
+                      {doneCount} vidéos spoofées — compare les métadonnées : chaque vidéo a un GPS, une date, un ID caméra <b>différents</b>.
+                    </span>
+                  </div>
+                )}
                 {jobs.map(job => (
                   <SpoofJobCard key={job.id} job={job} />
                 ))}
@@ -510,64 +503,99 @@ function SpoofJobCard({ job }: { job: SpoofJob }) {
     }
   }
 
+  const META_ROWS: { label: string; key: keyof AppliedMeta }[] = [
+    { label: 'Appareil',   key: 'model' },
+    { label: 'Logiciel',   key: 'software' },
+    { label: 'Localisation', key: 'city' },
+    { label: 'GPS',        key: 'gps' },
+    { label: 'Altitude',   key: 'altitude' },
+    { label: 'Date',       key: 'creationDate' },
+    { label: 'Fuseau',     key: 'timezone' },
+    { label: 'Objectif',   key: 'lens' },
+    { label: 'Focale',     key: 'focal' },
+    { label: 'Ouverture',  key: 'aperture' },
+    { label: 'ISO',        key: 'iso' },
+    { label: 'Exposition', key: 'exposure' },
+    { label: 'ID Caméra',  key: 'cameraId' },
+  ]
+
   return (
     <div
       className="sf-card"
       style={{
-        borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
+        borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12,
         borderColor: isDone ? 'rgba(99,102,241,0.3)' : isErr ? 'rgba(239,68,68,0.25)' : 'var(--border)',
         boxShadow: isDone ? '0 0 20px -6px rgba(99,102,241,0.12)' : 'none',
         transition: 'border-color 0.3s, box-shadow 0.3s',
       }}
     >
-      {/* Status icon */}
-      <div style={{
-        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: isDone ? 'rgba(99,102,241,0.12)' : isErr ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${isDone ? 'rgba(99,102,241,0.25)' : isErr ? 'rgba(239,68,68,0.2)' : 'var(--border)'}`,
-      }}>
-        {isQ && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
-        {isProc && <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1', animation: 'spin 0.9s linear infinite' }} />}
-        {isDone && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
-        {isErr && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
-      </div>
-
-      {/* Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ivory)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {job.name}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Status icon */}
+        <div style={{
+          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: isDone ? 'rgba(99,102,241,0.12)' : isErr ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${isDone ? 'rgba(99,102,241,0.25)' : isErr ? 'rgba(239,68,68,0.2)' : 'var(--border)'}`,
+        }}>
+          {isQ && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-4)" strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
+          {isProc && <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1', animation: 'spin 0.9s linear infinite' }} />}
+          {isDone && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
+          {isErr && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
         </div>
-        <div style={{ fontSize: 10, color: isDone ? 'rgba(99,102,241,0.7)' : isErr ? '#f87171' : 'var(--text-4)', marginTop: 2 }}>
-          {isQ && 'En attente…'}
-          {isProc && 'Traitement en cours…'}
-          {isDone && 'Spoofing terminé'}
-          {isErr && (job.error?.slice(0, 60) ?? 'Erreur')}
-        </div>
-      </div>
 
-      {/* Actions */}
-      {isDone && (
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          <button
-            onClick={download}
-            className="sf-btn cursor-pointer"
-            style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 7, gap: 5 }}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            Télécharger
-          </button>
-          {job.storagePath && (
-            <a
-              href="#"
-              onClick={e => { e.preventDefault(); window.location.hash = '#bank' }}
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ivory)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {job.name}
+          </div>
+          <div style={{ fontSize: 10, color: isDone ? 'rgba(99,102,241,0.7)' : isErr ? '#f87171' : 'var(--text-4)', marginTop: 2 }}>
+            {isQ && 'En attente…'}
+            {isProc && 'Traitement en cours…'}
+            {isDone && (job.meta ? `📱 ${job.meta.model} · 📍 ${job.meta.city}` : 'Spoofing terminé')}
+            {isErr && (job.error?.slice(0, 60) ?? 'Erreur')}
+          </div>
+        </div>
+
+        {/* Actions */}
+        {isDone && (
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button
+              onClick={download}
               className="sf-btn cursor-pointer"
-              style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 7, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+              style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 7, gap: 5 }}
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8"/></svg>
-              Banque
-            </a>
-          )}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Télécharger
+            </button>
+            {job.storagePath && (
+              <a
+                href="#"
+                onClick={e => { e.preventDefault(); window.location.hash = '#bank' }}
+                className="sf-btn cursor-pointer"
+                style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 7, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8"/></svg>
+                Banque
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Injected metadata — lets you verify / compare what changed per video */}
+      {isDone && job.meta && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '6px 14px',
+          padding: '10px 12px', borderRadius: 9, background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)',
+        }}>
+          {META_ROWS.map(({ label, key }) => (
+            <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 9, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+              <span style={{ fontSize: 11, color: 'var(--ivory)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={String(job.meta![key])}>
+                {String(job.meta![key])}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>

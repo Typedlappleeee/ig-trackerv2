@@ -16,39 +16,67 @@ const execFileAsync = promisify(execFile)
 
 // ── Spoofing presets / cities ──────────────────────────────────────────────────
 const PRESETS = {
-  iphone17pro:  { make: 'Apple', model: 'iPhone 17 Pro',  software: 'iOS 26.2', encoder: 'com.apple.quicktime' },
-  iphone16pro:  { make: 'Apple', model: 'iPhone 16 Pro',  software: 'iOS 17.5', encoder: 'com.apple.quicktime' },
-  iphone16:     { make: 'Apple', model: 'iPhone 16',       software: 'iOS 17.4', encoder: 'com.apple.quicktime' },
-  iphone15pro:  { make: 'Apple', model: 'iPhone 15 Pro',  software: 'iOS 17.0', encoder: 'com.apple.quicktime' },
-  iphone15:     { make: 'Apple', model: 'iPhone 15',       software: 'iOS 16.6', encoder: 'com.apple.quicktime' },
+  iphone17pro:  { make: 'Apple', model: 'iPhone 17 Pro',  software: 'iOS 26.2', encoder: 'com.apple.quicktime', lens: 'iPhone 17 Pro back triple camera 6.9mm f/1.78' },
+  iphone16pro:  { make: 'Apple', model: 'iPhone 16 Pro',  software: 'iOS 18.5', encoder: 'com.apple.quicktime', lens: 'iPhone 16 Pro back triple camera 6.765mm f/1.78' },
+  iphone16:     { make: 'Apple', model: 'iPhone 16',       software: 'iOS 18.4', encoder: 'com.apple.quicktime', lens: 'iPhone 16 back dual camera 5.96mm f/1.6' },
+  iphone15pro:  { make: 'Apple', model: 'iPhone 15 Pro',  software: 'iOS 17.5', encoder: 'com.apple.quicktime', lens: 'iPhone 15 Pro back triple camera 6.765mm f/1.78' },
+  iphone15:     { make: 'Apple', model: 'iPhone 15',       software: 'iOS 17.4', encoder: 'com.apple.quicktime', lens: 'iPhone 15 back dual camera 5.7mm f/1.6' },
 }
 
+// International locations across many countries. tz = UTC offset for authentic
+// com.apple.quicktime.creationdate. alt = base altitude (m) for the GPS fix.
 const GPS_CITIES = {
-  newyork:      { lat: '+40.7128', lon: '-074.0060', city: 'New York, NY' },
-  losangeles:   { lat: '+34.0522', lon: '-118.2437', city: 'Los Angeles, CA' },
-  chicago:      { lat: '+41.8781', lon: '-087.6298', city: 'Chicago, IL' },
-  miami:        { lat: '+25.7617', lon: '-080.1918', city: 'Miami, FL' },
-  houston:      { lat: '+29.7604', lon: '-095.3698', city: 'Houston, TX' },
-  phoenix:      { lat: '+33.4484', lon: '-112.0740', city: 'Phoenix, AZ' },
-  philadelphia: { lat: '+39.9526', lon: '-075.1652', city: 'Philadelphia, PA' },
-  sanantonio:   { lat: '+29.4241', lon: '-098.4936', city: 'San Antonio, TX' },
-  sandiego:     { lat: '+32.7157', lon: '-117.1611', city: 'San Diego, CA' },
-  dallas:       { lat: '+32.7767', lon: '-096.7970', city: 'Dallas, TX' },
-  boston:       { lat: '+42.3601', lon: '-071.0589', city: 'Boston, MA' },
-  seattle:      { lat: '+47.6062', lon: '-122.3321', city: 'Seattle, WA' },
-  denver:       { lat: '+39.7392', lon: '-104.9903', city: 'Denver, CO' },
-  nashville:    { lat: '+36.1627', lon: '-086.7816', city: 'Nashville, TN' },
-  atlanta:      { lat: '+33.7490', lon: '-084.3880', city: 'Atlanta, GA' },
-  portland:     { lat: '+45.5051', lon: '-122.6750', city: 'Portland, OR' },
-  lasvegas:     { lat: '+36.1699', lon: '-115.1398', city: 'Las Vegas, NV' },
-  austin:       { lat: '+30.2672', lon: '-097.7431', city: 'Austin, TX' },
-  minneapolis:  { lat: '+44.9778', lon: '-093.2650', city: 'Minneapolis, MN' },
-  sanfrancisco: { lat: '+37.7749', lon: '-122.4194', city: 'San Francisco, CA' },
+  // France
+  paris:        { lat: '+48.8566', lon: '+002.3522', city: 'Paris, France',        tz: '+0200', alt: 35 },
+  marseille:    { lat: '+43.2965', lon: '+005.3698', city: 'Marseille, France',    tz: '+0200', alt: 12 },
+  lyon:         { lat: '+45.7640', lon: '+004.8357', city: 'Lyon, France',         tz: '+0200', alt: 170 },
+  toulouse:     { lat: '+43.6047', lon: '+001.4442', city: 'Toulouse, France',     tz: '+0200', alt: 146 },
+  nice:         { lat: '+43.7102', lon: '+007.2620', city: 'Nice, France',         tz: '+0200', alt: 10 },
+  bordeaux:     { lat: '+44.8378', lon: '-000.5792', city: 'Bordeaux, France',     tz: '+0200', alt: 8 },
+  // UK / Ireland
+  london:       { lat: '+51.5074', lon: '-000.1278', city: 'London, UK',           tz: '+0100', alt: 11 },
+  manchester:   { lat: '+53.4808', lon: '-002.2426', city: 'Manchester, UK',       tz: '+0100', alt: 38 },
+  dublin:       { lat: '+53.3498', lon: '-006.2603', city: 'Dublin, Ireland',      tz: '+0100', alt: 20 },
+  // Spain / Portugal
+  madrid:       { lat: '+40.4168', lon: '-003.7038', city: 'Madrid, Spain',        tz: '+0200', alt: 667 },
+  barcelona:    { lat: '+41.3851', lon: '+002.1734', city: 'Barcelona, Spain',     tz: '+0200', alt: 12 },
+  lisbon:       { lat: '+38.7223', lon: '-009.1393', city: 'Lisbon, Portugal',     tz: '+0100', alt: 2 },
+  // Italy
+  rome:         { lat: '+41.9028', lon: '+012.4964', city: 'Rome, Italy',          tz: '+0200', alt: 21 },
+  milan:        { lat: '+45.4642', lon: '+009.1900', city: 'Milan, Italy',         tz: '+0200', alt: 120 },
+  // Germany / Benelux / Switzerland
+  berlin:       { lat: '+52.5200', lon: '+013.4050', city: 'Berlin, Germany',      tz: '+0200', alt: 34 },
+  munich:       { lat: '+48.1351', lon: '+011.5820', city: 'Munich, Germany',      tz: '+0200', alt: 520 },
+  amsterdam:    { lat: '+52.3676', lon: '+004.9041', city: 'Amsterdam, NL',        tz: '+0200', alt: 2 },
+  brussels:     { lat: '+50.8503', lon: '+004.3517', city: 'Brussels, Belgium',    tz: '+0200', alt: 28 },
+  zurich:       { lat: '+47.3769', lon: '+008.5417', city: 'Zurich, Switzerland',  tz: '+0200', alt: 408 },
+  geneva:       { lat: '+46.2044', lon: '+006.1432', city: 'Geneva, Switzerland',  tz: '+0200', alt: 375 },
+  // North America
+  newyork:      { lat: '+40.7128', lon: '-074.0060', city: 'New York, USA',        tz: '-0400', alt: 10 },
+  losangeles:   { lat: '+34.0522', lon: '-118.2437', city: 'Los Angeles, USA',     tz: '-0700', alt: 89 },
+  miami:        { lat: '+25.7617', lon: '-080.1918', city: 'Miami, USA',           tz: '-0400', alt: 2 },
+  toronto:      { lat: '+43.6532', lon: '-079.3832', city: 'Toronto, Canada',      tz: '-0400', alt: 76 },
+  montreal:     { lat: '+45.5017', lon: '-073.5673', city: 'Montreal, Canada',     tz: '-0400', alt: 36 },
+  mexico:       { lat: '+19.4326', lon: '-099.1332', city: 'Mexico City, Mexico',  tz: '-0600', alt: 2240 },
+  // Middle East / Asia / Oceania / South America
+  dubai:        { lat: '+25.2048', lon: '+055.2708', city: 'Dubai, UAE',           tz: '+0400', alt: 5 },
+  istanbul:     { lat: '+41.0082', lon: '+028.9784', city: 'Istanbul, Turkey',     tz: '+0300', alt: 39 },
+  tokyo:        { lat: '+35.6762', lon: '+139.6503', city: 'Tokyo, Japan',         tz: '+0900', alt: 40 },
+  singapore:    { lat: '+01.3521', lon: '+103.8198', city: 'Singapore',            tz: '+0800', alt: 15 },
+  sydney:       { lat: '-33.8688', lon: '+151.2093', city: 'Sydney, Australia',    tz: '+1000', alt: 58 },
+  saopaulo:     { lat: '-23.5505', lon: '-046.6333', city: 'Sao Paulo, Brazil',    tz: '-0300', alt: 760 },
 }
 
 function jitter(coord) {
   const offset = (Math.random() - 0.5) * 0.01
   return (parseFloat(coord) + offset).toFixed(6)
+}
+
+function randId(len) {
+  const hex = '0123456789ABCDEF'
+  let s = ''
+  for (let i = 0; i < len; i++) s += hex[Math.floor(Math.random() * 16)]
+  return s
 }
 
 function getSupabaseAdmin() {
@@ -105,21 +133,30 @@ async function handleSpoof(req, res) {
     }
 
     const meta = PRESETS[preset] ?? PRESETS.iphone17pro
-    const gps  = GPS_CITIES[gpsCity] ?? GPS_CITIES.newyork
+    const gps  = GPS_CITIES[gpsCity] ?? GPS_CITIES.paris
     const lat  = jitter(gps.lat)
     const lon  = jitter(gps.lon)
-    const locationStr = `${parseFloat(lat) >= 0 ? '+' : ''}${lat}${parseFloat(lon) >= 0 ? '+' : ''}${lon}/`
+    // GPS fix with random altitude → ISO 6709 (e.g. +48.8571+002.3490+035.123/)
+    const altVal = ((gps.alt ?? 10) + (Math.random() - 0.5) * 8).toFixed(3)
+    const altStr = `${parseFloat(altVal) >= 0 ? '+' : '-'}${Math.abs(parseFloat(altVal)).toFixed(3).padStart(7, '0')}`
+    const locationStr    = `${parseFloat(lat) >= 0 ? '+' : ''}${lat}${parseFloat(lon) >= 0 ? '+' : ''}${lon}/`
+    const locationAltStr = `${parseFloat(lat) >= 0 ? '+' : ''}${lat}${parseFloat(lon) >= 0 ? '+' : ''}${lon}${altStr}/`
     const dateBase = customDate ? customDate.replace(/\//g, ':').slice(0, 10).replace(/-/g, ':') : new Date().toISOString().slice(0, 10).replace(/-/g, ':')
     const dateDash = dateBase.replace(/:/g, '-')
     const hh = String(Math.floor(Math.random() * 14) + 7).padStart(2, '0')
     const mm = String(Math.floor(Math.random() * 60)).padStart(2, '0')
     const ss = String(Math.floor(Math.random() * 60)).padStart(2, '0')
     const ms = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
-    // creation_time: ISO 8601 UTC (Z). quicktime.creationdate: local time + US offset.
+    // creation_time: ISO 8601 UTC (Z). quicktime.creationdate: local time + city tz offset.
     const creationTime  = `${dateDash}T${hh}:${mm}:${ss}.${ms}Z`
-    const usOffsets     = ['-0500', '-0600', '-0700', '-0800', '-0400']
-    const tzOffset      = usOffsets[Math.floor(Math.random() * usOffsets.length)]
+    const tzOffset      = gps.tz ?? '+0000'
     const creationLocal = `${dateDash}T${hh}:${mm}:${ss}${tzOffset}`
+    // Per-export random identifiers (every file gets unique camera/track metadata).
+    const cameraId   = `${randId(8)}-${randId(4)}-${randId(4)}-${randId(4)}-${randId(12)}`
+    const focalLen   = (meta.lens.match(/([\d.]+)mm/) || [])[1] || '6.9'
+    const apertureF  = (meta.lens.match(/f\/([\d.]+)/) || [])[1] || '1.78'
+    const iso        = [32, 40, 50, 64, 80, 100, 125, 160, 200, 250][Math.floor(Math.random() * 10)]
+    const exposureMs = ['1/30', '1/40', '1/60', '1/80', '1/120', '1/250', '1/500'][Math.floor(Math.random() * 7)]
 
     const {
       brightness = 0, saturation = 0, contrast = 0,
@@ -136,13 +173,17 @@ async function handleSpoof(req, res) {
       '-metadata', `model=${meta.model}`,
       '-metadata', `software=${meta.software}`,
       '-metadata', `encoder=${meta.encoder}`,
-      '-metadata', `location=${locationStr}`,
-      '-metadata', `location-eng=${locationStr}`,
-      '-metadata', `com.apple.quicktime.location.ISO6709=${locationStr}`,
+      '-metadata', `location=${locationAltStr}`,
+      '-metadata', `location-eng=${locationAltStr}`,
+      '-metadata', `com.apple.quicktime.location.ISO6709=${locationAltStr}`,
+      '-metadata', `com.apple.quicktime.location.accuracy.horizontal=${(Math.random() * 8 + 2).toFixed(6)}`,
       '-metadata', `com.apple.quicktime.make=${meta.make}`,
       '-metadata', `com.apple.quicktime.model=${meta.model}`,
       '-metadata', `com.apple.quicktime.software=${meta.software}`,
       '-metadata', `com.apple.quicktime.creationdate=${creationLocal}`,
+      '-metadata', `com.apple.quicktime.camera.identifier=${cameraId}`,
+      '-metadata', `com.apple.quicktime.camera.lens_model=${meta.lens}`,
+      '-metadata', `com.apple.quicktime.camera.focal_length.35mm_equivalent=${focalLen}`,
       '-metadata', `creation_time=${creationTime}`,
       '-metadata', `date=${dateDash}`,
       '-metadata', `comment=${gps.city}`,
@@ -196,7 +237,25 @@ async function handleSpoof(req, res) {
     if (upErr) throw new Error(upErr.message)
 
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
-    res.json({ ok: true, url: publicUrl, storagePath: resultPath })
+
+    // Return the exact metadata written so the UI can display / compare it.
+    const appliedMeta = {
+      make:         meta.make,
+      model:        meta.model,
+      software:     meta.software,
+      city:         gps.city,
+      gps:          `${lat}, ${lon}`,
+      altitude:     `${altVal} m`,
+      creationDate: creationLocal,
+      timezone:     tzOffset,
+      cameraId,
+      lens:         meta.lens,
+      iso,
+      exposure:     exposureMs,
+      aperture:     `f/${apertureF}`,
+      focal:        `${focalLen}mm`,
+    }
+    res.json({ ok: true, url: publicUrl, storagePath: resultPath, appliedMeta })
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err) })
   } finally {
