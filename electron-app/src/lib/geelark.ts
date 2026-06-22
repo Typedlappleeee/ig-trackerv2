@@ -836,9 +836,12 @@ export async function postInstagramStory(
     } catch { /* ignore */ }
     return 'jpg'
   })()
-  // Always save as PNG on phone (lossless, no transparency issues, Instagram supports it)
-  const imgPath = '/sdcard/DCIM/Camera/sf_story.png'
-  let imgOnPhone = false
+  // The file extension on the phone MUST match the actual bytes we push.
+  // We convert to PNG (preferred) via canvas below; if that fails we fall back
+  // to the original bytes and keep their real extension. A png-named file that
+  // actually contains jpg bytes (or vice-versa) makes Android's media scanner
+  // mis-classify it → Instagram's gallery can't open it → "image n'upload pas".
+  let outExt = 'png'
 
   // Download the image server-side (via /api/proxy) to avoid CORS, then compress
   // client-side and push as base64 chunks via shell. Target: < 200 KB JPEG so the
@@ -933,8 +936,12 @@ export async function postInstagramStory(
     }
   }
 
+  // If PNG conversion succeeded, push PNG. Otherwise push the original bytes
+  // under their real extension so file content matches the file name.
   const pushData = compressed ?? imgBase64
-  log(`   📤 Push: ${Math.round(pushData.length / 1024)} KB`)
+  if (!compressed) outExt = _imgExt
+  const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
+  log(`   📤 Push: ${Math.round(pushData.length / 1024)} KB (.${outExt})`)
 
   // Push via base64 chunks (base64 chars A-Za-z0-9+/= are safe inside single quotes)
   const CHUNK = 3000, BATCH = 20
@@ -1138,18 +1145,31 @@ export async function postInstagramStory(
   await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkUrl)}"`)
   await sleep(1200)
 
-  // Optional custom sticker text
+  // Optional custom sticker text — replaces the default "LINK"/"LIEN" label.
   if (config.linkText?.trim()) {
+    log('   ✏️  Texte du sticker…')
+    await sleep(600)
     xml = await dumpXml(bearer, phoneId)
     const customPt =
-      findByText(xml, 'Customize sticker text', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
-      findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit')
+      findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
+      findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
+      findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
     if (customPt) {
+      log(`   ✓ Champ texte trouvé: ${customPt[0]},${customPt[1]}`)
       await shellExec(bearer, phoneId, `input tap ${customPt[0]} ${customPt[1]}`)
       await sleep(900)
-      await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
-      await sleep(1000)
+    } else {
+      // Fallback: the "Customize sticker text" field sits just below the URL
+      // input. Tap a bit under the URL field, then select-all + clear before typing.
+      log('   ↩︎ Champ « personnaliser le texte » non détecté — tap sous l\'URL')
+      await shellExec(bearer, phoneId, `input tap ${urlField[0]} ${urlField[1] + Math.floor(sh * 0.07)}`)
+      await sleep(900)
     }
+    // Clear any existing placeholder then type the custom label.
+    await shellExec(bearer, phoneId, 'input keyevent --longpress KEYCODE_DEL')
+    await sleep(300)
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
+    await sleep(1000)
   }
 
   // Confirm the link (Done / Terminé / checkmark in top-right)

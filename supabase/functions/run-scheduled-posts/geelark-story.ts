@@ -288,11 +288,21 @@ export async function postStoryServer(
 
   // ── 1. Push image to phone gallery ────────────────────────────────────────
   log('🖼 Chargement de l\'image…')
-  // Always save as jpg on phone (Instagram accepts JPEG; avoids PNG classification issues)
-  const imgPath = '/sdcard/DCIM/Camera/sf_story.png'
+  // The file extension MUST match the actual bytes. We re-encode to PNG below;
+  // if that fails we push the raw bytes under their original extension so the
+  // file content matches its name (else Android mis-classifies it → IG can't
+  // open it from the gallery).
+  const origExt = (() => {
+    try {
+      const p = new URL(config.imageUrl).pathname
+      const m = /\.(png|gif|webp|bmp|heic|heif|jpe?g)$/i.exec(p)
+      if (m) return m[1].toLowerCase().replace('jpeg', 'jpg')
+    } catch { /* ignore */ }
+    return 'jpg'
+  })()
 
   // Download the image directly (no CORS in Deno), then resize/compress with
-  // ImageScript. Target: small JPEG so the base64 push is fast.
+  // ImageScript. Target: small PNG so the base64 push is fast.
   let originalBytes: Uint8Array
   try {
     const resp = await fetch(config.imageUrl)
@@ -305,8 +315,9 @@ export async function postStoryServer(
   }
   log(`   📥 Image: ${Math.round(originalBytes.length / 1024)} KB`)
 
-  // Resize so longest side <= 1280 (enough for stories), keep aspect, encode JPEG q70.
+  // Resize so longest side <= 1280 (enough for stories), keep aspect, encode PNG.
   let pushData: string // base64
+  let outExt = 'png'
   try {
     const img = await decode(originalBytes)
     const MAX = 1280
@@ -320,11 +331,13 @@ export async function postStoryServer(
     pushData = base64Encode(png)
     log(`   🗜️ ImageScript: ${Math.round(originalBytes.length / 1024)} KB → ${Math.round((pushData.length * 3) / 4 / 1024)} KB (PNG)`)
   } catch (e) {
-    // Fallback: push the raw downloaded bytes without resize
-    log(`   ⚠️ ImageScript: ${e instanceof Error ? e.message : String(e)} — push brut sans redimensionnement`)
+    // Fallback: push the raw downloaded bytes, keep their real extension.
+    log(`   ⚠️ ImageScript: ${e instanceof Error ? e.message : String(e)} — push brut (.${origExt})`)
     pushData = base64Encode(originalBytes)
+    outExt = origExt
   }
-  log(`   📤 Push: ${Math.round(pushData.length / 1024)} KB`)
+  const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
+  log(`   📤 Push: ${Math.round(pushData.length / 1024)} KB (.${outExt})`)
 
   // Push via base64 chunks (base64 chars A-Za-z0-9+/= are safe inside single quotes)
   const CHUNK = 3000, BATCH = 20
@@ -528,18 +541,28 @@ export async function postStoryServer(
   await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkUrl)}"`)
   await sleep(1200)
 
-  // Optional custom sticker text
+  // Optional custom sticker text — replaces the default "LINK"/"LIEN" label.
   if (config.linkText?.trim()) {
+    log('   ✏️  Texte du sticker…')
+    await sleep(600)
     xml = await dumpXml(bearer, phoneId)
     const customPt =
-      findByText(xml, 'Customize sticker text', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
-      findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit')
+      findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
+      findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
+      findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
     if (customPt) {
+      log(`   ✓ Champ texte trouvé: ${customPt[0]},${customPt[1]}`)
       await shellExec(bearer, phoneId, `input tap ${customPt[0]} ${customPt[1]}`)
       await sleep(900)
-      await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
-      await sleep(1000)
+    } else {
+      log('   ↩︎ Champ « personnaliser le texte » non détecté — tap sous l\'URL')
+      await shellExec(bearer, phoneId, `input tap ${urlField[0]} ${urlField[1] + Math.floor(sh * 0.07)}`)
+      await sleep(900)
     }
+    await shellExec(bearer, phoneId, 'input keyevent --longpress KEYCODE_DEL')
+    await sleep(300)
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
+    await sleep(1000)
   }
 
   // Confirm the link (Done / Terminé / checkmark in top-right)
