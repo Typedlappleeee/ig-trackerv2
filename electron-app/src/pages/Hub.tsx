@@ -200,7 +200,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const [videoCount, setVideoCount]   = useState(0)
   const [weekPosts,  setWeekPosts]    = useState(0)
   const [upcoming,   setUpcoming]     = useState<ScheduledPost[]>([])
-  const [recent,     setRecent]       = useState<ScheduledPost[]>([])
+  const [recent,     setRecent]       = useState<Array<{ kind: 'scheduled'; data: ScheduledPost } | { kind: 'run'; data: { id: string; type: string; ok_count: number; err_count: number; total: number; created_at: string } }>>([])
+
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -211,7 +212,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     const bankQ = currentOrg
       ? supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
       : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
-    const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes] = await Promise.all([
+    const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes, directRunsRes] = await Promise.all([
       phonesQ,
       bankQ,
       supabase.from('scheduled_posts')
@@ -231,7 +232,11 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
         .select('*')
         .in('status', ['done', 'failed'])
         .order('executed_at', { ascending: false })
-        .limit(5),
+        .limit(8),
+      // Recent direct runs (for activity feed)
+      currentOrg
+        ? supabase.from('post_runs').select('*').eq('org_id', currentOrg.id).order('created_at', { ascending: false }).limit(8)
+        : supabase.from('post_runs').select('*').eq('user_id', user.id).is('org_id', null).order('created_at', { ascending: false }).limit(8),
     ])
     setPhoneCount(phonesRes.count ?? 0)
     setVideoCount(videosRes.count ?? 0)
@@ -239,7 +244,12 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
       .reduce((sum, r) => sum + (r.ok_count ?? 0), 0)
     setWeekPosts((weekRes.count ?? 0) + runPosts)
     setUpcoming((upcomingRes.data ?? []) as ScheduledPost[])
-    setRecent((recentRes.data ?? []) as ScheduledPost[])
+
+    // Merge scheduled posts + direct runs, sort by date, keep 5 most recent
+    const recentScheduled = ((recentRes.data ?? []) as ScheduledPost[]).map(d => ({ kind: 'scheduled' as const, data: d, _date: d.executed_at ?? d.created_at ?? '' }))
+    const recentRuns      = ((directRunsRes?.data ?? []) as Array<{ id: string; type: string; ok_count: number; err_count: number; total: number; created_at: string }>).map(d => ({ kind: 'run' as const, data: d, _date: d.created_at }))
+    const merged = [...recentScheduled, ...recentRuns].sort((a, b) => b._date.localeCompare(a._date)).slice(0, 5)
+    setRecent(merged.map(({ kind, data }) => ({ kind, data } as typeof merged[number])))
     setLoading(false)
   }, [currentOrg?.id, user.id])
 
@@ -429,7 +439,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             background: BG2, border: `1px solid ${HAIR}`, borderRadius: 10, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.35s both',
           }}>
-            <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('scheduler') }} />
+            <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('history') }} />
             {loading ? (
               <div style={{ padding: '24px 22px', color: FAINT, fontSize: 12, fontFamily: SANS }}>{t('hubLoading')}</div>
             ) : recent.length === 0 ? (
@@ -437,11 +447,21 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                 <p style={{ color: FAINT, fontSize: 12.5, margin: 0, fontFamily: SANS }}>{t('hubNoActivity')}</p>
               </div>
             ) : (
-              recent.map((post, i) => {
-                const phones = Array.isArray(post.phones) ? post.phones : []
-                const ok = post.status === 'done'
+              recent.map((item, i) => {
+                const ok = item.kind === 'scheduled' ? item.data.status === 'done' : item.data.err_count === 0
+                const label = item.kind === 'scheduled'
+                  ? (() => {
+                      const phones = Array.isArray(item.data.phones) ? item.data.phones : []
+                      return `${phones.length} ${t('hubAccounts')}${item.data.caption ? ` · ${item.data.caption.slice(0, 34)}${item.data.caption.length > 34 ? '…' : ''}` : ''}`
+                    })()
+                  : `${item.data.ok_count}/${item.data.total} compte${item.data.total > 1 ? 's' : ''} · Direct`
+                const date = item.kind === 'scheduled'
+                  ? fmtScheduledTime(item.data.executed_at ?? item.data.created_at)
+                  : fmtScheduledTime(item.data.created_at)
+                const status = item.kind === 'scheduled' ? item.data.status : (ok ? 'done' : 'failed')
+                const key = item.kind === 'scheduled' ? `sp-${item.data.id}` : `pr-${item.data.id}`
                 return (
-                  <div key={post.id} style={{
+                  <div key={key} style={{
                     padding: '12px 22px',
                     borderBottom: i < recent.length - 1 ? `1px solid ${HAIR}` : 'none',
                     display: 'flex', alignItems: 'center', gap: 12,
@@ -459,15 +479,10 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                         margin: '0 0 2px', fontSize: 13, fontWeight: 600, color: IVORY,
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         fontFamily: SANS,
-                      }}>
-                        {phones.length} {t('hubAccounts')}
-                        {post.caption ? ` · ${post.caption.slice(0, 38)}${post.caption.length > 38 ? '…' : ''}` : ''}
-                      </p>
-                      <p style={{ margin: 0, fontSize: 11.5, color: FAINT, fontFamily: SANS }}>
-                        {fmtScheduledTime(post.executed_at ?? post.created_at)}
-                      </p>
+                      }}>{label}</p>
+                      <p style={{ margin: 0, fontSize: 11.5, color: FAINT, fontFamily: SANS }}>{date}</p>
                     </div>
-                    <StatusBadge status={post.status} />
+                    <StatusBadge status={status} />
                   </div>
                 )
               })

@@ -566,6 +566,7 @@ const VideoRepurpose = lazy(() => import('@/pages/VideoRepurpose').then(m => ({ 
 const Mixer          = lazy(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
 const Licences       = lazy(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
 const Support        = lazy(() => import('@/pages/Support').then(m => ({ default: m.Support })))
+const History        = lazy(() => import('@/pages/History').then(m => ({ default: m.History })))
 const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazy(() => import('@/pages/StoryLink'))
@@ -847,6 +848,7 @@ function AppContent({ user }: { user: User }) {
       case 'scaleia':      return <ScaleIA />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
+      case 'history':      return <History     user={user} />
 
     }
   })()

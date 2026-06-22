@@ -112,12 +112,18 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
     setKeyLoading(true)
     setKeyErr(null)
     const res = await activateKey(key, userId)
-    setKeyLoading(false)
     if (res.success) {
+      // If the user already has an org (e.g. renewing an expired key), skip the create_org step
+      if (myOrgs.length > 0) {
+        setKeyLoading(false)
+        onActivated()
+        return
+      }
       setStep('create_org')
     } else {
       setKeyErr(res.error ?? 'Erreur inconnue')
     }
+    setKeyLoading(false)
   }
 
   // Org invite

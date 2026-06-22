@@ -60,6 +60,7 @@ export type Page =
   | 'community' | 'support'
   | 'settings' | 'licences'
   | 'scaleia'
+  | 'history'
 
 interface LayoutProps {
   user:      User
@@ -167,6 +168,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   licences:    'shield',
   community:   'chat',
   support:     'chat',
+  history:     'refresh',
 }
 
 // Sidebar divider — hairline
