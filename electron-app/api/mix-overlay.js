@@ -39,23 +39,24 @@ function escapeXml(s) {
     .replace(/'/g, '&apos;')
 }
 
-// Wrap text so no line exceeds maxPx pixels wide (estimated at ~0.55× fontSize per char for bold Arial)
-function wrapText(text, fontSize, maxPx) {
-  const charW = fontSize * 0.55
-  const maxChars = Math.max(8, Math.floor(maxPx / charW))
-  const words = text.split(' ')
+// Wrap text into lines ≤ maxChars. Respects existing newlines.
+function wrapText(text, maxChars) {
   const lines = []
-  let current = ''
-  for (const word of words) {
-    if (current.length + word.length + 1 > maxChars && current) {
-      lines.push(current)
-      current = word
-    } else {
-      current = current ? `${current} ${word}` : word
+  for (const segment of String(text).split(/\r?\n/)) {
+    const words = segment.split(' ')
+    let current = ''
+    for (const word of words) {
+      if (!word) continue
+      if (current.length + word.length + (current ? 1 : 0) > maxChars && current) {
+        lines.push(current)
+        current = word
+      } else {
+        current = current ? `${current} ${word}` : word
+      }
     }
+    if (current) lines.push(current)
   }
-  if (current) lines.push(current)
-  return lines
+  return lines.length ? lines : ['']
 }
 
 // Build a tight text overlay PNG via SVG → sharp
@@ -139,9 +140,9 @@ module.exports = async (req, res) => {
     }
 
     // ── Build text overlay PNG ───────────────────────────────────────────────
-    // Target ~85% of typical 9:16 video width (720px) so text wraps naturally
-    const TARGET_TEXT_W = 620
-    const lines = wrapText(String(caption), fontSize, TARGET_TEXT_W)
+    // 90% of 1080px width / ~0.58× fontSize per char (bold sans-serif estimate)
+    const maxChars = Math.max(10, Math.floor(1080 * 0.9 / (fontSize * 0.58)))
+    const lines = wrapText(String(caption), maxChars)
     const fontPath = (() => {
       const p = path.join(__dirname, 'fonts', 'font-bold.ttf')
       return fs.existsSync(p) ? p.replace(/\\/g, '/') : null
