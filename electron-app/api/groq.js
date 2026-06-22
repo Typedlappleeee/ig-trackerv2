@@ -26,8 +26,14 @@ export default async function handler(req, res) {
       }
 
       const boundary = `----GBoundary${Date.now()}`
-      const ext  = filename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
-      const mime = ext === 'mp3' ? 'audio/mpeg' : ext === 'webm' ? 'audio/webm' : 'video/mp4'
+      // Strip query-string/fragment; ensure the filename has a Groq-recognised extension
+      const GROQ_EXTS = new Set(['flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'opus', 'wav', 'webm'])
+      const cleanFilename = (filename || 'video.mp4').split('?')[0].split('#')[0]
+      const extMatch = cleanFilename.match(/\.([a-z0-9]+)$/i)
+      const ext = extMatch?.[1]?.toLowerCase()
+      const finalFilename = (ext && GROQ_EXTS.has(ext)) ? cleanFilename : `${cleanFilename}.mp4`
+      const resolvedExt  = (ext && GROQ_EXTS.has(ext)) ? ext : 'mp4'
+      const mime = resolvedExt === 'mp3' ? 'audio/mpeg' : resolvedExt === 'webm' ? 'audio/webm' : 'video/mp4'
 
       const parts = []
       function addField(name, value) {
@@ -40,7 +46,7 @@ export default async function handler(req, res) {
       addField('timestamp_granularities[]', 'word')
       if (language) addField('language', language)
       parts.push(Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`,
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${finalFilename}"\r\nContent-Type: ${mime}\r\n\r\n`,
       ))
       parts.push(buffer)
       parts.push(Buffer.from(`\r\n--${boundary}--\r\n`))

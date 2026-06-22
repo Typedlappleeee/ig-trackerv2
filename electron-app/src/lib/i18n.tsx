@@ -33,6 +33,8 @@ export const EN = {
   navCommunity: 'Community',
   navHub: 'Hub',
   navPhones: 'Phones',
+  navAccountCreator: 'Account Creator',
+  navTikTokPosting: 'TikTok Posting',
   navMonitor: 'Monitor Live',
   // ── Hub page ──
   hubGreetingMorning: 'Good morning,',
@@ -95,6 +97,7 @@ export const EN = {
   navAiTools: 'AI Tools',
   navRemix: 'Remix Video',
   navRepurpose: 'CloneVid',
+  navSpoof: 'Spoofing',
   navTextCopy: 'AI Text',
   navCaptionBank: 'Caption Bank',
   navMixer: 'Mixer',
@@ -136,6 +139,7 @@ export const EN = {
   sectionPrincipal: 'Main',
   sectionInstagram: 'Instagram',
   sectionCreation: 'Creation',
+  sectionTikTok: 'TikTok',
 
   // Page titles (topbar)
   pagePhones: 'Phones',
@@ -781,6 +785,8 @@ export const EN = {
   bankListView: 'List',
   bankFolders: 'Folders',
   bankNewFolderTitle: 'New folder',
+  bankDrive: 'Google Drive',
+  bankDriveTitle: 'Connect Google Drive folders',
   bankFolderNamePlaceholder: 'Folder name…',
   bankAllItems: 'All',
   bankSelectAllLabel: 'All',
@@ -1572,6 +1578,8 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   navCommunity: 'Communauté',
   navHub: 'Accueil',
   navPhones: 'Téléphones',
+  navAccountCreator: 'Créer des comptes',
+  navTikTokPosting: 'TikTok Posting',
   navMonitor: 'Monitor Live',
   // ── Hub page ──
   hubGreetingMorning: 'Bonjour,',
@@ -1634,6 +1642,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   navAiTools: 'Outils IA',
   navRemix: 'Remix vidéo',
   navRepurpose: 'CloneVid',
+  navSpoof: 'Spoofing',
   navTextCopy: 'Texte IA',
   navCaptionBank: 'Banque captions',
   navMixer: 'Mélangeur',
@@ -1674,6 +1683,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   sectionPrincipal: 'Principal',
   sectionInstagram: 'Instagram',
   sectionCreation: 'Création',
+  sectionTikTok: 'TikTok',
 
   pagePhones: 'Téléphones',
   pageMonitor: 'Monitor Live',
@@ -2202,6 +2212,8 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   bankListView: 'Liste',
   bankFolders: 'Dossiers',
   bankNewFolderTitle: 'Nouveau dossier',
+  bankDrive: 'Google Drive',
+  bankDriveTitle: 'Connecter des dossiers Google Drive',
   bankFolderNamePlaceholder: 'Nom du dossier…',
   bankAllItems: 'Tout',
   bankSelectAllLabel: 'Tout',

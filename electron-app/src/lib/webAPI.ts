@@ -60,6 +60,48 @@ function wasmQueue<T>(fn: () => Promise<T>): Promise<T> {
   )
 }
 
+// ── GéeLark phone lifecycle safety net (web) ─────────────────────────────────
+// On web there is no app-quit hook: if the user closes the tab mid-posting the
+// JS just dies and the cloud phones keep running (and billing). We track every
+// /phone/start and /phone/stop that flows through geelarkRequest, and on tab
+// close we fire a sendBeacon to stop any phone still marked as running.
+const _runningPhones = new Set<string>()
+let _geelarkBearer = ''
+let _unloadGuardInstalled = false
+
+function _ensureUnloadGuard() {
+  if (_unloadGuardInstalled || typeof window === 'undefined') return
+  _unloadGuardInstalled = true
+  const stopOnUnload = () => {
+    if (_runningPhones.size === 0 || !_geelarkBearer) return
+    const payload = JSON.stringify({
+      method: 'POST',
+      url: 'https://openapi.geelark.com/open/v1/phone/stop',
+      headers: { Authorization: `Bearer ${_geelarkBearer}` },
+      body: { ids: [..._runningPhones] },
+    })
+    try {
+      navigator.sendBeacon('/api/gx', new Blob([payload], { type: 'application/json' }))
+    } catch { /* best-effort */ }
+  }
+  // pagehide is the reliable one (fires on tab close + bfcache); keep beforeunload too
+  window.addEventListener('pagehide', stopOnUnload)
+  window.addEventListener('beforeunload', stopOnUnload)
+}
+
+function _trackPhoneCall(url: string, headers: Record<string, string> | undefined, body: unknown) {
+  try {
+    const isStart = url.includes('/phone/start')
+    const isStop  = url.includes('/phone/stop')
+    if (!isStart && !isStop) return
+    const bearer = (headers?.Authorization ?? headers?.authorization ?? '').replace(/^Bearer\s+/i, '')
+    if (bearer) _geelarkBearer = bearer
+    const ids: string[] = ((body as { ids?: string[] })?.ids) ?? []
+    if (isStart) { ids.forEach(id => _runningPhones.add(id)); _ensureUnloadGuard() }
+    else         { ids.forEach(id => _runningPhones.delete(id)) }
+  } catch { /* ignore */ }
+}
+
 // ── Build the web electronAPI object ────────────────────────────────────────
 export function buildWebAPI() {
   console.log('[webAPI] v4f213a5 — upload via SDK Supabase, pas de proxy serveur')
@@ -70,6 +112,7 @@ export function buildWebAPI() {
       method: string; url: string; headers?: Record<string, string>
       body?: unknown; isText?: boolean
     }) {
+      _trackPhoneCall(opts.url, opts.headers, opts.body)
       let r: Response
       try {
         r = await fetch('/api/gx', {
@@ -363,6 +406,33 @@ export function buildWebAPI() {
       })
     },
 
+    // ── Mixer — burn caption text onto video (web: Vercel /api/mix-overlay) ──────
+    async runFfmpegMixOverlay(opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom'; fontSize: number; fontColor: string }) {
+      try {
+        // Pass user's auth token so the server can upload to Supabase as the user
+        const { data: { session } } = await (await import('@/lib/supabase')).supabase.auth.getSession()
+        const r = await fetch('/api/mix-overlay', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            videoUrl:         opts.sourcePath,
+            caption:          opts.caption,
+            position:         opts.position,
+            fontSize:         opts.fontSize,
+            fontColor:        opts.fontColor,
+            userId:           session?.user?.id,
+            supabaseToken:    session?.access_token,
+            supabaseAnonKey:  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY,
+          }),
+        })
+        const data = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }))
+        if (!data.ok) return { ok: false as const, error: data.error ?? 'Erreur serveur mix-overlay' }
+        return { ok: true as const, outputPath: (data.url ?? data.storagePath) as string, storagePath: data.storagePath as string | undefined }
+      } catch (err) {
+        return { ok: false as const, error: String(err) }
+      }
+    },
+
     // ── Groq Whisper audio transcription (server-side proxy — avoids CORS) ──────
     async groqTranscription(opts: {
       apiKey: string
@@ -375,9 +445,11 @@ export function buildWebAPI() {
         let body: Record<string, unknown>
         if (opts.videoUrl) {
           // URL path: server fetches video directly — no bytes sent from client
+          console.log('[webAPI] groqTranscription → videoUrl path:', opts.videoUrl.slice(0, 100))
           body = { apiKey: opts.apiKey, videoUrl: opts.videoUrl, filename: opts.filename, language: opts.language }
         } else if (opts.audioBytes) {
           // Local file: encode as base64 (limited to ~18MB raw / ~25MB base64)
+          console.log('[webAPI] groqTranscription → audioBytes path:', (opts.audioBytes.byteLength / 1024 / 1024).toFixed(1), 'MB')
           const u8 = new Uint8Array(opts.audioBytes)
           let bin = ''
           for (let i = 0; i < u8.length; i += 8192)
@@ -387,11 +459,19 @@ export function buildWebAPI() {
           return { ok: false, error: 'Aucune source audio' }
         }
 
+        const bodyStr = JSON.stringify(body)
+        console.log('[webAPI] groqTranscription → POST /api/groq, body size:', (bodyStr.length / 1024).toFixed(1), 'KB')
         const r = await fetch('/api/groq', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(body),
+          body:    bodyStr,
         })
+        console.log('[webAPI] groqTranscription → réponse HTTP', r.status, r.ok ? 'OK' : 'ERROR')
+        if (!r.ok) {
+          const txt = await r.text().catch(() => '')
+          console.error('[webAPI] groqTranscription → corps réponse erreur:', txt.slice(0, 500))
+          return { ok: false, error: `Proxy HTTP ${r.status}` }
+        }
         try { return await r.json() } catch { return { ok: false, error: `Proxy HTTP ${r.status}` } }
       } catch (err) {
         return { ok: false, error: String(err) }

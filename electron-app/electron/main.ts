@@ -47,6 +47,13 @@ let win: BrowserWindow | null = null
 let tray: Tray | null = null
 let isMassPostingRunning = false
 
+// ── GeeLark phone lifecycle tracking ─────────────────────────────────────────
+// Every /phone/start call is intercepted in the geelark-request IPC handler below
+// and the phone IDs are registered here. On app quit we stop any that are still
+// running so the user is never charged for idle cloud phones.
+let geelarkBearer = ''
+const geelarkRunningPhones = new Set<string>()
+
 // Resolve tray icon path — falls back gracefully if logo not found
 function getTrayIcon() {
   const logoPath = app.isPackaged
@@ -71,7 +78,7 @@ function ensureTray() {
     { type: 'separator' },
     {
       label: 'Arrêter et quitter',
-      click: () => { isMassPostingRunning = false; app.quit() },
+      click: () => { isMassPostingRunning = false; geelarkQuitInProgress = false; app.quit() },
     },
   ]))
   tray.on('double-click', () => { win?.show(); win?.focus() })
@@ -579,6 +586,19 @@ ipcMain.handle('geelark-request', async (_event, opts: {
         data = null
       }
     }
+    // ── Phone lifecycle tracking (stop phones on quit) ──────────────────────
+    if (opts.url.includes('/phone/start') || opts.url.includes('/phone/stop')) {
+      const bearer = (opts.headers?.Authorization ?? opts.headers?.authorization ?? '')
+        .replace(/^Bearer\s+/i, '')
+      const ids: string[] = (opts.body as { ids?: string[] })?.ids ?? []
+      if (bearer) geelarkBearer = bearer
+      if (opts.url.includes('/phone/start')) {
+        for (const id of ids) geelarkRunningPhones.add(id)
+      } else {
+        for (const id of ids) geelarkRunningPhones.delete(id)
+      }
+    }
+
     return { ok: true, status: response.status, data }
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -835,7 +855,7 @@ ipcMain.handle('run-ffmpeg-repurpose', async (_event, opts: {
   const results: Array<{ ok: boolean; outputPath?: string; error?: string }> = []
   for (let i = 0; i < opts.variants.length; i++) {
     const v   = opts.variants[i]
-    const out = path.join(dir, `clonevid-${Date.now()}-${i}.mp4`)
+    const out = path.join(dir, `clonevid-${Date.now()}-${i}.mov`)
     const randomMs = Date.now() - Math.floor(Math.random() * 30 * 24 * 3600 * 1000)
     const creationTime = new Date(randomMs).toISOString()
     const args = [
@@ -879,7 +899,7 @@ ipcMain.handle('save-file-as', async (_event, opts: { sourcePath: string; defaul
     const res = await dialog.showSaveDialog(win!, {
       title: 'Enregistrer la vidéo',
       defaultPath: opts.defaultName,
-      filters: [{ name: 'Vidéo MP4', extensions: ['mp4'] }],
+      filters: [{ name: 'Vidéo MOV', extensions: ['mov'] }],
     })
     if (res.canceled || !res.filePath) return { ok: false, canceled: true }
     copyFileSync(src, res.filePath)
@@ -938,26 +958,67 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
              .replace(/\[/g, '\\[').replace(/\]/g, '\\]').replace(/%/g, '%%')
   }
 
-  // y position: bottom-anchored (text_h from bottom) or centred, or near top
-  const yExpr = opts.position === 'bottom'
-    ? '(h-text_h-60)'   // ~60px above the very bottom — matches the POV style
-    : opts.position === 'top'
-      ? '60'
-      : '(h/2-text_h/2)'
+  // Word-wrap the caption into lines ≤ maxChars.
+  // Respects existing newlines in the caption.
+  function wrapCaption(text: string, maxChars: number): string[] {
+    const lines: string[] = []
+    for (const segment of text.split(/\r?\n/)) {
+      const words = segment.split(' ')
+      let current = ''
+      for (const word of words) {
+        if (!word) continue
+        if (current.length + word.length + (current ? 1 : 0) > maxChars && current) {
+          lines.push(current)
+          current = word
+        } else {
+          current = current ? `${current} ${word}` : word
+        }
+      }
+      if (current) lines.push(current)
+    }
+    return lines.length ? lines : ['']
+  }
 
-  const borderPx = Math.max(3, Math.round(opts.fontSize * 0.08))
-  const dtParts = [`text='${escText(opts.caption)}'`]
-  if (fontFile) dtParts.push(`fontfile='${fontFile}'`)
-  dtParts.push(
-    `x=(w-text_w)/2`,              // horizontally centred
-    `y=${yExpr}`,
-    `fontsize=${opts.fontSize}`,
-    `fontcolor=${opts.fontColor}`,
-    `borderw=${borderPx}`, `bordercolor=black@1.0`,
-    `shadowx=3:shadowy=3:shadowcolor=black@0.7`,
-  )
-  const drawtext = `drawtext=${dtParts.join(':')}`
-  const vf = `scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black,setsar=1,${drawtext}`
+  // After scale+pad the output is always 1080×1920.
+  const VW = 1080, VH = 1920
+  const fs   = opts.fontSize
+  // Average char width for bold sans-serif at this size (rough but consistent).
+  const charW  = fs * 0.58
+  // Leave 5% margin on each side → usable width = 90% of VW
+  const maxChars = Math.max(10, Math.floor(VW * 0.9 / charW))
+  const lines  = wrapCaption(opts.caption, maxChars)
+  const lineH  = Math.round(fs * 1.5)   // generous line height
+  const totalH = lines.length * lineH
+
+  const startY = opts.position === 'bottom'
+    ? VH - totalH - 80
+    : opts.position === 'top'
+      ? 80
+      : Math.round((VH - totalH) / 2)
+
+  const borderPx = Math.max(3, Math.round(fs * 0.07))
+
+  const dtFilters = lines.map((line, i) => {
+    const y = startY + i * lineH
+    const dtParts = [`text='${escText(line)}'`]
+    if (fontFile) dtParts.push(`fontfile='${fontFile}'`)
+    dtParts.push(
+      `x=(w-text_w)/2`,
+      `y=${y}`,
+      `fontsize=${fs}`,
+      `fontcolor=${opts.fontColor}`,
+      `borderw=${borderPx}`, `bordercolor=black@1.0`,
+      `shadowx=2:shadowy=2:shadowcolor=black@0.8`,
+    )
+    return `drawtext=${dtParts.join(':')}`
+  })
+
+  const vf = [
+    `scale=${VW}:${VH}:force_original_aspect_ratio=decrease`,
+    `pad=${VW}:${VH}:-1:-1:color=black`,
+    `setsar=1`,
+    ...dtFilters,
+  ].join(',')
 
   const out = path.join(dir, `mixer-${Date.now()}.mp4`)
   const args = [
@@ -1615,14 +1676,24 @@ ipcMain.handle('groq-request', async (_event, opts: {
 
 // ── IPC: Groq Whisper audio transcription (multipart, bypasses renderer CORS) ─
 ipcMain.handle('groq-transcription', async (_event, opts: {
-  apiKey:    string
-  audioBytes: ArrayBuffer
-  filename:  string
-  language?: string
+  apiKey:     string
+  audioBytes?: ArrayBuffer
+  videoUrl?:  string    // bank URL — main process downloads it (avoids renderer CORS)
+  filename:   string
+  language?:  string
 }) => {
   try {
+    let buf: Buffer
+    if (opts.videoUrl) {
+      const res = await net.fetch(opts.videoUrl)
+      if (!res.ok) return { ok: false, error: `Téléchargement vidéo échoué (${res.status})` }
+      buf = Buffer.from(await res.arrayBuffer())
+    } else if (opts.audioBytes) {
+      buf = Buffer.from(opts.audioBytes)
+    } else {
+      return { ok: false, error: 'Aucune source audio (audioBytes ou videoUrl requis)' }
+    }
     const boundary = `----GBoundary${Date.now()}`
-    const buf = Buffer.from(opts.audioBytes)
     const ext = opts.filename.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'mp4'
     const mime = ext === 'mp3' ? 'audio/mpeg' : ext === 'webm' ? 'audio/webm' : 'video/mp4'
 
@@ -2035,6 +2106,25 @@ ipcMain.handle('run-ffmpeg-subtitles', async (_event, opts: {
       resolve({ ok: true, outputPath: out })
     })
   })
+})
+
+// Stop any GeeLark phones still running when the app quits (prevents billing for idle phones).
+// Uses a sync-like pattern: preventDefault → async stop → re-quit.
+let geelarkQuitInProgress = false
+app.on('before-quit', async (e) => {
+  if (geelarkQuitInProgress || geelarkRunningPhones.size === 0 || !geelarkBearer) return
+  e.preventDefault()
+  geelarkQuitInProgress = true
+  const ids = [...geelarkRunningPhones]
+  geelarkRunningPhones.clear()
+  try {
+    await net.fetch('https://openapi.geelark.com/open/v1/phone/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${geelarkBearer}` },
+      body: JSON.stringify({ ids }),
+    })
+  } catch { /* ignore — best-effort */ }
+  app.quit()
 })
 
 app.on('window-all-closed', () => {

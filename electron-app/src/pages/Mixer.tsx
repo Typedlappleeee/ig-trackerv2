@@ -654,6 +654,14 @@ export function Mixer({ user }: MixerProps) {
             {running && <div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />}
             {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok">{doneJobs.length}/{jobs.length} terminés</span>}
             {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger">{errorJobs.length} erreur{errorJobs.length > 1 ? 's' : ''}</span>}
+            {doneJobs.length > 0 && (
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, minWidth: 260 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-4)', whiteSpace: 'nowrap' }}>Enregistrer dans :</span>
+                <div style={{ flex: 1 }}>
+                  <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="" compact />
+                </div>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 10, height: 165 }}>
             {jobs.map(job => (

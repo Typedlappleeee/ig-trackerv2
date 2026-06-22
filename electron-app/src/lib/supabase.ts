@@ -38,7 +38,7 @@ export type OrgRole = 'owner' | 'admin' | 'member' | 'viewer'
 export type PageKey =
   | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'warmup' | 'aitools' | 'storylink'
-  | 'remix' | 'repurpose' | 'montage' | 'mixer' | 'subtitles'
+  | 'remix' | 'repurpose' | 'montage' | 'mixer' | 'subtitles' | 'spoof'
   | 'settings'
 
 // Granular action permissions (on top of tab visibility).
@@ -126,6 +126,7 @@ export interface Phone {
   video_count:  number
   bio:          string | null
   remark:       string | null
+  link:         string | null   // Lien OnlyFans / story link per account
   synced_at:    string
   created_at:   string
 }
@@ -146,6 +147,26 @@ export interface ContentItem {
   used_count:     number
   created_at:     string
   updated_at:     string
+  source?:              'upload' | 'drive' | null  // provenance de l'item
+  drive_file_id?:       string | null              // ID du fichier Google Drive d'origine
+  drive_connection_id?: string | null              // connexion Drive ayant importé l'item
+}
+
+// Connexion à un dossier Google Drive synchronisé vers la banque.
+export interface DriveConnection {
+  id:            string
+  user_id:       string
+  org_id:        string | null
+  name:          string
+  folder_id:     string
+  target_folder: string | null
+  recursive:     boolean
+  status:        'active' | 'paused' | 'error'
+  last_sync_at:  string | null
+  last_error:    string | null
+  synced_count:  number
+  created_at:    string
+  updated_at:    string
 }
 
 // Connexions partagées par organisation (lues à la place de AppConfig en mode orga).
