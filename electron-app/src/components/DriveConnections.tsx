@@ -64,6 +64,17 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
   const [folderId, setFolderId]   = useState('')
   const [target, setTarget]       = useState('')
   const [recursive, setRecursive] = useState(true)
+  const [copied, setCopied]       = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
+
+  async function copyEmail() {
+    if (!serviceEmail) return
+    try {
+      await navigator.clipboard.writeText(serviceEmail)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch { /* ignore */ }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -185,20 +196,73 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
         {/* Scrollable body */}
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
 
-          {/* Email compte de service à partager */}
-          {serviceEmail && (
-            <div style={{
-              padding: '10px 14px', borderRadius: 10, marginBottom: 16,
-              background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)',
-            }}>
-              <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 4px' }}>
-                Partage tes dossiers Drive avec cet email (accès Lecteur) :
-              </p>
-              <code style={{
-                fontSize: 12, fontWeight: 600, color: 'var(--text)', wordBreak: 'break-all',
-              }}>{serviceEmail}</code>
-            </div>
-          )}
+          {/* Guide « Comment connecter ton Drive » */}
+          <div style={{
+            borderRadius: 12, marginBottom: 16, overflow: 'hidden',
+            background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)',
+          }}>
+            <button
+              onClick={() => setShowGuide(g => !g)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '11px 14px',
+                background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>💡</span>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                Comment connecter ton Drive ?
+              </span>
+              <span style={{
+                display: 'inline-flex', transform: showGuide ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.15s', color: 'var(--text2)',
+              }}>
+                <Icon d="M19 9l-7 7-7-7" size={14} />
+              </span>
+            </button>
+
+            {showGuide && (
+              <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Étape 1 — partager */}
+                <div>
+                  <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>
+                    1. Partage ton dossier Drive
+                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 6px', lineHeight: 1.5 }}>
+                    Dans Google Drive : clic droit sur ton dossier → <b>Partager</b> → colle cet email en accès <b>Lecteur</b> :
+                  </p>
+                  {serviceEmail ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <code style={{
+                        flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--text)', wordBreak: 'break-all',
+                        padding: '6px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.25)',
+                        border: '1px solid var(--border)',
+                      }}>{serviceEmail}</code>
+                      <button onClick={copyEmail} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+                        style={{ flexShrink: 0, color: copied ? '#059669' : undefined }}>
+                        {copied ? '✓ Copié' : 'Copier'}
+                      </button>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 11.5, color: '#f59e0b', margin: 0 }}>
+                      (Email du compte de service à configurer côté admin — variable VITE_DRIVE_SERVICE_EMAIL.)
+                    </p>
+                  )}
+                </div>
+                {/* Étape 2 — coller le lien */}
+                <div>
+                  <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>
+                    2. Copie le lien du dossier
+                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0, lineHeight: 1.5 }}>
+                    Clic droit sur le dossier → <b>Copier le lien</b>, puis colle-le ci-dessous dans « Ajouter un dossier Drive ».
+                  </p>
+                </div>
+                <p style={{ fontSize: 11.5, color: 'var(--text2)', margin: 0, fontStyle: 'italic' }}>
+                  C'est tout — tes vidéos arrivent dans la banque et se mettent à jour toutes les heures.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Connexions existantes */}
           {loading ? (
