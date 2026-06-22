@@ -138,6 +138,7 @@ export const EN = {
   sectionPrincipal: 'Main',
   sectionInstagram: 'Instagram',
   sectionCreation: 'Creation',
+  sectionTikTok: 'TikTok',
 
   // Page titles (topbar)
   pagePhones: 'Phones',
@@ -1678,6 +1679,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   sectionPrincipal: 'Principal',
   sectionInstagram: 'Instagram',
   sectionCreation: 'Création',
+  sectionTikTok: 'TikTok',
 
   pagePhones: 'Téléphones',
   pageMonitor: 'Monitor Live',
