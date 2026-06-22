@@ -140,6 +140,53 @@ function VerifModal({
   )
 }
 
+// ── Phone number modal ────────────────────────────────────────────────────────
+function PhoneModal({ onSubmit }: { onSubmit: (phone: string) => void }) {
+  const [phone, setPhone] = useState('')
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9000, display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(5,3,15,0.75)', backdropFilter: 'blur(6px)',
+    }}>
+      <div className="glass-card" style={{
+        width: 420, borderRadius: 20, padding: '32px 28px', textAlign: 'center',
+      }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 14, margin: '0 auto 16px',
+          background: 'rgba(99,102,241,0.1)', border: '1.5px solid rgba(99,102,241,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#818CF8',
+        }}>
+          <Icon d={ICONS.phone} size={22} />
+        </div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+          Numéro de téléphone requis
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.5 }}>
+          Instagram exige un numéro pour envoyer un code SMS.<br />
+          Entrez un numéro avec l'indicatif pays (ex: +33612345678).
+        </p>
+        <Input
+          label="Numéro de téléphone"
+          placeholder="+33612345678"
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && phone.trim()) onSubmit(phone.trim()) }}
+          autoFocus
+        />
+        <Button
+          className="w-full mt-4"
+          disabled={!phone.trim()}
+          onClick={() => onSubmit(phone.trim())}
+        >
+          Valider →
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ── Log panel (collapsible) ───────────────────────────────────────────────────
 function LogPanel({ logs }: { logs: string[] }) {
   const [open, setOpen] = useState(false)
@@ -191,9 +238,12 @@ export default function AccountCreator({ user }: AccountCreatorProps) {
   const [jobs, setJobs]           = useState<AccountJob[] | null>(null)
   const [running, setRunning]     = useState(false)
 
-  // Pending verification code: email + promise resolver
   const [pendingVerif, setPendingVerif] = useState<{
     email: string; resolve: (code: string) => void
+  } | null>(null)
+
+  const [pendingPhone, setPendingPhone] = useState<{
+    resolve: (phone: string) => void
   } | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
@@ -241,11 +291,17 @@ export default function AccountCreator({ user }: AccountCreatorProps) {
 
       const log = (line: string) => appendLog(entry.id, line)
 
-      // onVerificationNeeded: pause automation until user submits the code
       const onVerificationNeeded = (email: string): Promise<string> => {
         updateJob(entry.id, { status: 'waiting_code' })
         return new Promise<string>(resolve => {
           setPendingVerif({ email, resolve })
+        })
+      }
+
+      const onPhoneNeeded = (): Promise<string> => {
+        updateJob(entry.id, { status: 'waiting_code' })
+        return new Promise<string>(resolve => {
+          setPendingPhone({ resolve })
         })
       }
 
@@ -266,9 +322,11 @@ export default function AccountCreator({ user }: AccountCreatorProps) {
         onVerificationNeeded,
         log,
         ctrl.signal,
+        onPhoneNeeded,
       )
 
       setPendingVerif(null)
+      setPendingPhone(null)
 
       if (result.ok) {
         updateJob(entry.id, {
@@ -546,13 +604,23 @@ export default function AccountCreator({ user }: AccountCreatorProps) {
         </div>
       )}
 
-      {/* Verification modal */}
+      {/* Verification code modal */}
       {pendingVerif && (
         <VerifModal
           email={pendingVerif.email}
           onSubmit={code => {
             pendingVerif.resolve(code)
             setPendingVerif(null)
+          }}
+        />
+      )}
+
+      {/* Phone number modal */}
+      {pendingPhone && (
+        <PhoneModal
+          onSubmit={phone => {
+            pendingPhone.resolve(phone)
+            setPendingPhone(null)
           }}
         />
       )}

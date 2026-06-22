@@ -1917,6 +1917,7 @@ export async function createInstagramAccount(
   onVerificationNeeded: (email: string) => Promise<string>,
   log: (m: string) => void,
   signal?: AbortSignal,
+  onPhoneNeeded?: () => Promise<string>,
 ): Promise<{ ok: boolean; username?: string; error?: string }> {
   const aborted = () => signal?.aborted ?? false
 
@@ -2084,6 +2085,50 @@ export async function createInstagramAccount(
     await sleepOrAbort(6000, signal)
     xml = await dumpXml(bearer, phoneId)
     if (aborted()) return { ok: false, error: 'Annulé' }
+
+    // ── Vérification par numéro de téléphone (Instagram insiste parfois) ──
+    // Détecte l'écran "Enter your phone number" pendant l'inscription et demande
+    // le numéro à l'utilisateur via onPhoneNeeded, puis saisit le code SMS.
+    const PHONE_REQ_KEYWORDS = [
+      'enter your phone number', 'enter your mobile number',
+      'entrez votre numéro de téléphone', 'entrez votre numéro',
+      'verify with your phone', 'vérifiez avec votre téléphone',
+      'add your phone number to sign up', 'phone number to continue',
+      'we need your phone number', 'numéro de téléphone pour continuer',
+    ]
+    if (PHONE_REQ_KEYWORDS.some(p => xml.toLowerCase().includes(p))) {
+      log('📱 Instagram demande un numéro de téléphone pour vérification…')
+      if (!onPhoneNeeded) {
+        return { ok: false, error: "Instagram exige un numéro de téléphone — configure onPhoneNeeded" }
+      }
+      const phoneNumber = await onPhoneNeeded()
+      if (!phoneNumber?.trim()) return { ok: false, error: 'Numéro de téléphone non fourni' }
+      if (aborted()) return { ok: false, error: 'Annulé' }
+
+      log(`📞 Saisie du numéro: ${phoneNumber.trim()}`)
+      const phonePt: [number, number] =
+        findByResourceId(xml, 'phone_number', 'mobile_number', 'phone_field', 'phone') ??
+        findByText(xml,
+          'Phone number', 'Mobile number', 'Numéro de téléphone',
+          'Enter phone number', 'Enter your number',
+        ) ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+
+      await clearAndType(bearer, phoneId, phonePt, phoneNumber.trim(), log)
+      await sleepOrAbort(800, signal)
+
+      xml = await dumpXml(bearer, phoneId)
+      nextPt =
+        findByText(xml, 'Next', 'Suivant', 'Continue', 'Continuer', 'Send code', 'Envoyer le code') ??
+        findByResourceId(xml, 'next_button', 'primary_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.90)]
+      await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
+      await sleepOrAbort(6000, signal)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 Après numéro (${xml.length} chars)`)
+      if (aborted()) return { ok: false, error: 'Annulé' }
+      // Le code SMS sera capturé par la boucle de vérification ci-dessous
+    }
 
     // ── Code de vérification (jusqu'à 3 tentatives) ────────────────────────
     const VERIF_KEYWORDS = [
