@@ -561,11 +561,64 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
   )
 }
 
+// ── Link cell (OnlyFans / story link) ────────────────────────────────────────
+function LinkCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue]     = useState(phone.link ?? '')
+  const [saving, setSaving]   = useState(false)
+  const ref                   = useRef<HTMLInputElement>(null)
+  const savedRef              = useRef(false)
+
+  useEffect(() => { if (editing) ref.current?.focus() }, [editing])
+  useEffect(() => { setValue(phone.link ?? '') }, [phone.link])
+
+  async function save() {
+    if (savedRef.current) return
+    savedRef.current = true
+    setSaving(true)
+    await onSave(phone.id, value)
+    setSaving(false)
+    setEditing(false)
+    savedRef.current = false
+  }
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter')  save()
+    if (e.key === 'Escape') { savedRef.current = true; setValue(phone.link ?? ''); setEditing(false); savedRef.current = false }
+  }
+
+  if (editing) return (
+    <input
+      ref={ref} value={value} onChange={e => setValue(e.target.value)}
+      onKeyDown={onKey} onBlur={save} disabled={saving}
+      className="sf-input"
+      placeholder="https://onlyfans.com/…"
+      style={{ width: '100%', padding: '2px 6px', fontSize: 12, borderColor: ACCENT }}
+    />
+  )
+  return (
+    <button
+      onClick={() => { savedRef.current = false; setEditing(true) }}
+      style={{
+        width: '100%', textAlign: 'left', background: 'none', border: 'none',
+        cursor: 'pointer', padding: '2px 4px', borderRadius: 5, fontFamily: SANS, fontStyle: 'italic',
+      }}
+    >
+      {phone.link ? (
+        <span style={{ fontSize: 11, color: '#22d3ee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 200 }}>
+          {phone.link}
+        </span>
+      ) : (
+        <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)', fontStyle: 'normal' }}>— Ajouter un lien</span>
+      )}
+    </button>
+  )
+}
+
 // ── Phone card row ────────────────────────────────────────────────────────────
 const PhoneRow = memo(function PhoneRow({
   phone, isSelected, checked, col, canDelete, index,
   setSelectedPhone, setContextMenu, setSessionDialog,
-  saveIgUsername, saveRemark, requestDelete, toggleSelect,
+  saveIgUsername, saveRemark, saveLink, requestDelete, toggleSelect,
 }: {
   phone: Phone; isSelected: boolean; checked: boolean; col: string; index: number
   canDelete: boolean
@@ -574,6 +627,7 @@ const PhoneRow = memo(function PhoneRow({
   setSessionDialog: (v: { phone: Phone } | null) => void
   saveIgUsername: (id: string, u: string) => Promise<void>
   saveRemark: (id: string, v: string) => Promise<void>
+  saveLink: (id: string, v: string) => Promise<void>
   requestDelete: (p: Phone) => void
   toggleSelect: (id: string) => void
 }) {
@@ -662,14 +716,9 @@ const PhoneRow = memo(function PhoneRow({
         }
       </td>
 
-      {/* IG username */}
+      {/* Lien OnlyFans / Story */}
       <td style={cellStyle} onClick={e => e.stopPropagation()}>
-        <IgCell phone={phone} onSave={saveIgUsername} />
-      </td>
-
-      {/* IG status */}
-      <td style={cellStyle}>
-        <IgStatusBadge phone={phone} />
+        <LinkCell phone={phone} onSave={saveLink} />
       </td>
 
       {/* Note */}
@@ -724,7 +773,7 @@ const PhoneRow = memo(function PhoneRow({
 // ── Phone card (grid view) ────────────────────────────────────────────────────
 const PhoneCard = memo(function PhoneCard({
   phone, isSelected, checked, col, canDelete,
-  setSelectedPhone, setContextMenu, setSessionDialog, requestDelete, toggleSelect,
+  setSelectedPhone, setContextMenu, setSessionDialog, requestDelete, toggleSelect, saveLink,
 }: {
   phone: Phone; isSelected: boolean; checked: boolean; col: string; canDelete: boolean
   setSelectedPhone: (p: Phone | null) => void
@@ -732,6 +781,7 @@ const PhoneCard = memo(function PhoneCard({
   setSessionDialog: (v: { phone: Phone } | null) => void
   requestDelete: (p: Phone) => void
   toggleSelect: (id: string) => void
+  saveLink: (id: string, v: string) => Promise<void>
 }) {
   const t = useT()
   const [hover, setHover] = useState(false)
@@ -829,40 +879,16 @@ const PhoneCard = memo(function PhoneCard({
         )}
       </div>
 
-      {/* Instagram block */}
+      {/* Lien OnlyFans / story */}
       <div style={{
         borderRadius: 11, padding: '10px 12px',
-        background: phone.ig_username ? 'rgba(99,102,241,0.05)' : 'rgba(233,234,240,0.02)',
-        border: `1px solid ${phone.ig_username ? 'rgba(99,102,241,0.14)' : HAIR}`,
-      }}>
-        {phone.ig_username ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: ACCENT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{phone.ig_username}</span>
-              <IgStatusBadge phone={phone} />
-            </div>
-            <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
-              <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.5)' }}>
-                <strong style={{ color: TEXT_1, fontWeight: 700 }}>{fmt(phone.followers)}</strong> {t('phonesIgFollowers')}
-              </span>
-              <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.5)' }}>
-                <strong style={{ color: TEXT_1, fontWeight: 700 }}>{fmt(phone.following)}</strong> {t('phonesIgFollowing')}
-              </span>
-            </div>
-          </>
-        ) : (
-          <button
-            onClick={e => { e.stopPropagation(); setSessionDialog({ phone }) }}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0',
-              color: 'rgba(233,234,240,0.4)', fontSize: 12, fontWeight: 500,
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-            {t('phoneIgCellAdd')}
-          </button>
-        )}
+        background: phone.link ? 'rgba(34,211,238,0.05)' : 'rgba(233,234,240,0.02)',
+        border: `1px solid ${phone.link ? 'rgba(34,211,238,0.2)' : HAIR}`,
+      }} onClick={e => e.stopPropagation()}>
+        <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(233,234,240,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>
+          Lien OnlyFans
+        </p>
+        <LinkCell phone={phone} onSave={saveLink} />
       </div>
 
       {/* Footer actions */}
@@ -1065,6 +1091,15 @@ export function Phones({ user }: PhonesProps) {
     const { error: err } = await supabase.from('phones').update({ remark: val }).eq('id', id)
     if (err) {
       toast.show({ kind: 'error', title: fr(`Échec de l'enregistrement de la note`, 'Failed to save note'), body: err.message })
+    }
+  }, [toast, fr])
+
+  const saveLink = useCallback(async (id: string, link: string) => {
+    const val = link.trim() || null
+    setPhones(prev => prev.map(p => p.id === id ? { ...p, link: val } : p))
+    const { error: err } = await supabase.from('phones').update({ link: val }).eq('id', id)
+    if (err) {
+      toast.show({ kind: 'error', title: fr('Échec de l\'enregistrement du lien', 'Failed to save link'), body: err.message })
     }
   }, [toast, fr])
 
@@ -1753,8 +1788,7 @@ export function Phones({ user }: PhonesProps) {
                         <th style={{ ...TH_BASE, width: 44 }}></th>
                         <th style={TH_BASE}>{t('phonesDetailModel')}</th>
                         <th style={{ ...TH_BASE, width: 120 }}>{t('phonesDetailGroup')}</th>
-                        <th style={{ ...TH_BASE, width: 160 }}>Instagram</th>
-                        <th style={{ ...TH_BASE, width: 110 }}>{t('phonesIgStatus')}</th>
+                        <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
                         <th style={{ ...TH_BASE, width: 150 }}>Note</th>
                         <th style={{ ...TH_BASE, width: 90 }}></th>
                       </tr>
@@ -1849,6 +1883,7 @@ export function Phones({ user }: PhonesProps) {
                       setSessionDialog={setSessionDialog}
                       requestDelete={requestDelete}
                       toggleSelect={toggleSelect}
+                      saveLink={saveLink}
                     />
                   ))}
                 </div>
@@ -1875,8 +1910,7 @@ export function Phones({ user }: PhonesProps) {
                         {sortTh(t('phonesDetailModel'), 'name')}
                         {/* Group sort */}
                         {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
-                        <th style={{ ...TH_BASE, width: 160 }}>Instagram</th>
-                        <th style={{ ...TH_BASE, width: 110 }}>{t('phonesIgStatus')}</th>
+                        <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
                         <th style={{ ...TH_BASE, width: 150 }}>Note</th>
                         <th style={{ ...TH_BASE, width: 100 }}></th>
                       </tr>
@@ -1896,6 +1930,7 @@ export function Phones({ user }: PhonesProps) {
                           setSessionDialog={setSessionDialog}
                           saveIgUsername={saveIgUsername}
                           saveRemark={saveRemark}
+                          saveLink={saveLink}
                           requestDelete={requestDelete}
                           toggleSelect={toggleSelect}
                         />
@@ -2012,49 +2047,24 @@ export function Phones({ user }: PhonesProps) {
                     </div>
                   </div>
 
-                  {/* Instagram section */}
-                  {p.ig_username && (
-                    <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
-                      <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 12px' }}>{t('phonesIgSection')}</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: ACCENT, fontSize: 13, fontWeight: 700,
-                          background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.4)',
-                        }}>
-                          {p.ig_username.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: ACCENT, margin: 0 }}>@{p.ig_username}</p>
-                          {(p.followers || p.following) ? (
-                            <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.45)', margin: '2px 0 0' }}>
-                              {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} ${t('phonesIgFollowers')}` : ''}
-                              {p.followers && p.following ? ' · ' : ''}
-                              {p.following ? `${p.following} ${t('phonesIgFollowing')}` : ''}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)' }}>{t('phonesIgStatus')}</span>
-                          <span style={{
-                            fontSize: 11, fontWeight: 600,
-                            color: p.ig_status === 'active' ? 'var(--ok)' : (p.ig_status === 'expired' || p.ig_status === 'error') ? 'var(--err)' : 'rgba(233,234,240,0.52)',
-                          }}>
-                            {p.ig_status === 'active' ? t('phonesIgStatusActive') : p.ig_status === 'expired' ? t('phonesIgStatusExpired') : p.ig_status === 'error' ? t('phonesIgStatusError') : t('phonesIgNotConfigured')}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)' }}>{t('phonesIgSession')}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? 'var(--ok)' : 'rgba(233,234,240,0.52)' }}>
-                            {p.ig_sessionid ? t('phonesIgSessionConfigured') : t('phonesIgNotConfigured')}
-                          </span>
-                        </div>
-                      </div>
+                  {/* Lien OnlyFans section */}
+                  <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
+                    <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }}>
+                      Lien OnlyFans / Story
+                    </p>
+                    <div style={{
+                      borderRadius: 10, padding: '10px 12px',
+                      background: p.link ? 'rgba(34,211,238,0.06)' : 'rgba(233,234,240,0.03)',
+                      border: `1px solid ${p.link ? 'rgba(34,211,238,0.22)' : HAIR}`,
+                    }}>
+                      <LinkCell phone={p} onSave={saveLink} />
                     </div>
-                  )}
+                    {p.link && (
+                      <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.3)', marginTop: 6 }}>
+                        Ce lien est utilisé automatiquement pour le sticker des stories.
+                      </p>
+                    )}
+                  </div>
 
                   {/* Quick actions */}
                   <div style={{ padding: '16px 18px' }}>
