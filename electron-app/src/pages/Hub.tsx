@@ -212,31 +212,29 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     const bankQ = currentOrg
       ? supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
       : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
+    const spQ  = (q: ReturnType<typeof supabase.from>) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    const prQ  = (q: ReturnType<typeof supabase.from>) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes, directRunsRes] = await Promise.all([
       phonesQ,
       bankQ,
-      supabase.from('scheduled_posts')
-        .select('id', { count: 'exact', head: true })
+      spQ(supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }))
         .in('status', ['done', 'failed'])
         .gte('created_at', weekAgo),
       // Runs directs (Posting / Mass Posting) — chaque ligne porte son ok_count
-      supabase.from('post_runs')
-        .select('ok_count')
+      prQ(supabase.from('post_runs').select('ok_count'))
         .gte('created_at', weekAgo),
-      supabase.from('scheduled_posts')
-        .select('*')
+      spQ(supabase.from('scheduled_posts').select('*'))
         .eq('status', 'pending')
         .order('scheduled_at', { ascending: true })
         .limit(5),
-      supabase.from('scheduled_posts')
-        .select('*')
+      spQ(supabase.from('scheduled_posts').select('*'))
         .in('status', ['done', 'failed'])
         .order('executed_at', { ascending: false })
         .limit(8),
       // Recent direct runs (for activity feed)
-      currentOrg
-        ? supabase.from('post_runs').select('*').eq('org_id', currentOrg.id).order('created_at', { ascending: false }).limit(8)
-        : supabase.from('post_runs').select('*').eq('user_id', user.id).is('org_id', null).order('created_at', { ascending: false }).limit(8),
+      prQ(supabase.from('post_runs').select('*'))
+        .order('created_at', { ascending: false })
+        .limit(8),
     ])
     setPhoneCount(phonesRes.count ?? 0)
     setVideoCount(videosRes.count ?? 0)
