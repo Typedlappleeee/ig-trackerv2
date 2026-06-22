@@ -574,12 +574,14 @@ const Subtitles      = lazy(() => import('@/pages/Subtitles').then(m => ({ defau
 const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { AppTour }           from '@/components/AppTour'
+import { canSeeTab }         from '@/lib/permissions'
+import type { PageKey }      from '@/lib/supabase'
 
 const BETA_KEY  = 'scaleflow-v1-seen'
 const TOUR_KEY  = 'scaleflow-show-tour'
 
 function AppContent({ user }: { user: User }) {
-  const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError } = useOrg()
+  const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError, role, perms } = useOrg()
   const conns = useConnections(user)
   const [page, setPage]                     = useState<Page>('hub')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
@@ -857,7 +859,11 @@ function AppContent({ user }: { user: User }) {
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
-      {showTour && <AppTour onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }} onNavigate={p => { setPage(p as Page); }} />}
+      {showTour && <AppTour
+        onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }}
+        onNavigate={p => { setPage(p as Page) }}
+        canSeePage={role ? (p) => canSeeTab(role, perms, p as PageKey) : undefined}
+      />}
       <Layout
         user={user}
         page={page}
