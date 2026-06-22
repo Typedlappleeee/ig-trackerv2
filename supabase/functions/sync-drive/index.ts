@@ -136,7 +136,15 @@ function extFromName(name: string): string {
   return m ? m[1].toLowerCase() : 'mp4'
 }
 
+const CORS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+}
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const cronSecret  = Deno.env.get('CRON_SECRET') ?? ''
@@ -157,11 +165,11 @@ Deno.serve(async (req) => {
       } catch { /* ignore */ }
     }
   }
-  if (!authorized) return new Response('Unauthorized', { status: 401 })
+  if (!authorized) return new Response('Unauthorized', { status: 401, headers: CORS })
 
   if (!saJsonRaw) {
     return new Response(JSON.stringify({ error: 'GOOGLE_SERVICE_ACCOUNT_JSON manquant' }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
+      status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   }
 
@@ -172,7 +180,7 @@ Deno.serve(async (req) => {
     privateKey  = sa.private_key
   } catch {
     return new Response(JSON.stringify({ error: 'GOOGLE_SERVICE_ACCOUNT_JSON invalide (JSON)' }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
+      status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   }
 
@@ -185,7 +193,7 @@ Deno.serve(async (req) => {
   const { data: conns, error: connErr } = await q
   if (connErr) {
     return new Response(JSON.stringify({ error: connErr.message }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
+      status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   }
 
@@ -194,7 +202,7 @@ Deno.serve(async (req) => {
     token = await getDriveAccessToken(clientEmail, privateKey)
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
+      status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   }
 
@@ -312,6 +320,6 @@ Deno.serve(async (req) => {
 
   summary.imported = importedTotal
   return new Response(JSON.stringify(summary), {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   })
 })
