@@ -399,6 +399,30 @@ async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   return output
 }
 
+// Find every EditText node in the dump, with its current text and center point.
+// Sorted top-to-bottom (by Y). Used to target the sticker-text field precisely:
+// the URL field contains "http…", the sticker-text field is the other one.
+interface EditField { text: string; center: [number, number]; y: number }
+function findEditTextFields(xml: string): EditField[] {
+  const fields: EditField[] = []
+  // Match any node whose class is an EditText (Instagram uses EditText subclasses)
+  const re = /<node\b[^>]*class="[^"]*EditText[^"]*"[^>]*>/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(xml)) !== null) {
+    const node = m[0]
+    const boundsM = node.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
+    if (!boundsM) continue
+    const x1 = +boundsM[1], y1 = +boundsM[2], x2 = +boundsM[3], y2 = +boundsM[4]
+    const textM = node.match(/\btext="([^"]*)"/)
+    fields.push({
+      text: textM ? textM[1] : '',
+      center: [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)],
+      y: y1,
+    })
+  }
+  return fields.sort((a, b) => a.y - b.y)
+}
+
 // Tap the field, triple-tap to select all existing text, delete it, then type new text.
 // Handles spaces and common special characters safely for Android `input text`.
 async function clearAndType(
@@ -1195,49 +1219,92 @@ export async function postInstagramStory(
   await sleep(1200)
 
   // Optional custom sticker text — replaces the default "LINK"/"LIEN" label.
-  // Tab (keyevent 61) moves focus URL→text field.
-  // We never use CTRL+A here — on some IG builds keycombination 113 29 types 'a'
-  // instead of selecting. Instead: MOVE_END then 50 DEL presses to wipe the field.
+  // Strategy: enumerate the EditText fields in the dialog. The URL field is the
+  // one containing "http"; the sticker-text field is the other one. We tap it
+  // explicitly, wipe it (MOVE_END + many DEL — never CTRL+A which mistypes 'a'),
+  // then type the caption. Finally we VERIFY the caption landed in that exact
+  // field (not the URL field) by re-reading the dump.
   if (config.linkText?.trim()) {
+    const wanted = config.linkText.trim()
+    const escaped = escapeForInputText(wanted)
     log('   ✏️  Texte du sticker…')
-    const escaped = escapeForInputText(config.linkText.trim())
 
-    async function typeIntoTextField(pt?: [number, number]) {
-      if (pt) {
-        await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`)
-        await sleep(600)
-      }
-      // Go to end, then delete backwards (up to 50 chars — more than "LINK"/"Lien")
+    // Helper: clear the currently focused field and type the caption.
+    async function wipeAndType() {
       await shellExec(bearer, phoneId, 'input keyevent 123')  // MOVE_END
       await sleep(150)
-      for (let i = 0; i < 5; i++) {
-        await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67')
+      for (let i = 0; i < 6; i++) {
+        await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67') // 10× DEL
         await sleep(60)
       }
-      await sleep(200)
+      await sleep(150)
       await shellExec(bearer, phoneId, `input text "${escaped}"`)
       await sleep(800)
     }
 
-    // Primary: Tab from URL field to text field, then clear + type
-    await shellExec(bearer, phoneId, 'input keyevent 61')  // TAB
-    await sleep(900)
-    await typeIntoTextField()
+    // Locate the sticker-text field: an EditText that is NOT the URL field.
+    let done = false
+    for (let attempt = 0; attempt < 3 && !done; attempt++) {
+      xml = await dumpXml(bearer, phoneId)
+      const fields = findEditTextFields(xml)
+      // URL field = contains http / the URL we typed. Text field = the rest.
+      const textField =
+        fields.find(f => !/https?:|www\./i.test(f.text) && f.center[1] !== urlField[1]) ??
+        // If both fields are empty-ish, the second (lower) EditText is the text one
+        (fields.length >= 2 ? fields[1] : undefined)
 
-    // Verify the text landed in the dialog
-    xml = await dumpXml(bearer, phoneId)
-    if (!findByText(xml, config.linkText.trim())) {
-      log('   ↩︎ Tab raté — tap direct sur le champ texte…')
-      const customPt =
-        findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
-        findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
-        findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker') ??
-        [urlField[0], urlField[1] + Math.floor(sh * 0.09)] as [number, number]
-      await typeIntoTextField(customPt as [number, number])
-      log('   ✓ Texte du sticker saisi (fallback)')
-    } else {
-      log('   ✓ Texte du sticker saisi')
+      if (textField) {
+        log(`   ✓ Champ texte ciblé: ${textField.center[0]},${textField.center[1]} (texte actuel: "${textField.text}")`)
+        await shellExec(bearer, phoneId, `input tap ${textField.center[0]} ${textField.center[1]}`)
+        await sleep(600)
+        await wipeAndType()
+      } else {
+        // Only one field (URL) visible → the sticker-text field may be hidden
+        // behind a "Customize sticker text" row that must be tapped to reveal it.
+        const revealPt =
+          findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
+          findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
+          findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
+        if (revealPt) {
+          log(`   ↪︎ Ouverture du champ « texte du sticker »…`)
+          await shellExec(bearer, phoneId, `input tap ${revealPt[0]} ${revealPt[1]}`)
+          await sleep(800)
+          await wipeAndType()
+        } else {
+          log('   ↩︎ Champ texte introuvable — nouvel essai…')
+          await sleep(500)
+          continue
+        }
+      }
+
+      // Verify: the caption must now be present in an EditText that is NOT the URL.
+      xml = await dumpXml(bearer, phoneId)
+      const after = findEditTextFields(xml)
+      const ok = after.some(f => f.text.includes(wanted) && !/https?:/i.test(f.text))
+      // Safety: make sure we didn't clobber the URL field.
+      const urlStillThere = after.some(f => /https?:/i.test(f.text))
+      if (ok && urlStillThere) {
+        log('   ✓ Texte du sticker saisi et vérifié')
+        done = true
+      } else if (ok && !urlStillThere) {
+        // We typed the caption into the URL field by mistake — restore URL, retry.
+        log('   ⚠ Texte saisi dans le mauvais champ — correction de l\'URL…')
+        const urlF = after.find(f => f.text.includes(wanted)) ?? null
+        if (urlF) {
+          await shellExec(bearer, phoneId, `input tap ${urlF.center[0]} ${urlF.center[1]}`)
+          await sleep(500)
+          await shellExec(bearer, phoneId, 'input keyevent 123')
+          await sleep(120)
+          for (let i = 0; i < 8; i++) { await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67'); await sleep(50) }
+          await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkUrl)}"`)
+          await sleep(700)
+        }
+        // loop will retry to place the caption in the proper field
+      } else {
+        log('   ↩︎ Texte non confirmé — nouvel essai…')
+      }
     }
+    if (!done) log('   ⚠ Impossible de confirmer le texte du sticker — publication quand même')
   }
 
   // Confirm the link (Done / Terminé / checkmark in top-right)
