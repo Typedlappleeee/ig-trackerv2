@@ -376,16 +376,12 @@ async function executeUnit(
         return
       }
 
-      let okN = 0
-      let failN = 0
-      for (let i = 0; i < task.phones.length; i++) {
-        const phone = task.phones[i]
-        const name  = phone.ig_username ?? phone.phone_name
-        const link  = (phone.link ?? '').trim()
+      const results = await Promise.all(task.phones.map(async (phone, i) => {
+        const name = phone.ig_username ?? phone.phone_name
+        const link = (phone.link ?? '').trim()
         if (!link) {
-          failN++
           log(`❌ ${name} : aucun lien configuré`)
-          continue
+          return false
         }
         const imageUrl = unit.mode === 'random'
           ? validImages[Math.floor(Math.random() * validImages.length)]
@@ -400,15 +396,16 @@ async function executeUnit(
             { imageUrl, linkUrl: link, linkText },
             m => log(`  ${name}: ${m}`),
           )
-          if (res.ok) { okN++; log(`✅ ${name} — story publiée`) }
-          else { failN++; log(`❌ ${name} : ${res.error ?? 'échec'}`) }
+          if (res.ok) { log(`✅ ${name} — story publiée`); return true }
+          else { log(`❌ ${name} : ${res.error ?? 'échec'}`); return false }
         } catch (err) {
-          failN++
           log(`❌ ${name} : ${err instanceof Error ? err.message : String(err)}`)
+          return false
         } finally {
           try { await stopPhone(bearer, phone.geelark_id) } catch { /* ignore */ }
         }
-      }
+      }))
+      const okN = results.filter(Boolean).length
 
       log(`⏰ Prochaine story dans ${recurHours}h`)
       await saveResult(okN > 0 ? 'done' : 'failed', okN > 0 ? undefined : 'Aucune story publiée')

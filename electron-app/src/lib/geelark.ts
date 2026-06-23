@@ -1195,6 +1195,7 @@ export async function postInstagramStory(
   await sleep(1200)
 
   // Optional custom sticker text — replaces the default "LINK"/"LIEN" label.
+  // The field shows "LINK"/"Lien" by default — must double-tap to select all then replace.
   if (config.linkText?.trim()) {
     log('   ✏️  Texte du sticker…')
     await sleep(600)
@@ -1203,22 +1204,11 @@ export async function postInstagramStory(
       findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
       findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
       findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
-    if (customPt) {
-      log(`   ✓ Champ texte trouvé: ${customPt[0]},${customPt[1]}`)
-      await shellExec(bearer, phoneId, `input tap ${customPt[0]} ${customPt[1]}`)
-      await sleep(900)
-    } else {
-      // Fallback: the "Customize sticker text" field sits just below the URL
-      // input. Tap a bit under the URL field, then select-all + clear before typing.
-      log('   ↩︎ Champ « personnaliser le texte » non détecté — tap sous l\'URL')
-      await shellExec(bearer, phoneId, `input tap ${urlField[0]} ${urlField[1] + Math.floor(sh * 0.07)}`)
-      await sleep(900)
-    }
-    // Clear any existing placeholder then type the custom label.
-    await shellExec(bearer, phoneId, 'input keyevent --longpress KEYCODE_DEL')
-    await sleep(300)
-    await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
-    await sleep(1000)
+    const targetPt: [number, number] = customPt ?? [urlField[0], urlField[1] + Math.floor(sh * 0.07)]
+    if (!customPt) log('   ↩︎ Champ « personnaliser le texte » non détecté — tap sous l\'URL')
+    else log(`   ✓ Champ texte trouvé: ${customPt[0]},${customPt[1]}`)
+    await clearAndType(bearer, phoneId, targetPt, config.linkText.trim(), log)
+    await sleep(800)
   }
 
   // Confirm the link (Done / Terminé / checkmark in top-right)

@@ -452,9 +452,8 @@ export default function StoryLink({ user }: { user: User }) {
       setJobs(prev => prev.map(j => j.phoneId === id ? { ...j, status } : j))
     }
 
-    let okCount = 0
-    for (const asgn of assignments) {
-      if (abortRef.current) break
+    const counts = await Promise.all(assignments.map(async asgn => {
+      if (abortRef.current) return 0
       setStatus(asgn.phoneId, 'running')
       try {
         const res = await postInstagramStory(
@@ -462,15 +461,17 @@ export default function StoryLink({ user }: { user: User }) {
           { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun },
           m => addLog(asgn.phoneId, m),
         )
-        if (res.ok) { setStatus(asgn.phoneId, 'ok'); okCount++ }
-        else { setStatus(asgn.phoneId, 'error'); addLog(asgn.phoneId, `[err] ${res.error ?? 'Échec'}`) }
+        if (res.ok) { setStatus(asgn.phoneId, 'ok'); return 1 }
+        else { setStatus(asgn.phoneId, 'error'); addLog(asgn.phoneId, `[err] ${res.error ?? 'Échec'}`); return 0 }
       } catch (e) {
         setStatus(asgn.phoneId, 'error')
         addLog(asgn.phoneId, `[err] ${e instanceof Error ? e.message : String(e)}`)
+        return 0
       } finally {
         try { await stopPhone(bearer, asgn.phoneId) } catch (_) { /* ignore */ }
       }
-    }
+    }))
+    const okCount = counts.reduce<number>((s, n) => s + n, 0)
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
   }
