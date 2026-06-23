@@ -1195,33 +1195,46 @@ export async function postInstagramStory(
   await sleep(1200)
 
   // Optional custom sticker text — replaces the default "LINK"/"LIEN" label.
-  // Tab (keyevent 61) moves focus from the URL field to the "Customize sticker
-  // text" field. This is more reliable than XML coordinate lookup because the
-  // field is often below the keyboard and hard to detect in the layout dump.
+  // Tab (keyevent 61) moves focus URL→text field.
+  // We never use CTRL+A here — on some IG builds keycombination 113 29 types 'a'
+  // instead of selecting. Instead: MOVE_END then 50 DEL presses to wipe the field.
   if (config.linkText?.trim()) {
     log('   ✏️  Texte du sticker…')
+    const escaped = escapeForInputText(config.linkText.trim())
 
-    // Move focus to next field (URL → sticker text) then select-all + type.
-    await shellExec(bearer, phoneId, 'input keyevent 61')   // TAB to next field
-    await sleep(800)
-    await shellExec(bearer, phoneId, 'input keycombination 113 29')  // CTRL+A → select all
-    await sleep(300)
-    await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
-    await sleep(800)
+    async function typeIntoTextField(pt?: [number, number]) {
+      if (pt) {
+        await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`)
+        await sleep(600)
+      }
+      // Go to end, then delete backwards (up to 50 chars — more than "LINK"/"Lien")
+      await shellExec(bearer, phoneId, 'input keyevent 123')  // MOVE_END
+      await sleep(150)
+      for (let i = 0; i < 5; i++) {
+        await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67')
+        await sleep(60)
+      }
+      await sleep(200)
+      await shellExec(bearer, phoneId, `input text "${escaped}"`)
+      await sleep(800)
+    }
 
-    // Fallback: if Tab left focus in the URL field (some IG builds have no Tab
-    // order), find the text field by XML and use clearAndType directly.
+    // Primary: Tab from URL field to text field, then clear + type
+    await shellExec(bearer, phoneId, 'input keyevent 61')  // TAB
+    await sleep(900)
+    await typeIntoTextField()
+
+    // Verify the text landed in the dialog
     xml = await dumpXml(bearer, phoneId)
-    const textInField = findByText(xml, config.linkText.trim())
-    if (!textInField) {
-      log('   ↩︎ Tab raté — recherche du champ texte dans le XML…')
+    if (!findByText(xml, config.linkText.trim())) {
+      log('   ↩︎ Tab raté — tap direct sur le champ texte…')
       const customPt =
         findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
         findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
         findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker') ??
         [urlField[0], urlField[1] + Math.floor(sh * 0.09)] as [number, number]
-      await clearAndType(bearer, phoneId, customPt as [number, number], config.linkText.trim(), log)
-      await sleep(800)
+      await typeIntoTextField(customPt as [number, number])
+      log('   ✓ Texte du sticker saisi (fallback)')
     } else {
       log('   ✓ Texte du sticker saisi')
     }
