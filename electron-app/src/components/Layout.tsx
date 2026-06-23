@@ -54,7 +54,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 
 export type Page =
   | 'hub'
-  | 'phones' | 'accountcreator'
+  | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
   | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof'
   | 'community' | 'support'
@@ -82,7 +82,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'phones',         label: 'navPhones',         icon: '📱' },
-      { id: 'accountcreator', label: 'navAccountCreator',  icon: '✨', isNew: true },
+
       { id: 'bank',           label: 'navBank',            icon: '🗂' },
     ],
   },
@@ -161,7 +161,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   scheduler:       'calendar',
   tasks:           'zap',
   storylink:       'send',
-  accountcreator:  'sparkles',
+
   bank:            'video',
   captionbank:     'chat',
   warmup:          'flame',
@@ -602,7 +602,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
 
   const isVisibleTab = (id: Page): boolean => {
-    if (id === 'licences' || id === 'storylink' || id === 'accountcreator' || id === 'tiktokposting') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'storylink' || id === 'tiktokposting') return effectiveSuperAdmin
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
     return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }

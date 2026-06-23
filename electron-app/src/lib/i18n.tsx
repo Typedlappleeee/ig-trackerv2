@@ -33,7 +33,7 @@ export const EN = {
   navCommunity: 'Community',
   navHub: 'Hub',
   navPhones: 'Phones',
-  navAccountCreator: 'Account Creator',
+
   navTikTokPosting: 'TikTok Posting',
   navMonitor: 'Monitor Live',
   // ── Hub page ──
@@ -1578,7 +1578,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   navCommunity: 'Communauté',
   navHub: 'Accueil',
   navPhones: 'Téléphones',
-  navAccountCreator: 'Créer des comptes',
+
   navTikTokPosting: 'TikTok Posting',
   navMonitor: 'Monitor Live',
   // ── Hub page ──

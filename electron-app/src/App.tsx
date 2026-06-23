@@ -552,7 +552,7 @@ import { initIgStatsPoller } from '@/lib/igStatsPoller'
 // bundle only carries the shell + Hub (default landing page after login).
 import Hub                   from '@/pages/Hub'
 const Phones          = lazy(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
-const AccountCreator  = lazy(() => import('@/pages/AccountCreator'))
+
 const TikTokPosting   = lazy(() => import('@/pages/TikTokPosting'))
 const Publish        = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
 const BankHub        = lazy(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
@@ -833,7 +833,7 @@ function AppContent({ user }: { user: User }) {
   const content = (() => {
     switch (page) {
       case 'phones':          return <Phones          user={user} key={refreshTick} />
-      case 'accountcreator':  return <AccountCreator  user={user} />
+
       case 'tiktokposting':   return <TikTokPosting   user={user} />
       case 'posting':      return <Publish     user={user} />
       case 'massposting':  return <Publish     user={user} />  // alias historique
