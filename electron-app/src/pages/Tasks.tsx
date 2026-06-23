@@ -778,6 +778,173 @@ function ConfirmDeleteDialog({
   )
 }
 
+// ── CaptionBankPicker ──────────────────────────────────────────────────────────
+// Modal to pick text items from caption_bank and append to a story's caption pool.
+
+interface CaptionBankPickerProps {
+  user: User
+  currentOrg: { id: string } | null
+  onSelect: (texts: string[]) => void
+  onClose: () => void
+}
+
+interface CaptionPickerItem { id: string; title: string; content: string; folder: string | null }
+
+function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankPickerProps) {
+  const [items, setItems]   = useState<CaptionPickerItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setLoading(true)
+    const base = supabase.from('caption_bank').select('id,title,content,folder').order('created_at', { ascending: false })
+    const q = currentOrg
+      ? base.eq('org_id', currentOrg.id)
+      : base.eq('user_id', user.id).is('org_id', null)
+    q.then(({ data }) => {
+      setItems((data ?? []) as CaptionPickerItem[])
+      setLoading(false)
+    })
+  }, [currentOrg?.id, user.id])
+
+  const filtered = items.filter(it => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return it.title.toLowerCase().includes(q) || it.content.toLowerCase().includes(q)
+  })
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next
+  })
+
+  const confirm = () => {
+    const texts = items.filter(it => selected.has(it.id)).map(it => it.content).filter(Boolean)
+    onSelect(texts)
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9500,
+        background: 'rgba(6,6,8,0.92)', backdropFilter: 'blur(14px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        className="anim-scale-in"
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 80px)',
+          background: '#0F1014', border: '1px solid rgba(233,234,240,0.08)',
+          borderRadius: 14, display: 'flex', flexDirection: 'column',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px', borderBottom: '1px solid rgba(233,234,240,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
+        }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#E9EAF0' }}>Banque de captions</p>
+            <p style={{ margin: 0, fontSize: 11, color: 'rgba(233,234,240,0.42)' }}>
+              {selected.size > 0 ? `${selected.size} caption${selected.size > 1 ? 's' : ''} sélectionnée${selected.size > 1 ? 's' : ''}` : 'Sélectionne les captions à ajouter au pool'}
+            </p>
+          </div>
+          <button onClick={onClose} className="cursor-pointer"
+            style={{ background: 'none', border: 'none', color: 'rgba(233,234,240,0.42)', display: 'flex', padding: 6, borderRadius: 6 }}>
+            <IconX size={12} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(233,234,240,0.06)', flexShrink: 0 }}>
+          <input
+            type="text"
+            placeholder="Rechercher…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            autoFocus
+            style={{
+              width: '100%', height: 34, padding: '0 12px', fontSize: 13, boxSizing: 'border-box',
+              background: 'rgba(233,234,240,0.03)', color: '#E9EAF0',
+              border: '1px solid rgba(233,234,240,0.1)', borderRadius: 8, outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Items list */}
+        <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'thin', padding: '8px 12px' }}>
+          {loading ? (
+            <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'rgba(233,234,240,0.4)' }}>Chargement…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'rgba(233,234,240,0.4)' }}>Aucune caption trouvée</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {filtered.map(it => {
+                const on = selected.has(it.id)
+                return (
+                  <button key={it.id} onClick={() => toggle(it.id)} className="cursor-pointer"
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
+                      padding: '9px 11px', borderRadius: 9, border: 'none',
+                      background: on ? 'rgba(244,114,182,0.08)' : 'rgba(233,234,240,0.02)',
+                      outline: on ? '1px solid rgba(244,114,182,0.3)' : '1px solid transparent',
+                      transition: 'all 0.12s',
+                    }}>
+                    <div style={{
+                      width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 2,
+                      background: on ? '#F472B6' : 'transparent',
+                      border: on ? 'none' : '1px solid rgba(233,234,240,0.2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {on && <IconCheck size={7} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {it.title && (
+                        <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 700, color: 'rgba(233,234,240,0.6)', letterSpacing: '0.02em' }}>{it.title}</p>
+                      )}
+                      <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(233,234,240,0.82)', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {it.content.length > 160 ? it.content.slice(0, 160) + '…' : it.content}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '12px 16px', borderTop: '1px solid rgba(233,234,240,0.08)', flexShrink: 0,
+          display: 'flex', gap: 10, justifyContent: 'flex-end',
+        }}>
+          <button onClick={onClose} className="cursor-pointer"
+            style={{ padding: '9px 16px', fontSize: 11, fontWeight: 700, background: 'transparent', color: 'rgba(233,234,240,0.42)', border: '1px solid rgba(233,234,240,0.08)', borderRadius: 7 }}>
+            Annuler
+          </button>
+          <button
+            onClick={confirm}
+            disabled={selected.size === 0}
+            className="cursor-pointer"
+            style={{
+              padding: '9px 20px', fontSize: 11, fontWeight: 800,
+              background: selected.size > 0 ? '#F472B6' : 'rgba(233,234,240,0.08)',
+              color: selected.size > 0 ? '#fff' : 'rgba(233,234,240,0.3)',
+              border: 'none', borderRadius: 7,
+            }}
+          >
+            Ajouter {selected.size > 0 ? `(${selected.size})` : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CreateTaskModal ────────────────────────────────────────────────────────────
 
 const GOLD  = '#6366F1'
@@ -916,6 +1083,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     editTask?.phones.forEach(p => { if (p.link) init[p.id] = p.link })
     return init
   })
+  const [showCaptionPickerFor, setShowCaptionPickerFor] = useState<number | null>(null)
   const [submitting, setSubmitting]   = useState(false)
   const [progress, setProgress]       = useState('')
   const [error, setError]             = useState<string | null>(null)
@@ -943,6 +1111,14 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Auto-fill phone links from DB (phones.link column), unless already set by the editTask
+      setPhoneLinks(prev => {
+        const next = { ...prev }
+        for (const p of ps) {
+          if (p.link && !(p.id in next)) next[p.id] = p.link
+        }
+        return next
+      })
     })
   }, [currentOrg?.id, user.id])
 
@@ -966,9 +1142,11 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     })
   }
 
-  // Story : lien d'un compte (état local, sinon valeur sauvée dans l'onglet Story)
+  // Story : lien d'un compte — priorité : état local > DB (phone.link) > localStorage
   const getPhoneLink = (id: string): string => {
     if (id in phoneLinks) return phoneLinks[id]
+    const dbPhone = phones.find(p => p.id === id)
+    if (dbPhone?.link) return dbPhone.link
     return localStorage.getItem(`sf-story-link-${id}`) ?? ''
   }
   const setPhoneLink = (id: string, link: string) => {
@@ -1359,178 +1537,243 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
 
           {/* ── Segments ── */}
           <section>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ ...labelStyle, marginBottom: 0 }}>
-                Segments
-                <span style={{ color: IVORY, letterSpacing: 'normal', fontSize: 11, textTransform: 'none', fontWeight: 500 }}>
-                  {' '}— {segments.length}
-                </span>
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <span style={{ ...labelStyle, marginBottom: 2 }}>Sous-tâches</span>
+                <p style={{ margin: 0, fontSize: 11, color: MUTED }}>
+                  Chaque sous-tâche s'exécute indépendamment sur les mêmes téléphones.
+                </p>
+              </div>
               <button
                 onClick={addSegment}
                 className="cursor-pointer"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 12px', fontSize: 10, fontWeight: 700,
-                  letterSpacing: '0.04em', textTransform: 'uppercase',
-                  background: 'rgba(99,102,241,0.12)', color: '#818CF8',
-                  border: '1px solid rgba(99,102,241,0.3)', borderRadius: 7,
+                  padding: '7px 14px', fontSize: 11, fontWeight: 700,
+                  background: 'rgba(99,102,241,0.1)', color: '#818CF8',
+                  border: '1px solid rgba(99,102,241,0.28)', borderRadius: 8,
+                  flexShrink: 0,
                 }}
               >
-                <IconPlus size={9} /> Ajouter un segment
+                <IconPlus size={10} /> Nouvelle sous-tâche
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {segments.map((seg, idx) => {
                 const isStory = seg.type === 'story'
                 const open = expandedIdx === idx
-                const accent = isStory ? '#F472B6' : '#818CF8'
+                const storyAccent = '#F472B6'
+                const pubAccent   = '#818CF8'
+                const accent = isStory ? storyAccent : pubAccent
+                const accentAlpha = isStory ? 'rgba(244,114,182,' : 'rgba(129,140,248,'
                 const intervalLabel = formatInterval(draftRecurHours(seg))
                 return (
                   <div key={idx} style={{
-                    borderRadius: 11,
-                    border: `1px solid ${open ? 'rgba(99,102,241,0.4)' : HAIR}`,
-                    background: open ? 'rgba(99,102,241,0.04)' : 'rgba(255,255,255,0.015)',
-                    overflow: 'hidden', transition: 'border-color 0.15s, background 0.15s',
+                    borderRadius: 12,
+                    border: `1px solid ${open ? accentAlpha + '0.35)' : HAIR}`,
+                    background: open ? accentAlpha + '0.03)' : 'rgba(255,255,255,0.015)',
+                    overflow: 'hidden', transition: 'border-color 0.18s, background 0.18s',
                   }}>
-                    {/* Accordion header */}
-                    <button
-                      onClick={() => setExpandedIdx(open ? -1 : idx)}
-                      className="cursor-pointer"
-                      style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '11px 14px', background: 'transparent', border: 'none', textAlign: 'left',
-                      }}
-                    >
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 5,
-                        background: isStory ? 'rgba(236,72,153,0.12)' : 'rgba(99,102,241,0.12)',
-                        color: accent, border: `1px solid ${isStory ? 'rgba(236,72,153,0.3)' : 'rgba(99,102,241,0.3)'}`,
-                        borderRadius: 6, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
-                      }}>
-                        {isStory ? <IconLinkType size={11} /> : <IconVideo size={11} />}
-                        {isStory ? 'Story' : 'Publication'}
-                      </span>
-                      <span style={{ fontSize: 11.5, color: MUTED, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {intervalLabel} · {seg.videos.length} {isStory ? 'image' : 'vidéo'}{seg.videos.length > 1 ? 's' : ''}
-                      </span>
+                    {/* Card header — always visible */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 0,
+                      borderLeft: `3px solid ${open ? accent : 'transparent'}`,
+                      transition: 'border-color 0.18s',
+                    }}>
+                      <button
+                        onClick={() => setExpandedIdx(open ? -1 : idx)}
+                        className="cursor-pointer"
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '12px 14px 12px 13px', background: 'transparent', border: 'none', textAlign: 'left',
+                        }}
+                      >
+                        {/* Type pill */}
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                          background: isStory ? 'rgba(236,72,153,0.1)' : 'rgba(99,102,241,0.1)',
+                          color: accent,
+                          border: `1px solid ${isStory ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
+                          borderRadius: 6, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
+                        }}>
+                          {isStory ? <IconLinkType size={11} /> : <IconVideo size={11} />}
+                          {isStory ? 'Story' : 'Publication'}
+                        </span>
+                        {/* Summary */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: 12, color: IVORY, fontWeight: 600 }}>
+                            {intervalLabel}
+                          </span>
+                          <span style={{ fontSize: 11, color: MUTED, marginLeft: 8 }}>
+                            · {seg.videos.length} {isStory ? 'image' : 'vidéo'}{seg.videos.length !== 1 ? 's' : ''}
+                            {isStory && seg.story_texts.length > 0 && ` · ${seg.story_texts.length} caption${seg.story_texts.length > 1 ? 's' : ''}`}
+                          </span>
+                        </div>
+                        {/* Chevron */}
+                        <span style={{ display: 'flex', color: MUTED, flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.18s' }}>
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </span>
+                      </button>
+                      {/* Delete — only when multiple segments */}
                       {segments.length > 1 && (
-                        <span
-                          onClick={e => { e.stopPropagation(); removeSegment(idx) }}
-                          title="Supprimer ce segment"
+                        <button
+                          onClick={() => removeSegment(idx)}
+                          title="Supprimer cette sous-tâche"
+                          className="cursor-pointer"
                           style={{
-                            width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            background: 'rgba(248,113,113,0.08)', color: 'rgba(248,113,113,0.75)',
+                            width: 36, height: 36, flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: 'none', border: 'none', marginRight: 6,
+                            color: 'rgba(248,113,113,0.55)', borderRadius: 7,
                           }}
                         >
                           <IconTrash size={12} />
-                        </span>
+                        </button>
                       )}
-                      <span style={{ display: 'flex', color: MUTED, flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.18s' }}>
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                      </span>
-                    </button>
+                    </div>
 
-                    {/* Accordion body */}
+                    {/* Expanded body */}
                     {open && (
-                      <div style={{ padding: '4px 14px 16px', display: 'flex', flexDirection: 'column', gap: 18, borderTop: `1px solid ${HAIR}` }}>
-                        {/* Type toggle */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
-                          {([
-                            { k: 'publication' as const, title: 'Publication', icon: <IconVideo size={14} /> },
-                            { k: 'story' as const,       title: 'Story',       icon: <IconLinkType size={14} /> },
-                          ]).map(opt => {
-                            const active = seg.type === opt.k
-                            return (
-                              <button key={opt.k}
-                                onClick={() => patchSegment(idx, { type: opt.k })}
-                                className="cursor-pointer"
-                                style={{
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                  padding: '9px 12px', borderRadius: 9, fontSize: 12, fontWeight: 700,
-                                  border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : HAIR}`,
-                                  background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
-                                  color: active ? IVORY : 'rgba(233,234,240,0.6)',
-                                }}>
-                                {opt.icon} {opt.title}
-                              </button>
-                            )
-                          })}
-                        </div>
+                      <div style={{ borderTop: `1px solid ${HAIR}`, padding: '16px 16px 20px' }}>
 
-                        {/* Médias */}
-                        <div>
-                          <span style={labelStyle}>
-                            {isStory ? 'Images' : 'Vidéos'}{seg.videos.length > 0 && (
-                              <span style={{ color: IVORY, letterSpacing: 'normal', fontSize: 11, textTransform: 'none', fontWeight: 500 }}> — {seg.videos.length}</span>
-                            )}
-                          </span>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', minHeight: 38 }}>
-                            {seg.videos.map((v, i) => (
-                              <span key={i} style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 7,
-                                padding: '5px 9px', borderRadius: 7, border: `1px solid ${HAIR}`,
-                                fontSize: 11.5, color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
-                              }}>
-                                <span style={{ fontWeight: 600, color: GOLD }}>{i + 1}</span>
-                                {v.title.length > 24 ? v.title.slice(0, 24) + '…' : v.title}
-                                <button
-                                  onClick={() => patchSegment(idx, { videos: seg.videos.filter((_, j) => j !== i) })}
+                        {/* ── Type ── */}
+                        <div style={{ marginBottom: 18 }}>
+                          <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>Type</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            {([
+                              { k: 'publication' as const, title: 'Publication', sub: 'Reels Instagram', icon: <IconVideo size={16} color="currentColor" /> },
+                              { k: 'story'       as const, title: 'Story',       sub: 'Image + lien',  icon: <IconLinkType size={16} color="currentColor" /> },
+                            ]).map(opt => {
+                              const active = seg.type === opt.k
+                              const optAccent = opt.k === 'story' ? storyAccent : pubAccent
+                              return (
+                                <button key={opt.k}
+                                  onClick={() => patchSegment(idx, { type: opt.k })}
                                   className="cursor-pointer"
-                                  style={{ background: 'none', border: 'none', color: '#F0A0AB', display: 'flex', padding: 0 }}
-                                >
-                                  <IconX size={8} />
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 11,
+                                    padding: '11px 14px', borderRadius: 9,
+                                    border: `1px solid ${active ? (opt.k === 'story' ? 'rgba(244,114,182,0.45)' : 'rgba(99,102,241,0.45)') : HAIR}`,
+                                    background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.08)' : 'rgba(99,102,241,0.08)') : 'rgba(255,255,255,0.02)',
+                                    color: active ? optAccent : 'rgba(233,234,240,0.55)',
+                                    transition: 'all 0.15s',
+                                  }}>
+                                  <span style={{
+                                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.12)' : 'rgba(99,102,241,0.12)') : 'rgba(255,255,255,0.04)',
+                                  }}>
+                                    {opt.icon}
+                                  </span>
+                                  <div style={{ textAlign: 'left' }}>
+                                    <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.6)' }}>{opt.title}</p>
+                                    <p style={{ margin: 0, fontSize: 10.5, color: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.7)' : 'rgba(129,140,248,0.7)') : MUTED }}>{opt.sub}</p>
+                                  </div>
                                 </button>
-                              </span>
-                            ))}
-                            <button
-                              onClick={() => setShowBankPickerFor(idx)}
-                              className="cursor-pointer"
-                              style={{
-                                padding: '6px 13px', fontSize: 10, fontWeight: 700,
-                                letterSpacing: '0.04em', textTransform: 'uppercase',
-                                background: GOLD, color: '#fff', border: 'none', borderRadius: 6,
-                              }}
-                            >
-                              + Depuis la banque
-                            </button>
+                              )
+                            })}
                           </div>
                         </div>
 
-                        {/* Légende (Publication) */}
+                        {/* ── Médias ── */}
+                        <div style={{ marginBottom: 18 }}>
+                          <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+                            {isStory ? 'Images' : 'Vidéos'}
+                            {seg.videos.length > 0 && <span style={{ color: IVORY, letterSpacing: 'normal', textTransform: 'none', fontWeight: 500, fontSize: 11 }}> — {seg.videos.length}</span>}
+                          </p>
+                          {seg.videos.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                              {seg.videos.map((v, i) => (
+                                <span key={i} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                                  padding: '4px 8px 4px 6px', borderRadius: 6,
+                                  border: `1px solid ${HAIR}`,
+                                  fontSize: 11.5, color: 'rgba(233,234,240,0.7)',
+                                  background: 'rgba(233,234,240,0.03)',
+                                }}>
+                                  <span style={{ width: 18, height: 18, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', background: accentAlpha + '0.15)', color: accent, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                                  {v.title.length > 22 ? v.title.slice(0, 22) + '…' : v.title}
+                                  <button
+                                    onClick={() => patchSegment(idx, { videos: seg.videos.filter((_, j) => j !== i) })}
+                                    className="cursor-pointer"
+                                    style={{ background: 'none', border: 'none', color: 'rgba(248,113,113,0.6)', display: 'flex', padding: 0, cursor: 'pointer' }}
+                                  >
+                                    <IconX size={8} />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setShowBankPickerFor(idx)}
+                            className="cursor-pointer"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 7,
+                              padding: '7px 14px', fontSize: 11, fontWeight: 700,
+                              background: accentAlpha + '0.1)', color: accent,
+                              border: `1px solid ${accentAlpha + '0.28)'}`, borderRadius: 7,
+                            }}
+                          >
+                            <IconPlus size={10} /> Depuis la banque de médias
+                          </button>
+                        </div>
+
+                        {/* ── Légende (Publication) ── */}
                         {!isStory && (
-                          <div>
-                            <span style={labelStyle}>Légende</span>
+                          <div style={{ marginBottom: 18 }}>
+                            <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>Légende</p>
                             <textarea
                               value={seg.caption}
                               onChange={e => patchSegment(idx, { caption: e.target.value })}
                               rows={3}
                               placeholder="Description Instagram…"
                               style={{
-                                width: '100%', minHeight: 64, padding: '10px 12px', fontSize: 13, lineHeight: 1.6,
+                                width: '100%', minHeight: 68, padding: '10px 12px', fontSize: 13, lineHeight: 1.6,
                                 background: 'rgba(233,234,240,0.02)', color: IVORY, resize: 'vertical',
-                                border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+                                border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
+                                fontFamily: 'inherit', boxSizing: 'border-box',
                               }}
                             />
                           </div>
                         )}
 
-                        {/* Textes du sticker (Story) */}
+                        {/* ── Pool de captions (Story) ── */}
                         {isStory && (
-                          <div>
-                            <span style={labelStyle}>
-                              Texte du sticker
-                              <span style={{ color: MUTED, letterSpacing: 'normal', fontSize: 10, textTransform: 'none', fontWeight: 500 }}> — optionnel, distribué par compte</span>
-                            </span>
-                            <div style={{ display: 'flex', gap: 8, marginBottom: seg.story_texts.length ? 10 : 0 }}>
+                          <div style={{ marginBottom: 18 }}>
+                            <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 4px' }}>Pool de captions</p>
+                            <p style={{ fontSize: 11, color: MUTED, margin: '0 0 10px' }}>Chaque compte pioche une caption aléatoire dans ce pool.</p>
+                            {/* Existing captions */}
+                            {seg.story_texts.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                                {seg.story_texts.map((txt, i) => (
+                                  <div key={i} style={{
+                                    display: 'flex', alignItems: 'center', gap: 8,
+                                    padding: '7px 10px', borderRadius: 7,
+                                    border: `1px solid ${HAIR}`,
+                                    background: 'rgba(233,234,240,0.02)',
+                                  }}>
+                                    <span style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(244,114,182,0.12)', color: storyAccent, fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                                    <span style={{ flex: 1, fontSize: 12, color: 'rgba(233,234,240,0.75)', lineHeight: 1.5, wordBreak: 'break-word' }}>{txt}</span>
+                                    <button
+                                      onClick={() => patchSegment(idx, { story_texts: seg.story_texts.filter((_, j) => j !== i) })}
+                                      className="cursor-pointer"
+                                      style={{ background: 'none', border: 'none', color: 'rgba(248,113,113,0.55)', display: 'flex', padding: 0, flexShrink: 0 }}
+                                    >
+                                      <IconX size={9} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Add caption row */}
+                            <div style={{ display: 'flex', gap: 7, marginBottom: 7 }}>
                               <input
                                 type="text"
                                 value={open ? storyTextDraft : ''}
                                 onChange={e => setStoryTextDraft(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStoryText(idx) } }}
-                                placeholder="Ex : Voir le lien 👆"
+                                placeholder="Ex : Voir le lien en bio 👆"
                                 style={{
                                   flex: 1, height: 36, padding: '0 12px', fontSize: 13,
                                   background: 'rgba(233,234,240,0.02)', color: IVORY,
@@ -1542,79 +1785,75 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 disabled={!storyTextDraft.trim()}
                                 className="cursor-pointer"
                                 style={{
-                                  padding: '0 16px', fontSize: 10, fontWeight: 700,
-                                  letterSpacing: '0.04em', textTransform: 'uppercase',
-                                  background: storyTextDraft.trim() ? GOLD : 'rgba(233,234,240,0.08)',
-                                  color: storyTextDraft.trim() ? '#fff' : MUTED, border: 'none', borderRadius: 7,
+                                  padding: '0 14px', fontSize: 11, fontWeight: 700,
+                                  background: storyTextDraft.trim() ? 'rgba(244,114,182,0.12)' : 'rgba(233,234,240,0.05)',
+                                  color: storyTextDraft.trim() ? storyAccent : MUTED,
+                                  border: `1px solid ${storyTextDraft.trim() ? 'rgba(244,114,182,0.3)' : HAIR}`,
+                                  borderRadius: 8,
                                 }}
                               >
                                 Ajouter
                               </button>
                             </div>
-                            {seg.story_texts.length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                {seg.story_texts.map((txt, i) => (
-                                  <span key={i} style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 7,
-                                    padding: '5px 9px', borderRadius: 7, border: `1px solid ${HAIR}`,
-                                    fontSize: 11.5, color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
-                                  }}>
-                                    {txt.length > 32 ? txt.slice(0, 32) + '…' : txt}
-                                    <button
-                                      onClick={() => patchSegment(idx, { story_texts: seg.story_texts.filter((_, j) => j !== i) })}
-                                      className="cursor-pointer"
-                                      style={{ background: 'none', border: 'none', color: '#F0A0AB', display: 'flex', padding: 0 }}
-                                    >
-                                      <IconX size={8} />
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                            {/* Import from caption bank */}
+                            <button
+                              onClick={() => setShowCaptionPickerFor(idx)}
+                              className="cursor-pointer"
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 7,
+                                padding: '7px 13px', fontSize: 11, fontWeight: 700,
+                                background: 'rgba(244,114,182,0.07)', color: storyAccent,
+                                border: '1px solid rgba(244,114,182,0.25)', borderRadius: 7,
+                              }}
+                            >
+                              <IconPlus size={10} /> Depuis la banque de captions
+                            </button>
                           </div>
                         )}
 
-                        {/* Paramètres du segment */}
+                        {/* ── Paramètres ── */}
                         <div>
-                          <span style={labelStyle}>Paramètres</span>
-                          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                            {/* Mode */}
-                            <div>
-                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Mode</p>
-                              <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 7, overflow: 'hidden' }}>
-                                {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
-                                  <button key={m.k} onClick={() => patchSegment(idx, { mode: m.k })} className="cursor-pointer"
-                                    style={{
-                                      padding: '8px 12px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                                      background: seg.mode === m.k ? IVORY : 'transparent', color: seg.mode === m.k ? '#0A0B0E' : MUTED, border: 'none',
-                                    }}>
-                                    {m.l}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                          <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 12px' }}>Paramètres</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
                             {/* Intervalle */}
                             <div>
                               <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Intervalle</p>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <input type="number" min={1} max={9999} value={seg.recurValue}
                                   onChange={e => patchSegment(idx, { recurValue: Math.max(1, Number(e.target.value) || 24) })}
-                                  style={{ width: 68, height: 34, padding: '0 10px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                  style={{ width: 62, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
                                 <select value={seg.recurUnit}
                                   onChange={e => patchSegment(idx, { recurUnit: e.target.value as 'minutes' | 'heures' | 'jours' })}
-                                  style={{ height: 34, padding: '0 8px', fontSize: 12, background: '#0F1014', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }}>
-                                  <option value="minutes">minutes</option>
-                                  <option value="heures">heures</option>
-                                  <option value="jours">jours</option>
+                                  className="cursor-pointer"
+                                  style={{ height: 34, padding: '0 6px', fontSize: 12, background: '#0F1014', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }}>
+                                  <option value="minutes">min</option>
+                                  <option value="heures">h</option>
+                                  <option value="jours">j</option>
                                 </select>
                               </div>
                             </div>
                             {/* Premier post */}
-                            <div>
+                            <div style={{ gridColumn: 'span 2' }}>
                               <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Premier post</p>
                               <input type="datetime-local" value={seg.next_run_at}
                                 onChange={e => patchSegment(idx, { next_run_at: e.target.value })}
-                                style={{ height: 34, padding: '0 10px', fontSize: 13, colorScheme: 'dark', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                style={{ height: 34, padding: '0 10px', fontSize: 12, colorScheme: 'dark', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+                            </div>
+                            {/* Mode */}
+                            <div>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Ordre médias</p>
+                              <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 7, overflow: 'hidden', height: 34 }}>
+                                {([{ k: 'seq', l: 'Seq.' }, { k: 'random', l: 'Aléa.' }] as const).map(m => (
+                                  <button key={m.k} onClick={() => patchSegment(idx, { mode: m.k })} className="cursor-pointer"
+                                    style={{
+                                      flex: 1, padding: '0 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                                      background: seg.mode === m.k ? IVORY : 'transparent',
+                                      color: seg.mode === m.k ? '#0A0B0E' : MUTED, border: 'none',
+                                    }}>
+                                    {m.l}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                             {/* Délai / compte (Publication) */}
                             {!isStory && (
@@ -1623,27 +1862,27 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <input type="number" min={0} max={120} value={seg.delay_minutes}
                                     onChange={e => patchSegment(idx, { delay_minutes: Math.max(0, Math.min(120, Number(e.target.value) || 0)) })}
-                                    style={{ width: 60, height: 34, padding: '0 10px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                    style={{ width: 54, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
                                   <span style={{ fontSize: 11, color: MUTED }}>min</span>
                                 </div>
                               </div>
                             )}
-                            {/* Essai Reels (Publication) */}
+                            {/* Reels trial (Publication) */}
                             {!isStory && (
                               <div>
-                                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Essai Reels</p>
+                                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Reels Trial</p>
                                 <button onClick={() => patchSegment(idx, { reels_trial: !seg.reels_trial })} className="cursor-pointer"
-                                  style={{ height: 34, padding: '0 16px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.reels_trial ? GOLD : 'transparent', color: seg.reels_trial ? '#0A0B0E' : MUTED, border: seg.reels_trial ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
+                                  style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.reels_trial ? GOLD : 'transparent', color: seg.reels_trial ? '#0A0B0E' : MUTED, border: seg.reels_trial ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
                                   {seg.reels_trial ? 'Activé' : 'Désactivé'}
                                 </button>
                               </div>
                             )}
                             {/* Usage unique */}
                             <div>
-                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{isStory ? 'Image' : 'Vidéo'} → usage unique</p>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Usage unique</p>
                               <button onClick={() => patchSegment(idx, { auto_remove_videos: !seg.auto_remove_videos })}
-                                title="Supprime chaque média de la pool après qu'il a été posté" className="cursor-pointer"
-                                style={{ height: 34, padding: '0 16px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.auto_remove_videos ? '#F59E0B' : 'transparent', color: seg.auto_remove_videos ? '#0A0B0E' : MUTED, border: seg.auto_remove_videos ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
+                                title="Retire chaque média du pool après utilisation" className="cursor-pointer"
+                                style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.auto_remove_videos ? '#F59E0B' : 'transparent', color: seg.auto_remove_videos ? '#0A0B0E' : MUTED, border: seg.auto_remove_videos ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
                                 {seg.auto_remove_videos ? 'Activé' : 'Désactivé'}
                               </button>
                             </div>
@@ -1757,6 +1996,27 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             setShowBankPickerFor(null)
           }}
           onClose={() => setShowBankPickerFor(null)}
+        />
+      )}
+
+      {/* Caption bank picker — adds text captions to a story segment's pool */}
+      {showCaptionPickerFor !== null && (
+        <CaptionBankPicker
+          user={user}
+          currentOrg={currentOrg}
+          onSelect={texts => {
+            const segIdx = showCaptionPickerFor
+            setSegments(prev => prev.map((s, i) => {
+              if (i !== segIdx) return s
+              const merged = [...s.story_texts]
+              for (const t of texts) {
+                if (!merged.includes(t)) merged.push(t)
+              }
+              return { ...s, story_texts: merged }
+            }))
+            setShowCaptionPickerFor(null)
+          }}
+          onClose={() => setShowCaptionPickerFor(null)}
         />
       )}
     </div>
