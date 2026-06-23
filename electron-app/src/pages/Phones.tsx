@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
+import { createPortal } from 'react-dom'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { useT, useLang } from '@/lib/i18n'
 import { canAccessPhoneGroup } from '@/lib/permissions'
-import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId, stopPhones } from '@/lib/geelark'
+import { fetchAllPhones, geelarkStatusLabel, stopPhones } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -64,8 +65,6 @@ function IgStatusBadge({ phone }: { phone: Phone }) {
     return <span className="sf-badge sf-badge-danger">{t('phoneError')}</span>
   if (phone.ig_status === 'rate_limited')
     return <span className="sf-badge sf-badge-warn">{t('phoneRateLimited')}</span>
-  if (phone.ig_sessionid)
-    return <span className="sf-badge sf-badge-accent">{t('phoneSession')}</span>
   return <span className="sf-badge sf-badge-muted">{t('phonePublic')}</span>
 }
 
@@ -107,289 +106,12 @@ const CountdownTicker = memo(function CountdownTicker({ enabled }: { enabled: bo
   )
 })
 
-// ── Session ID dialog ─────────────────────────────────────────────────────────
-function SessionDialog({
-  phone, bearer, onClose, onSaved,
-}: {
-  phone: Phone; bearer: string
-  onClose: () => void
-  onSaved: (id: string, sessionid: string, detectedUsername?: string) => void
-}) {
-  const t = useT()
-  const [value, setValue]               = useState(phone.ig_sessionid ?? '')
-  const [testing, setTesting]           = useState(false)
-  const [testResult, setTestResult]     = useState<'idle' | 'ok' | 'fail'>('idle')
-  const [detectedUser, setDetectedUser] = useState<string | null>(null)
-  const [saving, setSaving]             = useState(false)
-  const [saveError, setSaveError]       = useState<string | null>(null)
-  const [extracting, setExtracting]     = useState(false)
-  const [extractLogs, setExtractLogs]   = useState<string[]>([])
-  const [extractError, setExtractError] = useState<string | null>(null)
-  const inputRef      = useRef<HTMLInputElement>(null)
-  const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const abortCtrlRef  = useRef<AbortController | null>(null)
-  const logsEndRef    = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => { inputRef.current?.focus() }, [])
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  async function runTest(sessionid: string): Promise<{ ok: boolean; username?: string }> {
-    if (!sessionid.trim()) return { ok: false }
-    setTesting(true); setTestResult('idle'); setDetectedUser(null)
-    try {
-      const r = await window.electronAPI?.fetchInstagramBySession({
-        username:  phone.ig_username ?? '',
-        sessionid: sessionid.trim(),
-      })
-      if (r?.ok) {
-        setTestResult('ok')
-        if (r.username) setDetectedUser(r.username)
-        setTesting(false)
-        return { ok: true, username: r.username }
-      } else {
-        setTestResult('fail')
-      }
-    } catch {
-      setTestResult('fail')
-    }
-    setTesting(false)
-    return { ok: false }
-  }
-
-  async function extractFromPhone() {
-    if (!bearer || !phone.geelark_id) {
-      setExtractError('Phone not linked to GéeLark or missing token')
-      return
-    }
-    const ctrl = new AbortController()
-    abortCtrlRef.current = ctrl
-    setExtracting(true); setExtractLogs([]); setExtractError(null)
-    const logs: string[] = []
-    const addLog = (msg: string) => {
-      logs.push(msg)
-      setExtractLogs([...logs])
-      setTimeout(() => logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 30)
-    }
-    try {
-      const sessionid = await extractInstagramSessionId(bearer, phone.geelark_id, addLog, ctrl.signal)
-      if (sessionid) {
-        setValue(sessionid)
-        handleChange(sessionid)
-        setExtractError(null)
-      } else if (!ctrl.signal.aborted) {
-        setExtractError('sessionid not found — see logs above')
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (msg !== 'Cancelled') setExtractError(msg)
-    }
-    abortCtrlRef.current = null
-    setExtracting(false)
-  }
-
-  function cancelExtract() { abortCtrlRef.current?.abort() }
-
-  function handleChange(v: string) {
-    setValue(v)
-    setTestResult('idle')
-    setDetectedUser(null)
-    setSaveError(null)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (v.trim().length > 10) {
-      debounceRef.current = setTimeout(() => runTest(v), 400)
-    }
-  }
-
-  async function save() {
-    if (!value.trim()) return
-    setSaving(true); setSaveError(null)
-    let username = detectedUser ?? undefined
-    if (testResult !== 'ok') {
-      const r = await runTest(value)
-      if (!r.ok) { setSaving(false); return }
-      username = r.username
-    }
-    const { error } = await supabase.from('phones').update({ ig_sessionid: value.trim() || null }).eq('id', phone.id)
-    setSaving(false)
-    if (error) { setSaveError(error.message); return }
-    onSaved(phone.id, value.trim(), username)
-    onClose()
-  }
-
-  const busy = testing || saving
-
-  return (
-    <div className="sf-modal-bg" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="sf-modal sf-anim-scale-spring" style={{ width: 480, maxWidth: '90vw' }}>
-        <div className="sf-modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.35)', color: ACCENT,
-            }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="1.5" y="5.5" width="13" height="9" rx="2" stroke="currentColor" strokeWidth="1.4"/>
-                <path d="M5.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <div>
-              <h2 className="sf-modal-title">{t('phoneSessionTitle')}</h2>
-              {phone.ig_username && <p style={{ fontSize: 12, color: ACCENT, margin: '2px 0 0' }}>@{phone.ig_username}</p>}
-            </div>
-          </div>
-          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ width: 28, height: 28, borderRadius: 0 }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-            </svg>
-          </button>
-        </div>
-
-        <div className="sf-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {phone.geelark_id && bearer && (
-            <div style={{
-              background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.15)',
-              borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: TEXT_1, margin: 0 }}>{t('phoneAutoExtract')}</p>
-                  <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.52)', margin: '2px 0 0' }}>{t('phoneAutoExtractDesc')}</p>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {extracting && (
-                    <button className="sf-btn sf-btn-secondary sf-btn-sm" onClick={cancelExtract} style={{ cursor: 'pointer' }}>
-                      {t('phoneCancelExtract')}
-                    </button>
-                  )}
-                  <Button size="sm" onClick={extractFromPhone} loading={extracting} disabled={extracting}>
-                    {extracting ? t('phoneExtractingBtn') : t('phoneExtractBtn')}
-                  </Button>
-                </div>
-              </div>
-              {extractLogs.length > 0 && (
-                <div style={{
-                  background: 'rgba(0,0,0,0.35)', borderRadius: 0, padding: '8px 10px',
-                  maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
-                  border: '1px solid rgba(233,234,240,0.06)',
-                }}>
-                  {extractLogs.map((l, i) => (
-                    <p key={i} style={{
-                      fontSize: 10, fontFamily: 'monospace', margin: 0,
-                      color: l.startsWith('✅') ? '#7FD9B8' : l.startsWith('❌') || l.startsWith('🛑') ? '#F0A0AB' : l.startsWith('⚠️') ? '#E5C07B' : 'rgba(233,234,240,0.52)',
-                    }}>{l}</p>
-                  ))}
-                  <div ref={logsEndRef} />
-                </div>
-              )}
-              {extractError && (
-                <p style={{ fontSize: 11, color: '#F0A0AB', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.3"/>
-                    <path d="M6 3.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                    <circle cx="6" cy="8.5" r="0.6" fill="currentColor"/>
-                  </svg>
-                  {extractError}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div style={{
-            background: 'rgba(233,234,240,0.025)', border: '1px solid rgba(233,234,240,0.07)',
-            borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4,
-          }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_1, margin: '0 0 4px' }}>{t('phoneManualInstructions')}</p>
-            {[
-              <>1. Open <span style={{ color: ACCENT }}>{t('phoneManualStep1Chrome')}</span> in Chrome</>,
-              <>2. Press <span style={{ color: ACCENT }}>{t('phoneManualStep2DevTools')}</span> (DevTools)</>,
-              <>3. Go to <span style={{ color: ACCENT }}>{t('phoneManualStep3Cookies')}</span></>,
-              <>4. Find the <span style={{ color: ACCENT, fontFamily: 'monospace' }}>{t('phoneManualStep4Cookie')}</span> cookie and copy its value</>,
-            ].map((step, i) => (
-              <p key={i} style={{ fontSize: 11, color: 'rgba(233,234,240,0.52)', margin: 0 }}>{step}</p>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontFamily: SANS, fontSize: 9, fontWeight: 700, color: TEXT_3, letterSpacing: '0.25em', textTransform: 'uppercase' }}>{t('phoneSessionLabel')}</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                ref={inputRef}
-                type="password"
-                value={value}
-                onChange={e => handleChange(e.target.value)}
-                placeholder={t('phoneSessionPlaceholder')}
-                className="sf-input"
-                style={{
-                  width: '100%', boxSizing: 'border-box', paddingRight: 36,
-                  borderColor: testResult === 'ok' ? '#7FD9B8' : testResult === 'fail' ? '#F0A0AB' : undefined,
-                  fontFamily: 'monospace',
-                }}
-              />
-              <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, pointerEvents: 'none' }}>
-                {testing ? (
-                  <svg style={{ animation: 'spin 1s linear infinite' }} width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <circle cx="6.5" cy="6.5" r="5" stroke={ACCENT} strokeWidth="1.5" strokeDasharray="10 20" strokeLinecap="round"/>
-                  </svg>
-                ) : testResult === 'ok' ? (
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <path d="M2 7l3 3 6-6" stroke="#7FD9B8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ) : testResult === 'fail' ? (
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <path d="M2 2l9 9M11 2L2 11" stroke="#F0A0AB" strokeWidth="1.8" strokeLinecap="round"/>
-                  </svg>
-                ) : null}
-              </span>
-            </div>
-            {testResult === 'ok' && detectedUser && (
-              <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.52)', margin: 0 }}>
-                {t('phoneSessionTestOkUser')} <span style={{ color: ACCENT, fontWeight: 600 }}>@{detectedUser}</span>
-                {phone.ig_username && phone.ig_username !== detectedUser && (
-                  <span style={{ color: '#E5C07B', marginLeft: 4 }}>{t('phoneSessionDifferentUser')} @{phone.ig_username} {t('phoneSessionWillUpdate')}</span>
-                )}
-              </p>
-            )}
-            {testResult === 'fail' && <p style={{ fontSize: 11, color: '#F0A0AB', margin: 0 }}>{t('phoneSessionInvalid')}</p>}
-            {testResult === 'idle' && value.trim().length > 10 && !testing && (
-              <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.52)', margin: 0 }}>{t('phoneSessionAutoTest')}</p>
-            )}
-            {saveError && (
-              <p style={{ fontSize: 11, color: '#F0A0AB', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.3"/>
-                  <path d="M6 3.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                  <circle cx="6" cy="8.5" r="0.6" fill="currentColor"/>
-                </svg>
-                {saveError}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="sf-modal-footer">
-          <button onClick={onClose} disabled={busy} className="sf-btn sf-btn-ghost" style={{ cursor: 'pointer' }}>
-            {t('cancel')}
-          </button>
-          <Button size="sm" onClick={save} loading={busy} disabled={!value.trim()}>
-            {testing ? t('phoneSessionVerifying') : saving ? t('phoneSessionSaving') : testResult === 'ok' ? t('phoneSessionSave') : t('phoneSessionTestAndSave')}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Context menu ──────────────────────────────────────────────────────────────
 function ContextMenu({
-  phone, x, y, onClose, onSession, onUnlink, onDelete, canDelete,
+  phone, x, y, onClose, onUnlink, onDelete, canDelete,
 }: {
   phone: Phone; x: number; y: number; onClose: () => void
-  onSession: () => void; onUnlink: () => void; onDelete: () => void; canDelete: boolean
+  onUnlink: () => void; onDelete: () => void; canDelete: boolean
 }) {
   const t = useT()
   const menuRef = useRef<HTMLDivElement>(null)
@@ -430,7 +152,10 @@ function ContextMenu({
     </button>
   )
 
-  return (
+  // Portal to <body> so the menu escapes any transformed/animated ancestor
+  // (anim-page) — otherwise position:fixed becomes relative to that ancestor
+  // and the menu drifts to the top of the page when scrolled.
+  return createPortal(
     <div ref={menuRef} style={{
       position: 'fixed', zIndex: 50,
       background: '#0F1014', border: '1px solid rgba(233,234,240,0.09)',
@@ -441,10 +166,6 @@ function ContextMenu({
         <p style={{ fontSize: 12, fontWeight: 600, color: TEXT_1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.phone_name}</p>
         {phone.ig_username && <p style={{ fontSize: 10, color: ACCENT, margin: '1px 0 0' }}>@{phone.ig_username}</p>}
       </div>
-      {item(
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-        t('phoneCtxSessionId'), onSession
-      )}
       {phone.ig_username && item(
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
         t('phoneCtxUnlink'), onUnlink
@@ -458,7 +179,8 @@ function ContextMenu({
           )}
         </>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -683,14 +405,13 @@ function LinkCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
 // ── Phone card row ────────────────────────────────────────────────────────────
 const PhoneRow = memo(function PhoneRow({
   phone, isSelected, checked, col, canDelete, index,
-  setSelectedPhone, setContextMenu, setSessionDialog,
+  setSelectedPhone, setContextMenu,
   saveIgUsername, saveRemark, saveLink, requestDelete, toggleSelect,
 }: {
   phone: Phone; isSelected: boolean; checked: boolean; col: string; index: number
   canDelete: boolean
   setSelectedPhone: (p: Phone | null) => void
   setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
-  setSessionDialog: (v: { phone: Phone } | null) => void
   saveIgUsername: (id: string, u: string) => Promise<void>
   saveRemark: (id: string, v: string) => Promise<void>
   saveLink: (id: string, v: string) => Promise<void>
@@ -796,17 +517,6 @@ const PhoneRow = memo(function PhoneRow({
       <td style={{ ...cellStyle, padding: '10px 10px' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
           <button
-            onClick={() => setSessionDialog({ phone })}
-            title={t('phonesRowSessionId')}
-            className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
-            style={{ cursor: 'pointer' }}
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
-          </button>
-          <button
             className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
             title="More"
             style={{ cursor: 'pointer' }}
@@ -839,12 +549,11 @@ const PhoneRow = memo(function PhoneRow({
 // ── Phone card (grid view) ────────────────────────────────────────────────────
 const PhoneCard = memo(function PhoneCard({
   phone, isSelected, checked, col, canDelete,
-  setSelectedPhone, setContextMenu, setSessionDialog, requestDelete, toggleSelect, saveLink,
+  setSelectedPhone, setContextMenu, requestDelete, toggleSelect, saveLink,
 }: {
   phone: Phone; isSelected: boolean; checked: boolean; col: string; canDelete: boolean
   setSelectedPhone: (p: Phone | null) => void
   setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
-  setSessionDialog: (v: { phone: Phone } | null) => void
   requestDelete: (p: Phone) => void
   toggleSelect: (id: string) => void
   saveLink: (id: string, v: string) => Promise<void>
@@ -960,17 +669,8 @@ const PhoneCard = memo(function PhoneCard({
       {/* Footer actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
         <button
-          onClick={() => setSessionDialog({ phone })}
           className="sf-btn sf-btn-ghost sf-btn-sm"
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }}
-          title={t('phonesRowSessionId')}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-          {t('phoneSession')}
-        </button>
-        <button
-          className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
-          style={{ cursor: 'pointer' }} title="More"
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }} title="More"
           onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
         >
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="2" cy="6.5" r="1" fill="currentColor"/><circle cx="6.5" cy="6.5" r="1" fill="currentColor"/><circle cx="11" cy="6.5" r="1" fill="currentColor"/></svg>
@@ -1011,7 +711,6 @@ export function Phones({ user }: PhonesProps) {
   const [pollError, setPollError]     = useState<string | null>(null)
 
   const [contextMenu, setContextMenu]     = useState<{ phone: Phone; x: number; y: number } | null>(null)
-  const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
   const [selectedPhone, setSelectedPhone] = useState<Phone | null>(null)
   const [groupFilter, setGroupFilter]     = useState<string>('all')
 
@@ -1300,45 +999,16 @@ export function Phones({ user }: PhonesProps) {
     setBulkBusy(false)
   }
 
-  async function onSessionSaved(id: string, sessionid: string, detectedUsername?: string) {
-    const updates: Partial<Phone> = { ig_sessionid: sessionid || null }
-    if (detectedUsername) {
-      updates.ig_username = detectedUsername
-      await supabase.from('phones').update({ ig_username: detectedUsername }).eq('id', id)
-    }
-    setPhones(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
-
-    const username = detectedUsername ?? phonesRef.current.find(p => p.id === id)?.ig_username
-    if (sessionid && username && window.electronAPI?.fetchInstagramBySession) {
-      try {
-        const r = await window.electronAPI.fetchInstagramBySession({ username, sessionid })
-        if (r.ok) {
-          const statUpdates = {
-            ig_username:  r.username  ?? username,
-            followers:    r.followers  ?? 0,
-            following:    r.following  ?? 0,
-            total_views:  r.total_views ?? 0,
-            video_count:  r.posts       ?? 0,
-            bio:          r.bio         ?? '',
-            ig_status:    'active',
-          }
-          await supabase.from('phones').update(statUpdates).eq('id', id)
-          setPhones(prev => prev.map(p => p.id === id ? { ...p, ...statUpdates } : p))
-        }
-      } catch { /* silent */ }
-    }
-  }
-
   useEffect(() => {
     if (!selectedPhone) return
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
-      if (sessionDialog || contextMenu || confirmDelete || confirmBulkDelete) return
+      if (contextMenu || confirmDelete || confirmBulkDelete) return
       setSelectedPhone(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedPhone, sessionDialog, contextMenu, confirmDelete, confirmBulkDelete])
+  }, [selectedPhone, contextMenu, confirmDelete, confirmBulkDelete])
 
   // ── Filtering + sorting ────────────────────────────────────────────────────
   const visible = phones.filter(p => {
@@ -1446,18 +1116,10 @@ export function Phones({ user }: PhonesProps) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      {sessionDialog && (
-        <SessionDialog
-          phone={sessionDialog.phone} bearer={bearer}
-          onClose={() => setSessionDialog(null)}
-          onSaved={onSessionSaved}
-        />
-      )}
       {contextMenu && (
         <ContextMenu
           phone={contextMenu.phone} x={contextMenu.x} y={contextMenu.y}
           onClose={() => setContextMenu(null)}
-          onSession={() => setSessionDialog({ phone: contextMenu.phone })}
           onUnlink={() => unlinkIg(contextMenu.phone.id)}
           onDelete={() => requestDelete(contextMenu.phone)}
           canDelete={canDelete}
@@ -1599,7 +1261,6 @@ export function Phones({ user }: PhonesProps) {
           {/* ── Stats chips ──────────────────────────────────────────────── */}
           {!loading && phones.length > 0 && (() => {
             const onlinePct  = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
-            const withSession = phones.filter(p => p.ig_sessionid).length
             const statChips = [
               {
                 label: t('phoneSummaryTotal'), value: phones.length,
@@ -1621,16 +1282,6 @@ export function Phones({ user }: PhonesProps) {
                 icon: <span style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid rgba(233,234,240,0.4)', display: 'inline-block' }} />,
                 color: 'rgba(233,234,240,0.5)', sub: undefined as string | undefined,
               },
-              ...(withSession > 0 ? [{
-                label: t('phoneSession'), value: withSession,
-                icon: (
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-                    <path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                  </svg>
-                ),
-                color: ACCENT, sub: undefined as string | undefined,
-              }] : []),
             ]
             return (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
@@ -1953,7 +1604,6 @@ export function Phones({ user }: PhonesProps) {
                       canDelete={canDelete}
                       setSelectedPhone={setSelectedPhone}
                       setContextMenu={setContextMenu}
-                      setSessionDialog={setSessionDialog}
                       requestDelete={requestDelete}
                       toggleSelect={toggleSelect}
                       saveLink={saveLink}
@@ -2000,7 +1650,6 @@ export function Phones({ user }: PhonesProps) {
                           canDelete={canDelete}
                           setSelectedPhone={setSelectedPhone}
                           setContextMenu={setContextMenu}
-                          setSessionDialog={setSessionDialog}
                           saveIgUsername={saveIgUsername}
                           saveRemark={saveRemark}
                           saveLink={saveLink}
@@ -2075,11 +1724,6 @@ export function Phones({ user }: PhonesProps) {
                     {/* Quick action buttons */}
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[
-                        {
-                          label: t('phoneSession'),
-                          icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-                          action: () => setSessionDialog({ phone: p }),
-                        },
                         {
                           label: t('phonesSync'),
                           icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8 2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M7.5 1l1.5 1.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
@@ -2163,12 +1807,6 @@ export function Phones({ user }: PhonesProps) {
                             {p.ig_status === 'active' ? t('phonesIgStatusActive') : p.ig_status === 'expired' ? t('phonesIgStatusExpired') : p.ig_status === 'error' ? t('phonesIgStatusError') : t('phonesIgNotConfigured')}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)' }}>{t('phonesIgSession')}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? 'var(--ok)' : 'rgba(233,234,240,0.52)' }}>
-                            {p.ig_sessionid ? t('phonesIgSessionConfigured') : t('phonesIgNotConfigured')}
-                          </span>
-                        </div>
                       </div>
                     </div>
                   )}
@@ -2177,14 +1815,6 @@ export function Phones({ user }: PhonesProps) {
                   <div style={{ padding: '16px 18px' }}>
                     <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }}>{t('phonesQuickActions')}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <button onClick={() => setSessionDialog({ phone: p })} className="sf-btn sf-btn-ghost" style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                        borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
-                        color: ACCENT, cursor: 'pointer', justifyContent: 'flex-start',
-                      }}>
-                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                        {t('phonesSessionIdAction')}
-                      </button>
                       {p.ig_username && (
                         <button onClick={() => { unlinkIg(p.id); setSelectedPhone(null) }} className="sf-btn sf-btn-ghost" style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',

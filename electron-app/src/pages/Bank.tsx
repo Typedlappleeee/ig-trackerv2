@@ -1382,13 +1382,23 @@ export function Bank({ user }: BankProps) {
         </main>
       </div>
 
-      {/* ── Premium context menu ── */}
-      {ctxMenu && (
+      {/* ── Premium context menu ──
+          Rendered in a portal to <body> so it escapes this page's scroll
+          container, which carries an anim-page transform. A transformed
+          ancestor makes position:fixed relative to that ancestor (not the
+          viewport), so the menu scrolled with the page and ended up pinned at
+          the top. Portaling to body + viewport coords keeps it at the cursor.
+          left/top are divided by the body zoom (font-size setting) so the
+          offsets aren't scaled away from the click point. */}
+      {ctxMenu && createPortal((() => {
+        const zRaw = parseFloat(getComputedStyle(document.body).zoom || '1')
+        const zoom = zRaw && !isNaN(zRaw) ? zRaw : 1
+        return (
         <div
           className="fixed z-[60] rounded-xl py-1.5 min-w-[188px] shadow-2xl anim-scale-in"
           style={{
-            left: ctxMenu.x,
-            top: ctxMenu.y,
+            left: Math.min(ctxMenu.x / zoom, window.innerWidth / zoom - 200),
+            top:  Math.min(ctxMenu.y / zoom, window.innerHeight / zoom - 320),
             background: 'var(--surface)',
             border: '1px solid rgba(99,102,241,0.22)',
             boxShadow: '0 16px 48px -8px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.5)',
@@ -1446,7 +1456,8 @@ export function Bank({ user }: BankProps) {
             {t('bankCtxDelete')}
           </button>
         </div>
-      )}
+        )
+      })(), document.body)}
 
       {/* ── Video player ── */}
       {playingItem && (

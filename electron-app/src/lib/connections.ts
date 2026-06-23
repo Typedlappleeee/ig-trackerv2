@@ -4,8 +4,11 @@ import { supabase } from './supabase'
 import { useOrg } from './orgContext'
 
 // Default Groq key for agencies that haven't configured their own.
-// Set VITE_DEFAULT_GROQ_KEY in Vercel / .env.local to activate.
-const DEFAULT_GROQ_KEY = import.meta.env.VITE_DEFAULT_GROQ_KEY ?? ''
+// Set VITE_DEFAULT_GROQ_KEY in Vercel (and electron-app/.env.local for local
+// builds) — never hard-code the key in source (GitHub push protection blocks
+// it, and a VITE_ var is bundled client-side anyway). When set, it prefills
+// the Settings field and is used as the fallback for transcription.
+export const DEFAULT_GROQ_KEY = import.meta.env.VITE_DEFAULT_GROQ_KEY ?? ''
 
 // Connection-level config that switches between solo (app_config) and org (org_config).
 // Connection-only fields: bearer/groq/proxy/ig_sessionid. Other settings (theme,

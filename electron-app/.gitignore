@@ -3,4 +3,6 @@ dist
 dist-electron
 release
 .env
+.env.local
+.env.*.local
 *.log

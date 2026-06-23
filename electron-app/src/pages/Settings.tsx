@@ -9,7 +9,7 @@ import { useToast } from '@/components/Toast'
 import { OrganizationPanel } from '@/components/OrganizationPanel'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
-import { notifyConnectionsChanged } from '@/lib/connections'
+import { notifyConnectionsChanged, DEFAULT_GROQ_KEY } from '@/lib/connections'
 import { useLicense } from '@/lib/license'
 import { useCredits } from '@/lib/credits'
 import {
@@ -333,10 +333,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
   // ── Connexions ────────────────────────────────────────────────────────────
   const [bearer, setBearer]             = useState('')
-  const [groqKey, setGroqKey]           = useState('')
+  const [groqKey, setGroqKey]           = useState(DEFAULT_GROQ_KEY)
   const [anthropicKey, setAnthropicKey] = useState('')
-  const [proxyUrl, setProxyUrl]         = useState('')
-  const [igSession, setIgSession]       = useState('')
 
   useEffect(() => { if (initialPanel) setPanel(initialPanel) }, [initialPanel])
   useEffect(() => { if (initialTab)   setGenTab(initialTab)  }, [initialTab])
@@ -409,9 +407,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
         ])
         const d = configRes.data as any
         if (d) {
-          setBearer(d.bearer_token ?? ''); setGroqKey(d.groq_api_key ?? '')
-          setAnthropicKey(d.anthropic_api_key ?? ''); setProxyUrl(d.proxy ?? '')
-          setIgSession(d.ig_sessionid ?? '')
+          setBearer(d.bearer_token ?? ''); setGroqKey(d.groq_api_key || DEFAULT_GROQ_KEY)
+          setAnthropicKey(d.anthropic_api_key ?? '')
           setProfileEmail((d.profile_email as string) ?? user.email ?? '')
         }
         if (profileRes.data) {
@@ -474,14 +471,14 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       if (currentOrg) {
         const { error: e } = await supabase.from('org_config').upsert({
           org_id: currentOrg.id, bearer_token: bearer, groq_api_key: groqKey,
-          anthropic_api_key: anthropicKey, proxy: proxyUrl, ig_sessionid: igSession,
+          anthropic_api_key: anthropicKey,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'org_id' })
         if (e) throw e
       } else {
         const { error: e } = await supabase.from('app_config').upsert({
           user_id: user.id, bearer_token: bearer, groq_api_key: groqKey,
-          anthropic_api_key: anthropicKey, proxy: proxyUrl, ig_sessionid: igSession,
+          anthropic_api_key: anthropicKey,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         if (e) throw e
@@ -1281,8 +1278,6 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {[
                         { label: t('bearerToken'), type: 'password', placeholder: 'Bearer …', value: bearer, onChange: (v: string) => setBearer(v) },
-                        { label: t('proxyUrl'), type: 'text', placeholder: 'http://proxy:8080', value: proxyUrl, onChange: (v: string) => setProxyUrl(v) },
-                        { label: t('igSessionId'), type: 'password', placeholder: 'sessionid=…', value: igSession, onChange: (v: string) => setIgSession(v) },
                       ].map(field => (
                         <div key={field.label}>
                           <label className="text-[13px] font-medium text-text2" style={{ display: 'block', marginBottom: 6 }}>{field.label}</label>
