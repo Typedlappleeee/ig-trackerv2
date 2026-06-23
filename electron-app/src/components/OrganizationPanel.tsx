@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Organization, type OrgMember, type OrgInvite, type OrgRole, type OrgRoleTemplate, type PermOverrides, type PageKey, type ActionKey } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
-import { ROLE_LABELS, ALL_TABS, ALL_ACTIONS, TAB_GROUPS, canManageOrg, canSeeTab, canDoAction } from '@/lib/permissions'
+import { ROLE_LABELS, ALL_TABS, ALL_ACTIONS, TAB_GROUPS, canManageOrg } from '@/lib/permissions'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { Onboarding } from '@/components/Onboarding'
@@ -1023,9 +1023,11 @@ export function OrganizationPanel({ user }: Props) {
       <div className="flex gap-1 border-b border-border">
         {([
           { k: 'orgas',   label: 'Organisations', icon: 'building' as const },
-          { k: 'membres', label: 'Membres',        icon: 'users'    as const },
-          ...(canManage ? [{ k: 'roles', label: 'Rôles', icon: 'roles' as const }] : []),
-          ...(canManage ? [{ k: 'logs',  label: 'Logs',  icon: 'logs'  as const }] : []),
+          // Membres / Rôles / Logs : réservés aux admins & propriétaires.
+          // Un membre non-admin ne doit pas voir la liste des autres membres.
+          ...(canManage ? [{ k: 'membres', label: 'Membres', icon: 'users' as const }] : []),
+          ...(canManage ? [{ k: 'roles',   label: 'Rôles',   icon: 'roles' as const }] : []),
+          ...(canManage ? [{ k: 'logs',    label: 'Logs',    icon: 'logs'  as const }] : []),
         ] as const).map(t => (
           <button key={t.k} onClick={() => setOrgTab(t.k as typeof orgTab)}
             className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 inline-flex items-center gap-1.5 ${
@@ -1147,60 +1149,10 @@ export function OrganizationPanel({ user }: Props) {
             <p className="text-text2 text-sm">Active une organisation dans l'onglet "Organisations".</p>
           </div>
         ) : !canManage ? (
-          // Non-admin: show their own permissions (read-only)
-          <div className="space-y-4">
-            <section className="bg-card border border-border rounded-xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-border flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold flex-shrink-0">
-                  {(myMembership?.role ?? 'M')[0].toUpperCase()}
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-text">Mes accès</h2>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {myMembership && <RoleChip role={myMembership.role} />}
-                    <span className="text-xs text-text2">{currentOrg.name}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tabs access */}
-              <div className="px-5 py-4 border-b border-border">
-                <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-3">Onglets</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  {ALL_TABS.map(t => {
-                    const allowed = myRole ? canSeeTab(myRole, myMembership?.perm_overrides, t.key) : true
-                    return (
-                      <div key={t.key} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${allowed ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'}`}>
-                        <span>{t.icon}</span>
-                        <span className="truncate">{t.label}</span>
-                        <span className="ml-auto font-bold">{allowed ? '✓' : '✗'}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="px-5 py-4 border-b border-border">
-                <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-3">Actions</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {ALL_ACTIONS.map(a => {
-                    const allowed = myRole ? canDoAction(myRole, myMembership?.perm_overrides, a.key) : true
-                    return (
-                      <div key={a.key} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${allowed ? 'bg-ok/10 text-ok' : 'bg-surface text-text2'}`}>
-                        <span>{a.icon}</span>
-                        <span className="flex-1 truncate">{a.label}</span>
-                        <span className="font-bold">{allowed ? '✓' : '✗'}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="px-5 py-3">
-                <p className="text-[11px] text-text2 italic">Ces accès sont définis par les admins de l'organisation.</p>
-              </div>
-            </section>
+          <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
+            <p className="flex justify-center text-text2"><Icon name="lock" size={32} /></p>
+            <p className="text-text font-semibold">Accès réservé aux admins</p>
+            <p className="text-text2 text-sm">Seuls les propriétaires et admins peuvent gérer les membres.</p>
           </div>
         ) : (
           <section className="bg-card border border-border rounded-xl overflow-hidden">
