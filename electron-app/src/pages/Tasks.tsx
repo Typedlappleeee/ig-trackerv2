@@ -2121,18 +2121,21 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               <span style={{ fontSize: 16, color: phoneList.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{phoneList.length}</span> tél.
             </span>
             {!sequenceMode && (
-            <span style={{ fontSize: 11, color: MUTED }}>
-              <span style={{ fontSize: 16, color: segments.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{segments.length}</span> seg.
-            </span>
-            <span style={{ fontSize: 11, color: MUTED }}>
-              <span style={{ fontSize: 16, color: totalMedia ? GOLD : 'rgba(233,234,240,0.22)' }}>{totalMedia}</span> médias
-            </span>
-            {anyStory && phoneList.length > 0 && phonesWithLink < phoneList.length && (
-              <span style={{ fontSize: 11, color: '#F59E0B' }}>
-                {phoneList.length - phonesWithLink} lien(s) manquant(s)
-              </span>
+              <>
+                <span style={{ fontSize: 11, color: MUTED }}>
+                  <span style={{ fontSize: 16, color: segments.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{segments.length}</span> seg.
+                </span>
+                <span style={{ fontSize: 11, color: MUTED }}>
+                  <span style={{ fontSize: 16, color: totalMedia ? GOLD : 'rgba(233,234,240,0.22)' }}>{totalMedia}</span> médias
+                </span>
+                {anyStory && phoneList.length > 0 && phonesWithLink < phoneList.length && (
+                  <span style={{ fontSize: 11, color: '#F59E0B' }}>
+                    {phoneList.length - phonesWithLink} lien(s) manquant(s)
+                  </span>
+                )}
+                {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
+              </>
             )}
-            {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
           </div>
           <button
             onClick={onClose}
