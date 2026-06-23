@@ -1226,11 +1226,16 @@ export async function postInstagramStory(
   // field (not the URL field) by re-reading the dump.
   if (config.linkText?.trim()) {
     const wanted = config.linkText.trim()
-    const escaped = escapeForInputText(wanted)
+    // Accent-insensitive needle for verification (XML may HTML-escape & " < >).
+    const wantedAscii = toAsciiFallback(wanted).toLowerCase()
     log('   ✏️  Texte du sticker…')
 
-    // Helper: clear the currently focused field and type the caption.
-    async function wipeAndType() {
+    // Helper: clear the focused field then write the caption. The method varies
+    // per attempt so we can recover when one input path is unsupported:
+    //   attempt 0 → clipboard + CTRL+V paste (Unicode-safe)
+    //   attempt 1 → clipboard + long-press "Coller/Paste" menu
+    //   attempt 2 → `input text` with ASCII (accents stripped, emojis dropped)
+    async function wipeAndType(attempt: number, fieldPt: [number, number]) {
       await shellExec(bearer, phoneId, 'input keyevent 123')  // MOVE_END
       await sleep(150)
       for (let i = 0; i < 6; i++) {
@@ -1238,9 +1243,44 @@ export async function postInstagramStory(
         await sleep(60)
       }
       await sleep(150)
-      await shellExec(bearer, phoneId, `input text "${escaped}"`)
+
+      if (attempt === 0) {
+        // Clipboard + CTRL+V
+        const set = await pasteUnicodeText(bearer, phoneId, wanted)
+        if (!set) {
+          const ascii = toAsciiFallback(wanted) || wanted
+          await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
+        }
+      } else if (attempt === 1) {
+        // Set clipboard, then long-press the field → tap the "Paste/Coller" item
+        const shellSafe = wanted.replace(/'/g, `'\\''`)
+        await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
+        await sleep(300)
+        // Long-press to surface the context menu (longpress via swipe in place)
+        await shellExec(bearer, phoneId, `input swipe ${fieldPt[0]} ${fieldPt[1]} ${fieldPt[0]} ${fieldPt[1]} 700`)
+        await sleep(700)
+        const dump = await dumpXml(bearer, phoneId)
+        const pastePt =
+          findByText(dump, 'Paste', 'Coller', 'PASTE', 'COLLER') ??
+          findByTextPartial(dump, 'paste', 'coller')
+        if (pastePt) {
+          await shellExec(bearer, phoneId, `input tap ${pastePt[0]} ${pastePt[1]}`)
+        } else {
+          // No paste menu — fall back to ASCII input text
+          const ascii = toAsciiFallback(wanted) || wanted
+          await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
+        }
+      } else {
+        // Last resort: ASCII input text
+        const ascii = toAsciiFallback(wanted) || wanted
+        await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
+      }
       await sleep(800)
     }
+
+    // Verify helper: did the caption (accent-insensitive) land in a non-URL field?
+    const captionPresent = (fields: EditField[]) =>
+      fields.some(f => !/https?:/i.test(f.text) && toAsciiFallback(f.text).toLowerCase().includes(wantedAscii) && wantedAscii.length > 0)
 
     // Locate the sticker-text field: an EditText that is NOT the URL field.
     let done = false
@@ -1257,7 +1297,7 @@ export async function postInstagramStory(
         log(`   ✓ Champ texte ciblé: ${textField.center[0]},${textField.center[1]} (texte actuel: "${textField.text}")`)
         await shellExec(bearer, phoneId, `input tap ${textField.center[0]} ${textField.center[1]}`)
         await sleep(600)
-        await wipeAndType()
+        await wipeAndType(attempt, textField.center)
       } else {
         // Only one field (URL) visible → the sticker-text field may be hidden
         // behind a "Customize sticker text" row that must be tapped to reveal it.
@@ -1269,7 +1309,7 @@ export async function postInstagramStory(
           log(`   ↪︎ Ouverture du champ « texte du sticker »…`)
           await shellExec(bearer, phoneId, `input tap ${revealPt[0]} ${revealPt[1]}`)
           await sleep(800)
-          await wipeAndType()
+          await wipeAndType(attempt, revealPt)
         } else {
           log('   ↩︎ Champ texte introuvable — nouvel essai…')
           await sleep(500)
@@ -1280,7 +1320,7 @@ export async function postInstagramStory(
       // Verify: the caption must now be present in an EditText that is NOT the URL.
       xml = await dumpXml(bearer, phoneId)
       const after = findEditTextFields(xml)
-      const ok = after.some(f => f.text.includes(wanted) && !/https?:/i.test(f.text))
+      const ok = captionPresent(after)
       // Safety: make sure we didn't clobber the URL field.
       const urlStillThere = after.some(f => /https?:/i.test(f.text))
       if (ok && urlStillThere) {
@@ -1289,7 +1329,7 @@ export async function postInstagramStory(
       } else if (ok && !urlStillThere) {
         // We typed the caption into the URL field by mistake — restore URL, retry.
         log('   ⚠ Texte saisi dans le mauvais champ — correction de l\'URL…')
-        const urlF = after.find(f => f.text.includes(wanted)) ?? null
+        const urlF = after.find(f => toAsciiFallback(f.text).toLowerCase().includes(wantedAscii)) ?? null
         if (urlF) {
           await shellExec(bearer, phoneId, `input tap ${urlF.center[0]} ${urlF.center[1]}`)
           await sleep(500)
@@ -1526,6 +1566,31 @@ function escapeForInputText(text: string): string {
     .replace(/\$/g, '\\$')
     .replace(/!/g,  '\\!')
     .replace(/ /g,  '%s')
+}
+
+// Strip diacritics (é→e, à→a…) and drop any remaining non-ASCII (emojis).
+// Used as a last-resort fallback when clipboard paste is unavailable, because
+// Android `input text` silently drops non-ASCII characters.
+function toAsciiFallback(text: string): string {
+  return text
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove accents
+    .replace(/[^\x00-\x7F]/g, '')                     // drop emojis / other unicode
+}
+
+// Robustly type arbitrary Unicode text into the currently-focused field.
+// `input text` cannot handle accents/emojis, so we set the Android clipboard
+// and paste with CTRL+V. Returns true if the clipboard path was attempted.
+async function pasteUnicodeText(bearer: string, phoneId: string, text: string): Promise<boolean> {
+  // Escape single quotes for the shell single-quoted argument.
+  const shellSafe = text.replace(/'/g, `'\\''`)
+  // `cmd clipboard set-text` works on Android 10+ from the shell uid.
+  const res = await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
+  const failed = /unknown command|Exception|not found|Error/i.test(res.output)
+  if (failed) return false
+  await sleep(300)
+  await shellExec(bearer, phoneId, 'input keycombination 113 50') // CTRL+V (paste)
+  await sleep(700)
+  return true
 }
 
 // ── Instagram login automation ───────────────────────────────────────────────
