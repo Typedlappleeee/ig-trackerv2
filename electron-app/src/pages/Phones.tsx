@@ -2024,6 +2024,12 @@ export function Phones({ user }: PhonesProps) {
                   borderLeft: `1px solid ${HAIR}`,
                   background: '#0F1014', overflowY: 'auto',
                   marginLeft: 16,
+                  // Sticky so the panel stays in view no matter where you clicked in a
+                  // long list — no need to scroll back up to the top to see it / delete.
+                  // Scroll container is .sf-page-body; top:16 pins it near the top and the
+                  // maxHeight keeps it within the visible fold (panel scrolls internally).
+                  position: 'sticky', top: 16, alignSelf: 'flex-start',
+                  maxHeight: 'calc(100vh - 160px)', borderRadius: 12,
                 }}>
                   {/* Panel header */}
                   <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
