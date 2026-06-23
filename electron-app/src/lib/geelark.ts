@@ -402,7 +402,7 @@ async function dumpXml(bearer: string, phoneId: string): Promise<string> {
 // Find every EditText node in the dump, with its current text and center point.
 // Sorted top-to-bottom (by Y). Used to target the sticker-text field precisely:
 // the URL field contains "http…", the sticker-text field is the other one.
-interface EditField { text: string; center: [number, number]; y: number }
+interface EditField { text: string; center: [number, number]; y: number; focused: boolean }
 function findEditTextFields(xml: string): EditField[] {
   const fields: EditField[] = []
   // Match any node whose class is an EditText (Instagram uses EditText subclasses)
@@ -418,6 +418,7 @@ function findEditTextFields(xml: string): EditField[] {
       text: textM ? textM[1] : '',
       center: [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)],
       y: y1,
+      focused: /\bfocused="true"/.test(node),
     })
   }
   return fields.sort((a, b) => a.y - b.y)
@@ -1219,132 +1220,108 @@ export async function postInstagramStory(
   await sleep(1200)
 
   // Optional custom sticker text — replaces the default "LINK"/"LIEN" label.
-  // Strategy: enumerate the EditText fields in the dialog. The URL field is the
-  // one containing "http"; the sticker-text field is the other one. We tap it
-  // explicitly, wipe it (MOVE_END + many DEL — never CTRL+A which mistypes 'a'),
-  // then type the caption. Finally we VERIFY the caption landed in that exact
-  // field (not the URL field) by re-reading the dump.
+  // Robust multi-method writer with verification + diagnostics. We locate the
+  // sticker-text EditText, focus it (double-tap), clear it, then try several
+  // input methods IN SEQUENCE, re-reading the field after each to see which one
+  // actually wrote. This handles both the focus issue and Unicode (accents/
+  // emojis) which `input text` cannot type.
   if (config.linkText?.trim()) {
     const wanted = config.linkText.trim()
-    // Accent-insensitive needle for verification (XML may HTML-escape & " < >).
-    const wantedAscii = toAsciiFallback(wanted).toLowerCase()
-    log('   ✏️  Texte du sticker…')
+    const ascii  = toAsciiFallback(wanted)            // accents stripped, emojis dropped
+    const needle = ascii.toLowerCase()                // accent-insensitive verify needle
+    log(`   ✏️  Texte du sticker: "${wanted}"${ascii !== wanted ? ` (ascii: "${ascii}")` : ''}`)
 
-    // Helper: clear the focused field then write the caption. The method varies
-    // per attempt so we can recover when one input path is unsupported:
-    //   attempt 0 → clipboard + CTRL+V paste (Unicode-safe)
-    //   attempt 1 → clipboard + long-press "Coller/Paste" menu
-    //   attempt 2 → `input text` with ASCII (accents stripped, emojis dropped)
-    async function wipeAndType(attempt: number, fieldPt: [number, number]) {
-      await shellExec(bearer, phoneId, 'input keyevent 123')  // MOVE_END
-      await sleep(150)
-      for (let i = 0; i < 6; i++) {
-        await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67') // 10× DEL
-        await sleep(60)
+    // Read the current sticker-text field (non-URL EditText). Returns null if none.
+    const readTextField = async (): Promise<EditField | null> => {
+      const fields = findEditTextFields(await dumpXml(bearer, phoneId))
+      // Diagnostic: list every editable field so we can see the real layout.
+      log(`   🔎 ${fields.length} champ(s): ${fields.map(f => `[${f.center[0]},${f.center[1]} foc=${f.focused ? 1 : 0} "${f.text.slice(0, 20)}"]`).join(' ')}`)
+      return fields.find(f => !/https?:\/\/|www\./i.test(f.text)) ?? (fields.length >= 2 ? fields[1] : null)
+    }
+
+    // Has the caption landed in a non-URL field?
+    const present = (fields: EditField[]) =>
+      needle.length > 0 && fields.some(f => !/https?:\/\//i.test(f.text) && toAsciiFallback(f.text).toLowerCase().includes(needle))
+
+    // Focus + clear the given field.
+    const focusAndClear = async (pt: [number, number]) => {
+      await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`); await sleep(400)
+      await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`); await sleep(400)
+      await shellExec(bearer, phoneId, 'input keyevent 123'); await sleep(120) // MOVE_END
+      for (let i = 0; i < 3; i++) { await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67'); await sleep(60) }
+      await sleep(120)
+    }
+
+    // Re-read & report whether the caption is present now.
+    const verify = async (): Promise<boolean> => {
+      const after = findEditTextFields(await dumpXml(bearer, phoneId))
+      return present(after)
+    }
+
+    let done = false
+    // Locate field once (with a reveal-tap if only the URL field is visible).
+    let field = await readTextField()
+    if (!field) {
+      const dump = await dumpXml(bearer, phoneId)
+      const revealPt =
+        findByResourceId(dump, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
+        findByText(dump, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
+        findByTextPartial(dump, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
+      if (revealPt) {
+        log('   ↪︎ Ouverture du champ « texte du sticker »…')
+        await shellExec(bearer, phoneId, `input tap ${revealPt[0]} ${revealPt[1]}`); await sleep(800)
+        field = await readTextField()
       }
-      await sleep(150)
+    }
 
-      if (attempt === 0) {
-        // Clipboard + CTRL+V
-        const set = await pasteUnicodeText(bearer, phoneId, wanted)
-        if (!set) {
-          const ascii = toAsciiFallback(wanted) || wanted
-          await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
-        }
-      } else if (attempt === 1) {
-        // Set clipboard, then long-press the field → tap the "Paste/Coller" item
-        const shellSafe = wanted.replace(/'/g, `'\\''`)
-        await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
-        await sleep(300)
-        // Long-press to surface the context menu (longpress via swipe in place)
-        await shellExec(bearer, phoneId, `input swipe ${fieldPt[0]} ${fieldPt[1]} ${fieldPt[0]} ${fieldPt[1]} 700`)
+    if (field) {
+      const pt = field.center
+      log(`   🎯 Champ ciblé: ${pt[0]},${pt[1]}`)
+
+      // ── Method 1: plain `input text` (ASCII). This is the proven path — it's
+      // exactly how the URL is typed — so if focus is fine it WILL write text. ──
+      if (!done && ascii.length > 0) {
+        await focusAndClear(pt)
+        await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
         await sleep(700)
-        const dump = await dumpXml(bearer, phoneId)
-        const pastePt =
-          findByText(dump, 'Paste', 'Coller', 'PASTE', 'COLLER') ??
-          findByTextPartial(dump, 'paste', 'coller')
+        if (await verify()) { log('   ✓ Saisi via input text (ASCII)'); done = true }
+        else log('   … input text ASCII n\'a rien écrit')
+      }
+
+      // ── Method 2: clipboard set-text + CTRL+V (Unicode-safe, keeps emojis). ──
+      if (!done) {
+        await focusAndClear(pt)
+        const shellSafe = wanted.replace(/'/g, `'\\''`)
+        const setRes = await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
+        log(`   📋 cmd clipboard → "${(setRes.output || '').trim().slice(0, 60)}"`)
+        await sleep(300)
+        await shellExec(bearer, phoneId, 'input keycombination 113 50') // CTRL+V
+        await sleep(700)
+        if (await verify()) { log('   ✓ Saisi via presse-papier (CTRL+V)'); done = true }
+        else log('   … CTRL+V n\'a rien collé')
+      }
+
+      // ── Method 3: clipboard + long-press → "Coller/Paste" menu. ──
+      if (!done) {
+        await focusAndClear(pt)
+        await shellExec(bearer, phoneId, `input swipe ${pt[0]} ${pt[1]} ${pt[0]} ${pt[1]} 700`) // long-press
+        await sleep(700)
+        const menu = await dumpXml(bearer, phoneId)
+        const pastePt = findByText(menu, 'Paste', 'Coller', 'PASTE', 'COLLER') ?? findByTextPartial(menu, 'paste', 'coller')
         if (pastePt) {
           await shellExec(bearer, phoneId, `input tap ${pastePt[0]} ${pastePt[1]}`)
-        } else {
-          // No paste menu — fall back to ASCII input text
-          const ascii = toAsciiFallback(wanted) || wanted
-          await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
-        }
-      } else {
-        // Last resort: ASCII input text
-        const ascii = toAsciiFallback(wanted) || wanted
-        await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
-      }
-      await sleep(800)
-    }
-
-    // Verify helper: did the caption (accent-insensitive) land in a non-URL field?
-    const captionPresent = (fields: EditField[]) =>
-      fields.some(f => !/https?:/i.test(f.text) && toAsciiFallback(f.text).toLowerCase().includes(wantedAscii) && wantedAscii.length > 0)
-
-    // Locate the sticker-text field: an EditText that is NOT the URL field.
-    let done = false
-    for (let attempt = 0; attempt < 3 && !done; attempt++) {
-      xml = await dumpXml(bearer, phoneId)
-      const fields = findEditTextFields(xml)
-      // URL field = contains http / the URL we typed. Text field = the rest.
-      const textField =
-        fields.find(f => !/https?:|www\./i.test(f.text) && f.center[1] !== urlField[1]) ??
-        // If both fields are empty-ish, the second (lower) EditText is the text one
-        (fields.length >= 2 ? fields[1] : undefined)
-
-      if (textField) {
-        log(`   ✓ Champ texte ciblé: ${textField.center[0]},${textField.center[1]} (texte actuel: "${textField.text}")`)
-        await shellExec(bearer, phoneId, `input tap ${textField.center[0]} ${textField.center[1]}`)
-        await sleep(600)
-        await wipeAndType(attempt, textField.center)
-      } else {
-        // Only one field (URL) visible → the sticker-text field may be hidden
-        // behind a "Customize sticker text" row that must be tapped to reveal it.
-        const revealPt =
-          findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
-          findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
-          findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
-        if (revealPt) {
-          log(`   ↪︎ Ouverture du champ « texte du sticker »…`)
-          await shellExec(bearer, phoneId, `input tap ${revealPt[0]} ${revealPt[1]}`)
-          await sleep(800)
-          await wipeAndType(attempt, revealPt)
-        } else {
-          log('   ↩︎ Champ texte introuvable — nouvel essai…')
-          await sleep(500)
-          continue
-        }
-      }
-
-      // Verify: the caption must now be present in an EditText that is NOT the URL.
-      xml = await dumpXml(bearer, phoneId)
-      const after = findEditTextFields(xml)
-      const ok = captionPresent(after)
-      // Safety: make sure we didn't clobber the URL field.
-      const urlStillThere = after.some(f => /https?:/i.test(f.text))
-      if (ok && urlStillThere) {
-        log('   ✓ Texte du sticker saisi et vérifié')
-        done = true
-      } else if (ok && !urlStillThere) {
-        // We typed the caption into the URL field by mistake — restore URL, retry.
-        log('   ⚠ Texte saisi dans le mauvais champ — correction de l\'URL…')
-        const urlF = after.find(f => toAsciiFallback(f.text).toLowerCase().includes(wantedAscii)) ?? null
-        if (urlF) {
-          await shellExec(bearer, phoneId, `input tap ${urlF.center[0]} ${urlF.center[1]}`)
-          await sleep(500)
-          await shellExec(bearer, phoneId, 'input keyevent 123')
-          await sleep(120)
-          for (let i = 0; i < 8; i++) { await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67'); await sleep(50) }
-          await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkUrl)}"`)
           await sleep(700)
+          if (await verify()) { log('   ✓ Saisi via menu Coller'); done = true }
+          else log('   … menu Coller n\'a rien collé')
+        } else {
+          log('   … menu Coller introuvable')
         }
-        // loop will retry to place the caption in the proper field
-      } else {
-        log('   ↩︎ Texte non confirmé — nouvel essai…')
       }
+    } else {
+      log('   ⚠ Champ texte du sticker introuvable')
     }
-    if (!done) log('   ⚠ Impossible de confirmer le texte du sticker — publication quand même')
+
+    if (!done) log('   ⚠ Texte du sticker non écrit — publication quand même')
   }
 
   // Confirm the link (Done / Terminé / checkmark in top-right)
@@ -1575,22 +1552,6 @@ function toAsciiFallback(text: string): string {
   return text
     .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove accents
     .replace(/[^\x00-\x7F]/g, '')                     // drop emojis / other unicode
-}
-
-// Robustly type arbitrary Unicode text into the currently-focused field.
-// `input text` cannot handle accents/emojis, so we set the Android clipboard
-// and paste with CTRL+V. Returns true if the clipboard path was attempted.
-async function pasteUnicodeText(bearer: string, phoneId: string, text: string): Promise<boolean> {
-  // Escape single quotes for the shell single-quoted argument.
-  const shellSafe = text.replace(/'/g, `'\\''`)
-  // `cmd clipboard set-text` works on Android 10+ from the shell uid.
-  const res = await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
-  const failed = /unknown command|Exception|not found|Error/i.test(res.output)
-  if (failed) return false
-  await sleep(300)
-  await shellExec(bearer, phoneId, 'input keycombination 113 50') // CTRL+V (paste)
-  await sleep(700)
-  return true
 }
 
 // ── Instagram login automation ───────────────────────────────────────────────
