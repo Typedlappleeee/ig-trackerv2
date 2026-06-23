@@ -614,14 +614,14 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               width: 26, height: 26, borderRadius: 7,
               border: 'none',
               background: 'transparent',
-              color: 'rgba(233,234,240,0.3)',
+              color: 'rgba(233,234,240,0.45)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', flexShrink: 0,
               marginLeft: collapsed ? 'auto' : 0,
               transition: 'color 0.15s, background 0.15s',
             }}
             onMouseEnter={e => { e.currentTarget.style.color = 'rgba(241,240,247,0.7)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(233,234,240,0.3)'; e.currentTarget.style.background = 'transparent' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(233,234,240,0.45)'; e.currentTarget.style.background = 'transparent' }}
             title={collapsed ? t('expandSidebar') : t('collapseSidebar')}
           >
             <NavIcon d={ICONS.menu} size={14} />
@@ -788,12 +788,14 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             style={{
               display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
               width: '100%', padding: collapsed ? '4px 0' : '5px 8px', borderRadius: 8,
-              textAlign: 'left', cursor: 'pointer', border: 'none', background: 'transparent',
+              textAlign: 'left', cursor: 'pointer',
+              background: collapsed ? 'transparent' : 'rgba(255,255,255,0.025)',
+              border: collapsed ? 'none' : '1px solid rgba(255,255,255,0.06)',
               transition: 'background 0.15s',
               justifyContent: collapsed ? 'center' : 'flex-start',
             }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = collapsed ? 'transparent' : 'rgba(255,255,255,0.025)' }}
           >
             {/* Avatar pill */}
             <div style={{
@@ -838,6 +840,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
           {/* Left: page title + breadcrumb */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+            <span style={{ color: 'rgba(99,102,241,0.7)', flexShrink: 0, display: 'flex' }}>
+              <NavIcon d={ICONS[PAGE_ICON[page] ?? 'grid']} size={15} />
+            </span>
             <span style={{
               width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginRight: 3,
               background: 'linear-gradient(135deg, #6366F1, #E9EAF0)',
@@ -895,6 +900,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                 {/* Balance pill */}
                 <button
                   onClick={() => onNavigate('settings', 'abonnement')}
+                  className={credits.balance < 10 ? 'sf-credits-low' : undefined}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '5px 10px 5px 12px', borderRadius: '8px 0 0 8px',
@@ -1375,14 +1381,15 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                   transition: 'color 0.15s',
                 }}
               >
-                {active && (
-                  <span style={{
-                    position: 'absolute', top: 0, left: '20%', right: '20%', height: 2,
-                    background: 'linear-gradient(90deg,#6366F1,#818CF8)',
-                    borderRadius: '0 0 2px 2px',
-                  }} />
-                )}
-                <NavIcon d={ICONS[item.iconKey]} size={19} />
+                <div style={{
+                  width: 44, height: 30, borderRadius: 20,
+                  background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  border: active ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s',
+                }}>
+                  <NavIcon d={ICONS[item.iconKey]} size={19} />
+                </div>
                 <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.03em' }}>{item.label}</span>
               </button>
             )
