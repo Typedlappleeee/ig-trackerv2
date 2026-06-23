@@ -5,7 +5,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { useT, useLang } from '@/lib/i18n'
 import { canAccessPhoneGroup } from '@/lib/permissions'
-import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId } from '@/lib/geelark'
+import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId, stopPhones } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -621,11 +621,64 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
   )
 }
 
+// ── Link cell (OnlyFans / story link) ────────────────────────────────────────
+function LinkCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue]     = useState(phone.link ?? '')
+  const [saving, setSaving]   = useState(false)
+  const ref                   = useRef<HTMLInputElement>(null)
+  const savedRef              = useRef(false)
+
+  useEffect(() => { if (editing) ref.current?.focus() }, [editing])
+  useEffect(() => { setValue(phone.link ?? '') }, [phone.link])
+
+  async function save() {
+    if (savedRef.current) return
+    savedRef.current = true
+    setSaving(true)
+    await onSave(phone.id, value)
+    setSaving(false)
+    setEditing(false)
+    savedRef.current = false
+  }
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter')  save()
+    if (e.key === 'Escape') { savedRef.current = true; setValue(phone.link ?? ''); setEditing(false); savedRef.current = false }
+  }
+
+  if (editing) return (
+    <input
+      ref={ref} value={value} onChange={e => setValue(e.target.value)}
+      onKeyDown={onKey} onBlur={save} disabled={saving}
+      className="sf-input"
+      placeholder="https://onlyfans.com/…"
+      style={{ width: '100%', padding: '2px 6px', fontSize: 12, borderColor: ACCENT }}
+    />
+  )
+  return (
+    <button
+      onClick={() => { savedRef.current = false; setEditing(true) }}
+      style={{
+        width: '100%', textAlign: 'left', background: 'none', border: 'none',
+        cursor: 'pointer', padding: '2px 4px', borderRadius: 5, fontFamily: SANS, fontStyle: 'italic',
+      }}
+    >
+      {phone.link ? (
+        <span style={{ fontSize: 11, color: '#22d3ee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 200 }}>
+          {phone.link}
+        </span>
+      ) : (
+        <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)', fontStyle: 'normal' }}>— Ajouter un lien</span>
+      )}
+    </button>
+  )
+}
+
 // ── Phone card row ────────────────────────────────────────────────────────────
 const PhoneRow = memo(function PhoneRow({
   phone, isSelected, checked, col, canDelete, index,
   setSelectedPhone, setContextMenu, setSessionDialog,
-  saveIgUsername, saveRemark, requestDelete, toggleSelect,
+  saveIgUsername, saveRemark, saveLink, requestDelete, toggleSelect,
 }: {
   phone: Phone; isSelected: boolean; checked: boolean; col: string; index: number
   canDelete: boolean
@@ -634,6 +687,7 @@ const PhoneRow = memo(function PhoneRow({
   setSessionDialog: (v: { phone: Phone } | null) => void
   saveIgUsername: (id: string, u: string) => Promise<void>
   saveRemark: (id: string, v: string) => Promise<void>
+  saveLink: (id: string, v: string) => Promise<void>
   requestDelete: (p: Phone) => void
   toggleSelect: (id: string) => void
 }) {
@@ -722,14 +776,9 @@ const PhoneRow = memo(function PhoneRow({
         }
       </td>
 
-      {/* IG username */}
+      {/* Lien OnlyFans / Story */}
       <td style={cellStyle} onClick={e => e.stopPropagation()}>
-        <IgCell phone={phone} onSave={saveIgUsername} />
-      </td>
-
-      {/* IG status */}
-      <td style={cellStyle}>
-        <IgStatusBadge phone={phone} />
+        <LinkCell phone={phone} onSave={saveLink} />
       </td>
 
       {/* Note */}
@@ -781,6 +830,159 @@ const PhoneRow = memo(function PhoneRow({
   )
 })
 
+// ── Phone card (grid view) ────────────────────────────────────────────────────
+const PhoneCard = memo(function PhoneCard({
+  phone, isSelected, checked, col, canDelete,
+  setSelectedPhone, setContextMenu, setSessionDialog, requestDelete, toggleSelect, saveLink,
+}: {
+  phone: Phone; isSelected: boolean; checked: boolean; col: string; canDelete: boolean
+  setSelectedPhone: (p: Phone | null) => void
+  setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
+  setSessionDialog: (v: { phone: Phone } | null) => void
+  requestDelete: (p: Phone) => void
+  toggleSelect: (id: string) => void
+  saveLink: (id: string, v: string) => Promise<void>
+}) {
+  const t = useT()
+  const [hover, setHover] = useState(false)
+  const online  = phone.status === 'online'
+  const warming = phone.status === 'warming'
+  const dotColor = online ? 'var(--ok)' : warming ? 'var(--warn)' : 'rgba(233,234,240,0.28)'
+  const fmt = (n?: number) => !n ? '0' : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n)
+
+  return (
+    <div
+      onClick={() => setSelectedPhone(isSelected ? null : phone)}
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: 'relative', borderRadius: 16, padding: 16, cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', gap: 14,
+        background: isSelected ? 'rgba(99,102,241,0.08)' : hover ? 'rgba(233,234,240,0.035)' : 'rgba(233,234,240,0.02)',
+        border: `1px solid ${isSelected ? 'rgba(99,102,241,0.45)' : hover ? 'rgba(99,102,241,0.2)' : HAIR}`,
+        boxShadow: isSelected ? '0 8px 28px -10px rgba(99,102,241,0.5)' : hover ? '0 10px 30px -14px rgba(0,0,0,0.6)' : 'none',
+        transform: hover && !isSelected ? 'translateY(-2px)' : 'none',
+        transition: 'all 0.18s cubic-bezier(0.22,1,0.36,1)',
+      }}
+    >
+      {/* Top accent line */}
+      <span style={{
+        position: 'absolute', top: 0, left: 16, right: 16, height: 2, borderRadius: 2,
+        background: `linear-gradient(90deg, ${col}, transparent)`,
+        opacity: isSelected || hover ? 0.9 : 0.35, transition: 'opacity 0.18s',
+      }} />
+
+      {/* Header: checkbox + status badge */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <input
+          type="checkbox" checked={checked}
+          onClick={e => e.stopPropagation()}
+          onChange={() => toggleSelect(phone.id)}
+          style={{ cursor: 'pointer', accentColor: ACCENT, width: 15, height: 15 }}
+        />
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '3px 9px', borderRadius: 99, fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.04em', textTransform: 'uppercase',
+          background: online ? 'rgba(52,211,153,0.12)' : warming ? 'rgba(251,191,36,0.12)' : 'rgba(233,234,240,0.05)',
+          color: online ? 'var(--ok)' : warming ? 'var(--warn)' : 'rgba(233,234,240,0.45)',
+          border: `1px solid ${online ? 'rgba(52,211,153,0.25)' : warming ? 'rgba(251,191,36,0.25)' : 'rgba(233,234,240,0.08)'}`,
+        }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%', background: dotColor,
+            boxShadow: online ? '0 0 0 3px rgba(52,211,153,0.2)' : warming ? '0 0 0 3px rgba(251,191,36,0.2)' : 'none',
+            animation: online ? 'sf-ping 2s ease infinite' : 'none',
+          }} />
+          {online ? t('online') : warming ? 'warming' : t('offline')}
+        </span>
+      </div>
+
+      {/* Avatar + name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: `linear-gradient(135deg, ${col}26, ${col}10)`,
+          border: `1px solid ${col}40`, color: col, fontSize: 18, fontWeight: 700,
+        }}>
+          {phone.phone_name.charAt(0).toUpperCase()}
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {phone.phone_name}
+          </p>
+          {phone.serial_no && (
+            <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(233,234,240,0.3)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {phone.serial_no}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Group badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 22 }}>
+        {phone.group_name ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, padding: '3px 9px',
+            borderRadius: 99, fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: ACCENT,
+            border: '1px solid rgba(99,102,241,0.18)', whiteSpace: 'nowrap', maxWidth: '100%',
+            overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/>
+            </svg>
+            {phone.group_name}
+          </span>
+        ) : (
+          <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)' }}>{t('phonesDetailGroup')} —</span>
+        )}
+      </div>
+
+      {/* Lien OnlyFans / story */}
+      <div style={{
+        borderRadius: 11, padding: '10px 12px',
+        background: phone.link ? 'rgba(34,211,238,0.05)' : 'rgba(233,234,240,0.02)',
+        border: `1px solid ${phone.link ? 'rgba(34,211,238,0.2)' : HAIR}`,
+      }} onClick={e => e.stopPropagation()}>
+        <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(233,234,240,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>
+          Lien OnlyFans
+        </p>
+        <LinkCell phone={phone} onSave={saveLink} />
+      </div>
+
+      {/* Footer actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
+        <button
+          onClick={() => setSessionDialog({ phone })}
+          className="sf-btn sf-btn-ghost sf-btn-sm"
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }}
+          title={t('phonesRowSessionId')}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+          {t('phoneSession')}
+        </button>
+        <button
+          className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
+          style={{ cursor: 'pointer' }} title="More"
+          onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="2" cy="6.5" r="1" fill="currentColor"/><circle cx="6.5" cy="6.5" r="1" fill="currentColor"/><circle cx="11" cy="6.5" r="1" fill="currentColor"/></svg>
+        </button>
+        {canDelete && (
+          <button
+            onClick={() => requestDelete(phone)}
+            className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
+            style={{ cursor: 'pointer', color: 'var(--err)' }} title={t('phonesRowDelete')}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4.5 3V2h3v1M4 3l.4 7h3.2L8 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        )}
+      </div>
+    </div>
+  )
+})
+
 // ────────────────────────────────────────────────────────────────────────────
 
 export function Phones({ user }: PhonesProps) {
@@ -809,6 +1011,10 @@ export function Phones({ user }: PhonesProps) {
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() =>
+    (localStorage.getItem('sf-phones-view') as 'table' | 'grid') || 'table')
+
+  const changeViewMode = (m: 'table' | 'grid') => { setViewMode(m); localStorage.setItem('sf-phones-view', m) }
 
   const [confirmDelete, setConfirmDelete]     = useState<Phone | null>(null)
   const [deleteBusy, setDeleteBusy]           = useState(false)
@@ -1031,6 +1237,44 @@ export function Phones({ user }: PhonesProps) {
       setPhones(prev => prev.map(p => selectedIds.has(p.id) ? { ...p, ig_username: null, ig_sessionid: null, ig_status: null } : p))
       toast.show({ kind: 'ok', title: fr(`Instagram délié sur ${ids.length} téléphone(s)`, `Instagram unlinked on ${ids.length} phone(s)`) })
       setSelectedIds(new Set())
+    }
+    setBulkBusy(false)
+  }
+
+  async function stopSelectedPhones() {
+    if (!bearer || selectedIds.size === 0) return
+    setBulkBusy(true)
+    // Map selected row ids → GéeLark phone ids
+    const geelarkIds = phones
+      .filter(p => selectedIds.has(p.id) && p.geelark_id)
+      .map(p => p.geelark_id as string)
+    try {
+      const n = await stopPhones(bearer, geelarkIds)
+      toast.show({ kind: 'ok', title: fr(`${n || geelarkIds.length} téléphone(s) éteint(s)`, `${n || geelarkIds.length} phone(s) stopped`) })
+      setSelectedIds(new Set())
+      poller.pollNow()
+    } catch (e) {
+      toast.show({ kind: 'error', title: fr('Échec de l\'extinction', 'Failed to stop phones'), body: e instanceof Error ? e.message : String(e) })
+    }
+    setBulkBusy(false)
+  }
+
+  async function stopAllOnlinePhones() {
+    if (!bearer) return
+    const onlineIds = phones
+      .filter(p => (p.status === 'online' || p.status === 'warming') && p.geelark_id)
+      .map(p => p.geelark_id as string)
+    if (onlineIds.length === 0) {
+      toast.show({ kind: 'info', title: fr('Aucun téléphone allumé', 'No phones running') })
+      return
+    }
+    setBulkBusy(true)
+    try {
+      const n = await stopPhones(bearer, onlineIds)
+      toast.show({ kind: 'ok', title: fr(`${n || onlineIds.length} téléphone(s) éteint(s)`, `${n || onlineIds.length} phone(s) stopped`) })
+      poller.pollNow()
+    } catch (e) {
+      toast.show({ kind: 'error', title: fr('Échec de l\'extinction', 'Failed to stop phones'), body: e instanceof Error ? e.message : String(e) })
     }
     setBulkBusy(false)
   }
@@ -1306,6 +1550,21 @@ export function Phones({ user }: PhonesProps) {
               <CountdownTicker enabled={autoRefresh && !!bearer} />
             </div>
 
+            {/* Stop all running phones — safety against runaway billing */}
+            {onlineCount > 0 && (
+              <button
+                onClick={stopAllOnlinePhones} disabled={!bearer || bulkBusy}
+                className="sf-btn sf-btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: (!bearer || bulkBusy) ? 'not-allowed' : 'pointer', opacity: (!bearer || bulkBusy) ? 0.5 : 1, borderColor: 'rgba(248,113,113,0.4)', color: '#f87171' }}
+                title={fr('Éteindre tous les téléphones allumés', 'Power off all running phones')}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" />
+                </svg>
+                {fr(`Éteindre tout (${onlineCount})`, `Stop all (${onlineCount})`)}
+              </button>
+            )}
+
             {/* Sync button */}
             <button
               onClick={syncFromGeelark} disabled={!bearer || syncing}
@@ -1536,6 +1795,26 @@ export function Phones({ user }: PhonesProps) {
                   ))}
                 </div>
 
+                {/* View mode toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
+                  {([
+                    { mode: 'table' as const, title: fr('Vue tableau', 'Table view'), icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M1.5 5.5h11M1.5 8.5h11M5 5.5V12" stroke="currentColor" strokeWidth="1.3"/></svg> },
+                    { mode: 'grid' as const,  title: fr('Vue grille', 'Grid view'),  icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="8" y="1.5" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="1.5" y="8" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="8" y="8" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/></svg> },
+                  ]).map(({ mode, title, icon }) => (
+                    <button
+                      key={mode}
+                      onClick={() => changeViewMode(mode)}
+                      title={title}
+                      style={{
+                        width: 30, height: 24, borderRadius: 6, border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
+                        background: viewMode === mode ? 'rgba(99,102,241,0.18)' : 'transparent',
+                        color: viewMode === mode ? 'var(--accent-l)' : 'rgba(233,234,240,0.45)',
+                      }}
+                    >{icon}</button>
+                  ))}
+                </div>
+
                 {/* CSV export */}
                 <button
                   onClick={exportCsv} disabled={sortedVisible.length === 0}
@@ -1576,8 +1855,7 @@ export function Phones({ user }: PhonesProps) {
                         <th style={{ ...TH_BASE, width: 44 }}></th>
                         <th style={TH_BASE}>{t('phonesDetailModel')}</th>
                         <th style={{ ...TH_BASE, width: 120 }}>{t('phonesDetailGroup')}</th>
-                        <th style={{ ...TH_BASE, width: 160 }}>Instagram</th>
-                        <th style={{ ...TH_BASE, width: 110 }}>{t('phonesIgStatus')}</th>
+                        <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
                         <th style={{ ...TH_BASE, width: 150 }}>Note</th>
                         <th style={{ ...TH_BASE, width: 90 }}></th>
                       </tr>
@@ -1653,6 +1931,30 @@ export function Phones({ user }: PhonesProps) {
                   </button>
                 </div>
 
+              ) : viewMode === 'grid' ? (
+                /* Phone grid */
+                <div className="anim-stagger" style={{
+                  display: 'grid', gap: 12,
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))',
+                }}>
+                  {sortedVisible.map(phone => (
+                    <PhoneCard
+                      key={phone.id}
+                      phone={phone}
+                      isSelected={selectedPhone?.id === phone.id}
+                      checked={selectedIds.has(phone.id)}
+                      col={phoneColor(phone.phone_name)}
+                      canDelete={canDelete}
+                      setSelectedPhone={setSelectedPhone}
+                      setContextMenu={setContextMenu}
+                      setSessionDialog={setSessionDialog}
+                      requestDelete={requestDelete}
+                      toggleSelect={toggleSelect}
+                      saveLink={saveLink}
+                    />
+                  ))}
+                </div>
+
               ) : (
                 /* Phone table */
                 <div className="sf-table-wrap" style={{ borderRadius: 12, border: `1px solid ${HAIR}`, background: 'rgba(233,234,240,0.02)' }}>
@@ -1675,8 +1977,7 @@ export function Phones({ user }: PhonesProps) {
                         {sortTh(t('phonesDetailModel'), 'name')}
                         {/* Group sort */}
                         {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
-                        <th style={{ ...TH_BASE, width: 160 }}>Instagram</th>
-                        <th style={{ ...TH_BASE, width: 110 }}>{t('phonesIgStatus')}</th>
+                        <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
                         <th style={{ ...TH_BASE, width: 150 }}>Note</th>
                         <th style={{ ...TH_BASE, width: 100 }}></th>
                       </tr>
@@ -1696,6 +1997,7 @@ export function Phones({ user }: PhonesProps) {
                           setSessionDialog={setSessionDialog}
                           saveIgUsername={saveIgUsername}
                           saveRemark={saveRemark}
+                          saveLink={saveLink}
                           requestDelete={requestDelete}
                           toggleSelect={toggleSelect}
                         />
@@ -1857,7 +2159,12 @@ export function Phones({ user }: PhonesProps) {
                         </div>
                       </div>
                     </div>
-                  )}
+                    {p.link && (
+                      <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.3)', marginTop: 6 }}>
+                        Ce lien est utilisé automatiquement pour le sticker des stories.
+                      </p>
+                    )}
+                  </div>
 
                   {/* Quick actions */}
                   <div style={{ padding: '16px 18px' }}>
@@ -1915,6 +2222,20 @@ export function Phones({ user }: PhonesProps) {
             </span>
 
             <div style={{ width: 1, height: 20, background: HAIR }} />
+
+            {/* Stop / power off selected */}
+            <button
+              onClick={stopSelectedPhones}
+              disabled={bulkBusy}
+              className="sf-btn sf-btn-secondary sf-btn-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: bulkBusy ? 'wait' : 'pointer' }}
+              title={fr('Éteindre les téléphones sélectionnés', 'Power off selected phones')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" />
+              </svg>
+              {fr('Éteindre', 'Power off')}
+            </button>
 
             {/* Delete bulk */}
             {canDelete && (

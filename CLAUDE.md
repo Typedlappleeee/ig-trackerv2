@@ -38,6 +38,21 @@
 - Colonnes ajoutées par **`supabase/migrations/20260619_task_story.sql`** : `task_type` (text, défaut `publication`) et `story_texts` (jsonb, pool de textes).
 - Implémentation : `electron-app/src/pages/Tasks.tsx` — `runTaskNow` branche sur le flow Story si `task_type === 'story'` ; le formulaire `CreateTaskModal` adapte ses champs (images, liens par compte, pool de textes).
 
+## Tâches automatiques — sous-tâches / séquences
+
+- Colonne `recurring_tasks.steps` (jsonb, défaut `[]`) ajoutée par **`supabase/migrations/20260619b_task_steps.sql`**.
+- Chaque step : `{ id, type: 'publication'|'story'|'warmup', videos?/images?, caption?, story_texts?, phone_links?, mode?, delay_minutes?, delay_after_minutes?, reels_trial?, auto_remove_videos?, warmup_minutes? }`.
+- **Mode de distribution** (`mode`: `seq`|`random`) et **usage unique** (`auto_remove_videos`) sont configurables **par step** dans le `StepEditor`. L'usage unique retire les médias utilisés de la pool du step et met la tâche en pause si une pool est vidée.
+- Quand `steps = []`, la tâche utilise les colonnes plates legacy (`task_type`, `videos`, `caption`…) — rétrocompatible.
+- Le modal `CreateTaskModal` place **Nom** + **Téléphones** en haut, puis le toggle « Mode séquence ».
+
+## Exécution serveur des Stories (PC éteint)
+
+- **`supabase/functions/run-scheduled-posts/geelark-story.ts`** : port Deno de `postInstagramStory` (automation ADB + sticker lien). Téléchargement image direct (pas de CORS), compression via **ImageScript** (`encodeJPEG`, pas de Canvas).
+- L'edge function `index.ts` (étape 8) traite les stories **par téléphone, un seul par invocation** (boot ~30-60s + automation ~2 min tiennent dans le budget serverless). La progression est dans `scheduled_posts.result.story_progress.done` ; le post repasse en `pending` entre chaque téléphone pour reprendre au tick suivant du cron.
+- Auto-heal : une story `running` bloquée > 15 min est **remise en `pending`** (reprise), pas marquée échouée (sauf > 6 h).
+- **Limite** : seules les stories « plates » (`task_type='story'`, pas de `steps`) tournent côté serveur. Les séquences multi-étapes incluant story/warmup restent côté client.
+
 ## Sous-titres automatiques (Groq Whisper)
 
 - Onglet accessible aux **owner et admin uniquement** (pas member/viewer).

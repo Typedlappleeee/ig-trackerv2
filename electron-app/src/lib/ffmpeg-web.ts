@@ -1223,7 +1223,7 @@ export function runFfmpegRepurposeBatch(opts: {
       opts.onVariantProgress(i, 15)
 
       const { vf, crf, transformSummary } = buildRepurposeVariant(opts.seeds[i], opts.intensity, opts.format)
-      await ff.deleteFile('rp_out.mp4').catch(() => {})
+      await ff.deleteFile('rp_out.mov').catch(() => {})
 
       try {
         opts.onVariantProgress(i, 30)
@@ -1237,16 +1237,16 @@ export function runFfmpegRepurposeBatch(opts: {
           '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
           '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
           '-movflags', '+faststart',
-          '-y', 'rp_out.mp4',
+          '-y', 'rp_out.mov',
         ])
         opts.onVariantProgress(i, 90)
         // Validate output before creating blob — FFmpeg can exit 0 with an empty file
-        const rawOut = await ff.readFile('rp_out.mp4') as Uint8Array
+        const rawOut = await ff.readFile('rp_out.mov') as Uint8Array
         if (rawOut.byteLength < 5000) {
           const errLine = logs.filter(l => /error|invalid/i.test(l)).slice(-1)[0] ?? ''
           throw new Error(`Output vide (${rawOut.byteLength}B)${errLine ? ` — ${errLine}` : ''}`)
         }
-        const url = URL.createObjectURL(new Blob([rawOut.buffer as ArrayBuffer], { type: 'video/mp4' }))
+        const url = URL.createObjectURL(new Blob([rawOut.buffer as ArrayBuffer], { type: 'video/quicktime' }))
         opts.onVariantProgress(i, 100)
         results.push({ ok: true, outputPath: url, transformSummary })
       } catch (err) {
@@ -1257,7 +1257,7 @@ export function runFfmpegRepurposeBatch(opts: {
     }
 
     ff.off('log', logH)
-    for (const f of ['rp_in.mp4', 'rp_out.mp4']) await ff.deleteFile(f).catch(() => {})
+    for (const f of ['rp_in.mp4', 'rp_out.mov']) await ff.deleteFile(f).catch(() => {})
     return results
   })
 }

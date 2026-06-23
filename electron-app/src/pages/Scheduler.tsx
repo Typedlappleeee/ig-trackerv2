@@ -49,6 +49,7 @@ import { ScheduleModal } from '@/components/ScheduleModal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useCredits } from '@/lib/credits'
 import { useToast } from '@/components/Toast'
+import { pushNotification } from '@/lib/notificationStore'
 
 // setTimeout overflows int32 (~24.8 days) and fires immediately beyond this —
 // chain shorter timeouts instead of arming one long timer.
@@ -461,16 +462,24 @@ export function Scheduler({ user, onNavigate }: Props) {
       await finishScheduledPost(post.id, ok, msgs, ok ? undefined : msgs[msgs.length - 1])
       setRunningPost(null)
       runningRef.current.delete(post.id)
-      // Notify completion (toast + system notification)
-      const typeLabel = post.type === 'story' ? 'Stories' : post.type === 'mass_posting' ? 'Mass posting' : 'Posting'
+      const typeLabel = post.type === 'story' ? 'Story programmée' : post.type === 'mass_posting' ? 'Mass posting programmé' : 'Publication programmée'
+      const n = post.phones.length
+      // In-page toast
       toast.show({
         title: ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`,
-        body: `${post.phones.length} compte${post.phones.length > 1 ? 's' : ''}`,
+        body: `${n} compte${n > 1 ? 's' : ''}`,
         kind: ok ? 'ok' : 'error',
       })
+      // Persistent bell notification
+      pushNotification({
+        title: ok ? `${typeLabel} terminée ✓` : `${typeLabel} échouée`,
+        body:  `${n} compte${n > 1 ? 's' : ''}${post.created_by_name ? ' · ' + post.created_by_name : ''}`,
+        level: ok ? 'ok' : 'error',
+        page:  'scheduler',
+      })
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
-          body: `${post.phones.length} compte${post.phones.length > 1 ? 's' : ''} — ScaleFlow`,
+        new Notification(ok ? `${typeLabel} terminée ✓` : `${typeLabel} échouée`, {
+          body: `${n} compte${n > 1 ? 's' : ''} — ScaleFlow`,
         })
       }
       reload()

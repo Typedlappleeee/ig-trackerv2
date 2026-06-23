@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { getSignedUrl } from '@/lib/storage'
+import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { Spinner } from '@/components/ui/Spinner'
 import type { CaptionItem } from './CaptionBank'
 
@@ -28,8 +29,10 @@ interface MixJob {
   videoItem: ContentItem
   caption:   CaptionItem
   status:    'pending' | 'processing' | 'done' | 'error'
-  outputUrl?:  string
-  localPath?:  string
+  outputUrl?:   string
+  localPath?:   string
+  storagePath?: string  // Supabase storage path (web only) for bank-save
+  savedToBank?: boolean
   error?:    string
 }
 
@@ -291,6 +294,7 @@ export function Mixer({ user }: MixerProps) {
   const [running, setRunning] = useState(false)
   const [error,   setError]   = useState('')
   const [devNoticeOpen, setDevNoticeOpen] = useState(true)
+  const [saveFolder, setSaveFolder] = useState<string | null>(null)
 
   const removeVideo   = (id: string) => setSelVideos(p => p.filter(v => v.id !== id))
   const removeCaption = (id: string) => setSelCaptions(p => p.filter(c => c.id !== id))
@@ -349,14 +353,17 @@ export function Mixer({ user }: MixerProps) {
         })
         if (!res.ok || !res.outputPath) throw new Error(res.error ?? 'Échec ffmpeg')
 
-        // Make the output URL playable in the renderer via localvideo://
-        const localUrl = (() => {
-          let n = res.outputPath.replace(/\\/g, '/')
-          if (!n.startsWith('/')) n = '/' + n
-          return 'localvideo://' + n.split('/').map(encodeURIComponent).join('/')
-        })()
+        // Web: outputPath is a Supabase URL → use directly.
+        // Electron: outputPath is a local path → wrap in localvideo://.
+        const localUrl = res.outputPath.startsWith('http')
+          ? res.outputPath
+          : (() => {
+              let n = res.outputPath.replace(/\\/g, '/')
+              if (!n.startsWith('/')) n = '/' + n
+              return 'localvideo://' + n.split('/').map(encodeURIComponent).join('/')
+            })()
 
-        updateJob(job.id, { status: 'done', outputUrl: localUrl, localPath: res.outputPath })
+        updateJob(job.id, { status: 'done', outputUrl: localUrl, localPath: res.outputPath, storagePath: (res as any).storagePath })
         supabase.from('caption_bank').update({ used_count: (job.caption.used_count ?? 0) + 1 }).eq('id', job.caption.id).then(() => {})
       } catch (e: unknown) {
         updateJob(job.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
@@ -603,6 +610,11 @@ export function Mixer({ user }: MixerProps) {
                 ))}
               </div>
             </div>
+
+            {/* Bank destination — chosen before launching */}
+            <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de la banque" />
+            </div>
           </div>
 
           {/* Summary card */}
@@ -642,6 +654,11 @@ export function Mixer({ user }: MixerProps) {
             {running && <div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />}
             {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok">{doneJobs.length}/{jobs.length} terminés</span>}
             {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger">{errorJobs.length} erreur{errorJobs.length > 1 ? 's' : ''}</span>}
+            {doneJobs.length > 0 && (
+              <div style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-4)', whiteSpace: 'nowrap' }}>
+                Dossier : <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 10, height: 165 }}>
             {jobs.map(job => (
@@ -660,19 +677,49 @@ export function Mixer({ user }: MixerProps) {
                     <div className="sf-spinner" />
                   )}
                   {job.status === 'done' && job.outputUrl && (
-                    <button
-                      onClick={async e => {
-                        e.stopPropagation()
-                        if (job.localPath && window.electronAPI?.saveFileAs) {
-                          const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `mixer-${job.videoItem.title}.mp4` })
-                          if (r.ok || r.canceled) return
-                        }
-                        const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `mixer-${job.videoItem.title}.mp4`; a.click()
-                      }}
-                      className="sf-press cursor-pointer"
-                      style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    </button>
+                    <div style={{ position: 'absolute', bottom: 4, right: 4, display: 'flex', gap: 3 }}>
+                      {/* Save to bank */}
+                      {job.storagePath && !job.savedToBank && (
+                        <button
+                          title="Enregistrer dans la banque"
+                          onClick={async e => {
+                            e.stopPropagation()
+                            const { error } = await supabase.from('content_bank').insert({
+                              user_id: user.id, org_id: currentOrg?.id ?? null,
+                              title: `Mixer — ${job.videoItem.title}`,
+                              file_url: null,
+                              storage_path: job.storagePath,
+                              thumbnail_path: null,
+                              folder: saveFolder, tags: [], notes: '',
+                            })
+                            if (!error) updateJob(job.id, { savedToBank: true })
+                          }}
+                          className="sf-press cursor-pointer"
+                          style={{ background: 'rgba(99,102,241,0.85)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg>
+                        </button>
+                      )}
+                      {job.savedToBank && (
+                        <div title="Sauvegardé dans la banque" style={{ background: 'rgba(34,197,94,0.85)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                      )}
+                      {/* Download */}
+                      <button
+                        title="Télécharger"
+                        onClick={async e => {
+                          e.stopPropagation()
+                          if (job.localPath && window.electronAPI?.saveFileAs) {
+                            const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `mixer-${job.videoItem.title}.mp4` })
+                            if (r.ok || r.canceled) return
+                          }
+                          const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `mixer-${job.videoItem.title}.mp4`; a.click()
+                        }}
+                        className="sf-press cursor-pointer"
+                        style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      </button>
+                    </div>
                   )}
                 </div>
                 <p style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{job.videoItem.title}</p>

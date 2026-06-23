@@ -54,12 +54,14 @@ function SFLogo({ size = 28 }: { size?: number }) {
 
 export type Page =
   | 'hub'
-  | 'phones'
+  | 'phones' | 'accountcreator'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
-  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles'
+  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof'
   | 'community' | 'support'
   | 'settings' | 'licences'
   | 'scaleia'
+  | 'history'
+  | 'tiktokposting'
 
 interface LayoutProps {
   user:      User
@@ -79,8 +81,9 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Principal',
     defaultOpen: true,
     items: [
-      { id: 'phones',      label: 'navPhones',      icon: '📱' },
-      { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'phones',         label: 'navPhones',         icon: '📱' },
+      { id: 'accountcreator', label: 'navAccountCreator',  icon: '✨', isNew: true },
+      { id: 'bank',           label: 'navBank',            icon: '🗂' },
     ],
   },
   {
@@ -90,9 +93,16 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'tasks',       label: 'navTasks',        icon: '⚡' },
+      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', dev: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
+    ],
+  },
+  {
+    title: 'TikTok',
+    defaultOpen: true,
+    items: [
+      { id: 'tiktokposting', label: 'navTikTokPosting', icon: '🎵', isNew: true },
     ],
   },
   {
@@ -100,7 +110,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
-      { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
+      { id: 'spoof',       label: 'navSpoof',       icon: '🛡️', isNew: true },
       { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
       { id: 'subtitles',   label: 'navSubtitles',   icon: '💬', isNew: true },
     ],
@@ -144,29 +154,33 @@ type IconKey = keyof typeof ICONS
 
 // Map page id -> icon key
 const PAGE_ICON: Record<string, IconKey> = {
-  phones:      'phone',
-  monitor:     'monitor',
-  posting:     'send',
-  massposting: 'zap',
-  scheduler:   'calendar',
-  tasks:       'zap',
-  storylink:   'send',
-  bank:        'video',
-  captionbank: 'chat',
-  warmup:      'flame',
-  aitools:     'sparkles',
-  subtitles:   'chat',
-  montage:     'scissors',
-  remix:       'refresh',
-  repurpose:   'zap',
-  mixer:       'edit',
-  textcopy:    'edit',
-  scaleia:     'sparkles',
-  hub:         'grid',
-  settings:    'settings',
-  licences:    'shield',
-  community:   'chat',
-  support:     'chat',
+  phones:          'phone',
+  monitor:         'monitor',
+  posting:         'send',
+  massposting:     'zap',
+  scheduler:       'calendar',
+  tasks:           'zap',
+  storylink:       'send',
+  accountcreator:  'sparkles',
+  bank:            'video',
+  captionbank:     'chat',
+  warmup:          'flame',
+  aitools:         'sparkles',
+  subtitles:       'chat',
+  montage:         'scissors',
+  remix:           'refresh',
+  repurpose:       'zap',
+  mixer:           'edit',
+  spoof:           'shield',
+  textcopy:        'edit',
+  scaleia:         'sparkles',
+  hub:             'grid',
+  settings:        'settings',
+  licences:        'shield',
+  community:       'chat',
+  support:         'chat',
+  history:         'refresh',
+  tiktokposting:   'zap',
 }
 
 // Sidebar divider — hairline
@@ -258,6 +272,13 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
       .then(({ data }) => { if (data?.display_name) setDisplayName(data.display_name) })
   }, [user.id])
+
+  // Ask for desktop notification permission once, app-wide
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
+  }, [])
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
@@ -420,6 +441,92 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
+  // ── Centralized completion notifier for scheduled posts & automatic tasks ──
+  // Covers posts executed client-side (Scheduler / Tasks) AND server-side
+  // (edge function while the PC is off — caught up when the app reopens).
+  useEffect(() => {
+    const scopeKey = currentOrg?.id ?? user.id
+    const lastSeenKey = `sf-notif-lastseen-${scopeKey}`
+    const processed = new Set<string>()
+
+    const inScope = (row: any) =>
+      currentOrg ? row.org_id === currentOrg.id : (row.user_id === user.id && !row.org_id)
+
+    const parsePhones = (p: unknown): unknown[] => {
+      if (Array.isArray(p)) return p
+      if (typeof p === 'string') { try { const v = JSON.parse(p); return Array.isArray(v) ? v : [] } catch { return [] } }
+      return []
+    }
+
+    const notifyForPost = (row: any) => {
+      if (!row || processed.has(row.id)) return
+      processed.add(row.id)
+      const n = parsePhones(row.phones).length
+      const ok = row.status === 'done'
+      const isTask = !!row.task_id
+      const typeLabel = isTask ? 'Tâche automatique'
+        : row.type === 'story'        ? 'Story programmée'
+        : row.type === 'mass_posting' ? 'Mass posting programmé'
+        :                               'Publication programmée'
+      const accounts = `${n} compte${n > 1 ? 's' : ''}`
+      pushNotification({
+        title: ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`,
+        body:  `${accounts}${row.created_by_name ? ' · ' + row.created_by_name : ''}`,
+        level: ok ? 'ok' : 'error',
+        page:  isTask ? 'tasks' : 'scheduler',
+      })
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
+          body: `${accounts} — ScaleFlow`,
+        })
+      }
+      // Advance the last-seen marker so we don't re-notify on next reopen
+      if (row.executed_at) {
+        const prev = localStorage.getItem(lastSeenKey)
+        if (!prev || row.executed_at > prev) localStorage.setItem(lastSeenKey, row.executed_at)
+      }
+    }
+
+    // 1) Catch-up: posts that finished server-side while the app was closed
+    ;(async () => {
+      const lastSeen = localStorage.getItem(lastSeenKey)
+      // First ever load for this scope: just set the marker, don't dump history
+      if (!lastSeen) {
+        localStorage.setItem(lastSeenKey, new Date().toISOString())
+        return
+      }
+      let q = supabase.from('scheduled_posts')
+        .select('id,type,status,phones,executed_at,task_id,created_by_name')
+        .in('status', ['done', 'failed'])
+        .gt('executed_at', lastSeen)
+        .order('executed_at', { ascending: true })
+        .limit(15)
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      const { data } = await q
+      for (const row of (data ?? []) as any[]) notifyForPost(row)
+    })()
+
+    // 2) Realtime: live completions (client- or server-executed)
+    const ch = supabase.channel(`layout-posts-notif-${scopeKey}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'scheduled_posts' }, payload => {
+        const row = payload.new as any
+        const old = payload.old as any
+        if (!inScope(row)) return
+        if ((row.status === 'done' || row.status === 'failed') && old?.status !== row.status) {
+          notifyForPost(row)
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scheduled_posts' }, payload => {
+        const row = payload.new as any
+        if (!inScope(row)) return
+        // Recurring tasks insert their row already finished (status done/failed)
+        if (row.status === 'done' || row.status === 'failed') notifyForPost(row)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(ch) }
+  }, [currentOrg?.id, user.id])
+
   // Close the notif panel (marks everything as read on close, not on open,
   // so the unread badge stays meaningful while the panel is visible)
   function closeNotifPanel() {
@@ -495,7 +602,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
 
   const isVisibleTab = (id: Page): boolean => {
-    if (id === 'licences' || id === 'storylink') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'storylink' || id === 'accountcreator' || id === 'tiktokposting') return effectiveSuperAdmin
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
     return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }
@@ -663,7 +770,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           {([
             { section: NAV_SECTIONS[0], labelKey: 'sectionPrincipal',  defaultIcon: 'phone'  as IconKey },
             { section: NAV_SECTIONS[1], labelKey: 'sectionInstagram',  defaultIcon: 'send'   as IconKey },
-            { section: NAV_SECTIONS[2], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
+            { section: NAV_SECTIONS[2], labelKey: 'sectionTikTok',     defaultIcon: 'zap'    as IconKey },
+            { section: NAV_SECTIONS[3], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
           ] as Array<{ section: typeof NAV_SECTIONS[0]; labelKey: string; defaultIcon: IconKey }>)
             .map(({ section, labelKey, defaultIcon }) => {
               const items = section.items.filter(it => isVisibleTab(it.id) && (!it.dev || effectiveSuperAdmin))
