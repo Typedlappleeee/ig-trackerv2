@@ -404,8 +404,14 @@ function ContextMenu({
     return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('keydown', onKey) }
   }, [onClose])
 
-  const left = Math.min(x, window.innerWidth - 210)
-  const top  = Math.min(y, window.innerHeight - 230)
+  // The font-size setting applies a CSS `zoom` to <body> (petite=0.88, grande=1.13).
+  // `zoom` scales position:fixed offsets, while pointer clientX/Y are real pixels —
+  // so top:clientY would render at clientY*zoom and drift further down the page.
+  // Divide by the zoom factor so the menu lands exactly under the cursor.
+  const zRaw = parseFloat(getComputedStyle(document.body).zoom || '1')
+  const zoom = zRaw && !isNaN(zRaw) ? zRaw : 1
+  const left = Math.min(x / zoom, window.innerWidth / zoom - 210)
+  const top  = Math.min(y / zoom, window.innerHeight / zoom - 230)
 
   const item = (icon: React.ReactNode, label: string, onClick: () => void, danger = false) => (
     <button
