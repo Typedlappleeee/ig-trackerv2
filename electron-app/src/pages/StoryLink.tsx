@@ -404,13 +404,32 @@ export default function StoryLink({ user }: { user: User }) {
   // ── Assignment preview ────────────────────────────────────────────────────
   const selectedIds = [...selected]
 
+  // Stable shuffled indices — only regenerated when pool sizes or distribution mode changes.
+  // Using a ref avoids re-rendering on every shuffle update while keeping the value stable.
+  const stablePhotoIdx = useRef<number[]>([])
+  const stableTextIdx  = useRef<number[]>([])
+  const prevPhotoLen   = useRef(-1)
+  const prevTextLen    = useRef(-1)
+  const prevDistrib    = useRef<Distribution | null>(null)
+  if (
+    distribution !== prevDistrib.current ||
+    photoPool.length !== prevPhotoLen.current ||
+    textPool.length  !== prevTextLen.current
+  ) {
+    stablePhotoIdx.current = shuffleIndices(photoPool.length)
+    stableTextIdx.current  = shuffleIndices(textPool.length)
+    prevPhotoLen.current   = photoPool.length
+    prevTextLen.current    = textPool.length
+    prevDistrib.current    = distribution
+  }
+
   const buildAssignments = useCallback((ids: string[]) => {
     if (ids.length === 0 || photoPool.length === 0) return []
     const photoIndices = distribution === 'random'
-      ? shuffleIndices(photoPool.length)
+      ? stablePhotoIdx.current
       : photoPool.map((_, i) => i)
     const textIndices = textPool.length > 0
-      ? (distribution === 'random' ? shuffleIndices(textPool.length) : textPool.map((_, i) => i))
+      ? (distribution === 'random' ? stableTextIdx.current : textPool.map((_, i) => i))
       : []
     return ids.map((id, i) => ({
       phoneId: id,
