@@ -57,6 +57,22 @@ interface TaskVideo {
   title: string
 }
 
+// A segment = an independent sub-task within a task. Phones are shared at the
+// task level; each segment has its own type, media pool, interval, caption…
+interface TaskSegment {
+  id: string
+  type: TaskType
+  videos: TaskVideo[]
+  caption: string
+  story_texts: string[]
+  mode: 'seq' | 'random'
+  recur_hours: number
+  delay_minutes: number
+  reels_trial: boolean
+  auto_remove_videos: boolean
+  next_run_at: string
+}
+
 interface RecurringTask {
   id: string
   user_id: string
@@ -74,7 +90,7 @@ interface RecurringTask {
   next_run_at: string
   reels_trial: boolean
   auto_remove_videos: boolean
-  steps: TaskStep[]
+  segments: TaskSegment[]
   created_at: string
   last_run_at?: string | null
   run_count?: number | null
@@ -201,12 +217,98 @@ async function resolveTaskMediaUrl(media: TaskVideo): Promise<string> {
   return t
 }
 
+// A "unit" of work = the executable fields of either a legacy task or a segment.
+interface RunUnit {
+  type: TaskType
+  videos: TaskVideo[]
+  caption: string
+  story_texts: string[]
+  mode: 'seq' | 'random'
+  delay_minutes: number
+  reels_trial: boolean
+  recur_hours: number
+}
+
+// Entry point — routes to the segmented or legacy single-task flow.
 async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
+  if (task.segments && task.segments.length > 0) {
+    const now = Date.now()
+    const due = task.segments.filter(s => new Date(s.next_run_at).getTime() <= now)
+    for (const seg of due) {
+      await runSegmentNow(task, seg, bearer)
+    }
+    return
+  }
+
+  // Legacy single-task flow (no segments) — preserved as-is.
+  const nowIso     = new Date().toISOString()
+  const recurHours = Number(task.recur_hours) || 24
+  const nextRunAt  = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
+  await executeUnit(
+    task,
+    {
+      type: task.task_type, videos: task.videos, caption: task.caption,
+      story_texts: task.story_texts, mode: task.mode, delay_minutes: task.delay_minutes,
+      reels_trial: task.reels_trial, recur_hours: recurHours,
+    },
+    bearer,
+    async () => {
+      await supabase.from('recurring_tasks').update({
+        next_run_at: nextRunAt,
+        last_run_at: nowIso,
+        run_count:   (Number(task.run_count) || 0) + 1,
+      }).eq('id', task.id)
+    },
+  )
+}
+
+// Run a single segment of a task, then advance only that segment's timer and
+// recompute the task-level next_run_at (= min of all segments) for the cron.
+async function runSegmentNow(task: RecurringTask, segment: TaskSegment, bearer: string): Promise<void> {
+  const nowIso     = new Date().toISOString()
+  const recurHours = Number(segment.recur_hours) || 24
+  const segNextRun = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
+  await executeUnit(
+    task,
+    {
+      type: segment.type, videos: segment.videos, caption: segment.caption,
+      story_texts: segment.story_texts, mode: segment.mode, delay_minutes: segment.delay_minutes,
+      reels_trial: segment.reels_trial, recur_hours: recurHours,
+    },
+    bearer,
+    async () => {
+      // Re-fetch segments to avoid clobbering a sibling segment that ran in parallel
+      const { data } = await supabase.from('recurring_tasks').select('segments').eq('id', task.id).maybeSingle()
+      const raw = (data as { segments?: unknown } | null)?.segments
+      let segs: TaskSegment[] = Array.isArray(raw) ? raw as TaskSegment[]
+        : (typeof raw === 'string' ? JSON.parse(raw) as TaskSegment[] : task.segments)
+      segs = segs.map(s => s.id === segment.id ? { ...s, next_run_at: segNextRun } : s)
+      const minNext = segs.reduce((min, s) => {
+        const t = new Date(s.next_run_at).getTime()
+        return t < min ? t : min
+      }, Infinity)
+      await supabase.from('recurring_tasks').update({
+        segments:    segs,
+        next_run_at: new Date(isFinite(minNext) ? minNext : Date.now() + recurHours * 60 * 60 * 1000).toISOString(),
+        last_run_at: nowIso,
+        run_count:   (Number(task.run_count) || 0) + 1,
+      }).eq('id', task.id)
+    },
+  )
+}
+
+// Executes one unit of work (legacy task or a segment). `updateTimer` is the
+// caller-provided callback that advances the right timer afterwards.
+async function executeUnit(
+  task: RecurringTask,
+  unit: RunUnit,
+  bearer: string,
+  updateTimer: () => Promise<void>,
+): Promise<void> {
   const nowIso     = new Date().toISOString()
   const logs: string[] = []
   const log = (msg: string) => { logs.push(msg); console.log('[Task]', msg) }
-  const recurHours = Number(task.recur_hours) || 24
-  const nextRunAt  = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
+  const recurHours = Number(unit.recur_hours) || 24
 
   // Toujours écrire l'historique + reset le timer, même en cas d'erreur
   const saveResult = async (status: 'done' | 'failed', errorMsg?: string) => {
@@ -214,39 +316,22 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
       user_id:         task.user_id,
       org_id:          task.org_id ?? null,
       created_by_name: task.name || 'Tâche auto',
-      type:            task.task_type === 'story' ? 'story' : 'mass_posting',
+      type:            unit.type === 'story' ? 'story' : 'mass_posting',
       status,
       scheduled_at:    nowIso,
       executed_at:     new Date().toISOString(),
       phones:          task.phones,
-      videos:          task.videos,
-      caption:         task.caption,
-      delay_minutes:   task.delay_minutes ?? 0,
-      mode:            task.mode ?? 'seq',
+      videos:          unit.videos,
+      caption:         unit.caption,
+      delay_minutes:   unit.delay_minutes ?? 0,
+      mode:            unit.mode ?? 'seq',
       bearer_token:    '',
-      reels_trial:     task.reels_trial ?? false,
+      reels_trial:     unit.reels_trial ?? false,
       task_id:         task.id,
       result:          { logs },
       error_msg:       errorMsg ?? null,
     }).then(() => {}, () => {})
-    await supabase.from('recurring_tasks').update({
-      next_run_at: nextRunAt,
-      last_run_at: nowIso,
-      run_count:   (Number(task.run_count) || 0) + 1,
-    }).eq('id', task.id)
-    const n = task.phones.length
-    pushNotification({
-      title: status === 'done' ? `Tâche "${task.name || 'Auto'}" terminée ✓` : `Tâche "${task.name || 'Auto'}" échouée`,
-      body:  `${n} compte${n > 1 ? 's' : ''}${errorMsg ? ' · ' + errorMsg : ''}`,
-      level: status === 'done' ? 'ok' : 'error',
-      page:  'tasks',
-    })
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification(
-        status === 'done' ? `Tâche "${task.name || 'Auto'}" terminée ✓` : `Tâche "${task.name || 'Auto'}" échouée`,
-        { body: `${n} compte${n > 1 ? 's' : ''} — ScaleFlow` },
-      )
-    }
+    await updateTimer()
   }
 
   if (!bearer) {
@@ -259,245 +344,9 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     await saveResult('failed', 'aucun téléphone')
     return
   }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // STEPS MODE : enchaîner plusieurs actions (publication, story, warmup)
-  // ─────────────────────────────────────────────────────────────────────────────
-  if (task.steps && task.steps.length > 0) {
-    try {
-      // Clone des steps pour appliquer l'usage unique (retrait des médias utilisés)
-      const updatedSteps: TaskStep[] = task.steps.map(s => ({ ...s }))
-      let stepsChanged = false
-
-      for (let si = 0; si < task.steps.length; si++) {
-        const step = task.steps[si]
-        log(`▶ Étape ${si + 1}/${task.steps.length} : ${step.type}`)
-
-        if (step.type === 'warmup') {
-          const wMin = step.warmup_minutes ?? 5
-          log(`⏳ Warmup ${wMin} min — bientôt disponible`)
-          await new Promise(r => setTimeout(r, wMin * 60 * 1000))
-        } else if (step.type === 'story') {
-          const stepImages = step.images ?? []
-          const stepTexts = Array.isArray(step.story_texts) ? step.story_texts.filter(Boolean) : []
-          const stepMode = step.mode ?? task.mode ?? 'seq'
-          const phoneLinks = step.phone_links ?? {}
-
-          if (!stepImages.length) {
-            log(`❌ Étape ${si + 1} : aucune image`)
-          } else {
-            const imageUrls: (string | null)[] = []
-            const validImageIdx: number[] = []  // mapping position dans validImages → index dans stepImages
-            for (let i = 0; i < stepImages.length; i++) {
-              try {
-                const u = await resolveTaskMediaUrl(stepImages[i])
-                imageUrls.push(u)
-              } catch (err) {
-                log(`❌ Image échouée (${stepImages[i].title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
-                imageUrls.push(null)
-              }
-            }
-            imageUrls.forEach((u, idx) => { if (u) validImageIdx.push(idx) })
-            const validImages = imageUrls.filter((u): u is string => Boolean(u))
-            const usedImageOriginalIdx = new Set<number>()
-            if (!validImages.length) {
-              log(`❌ Étape ${si + 1} : aucune image exploitable`)
-            } else {
-              for (let i = 0; i < task.phones.length; i++) {
-                const phone = task.phones[i]
-                const name = phone.ig_username ?? phone.phone_name
-                const link = (phoneLinks[phone.id] ?? phone.link ?? '').trim()
-                if (!link) {
-                  log(`❌ ${name} : aucun lien configuré`)
-                  continue
-                }
-                const imgPick = stepMode === 'random'
-                  ? Math.floor(Math.random() * validImages.length)
-                  : i % validImages.length
-                const imageUrl = validImages[imgPick]
-                usedImageOriginalIdx.add(validImageIdx[imgPick])
-                const linkText = stepTexts.length
-                  ? (stepMode === 'random' ? stepTexts[Math.floor(Math.random() * stepTexts.length)] : stepTexts[i % stepTexts.length])
-                  : undefined
-                log(`▶ Story ${name}…`)
-                try {
-                  const res = await postInstagramStory(
-                    bearer, phone.geelark_id,
-                    { imageUrl, linkUrl: link, linkText },
-                    m => log(`  ${name}: ${m}`),
-                  )
-                  if (res.ok) log(`✅ ${name} — story publiée`)
-                  else log(`❌ ${name} : ${res.error ?? 'échec'}`)
-                } catch (err) {
-                  log(`❌ ${name} : ${err instanceof Error ? err.message : String(err)}`)
-                } finally {
-                  try { await stopPhone(bearer, phone.geelark_id) } catch { /* ignore */ }
-                }
-              }
-              // Usage unique : retire les images utilisées de la pool de l'étape
-              if (step.auto_remove_videos && usedImageOriginalIdx.size > 0) {
-                const remaining = stepImages.filter((_, idx) => !usedImageOriginalIdx.has(idx))
-                updatedSteps[si] = { ...updatedSteps[si], images: remaining }
-                stepsChanged = true
-                log(`🗑 ${stepImages.length - remaining.length} image(s) retirée(s) (${remaining.length} restante(s)).`)
-              }
-            }
-          }
-        } else {
-          // publication step
-          const stepVideos = step.videos ?? []
-          const stepCaption = step.caption ?? ''
-          const stepMode = step.mode ?? task.mode ?? 'seq'
-          const stepDelay = step.delay_minutes ?? task.delay_minutes ?? 0
-          const stepReelsTrial = step.reels_trial ?? task.reels_trial ?? false
-
-          if (!stepVideos.length) {
-            log(`❌ Étape ${si + 1} : aucune vidéo`)
-          } else {
-            log(`▶ Upload de ${stepVideos.length} vidéo(s) vers GéeLark…`)
-            const tokenByIndex: (string | null)[] = []
-            const validVideoIdx: number[] = []  // mapping position dans validTokens → index dans stepVideos
-            for (let i = 0; i < stepVideos.length; i++) {
-              const v = stepVideos[i]
-              try {
-                const tok = await resolveTaskVideoToken(bearer, v)
-                tokenByIndex.push(tok)
-                log(`✅ Vidéo ${i + 1}/${stepVideos.length} prête : ${v.title || tok.slice(0, 30)}`)
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err)
-                log(`❌ Vidéo échouée (${v.title || '?'}): ${msg}`)
-                tokenByIndex.push(null)
-              }
-            }
-            tokenByIndex.forEach((t, idx) => { if (t) validVideoIdx.push(idx) })
-            const validTokens = tokenByIndex.filter((t): t is string => Boolean(t))
-            const usedVideoOriginalIdx = new Set<number>()
-            if (!validTokens.length) {
-              log(`❌ Étape ${si + 1} : upload de toutes les vidéos a échoué`)
-            } else {
-              const phoneIds = task.phones.map(p => p.geelark_id)
-              log(`▶ Démarrage de ${phoneIds.length} téléphone(s)…`)
-              const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
-              const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
-              log(`  ${started} démarré(s)`)
-              if (started > 0) {
-                log('⏳ Attente 30s (boot)…')
-                await new Promise(r => setTimeout(r, 30_000))
-                const baseTs = Math.floor(Date.now() / 1000)
-                const taskIdByGid: Record<string, string> = {}
-                const rpaIds: string[] = []
-                for (let i = 0; i < task.phones.length; i++) {
-                  const phone = task.phones[i]
-                  const name = phone.ig_username ?? phone.phone_name
-                  const vidIdx = stepMode === 'random'
-                    ? Math.floor(Math.random() * validTokens.length)
-                    : i % validTokens.length
-                  usedVideoOriginalIdx.add(validVideoIdx[vidIdx])
-                  const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
-                    id: phone.geelark_id,
-                    scheduleAt: baseTs + i * stepDelay * 60,
-                    description: stepCaption,
-                    video: [validTokens[vidIdx]],
-                    ...(stepReelsTrial ? { shareType: 2 } : {}),
-                  })
-                  if (res['code'] === 0) {
-                    const d = res['data']
-                    let tid: string | undefined
-                    if (typeof d === 'string' && d) { tid = d }
-                    else if (d && typeof d === 'object') {
-                      const dObj = d as Record<string, unknown>
-                      const raw = dObj['id'] ?? dObj['taskId'] ?? dObj['task_id']
-                      if (raw != null) tid = String(raw)
-                    }
-                    if (tid) { rpaIds.push(tid); taskIdByGid[phone.geelark_id] = tid }
-                    log(`✅ Tâche créée : ${name}`)
-                  } else {
-                    log(`❌ ${name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
-                  }
-                }
-                if (rpaIds.length > 0) {
-                  log(`⏳ Suivi de ${rpaIds.length} tâche(s)…`)
-                  const pending = new Set(rpaIds)
-                  const stopped = new Set<string>()
-                  const deadline = Date.now() + 8 * 60 * 1000
-                  const gidByTid = new Map<string, string>()
-                  for (const [gid, tid] of Object.entries(taskIdByGid)) gidByTid.set(tid, gid)
-                  const STATUS: Record<number, string> = { 1: 'Pending', 2: 'En cours', 3: '✅ Done', 4: '❌ Failed', 7: 'Annulé' }
-                  while (pending.size > 0 && Date.now() < deadline) {
-                    await new Promise(r => setTimeout(r, 10_000))
-                    let qRes: Record<string, unknown>
-                    try { qRes = await glPost(bearer, '/task/query', { ids: [...pending] }) } catch { continue }
-                    const d = (qRes['data'] as Record<string, unknown>) ?? qRes
-                    const items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
-                    for (const item of (Array.isArray(items) ? items : [])) {
-                      const tid = (item['id'] ?? item['taskId']) as string
-                      const status = Number(item['status'])
-                      if ([3, 4, 7].includes(status)) {
-                        pending.delete(tid)
-                        const gid = gidByTid.get(tid)
-                        const phone = task.phones.find(p => p.geelark_id === gid)
-                        const name = phone?.ig_username ?? phone?.phone_name ?? tid
-                        const fail = item['failDesc'] ? ` — ${item['failDesc']}` : ''
-                        log(`${STATUS[status] ?? status} ${name}${fail}`)
-                        if (gid && !stopped.has(gid)) {
-                          stopped.add(gid)
-                          await glPost(bearer, '/phone/stop', { ids: [gid] }).catch(() => {})
-                        }
-                      }
-                    }
-                  }
-                  const remaining = phoneIds.filter(id => !stopped.has(id))
-                  if (remaining.length > 0) {
-                    await glPost(bearer, '/phone/stop', { ids: remaining }).catch(() => {})
-                  }
-                } else {
-                  await new Promise(r => setTimeout(r, 5 * 60 * 1000))
-                  await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
-                }
-              }
-            }
-            // Usage unique : retire les vidéos utilisées de la pool de l'étape
-            if (step.auto_remove_videos && usedVideoOriginalIdx.size > 0) {
-              const remaining = stepVideos.filter((_, idx) => !usedVideoOriginalIdx.has(idx))
-              updatedSteps[si] = { ...updatedSteps[si], videos: remaining }
-              stepsChanged = true
-              log(`🗑 ${stepVideos.length - remaining.length} vidéo(s) retirée(s) (${remaining.length} restante(s)).`)
-            }
-          }
-        }
-
-        // Wait between steps
-        if (step.delay_after_minutes && si < task.steps.length - 1) {
-          log(`⏳ Attente ${step.delay_after_minutes} min avant l'étape suivante…`)
-          await new Promise(r => setTimeout(r, step.delay_after_minutes! * 60 * 1000))
-        }
-      }
-
-      // Persiste les steps modifiés (usage unique) — met en pause si une pool est vidée
-      if (stepsChanged) {
-        const anyEmptied = updatedSteps.some(s =>
-          (s.type === 'publication' && (s.videos?.length ?? 0) === 0) ||
-          (s.type === 'story' && (s.images?.length ?? 0) === 0)
-        )
-        await supabase.from('recurring_tasks')
-          .update({ steps: updatedSteps, ...(anyEmptied ? { status: 'paused' } : {}) })
-          .eq('id', task.id)
-        if (anyEmptied) log('⏸ Pool d\'une étape vidée — tâche mise en pause.')
-      }
-
-      log(`⏰ Prochain post dans ${recurHours}h`)
-      await saveResult('done')
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      log(`❌ Erreur inattendue (steps): ${msg}`)
-      await saveResult('failed', msg)
-    }
-    return
-  }
-
-  if (!task.videos.length) {
-    log(task.task_type === 'story' ? '❌ Aucune image dans la tâche' : '❌ Aucune vidéo dans la tâche')
-    await saveResult('failed', task.task_type === 'story' ? 'aucune image' : 'aucune vidéo')
+  if (!unit.videos.length) {
+    log(unit.type === 'story' ? '❌ Aucune image dans la tâche' : '❌ Aucune vidéo dans la tâche')
+    await saveResult('failed', unit.type === 'story' ? 'aucune image' : 'aucune vidéo')
     return
   }
 
@@ -505,18 +354,18 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   // STORY : flow comme l'onglet Story (image + lien sticker par compte).
   // Pas d'upload GeeLark ni de RPA Reels : postInstagramStory pilote le téléphone.
   // ─────────────────────────────────────────────────────────────────────────────
-  if (task.task_type === 'story') {
+  if (unit.type === 'story') {
     try {
-      const texts = Array.isArray(task.story_texts) ? task.story_texts.filter(Boolean) : []
+      const texts = Array.isArray(unit.story_texts) ? unit.story_texts.filter(Boolean) : []
 
       // Résolution des URLs d'images (re-signe les URLs Supabase)
-      log(`▶ Préparation de ${task.videos.length} image(s)…`)
+      log(`▶ Préparation de ${unit.videos.length} image(s)…`)
       const imageUrls: (string | null)[] = []
-      for (let i = 0; i < task.videos.length; i++) {
+      for (let i = 0; i < unit.videos.length; i++) {
         try {
-          imageUrls.push(await resolveTaskMediaUrl(task.videos[i]))
+          imageUrls.push(await resolveTaskMediaUrl(unit.videos[i]))
         } catch (err) {
-          log(`❌ Image échouée (${task.videos[i].title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
+          log(`❌ Image échouée (${unit.videos[i].title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
           imageUrls.push(null)
         }
       }
@@ -538,11 +387,11 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
           log(`❌ ${name} : aucun lien configuré`)
           continue
         }
-        const imageUrl = task.mode === 'random'
+        const imageUrl = unit.mode === 'random'
           ? validImages[Math.floor(Math.random() * validImages.length)]
           : validImages[i % validImages.length]
         const linkText = texts.length
-          ? (task.mode === 'random' ? texts[Math.floor(Math.random() * texts.length)] : texts[i % texts.length])
+          ? (unit.mode === 'random' ? texts[Math.floor(Math.random() * texts.length)] : texts[i % texts.length])
           : undefined
         log(`▶ Story ${name}…`)
         try {
@@ -584,14 +433,14 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     // ── Step 1 : upload des vidéos vers GéeLark (séquentiel, AVANT le démarrage) ──
     // Exactement comme MassPosting : on upload d'abord, on démarre les téléphones
     // après. Sinon le téléphone reste inactif pendant l'upload et GéeLark l'éteint.
-    log(`▶ Upload de ${task.videos.length} vidéo(s) vers GéeLark…`)
+    log(`▶ Upload de ${unit.videos.length} vidéo(s) vers GéeLark…`)
     const tokenByIndex: (string | null)[] = []
-    for (let i = 0; i < task.videos.length; i++) {
-      const v = task.videos[i]
+    for (let i = 0; i < unit.videos.length; i++) {
+      const v = unit.videos[i]
       try {
         const tok = await resolveTaskVideoToken(bearer, v)
         tokenByIndex.push(tok)
-        log(`✅ Vidéo ${i + 1}/${task.videos.length} prête : ${v.title || tok.slice(0, 30)}`)
+        log(`✅ Vidéo ${i + 1}/${unit.videos.length} prête : ${v.title || tok.slice(0, 30)}`)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         log(`❌ Vidéo échouée (${v.title || '?'}): ${msg}`)
@@ -633,7 +482,7 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     for (let i = 0; i < task.phones.length; i++) {
       const phone  = task.phones[i]
       const name   = phone.ig_username ?? phone.phone_name
-      const vidIdx = task.mode === 'random'
+      const vidIdx = unit.mode === 'random'
         ? Math.floor(Math.random() * validTokens.length)
         : i % validTokens.length
       const trialUnsupported = phoneFlags.get(phone.geelark_id) ?? false
@@ -642,10 +491,10 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
         log(`⚠ Trial Reels désactivé pour ${name} (compte non éligible)`)
       const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
         id:          phone.geelark_id,
-        scheduleAt:  baseTs + i * (task.delay_minutes ?? 0) * 60,
-        description: task.caption,
+        scheduleAt:  baseTs + i * (unit.delay_minutes ?? 0) * 60,
+        description: unit.caption,
         video:       [validTokens[vidIdx]],
-        ...(useTrialReels ? { shareType: 2 } : {}),
+        ...(unit.reels_trial ? { shareType: 2 } : {}),
       })
       if (res['code'] === 0) {
         rpaCreated++
@@ -758,6 +607,24 @@ async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
     log(`❌ Erreur inattendue: ${msg}`)
     await saveResult('failed', msg)
   }
+}
+
+// A task is due if its (legacy) timer is reached, OR any segment is due.
+function isTaskDue(task: RecurringTask): boolean {
+  if (task.segments && task.segments.length > 0) {
+    return task.segments.some(s => new Date(s.next_run_at).getTime() <= Date.now())
+  }
+  return new Date(task.next_run_at).getTime() <= Date.now()
+}
+
+// Earliest upcoming run across a task (segment-aware).
+function taskNextRun(task: RecurringTask): string {
+  if (task.segments && task.segments.length > 0) {
+    return [...task.segments]
+      .sort((a, b) => new Date(a.next_run_at).getTime() - new Date(b.next_run_at).getTime())[0]?.next_run_at
+      ?? task.next_run_at
+  }
+  return task.next_run_at
 }
 
 function formatInterval(hours: number): string {
@@ -963,6 +830,173 @@ function ConfirmDeleteDialog({
   )
 }
 
+// ── CaptionBankPicker ──────────────────────────────────────────────────────────
+// Modal to pick text items from caption_bank and append to a story's caption pool.
+
+interface CaptionBankPickerProps {
+  user: User
+  currentOrg: { id: string } | null
+  onSelect: (texts: string[]) => void
+  onClose: () => void
+}
+
+interface CaptionPickerItem { id: string; title: string; content: string; folder: string | null }
+
+function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankPickerProps) {
+  const [items, setItems]   = useState<CaptionPickerItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setLoading(true)
+    const base = supabase.from('caption_bank').select('id,title,content,folder').order('created_at', { ascending: false })
+    const q = currentOrg
+      ? base.eq('org_id', currentOrg.id)
+      : base.eq('user_id', user.id).is('org_id', null)
+    q.then(({ data }) => {
+      setItems((data ?? []) as CaptionPickerItem[])
+      setLoading(false)
+    })
+  }, [currentOrg?.id, user.id])
+
+  const filtered = items.filter(it => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return it.title.toLowerCase().includes(q) || it.content.toLowerCase().includes(q)
+  })
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next
+  })
+
+  const confirm = () => {
+    const texts = items.filter(it => selected.has(it.id)).map(it => it.content).filter(Boolean)
+    onSelect(texts)
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9500,
+        background: 'rgba(6,6,8,0.92)', backdropFilter: 'blur(14px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        className="anim-scale-in"
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 80px)',
+          background: '#0F1014', border: '1px solid rgba(233,234,240,0.08)',
+          borderRadius: 14, display: 'flex', flexDirection: 'column',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px', borderBottom: '1px solid rgba(233,234,240,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
+        }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#E9EAF0' }}>Banque de captions</p>
+            <p style={{ margin: 0, fontSize: 11, color: 'rgba(233,234,240,0.42)' }}>
+              {selected.size > 0 ? `${selected.size} caption${selected.size > 1 ? 's' : ''} sélectionnée${selected.size > 1 ? 's' : ''}` : 'Sélectionne les captions à ajouter au pool'}
+            </p>
+          </div>
+          <button onClick={onClose} className="cursor-pointer"
+            style={{ background: 'none', border: 'none', color: 'rgba(233,234,240,0.42)', display: 'flex', padding: 6, borderRadius: 6 }}>
+            <IconX size={12} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(233,234,240,0.06)', flexShrink: 0 }}>
+          <input
+            type="text"
+            placeholder="Rechercher…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            autoFocus
+            style={{
+              width: '100%', height: 34, padding: '0 12px', fontSize: 13, boxSizing: 'border-box',
+              background: 'rgba(233,234,240,0.03)', color: '#E9EAF0',
+              border: '1px solid rgba(233,234,240,0.1)', borderRadius: 8, outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Items list */}
+        <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'thin', padding: '8px 12px' }}>
+          {loading ? (
+            <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'rgba(233,234,240,0.4)' }}>Chargement…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'rgba(233,234,240,0.4)' }}>Aucune caption trouvée</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {filtered.map(it => {
+                const on = selected.has(it.id)
+                return (
+                  <button key={it.id} onClick={() => toggle(it.id)} className="cursor-pointer"
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
+                      padding: '9px 11px', borderRadius: 9, border: 'none',
+                      background: on ? 'rgba(244,114,182,0.08)' : 'rgba(233,234,240,0.02)',
+                      outline: on ? '1px solid rgba(244,114,182,0.3)' : '1px solid transparent',
+                      transition: 'all 0.12s',
+                    }}>
+                    <div style={{
+                      width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 2,
+                      background: on ? '#F472B6' : 'transparent',
+                      border: on ? 'none' : '1px solid rgba(233,234,240,0.2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {on && <IconCheck size={7} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {it.title && (
+                        <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 700, color: 'rgba(233,234,240,0.6)', letterSpacing: '0.02em' }}>{it.title}</p>
+                      )}
+                      <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(233,234,240,0.82)', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {it.content.length > 160 ? it.content.slice(0, 160) + '…' : it.content}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '12px 16px', borderTop: '1px solid rgba(233,234,240,0.08)', flexShrink: 0,
+          display: 'flex', gap: 10, justifyContent: 'flex-end',
+        }}>
+          <button onClick={onClose} className="cursor-pointer"
+            style={{ padding: '9px 16px', fontSize: 11, fontWeight: 700, background: 'transparent', color: 'rgba(233,234,240,0.42)', border: '1px solid rgba(233,234,240,0.08)', borderRadius: 7 }}>
+            Annuler
+          </button>
+          <button
+            onClick={confirm}
+            disabled={selected.size === 0}
+            className="cursor-pointer"
+            style={{
+              padding: '9px 20px', fontSize: 11, fontWeight: 800,
+              background: selected.size > 0 ? '#F472B6' : 'rgba(233,234,240,0.08)',
+              color: selected.size > 0 ? '#fff' : 'rgba(233,234,240,0.3)',
+              border: 'none', borderRadius: 7,
+            }}
+          >
+            Ajouter {selected.size > 0 ? `(${selected.size})` : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CreateTaskModal ────────────────────────────────────────────────────────────
 
 const GOLD  = '#6366F1'
@@ -974,6 +1008,77 @@ function defaultNextRun(): string {
   const d = new Date(Date.now() + 60 * 60 * 1000)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// Modal-only UI state for one segment (interval split into value + unit, etc.)
+interface SegmentDraft {
+  type: TaskType
+  videos: SelVideo[]
+  caption: string
+  story_texts: string[]
+  mode: 'seq' | 'random'
+  recurValue: number
+  recurUnit: 'minutes' | 'heures' | 'jours'
+  delay_minutes: number
+  reels_trial: boolean
+  auto_remove_videos: boolean
+  next_run_at: string   // datetime-local string ("YYYY-MM-DDTHH:mm")
+}
+
+function segUid(): string {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `seg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function emptySegmentDraft(): SegmentDraft {
+  return {
+    type: 'publication', videos: [], caption: '', story_texts: [],
+    mode: 'seq', recurValue: 24, recurUnit: 'heures',
+    delay_minutes: 0, reels_trial: false, auto_remove_videos: false,
+    next_run_at: defaultNextRun(),
+  }
+}
+
+function draftRecurHours(d: SegmentDraft): number {
+  return d.recurUnit === 'jours' ? d.recurValue * 24
+    : d.recurUnit === 'minutes' ? d.recurValue / 60
+    : d.recurValue
+}
+
+function draftToSegment(draft: SegmentDraft, id: string, uploaded: TaskVideo[]): TaskSegment {
+  return {
+    id,
+    type: draft.type,
+    videos: uploaded,
+    caption: draft.caption.trim(),
+    story_texts: draft.type === 'story' ? draft.story_texts.filter(Boolean) : [],
+    mode: draft.mode,
+    recur_hours: draftRecurHours(draft),
+    delay_minutes: draft.delay_minutes,
+    reels_trial: draft.type === 'story' ? false : draft.reels_trial,
+    auto_remove_videos: draft.auto_remove_videos,
+    next_run_at: new Date(draft.next_run_at).toISOString(),
+  }
+}
+
+function segmentToDraft(seg: TaskSegment): SegmentDraft {
+  const recurUnit: 'minutes' | 'heures' | 'jours' = seg.recur_hours < 1 ? 'minutes'
+    : seg.recur_hours % 24 === 0 && seg.recur_hours >= 24 ? 'jours' : 'heures'
+  const recurValue = recurUnit === 'minutes' ? Math.round(seg.recur_hours * 60)
+    : recurUnit === 'jours' ? seg.recur_hours / 24 : seg.recur_hours
+  return {
+    type: seg.type,
+    videos: (seg.videos ?? []).map(v => ({ filePath: v.token, title: v.title })),
+    caption: seg.caption ?? '',
+    story_texts: seg.story_texts ?? [],
+    mode: seg.mode ?? 'seq',
+    recurValue, recurUnit,
+    delay_minutes: seg.delay_minutes ?? 0,
+    reels_trial: seg.reels_trial ?? false,
+    auto_remove_videos: seg.auto_remove_videos ?? false,
+    next_run_at: (seg.next_run_at ?? defaultNextRun()).slice(0, 16),
+  }
 }
 
 interface CreateTaskModalProps {
@@ -993,40 +1098,44 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   const [phoneSearch, setPhoneSearch] = useState('')
   const [groups, setGroups]           = useState<string[]>(['Tous'])
   const [groupFilter, setGroupFilter] = useState('Tous')
-  const [videos, setVideos]           = useState<SelVideo[]>(
-    editTask?.videos.map(v => ({ filePath: v.token, title: v.title })) ?? []
-  )
-  const [showBankPicker, setShowBankPicker] = useState(false)
   const [name, setName]               = useState(editTask?.name ?? '')
-  const [caption, setCaption]         = useState(editTask?.caption ?? '')
-  const [taskType, setTaskType]       = useState<TaskType>(editTask?.task_type ?? 'publication')
-  const [storyTexts, setStoryTexts]   = useState<string[]>(editTask?.story_texts ?? [])
-  const [storyTextDraft, setStoryTextDraft] = useState('')
+
+  // Segments — the heart of a task. Initialise from the edited task:
+  //   • task with segments → one draft per segment
+  //   • legacy task (no segments) → a single draft built from its top-level fields
+  //   • new task → one empty draft
+  const [segments, setSegments] = useState<SegmentDraft[]>(() => {
+    if (editTask?.segments && editTask.segments.length > 0) {
+      return editTask.segments.map(segmentToDraft)
+    }
+    if (editTask) {
+      return [segmentToDraft({
+        id: segUid(),
+        type: editTask.task_type ?? 'publication',
+        videos: editTask.videos ?? [],
+        caption: editTask.caption ?? '',
+        story_texts: editTask.story_texts ?? [],
+        mode: editTask.mode ?? 'seq',
+        recur_hours: editTask.recur_hours ?? 24,
+        delay_minutes: editTask.delay_minutes ?? 0,
+        reels_trial: editTask.reels_trial ?? false,
+        auto_remove_videos: editTask.auto_remove_videos ?? false,
+        next_run_at: editTask.next_run_at ?? new Date().toISOString(),
+      })]
+    }
+    return [emptySegmentDraft()]
+  })
+  const [expandedIdx, setExpandedIdx]           = useState(0)
+  const [showBankPickerFor, setShowBankPickerFor] = useState<number | null>(null)
+  const [storyTextDraft, setStoryTextDraft]     = useState('')
+
   // Liens par compte (Story) — pré-remplis depuis la tâche éditée, sinon depuis l'onglet Story (localStorage)
   const [phoneLinks, setPhoneLinks]   = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {}
     editTask?.phones.forEach(p => { if (p.link) init[p.id] = p.link })
     return init
   })
-  const [mode, setMode]               = useState<'seq' | 'random'>(editTask?.mode ?? 'seq')
-  const [recurUnit, setRecurUnit]     = useState<'minutes' | 'heures' | 'jours'>(
-    editTask
-      ? (editTask.recur_hours < 1 ? 'minutes'
-        : editTask.recur_hours % 24 === 0 && editTask.recur_hours >= 24 ? 'jours' : 'heures')
-      : 'heures'
-  )
-  const [recurValue, setRecurValue]   = useState(
-    editTask
-      ? (editTask.recur_hours < 1 ? Math.round(editTask.recur_hours * 60)
-        : editTask.recur_hours % 24 === 0 && editTask.recur_hours >= 24 ? editTask.recur_hours / 24 : editTask.recur_hours)
-      : 24
-  )
-  const [nextRunAt, setNextRunAt]     = useState(
-    editTask ? editTask.next_run_at.slice(0, 16) : defaultNextRun()
-  )
-  const [delayMin, setDelayMin]       = useState(editTask?.delay_minutes ?? 0)
-  const [reelsTrial, setReelsTrial]   = useState(editTask?.reels_trial ?? false)
-  const [autoRemove, setAutoRemove]   = useState(editTask?.auto_remove_videos ?? false)
+  const [showCaptionPickerFor, setShowCaptionPickerFor] = useState<number | null>(null)
   const [submitting, setSubmitting]   = useState(false)
   const [progress, setProgress]       = useState('')
   const [error, setError]             = useState<string | null>(null)
@@ -1037,9 +1146,18 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   })
   const [bankPickerTarget, setBankPickerTarget] = useState<{ stepIdx: number; field: 'videos' | 'images' } | null>(null)
 
-  const recurHours = recurUnit === 'jours' ? recurValue * 24
-    : recurUnit === 'minutes' ? recurValue / 60
-    : recurValue
+  // Segment mutation helpers
+  const patchSegment = (idx: number, patch: Partial<SegmentDraft>) =>
+    setSegments(prev => prev.map((s, i) => i === idx ? { ...s, ...patch } : s))
+  const addSegment = () => {
+    setSegments(prev => [...prev, emptySegmentDraft()])
+    setExpandedIdx(segments.length)   // expand the newly added one
+    setStoryTextDraft('')
+  }
+  const removeSegment = (idx: number) => {
+    setSegments(prev => prev.filter((_, i) => i !== idx))
+    setExpandedIdx(prev => (prev >= idx && prev > 0 ? prev - 1 : prev))
+  }
 
   useEffect(() => {
     let q = supabase.from('phones').select('*').order('phone_name')
@@ -1051,6 +1169,14 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Auto-fill phone links from DB (phones.link column), unless already set by the editTask
+      setPhoneLinks(prev => {
+        const next = { ...prev }
+        for (const p of ps) {
+          if (p.link && !(p.id in next)) next[p.id] = p.link
+        }
+        return next
+      })
     })
   }, [currentOrg?.id, user.id])
 
@@ -1074,9 +1200,11 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     })
   }
 
-  // Story : lien d'un compte (état local, sinon valeur sauvée dans l'onglet Story)
+  // Story : lien d'un compte — priorité : état local > DB (phone.link) > localStorage
   const getPhoneLink = (id: string): string => {
     if (id in phoneLinks) return phoneLinks[id]
+    const dbPhone = phones.find(p => p.id === id)
+    if (dbPhone?.link) return dbPhone.link
     return localStorage.getItem(`sf-story-link-${id}`) ?? ''
   }
   const setPhoneLink = (id: string, link: string) => {
@@ -1084,22 +1212,25 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     if (link.trim()) localStorage.setItem(`sf-story-link-${id}`, link.trim())
     else localStorage.removeItem(`sf-story-link-${id}`)
   }
-  function addStoryText() {
+  function addStoryText(idx: number) {
     const v = storyTextDraft.trim()
     if (!v) return
-    setStoryTexts(prev => [...prev, v])
+    patchSegment(idx, { story_texts: [...segments[idx].story_texts, v] })
     setStoryTextDraft('')
   }
 
-  const isStory = taskType === 'story'
+  const anyStory = segments.some(s => s.type === 'story')
   const phonesWithLink = phoneList.filter(p => getPhoneLink(p.id).trim()).length
 
   const isEdit = !!editTask
   // Le nom est optionnel — un nom est généré automatiquement s'il est vide.
-  const canSubmit = !submitting && phoneList.length > 0
-    && (sequenceMode
-      ? steps.length > 0 && steps.some(s => s.type === 'warmup' || (s.type === 'story' ? (s.images ?? []).length > 0 : (s.videos ?? []).length > 0))
-      : videos.length > 0 && (!isStory || phonesWithLink === phoneList.length))
+  const canSubmit = !submitting
+    && phoneList.length > 0
+    && segments.length > 0
+    && segments.every(s => s.videos.length > 0)
+    && (!anyStory || phonesWithLink === phoneList.length)
+
+  const totalMedia = segments.reduce((n, s) => n + s.videos.length, 0)
 
   const labelStyle: React.CSSProperties = {
     fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
@@ -1112,59 +1243,61 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     setError(null)
 
     try {
-      const uploadedVideos: TaskVideo[] = []
-
-      for (let i = 0; i < videos.length; i++) {
-        const v = videos[i]
-        setProgress(isStory ? `Préparation image ${i + 1}/${videos.length}…` : `Préparation vidéo ${i + 1}/${videos.length}…`)
-        // Story : on ne fait pas d'upload GeeLark — l'URL signée suffit (postInstagramStory la lit).
-        // Publication : URLs https stockées telles quelles (l'upload se fait à l'exécution).
-        if (isStory || v.filePath.startsWith('http://') || v.filePath.startsWith('https://')) {
-          uploadedVideos.push({ token: v.filePath, title: v.title })
-          continue
+      // Upload each segment's media (publication local files → GeeLark; story/https → kept)
+      const builtSegments: TaskSegment[] = []
+      for (let si = 0; si < segments.length; si++) {
+        const seg = segments[si]
+        const isStory = seg.type === 'story'
+        const uploaded: TaskVideo[] = []
+        for (let i = 0; i < seg.videos.length; i++) {
+          const v = seg.videos[i]
+          setProgress(`Segment ${si + 1}/${segments.length} — ${isStory ? 'image' : 'vidéo'} ${i + 1}/${seg.videos.length}…`)
+          if (isStory || v.filePath.startsWith('http://') || v.filePath.startsWith('https://')) {
+            uploaded.push({ token: v.filePath, title: v.title })
+            continue
+          }
+          if (!bearer || !window.electronAPI) {
+            uploaded.push({ token: v.filePath, title: v.title })
+            continue
+          }
+          const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: v.filePath })
+          if (up && up.ok && up.token) uploaded.push({ token: up.token, title: v.title })
+          else throw new Error(`Upload "${v.title}" échoué : ${up?.error ?? 'erreur inconnue'}`)
         }
-        // Local file — upload to GeeLark now (Electron only)
-        if (!bearer || !window.electronAPI) {
-          uploadedVideos.push({ token: v.filePath, title: v.title })
-          continue
-        }
-        const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: v.filePath })
-        if (up && up.ok && up.token) {
-          uploadedVideos.push({ token: up.token, title: v.title })
-        } else {
-          throw new Error(`Upload "${v.title}" échoué : ${up?.error ?? 'erreur inconnue'}`)
-        }
+        builtSegments.push(draftToSegment(seg, segUid(), uploaded))
       }
 
       setProgress('Sauvegarde de la tâche…')
 
-      const nextRunDate = new Date(nextRunAt)
+      const minNext = builtSegments.reduce(
+        (min, s) => Math.min(min, new Date(s.next_run_at).getTime()), Infinity,
+      )
+      const first = builtSegments[0]
       const autoName = `Tâche du ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}`
       const taskData = {
         user_id:       user.id,
         org_id:        currentOrg?.id ?? null,
         name:          name.trim() || autoName,
         status:        (editTask?.status ?? 'active') as 'active' | 'paused',
-        task_type:     sequenceMode ? 'publication' : taskType,
+        segments:      builtSegments,
+        // Top-level mirror of the first segment — keeps the server cron & older code working
+        task_type:     first.type,
         phones:        phoneList.map(p => ({
           id: p.id, geelark_id: p.geelark_id,
           phone_name: p.phone_name, ig_username: p.ig_username ?? null,
-          ...(isStory && !sequenceMode ? { link: getPhoneLink(p.id).trim() } : {}),
+          ...(anyStory ? { link: getPhoneLink(p.id).trim() } : {}),
         })),
-        videos:        sequenceMode ? [] : uploadedVideos,
-        caption:       sequenceMode ? '' : caption.trim(),
-        story_texts:   isStory && !sequenceMode ? storyTexts.filter(Boolean) : [],
-        mode,
-        delay_minutes: delayMin,
-        recur_hours:        recurHours,
-        next_run_at:        nextRunDate.toISOString(),
-        reels_trial:        isStory && !sequenceMode ? false : reelsTrial,
-        auto_remove_videos: autoRemove,
-        steps:         sequenceMode ? steps : [],
+        videos:        first.videos,
+        caption:       first.caption,
+        story_texts:   first.story_texts,
+        mode:          first.mode,
+        delay_minutes: first.delay_minutes,
+        recur_hours:        first.recur_hours,
+        next_run_at:        new Date(isFinite(minNext) ? minNext : Date.now()).toISOString(),
+        reels_trial:        first.reels_trial,
+        auto_remove_videos: first.auto_remove_videos,
       }
 
-      // Rétro-compat : si la colonne auto_remove_videos n'existe pas encore
-      // (migration non appliquée), on réessaie sans elle.
       const saveTask = async (payload: Record<string, unknown>) => {
         if (isEdit && editTask) {
           return supabase.from('recurring_tasks').update(payload).eq('id', editTask.id)
@@ -1173,20 +1306,28 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       }
 
       let { error: err } = await saveTask(taskData)
-      // Rétro-compat : colonnes task_type / story_texts manquantes (migration non appliquée)
+      // Rétro-compat : colonne segments manquante (migration non appliquée) → on
+      // sauvegarde la première sous-tâche en mode legacy (mono-segment).
+      if (err && /segments/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
+        const { segments: _seg, ...fallback } = taskData
+        ;({ error: err } = await saveTask(fallback))
+        if (!err && builtSegments.length > 1) {
+          setError('⚠ Multi-segments non supporté tant que la migration SQL n\'est pas appliquée — seul le 1er segment a été sauvegardé.')
+        }
+      }
+      // Rétro-compat : colonnes task_type / story_texts manquantes
       if (err && /(task_type|story_texts)/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
-        const { task_type: _t, story_texts: _s, ...fallback } = taskData
+        const { task_type: _t, story_texts: _s, segments: _sg, ...fallback } = taskData
         ;({ error: err } = await saveTask(fallback))
-        if (!err && isStory) setError('⚠ Type « Story » non supporté tant que la migration SQL n\'est pas appliquée — sauvegardé en publication.')
       }
-      // Rétro-compat : colonne auto_remove_videos manquante (migration non appliquée)
+      // Rétro-compat : colonne auto_remove_videos manquante
       if (err && /auto_remove_videos/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
-        const { auto_remove_videos: _omit, ...fallback } = taskData
+        const { auto_remove_videos: _omit, segments: _sg2, ...fallback } = taskData
         ;({ error: err } = await saveTask(fallback))
       }
-      // Rétro-compat : colonne recur_hours est integer au lieu de numeric → arrondir à l'heure la plus proche
+      // Rétro-compat : colonne recur_hours integer au lieu de numeric → arrondir
       if (err && /recur_hours/i.test(err.message) && /integer/i.test(err.message)) {
-        const rounded = { ...taskData, recur_hours: Math.max(1, Math.round(taskData.recur_hours as number)) }
+        const rounded = { ...taskData, recur_hours: Math.max(1, Math.round(taskData.recur_hours)) }
         ;({ error: err } = await saveTask(rounded))
         if (!err) setError('⚠ Intervalles en minutes non supportés tant que la migration SQL n\'est pas appliquée — sauvegardé en heures.')
       }
@@ -1553,7 +1694,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           </section>}
 
           {/* ── Liens par compte (Story) ── */}
-          {isStory && !sequenceMode && phoneList.length > 0 && (
+          {anyStory && phoneList.length > 0 && (
             <section>
               <span style={labelStyle}>
                 Lien par compte
@@ -1597,270 +1738,364 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             </section>
           )}
 
-          {/* ── Vidéos / Images ── */}
-          {!sequenceMode && <section>
-            <span style={labelStyle}>
-              {isStory ? 'Images' : 'Vidéos'}{videos.length > 0 && (
-                <span style={{ color: IVORY, letterSpacing: 'normal', fontSize: 11, textTransform: 'none', fontWeight: 500 }}>
-                  {' '}— {videos.length}
-                </span>
-              )}
-            </span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', minHeight: 38 }}>
-              {videos.map((v, i) => (
-                <span key={i} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
-                  padding: '5px 9px', borderRadius: 7,
-                  border: `1px solid ${HAIR}`, fontSize: 11.5,
-                  color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
-                }}>
-                  <span style={{ fontWeight: 600, color: GOLD }}>{i + 1}</span>
-                  {v.title.length > 28 ? v.title.slice(0, 28) + '…' : v.title}
-                  <button
-                    onClick={() => setVideos(prev => prev.filter((_, j) => j !== i))}
-                    className="cursor-pointer"
-                    style={{ background: 'none', border: 'none', color: '#F0A0AB', display: 'flex', padding: 0, cursor: 'pointer' }}
-                  >
-                    <IconX size={8} />
-                  </button>
-                </span>
-              ))}
+          {/* ── Segments ── */}
+          <section>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <span style={{ ...labelStyle, marginBottom: 2 }}>Sous-tâches</span>
+                <p style={{ margin: 0, fontSize: 11, color: MUTED }}>
+                  Chaque sous-tâche s'exécute indépendamment sur les mêmes téléphones.
+                </p>
+              </div>
               <button
-                onClick={() => setShowBankPicker(true)}
+                onClick={addSegment}
                 className="cursor-pointer"
                 style={{
-                  padding: '6px 13px', fontSize: 10, fontWeight: 700,
-                  letterSpacing: '0.04em', textTransform: 'uppercase',
-                  background: GOLD, color: '#fff', border: 'none', borderRadius: 6,
-                  transition: 'background 0.18s',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 14px', fontSize: 11, fontWeight: 700,
+                  background: 'rgba(99,102,241,0.1)', color: '#818CF8',
+                  border: '1px solid rgba(99,102,241,0.28)', borderRadius: 8,
+                  flexShrink: 0,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#818CF8' }}
-                onMouseLeave={e => { e.currentTarget.style.background = GOLD }}
               >
-                + Depuis la banque
+                <IconPlus size={10} /> Nouvelle sous-tâche
               </button>
             </div>
-          </section>}
 
-          {/* ── Légende (Publication) ── */}
-          {!isStory && !sequenceMode && (
-            <section>
-              <span style={labelStyle}>Légende</span>
-              <textarea
-                value={caption}
-                onChange={e => setCaption(e.target.value)}
-                rows={3}
-                placeholder="Description Instagram…"
-                style={{
-                  width: '100%', minHeight: 72, padding: '10px 12px',
-                  fontSize: 13, lineHeight: 1.6,
-                  background: 'rgba(233,234,240,0.02)', color: IVORY,
-                  resize: 'vertical', border: `1px solid ${HAIR}`,
-                  borderRadius: 8, outline: 'none', fontFamily: 'inherit',
-                  transition: 'border-color 0.2s', boxSizing: 'border-box',
-                }}
-                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = HAIR }}
-              />
-            </section>
-          )}
-
-          {/* ── Textes du sticker (Story) ── */}
-          {isStory && !sequenceMode && (
-            <section>
-              <span style={labelStyle}>
-                Texte du sticker
-                <span style={{ color: MUTED, letterSpacing: 'normal', fontSize: 10, textTransform: 'none', fontWeight: 500 }}> — optionnel, distribué par compte</span>
-              </span>
-              <div style={{ display: 'flex', gap: 8, marginBottom: storyTexts.length ? 10 : 0 }}>
-                <input
-                  type="text"
-                  value={storyTextDraft}
-                  onChange={e => setStoryTextDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStoryText() } }}
-                  placeholder="Ex : Voir le lien 👆"
-                  style={{
-                    flex: 1, height: 36, padding: '0 12px', fontSize: 13,
-                    background: 'rgba(233,234,240,0.02)', color: IVORY,
-                    border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
-                  }}
-                />
-                <button
-                  onClick={addStoryText}
-                  disabled={!storyTextDraft.trim()}
-                  className="cursor-pointer"
-                  style={{
-                    padding: '0 16px', fontSize: 10, fontWeight: 700,
-                    letterSpacing: '0.04em', textTransform: 'uppercase',
-                    background: storyTextDraft.trim() ? GOLD : 'rgba(233,234,240,0.08)',
-                    color: storyTextDraft.trim() ? '#fff' : MUTED,
-                    border: 'none', borderRadius: 7,
-                  }}
-                >
-                  Ajouter
-                </button>
-              </div>
-              {storyTexts.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {storyTexts.map((txt, i) => (
-                    <span key={i} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 7,
-                      padding: '5px 9px', borderRadius: 7,
-                      border: `1px solid ${HAIR}`, fontSize: 11.5,
-                      color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {segments.map((seg, idx) => {
+                const isStory = seg.type === 'story'
+                const open = expandedIdx === idx
+                const storyAccent = '#F472B6'
+                const pubAccent   = '#818CF8'
+                const accent = isStory ? storyAccent : pubAccent
+                const accentAlpha = isStory ? 'rgba(244,114,182,' : 'rgba(129,140,248,'
+                const intervalLabel = formatInterval(draftRecurHours(seg))
+                return (
+                  <div key={idx} style={{
+                    borderRadius: 12,
+                    border: `1px solid ${open ? accentAlpha + '0.35)' : HAIR}`,
+                    background: open ? accentAlpha + '0.03)' : 'rgba(255,255,255,0.015)',
+                    overflow: 'hidden', transition: 'border-color 0.18s, background 0.18s',
+                  }}>
+                    {/* Card header — always visible */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 0,
+                      borderLeft: `3px solid ${open ? accent : 'transparent'}`,
+                      transition: 'border-color 0.18s',
                     }}>
-                      {txt.length > 32 ? txt.slice(0, 32) + '…' : txt}
                       <button
-                        onClick={() => setStoryTexts(prev => prev.filter((_, j) => j !== i))}
+                        onClick={() => setExpandedIdx(open ? -1 : idx)}
                         className="cursor-pointer"
-                        style={{ background: 'none', border: 'none', color: '#F0A0AB', display: 'flex', padding: 0 }}
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '12px 14px 12px 13px', background: 'transparent', border: 'none', textAlign: 'left',
+                        }}
                       >
-                        <IconX size={8} />
+                        {/* Type pill */}
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                          background: isStory ? 'rgba(236,72,153,0.1)' : 'rgba(99,102,241,0.1)',
+                          color: accent,
+                          border: `1px solid ${isStory ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
+                          borderRadius: 6, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
+                        }}>
+                          {isStory ? <IconLinkType size={11} /> : <IconVideo size={11} />}
+                          {isStory ? 'Story' : 'Publication'}
+                        </span>
+                        {/* Summary */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: 12, color: IVORY, fontWeight: 600 }}>
+                            {intervalLabel}
+                          </span>
+                          <span style={{ fontSize: 11, color: MUTED, marginLeft: 8 }}>
+                            · {seg.videos.length} {isStory ? 'image' : 'vidéo'}{seg.videos.length !== 1 ? 's' : ''}
+                            {isStory && seg.story_texts.length > 0 && ` · ${seg.story_texts.length} caption${seg.story_texts.length > 1 ? 's' : ''}`}
+                          </span>
+                        </div>
+                        {/* Chevron */}
+                        <span style={{ display: 'flex', color: MUTED, flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.18s' }}>
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </span>
                       </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
+                      {/* Delete — only when multiple segments */}
+                      {segments.length > 1 && (
+                        <button
+                          onClick={() => removeSegment(idx)}
+                          title="Supprimer cette sous-tâche"
+                          className="cursor-pointer"
+                          style={{
+                            width: 36, height: 36, flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: 'none', border: 'none', marginRight: 6,
+                            color: 'rgba(248,113,113,0.55)', borderRadius: 7,
+                          }}
+                        >
+                          <IconTrash size={12} />
+                        </button>
+                      )}
+                    </div>
 
-          {/* ── Paramètres ── */}
-          <section>
-            <span style={labelStyle}>Paramètres</span>
-            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    {/* Expanded body */}
+                    {open && (
+                      <div style={{ borderTop: `1px solid ${HAIR}`, padding: '16px 16px 20px' }}>
 
-              {/* Mode */}
-              <div>
-                <p style={{ fontSize: 10.5, color: MUTED, marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase', margin: '0 0 6px' }}>Mode</p>
-                <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 7, overflow: 'hidden' }}>
-                  {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
-                    <button
-                      key={m.k}
-                      onClick={() => setMode(m.k)}
-                      className="cursor-pointer"
-                      style={{
-                        padding: '8px 14px', fontSize: 10, fontWeight: 700,
-                        letterSpacing: '0.04em', textTransform: 'uppercase',
-                        background: mode === m.k ? IVORY : 'transparent',
-                        color: mode === m.k ? '#0A0B0E' : MUTED,
-                        border: 'none', transition: 'all 0.18s',
-                      }}
-                    >
-                      {m.l}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                        {/* ── Type ── */}
+                        <div style={{ marginBottom: 18 }}>
+                          <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>Type</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            {([
+                              { k: 'publication' as const, title: 'Publication', sub: 'Reels Instagram', icon: <IconVideo size={16} color="currentColor" /> },
+                              { k: 'story'       as const, title: 'Story',       sub: 'Image + lien',  icon: <IconLinkType size={16} color="currentColor" /> },
+                            ]).map(opt => {
+                              const active = seg.type === opt.k
+                              const optAccent = opt.k === 'story' ? storyAccent : pubAccent
+                              return (
+                                <button key={opt.k}
+                                  onClick={() => patchSegment(idx, { type: opt.k })}
+                                  className="cursor-pointer"
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 11,
+                                    padding: '11px 14px', borderRadius: 9,
+                                    border: `1px solid ${active ? (opt.k === 'story' ? 'rgba(244,114,182,0.45)' : 'rgba(99,102,241,0.45)') : HAIR}`,
+                                    background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.08)' : 'rgba(99,102,241,0.08)') : 'rgba(255,255,255,0.02)',
+                                    color: active ? optAccent : 'rgba(233,234,240,0.55)',
+                                    transition: 'all 0.15s',
+                                  }}>
+                                  <span style={{
+                                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.12)' : 'rgba(99,102,241,0.12)') : 'rgba(255,255,255,0.04)',
+                                  }}>
+                                    {opt.icon}
+                                  </span>
+                                  <div style={{ textAlign: 'left' }}>
+                                    <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.6)' }}>{opt.title}</p>
+                                    <p style={{ margin: 0, fontSize: 10.5, color: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.7)' : 'rgba(129,140,248,0.7)') : MUTED }}>{opt.sub}</p>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
 
-              {/* Intervalle */}
-              <div>
-                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Intervalle</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="number"
-                    min={1}
-                    max={9999}
-                    value={recurValue}
-                    onChange={e => setRecurValue(Math.max(1, Number(e.target.value) || 24))}
-                    style={{
-                      width: 72, height: 34, padding: '0 10px', fontSize: 13,
-                      textAlign: 'center', background: 'rgba(233,234,240,0.02)',
-                      color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none',
-                    }}
-                  />
-                  <select
-                    value={recurUnit}
-                    onChange={e => setRecurUnit(e.target.value as 'minutes' | 'heures' | 'jours')}
-                    style={{
-                      height: 34, padding: '0 8px', fontSize: 12,
-                      background: '#0F1014', color: IVORY,
-                      border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none',
-                    }}
-                  >
-                    <option value="minutes">minutes</option>
-                    <option value="heures">heures</option>
-                    <option value="jours">jours</option>
-                  </select>
-                </div>
-              </div>
+                        {/* ── Médias ── */}
+                        <div style={{ marginBottom: 18 }}>
+                          <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+                            {isStory ? 'Images' : 'Vidéos'}
+                            {seg.videos.length > 0 && <span style={{ color: IVORY, letterSpacing: 'normal', textTransform: 'none', fontWeight: 500, fontSize: 11 }}> — {seg.videos.length}</span>}
+                          </p>
+                          {seg.videos.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                              {seg.videos.map((v, i) => (
+                                <span key={i} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                                  padding: '4px 8px 4px 6px', borderRadius: 6,
+                                  border: `1px solid ${HAIR}`,
+                                  fontSize: 11.5, color: 'rgba(233,234,240,0.7)',
+                                  background: 'rgba(233,234,240,0.03)',
+                                }}>
+                                  <span style={{ width: 18, height: 18, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', background: accentAlpha + '0.15)', color: accent, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                                  {v.title.length > 22 ? v.title.slice(0, 22) + '…' : v.title}
+                                  <button
+                                    onClick={() => patchSegment(idx, { videos: seg.videos.filter((_, j) => j !== i) })}
+                                    className="cursor-pointer"
+                                    style={{ background: 'none', border: 'none', color: 'rgba(248,113,113,0.6)', display: 'flex', padding: 0, cursor: 'pointer' }}
+                                  >
+                                    <IconX size={8} />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setShowBankPickerFor(idx)}
+                            className="cursor-pointer"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 7,
+                              padding: '7px 14px', fontSize: 11, fontWeight: 700,
+                              background: accentAlpha + '0.1)', color: accent,
+                              border: `1px solid ${accentAlpha + '0.28)'}`, borderRadius: 7,
+                            }}
+                          >
+                            <IconPlus size={10} /> Depuis la banque de médias
+                          </button>
+                        </div>
 
-              {/* Premier post */}
-              <div>
-                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Premier post</p>
-                <input
-                  type="datetime-local"
-                  value={nextRunAt}
-                  onChange={e => setNextRunAt(e.target.value)}
-                  style={{
-                    height: 34, padding: '0 10px', fontSize: 13, colorScheme: 'dark',
-                    background: 'rgba(233,234,240,0.02)', color: IVORY,
-                    border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none',
-                  }}
-                />
-              </div>
+                        {/* ── Légende (Publication) ── */}
+                        {!isStory && (
+                          <div style={{ marginBottom: 18 }}>
+                            <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>Légende</p>
+                            <textarea
+                              value={seg.caption}
+                              onChange={e => patchSegment(idx, { caption: e.target.value })}
+                              rows={3}
+                              placeholder="Description Instagram…"
+                              style={{
+                                width: '100%', minHeight: 68, padding: '10px 12px', fontSize: 13, lineHeight: 1.6,
+                                background: 'rgba(233,234,240,0.02)', color: IVORY, resize: 'vertical',
+                                border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
+                                fontFamily: 'inherit', boxSizing: 'border-box',
+                              }}
+                            />
+                          </div>
+                        )}
 
-              {/* Délai entre comptes (Publication uniquement) */}
-              {!isStory && (
-              <div>
-                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Délai / compte</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="number"
-                    min={0}
-                    max={120}
-                    value={delayMin}
-                    onChange={e => setDelayMin(Math.max(0, Math.min(120, Number(e.target.value) || 0)))}
-                    style={{
-                      width: 64, height: 34, padding: '0 10px', fontSize: 13,
-                      textAlign: 'center', background: 'rgba(233,234,240,0.02)',
-                      color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none',
-                    }}
-                  />
-                  <span style={{ fontSize: 11, color: MUTED }}>min</span>
-                </div>
-              </div>
-              )}
+                        {/* ── Pool de captions (Story) ── */}
+                        {isStory && (
+                          <div style={{ marginBottom: 18 }}>
+                            <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 4px' }}>Pool de captions</p>
+                            <p style={{ fontSize: 11, color: MUTED, margin: '0 0 10px' }}>Chaque compte pioche une caption aléatoire dans ce pool.</p>
+                            {/* Existing captions */}
+                            {seg.story_texts.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                                {seg.story_texts.map((txt, i) => (
+                                  <div key={i} style={{
+                                    display: 'flex', alignItems: 'center', gap: 8,
+                                    padding: '7px 10px', borderRadius: 7,
+                                    border: `1px solid ${HAIR}`,
+                                    background: 'rgba(233,234,240,0.02)',
+                                  }}>
+                                    <span style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(244,114,182,0.12)', color: storyAccent, fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                                    <span style={{ flex: 1, fontSize: 12, color: 'rgba(233,234,240,0.75)', lineHeight: 1.5, wordBreak: 'break-word' }}>{txt}</span>
+                                    <button
+                                      onClick={() => patchSegment(idx, { story_texts: seg.story_texts.filter((_, j) => j !== i) })}
+                                      className="cursor-pointer"
+                                      style={{ background: 'none', border: 'none', color: 'rgba(248,113,113,0.55)', display: 'flex', padding: 0, flexShrink: 0 }}
+                                    >
+                                      <IconX size={9} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Add caption row */}
+                            <div style={{ display: 'flex', gap: 7, marginBottom: 7 }}>
+                              <input
+                                type="text"
+                                value={open ? storyTextDraft : ''}
+                                onChange={e => setStoryTextDraft(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStoryText(idx) } }}
+                                placeholder="Ex : Voir le lien en bio 👆"
+                                style={{
+                                  flex: 1, height: 36, padding: '0 12px', fontSize: 13,
+                                  background: 'rgba(233,234,240,0.02)', color: IVORY,
+                                  border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
+                                }}
+                              />
+                              <button
+                                onClick={() => addStoryText(idx)}
+                                disabled={!storyTextDraft.trim()}
+                                className="cursor-pointer"
+                                style={{
+                                  padding: '0 14px', fontSize: 11, fontWeight: 700,
+                                  background: storyTextDraft.trim() ? 'rgba(244,114,182,0.12)' : 'rgba(233,234,240,0.05)',
+                                  color: storyTextDraft.trim() ? storyAccent : MUTED,
+                                  border: `1px solid ${storyTextDraft.trim() ? 'rgba(244,114,182,0.3)' : HAIR}`,
+                                  borderRadius: 8,
+                                }}
+                              >
+                                Ajouter
+                              </button>
+                            </div>
+                            {/* Import from caption bank */}
+                            <button
+                              onClick={() => setShowCaptionPickerFor(idx)}
+                              className="cursor-pointer"
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 7,
+                                padding: '7px 13px', fontSize: 11, fontWeight: 700,
+                                background: 'rgba(244,114,182,0.07)', color: storyAccent,
+                                border: '1px solid rgba(244,114,182,0.25)', borderRadius: 7,
+                              }}
+                            >
+                              <IconPlus size={10} /> Depuis la banque de captions
+                            </button>
+                          </div>
+                        )}
 
-              {/* Essai Reels (Publication uniquement) */}
-              {!isStory && (
-              <div>
-                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Essai Reels</p>
-                <button
-                  onClick={() => setReelsTrial(v => !v)}
-                  className="cursor-pointer"
-                  style={{
-                    height: 34, padding: '0 16px', fontSize: 10, fontWeight: 700,
-                    letterSpacing: '0.04em', textTransform: 'uppercase',
-                    background: reelsTrial ? GOLD : 'transparent',
-                    color: reelsTrial ? '#0A0B0E' : MUTED,
-                    border: reelsTrial ? 'none' : `1px solid ${HAIR}`,
-                    borderRadius: 7, transition: 'all 0.18s',
-                  }}
-                >
-                  {reelsTrial ? 'Activé' : 'Désactivé'}
-                </button>
-              </div>
-              )}
-
-              {/* Auto-suppression des médias */}
-              <div>
-                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{isStory ? 'Image' : 'Vidéo'} → usage unique</p>
-                <button
-                  onClick={() => setAutoRemove(v => !v)}
-                  title="Supprime chaque vidéo de la pool après qu'elle a été postée"
-                  className="cursor-pointer"
-                  style={{
-                    height: 34, padding: '0 16px', fontSize: 10, fontWeight: 700,
-                    letterSpacing: '0.04em', textTransform: 'uppercase',
-                    background: autoRemove ? '#F59E0B' : 'transparent',
-                    color: autoRemove ? '#0A0B0E' : MUTED,
-                    border: autoRemove ? 'none' : `1px solid ${HAIR}`,
-                    borderRadius: 7, transition: 'all 0.18s',
-                  }}
-                >
-                  {autoRemove ? 'Activé' : 'Désactivé'}
-                </button>
-              </div>
+                        {/* ── Paramètres ── */}
+                        <div>
+                          <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 12px' }}>Paramètres</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+                            {/* Intervalle */}
+                            <div>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Intervalle</p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <input type="number" min={1} max={9999} value={seg.recurValue}
+                                  onChange={e => patchSegment(idx, { recurValue: Math.max(1, Number(e.target.value) || 24) })}
+                                  style={{ width: 62, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                <select value={seg.recurUnit}
+                                  onChange={e => patchSegment(idx, { recurUnit: e.target.value as 'minutes' | 'heures' | 'jours' })}
+                                  className="cursor-pointer"
+                                  style={{ height: 34, padding: '0 6px', fontSize: 12, background: '#0F1014', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }}>
+                                  <option value="minutes">min</option>
+                                  <option value="heures">h</option>
+                                  <option value="jours">j</option>
+                                </select>
+                              </div>
+                            </div>
+                            {/* Premier post */}
+                            <div style={{ gridColumn: 'span 2' }}>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Premier post</p>
+                              <input type="datetime-local" value={seg.next_run_at}
+                                onChange={e => patchSegment(idx, { next_run_at: e.target.value })}
+                                style={{ height: 34, padding: '0 10px', fontSize: 12, colorScheme: 'dark', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+                            </div>
+                            {/* Mode */}
+                            <div>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Ordre médias</p>
+                              <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 7, overflow: 'hidden', height: 34 }}>
+                                {([{ k: 'seq', l: 'Seq.' }, { k: 'random', l: 'Aléa.' }] as const).map(m => (
+                                  <button key={m.k} onClick={() => patchSegment(idx, { mode: m.k })} className="cursor-pointer"
+                                    style={{
+                                      flex: 1, padding: '0 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                                      background: seg.mode === m.k ? IVORY : 'transparent',
+                                      color: seg.mode === m.k ? '#0A0B0E' : MUTED, border: 'none',
+                                    }}>
+                                    {m.l}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Délai / compte (Publication) */}
+                            {!isStory && (
+                              <div>
+                                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Délai / compte</p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <input type="number" min={0} max={120} value={seg.delay_minutes}
+                                    onChange={e => patchSegment(idx, { delay_minutes: Math.max(0, Math.min(120, Number(e.target.value) || 0)) })}
+                                    style={{ width: 54, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                  <span style={{ fontSize: 11, color: MUTED }}>min</span>
+                                </div>
+                              </div>
+                            )}
+                            {/* Reels trial (Publication) */}
+                            {!isStory && (
+                              <div>
+                                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Reels Trial</p>
+                                <button onClick={() => patchSegment(idx, { reels_trial: !seg.reels_trial })} className="cursor-pointer"
+                                  style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.reels_trial ? GOLD : 'transparent', color: seg.reels_trial ? '#0A0B0E' : MUTED, border: seg.reels_trial ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
+                                  {seg.reels_trial ? 'Activé' : 'Désactivé'}
+                                </button>
+                              </div>
+                            )}
+                            {/* Usage unique */}
+                            <div>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Usage unique</p>
+                              <button onClick={() => patchSegment(idx, { auto_remove_videos: !seg.auto_remove_videos })}
+                                title="Retire chaque média du pool après utilisation" className="cursor-pointer"
+                                style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.auto_remove_videos ? '#F59E0B' : 'transparent', color: seg.auto_remove_videos ? '#0A0B0E' : MUTED, border: seg.auto_remove_videos ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
+                                {seg.auto_remove_videos ? 'Activé' : 'Désactivé'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </section>
 
@@ -1887,15 +2122,12 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             </span>
             {!sequenceMode && (
             <span style={{ fontSize: 11, color: MUTED }}>
-              <span style={{ fontSize: 16, color: videos.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{videos.length}</span> {isStory ? 'images' : 'vidéos'}
+              <span style={{ fontSize: 16, color: segments.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{segments.length}</span> seg.
             </span>
-            )}
-            {sequenceMode && (
             <span style={{ fontSize: 11, color: MUTED }}>
-              <span style={{ fontSize: 16, color: steps.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{steps.length}</span> étape{steps.length > 1 ? 's' : ''}
+              <span style={{ fontSize: 16, color: totalMedia ? GOLD : 'rgba(233,234,240,0.22)' }}>{totalMedia}</span> médias
             </span>
-            )}
-            {isStory && !sequenceMode && phoneList.length > 0 && phonesWithLink < phoneList.length && (
+            {anyStory && phoneList.length > 0 && phonesWithLink < phoneList.length && (
               <span style={{ fontSize: 11, color: '#F59E0B' }}>
                 {phoneList.length - phonesWithLink} lien(s) manquant(s)
               </span>
@@ -1946,24 +2178,49 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         </div>
       </div>
 
-      {/* Bank picker */}
-      {showBankPicker && (
+      {/* Bank picker — adds to the targeted segment's media pool */}
+      {showBankPickerFor !== null && (
         <BankPicker
           user={user}
           mode="multi"
           resolveMode="signed-url"
           onSelect={(paths, titles) => {
+            const segIdx = showBankPickerFor
             const pathArr = paths as string[]
-            const newOnes = pathArr
-              .map((p, i) => ({
-                filePath: p,
-                title: titles?.[i] ?? p.replace(/\\/g, '/').split('/').pop()?.split('?')[0] ?? p,
-              }))
-              .filter(v => !videos.some(existing => existing.filePath === v.filePath))
-            setVideos(prev => [...prev, ...newOnes])
-            setShowBankPicker(false)
+            setSegments(prev => prev.map((s, i) => {
+              if (i !== segIdx) return s
+              const newOnes = pathArr
+                .map((p, j) => ({
+                  filePath: p,
+                  title: titles?.[j] ?? p.replace(/\\/g, '/').split('/').pop()?.split('?')[0] ?? p,
+                }))
+                .filter(v => !s.videos.some(existing => existing.filePath === v.filePath))
+              return { ...s, videos: [...s.videos, ...newOnes] }
+            }))
+            setShowBankPickerFor(null)
           }}
-          onClose={() => setShowBankPicker(false)}
+          onClose={() => setShowBankPickerFor(null)}
+        />
+      )}
+
+      {/* Caption bank picker — adds text captions to a story segment's pool */}
+      {showCaptionPickerFor !== null && (
+        <CaptionBankPicker
+          user={user}
+          currentOrg={currentOrg}
+          onSelect={texts => {
+            const segIdx = showCaptionPickerFor
+            setSegments(prev => prev.map((s, i) => {
+              if (i !== segIdx) return s
+              const merged = [...s.story_texts]
+              for (const t of texts) {
+                if (!merged.includes(t)) merged.push(t)
+              }
+              return { ...s, story_texts: merged }
+            }))
+            setShowCaptionPickerFor(null)
+          }}
+          onClose={() => setShowCaptionPickerFor(null)}
         />
       )}
 
@@ -2373,12 +2630,13 @@ function TaskCard({
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
-  onOpenAddVideos: () => void
+  onOpenAddVideos: (segmentId?: string) => void
   toggling: boolean
   deleting: boolean
 }) {
   const [hovered, setHovered] = useState(false)
   const isActive = task.status === 'active'
+  const hasSegments = !!task.segments && task.segments.length > 0
 
   const statusColor  = isActive ? '#34d399' : '#F59E0B'
   const statusBg     = isActive ? 'rgba(52,211,153,0.08)' : 'rgba(245,158,11,0.08)'
@@ -2529,7 +2787,17 @@ function TaskCard({
 
       {/* Row 2: stats chips */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        {(() => {
+        {hasSegments ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            background: 'rgba(99,102,241,0.1)', color: '#818CF8',
+            border: '1px solid rgba(99,102,241,0.28)',
+            borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700,
+          }}>
+            <IconBolt size={11} color="#818CF8" />
+            {(task.segments ?? []).length} segment{(task.segments ?? []).length > 1 ? 's' : ''}
+          </span>
+        ) : (() => {
           const story = task.task_type === 'story'
           return (
             <span style={{
@@ -2553,6 +2821,7 @@ function TaskCard({
           <IconPhone size={11} color="rgba(233,234,240,0.6)" />
           {task.phones.length} téléphone{task.phones.length > 1 ? 's' : ''}
         </span>
+        {!hasSegments && (
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           background: 'rgba(255,255,255,0.04)', color: 'var(--muted)',
@@ -2577,7 +2846,8 @@ function TaskCard({
             <IconPlus size={8} />
           </button>
         </span>
-        {task.mode === 'random' && (
+        )}
+        {!hasSegments && task.mode === 'random' && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             background: 'rgba(99,102,241,0.06)', color: '#818CF8',
@@ -2587,7 +2857,7 @@ function TaskCard({
             Aléatoire
           </span>
         )}
-        {task.reels_trial && (
+        {!hasSegments && task.reels_trial && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             background: 'rgba(167,139,250,0.06)', color: '#a78bfa',
@@ -2597,7 +2867,7 @@ function TaskCard({
             Essai Reels
           </span>
         )}
-        {task.auto_remove_videos && (
+        {!hasSegments && task.auto_remove_videos && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             background: 'rgba(245,158,11,0.06)', color: '#F59E0B',
@@ -2609,57 +2879,77 @@ function TaskCard({
         )}
       </div>
 
-      {/* Step sequence */}
-      {task.steps && task.steps.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-          {task.steps.map((step, idx) => (
-            <React.Fragment key={step.id}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
-                background: step.type === 'publication' ? 'rgba(99,102,241,0.12)'
-                  : step.type === 'story' ? 'rgba(236,72,153,0.1)'
-                  : 'rgba(245,158,11,0.1)',
-                color: step.type === 'publication' ? '#818CF8'
-                  : step.type === 'story' ? '#F472B6'
-                  : '#F59E0B',
-                border: `1px solid ${step.type === 'publication' ? 'rgba(99,102,241,0.25)'
-                  : step.type === 'story' ? 'rgba(236,72,153,0.25)'
-                  : 'rgba(245,158,11,0.25)'}`,
+      {hasSegments ? (
+        /* Segment list — one mini-row per segment with its own timer */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+          {(task.segments ?? []).map(seg => {
+            const story = seg.type === 'story'
+            return (
+              <div key={seg.id} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 10px', borderRadius: 8,
+                background: isActive ? 'rgba(99,102,241,0.04)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${isActive ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.05)'}`,
               }}>
-                {step.type === 'publication' ? '📹' : step.type === 'story' ? '📸' : '🔥'}
-                {' '}{step.type === 'publication' ? 'Publication' : step.type === 'story' ? 'Story' : 'Warmup'}
-              </span>
-              {idx < task.steps!.length - 1 && (
-                <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>→</span>
-              )}
-            </React.Fragment>
-          ))}
-          {task.steps[0]?.delay_after_minutes && (
-            <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.5)', marginLeft: 4 }}>
-              (délais configurés)
-            </span>
-          )}
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  background: story ? 'rgba(236,72,153,0.12)' : 'rgba(99,102,241,0.12)',
+                  color: story ? '#F472B6' : '#818CF8',
+                  border: `1px solid ${story ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
+                  borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 700, flexShrink: 0,
+                }}>
+                  {story ? <IconLinkType size={10} /> : <IconVideo size={10} />}
+                  {story ? 'Story' : 'Pub'}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
+                  {story ? <IconLinkType size={10} color="rgba(233,234,240,0.5)" /> : <IconVideo size={10} color="rgba(233,234,240,0.5)" />}
+                  {seg.videos.length}
+                  <button
+                    onClick={e => { e.stopPropagation(); onOpenAddVideos(seg.id) }}
+                    title="Ajouter des médias à ce segment"
+                    className="cursor-pointer"
+                    style={{
+                      width: 16, height: 16, borderRadius: 4, border: 'none',
+                      background: 'rgba(99,102,241,0.15)', color: '#818CF8',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}
+                  >
+                    <IconPlus size={7} />
+                  </button>
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#818CF8', flexShrink: 0 }}>
+                  <IconRepeat size={10} color="#818CF8" /> {formatInterval(seg.recur_hours)}
+                </span>
+                <span style={{
+                  marginLeft: 'auto', fontSize: 11, fontWeight: 700,
+                  color: isActive ? 'var(--accent-l)' : 'var(--muted)',
+                  fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+                }}>
+                  {isActive ? formatCountdown(seg.next_run_at) : 'En pause'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        /* Row 3: next run (legacy single-type task) */
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+          padding: '8px 12px', borderRadius: 8,
+          background: isActive ? 'rgba(99,102,241,0.05)' : 'rgba(255,255,255,0.025)',
+          border: `1px solid ${isActive ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.05)'}`,
+        }}>
+          <IconClock size={12} color={isActive ? 'var(--accent-l)' : 'var(--muted)'} />
+          <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>Prochain post :</span>
+          <span style={{
+            fontSize: 12, fontWeight: 700,
+            color: isActive ? 'var(--accent-l)' : 'var(--muted)',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {isActive ? formatCountdown(task.next_run_at) : 'En pause'}
+          </span>
         </div>
       )}
-
-      {/* Row 3: next run */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
-        padding: '8px 12px', borderRadius: 8,
-        background: isActive ? 'rgba(99,102,241,0.05)' : 'rgba(255,255,255,0.025)',
-        border: `1px solid ${isActive ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.05)'}`,
-      }}>
-        <IconClock size={12} color={isActive ? 'var(--accent-l)' : 'var(--muted)'} />
-        <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>Prochain post :</span>
-        <span style={{
-          fontSize: 12, fontWeight: 700,
-          color: isActive ? 'var(--accent-l)' : 'var(--muted)',
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          {isActive ? formatCountdown(task.next_run_at) : 'En pause'}
-        </span>
-      </div>
 
       {/* Caption preview */}
       {task.caption && (
@@ -2807,7 +3097,15 @@ function StatCard({
 // ── Upcoming run row ───────────────────────────────────────────────────────────
 
 function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
-  const diff = new Date(task.next_run_at).getTime() - Date.now()
+  const segs = task.segments ?? []
+  const nextSeg = segs.length > 0
+    ? [...segs].sort((a, b) => new Date(a.next_run_at).getTime() - new Date(b.next_run_at).getTime())[0]
+    : null
+  const effNextRun  = nextSeg ? nextSeg.next_run_at : task.next_run_at
+  const effType     = nextSeg ? nextSeg.type : task.task_type
+  const effVideos   = nextSeg ? nextSeg.videos.length : task.videos.length
+  const effInterval = nextSeg ? nextSeg.recur_hours : task.recur_hours
+  const diff = new Date(effNextRun).getTime() - Date.now()
   const imminent = diff <= 60 * 60 * 1000 // within 1h
   const accent = imminent ? '#34d399' : '#818CF8'
 
@@ -2831,9 +3129,9 @@ function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
           fontSize: 13, fontWeight: 800, color: accent, letterSpacing: '-0.02em',
           fontVariantNumeric: 'tabular-nums', textAlign: 'center', lineHeight: 1.1,
         }}>
-          {formatCountdown(task.next_run_at).replace('dans ', '')}
+          {formatCountdown(effNextRun).replace('dans ', '')}
         </span>
-        <span style={{ fontSize: 10, color: 'var(--muted)' }}>{formatAbsolute(task.next_run_at)}</span>
+        <span style={{ fontSize: 10, color: 'var(--muted)' }}>{formatAbsolute(effNextRun)}</span>
       </div>
 
       {/* Vertical divider with glow dot */}
@@ -2853,20 +3151,29 @@ function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          {task.task_type === 'story' && (
+          {effType === 'story' && (
             <span style={{ display: 'inline-flex', color: '#F472B6' }} title="Story"><IconLinkType size={13} /></span>
           )}
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.name || 'Tâche sans nom'}</span>
+          {segs.length > 1 && (
+            <span style={{
+              flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#818CF8',
+              background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
+              borderRadius: 5, padding: '1px 6px',
+            }}>
+              {segs.length} segments
+            </span>
+          )}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
             <IconPhone size={11} color="rgba(233,234,240,0.5)" /> {task.phones.length}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
-            {task.task_type === 'story' ? <IconLinkType size={11} color="rgba(233,234,240,0.5)" /> : <IconVideo size={11} color="rgba(233,234,240,0.5)" />} {task.videos.length}
+            {effType === 'story' ? <IconLinkType size={11} color="rgba(233,234,240,0.5)" /> : <IconVideo size={11} color="rgba(233,234,240,0.5)" />} {effVideos}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#818CF8' }}>
-            <IconRepeat size={11} color="#818CF8" /> {formatInterval(task.recur_hours)}
+            <IconRepeat size={11} color="#818CF8" /> {formatInterval(effInterval)}
           </span>
         </div>
       </div>
@@ -3001,7 +3308,7 @@ export function Tasks({ user }: { user: User }) {
   const [deleteTask, setDeleteTask] = useState<RecurringTask | null>(null)
   const [toggling, setToggling]         = useState<string | null>(null)
   const [deleting, setDeleting]         = useState<string | null>(null)
-  const [addVideosTaskId, setAddVideosTaskId] = useState<string | null>(null)
+  const [addVideosTaskId, setAddVideosTaskId] = useState<{ taskId: string; segmentId?: string } | null>(null)
 
   // Countdown ticker state + refs (effect that uses `load` is declared after load below)
   const [, setTick] = useState(0)
@@ -3024,6 +3331,7 @@ export function Tasks({ user }: { user: User }) {
           phones:             typeof t.phones === 'string' ? JSON.parse(t.phones as string) : (t.phones ?? []),
           videos:             typeof t.videos === 'string' ? JSON.parse(t.videos as string) : (t.videos ?? []),
           story_texts:        typeof t.story_texts === 'string' ? JSON.parse(t.story_texts as string) : (t.story_texts ?? []),
+          segments:           typeof t.segments === 'string' ? JSON.parse(t.segments as string) : (t.segments ?? []),
           task_type:          (t.task_type as TaskType) ?? 'publication',
           auto_remove_videos: (t.auto_remove_videos as boolean) ?? false,
           steps: (() => {
@@ -3059,9 +3367,8 @@ export function Tasks({ user }: { user: User }) {
     void load().then(() => {
       // Déclenche immédiatement si des tâches sont déjà en retard à l'ouverture de la page
       if (triggeringRef.current) return
-      const now     = Date.now()
       const overdue = tasksRef.current.filter(
-        t => t.status === 'active' && new Date(t.next_run_at).getTime() <= now,
+        t => t.status === 'active' && isTaskDue(t),
       )
       if (!overdue.length) return
       triggeringRef.current = true
@@ -3078,15 +3385,14 @@ export function Tasks({ user }: { user: User }) {
     const id = setInterval(async () => {
       setTick(t => t + 1)
       if (triggeringRef.current) return
-      const now = Date.now()
       const hasOverdue = tasksRef.current.some(
-        t => t.status === 'active' && new Date(t.next_run_at).getTime() <= now,
+        t => t.status === 'active' && isTaskDue(t),
       )
       if (!hasOverdue) return
       triggeringRef.current = true
       try {
         const overdue = tasksRef.current.filter(
-          t => t.status === 'active' && new Date(t.next_run_at).getTime() <= Date.now(),
+          t => t.status === 'active' && isTaskDue(t),
         )
         await Promise.all(overdue.map(t => runTaskNow(t, bearerRef.current).catch(() => {})))
         await load()
@@ -3102,8 +3408,18 @@ export function Tasks({ user }: { user: User }) {
       const newStatus = task.status === 'active' ? 'paused' : 'active'
       const updates: Partial<RecurringTask> = { status: newStatus }
       if (newStatus === 'active') {
-        const next = new Date(Date.now() + task.recur_hours * 60 * 60 * 1000)
-        updates.next_run_at = next.toISOString()
+        if (task.segments && task.segments.length > 0) {
+          // Reset each segment's timer to now + its own interval
+          const segs = task.segments.map(s => ({
+            ...s,
+            next_run_at: new Date(Date.now() + (Number(s.recur_hours) || 24) * 60 * 60 * 1000).toISOString(),
+          }))
+          updates.segments = segs
+          const minNext = segs.reduce((min, s) => Math.min(min, new Date(s.next_run_at).getTime()), Infinity)
+          updates.next_run_at = new Date(isFinite(minNext) ? minNext : Date.now()).toISOString()
+        } else {
+          updates.next_run_at = new Date(Date.now() + task.recur_hours * 60 * 60 * 1000).toISOString()
+        }
       }
       await supabase.from('recurring_tasks').update(updates).eq('id', task.id)
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...updates } : t))
@@ -3123,9 +3439,29 @@ export function Tasks({ user }: { user: User }) {
     }
   }
 
-  async function addVideosToTask(taskId: string, newVids: SelVideo[]) {
+  async function addVideosToTask(taskId: string, newVids: SelVideo[], segmentId?: string) {
     const task = tasks.find(t => t.id === taskId)
     if (!task) return
+
+    // Segmented task → append to the targeted segment's pool
+    if (segmentId && task.segments && task.segments.length > 0) {
+      const segs = task.segments.map(s => {
+        if (s.id !== segmentId) return s
+        const merged: TaskVideo[] = [
+          ...s.videos,
+          ...newVids
+            .filter(v => !s.videos.some(ev => ev.token === v.filePath))
+            .map(v => ({ token: v.filePath, title: v.title })),
+        ]
+        return { ...s, videos: merged }
+      })
+      await supabase.from('recurring_tasks').update({ segments: segs }).eq('id', taskId)
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, segments: segs } : t))
+      setAddVideosTaskId(null)
+      return
+    }
+
+    // Legacy task → append to the single pool
     const appended: TaskVideo[] = [
       ...task.videos,
       ...newVids
@@ -3140,10 +3476,10 @@ export function Tasks({ user }: { user: User }) {
   const activeTasks  = tasks.filter(t => t.status === 'active')
   const pausedTasks  = tasks.filter(t => t.status === 'paused')
   const upcoming     = [...activeTasks].sort(
-    (a, b) => new Date(a.next_run_at).getTime() - new Date(b.next_run_at).getTime()
+    (a, b) => new Date(taskNextRun(a)).getTime() - new Date(taskNextRun(b)).getTime()
   )
   const totalRuns    = history.filter(r => r.status === 'done').length
-  const nextRun      = upcoming[0]?.next_run_at
+  const nextRun      = upcoming[0] ? taskNextRun(upcoming[0]) : undefined
 
   const TABS: { id: TaskTab; label: string; count: number }[] = [
     { id: 'upcoming', label: 'À venir',    count: upcoming.length },
@@ -3292,7 +3628,7 @@ export function Tasks({ user }: { user: User }) {
                   onToggle={() => void toggleTask(task)}
                   onEdit={() => { setEditTask(task); setShowCreate(true) }}
                   onDelete={() => setDeleteTask(task)}
-                  onOpenAddVideos={() => setAddVideosTaskId(task.id)}
+                  onOpenAddVideos={(segmentId?: string) => setAddVideosTaskId({ taskId: task.id, segmentId })}
                 />
               ))}
             </div>
@@ -3360,7 +3696,7 @@ export function Tasks({ user }: { user: User }) {
               filePath: p,
               title: titles?.[i] ?? p.split('/').pop()?.split('?')[0] ?? p,
             }))
-            void addVideosToTask(addVideosTaskId, newVids)
+            void addVideosToTask(addVideosTaskId.taskId, newVids, addVideosTaskId.segmentId)
           }}
           onClose={() => setAddVideosTaskId(null)}
         />

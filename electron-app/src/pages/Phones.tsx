@@ -511,6 +511,66 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
   )
 }
 
+// ── Detail panel : Lien OnlyFans / sticker ────────────────────────────────────
+function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, link: string) => Promise<void> }) {
+  // DB d'abord, sinon valeur héritée de l'onglet Story (localStorage)
+  const initial = phone.link ?? localStorage.getItem(`sf-story-link-${phone.id}`) ?? ''
+  const [value, setValue] = useState(initial)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const dirty = (value.trim()) !== initial.trim()
+
+  // Resync when switching to another phone
+  useEffect(() => {
+    setValue(phone.link ?? localStorage.getItem(`sf-story-link-${phone.id}`) ?? '')
+    setSaved(false)
+  }, [phone.id, phone.link])
+
+  async function save() {
+    if (!dirty || saving) return
+    setSaving(true)
+    await onSave(phone.id, value)
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1800)
+  }
+
+  return (
+    <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
+      <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }}>
+        Lien OnlyFans
+      </p>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          type="url"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save() }}
+          onBlur={save}
+          placeholder="https://onlyfans.com/…"
+          className="sf-input"
+          style={{ flex: 1, minWidth: 0, padding: '7px 10px', fontSize: 12 }}
+        />
+        <button
+          onClick={save}
+          disabled={!dirty || saving}
+          className="sf-btn sf-btn-ghost sf-btn-sm"
+          style={{
+            flexShrink: 0, cursor: dirty && !saving ? 'pointer' : 'default',
+            opacity: dirty || saved ? 1 : 0.4,
+            color: saved ? 'var(--ok)' : ACCENT,
+          }}
+        >
+          {saving ? '…' : saved ? '✓' : '↵'}
+        </button>
+      </div>
+      <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', margin: '7px 0 0' }}>
+        Utilisé par les Stories et les tâches automatiques.
+      </p>
+    </div>
+  )
+}
+
 // ── Inline note edit ──────────────────────────────────────────────────────────
 function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
   const t = useT()
@@ -1094,11 +1154,18 @@ export function Phones({ user }: PhonesProps) {
     }
   }, [toast, fr])
 
+  // Lien OnlyFans / sticker — source de vérité utilisée par Story & Tâches auto.
   const saveLink = useCallback(async (id: string, link: string) => {
     const val = link.trim() || null
     setPhones(prev => prev.map(p => p.id === id ? { ...p, link: val } : p))
+    setSelectedPhone(prev => (prev && prev.id === id ? { ...prev, link: val } : prev))
+    // Garde le localStorage de l'onglet Story synchronisé
+    if (val) localStorage.setItem(`sf-story-link-${id}`, val)
+    else localStorage.removeItem(`sf-story-link-${id}`)
     const { error: err } = await supabase.from('phones').update({ link: val }).eq('id', id)
-    if (err) {
+    // Colonne absente (migration 20260622c non appliquée) → on garde le localStorage,
+    // sans alarmer l'utilisateur : Story/Tâches retombent dessus.
+    if (err && !(/link/i.test(err.message) && /column|schema|cache/i.test(err.message))) {
       toast.show({ kind: 'error', title: fr('Échec de l\'enregistrement du lien', 'Failed to save link'), body: err.message })
     }
   }, [toast, fr])
@@ -2047,17 +2114,50 @@ export function Phones({ user }: PhonesProps) {
                     </div>
                   </div>
 
-                  {/* Lien OnlyFans section */}
-                  <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
-                    <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }}>
-                      Lien OnlyFans / Story
-                    </p>
-                    <div style={{
-                      borderRadius: 10, padding: '10px 12px',
-                      background: p.link ? 'rgba(34,211,238,0.06)' : 'rgba(233,234,240,0.03)',
-                      border: `1px solid ${p.link ? 'rgba(34,211,238,0.22)' : HAIR}`,
-                    }}>
-                      <LinkCell phone={p} onSave={saveLink} />
+                  {/* Lien OnlyFans */}
+                  <PanelLinkField phone={p} onSave={saveLink} />
+
+                  {/* Instagram section */}
+                  {p.ig_username && (
+                    <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
+                      <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 12px' }}>{t('phonesIgSection')}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: ACCENT, fontSize: 13, fontWeight: 700,
+                          background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.4)',
+                        }}>
+                          {p.ig_username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: ACCENT, margin: 0 }}>@{p.ig_username}</p>
+                          {(p.followers || p.following) ? (
+                            <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.45)', margin: '2px 0 0' }}>
+                              {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} ${t('phonesIgFollowers')}` : ''}
+                              {p.followers && p.following ? ' · ' : ''}
+                              {p.following ? `${p.following} ${t('phonesIgFollowing')}` : ''}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)' }}>{t('phonesIgStatus')}</span>
+                          <span style={{
+                            fontSize: 11, fontWeight: 600,
+                            color: p.ig_status === 'active' ? 'var(--ok)' : (p.ig_status === 'expired' || p.ig_status === 'error') ? 'var(--err)' : 'rgba(233,234,240,0.52)',
+                          }}>
+                            {p.ig_status === 'active' ? t('phonesIgStatusActive') : p.ig_status === 'expired' ? t('phonesIgStatusExpired') : p.ig_status === 'error' ? t('phonesIgStatusError') : t('phonesIgNotConfigured')}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)' }}>{t('phonesIgSession')}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? 'var(--ok)' : 'rgba(233,234,240,0.52)' }}>
+                            {p.ig_sessionid ? t('phonesIgSessionConfigured') : t('phonesIgNotConfigured')}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                     {p.link && (
                       <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.3)', marginTop: 6 }}>

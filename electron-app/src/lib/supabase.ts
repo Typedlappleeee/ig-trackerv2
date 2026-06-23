@@ -126,7 +126,7 @@ export interface Phone {
   video_count:  number
   bio:          string | null
   remark:       string | null
-  link:         string | null   // Lien OnlyFans / story link per account
+  link:         string | null
   synced_at:    string
   created_at:   string
 }
