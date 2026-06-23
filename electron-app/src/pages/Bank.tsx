@@ -5,7 +5,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useT, useLang } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
-import { canAccessBankFolder } from '@/lib/permissions'
+import { canAccessBankFolder, canDoAction } from '@/lib/permissions'
 import { uploadVideoFromPath, uploadVideoFromBlob, deleteStorageObjects, type UploadScope } from '@/lib/storage'
 import { logActivity } from '@/lib/activityLog'
 import { Button }  from '@/components/ui/Button'
@@ -326,6 +326,12 @@ export function Bank({ user }: BankProps) {
   const [personalMode, setPersonalMode] = useState(false)
   // true when we should show personal (user-scoped) items regardless of org
   const isPersonal = personalMode || !currentOrg
+
+  // Action permissions — in personal mode or when no org, everything is allowed
+  const canUpload      = isPersonal || !role || canDoAction(role, perms, 'bank_upload')
+  const canDelete      = isPersonal || !role || canDoAction(role, perms, 'bank_delete')
+  const canMove        = isPersonal || !role || canDoAction(role, perms, 'bank_move')
+  const canCreateFolder = isPersonal || !role || canDoAction(role, perms, 'bank_folder_create')
 
   // Scope helper — applies the correct user/org filter to any Supabase query
   function scopeQ<T>(q: T): T {
@@ -702,10 +708,10 @@ export function Bank({ user }: BankProps) {
     if (!newName || newName === oldName) return
     // Rename all items in the folder
     await scopeQ(supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName))
-    // Also rename the sentinel row (title = folder name, folder = folder name)
+    // Also rename the sentinel row (title = folder name, folder = folder name) — handles both regular and Drive sentinels
     await scopeQ(supabase.from('content_bank')
       .update({ title: newName, folder: newName })
-      .eq('notes', '__sf_folder__').eq('folder', oldName))
+      .in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq('folder', oldName))
     setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === oldName ? { ...i, folder: newName as unknown as string } : i))
     setEmptyFolders(prev => prev.map(f => f === oldName ? newName : f))
     if (selectedFolder === oldName) setSelectedFolder(newName)
@@ -726,8 +732,8 @@ export function Bank({ user }: BankProps) {
       await qu
       setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
     }
-    // Delete the sentinel row for this folder from Supabase
-    await scopeQ(supabase.from('content_bank').delete().eq('notes', '__sf_folder__').eq('folder', name))
+    // Delete the sentinel row for this folder from Supabase (handles both regular and Drive sentinels)
+    await scopeQ(supabase.from('content_bank').delete().in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq('folder', name))
     setEmptyFolders(prev => prev.filter(f => f !== name))
     if (selectedFolder === name) setSelectedFolder(null)
     setFolderModal(null)
@@ -735,8 +741,8 @@ export function Bank({ user }: BankProps) {
 
   async function mergeFolderTo(fromFolder: string, toFolder: string | null) {
     await scopeQ(supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder))
-    // Delete sentinel of the merged folder
-    await scopeQ(supabase.from('content_bank').delete().eq('notes', '__sf_folder__').eq('folder', fromFolder))
+    // Delete sentinel of the merged folder (handles both regular and Drive sentinels)
+    await scopeQ(supabase.from('content_bank').delete().in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq('folder', fromFolder))
     setItems(prev => prev.map(i => (i as unknown as {folder?:string}).folder === fromFolder ? { ...i, folder: toFolder as unknown as string } : i))
     setEmptyFolders(prev => prev.filter(f => f !== fromFolder))
     if (selectedFolder === fromFolder) setSelectedFolder(toFolder)
@@ -897,13 +903,15 @@ export function Bank({ user }: BankProps) {
             {t('bankDrive')}
           </button>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="sf-btn sf-btn-primary cursor-pointer"
-          >
-            <IconPlus size={13} />
-            {t('add')}
-          </button>
+          {canUpload && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="sf-btn sf-btn-primary cursor-pointer"
+            >
+              <IconPlus size={13} />
+              {t('add')}
+            </button>
+          )}
         </div>
       </header>
 
@@ -995,13 +1003,15 @@ export function Bank({ user }: BankProps) {
           {/* Sidebar header */}
           <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
             <span className="text-[10px] font-bold uppercase tracking-widest text-text3">{t('bankFolders')}</span>
-            <button
-              onClick={() => setShowNewFolder(v => !v)}
-              className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer sf-press"
-              title={t('bankNewFolderTitle')}
-            >
-              <IconPlus size={12} />
-            </button>
+            {canCreateFolder && (
+              <button
+                onClick={() => setShowNewFolder(v => !v)}
+                className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer sf-press"
+                title={t('bankNewFolderTitle')}
+              >
+                <IconPlus size={12} />
+              </button>
+            )}
           </div>
 
           {/* New folder input */}
@@ -1406,16 +1416,16 @@ export function Bank({ user }: BankProps) {
           onMouseDown={e => e.stopPropagation()}
         >
           {[
-            {
+            ...(canMove ? [{
               icon: <IconPencil size={12} />,
               label: t('bankCtxRename'),
               action: () => { setRenameItem(ctxMenu.item); setCtxMenu(null) }
-            },
-            {
+            }] : []),
+            ...(canMove ? [{
               icon: <IconMove size={12} />,
               label: t('bankCtxMoveTo'),
               action: () => { setMoveItem(ctxMenu.item); setCtxMenu(null) }
-            },
+            }] : []),
             {
               icon: <IconTag size={12} />,
               label: t('bankCtxEditTags'),
@@ -1430,7 +1440,7 @@ export function Bank({ user }: BankProps) {
                 await downloadItem(it)
               }
             },
-            ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [{
+            ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path && canUpload ? [{
               icon: <IconUpload size={12} />,
               label: t('bankCtxUpload'),
               action: () => { reuploadItem(ctxMenu.item); setCtxMenu(null) }
@@ -1445,16 +1455,20 @@ export function Bank({ user }: BankProps) {
               {label}
             </button>
           ))}
-          <div className="h-px bg-border mx-2 my-1" />
-          <button
-            onClick={() => { setConfirmDeleteItem(ctxMenu.item); setCtxMenu(null) }}
-            className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors cursor-pointer text-danger hover:bg-danger/10"
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <IconTrash size={12} />
-            {t('bankCtxDelete')}
-          </button>
+          {canDelete && (
+            <>
+              <div className="h-px bg-border mx-2 my-1" />
+              <button
+                onClick={() => { setConfirmDeleteItem(ctxMenu.item); setCtxMenu(null) }}
+                className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors cursor-pointer text-danger hover:bg-danger/10"
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <IconTrash size={12} />
+                {t('bankCtxDelete')}
+              </button>
+            </>
+          )}
         </div>
         )
       })(), document.body)}

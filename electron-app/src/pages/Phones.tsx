@@ -5,7 +5,7 @@ import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { useT, useLang } from '@/lib/i18n'
-import { canAccessPhoneGroup } from '@/lib/permissions'
+import { canAccessPhoneGroup, canDoAction } from '@/lib/permissions'
 import { fetchAllPhones, geelarkStatusLabel, stopPhones } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
@@ -885,7 +885,7 @@ export function Phones({ user }: PhonesProps) {
     setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: null, ig_sessionid: null, ig_status: null } : p))
   }, [toast, fr])
 
-  const canDelete = !currentOrg || role === 'owner' || role === 'admin'
+  const canDelete = !currentOrg || !role || canDoAction(role, perms, 'phone_delete')
 
   const requestDelete = useCallback((phone: Phone) => { setConfirmDelete(phone) }, [])
 
