@@ -2159,12 +2159,7 @@ export function Phones({ user }: PhonesProps) {
                         </div>
                       </div>
                     </div>
-                    {p.link && (
-                      <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.3)', marginTop: 6 }}>
-                        Ce lien est utilisé automatiquement pour le sticker des stories.
-                      </p>
-                    )}
-                  </div>
+                  )}
 
                   {/* Quick actions */}
                   <div style={{ padding: '16px 18px' }}>

@@ -91,6 +91,7 @@ interface RecurringTask {
   reels_trial: boolean
   auto_remove_videos: boolean
   segments: TaskSegment[]
+  steps?: TaskStep[]
   created_at: string
   last_run_at?: string | null
   run_count?: number | null
@@ -1132,6 +1133,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     editTask?.phones.forEach(p => { if (p.link) init[p.id] = p.link })
     return init
   })
+  const [taskType, setTaskType]         = useState<TaskType>(editTask?.task_type ?? segments[0]?.type ?? 'publication')
   const [showCaptionPickerFor, setShowCaptionPickerFor] = useState<number | null>(null)
   const [submitting, setSubmitting]   = useState(false)
   const [progress, setProgress]       = useState('')
@@ -1293,6 +1295,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         next_run_at:        new Date(isFinite(minNext) ? minNext : Date.now()).toISOString(),
         reels_trial:        first.reels_trial,
         auto_remove_videos: first.auto_remove_videos,
+        steps:              sequenceMode ? steps : [],
       }
 
       const saveTask = async (payload: Record<string, unknown>) => {
@@ -2118,18 +2121,21 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               <span style={{ fontSize: 16, color: phoneList.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{phoneList.length}</span> tél.
             </span>
             {!sequenceMode && (
-            <span style={{ fontSize: 11, color: MUTED }}>
-              <span style={{ fontSize: 16, color: segments.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{segments.length}</span> seg.
-            </span>
-            <span style={{ fontSize: 11, color: MUTED }}>
-              <span style={{ fontSize: 16, color: totalMedia ? GOLD : 'rgba(233,234,240,0.22)' }}>{totalMedia}</span> médias
-            </span>
-            {anyStory && phoneList.length > 0 && phonesWithLink < phoneList.length && (
-              <span style={{ fontSize: 11, color: '#F59E0B' }}>
-                {phoneList.length - phonesWithLink} lien(s) manquant(s)
-              </span>
+              <>
+                <span style={{ fontSize: 11, color: MUTED }}>
+                  <span style={{ fontSize: 16, color: segments.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{segments.length}</span> seg.
+                </span>
+                <span style={{ fontSize: 11, color: MUTED }}>
+                  <span style={{ fontSize: 16, color: totalMedia ? GOLD : 'rgba(233,234,240,0.22)' }}>{totalMedia}</span> médias
+                </span>
+                {anyStory && phoneList.length > 0 && phonesWithLink < phoneList.length && (
+                  <span style={{ fontSize: 11, color: '#F59E0B' }}>
+                    {phoneList.length - phonesWithLink} lien(s) manquant(s)
+                  </span>
+                )}
+                {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
+              </>
             )}
-            {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
           </div>
           <button
             onClick={onClose}
