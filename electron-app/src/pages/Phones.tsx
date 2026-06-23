@@ -511,6 +511,66 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
   )
 }
 
+// ── Detail panel : Lien OnlyFans / sticker ────────────────────────────────────
+function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, link: string) => Promise<void> }) {
+  // DB d'abord, sinon valeur héritée de l'onglet Story (localStorage)
+  const initial = phone.link ?? localStorage.getItem(`sf-story-link-${phone.id}`) ?? ''
+  const [value, setValue] = useState(initial)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const dirty = (value.trim()) !== initial.trim()
+
+  // Resync when switching to another phone
+  useEffect(() => {
+    setValue(phone.link ?? localStorage.getItem(`sf-story-link-${phone.id}`) ?? '')
+    setSaved(false)
+  }, [phone.id, phone.link])
+
+  async function save() {
+    if (!dirty || saving) return
+    setSaving(true)
+    await onSave(phone.id, value)
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1800)
+  }
+
+  return (
+    <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
+      <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }}>
+        Lien OnlyFans
+      </p>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          type="url"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save() }}
+          onBlur={save}
+          placeholder="https://onlyfans.com/…"
+          className="sf-input"
+          style={{ flex: 1, minWidth: 0, padding: '7px 10px', fontSize: 12 }}
+        />
+        <button
+          onClick={save}
+          disabled={!dirty || saving}
+          className="sf-btn sf-btn-ghost sf-btn-sm"
+          style={{
+            flexShrink: 0, cursor: dirty && !saving ? 'pointer' : 'default',
+            opacity: dirty || saved ? 1 : 0.4,
+            color: saved ? 'var(--ok)' : ACCENT,
+          }}
+        >
+          {saving ? '…' : saved ? '✓' : '↵'}
+        </button>
+      </div>
+      <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', margin: '7px 0 0' }}>
+        Utilisé par les Stories et les tâches automatiques.
+      </p>
+    </div>
+  )
+}
+
 // ── Inline note edit ──────────────────────────────────────────────────────────
 function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
   const t = useT()
@@ -885,6 +945,22 @@ export function Phones({ user }: PhonesProps) {
     const { error: err } = await supabase.from('phones').update({ remark: val }).eq('id', id)
     if (err) {
       toast.show({ kind: 'error', title: fr(`Échec de l'enregistrement de la note`, 'Failed to save note'), body: err.message })
+    }
+  }, [toast, fr])
+
+  // Lien OnlyFans / sticker — source de vérité utilisée par Story & Tâches auto.
+  const saveLink = useCallback(async (id: string, link: string) => {
+    const val = link.trim() || null
+    setPhones(prev => prev.map(p => p.id === id ? { ...p, link: val } : p))
+    setSelectedPhone(prev => (prev && prev.id === id ? { ...prev, link: val } : prev))
+    // Garde le localStorage de l'onglet Story synchronisé
+    if (val) localStorage.setItem(`sf-story-link-${id}`, val)
+    else localStorage.removeItem(`sf-story-link-${id}`)
+    const { error: err } = await supabase.from('phones').update({ link: val }).eq('id', id)
+    // Colonne absente (migration 20260622c non appliquée) → on garde le localStorage,
+    // sans alarmer l'utilisateur : Story/Tâches retombent dessus.
+    if (err && !(/link/i.test(err.message) && /column|schema|cache/i.test(err.message))) {
+      toast.show({ kind: 'error', title: fr('Échec de l\'enregistrement du lien', 'Failed to save link'), body: err.message })
     }
   }, [toast, fr])
 
@@ -1735,6 +1811,9 @@ export function Phones({ user }: PhonesProps) {
                       ))}
                     </div>
                   </div>
+
+                  {/* Lien OnlyFans */}
+                  <PanelLinkField phone={p} onSave={saveLink} />
 
                   {/* Instagram section */}
                   {p.ig_username && (
