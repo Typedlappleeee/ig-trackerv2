@@ -40,42 +40,51 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null }
     }
 
-    // Helper: resolve org owner plan (null if not in org mode or user is the owner)
+    // Helper: resolve org owner plan (null if not in org mode or user is the owner).
+    // Primary path: SECURITY DEFINER RPC `org_owner_plan` — bypasses RLS so a
+    // member can validate access via the OWNER's license without needing their
+    // own key (you don't need a license to JOIN an org, only the org needs one).
     let orgOwnerPlan: LicenseStatus['plan'] = null
     if (orgId) {
-      const { data: org, error: orgErr } = await supabase
-        .from('organizations')
-        .select('owner_id')
-        .eq('id', orgId)
-        .maybeSingle()
-
-      if (orgErr) return FAIL_OPEN
-
-      if (org?.owner_id && org.owner_id !== userId) {
-        const { data: ownerProfile, error: ownerProfileErr } = await supabase
-          .from('profiles')
-          .select('is_super_admin')
-          .eq('id', org.owner_id)
+      const { data: rpcPlan, error: rpcErr } = await supabase.rpc('org_owner_plan', { p_org: orgId })
+      if (!rpcErr && rpcPlan) {
+        orgOwnerPlan = rpcPlan as LicenseStatus['plan']
+      } else {
+        // Fallback (RPC not deployed yet): direct queries via RLS policies.
+        const { data: org, error: orgErr } = await supabase
+          .from('organizations')
+          .select('owner_id')
+          .eq('id', orgId)
           .maybeSingle()
 
-        if (ownerProfileErr) return FAIL_OPEN
+        if (orgErr) return FAIL_OPEN
 
-        if (ownerProfile?.is_super_admin) {
-          orgOwnerPlan = 'pro'
-        } else {
-          const { data: ownerKey, error: ownerKeyErr } = await supabase
-            .from('license_keys')
-            .select('expires_at, plan')
-            .eq('user_id', org.owner_id)
-            .eq('is_active', true)
+        if (org?.owner_id && org.owner_id !== userId) {
+          const { data: ownerProfile, error: ownerProfileErr } = await supabase
+            .from('profiles')
+            .select('is_super_admin')
+            .eq('id', org.owner_id)
             .maybeSingle()
 
-          if (ownerKeyErr) return FAIL_OPEN
+          if (ownerProfileErr) return FAIL_OPEN
 
-          if (ownerKey) {
-            const exp = ownerKey.expires_at ? new Date(ownerKey.expires_at) : null
-            if (!exp || exp > new Date()) {
-              orgOwnerPlan = (ownerKey.plan as LicenseStatus['plan']) ?? 'standard'
+          if (ownerProfile?.is_super_admin) {
+            orgOwnerPlan = 'pro'
+          } else {
+            const { data: ownerKey, error: ownerKeyErr } = await supabase
+              .from('license_keys')
+              .select('expires_at, plan')
+              .eq('user_id', org.owner_id)
+              .eq('is_active', true)
+              .maybeSingle()
+
+            if (ownerKeyErr) return FAIL_OPEN
+
+            if (ownerKey) {
+              const exp = ownerKey.expires_at ? new Date(ownerKey.expires_at) : null
+              if (!exp || exp > new Date()) {
+                orgOwnerPlan = (ownerKey.plan as LicenseStatus['plan']) ?? 'standard'
+              }
             }
           }
         }

@@ -68,6 +68,42 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
 
   useEffect(() => { load() }, [load])
 
+  // Instant kick — listen for a broadcast from an admin who removed this user.
+  // The kicked member's session reloads immediately (no manual refresh needed).
+  // We can't rely on a postgres_changes DELETE event: RLS hides the row from the
+  // user once their membership is gone, so a broadcast on the org room is used.
+  useEffect(() => {
+    if (!currentId) return
+    const ch = supabase.channel(`org-room-${currentId}`)
+      .on('broadcast', { event: 'member_removed' }, ({ payload }) => {
+        if ((payload as { userId?: string })?.userId === user.id) {
+          if (localStorage.getItem(LS_KEY) === currentId) localStorage.removeItem(LS_KEY)
+          window.location.reload()
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [currentId, user.id])
+
+  // Safety net — re-validate membership every 15s in case the broadcast was
+  // missed (member was on another tab/org). If the row is gone, drop access.
+  useEffect(() => {
+    if (!currentId) return
+    const id = setInterval(async () => {
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('org_id', currentId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!error && !data) {
+        if (localStorage.getItem(LS_KEY) === currentId) localStorage.removeItem(LS_KEY)
+        window.location.reload()
+      }
+    }, 15000)
+    return () => clearInterval(id)
+  }, [currentId, user.id])
+
   const current = myOrgs.find(x => x.org.id === currentId) ?? null
 
   function switchOrg(orgId: string | null) {

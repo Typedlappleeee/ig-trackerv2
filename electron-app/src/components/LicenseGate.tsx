@@ -146,20 +146,13 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 : error.message
       setOrgErr(msg)
     } else {
+      // accept_org_invite (SECURITY DEFINER) is the source of truth: if it
+      // succeeded, the membership exists. We do NOT re-check the owner's license
+      // here — the member can't read another user's license_keys under RLS, so
+      // that check produced false "pas d'abonnement actif" errors. After reload,
+      // checkLicense validates access via the org owner's plan (org_owner_plan).
       const orgId = data as string | null
-      if (orgId) {
-        const { data: org } = await supabase
-          .from('organizations').select('owner_id').eq('id', orgId).maybeSingle()
-        const { data: ownerKey } = await supabase
-          .from('license_keys').select('expires_at')
-          .eq('user_id', org?.owner_id ?? '').eq('is_active', true).maybeSingle()
-        const expired = ownerKey?.expires_at ? new Date(ownerKey.expires_at) < new Date() : false
-        if (!ownerKey || expired) {
-          setOrgErr("Cette organisation n’a pas d’abonnement actif.")
-          return
-        }
-        localStorage.setItem('ig-tracker-current-org', orgId)
-      }
+      if (orgId) localStorage.setItem('ig-tracker-current-org', orgId)
       setOrgSuccess(true)
       setTimeout(() => window.location.reload(), 1500)
     }

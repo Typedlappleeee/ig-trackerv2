@@ -968,6 +968,18 @@ export function OrganizationPanel({ user }: Props) {
     const { error } = await supabase.from('organization_members').delete().eq('id', member.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
+    // Instant kick — notify the removed member's session to reload immediately.
+    if (currentOrg) {
+      try {
+        const ch = supabase.channel(`org-room-${currentOrg.id}`)
+        await new Promise<void>(res => {
+          ch.subscribe(s => { if (s === 'SUBSCRIBED') res() })
+          setTimeout(res, 2000) // don't hang if realtime is slow
+        })
+        await ch.send({ type: 'broadcast', event: 'member_removed', payload: { userId: member.user_id } })
+        supabase.removeChannel(ch)
+      } catch { /* best-effort — the 15s safety poll will catch it anyway */ }
+    }
     flash('Membre retiré')
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
