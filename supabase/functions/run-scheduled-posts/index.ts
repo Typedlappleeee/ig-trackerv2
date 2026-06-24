@@ -597,7 +597,9 @@ Deno.serve(async (req) => {
       // après la dernière tâche planifiée. Ce filet sera écrasé (plus tôt) par l'arrêt
       // normal une fois le post terminé.
       const safetyOffsetMs = delayMin > 0 ? (phones.length - 1) * delayMin * 60_000 : 0
-      const safetyStopAt = new Date(Date.now() + safetyOffsetMs + 15 * 60_000).toISOString()
+      // delay=0 → 5 min (posting takes <3 min) ; delay>0 → 15 min après la dernière tâche
+      const safetyBuffer = delayMin === 0 ? 5 * 60_000 : 15 * 60_000
+      const safetyStopAt = new Date(Date.now() + safetyOffsetMs + safetyBuffer).toISOString()
       const safetyUpd = await db.from('scheduled_posts').update({
         result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds },
         stop_phones_at: safetyStopAt, stop_phone_ids: geelarkIds,
@@ -622,47 +624,27 @@ Deno.serve(async (req) => {
         log(`⏳ ${taskIds.length} tâche(s) planifiée(s) chez GeelarK avec ${delayMin} min d'écart.`)
         log(`⏰ Arrêt automatique des téléphones programmé après la dernière tâche (+5 min).`)
       } else {
-        // 7. Polling court (3 min max) puis arrêt des téléphones
-        let elapsed = 0
-        const pending = new Set(taskIds)
-        while (pending.size > 0 && elapsed < 3 * 60_000) {
-          await sleep(15_000); elapsed += 15_000
-          const q = await gPost(bearer, '/task/query', { ids: [...pending] })
-          const items: any[] = q.data?.items ?? q.data?.list ?? []
-          for (const it of items) {
-            const tid = it.id ?? it.taskId
-            const st = Number(it.status)
-            if (st === 3) { log(`✅ Succès : ${tid}`); pending.delete(tid) }
-            else if ([4, 7, 8].includes(st)) {
-              const failedPhone = taskPhoneMap.get(tid)
-              log(`❌ Échec/annulé (${failedPhone?.ig_username ?? tid}): ${it.failDesc ?? '?'}`)
-              // If trial reels was used for this phone and it failed, mark it as unsupported
-              if (failedPhone && post.reels_trial && !(phoneFlags.get(failedPhone.geelark_id) ?? false)) {
-                await db.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', failedPhone.geelark_id)
-                log(`🔕 ${failedPhone.ig_username ?? failedPhone.phone_name} marqué : Trial Reels non supporté`)
-              }
-              pending.delete(tid)
-            }
-          }
-        }
-        if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) encore en cours après 3 min — GeelarK continue en arrière-plan.`)
-        log('⏹ Arrêt des téléphones…')
-        await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
+        // delay=0 : pas de polling inline — causerait un 504 sur le free tier Supabase
+        // (30 s boot + 3 min poll > 150 s limite). Le filet de sécurité a posé
+        // stop_phones_at = now+5 min ; le balayage 1ter de la prochaine invocation
+        // interrogera GeeLark, mettra à jour le statut et éteindra les téléphones.
+        log(`⏳ ${taskIds.length} tâche(s) lancée(s). Statut et arrêt auto dans ~5 min via balayage serveur.`)
       }
 
-      log('✅ Post programmé exécuté par le serveur.')
-      // Marque done + planifie l'arrêt différé des téléphones. Si les colonnes
-      // stop_phones_at/stop_phone_ids n'existent pas (migration non appliquée),
-      // on retombe sur un arrêt immédiat pour ne pas laisser les téléphones allumés.
-      const doneUpd = await db.from('scheduled_posts').update({
-        status: 'done', result: { logs }, error_msg: null,
-        stop_phones_at: stopPhonesAt, stop_phone_ids: stopPhoneIds,
-      }).eq('id', post.id)
-      if (doneUpd.error && /stop_phones?_(at|ids)/i.test(doneUpd.error.message)) {
-        if (stopPhoneIds) await gPost(bearer, '/phone/stop', { ids: stopPhoneIds }).catch(() => {})
-        await db.from('scheduled_posts').update({
+      // delay>0 → marque done immédiatement + planifie l'arrêt différé des téléphones.
+      // delay=0 → laisse "running" ; le sweep 1ter mettra à jour le statut dans ~5 min.
+      if (stopPhonesAt !== null) {
+        log('✅ Post programmé exécuté par le serveur.')
+        const doneUpd = await db.from('scheduled_posts').update({
           status: 'done', result: { logs }, error_msg: null,
+          stop_phones_at: stopPhonesAt, stop_phone_ids: stopPhoneIds,
         }).eq('id', post.id)
+        if (doneUpd.error && /stop_phones?_(at|ids)/i.test(doneUpd.error.message)) {
+          if (stopPhoneIds) await gPost(bearer, '/phone/stop', { ids: stopPhoneIds }).catch(() => {})
+          await db.from('scheduled_posts').update({
+            status: 'done', result: { logs }, error_msg: null,
+          }).eq('id', post.id)
+        }
       }
 
       // Auto-remove used videos from task pool (if enabled on parent task)
