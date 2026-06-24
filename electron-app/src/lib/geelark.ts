@@ -154,17 +154,6 @@ async function shellExec(
 
 // Ensure the cloud phone is running. Mirrors MassPosting's approach:
 // always send /phone/start then wait 30s flat (polling status is unreliable).
-export async function forceInstagramEnglish(bearer: string, phoneId: string): Promise<void> {
-  try {
-    // Android 13+ only — per-app locale, non-invasive (doesn't restart other apps)
-    await shellExec(bearer, phoneId,
-      'cmd locale set-app-locales com.instagram.android --locales en-US',
-      { maxRetries: 1 },
-    )
-    await sleepOrAbort(1000)
-  } catch { /* non-critical — older Android or shell not ready, proceed anyway */ }
-}
-
 async function ensurePhoneRunning(
   bearer: string,
   phoneId: string,
