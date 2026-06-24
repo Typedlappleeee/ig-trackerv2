@@ -156,14 +156,21 @@ async function shellExec(
 // always send /phone/start then wait 30s flat (polling status is unreliable).
 export async function forceInstagramEnglish(bearer: string, phoneId: string): Promise<void> {
   try {
-    await shellExec(bearer, phoneId,
+    // Android 13+: per-app locale (preferred, doesn't affect system)
+    const r = await shellExec(bearer, phoneId,
       'cmd locale set-app-locales com.instagram.android --locales en-US',
-      { maxRetries: 2 },
+      { maxRetries: 1 },
     )
-    await sleepOrAbort(1500)
-  } catch {
-    // non-critical — proceed without language change
-  }
+    if (r.status === 0) { await sleepOrAbort(1200); return }
+  } catch { /* fall through to system-wide method */ }
+  try {
+    // Android 7–12 fallback: change system locale + broadcast so apps reload
+    await shellExec(bearer, phoneId,
+      'settings put system system_locales en-US && am broadcast -a android.intent.action.LOCALE_CHANGED',
+      { maxRetries: 1 },
+    )
+    await sleepOrAbort(2000)
+  } catch { /* non-critical */ }
 }
 
 async function ensurePhoneRunning(
