@@ -475,13 +475,16 @@ Deno.serve(async (req) => {
     summary['recurring_tasks'] = `error: ${err instanceof Error ? err.message : String(err)}`
   }
 
-  // 2. Posts dus (limite 2 par invocation pour rester sous la limite de temps)
-  // type='story' exclu : les stories passent par de l'automation UI (~2 min par
-  // téléphone) qui dépasse les limites serverless — elles s'exécutent côté app.
+  // 2. Posts dus — UNIQUEMENT ceux issus de tâches récurrentes (task_id NOT NULL).
+  // Les posts manuels (Programmation tab, task_id IS NULL) sont exécutés côté client
+  // quand l'app est ouverte ; le serveur ne les réclame plus pour éviter de les bloquer
+  // en statut 'running' si le token GeeLark n'est pas disponible côté serveur.
+  // type='story' exclu : stories passent par automation UI (~2 min/tel) côté app.
   let duePostsQuery = db.from('scheduled_posts')
     .select('*')
     .eq('status', 'pending')
     .neq('type', 'story')
+    .not('task_id', 'is', null)
     .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(2)
