@@ -29,8 +29,9 @@ module.exports = async (req, res) => {
       if (lk !== 'referer' && lk !== 'origin') safeHeaders[k] = headers[k]
     }
 
+    // Timeout 28s — ADB shell commands (story, UI dump) can take 10-25s
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 9000)
+    const timer = setTimeout(() => controller.abort(), 28000)
 
     let response
     try {
@@ -47,7 +48,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({
         ok: false,
         error: isAbort
-          ? 'GéeLark inaccessible depuis le serveur web (timeout 9s)'
+          ? 'GéeLark inaccessible depuis le serveur web (timeout 28s)'
           : 'GéeLark inaccessible : ' + msg,
       })
     }

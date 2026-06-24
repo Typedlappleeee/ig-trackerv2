@@ -1,4 +1,8 @@
 {
+  "functions": {
+    "api/geelark.js": { "maxDuration": 30 },
+    "api/gx.js":      { "maxDuration": 30 }
+  },
   "buildCommand": "npm run build:web",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
