@@ -713,7 +713,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   bearer: string
   filePath: string
 }) => {
-  const TIMEOUT_MS = 90_000
+  const TIMEOUT_MS = 240_000 // 4 minutes
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS)
   try {

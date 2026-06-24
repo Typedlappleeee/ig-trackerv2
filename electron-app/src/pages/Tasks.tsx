@@ -37,7 +37,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
-import { postInstagramStory, stopPhone } from '@/lib/geelark'
+import { postInstagramStory, stopPhone, forceInstagramEnglish } from '@/lib/geelark'
 import { pushNotification } from '@/lib/notificationStore'
 
 type TaskType = 'publication' | 'story'
@@ -431,20 +431,19 @@ async function executeUnit(
     // ── Step 1 : upload des vidéos vers GéeLark (séquentiel, AVANT le démarrage) ──
     // Exactement comme MassPosting : on upload d'abord, on démarre les téléphones
     // après. Sinon le téléphone reste inactif pendant l'upload et GéeLark l'éteint.
-    log(`▶ Upload de ${unit.videos.length} vidéo(s) vers GéeLark…`)
-    const tokenByIndex: (string | null)[] = []
-    for (let i = 0; i < unit.videos.length; i++) {
-      const v = unit.videos[i]
-      try {
-        const tok = await resolveTaskVideoToken(bearer, v)
-        tokenByIndex.push(tok)
-        log(`✅ Vidéo ${i + 1}/${unit.videos.length} prête : ${v.title || tok.slice(0, 30)}`)
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        log(`❌ Vidéo échouée (${v.title || '?'}): ${msg}`)
-        tokenByIndex.push(null)
-      }
-    }
+    log(`▶ Upload de ${unit.videos.length} vidéo(s) vers GéeLark (parallèle)…`)
+    const tokenByIndex: (string | null)[] = await Promise.all(
+      unit.videos.map(async (v, i) => {
+        try {
+          const tok = await resolveTaskVideoToken(bearer, v)
+          log(`✅ Vidéo ${i + 1}/${unit.videos.length} prête`)
+          return tok
+        } catch (err) {
+          log(`❌ Vidéo ${i + 1} échouée (${v.title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
+          return null
+        }
+      })
+    )
     const validTokens = tokenByIndex.filter((t): t is string => Boolean(t))
     if (!validTokens.length) {
       const errMsg = 'Upload de toutes les vidéos a échoué'
@@ -465,9 +464,9 @@ async function executeUnit(
       return
     }
 
-    // ── Step 3 : attente boot 30s (téléphone frais, comme MassPosting) ────────
-    log('⏳ Attente 30s (boot)…')
-    await new Promise(r => setTimeout(r, 30_000))
+    // ── Step 3 : attente boot 20s ─────────────────────────────────────────────
+    log('⏳ Attente 20s (boot)…')
+    await new Promise(r => setTimeout(r, 20_000))
 
     // ── Step 4 : création des tâches RPA (séquentiel) ─────────────────────────
     log(`▶ Lancement du posting sur ${task.phones.length} téléphone(s)…`)
@@ -487,6 +486,7 @@ async function executeUnit(
       const useTrialReels = task.reels_trial && !trialUnsupported
       if (task.reels_trial && trialUnsupported)
         log(`⚠ Trial Reels désactivé pour ${name} (compte non éligible)`)
+      await forceInstagramEnglish(bearer, phone.geelark_id)
       const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
         id:          phone.geelark_id,
         scheduleAt:  baseTs + i * (unit.delay_minutes ?? 0) * 60,
