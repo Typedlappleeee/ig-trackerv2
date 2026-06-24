@@ -349,6 +349,8 @@ async function executeScheduledPostInner(
       const videoIdx = mode === 'random'
         ? Math.floor(Math.random() * videos.length)
         : i % videos.length
+      const { forceInstagramEnglish } = await import('./geelark')
+      await forceInstagramEnglish(bearer, phone.geelark_id)
       const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
         id:          phone.geelark_id,
         scheduleAt:  Math.floor(Date.now() / 1000),
