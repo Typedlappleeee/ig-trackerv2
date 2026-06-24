@@ -1020,7 +1020,7 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     ...dtFilters,
   ].join(',')
 
-  const out = path.join(dir, `mixer-${Date.now()}.mp4`)
+  const out = path.join(dir, `mixer-${Date.now()}.mov`)
   const args = [
     '-nostdin', '-fflags', '+genpts', '-i', srcPath,
     '-map', '0:v:0', '-map', '0:a?',
@@ -2080,7 +2080,7 @@ ipcMain.handle('run-ffmpeg-subtitles', async (_event, opts: {
     ? `${scaleFilter},${drawtextChain}`
     : scaleFilter
 
-  const out = path.join(dir, `subs-${Date.now()}.mp4`)
+  const out = path.join(dir, `subs-${Date.now()}.mov`)
   const args = [
     '-nostdin', '-i', srcPath,
     '-vf', vf,

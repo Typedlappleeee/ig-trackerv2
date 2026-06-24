@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
-import { getSignedUrl } from '@/lib/storage'
+import { getSignedUrl, uploadVideoFromPath } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { Spinner } from '@/components/ui/Spinner'
 import type { CaptionItem } from './CaptionBank'
@@ -679,20 +679,24 @@ export function Mixer({ user }: MixerProps) {
                   {job.status === 'done' && job.outputUrl && (
                     <div style={{ position: 'absolute', bottom: 4, right: 4, display: 'flex', gap: 3 }}>
                       {/* Save to bank */}
-                      {job.storagePath && !job.savedToBank && (
+                      {job.localPath && !job.savedToBank && (
                         <button
                           title="Enregistrer dans la banque"
                           onClick={async e => {
                             e.stopPropagation()
-                            const { error } = await supabase.from('content_bank').insert({
-                              user_id: user.id, org_id: currentOrg?.id ?? null,
-                              title: `Mixer — ${job.videoItem.title}`,
-                              file_url: null,
-                              storage_path: job.storagePath,
-                              thumbnail_path: null,
-                              folder: saveFolder, tags: [], notes: '',
-                            })
-                            if (!error) updateJob(job.id, { savedToBank: true })
+                            try {
+                              const scope = currentOrg?.id ? { mode: 'org' as const, id: currentOrg.id } : { mode: 'user' as const, id: user.id }
+                              const { storagePath, thumbnailPath } = await uploadVideoFromPath(job.localPath!, scope)
+                              const { error } = await supabase.from('content_bank').insert({
+                                user_id: user.id, org_id: currentOrg?.id ?? null,
+                                title: `Mixer — ${job.videoItem.title}`,
+                                file_url: null,
+                                storage_path: storagePath,
+                                thumbnail_path: thumbnailPath,
+                                folder: saveFolder, tags: [], notes: '',
+                              })
+                              if (!error) updateJob(job.id, { savedToBank: true })
+                            } catch { /* ignore upload errors */ }
                           }}
                           className="sf-press cursor-pointer"
                           style={{ background: 'rgba(99,102,241,0.85)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
@@ -710,10 +714,10 @@ export function Mixer({ user }: MixerProps) {
                         onClick={async e => {
                           e.stopPropagation()
                           if (job.localPath && window.electronAPI?.saveFileAs) {
-                            const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `mixer-${job.videoItem.title}.mp4` })
+                            const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `mixer-${job.videoItem.title}.mov` })
                             if (r.ok || r.canceled) return
                           }
-                          const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `mixer-${job.videoItem.title}.mp4`; a.click()
+                          const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `mixer-${job.videoItem.title}.mov`; a.click()
                         }}
                         className="sf-press cursor-pointer"
                         style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
