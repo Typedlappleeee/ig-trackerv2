@@ -713,6 +713,9 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   bearer: string
   filePath: string
 }) => {
+  const TIMEOUT_MS = 90_000
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), TIMEOUT_MS)
   try {
     // Step 1: get presigned upload URL
     const urlRes = await net.fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
@@ -722,6 +725,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
         'Authorization': `Bearer ${opts.bearer}`,
       },
       body: JSON.stringify({ fileType: 'mp4' }),
+      signal: abort.signal,
     })
     const urlData = await urlRes.json() as Record<string, unknown>
     if (urlData['code'] !== 0) {
@@ -736,7 +740,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
     // Step 2: read file bytes — local path or Supabase signed URL
     let fileBytes: Buffer
     if (opts.filePath.startsWith('https://') || opts.filePath.startsWith('http://')) {
-      const dlRes = await net.fetch(opts.filePath)
+      const dlRes = await net.fetch(opts.filePath, { signal: abort.signal })
       if (!dlRes.ok) return { ok: false, error: `Téléchargement vidéo échoué: ${dlRes.status}` }
       fileBytes = Buffer.from(await dlRes.arrayBuffer())
     } else {
@@ -745,6 +749,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
     const uploadRes = await net.fetch(uploadUrl, {
       method: 'PUT',
       body: new Uint8Array(fileBytes),
+      signal: abort.signal,
     })
     if (uploadRes.status < 200 || uploadRes.status >= 300) {
       return { ok: false, error: `Upload échoué (HTTP ${uploadRes.status})` }
@@ -753,7 +758,11 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
     // Return resourceUrl as token — Posting/MassPosting will pass it as `video: [token]`
     return { ok: true, token: resourceUrl }
   } catch (err: unknown) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    const msg = err instanceof Error ? err.message : String(err)
+    const isTimeout = abort.signal.aborted || msg.includes('abort') || msg.includes('Abort')
+    return { ok: false, error: isTimeout ? `Upload timeout (90s dépassé)` : msg }
+  } finally {
+    clearTimeout(timer)
   }
 })
 
