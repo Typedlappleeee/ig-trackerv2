@@ -323,8 +323,8 @@ async function executeScheduledPostInner(
     // If this client session dies before reaching the stop step (app closed, crash,
     // tab refreshed…), the server-side sweep (1ter) will call /phone/stop at
     // safetyStopAt — preventing phones from running indefinitely and billing forever.
-    // safetyStopAt = last-phone delay + 10 min polling window + 5 min buffer.
-    const safetyOffsetMs = (phones.length - 1) * delay_minutes * 60_000 + 15 * 60_000
+    // safetyStopAt = last-phone delay + 5 min buffer.
+    const safetyOffsetMs = (phones.length - 1) * delay_minutes * 60_000 + 5 * 60_000
     supabase.from('scheduled_posts').update({
       result:         { geelark_ids: geelarkIds, geelark_task_ids: [] },
       stop_phones_at: new Date(Date.now() + safetyOffsetMs).toISOString(),
