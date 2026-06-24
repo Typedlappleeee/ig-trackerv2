@@ -154,20 +154,6 @@ async function shellExec(
 
 // Ensure the cloud phone is running. Mirrors MassPosting's approach:
 // always send /phone/start then wait 30s flat (polling status is unreliable).
-// Force Instagram language to English before RPA tasks that use text-based selectors.
-// Non-fatal: if the command fails (older Android / permission issue) posting still attempts.
-export async function forceInstagramEnglish(bearer: string, phoneId: string): Promise<void> {
-  try {
-    await shellExec(bearer, phoneId,
-      'cmd locale set-app-locales com.instagram.android --locales en-US',
-      { maxRetries: 2 },
-    )
-    await sleepOrAbort(1500)
-  } catch {
-    // non-critical — proceed without language change
-  }
-}
-
 async function ensurePhoneRunning(
   bearer: string,
   phoneId: string,

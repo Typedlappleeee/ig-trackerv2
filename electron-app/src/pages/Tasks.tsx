@@ -37,7 +37,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
-import { postInstagramStory, stopPhone, forceInstagramEnglish } from '@/lib/geelark'
+import { postInstagramStory, stopPhone } from '@/lib/geelark'
 import { pushNotification } from '@/lib/notificationStore'
 
 type TaskType = 'publication' | 'story'
@@ -487,7 +487,6 @@ async function executeUnit(
       const useTrialReels = task.reels_trial && !trialUnsupported
       if (task.reels_trial && trialUnsupported)
         log(`⚠ Trial Reels désactivé pour ${name} (compte non éligible)`)
-      await forceInstagramEnglish(bearer, phone.geelark_id)
       const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
         id:          phone.geelark_id,
         scheduleAt:  baseTs + i * (unit.delay_minutes ?? 0) * 60,

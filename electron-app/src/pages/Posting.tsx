@@ -21,7 +21,6 @@ import { startCreditRun } from '@/lib/withCredits'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ACCENT_L, OK, ERR, WARN } from '@/lib/theme'
 import { useToast } from '@/components/Toast'
-import { forceInstagramEnglish } from '@/lib/geelark'
 
 interface PostingProps { user: User }
 
@@ -464,7 +463,6 @@ export function Posting({ user }: PostingProps) {
       for (let pi = 0; pi < phoneList.length; pi++) {
         const phone = phoneList[pi]
         if (stopRef.current) { markPhoneFailed(phone, 'Stoppé'); continue }
-        await forceInstagramEnglish(bearer, phone.geelark_id)
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
           scheduleAt:  scheduleTimes[pi],
