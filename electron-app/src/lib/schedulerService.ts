@@ -367,6 +367,12 @@ async function executeScheduledPostInner(
       }
     }
 
+    // Persist actual task IDs now that we have them — if app dies before step 5
+    // the sweep (1ter) can query GeeLark and mark the post done/failed correctly.
+    supabase.from('scheduled_posts').update({
+      result: { geelark_ids: geelarkIds, geelark_task_ids: taskIds },
+    }).eq('id', post.id).then(() => {}, () => {})
+
     // 4. Poll until done (max 10 min)
     let pollSuccessCount = 0
     let pollFailCount = 0
