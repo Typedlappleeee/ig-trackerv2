@@ -434,14 +434,14 @@ function PermModal({ member, templates, availableFolders, availableGroups, onSav
         )}
 
         {/* Inner tabs */}
-        <div className="flex border-b border-border px-6 flex-shrink-0 mt-3">
+        <div className="flex overflow-x-auto border-b border-border px-4 flex-shrink-0 mt-3" style={{ scrollbarWidth: 'none' }}>
           {([
             { k: 'tabs' as const, label: 'Onglets' },
             { k: 'actions' as const, label: 'Actions' },
             { k: 'restrictions' as const, label: 'Restrictions' },
           ]).map(t => (
             <button key={t.k} onClick={() => setInnerTab(t.k)}
-              className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text'}`}
+              className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text hover:bg-surface/60'}`}
             >{t.label}</button>
           ))}
         </div>
@@ -545,14 +545,14 @@ function RoleModal({ initial, availableFolders, availableGroups, onSave, onCance
         </div>
 
         {/* Inner tabs */}
-        <div className="flex border-b border-border px-6 flex-shrink-0">
+        <div className="flex overflow-x-auto border-b border-border px-4 flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
           {([
             { k: 'tabs' as const, label: 'Onglets' },
             { k: 'actions' as const, label: 'Actions' },
             { k: 'restrictions' as const, label: 'Restrictions' },
           ]).map(t => (
             <button key={t.k} onClick={() => setInnerTab(t.k)}
-              className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text'}`}
+              className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text hover:bg-surface/60'}`}
             >{t.label}</button>
           ))}
         </div>
@@ -675,14 +675,14 @@ function InvitePermModal({ invite, availableFolders, availableGroups, roleTempla
         )}
 
         {/* Inner tabs */}
-        <div className="flex border-b border-border px-6 flex-shrink-0 mt-3">
+        <div className="flex overflow-x-auto border-b border-border px-4 flex-shrink-0 mt-3" style={{ scrollbarWidth: 'none' }}>
           {([
             { k: 'tabs' as const, label: 'Onglets' },
             { k: 'actions' as const, label: 'Actions' },
             { k: 'restrictions' as const, label: 'Restrictions' },
           ]).map(t => (
             <button key={t.k} onClick={() => setInnerTab(t.k)}
-              className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text'}`}
+              className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text hover:bg-surface/60'}`}
             >{t.label}</button>
           ))}
         </div>
@@ -937,9 +937,11 @@ export function OrganizationPanel({ user }: Props) {
   async function changeRole(member: MemberRow, newRole: OrgRole) {
     if (member.role === 'owner') { flash('Le propriétaire ne peut pas changer de rôle', true); return }
     setBusy(true)
-    const { error } = await supabase.from('organization_members').update({ role: newRole, custom_role_id: null }).eq('id', member.id)
+    const { data: updated, error } = await supabase.from('organization_members').update({ role: newRole, custom_role_id: null }).eq('id', member.id).select('id')
     setBusy(false)
     if (error) { flash(error.message, true); return }
+    if (!updated || updated.length === 0) { flash('Impossible de changer le rôle (permissions insuffisantes)', true); return }
+    flash('Rôle modifié ✓')
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
@@ -1020,7 +1022,7 @@ export function OrganizationPanel({ user }: Props) {
       )}
 
       {/* Sub-tabs */}
-      <div className="flex gap-1 border-b border-border">
+      <div className="flex gap-1 border-b border-border overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         {([
           { k: 'orgas',   label: 'Organisations', icon: 'building' as const },
           // Membres / Rôles / Logs : réservés aux admins & propriétaires.
@@ -1030,7 +1032,7 @@ export function OrganizationPanel({ user }: Props) {
           ...(canManage ? [{ k: 'logs',    label: 'Logs',    icon: 'logs'  as const }] : []),
         ] as const).map(t => (
           <button key={t.k} onClick={() => setOrgTab(t.k as typeof orgTab)}
-            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 inline-flex items-center gap-1.5 ${
+            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
               orgTab === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
             }`}
           ><Icon name={t.icon} size={15} />{t.label}</button>
