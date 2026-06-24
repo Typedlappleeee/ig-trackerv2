@@ -663,7 +663,7 @@ export function MassPosting({ user }: MassPostingProps) {
           activeTasksRef.current = [...activeTasksRef.current, tid]
           setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
           log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
-          // Auto-stop after 5 minutes regardless of task status (clearable on Stop/unmount)
+          // Auto-stop after 4m30 regardless of task status (clearable on Stop/unmount)
           const timerId = window.setTimeout(() => {
             autoStopTimersRef.current = autoStopTimersRef.current.filter(id => id !== timerId)
             if (activePhonesRef.current.includes(asgn.phone.geelark_id)) {
@@ -673,7 +673,7 @@ export function MassPosting({ user }: MassPostingProps) {
               setPhoneStatus(asgn.phone.id, { status: 'done' })
               activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
             }
-          }, 5 * 60 * 1000)
+          }, 270_000)
           autoStopTimersRef.current.push(timerId)
         } else {
           log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
