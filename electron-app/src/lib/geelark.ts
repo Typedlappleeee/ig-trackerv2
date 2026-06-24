@@ -2734,6 +2734,9 @@ export async function postTikTokVideoAdb(
       findByText(xml, 'Describe...', 'Ajouter une description', 'Caption') ??
       [Math.floor(sw / 2), Math.floor(sh * 0.35)] as [number, number]
     log(`   Champ légende [${captionPt[0]},${captionPt[1]}]`)
+    // Pre-tap: ferme une éventuelle popup qui se serait ouverte sur cet écran
+    await shellExec(bearer, phoneId, `input tap ${captionPt[0]} ${captionPt[1]}`, { signal })
+    await sleepOrAbort(700, signal)
     await clearAndType(bearer, phoneId, captionPt, caption, log)
 
     // ── 20. Wait briefly ────────────────────────────────────────────────────
