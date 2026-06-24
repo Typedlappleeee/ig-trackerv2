@@ -300,7 +300,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     { id: 'repurpose',   label: t('navRepurpose'),   icon: 'refresh' },
     { id: 'remix',       label: t('navRemix'),       icon: 'layers' },
     { id: 'aitools',     label: t('navAiTools'),     icon: 'sparkles' },
-    { id: 'storylink',   label: t('navStoryLink'),   icon: 'link',     superAdminOnly: true },
+    { id: 'storylink',   label: t('navStoryLink'),   icon: 'link' },
     { id: 'community',   label: t('navCommunity'),   icon: 'chat' },
   ]
   const TOOL_SHORTCUTS = allToolShortcuts.filter(tool => {
