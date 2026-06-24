@@ -534,7 +534,6 @@ Deno.serve(async (req) => {
       const usedVideoIndices = new Set<number>()
 
       // Fetch fresh reels_trial_unsupported flags for phones
-      const geelarkIds = phones.map(p => p.geelark_id)
       const { data: phoneFlagsRaw } = await db.from('phones')
         .select('geelark_id, reels_trial_unsupported')
         .in('geelark_id', geelarkIds)
