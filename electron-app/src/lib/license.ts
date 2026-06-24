@@ -3,6 +3,8 @@ import { supabase } from './supabase'
 
 export type Plan = 'standard' | 'pro' | 'organisation'
 
+const PLAN_RANK: Record<Plan, number> = { standard: 0, pro: 1, organisation: 2 }
+
 export interface LicenseStatus {
   valid: boolean
   expired: boolean          // true when user had a key but it expired (vs never had one)
@@ -91,25 +93,33 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       }
     }
 
-    // Check own active key — gives access even without an org
-    const { data: ownKey, error: ownErr } = await supabase
+    // Check own active keys — pick the highest-plan valid key if multiple exist
+    const { data: ownKeys, error: ownErr } = await supabase
       .from('license_keys')
       .select('expires_at, plan')
       .eq('user_id', userId)
       .eq('is_active', true)
-      .maybeSingle()
 
     if (ownErr) return FAIL_OPEN
 
-    if (ownKey) {
-      const expiresAt = ownKey.expires_at ? new Date(ownKey.expires_at) : null
-      if (!expiresAt || expiresAt > new Date()) {
+    if (ownKeys && ownKeys.length > 0) {
+      const now = new Date()
+      const validKeys = ownKeys.filter(k => {
+        const exp = k.expires_at ? new Date(k.expires_at) : null
+        return !exp || exp > now
+      })
+
+      if (validKeys.length > 0) {
+        const bestKey = validKeys.sort((a, b) =>
+          (PLAN_RANK[(b.plan as Plan) ?? 'standard'] ?? 0) - (PLAN_RANK[(a.plan as Plan) ?? 'standard'] ?? 0)
+        )[0]
+        const expiresAt = bestKey.expires_at ? new Date(bestKey.expires_at) : null
         const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
-        const plan = (ownKey.plan as LicenseStatus['plan']) ?? 'standard'
+        const plan = (bestKey.plan as Plan) ?? 'standard'
         return { valid: true, expired: false, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan, orgOwnerPlan }
       }
-      // Key is active but past expiry date
-      return { valid: false, expired: true, expiresAt: expiresAt ?? null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+      // All keys are expired
+      return { valid: false, expired: true, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
     }
 
     // Org owner has an active key → member gets access via org
@@ -149,7 +159,23 @@ export async function activateKey(key: string, userId: string): Promise<{ succes
   if (selectErr) return { success: false, error: selectErr.message }
   if (!existing) return { success: false, error: 'Clé invalide ou déjà utilisée.' }
 
-  // Step 2: claim it
+  // Step 2: if user already has active keys of lower plan, deactivate them
+  const newRank = PLAN_RANK[(existing.plan as Plan) ?? 'standard'] ?? 0
+  if (newRank > 0) {
+    const { data: oldKeys } = await supabase
+      .from('license_keys')
+      .select('id, plan')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+    for (const old of oldKeys ?? []) {
+      const oldRank = PLAN_RANK[(old.plan as Plan) ?? 'standard'] ?? 0
+      if (oldRank < newRank) {
+        await supabase.from('license_keys').update({ is_active: false }).eq('id', old.id)
+      }
+    }
+  }
+
+  // Step 3: claim it
   const { error: updateErr } = await supabase
     .from('license_keys')
     .update({ user_id: userId, activated_at: new Date().toISOString() })

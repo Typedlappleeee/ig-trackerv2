@@ -319,6 +319,18 @@ async function executeScheduledPostInner(
     const startRes = await gPost(bearer, '/phone/start', { ids: geelarkIds }) as any
     if (startRes.code !== 0) onLog(`⚠ Démarrage: ${startRes.msg ?? startRes.code}`)
 
+    // Safety net: immediately store phone IDs + a scheduled stop time in the DB.
+    // If this client session dies before reaching the stop step (app closed, crash,
+    // tab refreshed…), the server-side sweep (1ter) will call /phone/stop at
+    // safetyStopAt — preventing phones from running indefinitely and billing forever.
+    // safetyStopAt = last-phone delay + 5 min buffer.
+    const safetyOffsetMs = (phones.length - 1) * delay_minutes * 60_000 + 5 * 60_000
+    supabase.from('scheduled_posts').update({
+      result:         { geelark_ids: geelarkIds, geelark_task_ids: [] },
+      stop_phones_at: new Date(Date.now() + safetyOffsetMs).toISOString(),
+      stop_phone_ids: geelarkIds,
+    }).eq('id', post.id).then(() => {}, () => {}) // fire-and-forget
+
     // 2. Wait for boot
     onLog('⏳ Boot téléphones (30s)…')
     await sleep(30_000)
@@ -355,6 +367,12 @@ async function executeScheduledPostInner(
       }
     }
 
+    // Persist actual task IDs now that we have them — if app dies before step 5
+    // the sweep (1ter) can query GeeLark and mark the post done/failed correctly.
+    supabase.from('scheduled_posts').update({
+      result: { geelark_ids: geelarkIds, geelark_task_ids: taskIds },
+    }).eq('id', post.id).then(() => {}, () => {})
+
     // 4. Poll until done (max 10 min)
     let pollSuccessCount = 0
     let pollFailCount = 0
@@ -382,6 +400,9 @@ async function executeScheduledPostInner(
     // 5. Stop phones
     onLog('⏹ Arrêt des téléphones…')
     await gPost(bearer, '/phone/stop', { ids: geelarkIds })
+    // Clear the safety stop — phones are stopped, sweep no longer needed.
+    supabase.from('scheduled_posts').update({ stop_phones_at: null, stop_phone_ids: null })
+      .eq('id', post.id).then(() => {}, () => {})
 
     const totalFailed = failedCount + pollFailCount
     const totalOk = phones.length - failedCount + pollSuccessCount - (taskIds.length - pollSuccessCount - pollFailCount)
@@ -397,6 +418,8 @@ async function executeScheduledPostInner(
   } catch (err: any) {
     onLog(`❌ Erreur : ${err.message}`)
     await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
+    supabase.from('scheduled_posts').update({ stop_phones_at: null, stop_phone_ids: null })
+      .eq('id', post.id).then(() => {}, () => {})
     return false
   }
 }

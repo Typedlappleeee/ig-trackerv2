@@ -864,7 +864,7 @@ ipcMain.handle('run-ffmpeg-repurpose', async (_event, opts: {
   const results: Array<{ ok: boolean; outputPath?: string; error?: string }> = []
   for (let i = 0; i < opts.variants.length; i++) {
     const v   = opts.variants[i]
-    const out = path.join(dir, `clonevid-${Date.now()}-${i}.mov`)
+    const out = path.join(dir, `clonevid-${Date.now()}-${i}.mp4`)
     const randomMs = Date.now() - Math.floor(Math.random() * 30 * 24 * 3600 * 1000)
     const creationTime = new Date(randomMs).toISOString()
     const args = [
