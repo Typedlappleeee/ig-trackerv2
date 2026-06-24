@@ -714,10 +714,10 @@ export function Mixer({ user }: MixerProps) {
                         onClick={async e => {
                           e.stopPropagation()
                           if (job.localPath && window.electronAPI?.saveFileAs) {
-                            const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `mixer-${job.videoItem.title}.mov` })
+                            const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `mixer-${job.videoItem.title}.mp4` })
                             if (r.ok || r.canceled) return
                           }
-                          const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `mixer-${job.videoItem.title}.mov`; a.click()
+                          const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `mixer-${job.videoItem.title}.mp4`; a.click()
                         }}
                         className="sf-press cursor-pointer"
                         style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>

@@ -143,7 +143,7 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
       <div style={{ padding: '6px 8px' }}>
         {isDone && (
           <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => downloadVariant(job, `clonevid_${index + 1}.mov`)}
+            <button onClick={() => downloadVariant(job, `clonevid_${index + 1}.mp4`)}
               className="sf-btn cursor-pointer"
               style={{ flex: 1, height: 28, fontSize: 9, background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 6 }}
             >

@@ -615,7 +615,7 @@ export function Montage({ user }: MontageProps) {
 
     // Montage is free — no credit deduction
 
-    const out = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mov` })
+    const out = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mp4` })
     if (!out) { setExporting(false); return }
     try {
       const { resolveContentToLocalPath } = await import('@/lib/storage')

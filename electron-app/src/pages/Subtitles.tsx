@@ -280,14 +280,14 @@ export function Subtitles({ user }: SubtitlesProps) {
       if (!src) return
       const a = document.createElement('a')
       a.href = src
-      a.download = videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mov'
+      a.download = videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mp4'
       a.click()
       return
     }
     if (!outputPath) return
     await window.electronAPI.saveFileAs({
       sourcePath:  outputPath,
-      defaultName: videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mov',
+      defaultName: videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mp4',
     })
   }
 
@@ -303,7 +303,7 @@ export function Subtitles({ user }: SubtitlesProps) {
       const scope = currentOrg?.id
         ? { mode: 'org' as const, id: currentOrg.id }
         : { mode: 'user' as const, id: user.id }
-      const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, `${title}.mov`, scope)
+      const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, `${title}.mp4`, scope)
       const { error } = await supabase.from('content_bank').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
         title: `Sous-titres — ${title}`,
