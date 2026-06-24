@@ -358,14 +358,17 @@ function PermBody({ innerTab, tabs, setTabs, actions, setActions, bankMode, setB
   )
 }
 
-// ── Member permission modal ──────────────────────────────────────────────────
-function PermModal({ member, templates, availableFolders, availableGroups, onSave, onCancel }: {
+// ── Member editor modal (role + permissions) ─────────────────────────────────
+function MemberEditorModal({ member, templates, availableFolders, availableGroups, onSave, onCancel }: {
   member: MemberRow; templates: OrgRoleTemplate[]
   availableFolders: string[]; availableGroups: string[]
-  onSave: (p: PermOverrides) => void; onCancel: () => void
+  onSave: (role: Exclude<OrgRole, 'owner'>, customRoleId: string | null, p: PermOverrides) => void
+  onCancel: () => void
 }) {
   const init = member.perm_overrides ?? {}
   const [innerTab, setInnerTab]   = useState<PermInnerTab>('tabs')
+  const [role, setRole]           = useState<Exclude<OrgRole, 'owner'>>(member.role === 'owner' ? 'member' : member.role as Exclude<OrgRole, 'owner'>)
+  const [customRoleId, setCustomRoleId] = useState<string | null>(member.custom_role_id ?? null)
   const [tabs, setTabs]           = useState<Partial<Record<PageKey, boolean>>>(init.tabs ?? {})
   const [actions, setActions]     = useState<Partial<Record<ActionKey, boolean>>>(init.actions ?? {})
   const [bankMode, setBankMode]   = useState<'all' | 'allow' | 'deny'>(init.bank_folders?.mode ?? 'all')
@@ -376,6 +379,7 @@ function PermModal({ member, templates, availableFolders, availableGroups, onSav
   const label = member.display_name?.trim() || member.email || member.user_id.slice(0, 8)
 
   function applyTemplate(t: OrgRoleTemplate) {
+    setCustomRoleId(t.id); setRole('member')
     const p = t.perm_overrides
     setTabs(p.tabs ?? {})
     setActions(p.actions ?? {})
@@ -393,8 +397,10 @@ function PermModal({ member, templates, availableFolders, availableGroups, onSav
     else out.bank_folders = { mode: bankMode, list: bankList }
     if (groupMode === 'all') out.phone_groups = { mode: 'all' }
     else out.phone_groups = { mode: 'allow', list: groupList }
-    onSave(out)
+    onSave(role, customRoleId, out)
   }
+
+  const activeTemplate = templates.find(t => t.id === customRoleId)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
@@ -406,35 +412,45 @@ function PermModal({ member, templates, availableFolders, availableGroups, onSav
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-sm font-bold text-text truncate">{label}</h2>
-            <div className="mt-0.5 flex items-center gap-2 flex-wrap">
-              <RoleChip role={member.role} />
-              {member.email && <span className="text-xs text-text2 truncate">{member.email}</span>}
-            </div>
+            {member.email && <p className="text-xs text-text2 truncate mt-0.5">{member.email}</p>}
           </div>
           <button onClick={onCancel} className="p-1.5 rounded-xl hover:bg-surface text-text2 hover:text-text transition-colors flex-shrink-0">
             <Icon name="x" size={18} />
           </button>
         </div>
 
-        {/* Quick-apply templates */}
-        {templates.length > 0 && (
-          <div className="px-6 pt-4 pb-1 flex-shrink-0">
-            <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-2">Appliquer un rôle rapide</p>
-            <div className="flex flex-wrap gap-1.5">
-              {templates.map(t => (
-                <button key={t.id} onClick={() => applyTemplate(t)}
-                  title={permSummary(t.perm_overrides)}
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-all hover:opacity-80 active:scale-95"
-                  style={{ background: t.color + '22', color: t.color, borderColor: t.color + '55' }}>
-                  {t.name}
-                </button>
-              ))}
-            </div>
+        {/* Role selector */}
+        <div className="px-6 pt-4 pb-3 border-b border-border flex-shrink-0 space-y-3">
+          <p className="text-[10px] font-bold text-text2 uppercase tracking-wider">Rôle système</p>
+          <div className="flex flex-wrap gap-2">
+            {(['admin', 'member', 'viewer'] as const).map(r => (
+              <button key={r} onClick={() => { setRole(r); setCustomRoleId(null) }}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${role === r && !customRoleId ? 'border-accent/60 bg-accent/15 text-accent' : 'border-border text-text2 hover:text-text hover:border-border/60 bg-surface'}`}>
+                <RoleChip role={r} />
+              </button>
+            ))}
           </div>
-        )}
+          {templates.length > 0 && (
+            <>
+              <p className="text-[10px] font-bold text-text2 uppercase tracking-wider">Rôle personnalisé</p>
+              <div className="flex flex-wrap gap-1.5">
+                {templates.map(t => (
+                  <button key={t.id} onClick={() => applyTemplate(t)}
+                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-all hover:opacity-80 active:scale-95 ${customRoleId === t.id ? 'ring-2 ring-offset-1 ring-offset-card' : ''}`}
+                    style={{ background: t.color + '22', color: t.color, borderColor: t.color + '55', ...(customRoleId === t.id ? { ringColor: t.color } : {}) }}>
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {activeTemplate && (
+            <p className="text-xs text-text2">Permissions pré-remplies depuis <strong className="text-text">{activeTemplate.name}</strong> — modifiables ci-dessous.</p>
+          )}
+        </div>
 
         {/* Inner tabs */}
-        <div className="flex overflow-x-auto border-b border-border px-4 flex-shrink-0 mt-3" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex overflow-x-auto border-b border-border px-4 flex-shrink-0 mt-0" style={{ scrollbarWidth: 'none' }}>
           {([
             { k: 'tabs' as const, label: 'Onglets' },
             { k: 'actions' as const, label: 'Actions' },
@@ -464,7 +480,7 @@ function PermModal({ member, templates, availableFolders, availableGroups, onSav
         {/* Footer */}
         <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-end gap-3">
           <Button variant="secondary" onClick={onCancel}>Annuler</Button>
-          <Button onClick={save}>Enregistrer les permissions</Button>
+          <Button onClick={save}>Enregistrer</Button>
         </div>
       </div>
     </div>
@@ -954,12 +970,12 @@ export function OrganizationPanel({ user }: Props) {
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
-  async function savePerms(member: MemberRow, perms: PermOverrides) {
+  async function savePerms(member: MemberRow, role: Exclude<OrgRole, 'owner'>, customRoleId: string | null, perms: PermOverrides) {
     setBusy(true)
-    const { error } = await supabase.from('organization_members').update({ perm_overrides: perms, custom_role_id: null }).eq('id', member.id)
+    const { error } = await supabase.from('organization_members').update({ role, custom_role_id: customRoleId, perm_overrides: perms }).eq('id', member.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    flash('Permissions mises à jour ✓'); setEditingMember(null)
+    flash('Membre mis à jour ✓'); setEditingMember(null)
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
@@ -1182,24 +1198,14 @@ export function OrganizationPanel({ user }: Props) {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {m.role === 'owner' || isMe ? (
-                        <RoleChip role={m.role} template={customTemplate} />
-                      ) : (
-                        <RoleDropdown
-                          value={m.custom_role_id ?? m.role}
-                          systemRole={m.role}
-                          templates={roleTemplates}
-                          onSystemRole={r => changeRole(m, r)}
-                          onTemplate={t => assignCustomRole(m, t)}
-                        />
-                      )}
+                      <RoleChip role={m.role} template={customTemplate} />
                       {m.role !== 'owner' && (
                         <button
                           onClick={() => setEditingMember(m)}
                           className="text-xs text-text2 hover:text-accent transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent/10 inline-flex items-center gap-1.5"
                         >
-                          <Icon name="shield" size={13} />
-                          <span className="hidden sm:inline">Permissions</span>
+                          <Icon name="pencil" size={13} />
+                          <span className="hidden sm:inline">Modifier</span>
                         </button>
                       )}
                       {m.role !== 'owner' && !isMe && (
@@ -1404,12 +1410,12 @@ export function OrganizationPanel({ user }: Props) {
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
       {editingMember && (
-        <PermModal
+        <MemberEditorModal
           member={editingMember}
           templates={roleTemplates}
           availableFolders={folders}
           availableGroups={groups}
-          onSave={perms => savePerms(editingMember, perms)}
+          onSave={(role, customRoleId, perms) => savePerms(editingMember, role, customRoleId, perms)}
           onCancel={() => setEditingMember(null)}
         />
       )}
