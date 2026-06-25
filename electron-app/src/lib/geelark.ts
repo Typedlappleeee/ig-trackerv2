@@ -1112,24 +1112,56 @@ async function _postInstagramStoryInner(
   // Always push the 9:16-padded JPEG. Fall back to raw original only if both canvas methods failed.
   outExt = compressed ? 'jpg' : _imgExt
   const pushData = compressed ?? imgBase64
-  const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
+  let imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
+  let sz = 0
 
-  // Push image via base64 chunks (cross-network, no CDN dependency).
-  log(`   📤 Push image (${Math.round(pushData.length / 1024)} KB)…`)
-  const CHUNK = 3000, BATCH = 20
-  const chunks: string[] = []
-  for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
-  log(`   📦 ${chunks.length} chunks…`)
-  await shellExec(bearer, phoneId,
-    `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-  for (let b = 1; b < chunks.length; b += BATCH) {
-    const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-    await shellExec(bearer, phoneId, cmd)
+  // ── Primary transfer: let the PHONE download the image itself ───────────────
+  // Exactly like the posting flow (the phone pulls the file from a URL), instead
+  // of streaming hundreds of base64 chunks through the shell — which is slow and
+  // corruption-prone, the real cause of failed story uploads. The phone has
+  // internet and the Supabase signed URL is reachable, so curl/wget just works.
+  // Trade-off: this fetches the ORIGINAL image (no 9:16 padding); the padded
+  // base64 path below stays as the fallback when the URL isn't phone-reachable.
+  if (/^https?:\/\//i.test(config.imageUrl)) {
+    const dlPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
+    const urlEsc = config.imageUrl.replace(/'/g, `'\\''`)
+    log('   📤 Téléchargement direct par le téléphone…')
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera; ` +
+      `curl -L -s -o '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+      `wget -q -O '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+      `toybox wget -O '${dlPath}' '${urlEsc}' 2>/dev/null; true`)
+    const ckd = await shellExec(bearer, phoneId, `wc -c < '${dlPath}' 2>/dev/null || echo 0`)
+    const szd = parseInt(ckd.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    if (szd >= 2000) {
+      imgPath = dlPath
+      outExt = _imgExt
+      sz = szd
+      log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
+    } else {
+      log(`   ⚠️ Téléchargement direct échoué (${szd} o) — bascule sur base64…`)
+      await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
+    }
   }
-  await shellExec(bearer, phoneId,
-    `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
-  const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-  const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+
+  // ── Fallback transfer: base64 chunks via shell (no phone-reachable URL) ──────
+  if (sz < 2000) {
+    log(`   📤 Push image base64 (${Math.round(pushData.length / 1024)} KB)…`)
+    const CHUNK = 3000, BATCH = 20
+    const chunks: string[] = []
+    for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
+    log(`   📦 ${chunks.length} chunks…`)
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+    for (let b = 1; b < chunks.length; b += BATCH) {
+      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+      await shellExec(bearer, phoneId, cmd)
+    }
+    await shellExec(bearer, phoneId,
+      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
+    const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+  }
   log(`   📎 Fichier: ${sz} octets`)
   if (sz < 2000) {
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
