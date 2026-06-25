@@ -1,4 +1,4 @@
-import { type PostingOpts, savePostingOpts } from '@/lib/postingOpts'
+import { type PostingOpts, type IntervalMode, savePostingOpts } from '@/lib/postingOpts'
 
 interface Props {
   opts: PostingOpts
@@ -44,12 +44,52 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
     savePostingOpts({ ...next, intervalMode: 'none' })
   }
 
+  const on = opts.intervalMode !== 'none'
+
+  // Estimation de l'heure du dernier post (1er immédiat, puis +N min par téléphone)
+  const intervalLabel = opts.intervalMode === 'random'
+    ? `${opts.intervalMin}–${opts.intervalMax}`
+    : String(opts.intervalMin)
+  let lastPostEstimate: string | null = null
+  if (on && phonesCount && phonesCount > 1) {
+    const perPhone = opts.intervalMode === 'random'
+      ? Math.max(opts.intervalMin, opts.intervalMax)
+      : opts.intervalMin
+    const last = new Date(Date.now() + (phonesCount - 1) * perPhone * 60_000)
+    lastPostEstimate = `${pad2(last.getHours())}:${pad2(last.getMinutes())}`
+  }
+
   return (
     <div className="rounded-2xl p-4 space-y-3"
       style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
 
-      {/* Reels Trial toggle */}
+      {/* Header row with toggle */}
       <div className="flex items-center gap-3">
+        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
+          <IconTimer size={14} />
+        </span>
+        <span className="flex-1 text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>
+          Intervalle entre posts
+        </span>
+        <button
+          onClick={() => onChange({ ...opts, intervalMode: on ? 'none' : 'fixed' })}
+          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+          style={{ background: on ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
+      </div>
+
+      {/* Help line */}
+      {on && (
+        <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)', margin: 0, paddingLeft: 26 }}>
+          1er post immédiat, puis +{intervalLabel} min par téléphone
+          {lastPostEstimate ? ` — dernier post vers ~${lastPostEstimate}` : ''}
+        </p>
+      )}
+
+      {/* Reels Trial toggle */}
+      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
         <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
           <IconFlask size={14} />
         </span>
@@ -66,6 +106,51 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         </button>
       </div>
 
+      {/* Expanded interval controls */}
+      {on && (
+        <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          {/* Mode pill */}
+          <div className="flex rounded-lg overflow-hidden flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            {(['fixed', 'random'] as IntervalMode[]).map(m => (
+              <button key={m}
+                onClick={() => set({ intervalMode: m })}
+                className="px-2.5 py-1.5 text-[11px] font-semibold transition-all"
+                style={opts.intervalMode === m
+                  ? { background: 'linear-gradient(130deg,#6366F1,#818CF8)', color: '#fff' }
+                  : { color: 'rgba(148,163,184,0.5)' }}>
+                {m === 'fixed' ? 'Fixe' : 'Aléatoire'}
+              </button>
+            ))}
+          </div>
+
+          {/* Inputs */}
+          <div className="flex items-center gap-1.5 flex-1 justify-end">
+            {opts.intervalMode === 'fixed' ? (
+              <>
+                <input type="number" min={1} max={120} value={opts.intervalMin}
+                  onChange={e => set({ intervalMin: Math.max(1, parseInt(e.target.value) || 1) })}
+                  className="w-14 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
+                <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>min</span>
+              </>
+            ) : (
+              <>
+                <input type="number" min={1} max={120} value={opts.intervalMin}
+                  onChange={e => set({ intervalMin: Math.max(1, parseInt(e.target.value) || 1) })}
+                  className="w-12 rounded-lg px-1.5 py-1.5 text-[12px] text-center focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
+                <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>→</span>
+                <input type="number" min={1} max={120} value={opts.intervalMax}
+                  onChange={e => set({ intervalMax: Math.max(1, parseInt(e.target.value) || 1) })}
+                  className="w-12 rounded-lg px-1.5 py-1.5 text-[12px] text-center focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
+                <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>min</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

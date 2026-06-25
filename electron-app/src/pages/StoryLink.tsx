@@ -331,7 +331,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [dryRun, setDryRun]                 = useState(false)
   const [showSchedule, setShowSchedule]     = useState(false)
   const [schedAt, setSchedAt]               = useState(() => defaultSchedValue(60))
-  const schedDelay = 0
+  const [schedDelay, setSchedDelay]         = useState(2)
   const [scheduling, setScheduling]         = useState(false)
   const [schedDone, setSchedDone]           = useState('')
   const [schedErr, setSchedErr]             = useState('')
@@ -1289,6 +1289,31 @@ export default function StoryLink({ user }: { user: User }) {
                       className="sf-input"
                       style={{ height: 38, width: '100%', colorScheme: 'dark' }}
                     />
+                  </div>
+
+                  {/* Delay between accounts */}
+                  <div>
+                    <label style={{
+                      display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
+                      textTransform: 'uppercase', color: ACCENT, marginBottom: 7,
+                    }}>Délai entre comptes</label>
+                    <div style={{ display: 'flex', gap: 7 }}>
+                      {[0, 2, 5, 10, 15].map(m => (
+                        <button
+                          key={m}
+                          onClick={() => setSchedDelay(m)}
+                          className="cursor-pointer"
+                          style={{
+                            flex: 1, height: 34, borderRadius: 8, cursor: 'pointer',
+                            fontSize: 12.5, fontWeight: 600,
+                            background: schedDelay === m ? 'rgba(99,102,241,0.15)' : 'transparent',
+                            border: `1px solid ${schedDelay === m ? 'rgba(99,102,241,0.4)' : HAIR}`,
+                            color: schedDelay === m ? ACCENT_L : 'var(--text-3)',
+                            transition: 'all 0.15s',
+                          }}
+                        >{m === 0 ? 'Aucun' : `${m} min`}</button>
+                      ))}
+                    </div>
                   </div>
 
                   {schedErr && (
