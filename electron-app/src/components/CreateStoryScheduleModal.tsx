@@ -116,7 +116,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
 
   // ── Schedule ──────────────────────────────────────────────────────────────
   const [schedAt, setSchedAt]       = useState(() => defaultSchedValue(60))
-  const [delay, setDelay]           = useState(2)
+  const delay = 0
   const [submitting, setSubmitting] = useState(false)
   const [schedDone, setSchedDone]   = useState('')
   const [schedErr, setSchedErr]     = useState('')
@@ -695,26 +695,6 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       className="sf-input"
                       style={{ height: 36, width: '100%', colorScheme: 'dark' }}
                     />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>Délai entre comptes</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {[0, 2, 5, 10, 15].map(m => (
-                        <button
-                          key={m}
-                          onClick={() => setDelay(m)}
-                          style={{
-                            flex: 1, height: 32, borderRadius: 7, cursor: 'pointer',
-                            fontSize: 12, fontWeight: 600,
-                            background: delay === m ? 'rgba(99,102,241,0.15)' : 'transparent',
-                            border: `1px solid ${delay === m ? 'rgba(99,102,241,0.4)' : HAIR}`,
-                            color: delay === m ? ACCENT_L : 'rgba(233,234,240,0.35)',
-                            transition: 'all 0.15s',
-                          }}
-                        >{m === 0 ? 'Aucun' : `${m} min`}</button>
-                      ))}
-                    </div>
                   </div>
 
                   <p style={{ margin: '10px 0 0', fontSize: 11, color: 'rgba(233,234,240,0.3)', lineHeight: 1.55 }}>
