@@ -349,6 +349,8 @@ export default function StoryLink({ user }: { user: User }) {
   function setLink(id: string, link: string) {
     setPhoneLinks(prev => ({ ...prev, [id]: link }))
     savePhoneLink(id, link)
+    supabase.from('phones').update({ link: link.trim() || null }).eq('geelark_id', id)
+      .then(() => {}, () => {})
   }
 
   // ── Load phones ───────────────────────────────────────────────────────────
