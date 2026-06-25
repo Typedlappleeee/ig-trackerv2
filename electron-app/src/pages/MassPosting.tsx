@@ -629,7 +629,12 @@ export function MassPosting({ user }: MassPostingProps) {
         tokenMap.set(vi, up.token)
         // Diagnostic : le token DOIT être une resourceUrl GéeLark (http…), pas autre chose.
         const tokenKind = /^https?:/.test(up.token) ? 'resourceUrl GéeLark ✓' : `inattendu: ${up.token.slice(0, 24)}`
-        log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…) — token: ${tokenKind}`, 'ok')
+        // Taille réelle de l'objet stocké chez GéeLark (vérifiée côté proxy). Si très
+        // petite ou nulle alors que la source est OK → le PUT a stocké un objet corrompu.
+        const sizeInfo = typeof up.uploadedSize === 'number'
+          ? ` — objet GéeLark: ${(up.uploadedSize / 1_000_000).toFixed(1)} Mo`
+          : ' — taille non vérifiée'
+        log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…) — token: ${tokenKind}${sizeInfo}`, 'ok')
       }
 
       // ── Step 2: start phones ──────────────────────────────────────────────

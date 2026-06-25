@@ -112,17 +112,40 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: false, error: `${SV}[SV-E005] No uploadUrl/resourceUrl. Keys: ${Object.keys(d).join(',')}` })
     }
 
-    let putRes = await fetchRetry('SV-D:put', uploadUrl, { method: 'PUT', body: bytes }, { tries: 3, timeoutMs: 45000 })
+    // PUT avec Content-Type ET Content-Length explicites. Sans ça, undici peut
+    // envoyer la requête en chunked / sans type, et certains stockages S3 présignés
+    // acceptent (200) mais stockent un objet incohérent que GéeLark ne sait pas
+    // décoder → vidéo absente de la galerie du téléphone alors que le token est valide.
+    const putHeaders = { 'Content-Type': 'video/mp4', 'Content-Length': String(bytes.length) }
+    let putRes = await fetchRetry('SV-D:put', uploadUrl, { method: 'PUT', headers: putHeaders, body: bytes }, { tries: 3, timeoutMs: 45000 })
     if (!putRes.ok) {
-      putRes = await fetchRetry('SV-D:put2', uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes }, { tries: 2, timeoutMs: 45000 })
+      putRes = await fetchRetry('SV-D:put2', uploadUrl, { method: 'PUT', body: bytes }, { tries: 2, timeoutMs: 45000 })
       if (!putRes.ok) {
         const errBody = await putRes.text().catch(() => '')
         return res.status(200).json({ ok: false, error: `${SV}[SV-E006] S3 PUT failed: ${putRes.status} — ${errBody.slice(0, 200)}` })
       }
     }
 
-    console.log(`${SV} [OK] token=${token.slice(0, 40)}`)
-    return res.status(200).json({ ok: true, token })
+    // Vérification : relire l'objet réellement stocké via la resourceUrl et comparer
+    // sa taille à ce qu'on a uploadé. Détecte un PUT « 200 mais objet vide/tronqué »
+    // — la cause d'une galerie vide avec un token pourtant valide. Best-effort :
+    // si la lecture échoue (propagation, HEAD non supporté) on n'invalide pas le post.
+    let uploadedSize = null
+    try {
+      const headRes = await fetchRetry('SV-E:verify', token, { method: 'GET', headers: { Range: 'bytes=0-0' } }, { tries: 2, timeoutMs: 15000 })
+      const cr = headRes.headers.get('content-range')   // ex: "bytes 0-0/1234567"
+      const total = cr && cr.includes('/') ? Number(cr.split('/')[1]) : Number(headRes.headers.get('content-length'))
+      if (Number.isFinite(total)) uploadedSize = total
+      console.log(`${SV} [SV-E:verify] objet stocké = ${uploadedSize} octets (attendu ${bytes.length})`)
+      if (Number.isFinite(total) && total < 50_000) {
+        return res.status(200).json({ ok: false, error: `${SV}[SV-E007] Objet GéeLark vide/tronqué (${total} octets, attendu ${bytes.length}). Le PUT a échoué silencieusement.` })
+      }
+    } catch (e) {
+      console.warn(`${SV} [SV-E:verify] vérification ignorée: ${e?.message ?? e}`)
+    }
+
+    console.log(`${SV} [OK] token=${token.slice(0, 40)} uploadedSize=${uploadedSize}`)
+    return res.status(200).json({ ok: true, token, uploadedSize })
   } catch (err) {
     const msg = err?.message ?? String(err)
     console.error(`${SV} exception:`, msg)

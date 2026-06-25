@@ -41,7 +41,7 @@ interface ElectronAPI {
   pickOutputFile:    (opts: { defaultName: string }) => Promise<string | null>
   pickAnyFile:       (opts?: { filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>
   pickOutputFolder:  () => Promise<string | null>
-  uploadVideoGeelark:(opts: { bearer: string; filePath: string }) => Promise<{ ok: boolean; token?: string; error?: string }>
+  uploadVideoGeelark:(opts: { bearer: string; filePath: string }) => Promise<{ ok: boolean; token?: string; error?: string; uploadedSize?: number | null }>
   fetchImage:        (opts: { url: string; headers?: Record<string, string> }) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>
   fetchInstagramHtml:(username: string) => Promise<{ ok: boolean; url?: string; html?: string; apiJson?: unknown; error?: string }>
   fetchInstagramBySession: (opts: { username: string; sessionid: string }) => Promise<{
