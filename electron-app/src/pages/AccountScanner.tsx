@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -53,7 +53,13 @@ export function AccountScanner({ user }: AccountScannerProps) {
   const [phones, setPhones]   = useState<Phone[]>([])
   const [loading, setLoading] = useState(true)
   const [results, setResults] = useState<Record<string, ScanResult>>(() => {
-    try { return JSON.parse(localStorage.getItem(cacheKey) ?? '{}') } catch { return {} }
+    try {
+      const raw = JSON.parse(localStorage.getItem(cacheKey) ?? '{}') as Record<string, ScanResult>
+      const valid: Health[] = ['active', 'banned', 'recheck', 'unchecked']
+      // Sanitize: drop entries with invalid health (old cache schema)
+      Object.keys(raw).forEach(k => { if (!valid.includes(raw[k]?.health as Health)) delete raw[k] })
+      return raw
+    } catch { return {} }
   })
   const [lastScan, setLastScan] = useState<string | null>(() => localStorage.getItem(lastScanKey))
   const [scanning, setScanning] = useState(false)
@@ -110,15 +116,27 @@ export function AccountScanner({ user }: AccountScannerProps) {
   }, [visibleRows])
 
   // ── Analyse d'un compte via le proxy de son téléphone ──────────────────────
-  async function analyzeOne(phone: Phone): Promise<ScanResult> {
-    if (!window.electronAPI?.checkInstagramStatus) {
-      return { health: 'recheck', checkedAt: new Date().toISOString() }
+  async function checkStatus(username: string, proxy: GeelarkProxy | null): Promise<{ ok: boolean; status: 'active' | 'banned' | 'blocked'; httpStatus?: number; error?: string }> {
+    // Electron : IPC direct (Node https + proxy agent)
+    if (window.electronAPI?.checkInstagramStatus) {
+      return window.electronAPI.checkInstagramStatus({ username, proxy })
     }
+    // Web : passe par l'API Vercel (même logique côté serveur)
+    const r = await fetch('/api/check-instagram-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, proxy }),
+    })
+    if (!r.ok) return { ok: false, status: 'blocked', error: `HTTP ${r.status}` }
+    return r.json()
+  }
+
+  async function analyzeOne(phone: Phone): Promise<ScanResult> {
     const username = (phone.ig_username ?? '').replace(/^@/, '')
     const proxy = proxyMapRef.current.get(phone.geelark_id) ?? null
     let last: { status: 'active' | 'banned' | 'blocked'; httpStatus?: number } = { status: 'blocked' }
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const r = await window.electronAPI.checkInstagramStatus({ username, proxy })
+      const r = await checkStatus(username, proxy)
       last = { status: r.status, httpStatus: r.httpStatus }
       if (r.status !== 'blocked') break          // verdict ferme (actif/banni) → stop
       if (attempt < MAX_RETRIES) await sleep(1500 + attempt * 1500)
@@ -129,10 +147,6 @@ export function AccountScanner({ user }: AccountScannerProps) {
 
   // ── Scan complet (pool de concurrence) ─────────────────────────────────────
   async function runFullScan() {
-    if (!window.electronAPI?.checkInstagramStatus) {
-      toast.show({ title: 'Analyse dispo uniquement sur l\'app desktop', kind: 'warn' })
-      return
-    }
     if (!conns.bearer) {
       toast.show({ title: 'Token GeeLark manquant', body: 'Ajoute-le dans Paramètres → Connexions', kind: 'error' })
       return
@@ -302,7 +316,7 @@ function StatCard({ label, value, color, sub, onClick, active }: {
 }
 
 function AccountRowItem({ row, onClick }: { row: AccountRow; onClick: () => void }) {
-  const meta = HEALTH_META[row.result.health]
+  const meta = HEALTH_META[row.result.health] ?? HEALTH_META['unchecked']
   return (
     <div
       onClick={onClick}

@@ -90,10 +90,10 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Instagram',
     defaultOpen: true,
     items: [
+      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', dev: true },
       { id: 'scanner',     label: 'navScanner',      icon: '🛰️', isNew: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
