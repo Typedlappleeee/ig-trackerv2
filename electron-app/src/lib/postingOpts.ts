@@ -36,21 +36,15 @@ export function savePostingOpts(opts: PostingOpts) {
   localStorage.setItem(KEY, JSON.stringify(opts))
 }
 
-// Tampon de boot : la tâche RPA ne doit JAMAIS être planifiée à l'instant exact
-// où on la crée. Le téléphone vient de booter (~30s) mais Instagram n'est pas
-// toujours prêt ; si scheduleAt = maintenant, GeeLark valide la tâche (statut
-// « Done ») mais ne poste rien. Un tampon laisse le temps à l'app d'être prête.
-const BOOT_BUFFER_SEC = 45
-
 // Returns an array of length `count` with scheduleAt timestamps (Unix seconds).
-// Phone[0] posts after a short boot buffer; subsequent phones are staggered.
+// Phone[0] always posts immediately; subsequent phones are staggered.
 export function buildScheduleTimes(count: number, opts: PostingOpts): number[] {
-  const base = Math.floor(Date.now() / 1000) + BOOT_BUFFER_SEC
+  const now = Math.floor(Date.now() / 1000)
   if (opts.intervalMode === 'none' || count <= 1) {
-    return Array.from({ length: count }, () => base)
+    return Array.from({ length: count }, () => now)
   }
-  const times: number[] = [base]
-  let t = base
+  const times: number[] = [now]
+  let t = now
   for (let i = 1; i < count; i++) {
     const delayMin = opts.intervalMode === 'fixed'
       ? opts.intervalMin
