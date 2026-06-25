@@ -477,14 +477,11 @@ Deno.serve(async (req) => {
 
   // 2. Posts dus — UNIQUEMENT ceux issus de tâches récurrentes (task_id NOT NULL).
   // Les posts manuels (Programmation tab, task_id IS NULL) sont exécutés côté client
-  // quand l'app est ouverte ; le serveur ne les réclame plus pour éviter de les bloquer
-  // en statut 'running' si le token GeeLark n'est pas disponible côté serveur.
   // type='story' exclu : stories passent par automation UI (~2 min/tel) côté app.
   let duePostsQuery = db.from('scheduled_posts')
     .select('*')
     .eq('status', 'pending')
     .neq('type', 'story')
-    .not('task_id', 'is', null)
     .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(2)
