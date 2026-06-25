@@ -6,6 +6,8 @@ import { execFile, spawn } from 'node:child_process'
 import https from 'node:https'
 import http from 'node:http'
 import path from 'node:path'
+import { HttpsProxyAgent } from 'https-proxy-agent'
+import { SocksProxyAgent } from 'socks-proxy-agent'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -402,6 +404,82 @@ function isSessionDead(status: number, data: unknown): boolean {
   if (d['logout_reason']) return true
   return false
 }
+
+// ── Scanner de comptes : statut d'un compte IG via le proxy du téléphone ─────
+// Détection fiable de ban SANS sessionid et SANS allumer le téléphone :
+// on charge instagram.com/<username>/ À TRAVERS le proxy assigné au téléphone
+// (même IP que le compte → pas de rate-limit, paraît légitime).
+//   • HTTP 404 / "page isn't available"        → banni / supprimé / désactivé (sûr)
+//   • HTTP 200 + données de profil             → actif
+//   • 429 / login wall / challenge / erreur    → bloqué (à revérifier, jamais un faux ban)
+interface GLProxy { type?: string; scheme?: string; server?: string; port?: number; username?: string; password?: string }
+function buildProxyAgent(proxy: GLProxy | null | undefined): https.Agent | undefined {
+  if (!proxy?.server || !proxy?.port) return undefined
+  const scheme = (proxy.type ?? proxy.scheme ?? 'http').toLowerCase()
+  const auth = proxy.username ? `${encodeURIComponent(proxy.username)}:${encodeURIComponent(proxy.password ?? '')}@` : ''
+  const url = `${scheme.startsWith('socks') ? 'socks5' : scheme}://${auth}${proxy.server}:${proxy.port}`
+  try {
+    const agent = scheme.startsWith('socks') ? new SocksProxyAgent(url) : new HttpsProxyAgent(url)
+    return agent as unknown as https.Agent
+  } catch { return undefined }
+}
+
+type IgStatus = 'active' | 'banned' | 'blocked'
+function classifyIgResponse(status: number, body: string): IgStatus {
+  if (status === 404) return 'banned'
+  const low = body.toLowerCase()
+  // Pages de compte inexistant/désactivé (même quand IG renvoie 200 avec une page d'erreur)
+  if (/sorry, this page isn'?t available|page isn'?t available|cette page n'est pas disponible|page introuvable|user not found|"users":\[\]/.test(low)) {
+    // Mais pas si c'est juste un mur de connexion générique
+    if (!/log in to see|connecte-toi pour voir|loginform/.test(low)) return 'banned'
+  }
+  if (status === 200) {
+    // Signaux d'un profil bien vivant
+    if (/"edge_followed_by"|"follower_count"|og:description|"biography"|profilepage|"edge_owner_to_timeline_media"/.test(low)) return 'active'
+    // 200 mais mur de login/consentement sans données exploitables → bloqué (pas un verdict)
+    if (/login|challenge|checkpoint|robot|captcha|few minutes|réessayer plus tard|try again later/.test(low)) return 'blocked'
+    // 200 vide / inconnu → bloqué prudemment
+    return 'blocked'
+  }
+  if (status === 429 || status === 401 || status === 403) return 'blocked'
+  return 'blocked'
+}
+
+ipcMain.handle('check-instagram-status', async (_event, opts: { username: string; proxy?: GLProxy | null }) => {
+  const username = (opts.username ?? '').replace(/^@/, '').trim()
+  if (!username) return { ok: false, status: 'blocked' as IgStatus, error: 'no_username' }
+  const agent = buildProxyAgent(opts.proxy)
+  const url = `https://www.instagram.com/${encodeURIComponent(username)}/`
+  return await new Promise<{ ok: boolean; status: IgStatus; httpStatus?: number; error?: string }>((resolve) => {
+    const parsed = new URL(url)
+    const req = https.request({
+      hostname: parsed.hostname,
+      path: parsed.pathname,
+      method: 'GET',
+      agent,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    }, (res) => {
+      const httpStatus = res.statusCode ?? 0
+      // 404 : pas besoin de lire le corps
+      if (httpStatus === 404) { res.resume(); resolve({ ok: true, status: 'banned', httpStatus }); return }
+      const chunks: Buffer[] = []
+      let size = 0
+      res.on('data', (c: Buffer) => { if (size < 600_000) { chunks.push(c); size += c.length } })
+      res.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf-8')
+        resolve({ ok: true, status: classifyIgResponse(httpStatus, body), httpStatus })
+      })
+      res.on('error', () => resolve({ ok: true, status: 'blocked', httpStatus, error: 'stream_error' }))
+    })
+    req.on('error', (e) => resolve({ ok: false, status: 'blocked', error: e instanceof Error ? e.message : String(e) }))
+    req.setTimeout(20_000, () => { req.destroy(new Error('timeout')); resolve({ ok: false, status: 'blocked', error: 'timeout' }) })
+    req.end()
+  })
+})
 
 ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: string; sessionid: string }) => {
   try {

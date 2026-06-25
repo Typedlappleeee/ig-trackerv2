@@ -3,6 +3,14 @@ import { registerStartedPhonesAuto } from './phoneWatch'
 const BASE = 'https://openapi.geelark.com/open/v1'
 
 // Raw phone shape returned by GéeLark API
+export interface GeelarkProxy {
+  type?:     string  // socks5 | http | https
+  server?:   string
+  port?:     number
+  username?: string
+  password?: string
+}
+
 export interface GeelarkPhone {
   id:          string
   serialNo?:   string | null
@@ -12,6 +20,18 @@ export interface GeelarkPhone {
   groupName?:  string | null
   status:      number  // 0=running, 1=stopped, 2=starting, 3=stopping
   remark?:     string | null
+  proxy?:      GeelarkProxy | null  // proxy assigné au téléphone (renvoyé par /phone/list)
+}
+
+// Récupère le proxy de chaque téléphone (mappé par geelark_id) via /phone/list.
+// Utilisé par le scanner : la requête IG d'un compte passe par SON proxy.
+export async function fetchPhoneProxies(bearer: string): Promise<Map<string, GeelarkProxy>> {
+  const phones = await fetchAllPhones(bearer)
+  const m = new Map<string, GeelarkProxy>()
+  for (const p of phones) {
+    if (p.proxy && p.proxy.server) m.set(p.id, p.proxy)
+  }
+  return m
 }
 
 function authHeaders(bearer: string) {
