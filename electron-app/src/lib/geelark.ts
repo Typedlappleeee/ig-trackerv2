@@ -269,6 +269,18 @@ export async function replyToIgCommentViaPhone(
   replyText: string,
   log?: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log ?? (() => {}),
+    () => _replyToIgCommentViaPhoneInner(bearer, phoneId, shortcode, username, replyText, log))
+}
+
+async function _replyToIgCommentViaPhoneInner(
+  bearer: string,
+  phoneId: string,
+  shortcode: string,
+  username: string,
+  replyText: string,
+  log?: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready) return { ok: false, error: 'phone_failed_to_start' }
@@ -522,6 +534,16 @@ async function saveFieldAndBack(
 }
 
 export async function updateInstagramProfile(
+  bearer: string,
+  phoneId: string,
+  config: MassEditConfig,
+  log: (m: string) => void,
+) {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _updateInstagramProfileInner(bearer, phoneId, config, log))
+}
+
+async function _updateInstagramProfileInner(
   bearer: string,
   phoneId: string,
   config: MassEditConfig,
@@ -846,23 +868,35 @@ export interface StoryConfig {
   dryRun?:  boolean           // run every step but stop right before publishing
 }
 
+// Wrap any phone operation with an auto-stop safety timer.
+// The phone is stopped after `ms` milliseconds regardless of what happens.
+async function withPhoneAutoStop<T>(
+  bearer: string,
+  phoneId: string,
+  ms: number,
+  label: string,
+  log: (m: string) => void,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const timer = setTimeout(() => {
+    log(`⏱ Timeout ${label} — arrêt automatique du téléphone`)
+    stopPhone(bearer, phoneId).catch(() => {})
+  }, ms)
+  try {
+    return await fn()
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function postInstagramStory(
   bearer: string,
   phoneId: string,
   config: StoryConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
-  // Safety auto-stop: stop the phone after 3 minutes regardless of outcome
-  const autoStopTimer = setTimeout(() => {
-    log('⏱ Timeout 3min — arrêt automatique du téléphone')
-    stopPhone(bearer, phoneId).catch(() => {})
-  }, 3 * 60 * 1000)
-
-  try {
-    return await _postInstagramStoryInner(bearer, phoneId, config, log)
-  } finally {
-    clearTimeout(autoStopTimer)
-  }
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _postInstagramStoryInner(bearer, phoneId, config, log))
 }
 
 async function _postInstagramStoryInner(
@@ -1032,63 +1066,25 @@ async function _postInstagramStoryInner(
   const pushData = compressed ?? imgBase64
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
 
-  // Strategy A: GeeLark presigned URL (same as video posting — reliable, fast).
-  // GET an S3 upload URL from GeeLark, PUT the JPEG bytes, then have the phone
-  // curl the CDN resourceUrl. Falls back to base64 chunk push if any step fails.
-  let uploadedViaUrl = false
-  try {
-    log('   ☁️ Upload via URL GeeLark…')
-    const urlRes = await geelarkFetch('POST', '/upload/getUrl', { fileType: 'jpg' }, bearer)
-    const urlData = (urlRes?.data ?? urlRes) as Record<string, unknown>
-    const uploadUrl   = String(urlData?.uploadUrl   ?? '')
-    const resourceUrl = String(urlData?.resourceUrl ?? '')
-    if (!uploadUrl || !resourceUrl) throw new Error('Réponse /upload/getUrl invalide')
-
-    // Decode base64 → Uint8Array → Blob for S3 PUT
-    const binStr2 = atob(pushData)
-    const u8put   = new Uint8Array(binStr2.length)
-    for (let i = 0; i < binStr2.length; i++) u8put[i] = binStr2.charCodeAt(i)
-    const putBlob = new Blob([u8put], { type: 'image/jpeg' })
-
-    const putRes = await fetch(uploadUrl, { method: 'PUT', body: putBlob })
-    if (!putRes.ok) throw new Error(`PUT S3 ${putRes.status}`)
-    log(`   ✅ Uploadé S3 (${Math.round(u8put.length / 1024)} KB)`)
-
-    // Phone downloads the image from the CDN
-    log('   📲 Téléchargement image sur le téléphone…')
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera && curl -s -L --max-time 60 -o '${imgPath}' '${resourceUrl}' && echo OK`)
-    const ck2 = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-    const sz2 = parseInt(ck2.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    log(`   📎 Fichier: ${sz2} octets`)
-    if (sz2 < 2000) throw new Error(`Fichier trop petit après curl (${sz2} o)`)
-    uploadedViaUrl = true
-  } catch (urlErr) {
-    log(`   ⚠️ Upload URL échoué: ${urlErr instanceof Error ? urlErr.message : String(urlErr)} — fallback base64…`)
+  // Push image via base64 chunks (cross-network, no CDN dependency).
+  log(`   📤 Push image (${Math.round(pushData.length / 1024)} KB)…`)
+  const CHUNK = 3000, BATCH = 20
+  const chunks: string[] = []
+  for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
+  log(`   📦 ${chunks.length} chunks…`)
+  await shellExec(bearer, phoneId,
+    `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+  for (let b = 1; b < chunks.length; b += BATCH) {
+    const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+    await shellExec(bearer, phoneId, cmd)
   }
-
-  // Strategy B: base64 chunk push (fallback)
-  if (!uploadedViaUrl) {
-    log(`   📤 Push base64 (${Math.round(pushData.length / 1024)} KB)…`)
-    let sz = 0
-    const CHUNK = 3000, BATCH = 20
-    const chunks: string[] = []
-    for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
-    log(`   📦 ${chunks.length} chunks…`)
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-    for (let b = 1; b < chunks.length; b += BATCH) {
-      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-      await shellExec(bearer, phoneId, cmd)
-    }
-    await shellExec(bearer, phoneId,
-      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
-    const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    log(`   📎 Fichier: ${sz} octets`)
-    if (sz < 2000) {
-      return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
-    }
+  await shellExec(bearer, phoneId,
+    `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
+  const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+  const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+  log(`   📎 Fichier: ${sz} octets`)
+  if (sz < 2000) {
+    return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
   }
 
   // Force media scanner so Instagram's gallery picker sees the new file.
@@ -1630,6 +1626,19 @@ export async function loginInstagramAccount(
   abortSignal: { abort: boolean },
   totpSecret?: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _loginInstagramAccountInner(bearer, phoneId, email, password, log, abortSignal, totpSecret))
+}
+
+async function _loginInstagramAccountInner(
+  bearer: string,
+  phoneId: string,
+  email: string,
+  password: string,
+  log: (m: string) => void,
+  abortSignal: { abort: boolean },
+  totpSecret?: string,
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
@@ -1979,6 +1988,19 @@ export async function loginInstagramAccount(
 
 // ── Main entry point ─────────────────────────────────────────────────────────
 export async function warmupAccount(
+  bearer: string,
+  phoneId: string,
+  config: WarmupConfig,
+  log: (m: string) => void,
+  abortSignal: { abort: boolean },
+): Promise<{ ok: boolean; error?: string }> {
+  // Auto-stop: browse duration + 3 min safety margin
+  const warmupMs = (config.browseMinutes * 60 + 3 * 60) * 1000
+  return withPhoneAutoStop(bearer, phoneId, warmupMs, `${config.browseMinutes + 3}min`, log,
+    () => _warmupAccountInner(bearer, phoneId, config, log, abortSignal))
+}
+
+async function _warmupAccountInner(
   bearer: string,
   phoneId: string,
   config: WarmupConfig,
@@ -2621,6 +2643,17 @@ export interface TikTokPostConfig {
 }
 
 export async function postTikTokVideoAdb(
+  bearer: string,
+  phoneId: string,
+  config: TikTokPostConfig,
+  log: (m: string) => void,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _postTikTokVideoAdbInner(bearer, phoneId, config, log, signal))
+}
+
+async function _postTikTokVideoAdbInner(
   bearer: string,
   phoneId: string,
   config: TikTokPostConfig,
