@@ -2640,257 +2640,152 @@ function TaskCard({
   const [hovered, setHovered] = useState(false)
   const isActive = task.status === 'active'
   const hasSegments = !!task.segments && task.segments.length > 0
+  const statusColor = isActive ? '#34d399' : '#F59E0B'
 
-  const statusColor  = isActive ? '#34d399' : '#F59E0B'
-  const statusBg     = isActive ? 'rgba(52,211,153,0.08)' : 'rgba(245,158,11,0.08)'
-  const statusBorder = isActive ? 'rgba(52,211,153,0.22)' : 'rgba(245,158,11,0.22)'
-  const glowColor    = isActive ? 'rgba(52,211,153,0.08)' : 'rgba(245,158,11,0.06)'
+  const metaParts: string[] = []
+  metaParts.push(`↻ ${formatInterval(task.recur_hours)}`)
+  metaParts.push(`${task.phones.length} tél.`)
+  if (!hasSegments) {
+    metaParts.push(task.task_type === 'story' ? 'Story' : 'Publication')
+    metaParts.push(`${task.videos.length} ${task.task_type === 'story' ? 'image' : 'vidéo'}${task.videos.length > 1 ? 's' : ''}`)
+  } else {
+    metaParts.push(`${(task.segments ?? []).length} étape${(task.segments ?? []).length > 1 ? 's' : ''}`)
+  }
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered
-          ? 'linear-gradient(135deg, rgba(99,102,241,0.045), rgba(99,102,241,0.02))'
-          : 'linear-gradient(135deg, rgba(17,17,32,0.9), rgba(12,12,21,0.9))',
-        border: `1px solid ${hovered ? 'rgba(99,102,241,0.22)' : 'rgba(233,234,240,0.07)'}`,
+        background: 'rgba(14,14,26,0.9)',
+        border: `1px solid ${hovered ? 'rgba(99,102,241,0.28)' : 'rgba(233,234,240,0.07)'}`,
         borderRadius: 14,
-        padding: '20px 22px',
-        transition: 'all 0.18s ease',
-        boxShadow: hovered
-          ? '0 8px 32px -8px rgba(99,102,241,0.18), 0 0 0 1px rgba(99,102,241,0.1)'
-          : '0 2px 12px rgba(0,0,0,0.25)',
+        padding: '18px 20px',
+        transition: 'border-color 0.18s ease, box-shadow 0.18s ease',
+        boxShadow: hovered ? '0 6px 28px -6px rgba(99,102,241,0.2)' : '0 2px 10px rgba(0,0,0,0.2)',
         position: 'relative',
         overflow: 'hidden',
       }}
     >
-      {/* Status accent top line */}
+      {/* Status accent left border */}
       <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-        background: isActive
-          ? 'linear-gradient(90deg, transparent, rgba(52,211,153,0.5), transparent)'
-          : 'linear-gradient(90deg, transparent, rgba(245,158,11,0.4), transparent)',
-        opacity: hovered ? 1 : 0.5,
-        transition: 'opacity 0.18s',
+        position: 'absolute', top: 0, left: 0, bottom: 0, width: 3,
+        background: statusColor, opacity: isActive ? 0.7 : 0.35,
+        borderRadius: '14px 0 0 14px',
       }} />
 
-      {/* Background glow blob */}
-      <div style={{
-        position: 'absolute', top: -30, right: -30, width: 120, height: 120,
-        borderRadius: '50%', background: glowColor,
-        pointerEvents: 'none', filter: 'blur(20px)',
-      }} />
+      <div style={{ paddingLeft: 8 }}>
+        {/* Row 1: name + action buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          {/* Status dot */}
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0,
+            boxShadow: isActive ? `0 0 7px ${statusColor}` : 'none',
+            animation: isActive ? 'pulse 1.6s ease-in-out infinite' : 'none',
+          }} />
 
-      {/* Row 1: name + status badges + action buttons */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{
-            margin: '0 0 8px', fontSize: 15, fontWeight: 700, color: 'var(--ivory)',
+            margin: 0, flex: 1, minWidth: 0,
+            fontSize: 14, fontWeight: 700, color: 'var(--ivory)',
             letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {task.name || 'Tâche sans nom'}
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-            {/* Status */}
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: statusBg, color: statusColor,
-              border: `1px solid ${statusBorder}`,
-              borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700,
-            }}>
-              <span style={{
-                width: 5, height: 5, borderRadius: '50%', background: statusColor,
-                boxShadow: isActive ? `0 0 6px ${statusColor}` : 'none',
-                display: 'inline-block',
-                animation: isActive ? 'pulse 1.4s ease-in-out infinite' : 'none',
-              }} />
-              {isActive ? 'Actif' : 'En pause'}
-            </span>
 
-            {/* Interval */}
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'rgba(99,102,241,0.08)', color: '#818CF8',
-              border: '1px solid rgba(99,102,241,0.2)',
-              borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 600,
-            }}>
-              <IconRepeat size={11} color="#818CF8" />
-              {formatInterval(task.recur_hours)}
-            </span>
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+            <button
+              onClick={onToggle}
+              disabled={toggling}
+              title={isActive ? 'Mettre en pause' : 'Reprendre'}
+              className="cursor-pointer"
+              style={{
+                width: 30, height: 30, borderRadius: 8, border: 'none',
+                background: isActive ? 'rgba(245,158,11,0.1)' : 'rgba(52,211,153,0.1)',
+                color: isActive ? '#F59E0B' : '#34d399',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s', opacity: toggling ? 0.5 : 1, cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = isActive ? 'rgba(245,158,11,0.22)' : 'rgba(52,211,153,0.22)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'rgba(245,158,11,0.1)' : 'rgba(52,211,153,0.1)' }}
+            >
+              {isActive ? <IconPause size={12} /> : <IconPlay size={12} />}
+            </button>
+            <button
+              onClick={onEdit}
+              title="Modifier"
+              className="cursor-pointer"
+              style={{
+                width: 30, height: 30, borderRadius: 8, border: 'none',
+                background: 'rgba(99,102,241,0.08)', color: '#818CF8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s', cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.18)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
+            >
+              <IconEdit size={12} />
+            </button>
+            <button
+              onClick={onDelete}
+              disabled={deleting}
+              title="Supprimer"
+              className="cursor-pointer"
+              style={{
+                width: 30, height: 30, borderRadius: 8, border: 'none',
+                background: 'rgba(248,113,113,0.06)', color: 'rgba(248,113,113,0.65)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.15s', opacity: deleting ? 0.5 : 1, cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.16)'; e.currentTarget.style.color = '#F87171' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.06)'; e.currentTarget.style.color = 'rgba(248,113,113,0.65)' }}
+            >
+              <IconTrash size={12} />
+            </button>
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          <button
-            onClick={onToggle}
-            disabled={toggling}
-            title={isActive ? 'Mettre en pause' : 'Reprendre'}
-            className="cursor-pointer"
-            style={{
-              width: 32, height: 32, borderRadius: 8, border: 'none',
-              background: isActive ? 'rgba(245,158,11,0.1)' : 'rgba(52,211,153,0.1)',
-              color: isActive ? '#F59E0B' : '#34d399',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.15s', opacity: toggling ? 0.5 : 1, cursor: 'pointer',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = isActive ? 'rgba(245,158,11,0.2)' : 'rgba(52,211,153,0.2)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = isActive ? 'rgba(245,158,11,0.1)' : 'rgba(52,211,153,0.1)'
-            }}
-          >
-            {isActive ? <IconPause size={13} /> : <IconPlay size={13} />}
-          </button>
-
-          <button
-            onClick={onEdit}
-            title="Modifier"
-            className="cursor-pointer"
-            style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: 'rgba(99,102,241,0.08)', color: '#818CF8',
-              border: '1px solid rgba(99,102,241,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.15s', cursor: 'pointer',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.16)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
-          >
-            <IconEdit size={13} />
-          </button>
-
-          <button
-            onClick={onDelete}
-            disabled={deleting}
-            title="Supprimer"
-            className="cursor-pointer"
-            style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: 'rgba(248,113,113,0.06)', color: 'rgba(248,113,113,0.7)',
-              border: '1px solid rgba(248,113,113,0.12)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.15s', opacity: deleting ? 0.5 : 1, cursor: 'pointer',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(248,113,113,0.14)'
-              e.currentTarget.style.color = '#F87171'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(248,113,113,0.06)'
-              e.currentTarget.style.color = 'rgba(248,113,113,0.7)'
-            }}
-          >
-            <IconTrash size={13} />
-          </button>
+        {/* Row 2: compact meta */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 14 }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0 }}>
+            {metaParts.map((part, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <span style={{ margin: '0 6px', opacity: 0.35 }}>·</span>}
+                <span>{part}</span>
+              </React.Fragment>
+            ))}
+            {!hasSegments && (
+              <button
+                onClick={e => { e.stopPropagation(); onOpenAddVideos() }}
+                title="Ajouter des vidéos"
+                className="cursor-pointer"
+                style={{
+                  marginLeft: 5, width: 16, height: 16, borderRadius: 4, border: 'none',
+                  background: 'rgba(99,102,241,0.14)', color: '#818CF8',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background 0.15s', flexShrink: 0,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.28)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.14)' }}
+              >
+                <IconPlus size={7} />
+              </button>
+            )}
+          </p>
         </div>
-      </div>
 
-      {/* Row 2: stats chips */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        {hasSegments ? (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            background: 'rgba(99,102,241,0.1)', color: '#818CF8',
-            border: '1px solid rgba(99,102,241,0.28)',
-            borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700,
-          }}>
-            <IconBolt size={11} color="#818CF8" />
-            {(task.segments ?? []).length} segment{(task.segments ?? []).length > 1 ? 's' : ''}
-          </span>
-        ) : (() => {
-          const story = task.task_type === 'story'
-          return (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: story ? 'rgba(236,72,153,0.1)' : 'rgba(99,102,241,0.1)',
-              color: story ? '#F472B6' : '#818CF8',
-              border: `1px solid ${story ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
-              borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700,
-            }}>
-              {story ? <IconLinkType size={11} /> : <IconVideo size={11} />}
-              {story ? 'Story' : 'Publication'}
-            </span>
-          )
-        })()}
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          background: 'rgba(255,255,255,0.04)', color: 'var(--muted)',
-          border: '1px solid rgba(255,255,255,0.055)', borderRadius: 6,
-          padding: '3px 10px', fontSize: 11,
-        }}>
-          <IconPhone size={11} color="rgba(233,234,240,0.6)" />
-          {task.phones.length} téléphone{task.phones.length > 1 ? 's' : ''}
-        </span>
-        {!hasSegments && (
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          background: 'rgba(255,255,255,0.04)', color: 'var(--muted)',
-          border: '1px solid rgba(255,255,255,0.055)', borderRadius: 6,
-          padding: '3px 6px 3px 10px', fontSize: 11,
-        }}>
-          <IconVideo size={11} color="rgba(233,234,240,0.6)" />
-          {task.videos.length} {task.task_type === 'story' ? 'image' : 'vidéo'}{task.videos.length > 1 ? 's' : ''}
-          <button
-            onClick={e => { e.stopPropagation(); onOpenAddVideos() }}
-            title="Ajouter des vidéos à la pool"
-            className="cursor-pointer"
-            style={{
-              width: 18, height: 18, borderRadius: 5, border: 'none',
-              background: 'rgba(99,102,241,0.15)', color: '#818CF8',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'background 0.15s', flexShrink: 0,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.3)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.15)' }}
-          >
-            <IconPlus size={8} />
-          </button>
-        </span>
-        )}
-        {!hasSegments && task.mode === 'random' && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            background: 'rgba(99,102,241,0.06)', color: '#818CF8',
-            border: '1px solid rgba(99,102,241,0.15)', borderRadius: 6,
-            padding: '3px 10px', fontSize: 11,
-          }}>
-            Aléatoire
-          </span>
-        )}
-        {!hasSegments && task.reels_trial && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            background: 'rgba(167,139,250,0.06)', color: '#a78bfa',
-            border: '1px solid rgba(167,139,250,0.18)', borderRadius: 6,
-            padding: '3px 10px', fontSize: 11,
-          }}>
-            Essai Reels
-          </span>
-        )}
-        {!hasSegments && task.auto_remove_videos && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            background: 'rgba(245,158,11,0.06)', color: '#F59E0B',
-            border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6,
-            padding: '3px 10px', fontSize: 11,
-          }}>
-            Usage unique
-          </span>
-        )}
-      </div>
+        {/* Separator */}
+        <div style={{ height: 1, background: 'rgba(233,234,240,0.05)', marginBottom: 12 }} />
 
       {hasSegments ? (
         /* Segment list — one mini-row per segment with its own timer */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {(task.segments ?? []).map(seg => {
             const story = seg.type === 'story'
             return (
               <div key={seg.id} style={{
                 display: 'flex', alignItems: 'center', gap: 8,
-                padding: '7px 10px', borderRadius: 8,
+                padding: '6px 10px', borderRadius: 8,
                 background: isActive ? 'rgba(99,102,241,0.04)' : 'rgba(255,255,255,0.02)',
                 border: `1px solid ${isActive ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.05)'}`,
               }}>
@@ -2935,39 +2830,25 @@ function TaskCard({
           })}
         </div>
       ) : (
-        /* Row 3: next run (legacy single-type task) */
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
-          padding: '8px 12px', borderRadius: 8,
-          background: isActive ? 'rgba(99,102,241,0.05)' : 'rgba(255,255,255,0.025)',
-          border: `1px solid ${isActive ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.05)'}`,
-        }}>
-          <IconClock size={12} color={isActive ? 'var(--accent-l)' : 'var(--muted)'} />
-          <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>Prochain post :</span>
+        /* Next run inline */
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <IconClock size={11} color={isActive ? 'var(--accent-l)' : 'var(--muted)'} />
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Prochain post</span>
           <span style={{
             fontSize: 12, fontWeight: 700,
             color: isActive ? 'var(--accent-l)' : 'var(--muted)',
             fontVariantNumeric: 'tabular-nums',
           }}>
-            {isActive ? formatCountdown(task.next_run_at) : 'En pause'}
+            {isActive ? formatCountdown(task.next_run_at) : '—'}
           </span>
+          {isActive && (
+            <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)' }}>
+              · {formatAbsolute(task.next_run_at)}
+            </span>
+          )}
         </div>
       )}
-
-      {/* Caption preview */}
-      {task.caption && (
-        <p style={{
-          margin: 0,
-          fontSize: 11.5, lineHeight: 1.6, color: 'var(--muted)',
-          fontStyle: 'italic',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-        }}>
-          "{task.caption.slice(0, 100)}{task.caption.length > 100 ? '…' : ''}"
-        </p>
-      )}
+      </div>
     </div>
   )
 }
@@ -2976,12 +2857,12 @@ function TaskCard({
 
 function TaskSkeleton() {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
       {[0, 1, 2, 3].map(i => (
         <div
           key={i}
           className="sf-skeleton"
-          style={{ height: 180, borderRadius: 14, opacity: 1 - i * 0.15 }}
+          style={{ height: 148, borderRadius: 14, opacity: 1 - i * 0.15 }}
         />
       ))}
     </div>
@@ -3033,66 +2914,6 @@ function EmptyState({ onNew }: { onNew: () => void }) {
         <IconPlus size={11} />
         Créer ma première tâche
       </button>
-    </div>
-  )
-}
-
-// ── KPI Stat Card ────────────────────────────────────────────────────────────
-
-function StatCard({
-  label, value, sub, accent, icon, pulse,
-}: {
-  label: string
-  value: string | number
-  sub?: string
-  accent: string
-  icon: React.ReactNode
-  pulse?: boolean
-}) {
-  return (
-    <div style={{
-      flex: '1 1 180px', minWidth: 160,
-      background: 'linear-gradient(135deg, rgba(17,17,32,0.9), rgba(12,12,21,0.9))',
-      border: '1px solid rgba(233,234,240,0.07)',
-      borderRadius: 14, padding: '16px 18px',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div style={{
-        position: 'absolute', top: -24, right: -24, width: 90, height: 90,
-        borderRadius: '50%', background: accent, opacity: 0.07,
-        filter: 'blur(18px)', pointerEvents: 'none',
-      }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{
-          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: `${accent}1a`, border: `1px solid ${accent}33`, color: accent,
-        }}>
-          {icon}
-        </span>
-        <span style={{
-          fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-          color: 'var(--muted)',
-        }}>
-          {label}
-        </span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{
-          fontSize: 26, fontWeight: 800, color: 'var(--ivory)', letterSpacing: '-0.03em',
-          fontVariantNumeric: 'tabular-nums', lineHeight: 1,
-        }}>
-          {value}
-        </span>
-        {pulse && (
-          <span style={{
-            width: 6, height: 6, borderRadius: '50%', background: accent,
-            boxShadow: `0 0 6px ${accent}`, display: 'inline-block',
-            animation: 'pulse 1.4s ease-in-out infinite',
-          }} />
-        )}
-      </div>
-      {sub && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--muted)' }}>{sub}</p>}
     </div>
   )
 }
@@ -3529,32 +3350,46 @@ export function Tasks({ user }: { user: User }) {
           </div>
         </div>
 
-        {/* ── KPI stat cards ──────────────────────────────────────────────── */}
-        <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
-          <StatCard
-            label="Actives" value={activeTasks.length}
-            accent="#34d399" pulse={activeTasks.length > 0}
-            sub={activeTasks.length > 0 ? 'en cours d\'exécution' : 'aucune active'}
-            icon={<IconBolt size={15} color="#34d399" />}
-          />
-          <StatCard
-            label="En pause" value={pausedTasks.length}
-            accent="#F59E0B"
-            sub={pausedTasks.length > 0 ? 'mises en pause' : '—'}
-            icon={<IconPause size={13} />}
-          />
-          <StatCard
-            label="Publications" value={totalRuns}
-            accent="#818CF8"
-            sub="exécutées avec succès"
-            icon={<IconCheck size={13} />}
-          />
-          <StatCard
-            label="Prochaine" value={nextRun ? formatCountdown(nextRun).replace('dans ', '') : '—'}
-            accent="#6366F1"
-            sub={nextRun ? formatAbsolute(nextRun) : 'aucune prévue'}
-            icon={<IconClock size={14} color="#6366F1" />}
-          />
+        {/* ── Stats inline bar ────────────────────────────────────────────── */}
+        <div className="sf-anim-slide-up sf-d150" style={{
+          display: 'flex', alignItems: 'center', gap: 0,
+          padding: '10px 16px', marginBottom: 20,
+          background: 'rgba(255,255,255,0.025)',
+          border: '1px solid rgba(233,234,240,0.06)',
+          borderRadius: 10, flexWrap: 'wrap',
+        }}>
+          {[
+            { label: 'actives', value: activeTasks.length, color: '#34d399', pulse: activeTasks.length > 0 },
+            { label: 'en pause', value: pausedTasks.length, color: '#F59E0B', pulse: false },
+            { label: 'publications', value: totalRuns, color: '#818CF8', pulse: false },
+          ].map((stat, i) => (
+            <React.Fragment key={stat.label}>
+              {i > 0 && <span style={{ width: 1, height: 18, background: 'rgba(233,234,240,0.08)', margin: '0 16px' }} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%', background: stat.color, flexShrink: 0,
+                  animation: stat.pulse ? 'pulse 1.6s ease-in-out infinite' : 'none',
+                  boxShadow: stat.pulse ? `0 0 6px ${stat.color}` : 'none',
+                }} />
+                <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ivory)', fontVariantNumeric: 'tabular-nums' }}>
+                  {stat.value}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{stat.label}</span>
+              </div>
+            </React.Fragment>
+          ))}
+          {nextRun && (
+            <>
+              <span style={{ width: 1, height: 18, background: 'rgba(233,234,240,0.08)', margin: '0 16px' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <IconClock size={12} color="#6366F1" />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>Prochaine</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-l)', fontVariantNumeric: 'tabular-nums' }}>
+                  {formatCountdown(nextRun).replace('dans ', '')}
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Tabs ────────────────────────────────────────────────────────── */}
@@ -3621,7 +3456,7 @@ export function Tasks({ user }: { user: User }) {
               onNew={() => { setEditTask(null); setShowCreate(true) }}
             />
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
               {tasks.map(task => (
                 <TaskCard
                   key={task.id}
