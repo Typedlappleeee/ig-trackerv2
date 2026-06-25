@@ -149,6 +149,54 @@ Deno.serve(async (req) => {
   const fnStart = Date.now()
   const summary: Record<string, string> = {}
 
+  // Résout le bearer GeeLark d'un (org_id, user_id) avec cache mémoire.
+  const _bearerCache = new Map<string, string>()
+  async function resolveBearer(orgId: string | null, userId: string | null): Promise<string> {
+    const key = `${orgId ?? ''}|${userId ?? ''}`
+    if (_bearerCache.has(key)) return _bearerCache.get(key)!
+    let bearer = ''
+    if (orgId) {
+      const { data } = await db.from('org_config').select('bearer_token').eq('org_id', orgId).maybeSingle()
+      bearer = data?.bearer_token ?? ''
+    }
+    if (!bearer && userId) {
+      const { data } = await db.from('app_config').select('bearer_token').eq('user_id', userId).maybeSingle()
+      bearer = data?.bearer_token ?? ''
+    }
+    _bearerCache.set(key, bearer)
+    return bearer
+  }
+
+  // ── 0. WATCHDOG ANTI-COÛT ───────────────────────────────────────────────────
+  // Éteint tout téléphone démarré par l'AUTOMATION (inscrit dans phone_power_watch)
+  // dont l'heure-limite stop_at est dépassée — même si l'app cliente est fermée.
+  // Les téléphones démarrés à la main ne sont jamais inscrits → jamais touchés.
+  try {
+    let dueWatch = db.from('phone_power_watch').select('geelark_id, org_id, user_id, stop_at').lt('stop_at', nowIso).limit(300)
+    if (filterUserId) dueWatch = dueWatch.eq('user_id', filterUserId)
+    const { data: due } = await dueWatch
+    if (due && due.length > 0) {
+      // Regroupe par bearer pour minimiser les appels /phone/stop
+      const byBearer = new Map<string, string[]>()
+      for (const row of due) {
+        const bearer = await resolveBearer(row.org_id, row.user_id)
+        if (!bearer) continue
+        if (!byBearer.has(bearer)) byBearer.set(bearer, [])
+        byBearer.get(bearer)!.push(row.geelark_id)
+      }
+      let stopped = 0
+      for (const [bearer, ids] of byBearer) {
+        await gPost(bearer, '/phone/stop', { ids }).catch(() => {})
+        stopped += ids.length
+      }
+      // Purge les lignes traitées (qu'on ait pu résoudre le bearer ou non)
+      await db.from('phone_power_watch').delete().in('geelark_id', due.map(r => r.geelark_id))
+      summary['watchdog'] = `éteint ${stopped} téléphone(s) en dépassement (5 min)`
+    }
+  } catch (err) {
+    summary['watchdog'] = `error: ${err instanceof Error ? err.message : String(err)}`
+  }
+
   // 1. Auto-heal : posts "running" trop vieux (> 30 min).
   // Avant de marquer "failed", on RE-INTERROGE GeeLark avec les task_ids persistés :
   // l'invocation qui a lancé le post a souvent été tuée (budget serverless) AVANT de
@@ -368,14 +416,19 @@ Deno.serve(async (req) => {
   //   - Premier jour (credits_charged_date IS NULL) : 50 crédits/jour + N téléphones × 2
   //   - Jours suivants : N téléphones × 2 (les 50/jour sont débités à minuit par l'étape 0-daily)
   try {
-    let dueTasksQuery = db.from('recurring_tasks')
-      .select('*')
+    // Claim atomique : on met à jour next_run_at en MÊME TEMPS qu'on lit les tâches dues.
+    // Si deux instances du cron tournent en parallèle, seule la première voit les lignes
+    // (la seconde trouve next_run_at déjà mis à jour au-delà de now → aucune ligne).
+    // Cela empêche la double exécution et le double démarrage des téléphones.
+    const tempNextRun = new Date(Date.now() + 999 * 60 * 60 * 1000).toISOString() // +999h sentinel
+    let claimQuery = db.from('recurring_tasks')
+      .update({ next_run_at: tempNextRun })
       .eq('status', 'active')
       .lte('next_run_at', nowIso)
-      .order('next_run_at', { ascending: true })
+      .select('*')
       .limit(5)
-    if (filterUserId) dueTasksQuery = dueTasksQuery.eq('user_id', filterUserId)
-    const { data: dueTasks } = await dueTasksQuery
+    if (filterUserId) claimQuery = claimQuery.eq('user_id', filterUserId)
+    const { data: dueTasks } = await claimQuery
 
     for (const task of dueTasks ?? []) {
       const phones: unknown[] = typeof task.phones === 'string' ? JSON.parse(task.phones) : (task.phones ?? [])
@@ -406,6 +459,7 @@ Deno.serve(async (req) => {
       }
 
       const recurHours = Number(task.recur_hours) || 24
+      // nextRun remplace le sentinel posé par le claim atomique ci-dessus.
       const nextRun = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
 
       // Tâches multi-étapes (steps) vs legacy (flat fields)
@@ -476,12 +530,13 @@ Deno.serve(async (req) => {
   }
 
   // 2. Posts dus — UNIQUEMENT ceux issus de tâches récurrentes (task_id NOT NULL).
-  // Les posts manuels (Programmation tab, task_id IS NULL) sont exécutés côté client
+  // Les posts manuels (Programmation tab, task_id IS NULL) sont exécutés côté client.
   // type='story' exclu : stories passent par automation UI (~2 min/tel) côté app.
   let duePostsQuery = db.from('scheduled_posts')
     .select('*')
     .eq('status', 'pending')
     .neq('type', 'story')
+    .not('task_id', 'is', null)
     .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(2)
@@ -600,6 +655,11 @@ Deno.serve(async (req) => {
       // delay=0 → 5 min (posting takes <3 min) ; delay>0 → 15 min après la dernière tâche
       const safetyBuffer = delayMin === 0 ? 5 * 60_000 : 15 * 60_000
       const safetyStopAt = new Date(Date.now() + safetyOffsetMs + safetyBuffer).toISOString()
+      // Watchdog unifié : inscrit aussi ces téléphones (démarrés par le serveur).
+      await db.from('phone_power_watch').upsert(
+        geelarkIds.map(id => ({ geelark_id: id, org_id: post.org_id, user_id: post.user_id, reason: 'server_post', stop_at: safetyStopAt })),
+        { onConflict: 'geelark_id' },
+      ).then(() => {}, () => {})
       const safetyUpd = await db.from('scheduled_posts').update({
         result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds },
         stop_phones_at: safetyStopAt, stop_phone_ids: geelarkIds,
@@ -724,6 +784,7 @@ Deno.serve(async (req) => {
       .select('*')
       .eq('status', 'pending')
       .eq('type', 'story')
+      .not('task_id', 'is', null)
       .lte('scheduled_at', nowIso)
       .order('scheduled_at', { ascending: true })
       .limit(3)
@@ -792,6 +853,11 @@ Deno.serve(async (req) => {
             : undefined
 
           log(`▶ [serveur] Story ${name}…`)
+          // Watchdog : si l'invocation meurt avant le finally, le phone est éteint après 5 min.
+          await db.from('phone_power_watch').upsert(
+            [{ geelark_id: phone.geelark_id, org_id: post.org_id, user_id: post.user_id, reason: 'server_story', stop_at: new Date(Date.now() + 5 * 60_000).toISOString() }],
+            { onConflict: 'geelark_id' },
+          ).then(() => {}, () => {})
           try {
             const res = await postStoryServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText }, m => log(`  ${name}: ${m}`))
             if (res.ok) log(`✅ ${name} — story publiée`)
@@ -800,6 +866,7 @@ Deno.serve(async (req) => {
             log(`❌ ${name} : ${e instanceof Error ? e.message : String(e)}`)
           } finally {
             await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] }).catch(() => {})
+            await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
           }
           doneSet.add(phone.geelark_id)
           processedThisRun++

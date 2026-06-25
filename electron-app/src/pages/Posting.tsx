@@ -21,7 +21,7 @@ import { startCreditRun } from '@/lib/withCredits'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ACCENT_L, OK, ERR, WARN } from '@/lib/theme'
 import { useToast } from '@/components/Toast'
-import { forceInstagramEnglish } from '@/lib/geelark'
+import { registerStartedPhones } from '@/lib/phoneWatch'
 
 interface PostingProps { user: User }
 
@@ -438,6 +438,8 @@ export function Posting({ user }: PostingProps) {
       activePhonesRef.current = [...geelarkIds]
       const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
       log(`  ${started} started`, started > 0 ? 'ok' : 'warn')
+      // Filet de sécurité serveur : watchdog éteint ces téléphones après 5 min si l'app ferme.
+      registerStartedPhones(geelarkIds, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'posting' })
       setProgress(35)
 
       log('⏳ Attente 30s (boot)…')
@@ -464,7 +466,6 @@ export function Posting({ user }: PostingProps) {
       for (let pi = 0; pi < phoneList.length; pi++) {
         const phone = phoneList[pi]
         if (stopRef.current) { markPhoneFailed(phone, 'Stoppé'); continue }
-        await forceInstagramEnglish(bearer, phone.geelark_id)
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
           scheduleAt:  scheduleTimes[pi],

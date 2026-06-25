@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { registerStartedPhones } from './phoneWatch'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -330,6 +331,11 @@ async function executeScheduledPostInner(
       stop_phones_at: new Date(Date.now() + safetyOffsetMs).toISOString(),
       stop_phone_ids: geelarkIds,
     }).eq('id', post.id).then(() => {}, () => {}) // fire-and-forget
+    // Garde-fou watchdog : inscrit ces téléphones (démarrés par l'automation) avec
+    // la même heure-limite que le filet stop_phones_at.
+    registerStartedPhones(geelarkIds, { orgId: post.org_id ?? null, userId: post.user_id }, {
+      stopAt: new Date(Date.now() + safetyOffsetMs), reason: 'scheduler',
+    })
 
     // 2. Wait for boot
     onLog('⏳ Boot téléphones (30s)…')
@@ -349,8 +355,6 @@ async function executeScheduledPostInner(
       const videoIdx = mode === 'random'
         ? Math.floor(Math.random() * videos.length)
         : i % videos.length
-      const { forceInstagramEnglish } = await import('./geelark')
-      await forceInstagramEnglish(bearer, phone.geelark_id)
       const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
         id:          phone.geelark_id,
         scheduleAt:  Math.floor(Date.now() / 1000),

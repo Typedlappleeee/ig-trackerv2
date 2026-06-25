@@ -1,6 +1,16 @@
+import { registerStartedPhonesAuto } from './phoneWatch'
+
 const BASE = 'https://openapi.geelark.com/open/v1'
 
 // Raw phone shape returned by GéeLark API
+export interface GeelarkProxy {
+  type?:     string  // socks5 | http | https
+  server?:   string
+  port?:     number
+  username?: string
+  password?: string
+}
+
 export interface GeelarkPhone {
   id:          string
   serialNo?:   string | null
@@ -10,6 +20,18 @@ export interface GeelarkPhone {
   groupName?:  string | null
   status:      number  // 0=running, 1=stopped, 2=starting, 3=stopping
   remark?:     string | null
+  proxy?:      GeelarkProxy | null  // proxy assigné au téléphone (renvoyé par /phone/list)
+}
+
+// Récupère le proxy de chaque téléphone (mappé par geelark_id) via /phone/list.
+// Utilisé par le scanner : la requête IG d'un compte passe par SON proxy.
+export async function fetchPhoneProxies(bearer: string): Promise<Map<string, GeelarkProxy>> {
+  const phones = await fetchAllPhones(bearer)
+  const m = new Map<string, GeelarkProxy>()
+  for (const p of phones) {
+    if (p.proxy && p.proxy.server) m.set(p.id, p.proxy)
+  }
+  return m
 }
 
 function authHeaders(bearer: string) {
@@ -152,8 +174,12 @@ async function shellExec(
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
-// Ensure the cloud phone is running. Mirrors MassPosting's approach:
-// always send /phone/start then wait 30s flat (polling status is unreliable).
+// ⚠️ NE PAS appeler juste avant un RPA instagramPubReels.
+// `cmd locale set-app-locales` redémarre le process Instagram sur les téléphones
+// Android 13+ où la commande prend effet → l'RPA démarre sur une app en plein
+// redémarrage et échoue (posting OK sur certains comptes, KO sur d'autres).
+// Historique : ajoutée/revert plusieurs fois car « broke phones ». Conservée
+// uniquement pour un usage hors chemin de posting (ex: setup manuel).
 export async function forceInstagramEnglish(bearer: string, phoneId: string): Promise<void> {
   try {
     await shellExec(bearer, phoneId,
@@ -188,6 +214,9 @@ async function ensurePhoneRunning(
   // Always send start command (GéeLark no-ops if already running)
   log?.('📱 Envoi commande de démarrage…')
   const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
+  // Filet anti-coût : inscrit ce téléphone (démarré par l'automation) pour que le
+  // watchdog serveur l'éteigne après 5 min si l'app se ferme avant l'auto-stop.
+  registerStartedPhonesAuto([phoneId], { reason: 'ensurePhoneRunning' }).catch(() => {})
   const code    = Number(startRes['code'] ?? -1)
   const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
   const failed  = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
@@ -262,6 +291,18 @@ async function warmupShellDelay(
 // Reply to an Instagram comment by driving the cloud phone via shell commands.
 // Auto-starts the phone if needed.
 export async function replyToIgCommentViaPhone(
+  bearer: string,
+  phoneId: string,
+  shortcode: string,
+  username: string,
+  replyText: string,
+  log?: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log ?? (() => {}),
+    () => _replyToIgCommentViaPhoneInner(bearer, phoneId, shortcode, username, replyText, log))
+}
+
+async function _replyToIgCommentViaPhoneInner(
   bearer: string,
   phoneId: string,
   shortcode: string,
@@ -522,6 +563,16 @@ async function saveFieldAndBack(
 }
 
 export async function updateInstagramProfile(
+  bearer: string,
+  phoneId: string,
+  config: MassEditConfig,
+  log: (m: string) => void,
+) {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _updateInstagramProfileInner(bearer, phoneId, config, log))
+}
+
+async function _updateInstagramProfileInner(
   bearer: string,
   phoneId: string,
   config: MassEditConfig,
@@ -846,23 +897,35 @@ export interface StoryConfig {
   dryRun?:  boolean           // run every step but stop right before publishing
 }
 
+// Wrap any phone operation with an auto-stop safety timer.
+// The phone is stopped after `ms` milliseconds regardless of what happens.
+async function withPhoneAutoStop<T>(
+  bearer: string,
+  phoneId: string,
+  ms: number,
+  label: string,
+  log: (m: string) => void,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const timer = setTimeout(() => {
+    log(`⏱ Timeout ${label} — arrêt automatique du téléphone`)
+    stopPhone(bearer, phoneId).catch(() => {})
+  }, ms)
+  try {
+    return await fn()
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function postInstagramStory(
   bearer: string,
   phoneId: string,
   config: StoryConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
-  // Safety auto-stop: stop the phone after 3 minutes regardless of outcome
-  const autoStopTimer = setTimeout(() => {
-    log('⏱ Timeout 3min — arrêt automatique du téléphone')
-    stopPhone(bearer, phoneId).catch(() => {})
-  }, 3 * 60 * 1000)
-
-  try {
-    return await _postInstagramStoryInner(bearer, phoneId, config, log)
-  } finally {
-    clearTimeout(autoStopTimer)
-  }
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _postInstagramStoryInner(bearer, phoneId, config, log))
 }
 
 async function _postInstagramStoryInner(
@@ -1032,8 +1095,8 @@ async function _postInstagramStoryInner(
   const pushData = compressed ?? imgBase64
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
 
-  log(`   📤 Push image 9:16 (${Math.round(pushData.length / 1024)} KB)…`)
-  let sz = 0
+  // Push image via base64 chunks (cross-network, no CDN dependency).
+  log(`   📤 Push image (${Math.round(pushData.length / 1024)} KB)…`)
   const CHUNK = 3000, BATCH = 20
   const chunks: string[] = []
   for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
@@ -1047,9 +1110,8 @@ async function _postInstagramStoryInner(
   await shellExec(bearer, phoneId,
     `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
   const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-  sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+  const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
   log(`   📎 Fichier: ${sz} octets`)
-
   if (sz < 2000) {
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
   }
@@ -1593,6 +1655,19 @@ export async function loginInstagramAccount(
   abortSignal: { abort: boolean },
   totpSecret?: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _loginInstagramAccountInner(bearer, phoneId, email, password, log, abortSignal, totpSecret))
+}
+
+async function _loginInstagramAccountInner(
+  bearer: string,
+  phoneId: string,
+  email: string,
+  password: string,
+  log: (m: string) => void,
+  abortSignal: { abort: boolean },
+  totpSecret?: string,
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
@@ -1942,6 +2017,19 @@ export async function loginInstagramAccount(
 
 // ── Main entry point ─────────────────────────────────────────────────────────
 export async function warmupAccount(
+  bearer: string,
+  phoneId: string,
+  config: WarmupConfig,
+  log: (m: string) => void,
+  abortSignal: { abort: boolean },
+): Promise<{ ok: boolean; error?: string }> {
+  // Auto-stop: browse duration + 3 min safety margin
+  const warmupMs = (config.browseMinutes * 60 + 3 * 60) * 1000
+  return withPhoneAutoStop(bearer, phoneId, warmupMs, `${config.browseMinutes + 3}min`, log,
+    () => _warmupAccountInner(bearer, phoneId, config, log, abortSignal))
+}
+
+async function _warmupAccountInner(
   bearer: string,
   phoneId: string,
   config: WarmupConfig,
@@ -2584,6 +2672,17 @@ export interface TikTokPostConfig {
 }
 
 export async function postTikTokVideoAdb(
+  bearer: string,
+  phoneId: string,
+  config: TikTokPostConfig,
+  log: (m: string) => void,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _postTikTokVideoAdbInner(bearer, phoneId, config, log, signal))
+}
+
+async function _postTikTokVideoAdbInner(
   bearer: string,
   phoneId: string,
   config: TikTokPostConfig,

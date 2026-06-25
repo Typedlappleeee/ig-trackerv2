@@ -15,7 +15,37 @@ function getSupabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-const SV = '[SERVER-v3]'
+const SV = '[SERVER-v4]'
+
+// Network errors ("fetch failed") are usually transient — DNS hiccup, connection
+// reset, TLS, or a momentary timeout. Retrying with backoff absorbs most of them.
+// Each attempt has its own AbortController timeout so a stalled socket fails fast
+// instead of eating the whole 60s budget.
+async function fetchRetry(label, url, init = {}, { tries = 3, timeoutMs = 25000 } = {}) {
+  let lastErr
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal })
+      clearTimeout(timer)
+      return res
+    } catch (err) {
+      clearTimeout(timer)
+      lastErr = err
+      // Surface the real reason: undici hides it in err.cause.code (ECONNRESET,
+      // ETIMEDOUT, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT…) or it's an abort timeout.
+      const cause = err?.cause?.code || err?.cause?.message || (ctrl.signal.aborted ? 'TIMEOUT' : '')
+      console.warn(`${SV} [${label}] tentative ${attempt}/${tries} échouée: ${err?.message ?? err}${cause ? ` (cause=${cause})` : ''}`)
+      if (attempt < tries) await new Promise(r => setTimeout(r, attempt * 1500))
+    }
+  }
+  // Re-throw with a label + cause so the caller's catch produces a useful message.
+  const cause = lastErr?.cause?.code || lastErr?.cause?.message || ''
+  const e = new Error(`[${label}] ${lastErr?.message ?? 'fetch failed'}${cause ? ` (cause=${cause})` : ''}`)
+  e._labelled = true
+  throw e
+}
 
 module.exports = async (req, res) => {
   try {
@@ -37,7 +67,7 @@ module.exports = async (req, res) => {
     if (signedUrl) {
       // Direct fetch — no admin key needed (signed URL already contains auth token)
       console.log(`${SV} [SV-A] fetch signedUrl (${String(signedUrl).slice(0, 80)})`)
-      const dlRes = await fetch(signedUrl)
+      const dlRes = await fetchRetry('SV-A:download', signedUrl, {}, { tries: 3, timeoutMs: 30000 })
       if (!dlRes.ok) {
         return res.status(200).json({ ok: false, error: `${SV}[SV-E002] Fetch vidéo échoué: ${dlRes.status}` })
       }
@@ -54,11 +84,11 @@ module.exports = async (req, res) => {
       bytes = Buffer.from(await blob.arrayBuffer())
     }
 
-    const glUrlRes = await fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
+    const glUrlRes = await fetchRetry('SV-C:getUrl', 'https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
       body: JSON.stringify({ fileType: 'mp4' }),
-    })
+    }, { tries: 3, timeoutMs: 20000 })
     if (!glUrlRes.ok) {
       return res.status(200).json({ ok: false, error: `${SV}[SV-E004a] GéeLark URL HTTP: ${glUrlRes.status}` })
     }
@@ -73,9 +103,9 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: false, error: `${SV}[SV-E005] No uploadUrl/resourceUrl. Keys: ${Object.keys(d).join(',')}` })
     }
 
-    let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes })
+    let putRes = await fetchRetry('SV-D:put', uploadUrl, { method: 'PUT', body: bytes }, { tries: 3, timeoutMs: 45000 })
     if (!putRes.ok) {
-      putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes })
+      putRes = await fetchRetry('SV-D:put2', uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes }, { tries: 2, timeoutMs: 45000 })
       if (!putRes.ok) {
         const errBody = await putRes.text().catch(() => '')
         return res.status(200).json({ ok: false, error: `${SV}[SV-E006] S3 PUT failed: ${putRes.status} — ${errBody.slice(0, 200)}` })

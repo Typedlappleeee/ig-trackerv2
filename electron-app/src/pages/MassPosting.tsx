@@ -8,7 +8,8 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, forceInstagramEnglish } from '@/lib/geelark'
+import { takeScreenshot } from '@/lib/geelark'
+import { registerStartedPhones, unregisterPhones } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
@@ -612,6 +613,9 @@ export function MassPosting({ user }: MassPostingProps) {
       const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
       const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
       log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
+      // Filet de sécurité serveur : si ScaleFlow se ferme, le watchdog éteint ces
+      // téléphones après 5 min (ils ont été démarrés par l'automation, pas à la main).
+      registerStartedPhones(geelarkIds, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
 
       // Aucun téléphone démarré → inutile de continuer : abort + refund total
       if (started === 0) {
@@ -649,7 +653,6 @@ export function MassPosting({ user }: MassPostingProps) {
         }
         setPhoneStatus(asgn.phone.id, { status: 'posting' })
         postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
-        await forceInstagramEnglish(bearer, asgn.phone.geelark_id)
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          asgn.phone.geelark_id,
           scheduleAt:  scheduleTimes[ai],
@@ -670,6 +673,7 @@ export function MassPosting({ user }: MassPostingProps) {
               geelark(bearer, '/phone/stop', { ids: [asgn.phone.geelark_id] })
                 .then(() => log(`  ${asgn.phone.phone_name} — posting fini`, 'ok'))
                 .catch(() => {})
+              unregisterPhones([asgn.phone.geelark_id])
               setPhoneStatus(asgn.phone.id, { status: 'done' })
               activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
             }
@@ -780,6 +784,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 geelark(bearer, '/phone/stop', { ids: [phone.geelark_id] })
                   .then(() => log(`  ${phone.phone_name} éteint`, 'ok'))
                   .catch(e => log(`  extinction ${phone.phone_name}: ${e instanceof Error ? e.message : String(e)}`, 'warn'))
+                unregisterPhones([phone.geelark_id])
                 activePhonesRef.current = activePhonesRef.current.filter(id => id !== phone.geelark_id)
                 activeTasksRef.current  = activeTasksRef.current.filter(id => id !== tid)
               }

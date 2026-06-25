@@ -49,6 +49,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchInstagramBySession: (opts: { username: string; sessionid: string }) =>
     ipcRenderer.invoke('fetch-instagram-by-session', opts),
 
+  // Scanner : statut d'un compte IG (actif/banni/bloqué) via le proxy du téléphone
+  checkInstagramStatus: (opts: { username: string; proxy?: { type?: string; server?: string; port?: number; username?: string; password?: string } | null }) =>
+    ipcRenderer.invoke('check-instagram-status', opts),
+
   // Read a local video file as a data URL (fallback when localvideo:// fails)
   readLocalVideo: (filePath: string) => ipcRenderer.invoke('read-local-video', filePath),
 

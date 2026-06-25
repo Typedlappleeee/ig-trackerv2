@@ -8,6 +8,7 @@ import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
 import { OrgProvider, useOrg } from '@/lib/orgContext'
 import { useConnections }    from '@/lib/connections'
+import { setWatchScope }     from '@/lib/phoneWatch'
 import { playSplash, unlockAudio } from '@/lib/sounds'
 import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/lib/music'
 import { checkLicense, LicenseContext, type LicenseStatus } from '@/lib/license'
@@ -573,6 +574,7 @@ const History        = lazy(() => import('@/pages/History').then(m => ({ default
 const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazy(() => import('@/pages/StoryLink'))
+const AccountScanner = lazy(() => import('@/pages/AccountScanner').then(m => ({ default: m.AccountScanner })))
 const Subtitles      = lazy(() => import('@/pages/Subtitles').then(m => ({ default: m.Subtitles })))
 const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
@@ -586,6 +588,13 @@ const TOUR_KEY  = 'scaleflow-show-tour'
 function AppContent({ user }: { user: User }) {
   const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError, role, perms } = useOrg()
   const conns = useConnections(user)
+
+  // Scope du garde-fou anti-coût : permet aux fonctions bas-niveau (geelark.ts)
+  // d'inscrire les téléphones qu'elles démarrent pour le watchdog serveur.
+  useEffect(() => {
+    setWatchScope({ orgId: currentOrg?.id ?? null, userId: user.id })
+    return () => setWatchScope(null)
+  }, [currentOrg?.id, user.id])
   const [page, setPage]                     = useState<Page>('hub')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
@@ -840,6 +849,7 @@ function AppContent({ user }: { user: User }) {
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'tasks':        return <Tasks       user={user} />
       case 'storylink':    return <StoryLink   user={user} />
+      case 'scanner':      return <AccountScanner user={user} />
       case 'bank':         return <BankHub     user={user} initialTab="videos" />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />

@@ -37,7 +37,8 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
-import { postInstagramStory, stopPhone, forceInstagramEnglish } from '@/lib/geelark'
+import { postInstagramStory, stopPhone } from '@/lib/geelark'
+import { registerStartedPhones } from '@/lib/phoneWatch'
 import { pushNotification } from '@/lib/notificationStore'
 
 type TaskType = 'publication' | 'story'
@@ -389,9 +390,11 @@ async function executeUnit(
       // Démarrage groupé — UN seul appel /phone/start avec tous les IDs
       if (phonesWithLink.length > 0) {
         log(`▶ Démarrage de ${phonesWithLink.length} téléphone(s)…`)
-        const startRes = await glPost(bearer, '/phone/start', { ids: phonesWithLink.map(p => p.phone.geelark_id) })
+        const storyIds = phonesWithLink.map(p => p.phone.geelark_id)
+        const startRes = await glPost(bearer, '/phone/start', { ids: storyIds })
         const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
         log(`  ${started} démarré(s)`)
+        registerStartedPhones(storyIds, { orgId: task.org_id ?? null, userId: task.user_id }, { reason: 'task_story' })
         log('⏳ Attente 30s (boot)…')
         await new Promise(r => setTimeout(r, 30_000))
       }
@@ -470,6 +473,7 @@ async function executeUnit(
     const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
     const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
     log(`  ${started} démarré(s)`)
+    registerStartedPhones(phoneIds, { orgId: task.org_id ?? null, userId: task.user_id }, { reason: 'task_publication' })
     if (started === 0) {
       log('❌ Aucun téléphone démarré')
       log(`⏰ Prochain post dans ${recurHours}h`)
@@ -499,7 +503,6 @@ async function executeUnit(
       const useTrialReels = task.reels_trial && !trialUnsupported
       if (task.reels_trial && trialUnsupported)
         log(`⚠ Trial Reels désactivé pour ${name} (compte non éligible)`)
-      await forceInstagramEnglish(bearer, phone.geelark_id)
       const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
         id:          phone.geelark_id,
         scheduleAt:  baseTs + i * (unit.delay_minutes ?? 0) * 60,
