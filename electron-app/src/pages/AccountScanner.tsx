@@ -53,7 +53,13 @@ export function AccountScanner({ user }: AccountScannerProps) {
   const [phones, setPhones]   = useState<Phone[]>([])
   const [loading, setLoading] = useState(true)
   const [results, setResults] = useState<Record<string, ScanResult>>(() => {
-    try { return JSON.parse(localStorage.getItem(cacheKey) ?? '{}') } catch { return {} }
+    try {
+      const raw = JSON.parse(localStorage.getItem(cacheKey) ?? '{}') as Record<string, ScanResult>
+      const valid: Health[] = ['active', 'banned', 'recheck', 'unchecked']
+      // Sanitize: drop entries with invalid health (old cache schema)
+      Object.keys(raw).forEach(k => { if (!valid.includes(raw[k]?.health as Health)) delete raw[k] })
+      return raw
+    } catch { return {} }
   })
   const [lastScan, setLastScan] = useState<string | null>(() => localStorage.getItem(lastScanKey))
   const [scanning, setScanning] = useState(false)
@@ -302,7 +308,7 @@ function StatCard({ label, value, color, sub, onClick, active }: {
 }
 
 function AccountRowItem({ row, onClick }: { row: AccountRow; onClick: () => void }) {
-  const meta = HEALTH_META[row.result.health]
+  const meta = HEALTH_META[row.result.health] ?? HEALTH_META['unchecked']
   return (
     <div
       onClick={onClick}
