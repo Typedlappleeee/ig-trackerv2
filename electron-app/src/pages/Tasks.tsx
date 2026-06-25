@@ -377,13 +377,26 @@ async function executeUnit(
         return
       }
 
-      const results = await Promise.all(task.phones.map(async (phone, i) => {
-        const name = phone.ig_username ?? phone.phone_name
-        const link = (phone.link ?? '').trim()
-        if (!link) {
-          log(`❌ ${name} : aucun lien configuré`)
-          return false
-        }
+      // Pré-filtrer les téléphones valides (lien requis)
+      const validPhones = task.phones.map((phone, i) => ({
+        phone, i,
+        name: phone.ig_username ?? phone.phone_name,
+        link: (phone.link ?? '').trim(),
+      }))
+      validPhones.filter(p => !p.link).forEach(p => log(`❌ ${p.name} : aucun lien configuré`))
+      const phonesWithLink = validPhones.filter(p => p.link)
+
+      // Démarrage groupé — UN seul appel /phone/start avec tous les IDs
+      if (phonesWithLink.length > 0) {
+        log(`▶ Démarrage de ${phonesWithLink.length} téléphone(s)…`)
+        const startRes = await glPost(bearer, '/phone/start', { ids: phonesWithLink.map(p => p.phone.geelark_id) })
+        const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
+        log(`  ${started} démarré(s)`)
+        log('⏳ Attente 30s (boot)…')
+        await new Promise(r => setTimeout(r, 30_000))
+      }
+
+      const results = await Promise.all(phonesWithLink.map(async ({ phone, i, name, link }) => {
         const imageUrl = unit.mode === 'random'
           ? validImages[Math.floor(Math.random() * validImages.length)]
           : validImages[i % validImages.length]
