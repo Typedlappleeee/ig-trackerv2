@@ -1029,7 +1029,7 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     ...dtFilters,
   ].join(',')
 
-  const out = path.join(dir, `mixer-${Date.now()}.mp4`)
+  const out = path.join(dir, `mixer-${Date.now()}.mov`)
   const args = [
     '-nostdin', '-fflags', '+genpts', '-i', srcPath,
     '-map', '0:v:0', '-map', '0:a?',
@@ -1514,7 +1514,7 @@ ipcMain.handle('pick-output-file', async (_event, opts: { defaultName: string })
   const result = await dialog.showSaveDialog(win, {
     title: 'Enregistrer le montage',
     defaultPath: opts.defaultName,
-    filters: [{ name: 'Vidéo MP4', extensions: ['mp4'] }],
+    filters: [{ name: 'Vidéo MOV', extensions: ['mov'] }],
   })
   return result.canceled ? null : result.filePath
 })
@@ -2089,7 +2089,7 @@ ipcMain.handle('run-ffmpeg-subtitles', async (_event, opts: {
     ? `${scaleFilter},${drawtextChain}`
     : scaleFilter
 
-  const out = path.join(dir, `subs-${Date.now()}.mp4`)
+  const out = path.join(dir, `subs-${Date.now()}.mov`)
   const args = [
     '-nostdin', '-i', srcPath,
     '-vf', vf,
