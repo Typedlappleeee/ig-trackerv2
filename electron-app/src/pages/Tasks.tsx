@@ -1138,7 +1138,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
   const [submitting, setSubmitting]   = useState(false)
   const [progress, setProgress]       = useState('')
   const [error, setError]             = useState<string | null>(null)
-  const [sequenceMode, setSequenceMode] = useState(editTask ? (editTask.steps?.length ?? 0) > 0 : false)
+  const [sequenceMode, setSequenceMode] = useState(editTask ? ((editTask.steps?.length ?? 0) > 0 || (editTask.segments?.length ?? 0) > 0) : false)
   const [steps, setSteps]             = useState<TaskStep[]>(() => {
     if (editTask?.steps?.length) return editTask.steps
     return []
