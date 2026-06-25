@@ -303,7 +303,7 @@ export function Subtitles({ user }: SubtitlesProps) {
       const scope = currentOrg?.id
         ? { mode: 'org' as const, id: currentOrg.id }
         : { mode: 'user' as const, id: user.id }
-      const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, `${title}.mp4`, scope)
+      const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, `${title}.mov`, scope)
       const { error } = await supabase.from('content_bank').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
         title: `Sous-titres — ${title}`,
