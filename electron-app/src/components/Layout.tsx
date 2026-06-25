@@ -605,8 +605,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   const isVisibleTab = (id: Page): boolean => {
     if (id === 'licences' || id === 'tiktokposting') return effectiveSuperAdmin
-    // Scanner de comptes : réservé aux owner/admin (pas member/viewer)
-    if (id === 'scanner') return effectiveRole === 'owner' || effectiveRole === 'admin'
+    // Scanner + Tâches automatiques : réservés aux owner/admin (pas member/viewer)
+    if (id === 'scanner' || id === 'tasks') return effectiveRole === 'owner' || effectiveRole === 'admin'
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
     return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }
