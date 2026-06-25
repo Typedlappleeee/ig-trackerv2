@@ -55,7 +55,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 const LS_MODE = 'sf-mass-posting-mode'
 
 const STATUS_DOT: Record<string, string> = {
-  uploading: 'var(--info, #38BDF8)', posting: WARN, done: OK, error: ERR,
+  uploading: 'var(--info, #38BDF8)', posting: WARN, done: OK, error: ERR, cancelled: FAINT,
 }
 
 // Badge variant map for status
@@ -64,6 +64,7 @@ const STATUS_BADGE: Record<string, string> = {
   posting:   'sf-badge sf-badge-warn',
   done:      'sf-badge sf-badge-ok',
   error:     'sf-badge sf-badge-danger',
+  cancelled: 'sf-badge sf-badge-muted',
 }
 
 // Ligne de téléphone mémoïsée — la liste se re-render toutes les 10s pendant
@@ -158,6 +159,7 @@ export function MassPosting({ user }: MassPostingProps) {
     posting:   t('schedulerStatusInProgress'),
     done:      t('schedulerStatusDone'),
     error:     t('schedulerStatusFailed'),
+    cancelled: 'Annulé',
   }
   const { currentOrg, role, perms } = useOrg()
   const credits = useCredits()
@@ -423,12 +425,12 @@ export function MassPosting({ user }: MassPostingProps) {
     }
     activeTasksRef.current = []
     activePhonesRef.current = []
-    // Marque tous les téléphones sans statut final comme "done" (arrêt manuel)
+    // Marque tous les téléphones sans statut final comme "cancelled" (arrêt manuel)
     // — sinon ceux qui étaient en "uploading" restent bloqués indéfiniment.
     const current = getMassPostingState().taskStatuses
     for (const [phoneId, st] of current.entries()) {
       if (st.status !== 'done' && st.status !== 'error') {
-        setPhoneStatus(phoneId, { status: 'done' })
+        setPhoneStatus(phoneId, { status: 'cancelled' })
       }
     }
     log('Arrêté.', 'warn')
@@ -891,11 +893,12 @@ export function MassPosting({ user }: MassPostingProps) {
 
 
   // Live progress stats
-  const totalTasks = assignments.length
-  const doneTasks  = [...taskStatuses.values()].filter(s => s.status === 'done').length
-  const errorTasks = [...taskStatuses.values()].filter(s => s.status === 'error').length
-  const activeTasks = [...taskStatuses.values()].filter(s => s.status === 'uploading' || s.status === 'posting').length
-  const progressPct = totalTasks > 0 ? Math.round(((doneTasks + errorTasks) / totalTasks) * 100) : 0
+  const totalTasks     = assignments.length
+  const doneTasks      = [...taskStatuses.values()].filter(s => s.status === 'done').length
+  const errorTasks     = [...taskStatuses.values()].filter(s => s.status === 'error').length
+  const cancelledTasks = [...taskStatuses.values()].filter(s => s.status === 'cancelled').length
+  const activeTasks    = [...taskStatuses.values()].filter(s => s.status === 'uploading' || s.status === 'posting').length
+  const progressPct    = totalTasks > 0 ? Math.round(((doneTasks + errorTasks + cancelledTasks) / totalTasks) * 100) : 0
   const toast = useToast()
   const [lastRun, setLastRun] = useState<{ ok: number; err: number; total: number } | null>(null)
   const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0

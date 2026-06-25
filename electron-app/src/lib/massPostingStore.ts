@@ -10,7 +10,7 @@ export interface TaskLog {
 }
 
 export interface TaskStatus {
-  status:  'idle' | 'pending' | 'uploading' | 'posting' | 'done' | 'error'
+  status:  'idle' | 'pending' | 'uploading' | 'posting' | 'done' | 'error' | 'cancelled'
   taskId?: string
   detail?: string
 }
