@@ -1,4 +1,4 @@
-import { registerStartedPhonesAuto } from './phoneWatch'
+import { registerStartedPhonesAuto, unregisterPhones } from './phoneWatch'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -92,6 +92,10 @@ export async function stopPhone(bearer: string, phoneId: string): Promise<void> 
   try {
     await geelarkFetch('POST', '/phone/stop', { ids: [phoneId] }, bearer)
   } catch { /* ignore */ }
+  // Un arrêt propre doit TOUJOURS retirer le tel du watchdog serveur. Sinon la
+  // ligne phone_power_watch (stop_at = +5 min) survit et le cron éteint le tel en
+  // plein milieu du run SUIVANT → posting et story déconnent en alternance.
+  unregisterPhones([phoneId]).catch(() => {})
 }
 
 // Stop several phones in one call. Returns how many GéeLark reported stopped.
@@ -100,6 +104,8 @@ export async function stopPhones(bearer: string, phoneIds: string[]): Promise<nu
   const res = await geelarkFetch('POST', '/phone/stop', { ids: phoneIds }, bearer)
   const data = (res?.data ?? res) as Record<string, unknown>
   const success = Number((data?.successAmount ?? data?.successDetails ?? phoneIds.length))
+  // Idem : nettoie le watchdog pour ne pas tuer un run ultérieur sur ces tels.
+  unregisterPhones(phoneIds).catch(() => {})
   return Number.isFinite(success) ? success : phoneIds.length
 }
 
@@ -963,10 +969,29 @@ async function _postInstagramStoryInner(
     `-o -iname '*.gif' -o -iname '*.heic' -o -iname '*.mp4' -o -iname '*.mov' \\) ` +
     `-delete 2>/dev/null; ` +
     `rm -rf /sdcard/DCIM/Camera/* 2>/dev/null; true`)
-  // Rescan so the media store forgets the deleted files before we add the new one.
+  // Purge the MediaStore so IG's picker doesn't show "ghost" tiles for the files
+  // we just deleted. A directory MEDIA_SCANNER_SCAN_FILE does NOT remove entries
+  // of already-deleted files — it only indexes existing ones — so stale rows
+  // survive and render as black, non-selectable thumbnails. Delete the rows
+  // directly via the media content provider (GeeLark phones run rooted/system).
+  await shellExec(bearer, phoneId,
+    `content delete --uri content://media/external/images/media 2>/dev/null; ` +
+    `content delete --uri content://media/external/video/media 2>/dev/null; ` +
+    `content delete --uri content://media/external/file 2>/dev/null; true`)
+  // Then trigger a fresh volume scan so the now-empty gallery is reflected.
   await shellExec(bearer, phoneId,
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; ` +
     `am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard 2>/dev/null; true`)
+  // Grant Instagram FULL media access. Without this, Android 13/14 hands IG only
+  // partial "Selected photos" access, so a freshly-pushed file is invisible /
+  // non-selectable in the picker. Granting up-front avoids that and the fragile
+  // "Allow" popup tap. Unknown perms on older Android just no-op.
+  await shellExec(bearer, phoneId,
+    `pm grant com.instagram.android android.permission.READ_MEDIA_IMAGES 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_MEDIA_VIDEO 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_MEDIA_VISUAL_USER_SELECTED 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_EXTERNAL_STORAGE 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null; true`)
   await sleep(1500)
 
   // ── 1. Push image to phone gallery ────────────────────────────────────────
@@ -1093,24 +1118,56 @@ async function _postInstagramStoryInner(
   // Always push the 9:16-padded JPEG. Fall back to raw original only if both canvas methods failed.
   outExt = compressed ? 'jpg' : _imgExt
   const pushData = compressed ?? imgBase64
-  const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
+  let imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
+  let sz = 0
 
-  // Push image via base64 chunks (cross-network, no CDN dependency).
-  log(`   📤 Push image (${Math.round(pushData.length / 1024)} KB)…`)
-  const CHUNK = 3000, BATCH = 20
-  const chunks: string[] = []
-  for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
-  log(`   📦 ${chunks.length} chunks…`)
-  await shellExec(bearer, phoneId,
-    `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-  for (let b = 1; b < chunks.length; b += BATCH) {
-    const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-    await shellExec(bearer, phoneId, cmd)
+  // ── Primary transfer: let the PHONE download the image itself ───────────────
+  // Exactly like the posting flow (the phone pulls the file from a URL), instead
+  // of streaming hundreds of base64 chunks through the shell — which is slow and
+  // corruption-prone, the real cause of failed story uploads. The phone has
+  // internet and the Supabase signed URL is reachable, so curl/wget just works.
+  // Trade-off: this fetches the ORIGINAL image (no 9:16 padding); the padded
+  // base64 path below stays as the fallback when the URL isn't phone-reachable.
+  if (/^https?:\/\//i.test(config.imageUrl)) {
+    const dlPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
+    const urlEsc = config.imageUrl.replace(/'/g, `'\\''`)
+    log('   📤 Téléchargement direct par le téléphone…')
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera; ` +
+      `curl -L -s -o '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+      `wget -q -O '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+      `toybox wget -O '${dlPath}' '${urlEsc}' 2>/dev/null; true`)
+    const ckd = await shellExec(bearer, phoneId, `wc -c < '${dlPath}' 2>/dev/null || echo 0`)
+    const szd = parseInt(ckd.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    if (szd >= 2000) {
+      imgPath = dlPath
+      outExt = _imgExt
+      sz = szd
+      log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
+    } else {
+      log(`   ⚠️ Téléchargement direct échoué (${szd} o) — bascule sur base64…`)
+      await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
+    }
   }
-  await shellExec(bearer, phoneId,
-    `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
-  const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-  const sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+
+  // ── Fallback transfer: base64 chunks via shell (no phone-reachable URL) ──────
+  if (sz < 2000) {
+    log(`   📤 Push image base64 (${Math.round(pushData.length / 1024)} KB)…`)
+    const CHUNK = 3000, BATCH = 20
+    const chunks: string[] = []
+    for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
+    log(`   📦 ${chunks.length} chunks…`)
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+    for (let b = 1; b < chunks.length; b += BATCH) {
+      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+      await shellExec(bearer, phoneId, cmd)
+    }
+    await shellExec(bearer, phoneId,
+      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
+    const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+  }
   log(`   📎 Fichier: ${sz} octets`)
   if (sz < 2000) {
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }

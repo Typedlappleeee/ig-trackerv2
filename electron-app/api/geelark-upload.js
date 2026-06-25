@@ -72,7 +72,16 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: false, error: `${SV}[SV-E002] Fetch vidéo échoué: ${dlRes.status}` })
       }
       bytes = Buffer.from(await dlRes.arrayBuffer())
-      console.log(`${SV} [SV-A] fetch ok, ${bytes.length} bytes`)
+      console.log(`${SV} [SV-A] fetch ok, ${bytes.length} bytes, content-type=${dlRes.headers.get('content-type') ?? '?'}`)
+      // Garde-fou : une URL signée expirée renvoie souvent un petit corps d'erreur
+      // (JSON/XML) avec un statut 200. Sans ce contrôle, on uploaderait ces octets
+      // bidons chez GéeLark → token "vert" mais vidéo indécodable → galerie vide sur
+      // le téléphone. Une vraie vidéo fait toujours bien plus de 50 Ko.
+      const ct = (dlRes.headers.get('content-type') ?? '').toLowerCase()
+      if (bytes.length < 50_000 || ct.includes('json') || ct.includes('xml') || ct.includes('text/html')) {
+        const preview = bytes.slice(0, 200).toString('utf8').replace(/\s+/g, ' ')
+        return res.status(200).json({ ok: false, error: `${SV}[SV-E002b] Source vidéo invalide (${bytes.length} octets, type=${ct || '?'}) — URL signée probablement expirée. Aperçu: ${preview}` })
+      }
     } else {
       // storagePath — requires SUPABASE_SERVICE_ROLE_KEY
       console.log(`${SV} [SV-B] storagePath path, tentative admin client`)
