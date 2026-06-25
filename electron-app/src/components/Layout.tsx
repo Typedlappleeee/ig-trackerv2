@@ -55,7 +55,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'hub'
   | 'phones'
-  | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
+  | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink' | 'scanner'
   | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof'
   | 'community' | 'support'
   | 'settings' | 'licences'
@@ -95,6 +95,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', dev: true },
+      { id: 'scanner',     label: 'navScanner',      icon: '🛰️', isNew: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
   },
@@ -161,6 +162,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   scheduler:       'calendar',
   tasks:           'zap',
   storylink:       'send',
+  scanner:         'shield',
 
   bank:            'video',
   captionbank:     'chat',
@@ -603,6 +605,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   const isVisibleTab = (id: Page): boolean => {
     if (id === 'licences' || id === 'tiktokposting') return effectiveSuperAdmin
+    // Scanner de comptes : réservé aux owner/admin (pas member/viewer)
+    if (id === 'scanner') return effectiveRole === 'owner' || effectiveRole === 'admin'
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
     return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }
@@ -650,6 +654,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     scheduler:   t('pageScheduler'),
     tasks:       t('navTasks'),
     storylink:   t('navStoryLink'),
+    scanner:     t('navScanner'),
     bank:        t('pageBank'),
     captionbank: t('navCaptionBank'),
     aitools:     t('pageAiTools'),
