@@ -395,11 +395,14 @@ export function MassPosting({ user }: MassPostingProps) {
   }, [phoneList.map(p => p.id).join(','), selectedVideos.map(v => v.item.id).join(','), mode, randomSeed])
 
   async function stop() {
+    // Guard : un seul appel simultané, évite les "Stop requested" en boucle
+    // quand plusieurs timers auto-stop se déclenchent en même temps.
+    if (stopRef.current) return
     stopRef.current = true
-    // Clear les auto-stop de 5 min — sinon ils raniment des statuts après le stop
+    // Clear les auto-stop de 5 min — sinon ils re-déclenchent stop()
     autoStopTimersRef.current.forEach(id => clearTimeout(id))
     autoStopTimersRef.current = []
-    log('Stop requested — cancelling tasks and shutting down phones…', 'warn')
+    log('Stop — annulation des tâches et extinction des téléphones…', 'warn')
     const tasks = activeTasksRef.current
     const phones = activePhonesRef.current
     try {
@@ -420,6 +423,15 @@ export function MassPosting({ user }: MassPostingProps) {
     }
     activeTasksRef.current = []
     activePhonesRef.current = []
+    // Marque tous les téléphones sans statut final comme "done" (arrêt manuel)
+    // — sinon ceux qui étaient en "uploading" restent bloqués indéfiniment.
+    const current = getMassPostingState().taskStatuses
+    for (const [phoneId, st] of current.entries()) {
+      if (st.status !== 'done' && st.status !== 'error') {
+        setPhoneStatus(phoneId, { status: 'done' })
+      }
+    }
+    log('Arrêté.', 'warn')
   }
 
   async function generateCaption() {
