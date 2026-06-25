@@ -316,8 +316,8 @@ export default function StoryLink({ user }: { user: User }) {
   const [selected, setSelected]       = useState<Set<string>>(new Set())
 
   // ── Pool config (persisted) ───────────────────────────────────────────────
-  const [photoPool, setPhotoPool]     = useState<PoolPhoto[]>(loadPhotoPool)
-  const [textPool, setTextPool]       = useState<string[]>(loadTextPool)
+  const [photoPool, setPhotoPool]     = useState<PoolPhoto[]>([])
+  const [textPool, setTextPool]       = useState<string[]>([])
   const [distribution, setDistrib]    = useState<Distribution>(loadDistrib)
   const [phoneLinks, setPhoneLinks]   = useState<Record<string, string>>({})
 
