@@ -524,12 +524,13 @@ Deno.serve(async (req) => {
   }
 
   // 2. Posts dus — UNIQUEMENT ceux issus de tâches récurrentes (task_id NOT NULL).
-  // Les posts manuels (Programmation tab, task_id IS NULL) sont exécutés côté client
+  // Les posts manuels (Programmation tab, task_id IS NULL) sont exécutés côté client.
   // type='story' exclu : stories passent par automation UI (~2 min/tel) côté app.
   let duePostsQuery = db.from('scheduled_posts')
     .select('*')
     .eq('status', 'pending')
     .neq('type', 'story')
+    .not('task_id', 'is', null)
     .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(2)
@@ -777,6 +778,7 @@ Deno.serve(async (req) => {
       .select('*')
       .eq('status', 'pending')
       .eq('type', 'story')
+      .not('task_id', 'is', null)
       .lte('scheduled_at', nowIso)
       .order('scheduled_at', { ascending: true })
       .limit(3)
