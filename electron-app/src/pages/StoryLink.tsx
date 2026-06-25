@@ -364,23 +364,40 @@ export default function StoryLink({ user }: { user: User }) {
       setGroups(['Tous', ...grps])
       if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
       // Prefer DB link column (set from Phones tab) over localStorage fallback.
-      const { data: dbPhones } = await supabase.from('phones').select('geelark_id,link').in(
+      const { data: dbPhones } = await supabase.from('phones').select('id,geelark_id,link').in(
         'geelark_id', list.map(p => p.id),
       )
-      const dbLinkMap = new Map(
-        (dbPhones ?? []).map(r => [r.geelark_id as string, (r.link as string | null) ?? ''])
+      // Map: geelark_id → { link, supabase_uuid }
+      const dbInfoMap = new Map(
+        (dbPhones ?? []).map(r => [
+          r.geelark_id as string,
+          { link: (r.link as string | null) ?? '', uuid: r.id as string },
+        ])
       )
+      const toBackfill: { geelark_id: string; link: string }[] = []
       setPhoneLinks(prev => {
         const n = { ...prev }
         list.forEach(p => {
           if (n[p.id] === undefined) {
-            const dbVal = dbLinkMap.get(p.id)
-            const v = dbVal || loadPhoneLink(p.id)
-            if (v) n[p.id] = v
+            const info = dbInfoMap.get(p.id)
+            // Try: DB link → localStorage by geelark_id → localStorage by supabase uuid (Phones tab key)
+            const v = info?.link
+              || loadPhoneLink(p.id)
+              || (info?.uuid ? localStorage.getItem(`sf-story-link-${info.uuid}`) ?? '' : '')
+            if (v) {
+              n[p.id] = v
+              // If found only in localStorage but not yet in DB, backfill
+              if (!info?.link) toBackfill.push({ geelark_id: p.id, link: v })
+            }
           }
         })
         return n
       })
+      // Persist localStorage-only links to DB so future loads are reliable
+      for (const { geelark_id, link } of toBackfill) {
+        supabase.from('phones').update({ link }).eq('geelark_id', geelark_id)
+          .then(() => {}, () => {})
+      }
     } catch (_) { /* ignore */ }
     setLoading(false)
   }
