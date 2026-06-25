@@ -574,7 +574,6 @@ const History        = lazy(() => import('@/pages/History').then(m => ({ default
 const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazy(() => import('@/pages/StoryLink'))
-const AccountScanner = lazy(() => import('@/pages/AccountScanner').then(m => ({ default: m.AccountScanner })))
 const Subtitles      = lazy(() => import('@/pages/Subtitles').then(m => ({ default: m.Subtitles })))
 const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
@@ -849,7 +848,6 @@ function AppContent({ user }: { user: User }) {
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'tasks':        return <Tasks       user={user} />
       case 'storylink':    return <StoryLink   user={user} />
-      case 'scanner':      return <AccountScanner user={user} />
       case 'bank':         return <BankHub     user={user} initialTab="videos" />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
