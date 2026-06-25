@@ -493,6 +493,18 @@ export default function StoryLink({ user }: { user: User }) {
     const okCount = counts.reduce<number>((s, n) => s + n, 0)
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
+
+    // Reset après un run réussi : vide pool photos, textes et sélection téléphones
+    if (okCount > 0) {
+      setTimeout(() => {
+        setPhotoPool([])
+        savePhotoPool([])
+        setTextPool([])
+        saveTextPool([])
+        setSelected(new Set())
+        setJobs([])
+      }, 3000)
+    }
   }
 
   // ── Schedule ──────────────────────────────────────────────────────────────
