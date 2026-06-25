@@ -470,14 +470,19 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   // Resolve the upload path for a selected video.
-  // Priority: localPath → file_url (signed URL from BankPicker) → fresh signed URL from storage_path
+  // Priority: localPath → FRESH signed URL from storage_path → file_url (legacy fallback).
+  // We re-sign from storage_path FIRST (like the server flow) because sv.item.file_url
+  // is a URL stored in the DB that may be expired; an expired URL can return a small
+  // error body with HTTP 200, which the GéeLark upload then accepts as a "video" →
+  // GéeLark can't decode it → the phone's gallery is empty when the RPA opens Instagram.
   async function resolveVideoPath(sv: SelectedVideo): Promise<string | null> {
     if (sv.localPath) return sv.localPath
-    if (sv.item.file_url) return sv.item.file_url
     if (sv.item.storage_path) {
       const { getSignedUrl } = await import('@/lib/storage')
-      return getSignedUrl(sv.item.storage_path).catch(() => null)
+      const fresh = await getSignedUrl(sv.item.storage_path).catch(() => null)
+      if (fresh) return fresh
     }
+    if (sv.item.file_url) return sv.item.file_url
     return null
   }
 
@@ -607,6 +612,11 @@ export function MassPosting({ user }: MassPostingProps) {
           log(`Vidéo ${vi + 1} sans source — ignorée`, 'warn')
           continue
         }
+        // Diagnostic : d'où vient la vidéo (URL signée Supabase, blob local…)
+        const srcKind = /^https?:/.test(fileSource)
+          ? (fileSource.includes('supabase') ? 'URL signée Supabase' : 'URL https')
+          : fileSource.startsWith('blob:') ? 'blob local' : 'chemin local'
+        log(`Vidéo ${vi + 1} : source = ${srcKind}`, 'info')
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
         if (!up.ok || !up.token) {
           log(`Upload échoué (${sv.item.title}): ${up.error}`, 'error')
@@ -617,7 +627,9 @@ export function MassPosting({ user }: MassPostingProps) {
         }
 
         tokenMap.set(vi, up.token)
-        log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
+        // Diagnostic : le token DOIT être une resourceUrl GéeLark (http…), pas autre chose.
+        const tokenKind = /^https?:/.test(up.token) ? 'resourceUrl GéeLark ✓' : `inattendu: ${up.token.slice(0, 24)}`
+        log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…) — token: ${tokenKind}`, 'ok')
       }
 
       // ── Step 2: start phones ──────────────────────────────────────────────
