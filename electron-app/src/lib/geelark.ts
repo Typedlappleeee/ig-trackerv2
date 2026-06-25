@@ -1032,26 +1032,63 @@ async function _postInstagramStoryInner(
   const pushData = compressed ?? imgBase64
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
 
-  log(`   📤 Push image 9:16 (${Math.round(pushData.length / 1024)} KB)…`)
-  let sz = 0
-  const CHUNK = 3000, BATCH = 20
-  const chunks: string[] = []
-  for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
-  log(`   📦 ${chunks.length} chunks…`)
-  await shellExec(bearer, phoneId,
-    `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-  for (let b = 1; b < chunks.length; b += BATCH) {
-    const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-    await shellExec(bearer, phoneId, cmd)
-  }
-  await shellExec(bearer, phoneId,
-    `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
-  const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-  sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-  log(`   📎 Fichier: ${sz} octets`)
+  // Strategy A: GeeLark presigned URL (same as video posting — reliable, fast).
+  // GET an S3 upload URL from GeeLark, PUT the JPEG bytes, then have the phone
+  // curl the CDN resourceUrl. Falls back to base64 chunk push if any step fails.
+  let uploadedViaUrl = false
+  try {
+    log('   ☁️ Upload via URL GeeLark…')
+    const urlRes = await geelarkFetch('POST', '/upload/getUrl', { fileType: 'jpg' }, bearer)
+    const urlData = (urlRes?.data ?? urlRes) as Record<string, unknown>
+    const uploadUrl   = String(urlData?.uploadUrl   ?? '')
+    const resourceUrl = String(urlData?.resourceUrl ?? '')
+    if (!uploadUrl || !resourceUrl) throw new Error('Réponse /upload/getUrl invalide')
 
-  if (sz < 2000) {
-    return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
+    // Decode base64 → Uint8Array → Blob for S3 PUT
+    const binStr2 = atob(pushData)
+    const u8put   = new Uint8Array(binStr2.length)
+    for (let i = 0; i < binStr2.length; i++) u8put[i] = binStr2.charCodeAt(i)
+    const putBlob = new Blob([u8put], { type: 'image/jpeg' })
+
+    const putRes = await fetch(uploadUrl, { method: 'PUT', body: putBlob })
+    if (!putRes.ok) throw new Error(`PUT S3 ${putRes.status}`)
+    log(`   ✅ Uploadé S3 (${Math.round(u8put.length / 1024)} KB)`)
+
+    // Phone downloads the image from the CDN
+    log('   📲 Téléchargement image sur le téléphone…')
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera && curl -s -L --max-time 60 -o '${imgPath}' '${resourceUrl}' && echo OK`)
+    const ck2 = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+    const sz2 = parseInt(ck2.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    log(`   📎 Fichier: ${sz2} octets`)
+    if (sz2 < 2000) throw new Error(`Fichier trop petit après curl (${sz2} o)`)
+    uploadedViaUrl = true
+  } catch (urlErr) {
+    log(`   ⚠️ Upload URL échoué: ${urlErr instanceof Error ? urlErr.message : String(urlErr)} — fallback base64…`)
+  }
+
+  // Strategy B: base64 chunk push (fallback)
+  if (!uploadedViaUrl) {
+    log(`   📤 Push base64 (${Math.round(pushData.length / 1024)} KB)…`)
+    let sz = 0
+    const CHUNK = 3000, BATCH = 20
+    const chunks: string[] = []
+    for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
+    log(`   📦 ${chunks.length} chunks…`)
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+    for (let b = 1; b < chunks.length; b += BATCH) {
+      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+      await shellExec(bearer, phoneId, cmd)
+    }
+    await shellExec(bearer, phoneId,
+      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
+    const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    log(`   📎 Fichier: ${sz} octets`)
+    if (sz < 2000) {
+      return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
+    }
   }
 
   // Force media scanner so Instagram's gallery picker sees the new file.
