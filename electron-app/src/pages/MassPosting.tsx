@@ -8,7 +8,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, forceInstagramEnglish } from '@/lib/geelark'
+import { takeScreenshot } from '@/lib/geelark'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
@@ -649,7 +649,6 @@ export function MassPosting({ user }: MassPostingProps) {
         }
         setPhoneStatus(asgn.phone.id, { status: 'posting' })
         postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
-        await forceInstagramEnglish(bearer, asgn.phone.geelark_id)
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          asgn.phone.geelark_id,
           scheduleAt:  scheduleTimes[ai],

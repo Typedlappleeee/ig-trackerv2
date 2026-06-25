@@ -152,8 +152,12 @@ async function shellExec(
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
-// Ensure the cloud phone is running. Mirrors MassPosting's approach:
-// always send /phone/start then wait 30s flat (polling status is unreliable).
+// ⚠️ NE PAS appeler juste avant un RPA instagramPubReels.
+// `cmd locale set-app-locales` redémarre le process Instagram sur les téléphones
+// Android 13+ où la commande prend effet → l'RPA démarre sur une app en plein
+// redémarrage et échoue (posting OK sur certains comptes, KO sur d'autres).
+// Historique : ajoutée/revert plusieurs fois car « broke phones ». Conservée
+// uniquement pour un usage hors chemin de posting (ex: setup manuel).
 export async function forceInstagramEnglish(bearer: string, phoneId: string): Promise<void> {
   try {
     await shellExec(bearer, phoneId,
