@@ -945,13 +945,22 @@ export async function postInstagramStory(
   }
   log(`   📥 Image: ${Math.round(imgBase64.length / 1024)} KB`)
 
-  // Compress to JPEG ≤ 200 KB using OffscreenCanvas, then DOM Canvas as fallback.
-  // Target 720×1280 (enough for stories). Output JPEG ~0.75 quality ≈ 300-500 KB
-  // (PNG would be 3-5 MB → 1000+ shell chunks → corruption/timeout).
-  // outExt stays 'jpg' when canvas succeeds; falls back to original extension
-  // if both canvas methods fail so the file bytes always match the file name.
-  const MAX_W = 720, MAX_H = 1280
+  // Always produce a 1080×1920 (9:16) JPEG with the image centered on a black
+  // background. This prevents Instagram from cropping non-9:16 source images.
+  // Try OffscreenCanvas first (no DOM), fall back to DOM canvas.
+  const STORY_W = 1080, STORY_H = 1920
   let compressed: string | null = null
+
+  const drawCentered = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, srcW: number, srcH: number, drawFn: (dx: number, dy: number, dw: number, dh: number) => void) => {
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, STORY_W, STORY_H)
+    const scale = Math.min(STORY_W / srcW, STORY_H / srcH)
+    const dw = Math.round(srcW * scale)
+    const dh = Math.round(srcH * scale)
+    const dx = Math.round((STORY_W - dw) / 2)
+    const dy = Math.round((STORY_H - dh) / 2)
+    drawFn(dx, dy, dw, dh)
+  }
 
   // Attempt 1: OffscreenCanvas (no DOM dependency)
   try {
@@ -960,13 +969,12 @@ export async function postInstagramStory(
     const u8in = new Uint8Array(binStr.length)
     for (let i = 0; i < binStr.length; i++) u8in[i] = binStr.charCodeAt(i)
     const bitmap = await createImageBitmap(new Blob([u8in], { type: mimeIn }))
-    let w = bitmap.width, h = bitmap.height
-    if (w > MAX_W || h > MAX_H) { const r = Math.min(MAX_W / w, MAX_H / h); w = Math.round(w * r); h = Math.round(h * r) }
-    const oc = new OffscreenCanvas(w, h)
-    oc.getContext('2d')!.drawImage(bitmap, 0, 0, w, h)
-    const blob = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.82 })
+    const oc = new OffscreenCanvas(STORY_W, STORY_H)
+    const ctx = oc.getContext('2d')!
+    drawCentered(ctx, bitmap.width, bitmap.height, (dx, dy, dw, dh) => ctx.drawImage(bitmap, dx, dy, dw, dh))
+    const blob = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.88 })
     compressed = bufToB64(await blob.arrayBuffer())
-    if (compressed) log(`   🗜️ OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB (JPEG)`)
+    if (compressed) log(`   🗜️ 9:16 OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB`)
   } catch (e) {
     log(`   ⚠️ OffscreenCanvas: ${e instanceof Error ? e.message : String(e)}`)
   }
@@ -983,63 +991,44 @@ export async function postInstagramStory(
         const img = new Image()
         img.onload = () => {
           URL.revokeObjectURL(blobUrl)
-          let w = img.naturalWidth, h = img.naturalHeight
-          if (w > MAX_W || h > MAX_H) { const r = Math.min(MAX_W / w, MAX_H / h); w = Math.round(w * r); h = Math.round(h * r) }
           const cv = document.createElement('canvas')
-          cv.width = w; cv.height = h
-          cv.getContext('2d')!.drawImage(img, 0, 0, w, h)
-          const dataUrl = cv.toDataURL('image/jpeg', 0.82)
+          cv.width = STORY_W; cv.height = STORY_H
+          const ctx = cv.getContext('2d')!
+          drawCentered(ctx, img.naturalWidth, img.naturalHeight, (dx, dy, dw, dh) => ctx.drawImage(img, dx, dy, dw, dh))
+          const dataUrl = cv.toDataURL('image/jpeg', 0.88)
           resolve(dataUrl.slice(dataUrl.indexOf(',') + 1))
         }
         img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
         img.src = blobUrl
       })
-      if (c2) { compressed = c2; log(`   🗜️ Canvas DOM: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(c2.length / 1024)} KB (JPEG)`) }
+      if (c2) { compressed = c2; log(`   🗜️ 9:16 Canvas DOM: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(c2.length / 1024)} KB`) }
     } catch (e) {
       log(`   ⚠️ Canvas DOM: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
-  // Canvas produced JPEG → use .jpg. Fallback = raw original bytes → original extension.
+  // Always push the 9:16-padded JPEG. Fall back to raw original only if both canvas methods failed.
+  outExt = compressed ? 'jpg' : _imgExt
   const pushData = compressed ?? imgBase64
-  if (compressed) { outExt = 'jpg' } else { outExt = _imgExt }
   const imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
-  // Strategy 1: direct download on the phone via curl/wget — faster and more reliable
-  // than base64 chunks, but requires the phone to reach the Supabase URL directly.
+
+  log(`   📤 Push image 9:16 (${Math.round(pushData.length / 1024)} KB)…`)
   let sz = 0
-  log('   📥 Téléchargement direct sur le téléphone…')
-  try {
-    const escapedUrl = config.imageUrl.replace(/\\/g, '\\\\').replace(/'/g, "'\\''")
-    const dlCmd =
-      `mkdir -p /sdcard/DCIM/Camera && ` +
-      `(curl -L --connect-timeout 30 --max-time 120 -s -o '${imgPath}' '${escapedUrl}' 2>/dev/null || ` +
-      ` wget -q -O '${imgPath}' '${escapedUrl}' 2>/dev/null) && ` +
-      `wc -c < '${imgPath}' 2>/dev/null || echo 0`
-    const dlResult = await shellExec(bearer, phoneId, dlCmd)
-    sz = parseInt(dlResult.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    if (sz > 2000) log(`   ✅ Download direct: ${sz} octets`)
-  } catch { /* fallthrough to base64 */ }
-
-  // Strategy 2: base64 chunk push (fallback when direct download fails)
-  if (sz < 2000) {
-    log(`   📤 Fallback base64: ${Math.round(pushData.length / 1024)} KB (.${outExt})`)
-    const CHUNK = 3000, BATCH = 20
-    const chunks: string[] = []
-    for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
-    log(`   📦 ${chunks.length} chunks × ${BATCH}…`)
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
-    for (let b = 1; b < chunks.length; b += BATCH) {
-      const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
-      await shellExec(bearer, phoneId, cmd)
-    }
-    await shellExec(bearer, phoneId,
-      `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
-
-    const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    log(`   📎 Fichier: ${sz} octets`)
+  const CHUNK = 3000, BATCH = 20
+  const chunks: string[] = []
+  for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
+  log(`   📦 ${chunks.length} chunks…`)
+  await shellExec(bearer, phoneId,
+    `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
+  for (let b = 1; b < chunks.length; b += BATCH) {
+    const cmd = chunks.slice(b, b + BATCH).map(c => `printf '%s' '${c}' >> '${imgPath}.b64'`).join(' && ')
+    await shellExec(bearer, phoneId, cmd)
   }
+  await shellExec(bearer, phoneId,
+    `base64 -d < '${imgPath}.b64' > '${imgPath}' 2>/dev/null || base64 --decode < '${imgPath}.b64' > '${imgPath}' 2>/dev/null; rm -f '${imgPath}.b64'`)
+  const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
+  sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+  log(`   📎 Fichier: ${sz} octets`)
 
   if (sz < 2000) {
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
