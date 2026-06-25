@@ -8,6 +8,7 @@ import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
 import { OrgProvider, useOrg } from '@/lib/orgContext'
 import { useConnections }    from '@/lib/connections'
+import { setWatchScope }     from '@/lib/phoneWatch'
 import { playSplash, unlockAudio } from '@/lib/sounds'
 import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/lib/music'
 import { checkLicense, LicenseContext, type LicenseStatus } from '@/lib/license'
@@ -587,6 +588,13 @@ const TOUR_KEY  = 'scaleflow-show-tour'
 function AppContent({ user }: { user: User }) {
   const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError, role, perms } = useOrg()
   const conns = useConnections(user)
+
+  // Scope du garde-fou anti-coût : permet aux fonctions bas-niveau (geelark.ts)
+  // d'inscrire les téléphones qu'elles démarrent pour le watchdog serveur.
+  useEffect(() => {
+    setWatchScope({ orgId: currentOrg?.id ?? null, userId: user.id })
+    return () => setWatchScope(null)
+  }, [currentOrg?.id, user.id])
   const [page, setPage]                     = useState<Page>('hub')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)

@@ -1,3 +1,5 @@
+import { registerStartedPhonesAuto } from './phoneWatch'
+
 const BASE = 'https://openapi.geelark.com/open/v1'
 
 // Raw phone shape returned by GéeLark API
@@ -192,6 +194,9 @@ async function ensurePhoneRunning(
   // Always send start command (GéeLark no-ops if already running)
   log?.('📱 Envoi commande de démarrage…')
   const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
+  // Filet anti-coût : inscrit ce téléphone (démarré par l'automation) pour que le
+  // watchdog serveur l'éteigne après 5 min si l'app se ferme avant l'auto-stop.
+  registerStartedPhonesAuto([phoneId], { reason: 'ensurePhoneRunning' }).catch(() => {})
   const code    = Number(startRes['code'] ?? -1)
   const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
   const failed  = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)

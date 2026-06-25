@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { registerStartedPhones } from './phoneWatch'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -330,6 +331,11 @@ async function executeScheduledPostInner(
       stop_phones_at: new Date(Date.now() + safetyOffsetMs).toISOString(),
       stop_phone_ids: geelarkIds,
     }).eq('id', post.id).then(() => {}, () => {}) // fire-and-forget
+    // Garde-fou watchdog : inscrit ces téléphones (démarrés par l'automation) avec
+    // la même heure-limite que le filet stop_phones_at.
+    registerStartedPhones(geelarkIds, { orgId: post.org_id ?? null, userId: post.user_id }, {
+      stopAt: new Date(Date.now() + safetyOffsetMs), reason: 'scheduler',
+    })
 
     // 2. Wait for boot
     onLog('⏳ Boot téléphones (30s)…')
