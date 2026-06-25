@@ -295,9 +295,24 @@ export async function postStoryServer(
     `\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' ` +
     `-o -iname '*.gif' -o -iname '*.heic' -o -iname '*.mp4' -o -iname '*.mov' \\) ` +
     `-delete 2>/dev/null; rm -rf /sdcard/DCIM/Camera/* 2>/dev/null; true`)
+  // Purge stale MediaStore rows so IG's picker doesn't show black, non-selectable
+  // "ghost" tiles for the files we just deleted (a directory scan won't remove
+  // already-deleted entries). GeeLark phones run rooted/system → content delete OK.
+  await shellExec(bearer, phoneId,
+    `content delete --uri content://media/external/images/media 2>/dev/null; ` +
+    `content delete --uri content://media/external/video/media 2>/dev/null; ` +
+    `content delete --uri content://media/external/file 2>/dev/null; true`)
   await shellExec(bearer, phoneId,
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; ` +
     `am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard 2>/dev/null; true`)
+  // Grant IG full media access so a freshly-pushed file is visible/selectable on
+  // Android 13/14 (default partial "Selected photos" access hides new files).
+  await shellExec(bearer, phoneId,
+    `pm grant com.instagram.android android.permission.READ_MEDIA_IMAGES 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_MEDIA_VIDEO 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_MEDIA_VISUAL_USER_SELECTED 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_EXTERNAL_STORAGE 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null; true`)
   await sleep(1500)
 
   // ── 1. Push image to phone gallery ────────────────────────────────────────

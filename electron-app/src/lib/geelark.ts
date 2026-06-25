@@ -963,10 +963,29 @@ async function _postInstagramStoryInner(
     `-o -iname '*.gif' -o -iname '*.heic' -o -iname '*.mp4' -o -iname '*.mov' \\) ` +
     `-delete 2>/dev/null; ` +
     `rm -rf /sdcard/DCIM/Camera/* 2>/dev/null; true`)
-  // Rescan so the media store forgets the deleted files before we add the new one.
+  // Purge the MediaStore so IG's picker doesn't show "ghost" tiles for the files
+  // we just deleted. A directory MEDIA_SCANNER_SCAN_FILE does NOT remove entries
+  // of already-deleted files — it only indexes existing ones — so stale rows
+  // survive and render as black, non-selectable thumbnails. Delete the rows
+  // directly via the media content provider (GeeLark phones run rooted/system).
+  await shellExec(bearer, phoneId,
+    `content delete --uri content://media/external/images/media 2>/dev/null; ` +
+    `content delete --uri content://media/external/video/media 2>/dev/null; ` +
+    `content delete --uri content://media/external/file 2>/dev/null; true`)
+  // Then trigger a fresh volume scan so the now-empty gallery is reflected.
   await shellExec(bearer, phoneId,
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; ` +
     `am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard 2>/dev/null; true`)
+  // Grant Instagram FULL media access. Without this, Android 13/14 hands IG only
+  // partial "Selected photos" access, so a freshly-pushed file is invisible /
+  // non-selectable in the picker. Granting up-front avoids that and the fragile
+  // "Allow" popup tap. Unknown perms on older Android just no-op.
+  await shellExec(bearer, phoneId,
+    `pm grant com.instagram.android android.permission.READ_MEDIA_IMAGES 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_MEDIA_VIDEO 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_MEDIA_VISUAL_USER_SELECTED 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.READ_EXTERNAL_STORAGE 2>/dev/null; ` +
+    `pm grant com.instagram.android android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null; true`)
   await sleep(1500)
 
   // ── 1. Push image to phone gallery ────────────────────────────────────────
