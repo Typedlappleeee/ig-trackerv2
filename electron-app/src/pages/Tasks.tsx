@@ -1666,45 +1666,6 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
             </section>
           )}
 
-          {/* ── Type de tâche ── */}
-          {!sequenceMode && <section>
-            <span style={labelStyle}>Type de tâche</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {([
-                { k: 'publication' as const, title: 'Publication', desc: 'Reels / posts vidéo', icon: <IconVideo size={16} /> },
-                { k: 'story' as const,       title: 'Story',       desc: 'Image + lien par compte', icon: <IconLinkType size={16} /> },
-              ]).map(opt => {
-                const active = taskType === opt.k
-                return (
-                  <button
-                    key={opt.k}
-                    onClick={() => setTaskType(opt.k)}
-                    className="cursor-pointer"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left',
-                      padding: '12px 14px', borderRadius: 11,
-                      border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : HAIR}`,
-                      background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{
-                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: active ? GOLD : 'rgba(255,255,255,0.05)',
-                      color: active ? '#fff' : 'rgba(233,234,240,0.55)',
-                    }}>
-                      {opt.icon}
-                    </div>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.72)' }}>{opt.title}</p>
-                      <p style={{ margin: 0, fontSize: 10.5, color: active ? 'rgba(129,140,248,0.85)' : MUTED }}>{opt.desc}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </section>}
 
           {/* ── Liens par compte (Story) ── */}
           {anyStory && phoneList.length > 0 && (
