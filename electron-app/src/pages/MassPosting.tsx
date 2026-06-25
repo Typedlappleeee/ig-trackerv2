@@ -8,7 +8,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot } from '@/lib/geelark'
+import { takeScreenshot, postInstagramReels, stopPhone } from '@/lib/geelark'
 import { registerStartedPhones, unregisterPhones } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
@@ -594,281 +594,85 @@ export function MassPosting({ user }: MassPostingProps) {
     })
 
     try {
-      // ── Step 1: upload only videos actually assigned to a phone ──────────
+      // ── Step 1: resolve video URLs (no GeeLark S3 upload) ────────────────
       const usedIndices = [...new Set(assignments.map(a => a.videoIndex).filter(i => i >= 0))]
-      log(`Upload de ${usedIndices.length} vidéo(s) vers GéeLark…`)
-      const tokenMap = new Map<number, string>() // videoIndex → token
+      log(`Résolution de ${usedIndices.length} vidéo(s)…`)
+      const urlMap = new Map<number, string>() // videoIndex → direct URL
 
       for (const vi of usedIndices) {
         const sv = selectedVideos[vi]
-
-        // Mark phones using this video as uploading
-        assignments.forEach(a => {
-          if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'uploading' })
-        })
-
-        const fileSource = await resolveVideoPath(sv)
-        if (!fileSource) {
-          log(`Vidéo ${vi + 1} sans source — ignorée`, 'warn')
+        const url = await resolveVideoPath(sv)
+        if (!url) {
+          log(`Vidéo ${vi + 1} (${sv.item.title}) sans source — ignorée`, 'warn')
           continue
         }
-        // Diagnostic : d'où vient la vidéo (URL signée Supabase, blob local…)
-        const srcKind = /^https?:/.test(fileSource)
-          ? (fileSource.includes('supabase') ? 'URL signée Supabase' : 'URL https')
-          : fileSource.startsWith('blob:') ? 'blob local' : 'chemin local'
-        log(`Vidéo ${vi + 1} : source = ${srcKind}`, 'info')
-        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
-        if (!up.ok || !up.token) {
-          log(`Upload échoué (${sv.item.title}): ${up.error}`, 'error')
-          assignments.forEach(a => {
-            if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'error', detail: up.error })
-          })
-          continue
-        }
-
-        tokenMap.set(vi, up.token)
-        // Diagnostic : le token DOIT être une resourceUrl GéeLark (http…), pas autre chose.
-        const tokenKind = /^https?:/.test(up.token) ? 'resourceUrl GéeLark ✓' : `inattendu: ${up.token.slice(0, 24)}`
-        // Taille réelle de l'objet stocké chez GéeLark (vérifiée côté proxy). Si très
-        // petite ou nulle alors que la source est OK → le PUT a stocké un objet corrompu.
-        const sizeInfo = typeof up.uploadedSize === 'number'
-          ? ` — objet GéeLark: ${(up.uploadedSize / 1_000_000).toFixed(1)} Mo`
-          : ' — taille non vérifiée'
-        log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…) — token: ${tokenKind}${sizeInfo}`, 'ok')
+        urlMap.set(vi, url)
+        const srcKind = url.includes('supabase') ? 'URL signée Supabase' : /^https?:/.test(url) ? 'URL https' : 'chemin local'
+        log(`Vidéo ${vi + 1} prête — ${srcKind}`, 'ok')
       }
 
-      // ── Step 2: start phones ──────────────────────────────────────────────
-      if (stopRef.current) { log('Run interrompu avant le démarrage des téléphones', 'warn'); return }
-      const geelarkIds = phoneList.map(p => p.geelark_id)
-      activePhonesRef.current = geelarkIds
-      log(`Démarrage de ${phoneList.length} téléphone(s)…`)
-      const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
-      const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
-      log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
-      // Filet de sécurité serveur : si ScaleFlow se ferme, le watchdog éteint ces
-      // téléphones après 5 min (ils ont été démarrés par l'automation, pas à la main).
-      registerStartedPhones(geelarkIds, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
+      if (stopRef.current) { log('Run interrompu avant démarrage', 'warn'); return }
 
-      // Aucun téléphone démarré → inutile de continuer : abort + refund total
-      if (started === 0) {
-        run.abort()
-        const cur = getMassPostingState().taskStatuses
-        for (const p of phoneList) {
-          if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: 'démarrage échoué' })
+      // ── Step 2: post to all phones in parallel via ADB ────────────────────
+      // Each phone downloads the video itself (curl/wget on the phone), then
+      // Instagram's Reel creation UI is driven via UIAutomator shell commands.
+      // No GeeLark S3 PUT involved — bypasses the S3 corruption issue entirely.
+      log(`📱 Publication ADB en parallèle sur ${assignments.length} téléphone(s)…`)
+
+      await Promise.allSettled(assignments.map(async (asgn) => {
+        if (stopRef.current) {
+          setPhoneStatus(asgn.phone.id, { status: 'cancelled' })
+          return
         }
-        log('Aucun téléphone démarré — run annulé', 'error')
-        return
-      }
-
-      if (stopRef.current) { log('Run interrompu avant le boot', 'warn'); return }
-      log('Attente 30s (boot)…')
-      await new Promise(r => setTimeout(r, 30000))
-      if (stopRef.current) { log('Run interrompu après le boot', 'warn'); return }
-
-      // ── Step 3: create RPA tasks ──────────────────────────────────────────
-      log('Creating post tasks…')
-      const taskIds: Record<string, string> = {}
-      const scheduleTimes = buildScheduleTimes(assignments.length, postingOpts)
-      if (postingOpts.intervalMode !== 'none' && assignments.length > 1) {
-        const lastMin = Math.round((scheduleTimes[scheduleTimes.length - 1] - scheduleTimes[0]) / 60)
-        log(`Intervalle activé — dernier post dans ~${lastMin} min`, 'info')
-      }
-
-      for (let ai = 0; ai < assignments.length; ai++) {
-        if (stopRef.current) { log('Création des tâches interrompue (stop)', 'warn'); break }
-        const asgn = assignments[ai]
-        const token = tokenMap.get(asgn.videoIndex)
-        if (!token) {
-          log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
-          setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
-          continue
+        const videoUrl = urlMap.get(asgn.videoIndex)
+        if (!videoUrl) {
+          log(`  ${asgn.phone.phone_name}: pas d'URL vidéo`, 'warn')
+          setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video url' })
+          return
         }
+
+        activePhonesRef.current = [...activePhonesRef.current, asgn.phone.geelark_id]
+        registerStartedPhones(
+          [asgn.phone.geelark_id],
+          { orgId: currentOrg?.id ?? null, userId: user.id },
+          { reason: 'mass_posting_adb' },
+        )
         setPhoneStatus(asgn.phone.id, { status: 'posting' })
-        postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
-        const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-          id:          asgn.phone.geelark_id,
-          scheduleAt:  scheduleTimes[ai],
-          description: caption,
-          video:       [token],
-          ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
-        })
-        if (taskRes['code'] === 0) {
-          const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
-          taskIds[asgn.phone.geelark_id] = tid
-          activeTasksRef.current = [...activeTasksRef.current, tid]
-          setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
-          log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
-          // Auto-stop after 4m30 regardless of task status (clearable on Stop/unmount)
-          const timerId = window.setTimeout(() => {
-            autoStopTimersRef.current = autoStopTimersRef.current.filter(id => id !== timerId)
-            if (activePhonesRef.current.includes(asgn.phone.geelark_id)) {
-              geelark(bearer, '/phone/stop', { ids: [asgn.phone.geelark_id] })
-                .then(() => log(`  ${asgn.phone.phone_name} — posting fini`, 'ok'))
-                .catch(() => {})
-              unregisterPhones([asgn.phone.geelark_id])
-              setPhoneStatus(asgn.phone.id, { status: 'done' })
-              activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
-            }
-          }, 270_000)
-          autoStopTimersRef.current.push(timerId)
-        } else {
-          log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
-          setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
+
+        const phoneLog = (m: string) => log(`[${asgn.phone.phone_name}] ${m}`)
+
+        try {
+          const result = await postInstagramReels(
+            bearer,
+            asgn.phone.geelark_id,
+            { videoUrl, caption },
+            phoneLog,
+          )
+          setPhoneStatus(asgn.phone.id, {
+            status: result.ok ? 'done' : 'error',
+            detail: result.error,
+          })
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          phoneLog(`❌ ${msg}`)
+          setPhoneStatus(asgn.phone.id, { status: 'error', detail: msg })
+        } finally {
+          stopPhone(bearer, asgn.phone.geelark_id).catch(() => {})
+          activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
         }
-      }
+      }))
 
-      // ── Step 4: poll until done (max 10 min) ─────────────────────────────
-      if (Object.keys(taskIds).length > 0) {
-        log(`Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
-        const pending = new Set(Object.values(taskIds))
-        const deadline = Date.now() + 6 * 60 * 1000
-        const STATUS: Record<number, string> = { 1: 'Pending', 2: 'In progress', 3: 'Done', 4: 'Failed', 7: 'Cancelled' }
-
-        // Phrases spécifiques d'un popup login/vérification — des mots isolés
-        // ('confirm', 'login') matchaient l'UI normale d'Instagram (faux positifs).
-        const ALERT_KEYWORDS = [
-          'log in to instagram', 'log into another account', 'sign in to instagram',
-          'enter your password', 'forgot password', 'mot de passe oublié', 'saisis ton mot de passe',
-          'confirm your identity', 'confirme ton identité',
-          'suspicious login', 'suspicious activity', 'connexion suspecte', 'activité suspecte',
-          'unusual login', 'unusual activity', 'activité inhabituelle',
-          'verify your account', 'verify your identity', 'vérifie ton compte',
-          'verification code', 'code de vérification', 'enter the code', 'entre le code',
-          'we detected', 'nous avons détecté', 'challenge_required',
-          '2-step verification', 'two-factor authentication', 'validation en deux étapes',
-        ]
-        function containsAlertKeyword(text: string): string | null {
-          const lower = text.toLowerCase()
-          return ALERT_KEYWORDS.find(k => lower.includes(k)) ?? null
-        }
-        async function checkPhoneScreen(geelarkId: string, phoneName: string) {
-          if (notifiedRef.current.has(geelarkId)) return
-          try {
-            const dataUrl = await takeScreenshot(bearer, geelarkId)
-            if (!dataUrl) return
-            // OCR if available (Electron), otherwise just notify based on timeout
-            let keyword: string | null = null
-            if (window.electronAPI?.runTesseractOcr) {
-              const base64 = dataUrl.split(',')[1]
-              const ocr = await window.electronAPI.runTesseractOcr({ imageBase64: base64, lang: 'eng+fra' })
-              if (ocr.ok) keyword = containsAlertKeyword(ocr.text ?? '')
-            }
-            const needsAttention = keyword != null
-            const msg = needsAttention
-              ? `${phoneName} : fenêtre "${keyword}" détectée — intervention requise`
-              : `${phoneName} : posting long — vérifiez l'écran`
-            log(msg + ` [screenshot]::${dataUrl}`, needsAttention ? 'warn' : 'warn')
-            notifiedRef.current.add(geelarkId)
-            // Desktop notification (works in Electron + browser with permission)
-            if (Notification.permission === 'granted') {
-              new Notification('ScaleFlow — Intervention requise', {
-                body: needsAttention
-                  ? `${phoneName} : fenêtre de connexion/vérification détectée`
-                  : `${phoneName} prend du temps — ouvrez ScaleFlow pour vérifier`,
-                icon: '/sf-logo.svg',
-              })
-            }
-          } catch { /* ignore screenshot errors */ }
-        }
-
-        let pollCount = 0
-        while (pending.size > 0 && Date.now() < deadline) {
-          if (stopRef.current) { log('Polling interrompu (stop)', 'warn'); break }
-          await new Promise(r => setTimeout(r, 10000))
-          if (stopRef.current) { log('Polling interrompu (stop)', 'warn'); break }
-          let qRes: Record<string, unknown>
-          try {
-            qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
-          } catch (pollErr) {
-            log(`Poll /task/query raté: ${pollErr instanceof Error ? pollErr.message : String(pollErr)} — on réessaie…`, 'warn')
-            continue
-          }
-          pollCount++
-
-          // RPA tasks may live under different response keys depending on the GéeLark API version
-          const d = (qRes['data'] as Record<string, unknown>) ?? qRes
-          let items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
-          if (!Array.isArray(items)) items = []
-
-          // First poll diagnostic: log raw shape so we can fix it if items is empty
-          if (pollCount === 1 && items.length === 0) {
-            console.log('[mass-posting] /task/query raw response:', JSON.stringify(qRes).slice(0, 800))
-            log(`Réponse /task/query (debug): clés=${Object.keys(d).join(',') || '(vide)'}`, 'warn')
-          }
-
-          for (const item of items) {
-            const tid    = (item['id'] ?? item['taskId']) as string
-            const status = Number(item['status'])
-            const phone  = phoneList.find(p => taskIds[p.geelark_id] === tid)
-            const name   = phone?.phone_name ?? tid
-            if ([3, 4, 7].includes(status)) {
-              pending.delete(tid)
-              postingStartRef.current.delete(phone?.geelark_id ?? '')
-              const level = status === 3 ? 'ok' : 'error'
-              const fail  = item['failDesc'] ? ` — ${item['failDesc']}` : ''
-              log(`${STATUS[status] ?? status} ${name}${fail}`, level)
-              if (phone) {
-                setPhoneStatus(phone.id, {
-                  status: status === 3 ? 'done' : 'error',
-                  detail: item['failDesc'] as string | undefined,
-                })
-                // Power off this phone immediately now that its task is finished
-                geelark(bearer, '/phone/stop', { ids: [phone.geelark_id] })
-                  .then(() => log(`  ${phone.phone_name} éteint`, 'ok'))
-                  .catch(e => log(`  extinction ${phone.phone_name}: ${e instanceof Error ? e.message : String(e)}`, 'warn'))
-                unregisterPhones([phone.geelark_id])
-                activePhonesRef.current = activePhonesRef.current.filter(id => id !== phone.geelark_id)
-                activeTasksRef.current  = activeTasksRef.current.filter(id => id !== tid)
-              }
-            }
-          }
-
-          // Every 12 polls (~2 min): screenshot phones still running to detect login/verification popups
-          if (pollCount % 12 === 0) {
-            for (const [geelarkId, startedAt] of postingStartRef.current) {
-              if (Date.now() - startedAt > 90_000) {  // only after 1.5 min
-                const ph = phoneList.find(p => p.geelark_id === geelarkId)
-                if (ph) checkPhoneScreen(geelarkId, ph.phone_name).catch(() => {})
-              }
-            }
-          }
-        }
-        if (pending.size > 0 && !stopRef.current) {
-          log(`${pending.size} tâche(s) sans réponse après le délai — marquées « non confirmé »`, 'warn')
-          // Le post a probablement abouti, mais GéeLark n'a pas confirmé :
-          // statut visuel distinct plutôt qu'un done silencieux.
-          for (const tid of pending) {
-            const phone = phoneList.find(p => taskIds[p.geelark_id] === tid)
-            if (phone) setPhoneStatus(phone.id, { status: 'done', detail: 'non confirmé' })
-          }
-        }
-      }
-
-      // ── Step 5: stop any phones still running (timeout / no-response) ────
-      const remaining = activePhonesRef.current
-      if (remaining.length > 0) {
-        log(`Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
-        await geelark(bearer, '/phone/stop', { ids: remaining })
-        unregisterPhones(remaining).catch(() => {})
-      }
-
-      // Mark only phones without a final status yet as done (preserve 'error' states)
-      const currentStatuses = getMassPostingState().taskStatuses
-      for (const p of phoneList) {
-        const existing = currentStatuses.get(p.id)?.status
-        if (existing !== 'done' && existing !== 'error') {
-          setPhoneStatus(p.id, { status: 'done' })
-        }
-      }
-
-      // Read final counts from sync store (not stale React closure)
+      // ── Step 3: summary ───────────────────────────────────────────────────
       const finalStatuses = getMassPostingState().taskStatuses
       const okN = [...finalStatuses.values()].filter(s => s.status === 'done').length
       const errN = [...finalStatuses.values()].filter(s => s.status === 'error').length
       setLastRun({ ok: okN, err: errN, total: assignments.length })
-      toast.show({ title: errN === 0 ? 'Mass posting terminé ✓' : 'Mass posting terminé avec erreurs', body: `${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`, kind: errN === 0 ? 'ok' : 'error' })
+      toast.show({
+        title: errN === 0 ? 'Mass posting terminé ✓' : 'Mass posting terminé avec erreurs',
+        body: `${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`,
+        kind: errN === 0 ? 'ok' : 'error',
+      })
 
-      // Log run for the Hub "posts this week" counter (post_runs table, not scheduled_posts)
       if (okN > 0) {
         supabase.from('post_runs').insert({
           user_id:   user.id,
@@ -877,7 +681,7 @@ export function MassPosting({ user }: MassPostingProps) {
           ok_count:  okN,
           err_count: errN,
           total:     assignments.length,
-        }) // fire-and-forget, non-blocking
+        })
       }
       log('Done! Resetting in 5s…', 'ok')
       await new Promise(r => setTimeout(r, 5000))
@@ -887,7 +691,6 @@ export function MassPosting({ user }: MassPostingProps) {
 
     } catch (e: unknown) {
       log(`Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
-      // Always stop phones on unexpected crash — so they don't stay on indefinitely
       const stuck = activePhonesRef.current
       if (stuck.length > 0) {
         log(`Arrêt d'urgence de ${stuck.length} téléphone(s)…`, 'warn')
