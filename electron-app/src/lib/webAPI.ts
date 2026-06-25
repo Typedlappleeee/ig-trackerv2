@@ -300,8 +300,8 @@ export function buildWebAPI() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer }),
             })
-            const j = await r.json() as { ok: boolean; token?: string; error?: string }
-            if (j.ok && j.token) return { ok: true, token: j.token }
+            const j = await r.json() as { ok: boolean; token?: string; error?: string; uploadedSize?: number | null }
+            if (j.ok && j.token) return { ok: true, token: j.token, uploadedSize: j.uploadedSize ?? null }
             // Server reachable but upload failed — report its error directly
             if (j.error) return { ok: false, error: j.error }
           } catch { /* serveur indisponible — bascule sur le flux client ci-dessous */ }
