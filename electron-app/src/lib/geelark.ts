@@ -1627,18 +1627,11 @@ async function _postInstagramReelsInner(
     return { ok: false, error: `Vidéo non téléchargée sur le téléphone (${videoSize} octets) — URL inaccessible depuis le téléphone?` }
   }
 
-  // Touch + scan so Instagram's gallery picker sees the file as "most recent"
+  // Scan into MediaStore so the file gets a content:// URI we can hand to IG.
   await shellExec(bearer, phoneId,
     `touch -m '${vidPath}' && ` +
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${vidPath} 2>/dev/null`)
   await sleep(5000)
-
-  // ── 2. Open Instagram ──────────────────────────────────────────────────────
-  log('📲 Lancement Instagram…')
-  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
-  await sleep(1500)
-  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
-  await sleep(8000)
 
   async function dismissPermissionDialog(): Promise<boolean> {
     const permXml = await dumpXml(bearer, phoneId)
@@ -1656,61 +1649,103 @@ async function _postInstagramReelsInner(
     return false
   }
 
-  await dismissPermissionDialog()
+  // ── 2. Resolve the MediaStore content URI of the video ─────────────────────
+  // A content:// URI lets us hand the file straight to Instagram via a SEND
+  // intent — IG opens directly in the composer, no gallery navigation, no "+".
+  log('🔎 Résolution de l\'URI MediaStore…')
+  const q = await shellExec(bearer, phoneId,
+    `content query --uri content://media/external/video/media ` +
+    `--projection _id --where "_data='${vidPath}'" 2>/dev/null`)
+  const idMatch = (q.output ?? '').match(/_id=(\d+)/)
+  const contentUri = idMatch ? `content://media/external/video/media/${idMatch[1]}` : null
+  log(contentUri ? `   ✅ URI: ${contentUri}` : '   ⚠️ URI MediaStore introuvable — fallback galerie')
 
-  // ── 3. Tap "+" to create new content ──────────────────────────────────────
-  log('➕ Nouveau contenu…')
-  let xml = await dumpXml(bearer, phoneId)
-  const newPostBtn =
-    findByResourceId(xml, 'create_new_content_button', 'action_bar_new_post', 'tab_bar_new_post',
-      'new_post_button', 'add_button', 'creation_tab', 'tab_home_new_post') ??
-    findByText(xml, 'New post', 'Nouveau post', 'Create', 'Créer')
-  if (newPostBtn) {
-    await shellExec(bearer, phoneId, `input tap ${newPostBtn[0]} ${newPostBtn[1]}`)
-  } else {
-    // "+" is the center-bottom nav button on most IG versions
-    await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.965)}`)
-  }
-  await sleep(3500)
-  await dismissPermissionDialog()
+  // ── 3. Open Instagram directly in the composer via SEND intent ─────────────
+  let xml = ''
+  let composerOpened = false
+  if (contentUri) {
+    log('📲 Ouverture d\'Instagram dans le compositeur (intent SEND)…')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+    await sleep(1500)
+    // ShareHandlerActivity loads the video and lands straight on the editor.
+    await shellExec(bearer, phoneId,
+      `am start -a android.intent.action.SEND -t video/mp4 ` +
+      `--eu android.intent.extra.STREAM ${contentUri} ` +
+      `--grant-read-uri-permission ` +
+      `-n com.instagram.android/com.instagram.share.handleractivity.ShareHandlerActivity`)
+    await sleep(8000)
+    await dismissPermissionDialog()
 
-  // ── 4. Navigate to "Reel" tab in the creator ──────────────────────────────
-  log('🎬 Sélection du type Reel…')
-  xml = await dumpXml(bearer, phoneId)
-  const reelTab =
-    findByText(xml, 'Reel', 'Réel', 'REEL', 'RÉEL', 'Reels', 'Réels') ??
-    findByResourceId(xml, 'clips_new_post', 'reel_tab', 'reels_tab', 'reel_option', 'clips_tab',
-      'creation_type_reels', 'reels_creation_tab')
-  if (reelTab) {
-    log(`   Reel tab: ${reelTab[0]},${reelTab[1]}`)
-    await shellExec(bearer, phoneId, `input tap ${reelTab[0]} ${reelTab[1]}`)
-    await sleep(2500)
-  } else {
-    log('   ⚠️ Tab Reel non trouvé — on continue (peut déjà être en mode Reel)')
-  }
-  await dismissPermissionDialog()
-
-  // ── 5. Select the most-recent video from gallery ───────────────────────────
-  log('🎞 Sélection de la vidéo dans la galerie…')
-  xml = await dumpXml(bearer, phoneId)
-
-  // Try to find gallery grid items — pick the topmost-leftmost (most recent)
-  const firstThumb = (() => {
-    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item|thumbnail|clip_thumbnail)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
-    let best: [number, number] | null = null
-    let bestScore = Infinity
-    let m: RegExpExecArray | null
-    while ((m = re.exec(xml)) !== null) {
-      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
-      const score = y1 * 10000 + x1
-      if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
+    // A bottom sheet may ask Feed / Reel / Story — choose Reel if present.
+    xml = await dumpXml(bearer, phoneId)
+    const reelChoice = findByText(xml, 'Reel', 'Réel', 'Reels', 'Réels')
+    if (reelChoice) {
+      log('   🎬 Choix « Reel » dans la feuille de partage')
+      await shellExec(bearer, phoneId, `input tap ${reelChoice[0]} ${reelChoice[1]}`)
+      await sleep(4000)
+      await dismissPermissionDialog()
+      xml = await dumpXml(bearer, phoneId)
     }
-    return best ?? [Math.floor(sw * 0.17), Math.floor(sh * 0.30)] as [number, number]
-  })()
-  log(`   👆 Tap premier item: ${firstThumb[0]},${firstThumb[1]}`)
-  await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
-  await sleep(3500)
-  await dismissPermissionDialog()
+
+    // Did we actually reach an editor/composer screen?
+    composerOpened = /next_button|clips_next_button|caption_edit_text|caption_text|share_button|clips_publish_button|trim|adjust_clips/i.test(xml)
+    log(composerOpened ? '   ✅ Compositeur ouvert via intent' : '   ⚠️ Intent n\'a pas ouvert le compositeur — fallback galerie')
+  }
+
+  // ── 3b. Fallback: classic tap navigation (+ → Reel → gallery) ──────────────
+  if (!composerOpened) {
+    log('📲 Lancement Instagram (fallback)…')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+    await sleep(1500)
+    await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
+    await sleep(8000)
+    await dismissPermissionDialog()
+
+    log('➕ Nouveau contenu…')
+    xml = await dumpXml(bearer, phoneId)
+    const newPostBtn =
+      findByResourceId(xml, 'create_new_content_button', 'action_bar_new_post', 'tab_bar_new_post',
+        'new_post_button', 'add_button', 'creation_tab', 'tab_home_new_post') ??
+      findByText(xml, 'New post', 'Nouveau post', 'Create', 'Créer')
+    if (newPostBtn) {
+      await shellExec(bearer, phoneId, `input tap ${newPostBtn[0]} ${newPostBtn[1]}`)
+    } else {
+      await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.965)}`)
+    }
+    await sleep(3500)
+    await dismissPermissionDialog()
+
+    log('🎬 Sélection du type Reel…')
+    xml = await dumpXml(bearer, phoneId)
+    const reelTab =
+      findByText(xml, 'Reel', 'Réel', 'REEL', 'RÉEL', 'Reels', 'Réels') ??
+      findByResourceId(xml, 'clips_new_post', 'reel_tab', 'reels_tab', 'reel_option', 'clips_tab',
+        'creation_type_reels', 'reels_creation_tab')
+    if (reelTab) {
+      await shellExec(bearer, phoneId, `input tap ${reelTab[0]} ${reelTab[1]}`)
+      await sleep(2500)
+    }
+    await dismissPermissionDialog()
+
+    log('🎞 Sélection de la vidéo dans la galerie…')
+    xml = await dumpXml(bearer, phoneId)
+    const firstThumb = (() => {
+      const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item|thumbnail|clip_thumbnail)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+      let best: [number, number] | null = null
+      let bestScore = Infinity
+      let m: RegExpExecArray | null
+      while ((m = re.exec(xml)) !== null) {
+        const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
+        const score = y1 * 10000 + x1
+        if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
+      }
+      return best ?? [Math.floor(sw * 0.17), Math.floor(sh * 0.30)] as [number, number]
+    })()
+    log(`   👆 Tap premier item: ${firstThumb[0]},${firstThumb[1]}`)
+    await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
+    await sleep(3500)
+    await dismissPermissionDialog()
+  }
 
   // ── 6. Navigate "Next" through editing/trim screens ───────────────────────
   log('▶️  Navigation vers l\'écran de publication…')
