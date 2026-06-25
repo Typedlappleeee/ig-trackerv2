@@ -1,4 +1,4 @@
-import { registerStartedPhonesAuto } from './phoneWatch'
+import { registerStartedPhonesAuto, unregisterPhones } from './phoneWatch'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -92,6 +92,10 @@ export async function stopPhone(bearer: string, phoneId: string): Promise<void> 
   try {
     await geelarkFetch('POST', '/phone/stop', { ids: [phoneId] }, bearer)
   } catch { /* ignore */ }
+  // Un arrêt propre doit TOUJOURS retirer le tel du watchdog serveur. Sinon la
+  // ligne phone_power_watch (stop_at = +5 min) survit et le cron éteint le tel en
+  // plein milieu du run SUIVANT → posting et story déconnent en alternance.
+  unregisterPhones([phoneId]).catch(() => {})
 }
 
 // Stop several phones in one call. Returns how many GéeLark reported stopped.
@@ -100,6 +104,8 @@ export async function stopPhones(bearer: string, phoneIds: string[]): Promise<nu
   const res = await geelarkFetch('POST', '/phone/stop', { ids: phoneIds }, bearer)
   const data = (res?.data ?? res) as Record<string, unknown>
   const success = Number((data?.successAmount ?? data?.successDetails ?? phoneIds.length))
+  // Idem : nettoie le watchdog pour ne pas tuer un run ultérieur sur ces tels.
+  unregisterPhones(phoneIds).catch(() => {})
   return Number.isFinite(success) ? success : phoneIds.length
 }
 

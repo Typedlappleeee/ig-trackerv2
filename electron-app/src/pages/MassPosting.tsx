@@ -418,6 +418,7 @@ export function MassPosting({ user }: MassPostingProps) {
     try {
       if (phones.length > 0) {
         await geelark(bearer, '/phone/stop', { ids: phones })
+        unregisterPhones(phones).catch(() => {})
         log(`  ${phones.length} téléphone(s) éteint(s)`, 'warn')
       }
     } catch (e) {
@@ -831,6 +832,7 @@ export function MassPosting({ user }: MassPostingProps) {
       if (remaining.length > 0) {
         log(`Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
         await geelark(bearer, '/phone/stop', { ids: remaining })
+        unregisterPhones(remaining).catch(() => {})
       }
 
       // Mark only phones without a final status yet as done (preserve 'error' states)
@@ -873,6 +875,7 @@ export function MassPosting({ user }: MassPostingProps) {
       if (stuck.length > 0) {
         log(`Arrêt d'urgence de ${stuck.length} téléphone(s)…`, 'warn')
         geelark(bearer, '/phone/stop', { ids: stuck }).catch(() => {})
+        unregisterPhones(stuck).catch(() => {})
       }
     }
 
