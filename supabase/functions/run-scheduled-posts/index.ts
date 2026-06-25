@@ -416,14 +416,19 @@ Deno.serve(async (req) => {
   //   - Premier jour (credits_charged_date IS NULL) : 50 crédits/jour + N téléphones × 2
   //   - Jours suivants : N téléphones × 2 (les 50/jour sont débités à minuit par l'étape 0-daily)
   try {
-    let dueTasksQuery = db.from('recurring_tasks')
-      .select('*')
+    // Claim atomique : on met à jour next_run_at en MÊME TEMPS qu'on lit les tâches dues.
+    // Si deux instances du cron tournent en parallèle, seule la première voit les lignes
+    // (la seconde trouve next_run_at déjà mis à jour au-delà de now → aucune ligne).
+    // Cela empêche la double exécution et le double démarrage des téléphones.
+    const tempNextRun = new Date(Date.now() + 999 * 60 * 60 * 1000).toISOString() // +999h sentinel
+    let claimQuery = db.from('recurring_tasks')
+      .update({ next_run_at: tempNextRun })
       .eq('status', 'active')
       .lte('next_run_at', nowIso)
-      .order('next_run_at', { ascending: true })
+      .select('*')
       .limit(5)
-    if (filterUserId) dueTasksQuery = dueTasksQuery.eq('user_id', filterUserId)
-    const { data: dueTasks } = await dueTasksQuery
+    if (filterUserId) claimQuery = claimQuery.eq('user_id', filterUserId)
+    const { data: dueTasks } = await claimQuery
 
     for (const task of dueTasks ?? []) {
       const phones: unknown[] = typeof task.phones === 'string' ? JSON.parse(task.phones) : (task.phones ?? [])
@@ -454,6 +459,7 @@ Deno.serve(async (req) => {
       }
 
       const recurHours = Number(task.recur_hours) || 24
+      // nextRun remplace le sentinel posé par le claim atomique ci-dessus.
       const nextRun = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
 
       // Tâches multi-étapes (steps) vs legacy (flat fields)
