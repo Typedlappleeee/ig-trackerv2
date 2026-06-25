@@ -852,6 +852,25 @@ export async function postInstagramStory(
   config: StoryConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
+  // Safety auto-stop: stop the phone after 3 minutes regardless of outcome
+  const autoStopTimer = setTimeout(() => {
+    log('⏱ Timeout 3min — arrêt automatique du téléphone')
+    stopPhone(bearer, phoneId).catch(() => {})
+  }, 3 * 60 * 1000)
+
+  try {
+    return await _postInstagramStoryInner(bearer, phoneId, config, log)
+  } finally {
+    clearTimeout(autoStopTimer)
+  }
+}
+
+async function _postInstagramStoryInner(
+  bearer: string,
+  phoneId: string,
+  config: StoryConfig,
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
   const ready = await ensurePhoneRunning(bearer, phoneId, log)
   if (!ready) throw new Error('Téléphone non démarré')
 
@@ -945,10 +964,11 @@ export async function postInstagramStory(
   }
   log(`   📥 Image: ${Math.round(imgBase64.length / 1024)} KB`)
 
-  // Always produce a 1080×1920 (9:16) JPEG with the image centered on a black
+  // Always produce a 720×1280 (9:16) JPEG with the image centered on a black
   // background. This prevents Instagram from cropping non-9:16 source images.
+  // 720×1280 keeps file size small (~150-300 KB) for fast base64 push.
   // Try OffscreenCanvas first (no DOM), fall back to DOM canvas.
-  const STORY_W = 1080, STORY_H = 1920
+  const STORY_W = 720, STORY_H = 1280
   let compressed: string | null = null
 
   const drawCentered = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, srcW: number, srcH: number, drawFn: (dx: number, dy: number, dw: number, dh: number) => void) => {
