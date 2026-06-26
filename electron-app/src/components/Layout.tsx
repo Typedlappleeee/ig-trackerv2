@@ -79,11 +79,11 @@ interface NavSection { title: string; items: NavItem[]; defaultOpen?: boolean }
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: 'Pilotage',
+    title: 'Principal',
     defaultOpen: true,
     items: [
       { id: 'phones',      label: 'navPhones',       icon: '📱' },
-      { id: 'stats',       label: 'navStats',        icon: '📊' },
+      { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'history',     label: 'navHistory',      icon: '🕑' },
     ],
   },
@@ -99,22 +99,13 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: 'Contenu',
-    defaultOpen: true,
-    items: [
-      { id: 'bank',        label: 'navBank',         icon: '🗂' },
-      { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
-    ],
-  },
-  {
     title: 'Studio vidéo',
     defaultOpen: true,
     items: [
       { id: 'remix',       label: 'navRemix',        icon: '🔀' },
-      { id: 'repurpose',   label: 'navRepurpose',    icon: '🧬' },
       { id: 'spoof',       label: 'navSpoof',        icon: '🛡️' },
       { id: 'subtitles',   label: 'navSubtitles',    icon: '💬' },
-      { id: 'montage',     label: 'navMontage',      icon: '🎬' },
+      { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
       { id: 'mixer',       label: 'navMixer',        icon: '🎞️', dev: true },
     ],
   },
