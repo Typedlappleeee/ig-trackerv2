@@ -170,6 +170,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [caption, _setCaption]            = useState(ms.caption)
   const [mode, _setMode]                  = useState<'seq' | 'random'>(() => localStorage.getItem(LS_MODE) === 'random' ? 'random' : 'seq')
   const setMode = (m: 'seq' | 'random') => { _setMode(m); localStorage.setItem(LS_MODE, m) }
+  const [platform, _setPlatform]          = useState<'instagram' | 'tiktok'>(() => localStorage.getItem('sf-mp-platform') === 'tiktok' ? 'tiktok' : 'instagram')
+  const setPlatform = (p: 'instagram' | 'tiktok') => { _setPlatform(p); localStorage.setItem('sf-mp-platform', p) }
   const [bearer, setBearer]               = useState('')
   const [groqKey, setGroqKey]             = useState('')
   const [posting, _setPosting]            = useState(ms.posting)
@@ -482,6 +484,7 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function scheduleMassPost(scheduledAt: Date) {
+    if (platform === 'tiktok')      { log('Programmation TikTok bientôt disponible — utilise « Publier maintenant » pour TikTok.', 'warn'); return }
     if (!bearer)                    { log('Missing GéeLark token — Settings', 'error'); return }
     if (phoneList.length === 0)     { log('Select at least one phone', 'warn'); return }
     if (selectedVideos.length === 0){ log('Select at least one video', 'warn'); return }
@@ -657,46 +660,91 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`Intervalle activé — dernier post dans ~${lastMin} min`, 'info')
       }
 
-      for (let ai = 0; ai < assignments.length; ai++) {
-        if (stopRef.current) { log('Création des tâches interrompue (stop)', 'warn'); break }
-        const asgn = assignments[ai]
-        const token = tokenMap.get(asgn.videoIndex)
-        if (!token) {
-          log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
-          setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
-          continue
+      // Programme l'auto-stop d'un téléphone (4m30) — partagé IG/TikTok.
+      const armAutoStop = (geelarkId: string, phoneId: string, phoneName: string) => {
+        const timerId = window.setTimeout(() => {
+          autoStopTimersRef.current = autoStopTimersRef.current.filter(id => id !== timerId)
+          if (activePhonesRef.current.includes(geelarkId)) {
+            geelark(bearer, '/phone/stop', { ids: [geelarkId] })
+              .then(() => log(`  ${phoneName} — posting fini`, 'ok'))
+              .catch(() => {})
+            unregisterPhones([geelarkId])
+            setPhoneStatus(phoneId, { status: 'done' })
+            activePhonesRef.current = activePhonesRef.current.filter(id => id !== geelarkId)
+          }
+        }, 270_000)
+        autoStopTimersRef.current.push(timerId)
+      }
+
+      if (platform === 'tiktok') {
+        // ── TikTok : un seul appel /task/add (taskType:1) qui batch tous les comptes ──
+        const list: Array<{ scheduleAt: number; envId: string; video: string; videoDesc: string; ai: number }> = []
+        for (let ai = 0; ai < assignments.length; ai++) {
+          const asgn = assignments[ai]
+          const token = tokenMap.get(asgn.videoIndex)
+          if (!token) {
+            log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
+            continue
+          }
+          setPhoneStatus(asgn.phone.id, { status: 'posting' })
+          postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
+          list.push({ scheduleAt: scheduleTimes[ai], envId: asgn.phone.geelark_id, video: token, videoDesc: caption, ai })
         }
-        setPhoneStatus(asgn.phone.id, { status: 'posting' })
-        postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
-        const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-          id:          asgn.phone.geelark_id,
-          scheduleAt:  scheduleTimes[ai],
-          description: caption,
-          video:       [token],
-          ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
-        })
-        if (taskRes['code'] === 0) {
-          const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
-          taskIds[asgn.phone.geelark_id] = tid
-          activeTasksRef.current = [...activeTasksRef.current, tid]
-          setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
-          log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
-          // Auto-stop after 4m30 regardless of task status (clearable on Stop/unmount)
-          const timerId = window.setTimeout(() => {
-            autoStopTimersRef.current = autoStopTimersRef.current.filter(id => id !== timerId)
-            if (activePhonesRef.current.includes(asgn.phone.geelark_id)) {
-              geelark(bearer, '/phone/stop', { ids: [asgn.phone.geelark_id] })
-                .then(() => log(`  ${asgn.phone.phone_name} — posting fini`, 'ok'))
-                .catch(() => {})
-              unregisterPhones([asgn.phone.geelark_id])
-              setPhoneStatus(asgn.phone.id, { status: 'done' })
-              activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
-            }
-          }, 270_000)
-          autoStopTimersRef.current.push(timerId)
-        } else {
-          log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
-          setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
+        if (list.length > 0) {
+          const taskRes = await geelark(bearer, '/task/add', {
+            taskType: 1,
+            list: list.map(({ scheduleAt, envId, video, videoDesc }) => ({ scheduleAt, envId, video, videoDesc })),
+          })
+          // /task/add renvoie data.taskIds (tableau, dans l'ordre de la liste envoyée)
+          const ids = ((taskRes['data'] as Record<string, unknown>)?.['taskIds'] ?? []) as string[]
+          if (taskRes['code'] === 0 && Array.isArray(ids) && ids.length > 0) {
+            list.forEach((item, idx) => {
+              const asgn = assignments[item.ai]
+              const tid = ids[idx]
+              if (!tid) { setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no task id' }); return }
+              taskIds[asgn.phone.geelark_id] = tid
+              activeTasksRef.current = [...activeTasksRef.current, tid]
+              setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
+              log(`  Tâche TikTok créée pour ${asgn.phone.phone_name}`, 'ok')
+              armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
+            })
+          } else {
+            log(`  TikTok /task/add: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
+            list.forEach(item => setPhoneStatus(assignments[item.ai].phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) }))
+          }
+        }
+      } else {
+        // ── Instagram : une tâche RPA instagramPubReels par téléphone ──
+        for (let ai = 0; ai < assignments.length; ai++) {
+          if (stopRef.current) { log('Création des tâches interrompue (stop)', 'warn'); break }
+          const asgn = assignments[ai]
+          const token = tokenMap.get(asgn.videoIndex)
+          if (!token) {
+            log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
+            continue
+          }
+          setPhoneStatus(asgn.phone.id, { status: 'posting' })
+          postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
+          const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
+            id:          asgn.phone.geelark_id,
+            scheduleAt:  scheduleTimes[ai],
+            description: caption,
+            video:       [token],
+            ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
+          })
+          if (taskRes['code'] === 0) {
+            const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
+            taskIds[asgn.phone.geelark_id] = tid
+            activeTasksRef.current = [...activeTasksRef.current, tid]
+            setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
+            log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
+            armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
+          } else {
+            log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
+          }
         }
       }
 
@@ -971,6 +1019,30 @@ export function MassPosting({ user }: MassPostingProps) {
 
           {/* Right: controls */}
           <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+
+            {/* Platform toggle — Instagram / TikTok */}
+            <div style={{
+              display: 'flex',
+              border: '1px solid rgba(233,234,240,0.1)',
+              borderRadius: 8,
+              overflow: 'hidden',
+              background: 'rgba(255,255,255,0.03)',
+            }}>
+              {([{ k: 'instagram', label: 'Instagram', emoji: '📸' }, { k: 'tiktok', label: 'TikTok', emoji: '🎵' }] as const).map(p => (
+                <button key={p.k} onClick={() => setPlatform(p.k)}
+                  className="cursor-pointer"
+                  title={`Publier sur ${p.label}`}
+                  style={{
+                    padding: '7px 12px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: platform === p.k ? 'var(--accent)' : 'transparent',
+                    color: platform === p.k ? '#fff' : MUTED,
+                    border: 'none', transition: 'all 0.18s',
+                  }}>
+                  <span>{p.emoji}</span>{p.label}
+                </button>
+              ))}
+            </div>
 
             {/* Mode toggle */}
             <div style={{

@@ -109,13 +109,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'mixer',       label: 'navMixer',        icon: '🎞️', dev: true },
     ],
   },
-  {
-    title: 'TikTok',
-    defaultOpen: true,
-    items: [
-      { id: 'tiktokposting', label: 'navTikTokPosting', icon: '🎵' },
-    ],
-  },
 ]
 
 // ── SVG Icon helper ──────────────────────────────────────────────────────────
