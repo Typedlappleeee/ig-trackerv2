@@ -2328,13 +2328,3 @@ textarea:focus-visible {
 .sf-tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 .sf-row { transition: background var(--t-fast); }
 .sf-row:hover { background: rgba(255,255,255,0.022); }
-
-/* — Tables "control center" : en-tête net, lignes plus respirantes — */
-.sf-table th {
-  background: rgba(255,255,255,0.018);
-  color: var(--text-3);
-  border-bottom: 1px solid var(--border-md);
-}
-.sf-table td { padding-top: 12px; padding-bottom: 12px; }
-.sf-table tbody tr:hover td { background: rgba(99,102,241,0.05); }
-.sf-table tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
