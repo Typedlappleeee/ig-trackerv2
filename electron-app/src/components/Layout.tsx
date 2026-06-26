@@ -83,7 +83,6 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'phones',         label: 'navPhones',         icon: '📱' },
-      { id: 'stats',          label: 'navStats',           icon: '📊', isNew: true },
 
       { id: 'bank',           label: 'navBank',            icon: '🗂' },
     ],
