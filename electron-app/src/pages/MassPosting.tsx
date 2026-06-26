@@ -170,8 +170,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [caption, _setCaption]            = useState(ms.caption)
   const [mode, _setMode]                  = useState<'seq' | 'random'>(() => localStorage.getItem(LS_MODE) === 'random' ? 'random' : 'seq')
   const setMode = (m: 'seq' | 'random') => { _setMode(m); localStorage.setItem(LS_MODE, m) }
-  const [platform, _setPlatform]          = useState<'instagram' | 'tiktok'>(() => localStorage.getItem('sf-mp-platform') === 'tiktok' ? 'tiktok' : 'instagram')
-  const setPlatform = (p: 'instagram' | 'tiktok') => { _setPlatform(p); localStorage.setItem('sf-mp-platform', p) }
+  // Plateforme pilotée par le wrapper Publish (popup + remount). Lecture seule ici.
+  const platform: 'instagram' | 'tiktok' = localStorage.getItem('sf-mp-platform') === 'tiktok' ? 'tiktok' : 'instagram'
   const [bearer, setBearer]               = useState('')
   const [groqKey, setGroqKey]             = useState('')
   const [posting, _setPosting]            = useState(ms.posting)
@@ -1019,30 +1019,6 @@ export function MassPosting({ user }: MassPostingProps) {
 
           {/* Right: controls */}
           <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-
-            {/* Platform toggle — Instagram / TikTok */}
-            <div style={{
-              display: 'flex',
-              border: '1px solid rgba(233,234,240,0.1)',
-              borderRadius: 8,
-              overflow: 'hidden',
-              background: 'rgba(255,255,255,0.03)',
-            }}>
-              {([{ k: 'instagram', label: 'Instagram', emoji: '📸' }, { k: 'tiktok', label: 'TikTok', emoji: '🎵' }] as const).map(p => (
-                <button key={p.k} onClick={() => setPlatform(p.k)}
-                  className="cursor-pointer"
-                  title={`Publier sur ${p.label}`}
-                  style={{
-                    padding: '7px 12px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    background: platform === p.k ? 'var(--accent)' : 'transparent',
-                    color: platform === p.k ? '#fff' : MUTED,
-                    border: 'none', transition: 'all 0.18s',
-                  }}>
-                  <span>{p.emoji}</span>{p.label}
-                </button>
-              ))}
-            </div>
 
             {/* Mode toggle */}
             <div style={{
