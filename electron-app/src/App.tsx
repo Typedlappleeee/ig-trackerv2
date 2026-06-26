@@ -556,6 +556,7 @@ const Phones          = lazy(() => import('@/pages/Phones').then(m => ({ default
 
 const TikTokPosting   = lazy(() => import('@/pages/TikTokPosting'))
 const Publish        = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
+const Stats          = lazy(() => import('@/pages/Stats').then(m => ({ default: m.Stats })))
 const BankHub        = lazy(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
 const Montage        = lazy(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
 const Remix          = lazy(() => import('@/pages/Remix').then(m => ({ default: m.Remix })))
@@ -861,6 +862,7 @@ function AppContent({ user }: { user: User }) {
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
       case 'hub':          return <Hub          user={user} onNavigate={handleNavigate} />
+      case 'stats':        return <Stats        user={user} />
       case 'scaleia':      return <ScaleIA />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
@@ -903,7 +905,7 @@ const isElectron = typeof window !== 'undefined' && !!window.electronAPI
 const FORCE_LOGOUT_VER = 'sf_v4'
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user, loading, isPasswordRecovery, clearPasswordRecovery } = useAuth()
   const [splashDone, setSplashDone] = useState(false)
 
   // Force re-login for all users (version bump invalidates old sessions)
@@ -915,14 +917,15 @@ export default function App() {
   }, [])
 
   // Web: show landing when not logged in (Electron keeps the auth page directly)
-  if (!isElectron && !loading && !user) return <ChunkErrorBoundary><Suspense fallback={<FullPageLoader />}><Landing /></Suspense></ChunkErrorBoundary>
+  if (!isElectron && !loading && !user && !isPasswordRecovery) return <ChunkErrorBoundary><Suspense fallback={<FullPageLoader />}><Landing /></Suspense></ChunkErrorBoundary>
 
   return (
     <>
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       {splashDone && (
-        loading        ? <FullPageLoader /> :
-        !user          ? <AuthPage />       :
+        loading             ? <FullPageLoader /> :
+        isPasswordRecovery  ? <AuthPage initialTab="reset" onResetDone={clearPasswordRecovery} /> :
+        !user               ? <AuthPage />       :
         <LangProvider><OrgProvider user={user}><AppContent user={user} /></OrgProvider></LangProvider>
       )}
       <FlameOverlay />

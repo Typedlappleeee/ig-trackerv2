@@ -2250,3 +2250,81 @@ html[data-glass="off"] #root::after { display: none; }
   0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
   50%       { box-shadow: 0 0 0 4px rgba(239,68,68,0.15); }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGN REFINEMENT LAYER — polish global (ajouté en dernier → gagne la cascade)
+   Inspiration "control center" : noirs profonds, bordures nettes, accents
+   maîtrisés, élévation douce, pills de statut lisibles. Aucune refonte de fond —
+   uniquement les fondations partagées par toutes les pages.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* — Bouton primaire : dégradé subtil + halo, plus premium — */
+.btn-sf-primary {
+  background: linear-gradient(135deg, #6E70F6 0%, #5C5EF0 52%, #5052E8 100%) !important;
+  border-color: rgba(129,140,248,0.45) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 4px 18px -7px rgba(99,102,241,0.6);
+  transition: filter 0.18s ease, box-shadow 0.22s ease, transform 0.12s ease !important;
+}
+.btn-sf-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7B7DF9 0%, #6669F4 52%, #5C5EEE 100%) !important;
+  border-color: rgba(129,140,248,0.6) !important;
+  filter: brightness(1.03);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 7px 26px -7px rgba(99,102,241,0.75);
+  transform: translateY(-1px);
+}
+.btn-sf-primary:active:not(:disabled) {
+  filter: brightness(0.96);
+  transform: translateY(0);
+}
+
+/* — Pills de statut : plus nettes, look "data table" — */
+.sf-badge {
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+  border-radius: 7px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* — Élévation des cartes : hover + lift cohérents (sans toucher au fond) — */
+.sf-card {
+  transition: border-color var(--t-base), background var(--t-base), box-shadow var(--t-base);
+}
+.sf-card:hover {
+  box-shadow: 0 6px 22px -12px rgba(0,0,0,0.7);
+}
+.sf-card-lift {
+  transition: border-color var(--t-base), box-shadow var(--t-base), transform var(--t-smooth);
+}
+.sf-card-lift:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-accent);
+  box-shadow: 0 10px 30px -14px rgba(0,0,0,0.75), 0 0 0 1px rgba(99,102,241,0.07);
+}
+
+/* — Focus des champs : anneau accent propre — */
+.sf-input:focus,
+input[type="text"]:focus-visible,
+input[type="email"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="search"]:focus-visible,
+input[type="number"]:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: rgba(99,102,241,0.55) !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.13);
+}
+
+/* — Scrollbars fines et discrètes — */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(150,158,205,0.16);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(150,158,205,0.32); }
+
+/* — Utilitaires partagés — */
+.sf-tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.sf-row { transition: background var(--t-fast); }
+.sf-row:hover { background: rgba(255,255,255,0.022); }

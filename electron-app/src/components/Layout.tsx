@@ -55,6 +55,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'hub'
   | 'phones'
+  | 'stats'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
   | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof'
   | 'community' | 'support'
@@ -155,6 +156,7 @@ type IconKey = keyof typeof ICONS
 // Map page id -> icon key
 const PAGE_ICON: Record<string, IconKey> = {
   phones:          'phone',
+  stats:           'monitor',
   monitor:         'monitor',
   posting:         'send',
   massposting:     'zap',
@@ -605,7 +607,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     if (id === 'licences' || id === 'tiktokposting') return effectiveSuperAdmin
     // Scanner + Tâches automatiques : réservés aux owner/admin (pas member/viewer)
     if (id === 'tasks') return effectiveRole === 'owner' || effectiveRole === 'admin'
-    if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
+    if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub' || id === 'stats') return true
     return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }
 
