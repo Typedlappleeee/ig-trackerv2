@@ -1,9 +1,9 @@
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 
-type Tab = 'login' | 'register'
+type Tab = 'login' | 'register' | 'forgot' | 'reset'
 
 function SFLogoMark() {
   return (
@@ -44,8 +44,19 @@ export function AuthPage() {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
   const [success, setSuccess]   = useState<string | null>(null)
+  const [showPwd, setShowPwd]   = useState(false)
 
   const clearMessages = () => { setError(null); setSuccess(null) }
+
+  // Detect recovery token in URL hash → switch to reset password view
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash.includes('type=recovery') || hash.includes('type=signup')) {
+      setTab('reset')
+      // Clean URL so the token isn't visible
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -56,16 +67,30 @@ export function AuthPage() {
       if (tab === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-      } else {
+
+      } else if (tab === 'register') {
         if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.')
         if (password.length < 6) throw new Error('Le mot de passe doit faire au moins 6 caractères.')
-
         const { data, error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-
         if (data.user && !data.session) {
           setSuccess('Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse.')
         }
+
+      } else if (tab === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        })
+        if (error) throw error
+        setSuccess('Email envoyé ! Clique sur le lien dans ta boîte mail pour réinitialiser ton mot de passe.')
+
+      } else if (tab === 'reset') {
+        if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.')
+        if (password.length < 6) throw new Error('Le mot de passe doit faire au moins 6 caractères.')
+        const { error } = await supabase.auth.updateUser({ password })
+        if (error) throw error
+        setSuccess('Mot de passe mis à jour ! Tu peux maintenant te connecter.')
+        setTimeout(() => switchTab('login'), 2500)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Une erreur est survenue.'
@@ -80,7 +105,10 @@ export function AuthPage() {
     clearMessages()
     setPassword('')
     setConfirm('')
+    setShowPwd(false)
   }
+
+  const isForgotOrReset = tab === 'forgot' || tab === 'reset'
 
   return (
     <div
@@ -129,69 +157,128 @@ export function AuthPage() {
           className="glass-card rounded-2xl p-6 anim-scale-in"
           style={{ animationDelay: '0.1s' }}
         >
-          {/* Tabs */}
-          <div
-            className="flex rounded-xl p-1 mb-6"
-            style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}
-          >
-            {(['login', 'register'] as Tab[]).map(t => (
+          {/* Tabs — hidden on forgot/reset */}
+          {!isForgotOrReset && (
+            <div
+              className="flex rounded-xl p-1 mb-6"
+              style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}
+            >
+              {(['login', 'register'] as Tab[]).map(t => (
+                <button
+                  key={t}
+                  onClick={() => switchTab(t)}
+                  className="flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200"
+                  style={
+                    tab === t
+                      ? {
+                          background: 'linear-gradient(130deg, #6366F1, #818CF8)',
+                          color: '#fff',
+                          boxShadow: '0 2px 12px -2px rgba(99,102,241,0.5)',
+                        }
+                      : { color: 'rgba(233,234,240,0.6)' }
+                  }
+                >
+                  {t === 'login' ? 'Se connecter' : 'Créer un compte'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Forgot / Reset header */}
+          {isForgotOrReset && (
+            <div className="mb-6">
               <button
-                key={t}
-                onClick={() => switchTab(t)}
-                className="flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200"
-                style={
-                  tab === t
-                    ? {
-                        background: 'linear-gradient(130deg, #6366F1, #818CF8)',
-                        color: '#fff',
-                        boxShadow: '0 2px 12px -2px rgba(99,102,241,0.5)',
-                      }
-                    : { color: 'rgba(233,234,240,0.6)' }
-                }
+                onClick={() => switchTab('login')}
+                className="flex items-center gap-1.5 text-xs mb-4 transition-opacity hover:opacity-100 opacity-60"
+                style={{ color: 'rgba(233,234,240,0.8)' }}
               >
-                {t === 'login' ? 'Se connecter' : 'Créer un compte'}
+                ← Retour à la connexion
               </button>
-            ))}
-          </div>
+              <p className="text-sm font-semibold text-white">
+                {tab === 'forgot' ? 'Mot de passe oublié' : 'Nouveau mot de passe'}
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'rgba(233,234,240,0.45)' }}>
+                {tab === 'forgot'
+                  ? 'Entre ton email — on t\'envoie un lien de réinitialisation.'
+                  : 'Choisis un nouveau mot de passe pour ton compte.'}
+              </p>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="anim-page" style={{ animationDelay: '0.18s' }}>
-              <Input
-                label="Email"
-                type="email"
-                placeholder="ton@email.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </div>
 
-            <div className="anim-page" style={{ animationDelay: '0.24s' }}>
-              <Input
-                label="Mot de passe"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-                hint={tab === 'register' ? '6 caractères minimum' : undefined}
-              />
-            </div>
+            {/* Email — hidden on reset */}
+            {tab !== 'reset' && (
+              <div className="anim-page" style={{ animationDelay: '0.18s' }}>
+                <Input
+                  label="Email"
+                  type="email"
+                  placeholder="ton@email.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+            )}
 
-            {tab === 'register' && (
+            {/* Password — hidden on forgot */}
+            {tab !== 'forgot' && (
+              <div className="anim-page" style={{ animationDelay: '0.24s' }}>
+                <div className="relative">
+                  <Input
+                    label={tab === 'reset' ? 'Nouveau mot de passe' : 'Mot de passe'}
+                    type={showPwd ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                    hint={tab !== 'login' ? '6 caractères minimum' : undefined}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd(v => !v)}
+                    className="absolute right-3 top-8 opacity-50 hover:opacity-100 transition-opacity"
+                    style={{ color: 'rgba(233,234,240,0.8)' }}
+                    tabIndex={-1}
+                  >
+                    {showPwd
+                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Confirm password */}
+            {(tab === 'register' || tab === 'reset') && (
               <div className="anim-slide-down">
                 <Input
                   label="Confirmer le mot de passe"
-                  type="password"
+                  type={showPwd ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
                   required
                   autoComplete="new-password"
                 />
+              </div>
+            )}
+
+            {/* Forgot password link — only on login */}
+            {tab === 'login' && (
+              <div className="flex justify-end -mt-1">
+                <button
+                  type="button"
+                  onClick={() => switchTab('forgot')}
+                  className="text-xs transition-opacity hover:opacity-100 opacity-60"
+                  style={{ color: 'rgba(99,102,241,0.9)' }}
+                >
+                  Mot de passe oublié ?
+                </button>
               </div>
             )}
 
@@ -230,7 +317,10 @@ export function AuthPage() {
                 loading={loading}
                 className="mt-2"
               >
-                {tab === 'login' ? 'Se connecter' : 'Créer mon compte'}
+                {tab === 'login'    ? 'Se connecter'
+                 : tab === 'register' ? 'Créer mon compte'
+                 : tab === 'forgot'   ? 'Envoyer le lien'
+                 : 'Enregistrer le mot de passe'}
               </Button>
             </div>
           </form>
@@ -258,5 +348,7 @@ function friendlyError(raw: string): string {
     return 'Trop de tentatives. Réessaie dans quelques minutes.'
   if (r.includes('network') || r.includes('fetch'))
     return 'Erreur réseau. Vérifie ta connexion internet.'
+  if (r.includes('expired') || r.includes('invalid') || r.includes('otp'))
+    return 'Lien expiré ou invalide. Redemande un nouveau lien.'
   return raw
 }
