@@ -850,6 +850,12 @@ export function MassPosting({ user }: MassPostingProps) {
       const errN = [...finalStatuses.values()].filter(s => s.status === 'error').length
       setLastRun({ ok: okN, err: errN, total: assignments.length })
       toast.show({ title: errN === 0 ? 'Mass posting terminé ✓' : 'Mass posting terminé avec erreurs', body: `${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`, kind: errN === 0 ? 'ok' : 'error' })
+      import('@/lib/notify').then(({ sendNotification }) => sendNotification({
+        userId: user.id, orgId: currentOrg?.id ?? null,
+        event: errN > 0 ? 'post_failed' : 'batch_done',
+        subject: errN === 0 ? '✅ Mass posting terminé' : '⚠️ Mass posting terminé avec erreurs',
+        message: `${okN}/${assignments.length} compte(s) publiés avec succès${errN ? ` · ${errN} échec(s)` : ''}.`,
+      })).catch(() => {})
 
       // Log run for the Hub "posts this week" counter (post_runs table, not scheduled_posts)
       if (okN > 0) {

@@ -12,6 +12,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { postStoryServer } from './geelark-story.ts'
+import { notifyOwner } from './notify.ts'
 
 const GEELARK = 'https://openapi.geelark.com/open/v1'
 
@@ -382,7 +383,7 @@ Deno.serve(async (req) => {
   if (nowUtc.getUTCHours() === 0 && !filterUserId) {
     try {
       const { data: activeTasks } = await db.from('recurring_tasks')
-        .select('id, user_id, credits_charged_date')
+        .select('id, user_id, org_id, name, credits_charged_date')
         .eq('status', 'active')
       for (const task of activeTasks ?? []) {
         if (task.credits_charged_date === todayStr) continue  // déjà débité aujourd'hui
@@ -401,6 +402,10 @@ Deno.serve(async (req) => {
             .update({ status: 'paused' })
             .eq('id', task.id)
           summary[`daily:${task.id}`] = `paused (${creditRes?.error ?? 'insufficient credits'})`
+          await notifyOwner(db, { userId: task.user_id, orgId: task.org_id },
+            'task_paused',
+            '⏸️ Tâche automatique mise en pause',
+            `La tâche « ${task.name ?? task.id} » a été mise en pause : crédits insuffisants pour le débit quotidien de 50 crédits. Recharge ton solde puis réactive-la.`)
         }
       }
     } catch (err) {
@@ -448,6 +453,10 @@ Deno.serve(async (req) => {
         if (!creditRes?.ok) {
           await db.from('recurring_tasks').update({ status: 'paused' }).eq('id', task.id)
           summary[`task:${task.id}`] = `paused — crédits insuffisants (${creditRes?.error ?? ''})`
+          await notifyOwner(db, { userId: task.user_id, orgId: task.org_id },
+            'task_paused',
+            '⏸️ Tâche automatique mise en pause',
+            `La tâche « ${task.name ?? task.id} » a été mise en pause : crédits insuffisants pour cette exécution. Recharge ton solde puis réactive-la.`)
           continue
         }
         // Marque la date du débit journalier si on vient de le prendre
@@ -722,6 +731,10 @@ Deno.serve(async (req) => {
                 .update({ videos: [], status: 'paused' })
                 .eq('id', post.task_id)
               log('⏸ Pool de vidéos vide — tâche mise en pause.')
+              await notifyOwner(db, { userId: post.user_id, orgId: post.org_id },
+                'task_paused',
+                '⏸️ Tâche automatique en pause',
+                `La tâche a été mise en pause : toutes les vidéos de la pool ont été utilisées (usage unique). Ajoute de nouvelles vidéos puis réactive-la.`)
             } else {
               await db.from('recurring_tasks')
                 .update({ videos: remaining })

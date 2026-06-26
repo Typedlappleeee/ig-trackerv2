@@ -7,6 +7,7 @@ import { Input }  from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/Toast'
 import { OrganizationPanel } from '@/components/OrganizationPanel'
+import { NotificationChannels } from '@/components/NotificationChannels'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
 import { notifyConnectionsChanged, DEFAULT_GROQ_KEY } from '@/lib/connections'
@@ -945,6 +946,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                         </div>
                       )}
                     </div>
+
+                    <NotificationChannels user={user} />
                   </div>
                 )}
 
