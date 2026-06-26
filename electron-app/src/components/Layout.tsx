@@ -765,14 +765,10 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
           <SidebarDivider />
 
-          {/* Sections — collapsible */}
-          {([
-            { section: NAV_SECTIONS[0], labelKey: 'sectionPrincipal',  defaultIcon: 'phone'  as IconKey },
-            { section: NAV_SECTIONS[1], labelKey: 'sectionInstagram',  defaultIcon: 'send'   as IconKey },
-            { section: NAV_SECTIONS[2], labelKey: 'sectionTikTok',     defaultIcon: 'zap'    as IconKey },
-            { section: NAV_SECTIONS[3], labelKey: 'sectionCreation',   defaultIcon: 'edit'   as IconKey },
-          ] as Array<{ section: typeof NAV_SECTIONS[0]; labelKey: string; defaultIcon: IconKey }>)
-            .map(({ section, labelKey, defaultIcon }) => {
+          {/* Sections — collapsible (itère NAV_SECTIONS directement, robuste à
+              l'ajout/suppression de sections) */}
+          {NAV_SECTIONS.map((section, si) => {
+              const defaultIcon: IconKey = (['phone', 'send', 'edit', 'zap', 'video'] as IconKey[])[si] ?? 'grid'
               const items = section.items.filter(it => isVisibleTab(it.id) && (!it.dev || effectiveSuperAdmin))
               if (items.length === 0) return null
               const isOpen = openSections[section.title] !== false
@@ -784,7 +780,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                       className={`sf-sidebar-section${isOpen ? '' : ' is-closed'}`}
                       onClick={() => toggleSection(section.title)}
                     >
-                      <span className="sf-sidebar-section-label">{t(labelKey as any)}</span>
+                      <span className="sf-sidebar-section-label">{section.title}</span>
                       <span className="sf-sidebar-section-line" />
                       <span className="sf-sidebar-section-arrow">
                         <NavIcon d={ICONS.chevronDown} size={10} />
