@@ -403,6 +403,24 @@ function LinkCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
 }
 
 // ── Phone card row ────────────────────────────────────────────────────────────
+// Compact follower/view counts: 12 300 → 12.3K, 1 240 000 → 1.2M
+function fmtCount(n: number | null | undefined): string {
+  const v = Number(n) || 0
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1).replace(/\.0$/, '') + 'M'
+  if (v >= 1_000)     return (v / 1_000).toFixed(v >= 10_000 ? 0 : 1).replace(/\.0$/, '') + 'K'
+  return String(v)
+}
+
+// Instagram status → pill style. active=vert, expired=ambre, autre/erreur=rouge.
+function igPill(status: string | null | undefined): { label: string; color: string; bg: string; border: string } | null {
+  switch (status) {
+    case 'active':  return { label: 'Actif',   color: 'var(--ok)',     bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.22)' }
+    case 'expired': return { label: 'Expiré',  color: 'var(--warn)',   bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.22)' }
+    case 'error':   return { label: 'Erreur',  color: 'var(--danger)', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.22)' }
+    default:        return null
+  }
+}
+
 const PhoneRow = memo(function PhoneRow({
   phone, isSelected, checked, col, canDelete, index,
   setSelectedPhone, setContextMenu,
@@ -489,6 +507,36 @@ const PhoneRow = memo(function PhoneRow({
             )}
           </div>
         </div>
+      </td>
+
+      {/* Instagram account — handle + status pill + followers/posts */}
+      <td style={cellStyle}>
+        {phone.ig_username ? (() => {
+          const pill = igPill(phone.ig_status)
+          return (
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: TEXT_1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>
+                  @{phone.ig_username}
+                </span>
+                {pill && (
+                  <span style={{
+                    flexShrink: 0, fontSize: 9, fontWeight: 700, padding: '1.5px 6px', borderRadius: 6,
+                    color: pill.color, background: pill.bg, border: `1px solid ${pill.border}`,
+                    textTransform: 'uppercase', letterSpacing: '0.02em',
+                  }}>{pill.label}</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, fontSize: 10.5, color: 'rgba(233,234,240,0.4)', fontVariantNumeric: 'tabular-nums' }}>
+                <span><b style={{ color: 'rgba(233,234,240,0.7)', fontWeight: 700 }}>{fmtCount(phone.followers)}</b> abonnés</span>
+                <span style={{ color: 'rgba(233,234,240,0.22)' }}>·</span>
+                <span>{fmtCount(phone.video_count)} posts</span>
+              </div>
+            </div>
+          )
+        })() : (
+          <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)' }}>Non lié</span>
+        )}
       </td>
 
       {/* Group */}
@@ -1511,6 +1559,7 @@ export function Phones({ user }: PhonesProps) {
                         <th style={{ ...TH_BASE, width: 36 }}></th>
                         <th style={{ ...TH_BASE, width: 44 }}></th>
                         <th style={TH_BASE}>{t('phonesDetailModel')}</th>
+                        <th style={{ ...TH_BASE, width: 210 }}>Instagram</th>
                         <th style={{ ...TH_BASE, width: 120 }}>{t('phonesDetailGroup')}</th>
                         <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
                         <th style={{ ...TH_BASE, width: 150 }}>Note</th>
@@ -1529,6 +1578,12 @@ export function Phones({ user }: PhonesProps) {
                                 <div className="sf-skeleton" style={{ height: 11, width: 110, borderRadius: 4 }} />
                                 <div className="sf-skeleton" style={{ height: 8, width: 70, borderRadius: 4 }} />
                               </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              <div className="sf-skeleton" style={{ height: 11, width: 120, borderRadius: 4 }} />
+                              <div className="sf-skeleton" style={{ height: 8, width: 90, borderRadius: 4 }} />
                             </div>
                           </td>
                           <td><div className="sf-skeleton" style={{ height: 20, width: 65, borderRadius: 99 }} /></td>
@@ -1631,6 +1686,8 @@ export function Phones({ user }: PhonesProps) {
                         {sortTh('', 'status', { width: 44 }, fr('Trier par statut', 'Sort by status'))}
                         {/* Name sort */}
                         {sortTh(t('phonesDetailModel'), 'name')}
+                        {/* Instagram account */}
+                        <th style={{ ...TH_BASE, width: 210 }}>Instagram</th>
                         {/* Group sort */}
                         {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
                         <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
