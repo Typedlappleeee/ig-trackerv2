@@ -56,10 +56,11 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
   icon: React.ReactNode; title: string; desc: string; tags: string[]; locked?: boolean; onClick: () => void
 }) {
   return (
-    <button onClick={onClick} className="cursor-pointer text-left w-full group relative rounded-2xl p-4 transition-all card-lift sf-card-lift sf-spotlight overflow-hidden"
+    <button onClick={onClick} className="sf-card cursor-pointer text-left w-full group relative rounded-2xl transition-all card-lift sf-card-lift sf-spotlight overflow-hidden"
       style={{
-        background: '#0E0E16',
+        background: 'var(--bg-2, #13141A)',
         border: '1px solid rgba(99,102,241,0.12)',
+        padding: 16,
         opacity: locked ? 0.6 : 1,
       }}>
       {/* Hover glow overlay */}
@@ -175,7 +176,7 @@ export function AiTools({ user }: AiToolsProps) {
           {/* Text */}
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
             <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('aiToolsTitle')}</h1>
-            <p className="sf-page-sub">AI Creative Studio</p>
+            <p className="sf-page-sub">Outils de traitement vidéo et de variation de contenu</p>
           </div>
         </div>
 
@@ -183,7 +184,7 @@ export function AiTools({ user }: AiToolsProps) {
 
       {/* ── Content ── */}
       <div className="sf-page-body">
-        <div className="space-y-10 max-w-6xl">
+        <div className="space-y-6 max-w-6xl">
           {/* ── Outils IA ── */}
           <section>
             <SectionHeader label="Outils vidéo" badge="FFmpeg" icon={<Icon name="video" size={13} />} />

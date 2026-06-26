@@ -6,7 +6,7 @@ import { fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import {
   TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR,
-  BG_0 as BG, BG_1 as BG2, SANS,
+  BG_0 as BG, BG_2 as BG2, ACCENT, ACCENT_L, OK, ERR, SANS,
 } from '@/lib/theme'
 
 interface PostRun {
@@ -40,16 +40,10 @@ function StatusPill({ status }: { status: string }) {
   const ok  = status === 'done'
   const err = status === 'failed'
   const pending = status === 'pending' || status === 'running'
-  const color = ok ? '#34D399' : err ? '#F87171' : '#94A3B8'
-  const bg    = ok ? 'rgba(52,211,153,0.08)' : err ? 'rgba(248,113,113,0.08)' : 'rgba(148,163,184,0.08)'
-  const border= ok ? 'rgba(52,211,153,0.25)' : err ? 'rgba(248,113,113,0.25)' : 'rgba(148,163,184,0.2)'
+  const variant = ok ? 'ok' : err ? 'danger' : pending ? 'accent' : 'muted'
   const label = ok ? 'PUBLIÉ' : err ? 'ÉCHEC' : pending ? 'EN COURS' : status.toUpperCase()
   return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-      color, background: bg, border: `1px solid ${border}`,
-      borderRadius: 5, padding: '2px 7px', fontFamily: SANS, whiteSpace: 'nowrap',
-    }}>{label}</span>
+    <span className={`sf-badge sf-badge-${variant}`} style={{ whiteSpace: 'nowrap' }}>{label}</span>
   )
 }
 
@@ -62,8 +56,8 @@ function IconBox({ ok }: { ok: boolean }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {ok
-        ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={OK} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ERR} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       }
     </div>
   )
@@ -133,51 +127,62 @@ export function History({ user }: { user: User }) {
     <button
       onClick={() => setFilter(f)}
       style={{
-        padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
+        padding: '6px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
         cursor: 'pointer', transition: 'all 0.15s',
         background: filter === f ? 'rgba(99,102,241,0.18)' : 'transparent',
-        color: filter === f ? '#818CF8' : FAINT,
-        border: filter === f ? '1px solid rgba(99,102,241,0.35)' : `1px solid transparent`,
+        color: filter === f ? ACCENT_L : MUTED,
+        border: filter === f ? '1px solid rgba(99,102,241,0.35)' : `1px solid ${HAIR}`,
       }}
     >{label}</button>
   )
 
   return (
-    <div style={{ minHeight: '100%', background: BG, padding: '32px 40px 80px', boxSizing: 'border-box', overflowY: 'auto' }}>
+    <div style={{ minHeight: '100%', background: BG, padding: '24px 28px 80px', boxSizing: 'border-box', overflowY: 'auto' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
+      <div className="sf-anim-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
         <div style={{
           width: 42, height: 42, borderRadius: 12, flexShrink: 0,
           background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(99,102,241,0.06))',
           border: '1px solid rgba(99,102,241,0.28)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
           </svg>
         </div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: IVORY, fontFamily: SANS }}>Historique</h1>
-          <p style={{ margin: 0, fontSize: 12, color: FAINT, fontFamily: SANS, marginTop: 2 }}>Tous vos posts — programmés et directs</p>
+          <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: IVORY, fontFamily: SANS, letterSpacing: '-0.01em' }}>Historique</h1>
+          <p style={{ margin: 0, fontSize: 13, color: MUTED, fontFamily: SANS, marginTop: 2 }}>Tous vos posts — programmés et directs</p>
         </div>
       </div>
 
       {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {filterBtn('all', 'Tout')}
         {filterBtn('scheduled', 'Programmé')}
         {filterBtn('direct', 'Direct')}
       </div>
 
       {/* List */}
-      <div style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 12, overflow: 'hidden' }}>
+      <div className="sf-card sf-anim-slide-up" style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 14, overflow: 'hidden', padding: 0 }}>
         {loading && items.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: FAINT, fontSize: 13, fontFamily: SANS }}>
+          <div style={{ padding: 48, textAlign: 'center', color: MUTED, fontSize: 13, fontFamily: SANS }}>
             Chargement…
           </div>
         ) : items.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 13, color: FAINT, fontFamily: SANS }}>Aucun historique pour l'instant</p>
+          <div style={{ padding: '56px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: 'rgba(99,102,241,0.06)', border: `1px solid ${HAIR}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
+              </svg>
+            </div>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: IVORY, fontFamily: SANS }}>Aucun historique pour l'instant</p>
+            <p style={{ margin: 0, fontSize: 12.5, color: FAINT, fontFamily: SANS }}>Vos posts programmés et directs apparaîtront ici.</p>
           </div>
         ) : (
           items.map((item, i) => {
@@ -188,20 +193,21 @@ export function History({ user }: { user: User }) {
               const typeLabel = TYPE_LABELS[post.type ?? ''] ?? 'Post'
               return (
                 <div key={`sp-${post.id}`} style={{
-                  padding: '13px 20px',
+                  padding: '14px 20px',
                   borderBottom: i < items.length - 1 ? `1px solid ${HAIR}` : 'none',
                   display: 'flex', alignItems: 'center', gap: 12,
                 }}>
                   <IconBox ok={ok} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
-                      margin: '0 0 2px', fontSize: 13, fontWeight: 600, color: IVORY,
+                      margin: '0 0 3px', fontSize: 13, fontWeight: 600, color: IVORY,
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SANS,
+                      fontVariantNumeric: 'tabular-nums',
                     }}>
                       {phones.length} compte{phones.length > 1 ? 's' : ''}
                       {post.caption ? ` · ${post.caption.slice(0, 50)}${post.caption.length > 50 ? '…' : ''}` : ''}
                     </p>
-                    <p style={{ margin: 0, fontSize: 11, color: FAINT, fontFamily: SANS }}>
+                    <p style={{ margin: 0, fontSize: 11.5, color: MUTED, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
                       {typeLabel} · Programmé · {fmtScheduledTime(post.executed_at ?? post.created_at)}
                     </p>
                   </div>
@@ -214,19 +220,20 @@ export function History({ user }: { user: User }) {
               const typeLabel = TYPE_LABELS[run.type] ?? run.type
               return (
                 <div key={`pr-${run.id}`} style={{
-                  padding: '13px 20px',
+                  padding: '14px 20px',
                   borderBottom: i < items.length - 1 ? `1px solid ${HAIR}` : 'none',
                   display: 'flex', alignItems: 'center', gap: 12,
                 }}>
                   <IconBox ok={ok} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
-                      margin: '0 0 2px', fontSize: 13, fontWeight: 600, color: IVORY, fontFamily: SANS,
+                      margin: '0 0 3px', fontSize: 13, fontWeight: 600, color: IVORY, fontFamily: SANS,
+                      fontVariantNumeric: 'tabular-nums',
                     }}>
                       {run.ok_count}/{run.total} compte{run.total > 1 ? 's' : ''}
                       {run.err_count > 0 ? ` · ${run.err_count} échec${run.err_count > 1 ? 's' : ''}` : ''}
                     </p>
-                    <p style={{ margin: 0, fontSize: 11, color: FAINT, fontFamily: SANS }}>
+                    <p style={{ margin: 0, fontSize: 11.5, color: MUTED, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
                       {typeLabel} · Direct · {fmtScheduledTime(run.created_at)}
                     </p>
                   </div>
@@ -240,27 +247,21 @@ export function History({ user }: { user: User }) {
         {/* Load more */}
         {hasMore && !loading && (
           <div style={{ padding: '14px 20px', borderTop: `1px solid ${HAIR}`, textAlign: 'center' }}>
-            <button
-              onClick={loadMore}
-              style={{
-                fontSize: 12, fontWeight: 600, color: '#818CF8', background: 'transparent',
-                border: '1px solid rgba(99,102,241,0.3)', borderRadius: 8, padding: '6px 20px',
-                cursor: 'pointer', fontFamily: SANS,
-              }}
-            >Charger plus</button>
+            <button className="sf-btn sf-btn-ghost sf-btn-sm" onClick={loadMore}>Charger plus</button>
           </div>
         )}
 
         {loading && items.length > 0 && (
-          <div style={{ padding: '14px 20px', textAlign: 'center', color: FAINT, fontSize: 12, fontFamily: SANS }}>
+          <div style={{ padding: '14px 20px', textAlign: 'center', color: MUTED, fontSize: 12, fontFamily: SANS }}>
             Chargement…
           </div>
         )}
       </div>
 
-      <p style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: FAINT, fontFamily: SANS }}>
+      <p style={{ marginTop: 16, textAlign: 'center', fontSize: 11, color: FAINT, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
         {items.length} entrée{items.length > 1 ? 's' : ''}
       </p>
+      </div>
     </div>
   )
 }

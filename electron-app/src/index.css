@@ -2328,3 +2328,138 @@ textarea:focus-visible {
 .sf-tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 .sf-row { transition: background var(--t-fast); }
 .sf-row:hover { background: rgba(255,255,255,0.022); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PREMIUM CONTROL-CENTER LAYER — couche finale partagée (gagne la cascade)
+   But : harmoniser TOUTES les pages sur une base dense, sobre et premium.
+   100% additif — n'altère aucun token ni aucune classe existante, ne fait
+   qu'affiner les fondations communes (boutons, cartes, pills, champs, tables,
+   scrollbars, en-têtes, nombres). Tout repose sur les variables déjà définies
+   (--surface, --border, --accent, --text-*, --r-*, --t-*) — aucune couleur
+   inventée hors palette.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* — Nombres tabulaires partout : alignement parfait des chiffres dans les
+     stats, tables, badges et inputs numériques (densité "data table"). — */
+.sf-stat-value,
+.sf-table td,
+.sf-badge,
+.sf-input[type="number"],
+.kpi-value {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "kern";
+}
+
+/* — En-tête de page : hiérarchie typographique premium (titre 800, sous-titre
+     discret) cohérente sur toutes les pages. — */
+.sf-page-title {
+  font-weight: 800;
+  letter-spacing: -0.022em;
+}
+.sf-page-sub { color: var(--text-2); }
+
+/* — Bouton primaire (.sf-btn-primary) : surface plus dense, halo accent
+     maîtrisé, presse tactile nette. — */
+.sf-btn-primary {
+  background: linear-gradient(150deg, #818CF8 0%, #6366F1 46%, #4F46E5 100%);
+  color: #fff;
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.35),
+    0 6px 20px -8px rgba(99,102,241,0.62),
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    inset 0 -1px 0 rgba(0,0,0,0.22);
+}
+.sf-btn-primary:hover {
+  background: linear-gradient(150deg, #8E97FA 0%, #6366F1 46%, #5B21B6 100%);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.35),
+    0 10px 30px -6px rgba(99,102,241,0.78),
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    inset 0 -1px 0 rgba(0,0,0,0.22);
+  transform: translateY(-1px);
+}
+.sf-btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.97); }
+
+/* — Cartes (.sf-card) : profondeur en couches + liseré supérieur lumineux,
+     hover vivant mais sobre. Base BG_2 conservée. — */
+.sf-card {
+  position: relative;
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.3),
+    0 6px 18px -10px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  transition: border-color var(--t-base), box-shadow var(--t-base), transform var(--t-smooth);
+}
+.sf-card:hover {
+  border-color: rgba(99,102,241,0.28);
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.32),
+    0 12px 34px -12px rgba(0,0,0,0.62),
+    0 0 26px -10px rgba(99,102,241,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* — Pills de statut (.sf-badge*) : lisibles, calibrées, look "table". Les
+     variantes héritent de leurs couleurs sémantiques (ok/warn/danger/accent/
+     muted) déjà définies — on ne touche qu'au gabarit. — */
+.sf-badge {
+  padding: 2.5px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 7px;
+  line-height: 1.45;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.sf-badge-accent { color: var(--accent-lt); }
+
+/* — Champs au focus : anneau accent net + surface qui respire, cohérent sur
+     les inputs sf et natifs (sans casser les styles inline éventuels). — */
+.sf-input:focus,
+.sf-textarea:focus {
+  outline: none;
+  border-color: rgba(99,102,241,0.6);
+  background: rgba(99,102,241,0.05);
+  box-shadow:
+    0 0 0 3px rgba(99,102,241,0.13),
+    0 0 16px -6px rgba(99,102,241,0.3),
+    inset 0 1px 0 rgba(99,102,241,0.06);
+}
+
+/* — Tables (.sf-table) : en-têtes denses, lignes lisibles, rail accent au
+     survol, alternance ténue pour le balayage vertical. — */
+.sf-table th {
+  background: rgba(255,255,255,0.015);
+  color: var(--text-3);
+  letter-spacing: 0.08em;
+}
+.sf-table tbody tr { transition: background var(--t-fast), box-shadow var(--t-fast); }
+.sf-table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.012); }
+.sf-table tbody tr:hover td {
+  background: rgba(99,102,241,0.05);
+  color: var(--text-1);
+}
+.sf-table tbody tr:hover td:first-child {
+  box-shadow: inset 2px 0 0 rgba(99,102,241,0.55);
+}
+
+/* — Scrollbars : fines, discrètes, accent au survol — partagées globalement
+     et sur les conteneurs scrollables des pages. — */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(150,158,205,0.18);
+  border-radius: 99px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99,102,241,0.42);
+  background-clip: padding-box;
+}
+* { scrollbar-width: thin; scrollbar-color: rgba(150,158,205,0.2) transparent; }
+
+/* — Empty states : icône + titre + description calibrés selon le cahier des
+     charges (titre 14/700, description 12.5 discrète). — */
+.sf-empty-title { font-size: 14px; font-weight: 700; }
+.sf-empty-desc  { font-size: 12.5px; color: var(--text-3); }

@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { Bank } from '@/pages/Bank'
 import { CaptionBank } from '@/pages/CaptionBank'
 import { playNav } from '@/lib/sounds'
+import { BG_0, BG_2, TEXT_1, TEXT_2, HAIR } from '@/lib/theme'
 
 type Tab = 'videos' | 'captions'
 
@@ -38,20 +39,22 @@ export function BankHub({ user, initialTab = 'videos' }: { user: User; initialTa
   const activeTab = TABS.find(t => t.id === tab)!
 
   return (
-    <div className="h-full flex flex-col overflow-hidden anim-page" style={{ background: 'var(--base)' }}>
+    <div className="h-full flex flex-col overflow-hidden anim-page" style={{ background: BG_0 }}>
 
-      {/* ── Premium header with gradient title ──────────────────────────────── */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div className="flex items-center gap-4 mb-5">
-          {/* Icon with glow */}
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0" style={{ padding: '24px 28px 20px', borderBottom: `1px solid ${HAIR}` }}>
+        <div className="flex items-center" style={{ gap: 16, marginBottom: 20 }}>
+          {/* Icon */}
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
+            className="flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
             style={{
-              background: `linear-gradient(135deg, rgba(${activeTab.accentRgb},0.18), rgba(${activeTab.accentRgb},0.06))`,
-              border: `1px solid rgba(${activeTab.accentRgb},0.3)`,
-              boxShadow: `0 0 20px -4px rgba(${activeTab.accentRgb},0.4)`,
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: BG_2,
+              border: `1px solid ${HAIR}`,
               color: activeTab.accent,
-              transition: 'all 0.3s ease',
+              transition: 'color 0.3s ease',
             }}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -59,8 +62,8 @@ export function BankHub({ user, initialTab = 'videos' }: { user: User; initialTa
             </svg>
           </div>
           <div>
-            <h1 className="text-[20px] font-black leading-none sf-text-gradient sf-anim-slide-up sf-d50">Content Bank</h1>
-            <p className="text-[13px] text-text3 mt-1 sf-anim-slide-up sf-d100">Manage your videos, media and caption templates</p>
+            <h1 className="sf-anim-slide-up sf-d50" style={{ fontSize: 21, fontWeight: 800, lineHeight: 1.1, color: TEXT_1 }}>Content Bank</h1>
+            <p className="sf-anim-slide-up sf-d100" style={{ fontSize: 13, color: TEXT_2, marginTop: 4 }}>Manage your videos, media and caption templates</p>
           </div>
         </div>
 

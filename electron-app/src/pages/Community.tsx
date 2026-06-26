@@ -1686,8 +1686,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       </span>
                     </div>
                   ))}
-                  <button className="w-full mt-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer"
-                    style={{ background: 'transparent', color: 'rgba(233,234,240,0.35)', border: '1px solid rgba(99,102,241,0.1)' }}>
+                  <button className="sf-btn sf-btn-ghost sf-btn-sm w-full mt-1 cursor-pointer">
                     {t('communityViewLeaderboard')}
                   </button>
                 </div>

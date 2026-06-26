@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { ACCENT, ACCENT_L, TEXT_1, TEXT_2, TEXT_3, HAIR, BG_1, BG_2, OK, WARN, ERR } from '@/lib/theme'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { getSignedUrl, uploadVideoFromPath } from '@/lib/storage'
@@ -44,10 +45,10 @@ function VideoThumb({ item, size = 'sm' }: { item: ContentItem; size?: 'sm' | 'm
   }, [item.thumbnail_path, item.storage_path])
   const h = size === 'md' ? 100 : 72
   return (
-    <div style={{ width: '100%', height: h, background: '#0E0E16', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+    <div style={{ width: '100%', height: h, background: BG_2, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
       {url
         ? <img src={url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(148,163,184,0.35)' }}><IconClapperboard size={18} /></div>
+        : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: TEXT_3 }}><IconClapperboard size={18} /></div>
       }
     </div>
   )
@@ -63,20 +64,20 @@ function PickerSidebar({
 }) {
   const btnBase: React.CSSProperties = {
     width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-    padding: '7px 12px', textAlign: 'left', fontSize: 12,
+    padding: '8px 12px', textAlign: 'left', fontSize: 12,
     background: 'transparent', border: 'none', cursor: 'pointer',
     overflow: 'hidden',
   }
   const active0 = active === null
   return (
-    <div style={{ width: 160, flexShrink: 0, borderRight: '1px solid rgba(99,102,241,0.08)', overflowY: 'auto', padding: '4px 0' }}>
+    <div style={{ width: 160, flexShrink: 0, borderRight: `1px solid ${HAIR}`, overflowY: 'auto', padding: '4px 0' }}>
       <button
         onClick={() => onSelect(null)}
-        style={{ ...btnBase, background: active0 ? 'rgba(99,102,241,0.12)' : 'transparent', borderLeft: `2px solid ${active0 ? '#6366F1' : 'transparent'}`, color: active0 ? '#818CF8' : '#52525b', paddingLeft: active0 ? 10 : 12 }}
+        style={{ ...btnBase, background: active0 ? 'rgba(99,102,241,0.12)' : 'transparent', borderLeft: `2px solid ${active0 ? ACCENT : 'transparent'}`, color: active0 ? ACCENT_L : TEXT_2, paddingLeft: active0 ? 10 : 12 }}
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span style={{ flex: 1 }}>{allLabel}</span>
-        <span style={{ fontSize: 10, opacity: 0.55 }}>{allCount}</span>
+        <span style={{ fontSize: 10, opacity: 0.55, fontVariantNumeric: 'tabular-nums' }}>{allCount}</span>
       </button>
       {folders.map(f => {
         const isA = active === f
@@ -84,7 +85,7 @@ function PickerSidebar({
           <button
             key={f}
             onClick={() => onSelect(f)}
-            style={{ ...btnBase, background: isA ? 'rgba(99,102,241,0.12)' : 'transparent', borderLeft: `2px solid ${isA ? '#6366F1' : 'transparent'}`, color: isA ? '#818CF8' : '#52525b', paddingLeft: isA ? 10 : 12 }}
+            style={{ ...btnBase, background: isA ? 'rgba(99,102,241,0.12)' : 'transparent', borderLeft: `2px solid ${isA ? ACCENT : 'transparent'}`, color: isA ? ACCENT_L : TEXT_2, paddingLeft: isA ? 10 : 12 }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
@@ -133,13 +134,13 @@ function VideoPicker({
   return (
     <div tabIndex={-1} ref={el => el?.focus()} onKeyDown={e => { if (e.key === 'Escape') onClose() }}
       style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', outline: 'none' }} onClick={onClose}>
-      <div style={{ background: '#0E0E16', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 20, width: 900, maxWidth: '95vw', height: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: BG_2, border: `1px solid ${HAIR}`, borderRadius: 16, width: 900, maxWidth: '95vw', height: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', flexShrink: 0 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
           </div>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#fff', flex: 1 }}>Banque vidéo</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, flex: 1 }}>Banque vidéo</h2>
           <input
             type="text" placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
             className="sf-input" style={{ width: 160 }}
@@ -157,19 +158,19 @@ function VideoPicker({
             {loading ? (
               <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="lg" /></div>
             ) : visible.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 64, color: '#52525b', fontSize: 13 }}>Aucune vidéo</div>
+              <div style={{ textAlign: 'center', paddingTop: 64, color: TEXT_3, fontSize: 13 }}>Aucune vidéo</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
                 {visible.map(item => {
                   const sel = selected.has(item.id)
                   return (
                     <div key={item.id} onClick={() => toggle(item.id)}
                       className="sf-hover-lift"
-                      style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', border: `2px solid ${sel ? '#6366F1' : 'rgba(99,102,241,0.08)'}`, background: '#07070B', transition: 'border-color 0.12s, transform 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease', position: 'relative' }}>
+                      style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', border: `2px solid ${sel ? ACCENT : HAIR}`, background: BG_1, transition: 'border-color 0.12s, transform 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease', position: 'relative' }}>
                       <VideoThumb item={item} size="md" />
-                      <p style={{ fontSize: 10, color: '#94a3b8', padding: '5px 6px 5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</p>
+                      <p style={{ fontSize: 10, color: TEXT_2, padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</p>
                       {sel && (
-                        <div style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 6, background: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 6, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="1.5 5 4 7.5 8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </div>
                       )}
@@ -220,13 +221,13 @@ function CaptionPicker({
   return (
     <div tabIndex={-1} ref={el => el?.focus()} onKeyDown={e => { if (e.key === 'Escape') onClose() }}
       style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', outline: 'none' }} onClick={onClose}>
-      <div style={{ background: '#0E0E16', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 20, width: 720, maxWidth: '95vw', height: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: BG_2, border: `1px solid ${HAIR}`, borderRadius: 16, width: 720, maxWidth: '95vw', height: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', flexShrink: 0 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </div>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#fff', flex: 1 }}>Banque de captions</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, flex: 1 }}>Banque de captions</h2>
           <input
             type="text" placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
             className="sf-input" style={{ width: 160 }}
@@ -244,7 +245,7 @@ function CaptionPicker({
             {loading ? (
               <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="lg" /></div>
             ) : visible.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 64, color: '#52525b', fontSize: 13 }}>Aucune caption</div>
+              <div style={{ textAlign: 'center', paddingTop: 64, color: TEXT_3, fontSize: 13 }}>Aucune caption</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {visible.map(item => {
@@ -252,13 +253,13 @@ function CaptionPicker({
                   return (
                     <div key={item.id} onClick={() => toggle(item.id)}
                       className="sf-hover-lift"
-                      style={{ padding: '12px 14px', borderRadius: 12, background: sel ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.025)', border: `1px solid ${sel ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`, cursor: 'pointer', transition: 'all 0.12s', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? '#6366F1' : 'rgba(255,255,255,0.15)'}`, background: sel ? '#6366F1' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                      style={{ padding: '12px 14px', borderRadius: 12, background: sel ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${sel ? 'rgba(99,102,241,0.4)' : HAIR}`, cursor: 'pointer', transition: 'all 0.12s', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? ACCENT : 'rgba(255,255,255,0.15)'}`, background: sel ? ACCENT : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                         {sel && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="1.5 5 4 7.5 8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        {item.title && <p style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</p>}
-                        <p className="line-clamp-3" style={{ fontSize: 11, color: '#52525b', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{item.content}</p>
+                        {item.title && <p style={{ fontSize: 12, fontWeight: 600, color: TEXT_1, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</p>}
+                        <p className="line-clamp-3" style={{ fontSize: 11, color: TEXT_2, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{item.content}</p>
                         {item.folder && (
                           <span className="sf-badge sf-badge-accent" style={{ marginTop: 6, display: 'inline-flex' }}>{item.folder}</span>
                         )}
@@ -385,12 +386,12 @@ export function Mixer({ user }: MixerProps) {
       {/* ── Avertissement : en développement ── */}
       {devNoticeOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(14,14,22,0.85)', backdropFilter: 'blur(6px)' }}>
-          <div className="sf-card sf-anim-slide-up" style={{ maxWidth: 440, padding: '40px 48px', textAlign: 'center', borderColor: 'rgba(245,158,11,0.22)', background: 'rgba(245,158,11,0.03)' }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#F59E0B' }}>
+          <div className="sf-card sf-anim-slide-up" style={{ maxWidth: 440, padding: '40px 48px', textAlign: 'center', borderColor: 'rgba(251,191,36,0.22)', background: 'rgba(251,191,36,0.03)' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: WARN }}>
               <IconClapperboard size={26} />
             </div>
-            <h2 style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ivory)', marginBottom: 10 }}>En développement</h2>
-            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65 }}>Cette fonctionnalité est encore en développement — il peut y avoir des bugs.</p>
+            <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: TEXT_1, marginBottom: 10 }}>En développement</h2>
+            <p style={{ fontSize: 13, color: TEXT_2, lineHeight: 1.65 }}>Cette fonctionnalité est encore en développement — il peut y avoir des bugs.</p>
             <button onClick={() => setDevNoticeOpen(false)} className="sf-btn sf-btn-primary cursor-pointer" style={{ marginTop: 24 }}>
               Continuer
             </button>
@@ -410,7 +411,7 @@ export function Mixer({ user }: MixerProps) {
             boxShadow: '0 0 24px -6px rgba(99,102,241,0.5)',
           }}>
             {/* Edit + merge icon */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
@@ -420,7 +421,7 @@ export function Mixer({ user }: MixerProps) {
               <h1 className="sf-page-title" style={{
                 background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(233,234,240,0.9) 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                fontSize: 22, fontWeight: 900,
+                fontSize: 22, fontWeight: 800,
               }}>
                 Mixer
               </h1>
@@ -472,7 +473,7 @@ export function Mixer({ user }: MixerProps) {
           <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
               </div>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Vidéos source</span>
             </div>
@@ -498,7 +499,8 @@ export function Mixer({ user }: MixerProps) {
                 <div className="sf-empty-icon">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-glow)" strokeWidth="1.75"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
                 </div>
-                <p className="sf-empty-desc" style={{ fontSize: 12 }}>Aucune vidéo<br/>Ajoute depuis la banque</p>
+                <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>Aucune vidéo</p>
+                <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>Ajoute des vidéos depuis la banque</p>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -523,7 +525,7 @@ export function Mixer({ user }: MixerProps) {
           <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               </div>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Captions</span>
             </div>
@@ -549,7 +551,8 @@ export function Mixer({ user }: MixerProps) {
                 <div className="sf-empty-icon">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-glow)" strokeWidth="1.75" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 </div>
-                <p className="sf-empty-desc" style={{ fontSize: 12 }}>Aucune caption<br/>Ajoute depuis la banque</p>
+                <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>Aucune caption</p>
+                <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>Ajoute des captions depuis la banque</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -573,7 +576,7 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Config card */}
           <div className="sf-card sf-spotlight" style={{ padding: '20px 22px' }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.11em', marginBottom: 18 }}>Configuration du texte</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 20 }}>Configuration du texte</p>
 
             {/* Position */}
             <div style={{ marginBottom: 20 }}>
@@ -581,7 +584,7 @@ export function Mixer({ user }: MixerProps) {
               <div style={{ display: 'flex', gap: 8 }}>
                 {(['top', 'middle', 'bottom'] as MixPosition[]).map(p => (
                   <button key={p} onClick={() => setPosition(p)} className="cursor-pointer"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, transition: 'all 0.12s', border: position === p ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', background: position === p ? 'rgba(99,102,241,0.18)' : 'var(--surface)', color: position === p ? '#818CF8' : 'var(--text-3)', cursor: 'pointer' }}>
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, transition: 'all 0.12s', border: position === p ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', background: position === p ? 'rgba(99,102,241,0.18)' : 'var(--surface)', color: position === p ? ACCENT_L : TEXT_3, cursor: 'pointer' }}>
                     {p === 'top' ? <><IconChevronUp size={14} /> Haut</> : p === 'middle' ? <><IconAlignCenter size={14} /> Centre</> : <><IconChevronDown size={14} /> Bas</>}
                   </button>
                 ))}
@@ -592,7 +595,7 @@ export function Mixer({ user }: MixerProps) {
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <p className="sf-section-label" style={{ margin: 0 }}>Taille de police</p>
-                <span className="sf-badge sf-badge-accent">{fontSize}px</span>
+                <span className="sf-badge sf-badge-accent" style={{ fontVariantNumeric: 'tabular-nums' }}>{fontSize}px</span>
               </div>
               <input type="range" min={18} max={72} step={2} value={fontSize} onChange={e => setFontSize(Number(e.target.value))}
                 style={{ width: '100%', accentColor: '#6366F1', cursor: 'pointer' }} />
@@ -603,10 +606,10 @@ export function Mixer({ user }: MixerProps) {
               <p className="sf-section-label" style={{ marginBottom: 8 }}>Couleur du texte</p>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="color" value={fontColor} onChange={e => setFontColor(e.target.value)}
-                  style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border-md)', background: 'transparent', cursor: 'pointer', padding: 2 }} />
+                  style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${HAIR}`, background: 'transparent', cursor: 'pointer', padding: 2 }} />
                 {['#ffffff', '#000000', '#ffff00', '#ff4444', '#44aaff'].map(c => (
                   <button key={c} onClick={() => setFontColor(c)} className="cursor-pointer"
-                    style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: `2px solid ${fontColor === c ? '#6366F1' : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', transform: fontColor === c ? 'scale(1.15)' : 'scale(1)', transition: 'all 0.1s' }} />
+                    style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: `2px solid ${fontColor === c ? ACCENT : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', transform: fontColor === c ? 'scale(1.15)' : 'scale(1)', transition: 'all 0.1s' }} />
                 ))}
               </div>
             </div>
@@ -622,16 +625,16 @@ export function Mixer({ user }: MixerProps) {
             <div className="sf-card anim-scale-in" style={{ padding: '16px 20px', borderColor: 'rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.06)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 </div>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: '#818CF8' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: ACCENT_L, fontVariantNumeric: 'tabular-nums' }}>
                     {mode === 'random'
                       ? `${selVideos.length} vidéo${selVideos.length > 1 ? 's' : ''} × 1 caption = ${selVideos.length} résultat${selVideos.length > 1 ? 's' : ''}`
                       : `${selVideos.length} × ${selCaptions.length} = ${selVideos.length * selCaptions.length} résultat${selVideos.length * selCaptions.length > 1 ? 's' : ''}`
                     }
                   </p>
-                  <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>Mode: {mode === 'random' ? 'Aléatoire — 1 caption par vidéo' : 'Toutes les combinaisons'}</p>
+                  <p style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>Mode: {mode === 'random' ? 'Aléatoire — 1 caption par vidéo' : 'Toutes les combinaisons'}</p>
                 </div>
               </div>
             </div>
@@ -639,8 +642,8 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Error */}
           {error && (
-            <div className="sf-card" style={{ padding: '12px 16px', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.06)' }}>
-              <p style={{ fontSize: 12, color: '#f87171' }}>{error}</p>
+            <div className="sf-card" style={{ padding: '12px 16px', borderColor: 'rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.06)' }}>
+              <p style={{ fontSize: 12, color: ERR }}>{error}</p>
             </div>
           )}
         </div>
@@ -650,13 +653,13 @@ export function Mixer({ user }: MixerProps) {
       {jobs.length > 0 && (
         <div className="sf-anim-slide-up" style={{ flexShrink: 0, height: 228, borderTop: '1px solid var(--border)', padding: '14px 20px', overflowX: 'auto', background: 'var(--surface)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexShrink: 0 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Résultats</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Résultats</p>
             {running && <div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />}
-            {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok">{doneJobs.length}/{jobs.length} terminés</span>}
-            {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger">{errorJobs.length} erreur{errorJobs.length > 1 ? 's' : ''}</span>}
+            {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok" style={{ fontVariantNumeric: 'tabular-nums' }}>{doneJobs.length}/{jobs.length} terminés</span>}
+            {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger" style={{ fontVariantNumeric: 'tabular-nums' }}>{errorJobs.length} erreur{errorJobs.length > 1 ? 's' : ''}</span>}
             {doneJobs.length > 0 && (
-              <div style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-4)', whiteSpace: 'nowrap' }}>
-                Dossier : <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
+              <div style={{ marginLeft: 'auto', fontSize: 10, color: TEXT_3, whiteSpace: 'nowrap' }}>
+                Dossier : <span style={{ color: ACCENT_L, fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
               </div>
             )}
           </div>
@@ -670,8 +673,8 @@ export function Mixer({ user }: MixerProps) {
                       onMouseLeave={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }} />
                   ) : job.status === 'error' ? (
                     <div title={job.error} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, width: '100%', height: '100%' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                      <span style={{ color: '#f87171', fontSize: 9, textAlign: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}>{job.error ?? 'Erreur'}</span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ERR} strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <span style={{ color: ERR, fontSize: 9, textAlign: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}>{job.error ?? 'Erreur'}</span>
                     </div>
                   ) : (
                     <div className="sf-spinner" />
@@ -699,12 +702,12 @@ export function Mixer({ user }: MixerProps) {
                             } catch { /* ignore upload errors */ }
                           }}
                           className="sf-press cursor-pointer"
-                          style={{ background: 'rgba(99,102,241,0.85)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
+                          style={{ background: ACCENT, borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg>
                         </button>
                       )}
                       {job.savedToBank && (
-                        <div title="Sauvegardé dans la banque" style={{ background: 'rgba(34,197,94,0.85)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div title="Sauvegardé dans la banque" style={{ background: OK, borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
                       )}

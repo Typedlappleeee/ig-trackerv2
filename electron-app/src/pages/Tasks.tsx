@@ -2876,10 +2876,10 @@ function EmptyState({ onNew }: { onNew: () => void }) {
         }} />
       </div>
 
-      <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--ivory)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--ivory)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
         Aucune tâche automatique
       </p>
-      <p style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--muted)', margin: '0 0 28px', maxWidth: 360 }}>
+      <p style={{ fontSize: 12.5, lineHeight: 1.7, color: 'var(--text-3)', margin: '0 0 24px', maxWidth: 360 }}>
         Les tâches automatiques postent sur tes comptes à intervalles réguliers, sans action de ta part.
       </p>
 
@@ -3024,16 +3024,14 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
         {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{
-            margin: '0 0 4px', fontSize: 13.5, fontWeight: 700, color: 'var(--ivory)',
+            margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: 'var(--ivory)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {run.created_by_name || 'Tâche'}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{
-              fontSize: 10.5, fontWeight: 700, color: cfg.color,
-              background: cfg.bg, border: `1px solid ${cfg.border}`,
-              borderRadius: 20, padding: '2px 9px',
+            <span className="sf-badge" style={{
+              color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`,
             }}>
               {cfg.label}
             </span>
@@ -3541,8 +3539,8 @@ function EmptyTab({ icon, title, text, onNew }: {
       }}>
         {icon}
       </div>
-      <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--ivory)', margin: '0 0 8px' }}>{title}</p>
-      <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--muted)', margin: '0 0 20px', maxWidth: 340 }}>{text}</p>
+      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--ivory)', margin: '0 0 8px' }}>{title}</p>
+      <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-3)', margin: '0 0 20px', maxWidth: 340 }}>{text}</p>
       {onNew && (
         <button onClick={onNew} className="sf-btn sf-btn-primary cursor-pointer"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>

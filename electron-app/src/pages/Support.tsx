@@ -464,7 +464,7 @@ function ThreadView({
             <span className="text-border">·</span>
             <span>{categoryLabel(t, ticket.category)}</span>
             <span className="text-border">·</span>
-            <span>{fmtDate(ticket.created_at, lang)}</span>
+            <span className="tabular-nums">{fmtDate(ticket.created_at, lang)}</span>
           </p>
         </div>
         {isAdmin && (
@@ -521,7 +521,7 @@ function ThreadView({
                       {m.is_admin && (
                         <span className="sf-badge sf-badge-accent text-[10px]">Admin</span>
                       )}
-                      <span className="text-[11px] text-text3">{fmtDate(m.created_at, lang)}</span>
+                      <span className="text-[11px] text-text3 tabular-nums">{fmtDate(m.created_at, lang)}</span>
                     </div>
                     <div
                       className={`rounded-2xl px-4 py-3 text-[13px] text-text whitespace-pre-wrap leading-relaxed max-w-[85%] ${
@@ -680,8 +680,8 @@ function UserSupport({ user }: { user: User }) {
               <div className="text-accent/60 sf-anim-scale-spring">
                 <IconTicket />
               </div>
-              <p className="text-base font-bold text-text mt-2">{t('supportNoTicketsYet')}</p>
-              <p className="text-[13px] text-text3">{t('supportNoTicketsHint')}</p>
+              <p className="text-[14px] font-bold text-text mt-2">{t('supportNoTicketsYet')}</p>
+              <p className="text-[12.5px] text-text3">{t('supportNoTicketsHint')}</p>
               <button
                 onClick={() => setView('create')}
                 className="sf-btn sf-btn-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2 mt-2"
@@ -712,7 +712,7 @@ function UserSupport({ user }: { user: User }) {
                       <p className="text-[11px] text-text3 flex items-center gap-1.5">
                         <span>{categoryLabel[tk.category]}</span>
                         <span className="text-border">·</span>
-                        <span>{fmtDate(tk.created_at, lang)}</span>
+                        <span className="tabular-nums">{fmtDate(tk.created_at, lang)}</span>
                       </p>
                     </div>
                     <div className="text-text3 group-hover:text-text2 transition-colors mt-1 shrink-0">
@@ -783,7 +783,7 @@ function AdminSupport({ user }: { user: User }) {
         <div className="sf-page-header">
           <div className="sf-anim-slide-up sf-d50">
             <h1 className="sf-page-title">{t('supportAdminPanel')}</h1>
-            <p className="sf-page-subtitle">{tickets.length} {t('supportAdminTotal')}</p>
+            <p className="sf-page-subtitle"><span className="tabular-nums">{tickets.length}</span> {t('supportAdminTotal')}</p>
           </div>
         </div>
         <div className="sf-page-body">
@@ -805,7 +805,7 @@ function AdminSupport({ user }: { user: User }) {
       <div className="sf-page-header">
         <div className="sf-anim-slide-up sf-d50">
           <h1 className="sf-page-title">{t('supportAdminTickets')}</h1>
-          <p className="sf-page-subtitle">{tickets.length} {t('supportAdminTotal')}</p>
+          <p className="sf-page-subtitle"><span className="tabular-nums">{tickets.length}</span> {t('supportAdminTotal')}</p>
         </div>
         <button
           onClick={load}
@@ -838,7 +838,7 @@ function AdminSupport({ user }: { user: User }) {
                 {s === 'all'
                   ? t('supportAdminAll')
                   : t(`supportStatus${s === 'in_progress' ? 'InProgress' : s.charAt(0).toUpperCase() + s.slice(1)}` as Parameters<typeof t>[0])}
-                <span className="ml-1 opacity-60 text-[11px]">({counts[s] ?? 0})</span>
+                <span className="ml-1 opacity-60 text-[11px] tabular-nums">({counts[s] ?? 0})</span>
               </button>
             ))}
           </div>
@@ -853,21 +853,21 @@ function AdminSupport({ user }: { user: User }) {
         ) : shown.length === 0 ? (
           <div className="sf-empty">
             <div className="text-accent/60 sf-anim-scale-spring"><IconTicket /></div>
-            <p className="text-[13px] text-text3 mt-2">{t('supportAdminNoTickets')}</p>
+            <p className="text-[14px] font-bold text-text mt-2">{t('supportAdminNoTickets')}</p>
           </div>
         ) : (
-          <div className="sf-card overflow-hidden sf-anim-slide-up sf-d200">
-            <table className="w-full">
+          <div className="sf-table-wrap sf-card overflow-hidden sf-anim-slide-up sf-d200">
+            <table className="sf-table w-full">
               <thead>
                 <tr className="border-b border-border bg-surface2/50">
-                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColSubject')}</th>
-                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColEmail')}</th>
-                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColOrg')}</th>
-                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColCat')}</th>
-                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColStatus')}</th>
-                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColPriority')}</th>
-                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColMsgs')}</th>
-                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColUpdated')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColSubject')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColEmail')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColOrg')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColCat')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColStatus')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColPriority')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColMsgs')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportAdminColUpdated')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -883,8 +883,8 @@ function AdminSupport({ user }: { user: User }) {
                     <td className="px-5 py-4 text-[13px] text-text2">{categoryLabel[tk.category]}</td>
                     <td className="px-5 py-4"><StatusBadge status={tk.status} /></td>
                     <td className="px-5 py-4"><PriorityBadge priority={tk.priority} /></td>
-                    <td className="px-5 py-4 text-[13px] text-text2 text-center">{tk.message_count ?? 0}</td>
-                    <td className="px-5 py-4 text-[13px] text-text3 whitespace-nowrap">{fmtDate(tk.updated_at, lang)}</td>
+                    <td className="px-5 py-4 text-[13px] text-text2 text-center tabular-nums">{tk.message_count ?? 0}</td>
+                    <td className="px-5 py-4 text-[13px] text-text3 whitespace-nowrap tabular-nums">{fmtDate(tk.updated_at, lang)}</td>
                   </tr>
                 ))}
               </tbody>

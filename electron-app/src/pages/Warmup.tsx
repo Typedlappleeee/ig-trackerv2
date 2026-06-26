@@ -464,13 +464,13 @@ export function Warmup({ user }: WarmupProps) {
             {onlineCount > 0
               ? <span className="sf-ping-dot" />
               : <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />}
-            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)' }}>
+            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
               <span style={{ color: onlineCount > 0 ? 'var(--ok)' : 'var(--text-4)', fontWeight: 700 }}>{onlineCount}</span>
               /{phones.length} {t('warmupOnline')}
             </span>
           </div>
           {selected.size > 0 && (
-            <span className="sf-badge sf-badge-violet" style={{ fontSize: 12, padding: '4px 10px' }}>
+            <span className="sf-badge sf-badge-accent" style={{ fontSize: 12, padding: '4px 10px', fontVariantNumeric: 'tabular-nums' }}>
               {selected.size} {t('warmupSelected')}{lang === 'fr' && selected.size !== 1 ? 's' : ''}
             </span>
           )}
@@ -502,7 +502,7 @@ export function Warmup({ user }: WarmupProps) {
                   <span style={{ color: 'var(--accent-l)', display: 'flex' }}><IconSmartphone size={15} /></span>
                   <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{t('warmupPhoneList')}</span>
                   {phones.length > 0 && (
-                    <span className="sf-badge sf-badge-violet">{phones.length}</span>
+                    <span className="sf-badge sf-badge-accent" style={{ fontVariantNumeric: 'tabular-nums' }}>{phones.length}</span>
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -545,7 +545,7 @@ export function Warmup({ user }: WarmupProps) {
                   <div style={{
                     padding: '0 10px', height: 32, display: 'flex', alignItems: 'center',
                     borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)',
-                    fontSize: 11, fontFamily: 'monospace', color: 'var(--text-4)', flexShrink: 0,
+                    fontSize: 11, fontFamily: 'monospace', color: 'var(--text-4)', flexShrink: 0, fontVariantNumeric: 'tabular-nums',
                   }}>
                     {visiblePhones.length}/{phones.length}
                   </div>
@@ -640,7 +640,7 @@ export function Warmup({ user }: WarmupProps) {
 
                       {/* Job status badge */}
                       {job && job.status !== 'idle' && (
-                        <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-green' : job.status === 'error' ? 'sf-badge-red' : 'sf-badge-violet'}`}
+                        <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-ok' : job.status === 'error' ? 'sf-badge-danger' : 'sf-badge-accent'}`}
                           style={{ fontSize: 10, flexShrink: 0 }}>
                           {job.status === 'done' ? t('warmupDoneLabel') : job.status === 'error' ? t('warmupErrLabel') : t('warmupRunLabel')}
                         </span>
@@ -690,7 +690,7 @@ export function Warmup({ user }: WarmupProps) {
                             : `${doneCount}/${jobs.length} ${t('warmupSuccessPartial')} · ${errorCount} ${t('warmupErrors')}`}
                       </p>
                       {running && (
-                        <p style={{ fontSize: 11, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 2 }}>
+                        <p style={{ fontSize: 11, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                           {doneCount} {t('warmupDoneLabel').toLowerCase()} · {runningCount} {lang === 'en' ? 'active' : 'actif'} · {idleCount} {lang === 'en' ? 'waiting' : 'en attente'}
                         </p>
                       )}
@@ -710,7 +710,7 @@ export function Warmup({ user }: WarmupProps) {
                       <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                         {t('warmupProgression')}
                       </span>
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-l)' }}>{progress}%</span>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-l)', fontVariantNumeric: 'tabular-nums' }}>{progress}%</span>
                     </div>
                     <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                       <div style={{
@@ -761,7 +761,7 @@ export function Warmup({ user }: WarmupProps) {
                               </p>
                             )}
                           </div>
-                          <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-green' : job.status === 'error' ? 'sf-badge-red' : job.status === 'running' ? 'sf-badge-violet' : ''}`}
+                          <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-ok' : job.status === 'error' ? 'sf-badge-danger' : job.status === 'running' ? 'sf-badge-accent' : 'sf-badge-muted'}`}
                             style={{ fontSize: 9, flexShrink: 0 }}>
                             {job.status}
                           </span>
@@ -1034,7 +1034,7 @@ export function Warmup({ user }: WarmupProps) {
                         value={editBio} onChange={e => setEditBio(e.target.value)}
                         className="sf-input sf-textarea" style={{ fontSize: 12, resize: 'none' }}
                       />
-                      <p style={{ fontSize: 10, marginTop: 3, fontFamily: 'monospace', color: editBio.length > 150 ? 'var(--err)' : 'var(--text-4)' }}>
+                      <p style={{ fontSize: 10, marginTop: 3, fontFamily: 'monospace', color: editBio.length > 150 ? 'var(--err)' : 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>
                         {editBio.length}/150
                       </p>
                     </div>
@@ -1202,7 +1202,7 @@ export function Warmup({ user }: WarmupProps) {
                     ].map(({ label, value, color }) => (
                       <div key={label} style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
                         <p style={{ fontSize: 9, fontFamily: 'monospace', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{label}</p>
-                        <p style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace', color }}>{value}</p>
+                        <p style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace', color, fontVariantNumeric: 'tabular-nums' }}>{value}</p>
                       </div>
                     ))}
                   </div>

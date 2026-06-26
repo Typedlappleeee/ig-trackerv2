@@ -557,7 +557,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   </svg>
                 </div>
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: sources.length ? '#6366F1' : 'var(--ivory)', marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: sources.length ? '#6366F1' : 'var(--text-1)', marginBottom: 4 }}>
                 {sources.length ? `${sources.length} vidéo${sources.length > 1 ? 's' : ''} sélectionnée${sources.length > 1 ? 's' : ''}` : t('repurposeDropVideo')}
               </div>
               <div style={{ fontSize: 10, color: 'var(--muted)' }}>
@@ -571,7 +571,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 {sources.map((src, i) => (
                   <div key={i} className="sf-card" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 9 }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(99,102,241,0.7)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
-                    <span style={{ flex: 1, fontSize: 11, color: 'var(--ivory)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ flex: 1, fontSize: 11, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {src.name.slice(0, 22)}{src.name.length > 22 ? '…' : ''}
                     </span>
                     {!running && (
@@ -770,7 +770,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
         </div>
 
         {/* ── Right: output preview / variants grid ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', background: 'var(--base)' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', background: 'var(--base)' }}>
           {jobs.length === 0 ? (
             <div className="sf-empty anim-stagger" style={{ height: '100%' }}>
               {/* Animated icon */}

@@ -288,8 +288,8 @@ export function Licences({ user: _user }: Props) {
                   {s.icon}
                 </svg>
               </div>
-              <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
-              <p className="text-[12px] text-text2 mt-1">{s.label}</p>
+              <p className={`text-3xl font-black ${s.color}`} style={{ fontVariantNumeric: 'tabular-nums' }}>{s.value}</p>
+              <p className="text-[11px] font-semibold text-text2 mt-1 uppercase" style={{ letterSpacing: '0.04em' }}>{s.label}</p>
             </div>
           ))}
         </div>
@@ -300,11 +300,11 @@ export function Licences({ user: _user }: Props) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14"/>
             </svg>
-            <p className="text-[15px] font-bold text-text">{t('createKey')}</p>
+            <p className="text-[13px] font-bold text-text">{t('createKey')}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">{lang === 'en' ? 'Generated key' : 'Clé générée'}</label>
+              <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{lang === 'en' ? 'Generated key' : 'Clé générée'}</label>
               <div className="flex gap-2">
                 <input
                   value={genKey}
@@ -323,14 +323,14 @@ export function Licences({ user: _user }: Props) {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">{t('keyDuration')}</label>
+              <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{t('keyDuration')}</label>
               <div className="flex gap-2 flex-wrap">
                 {DURATIONS.map(d => (
                   <button
                     key={d.label}
                     onClick={() => setDuration(d.days)}
                     className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
-                    style={duration === d.days ? { background: 'linear-gradient(130deg,#6366F1,#6366F1)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={duration === d.days ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     {d.label}
                   </button>
@@ -338,7 +338,7 @@ export function Licences({ user: _user }: Props) {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">{t('keyPlan')}</label>
+              <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{t('keyPlan')}</label>
               <div className="flex gap-2">
                 {['standard', 'pro', 'organisation'].map(p => (
                   <button
@@ -353,7 +353,7 @@ export function Licences({ user: _user }: Props) {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">{t('keyNotes')}</label>
+              <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{t('keyNotes')}</label>
               <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="ex: Discord @pseudo" />
             </div>
           </div>
@@ -394,10 +394,12 @@ export function Licences({ user: _user }: Props) {
             </div>
           ) : filtered.length === 0 ? (
             <div className="sf-empty">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 8.3-8.3"/><path d="m17 5 3 3"/><path d="m14 8 3 3"/>
-              </svg>
-              <p>{t('noKeys')}</p>
+              <div className="sf-empty-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 8.3-8.3"/><path d="m17 5 3 3"/><path d="m14 8 3 3"/>
+                </svg>
+              </div>
+              <p className="sf-empty-title">{t('noKeys')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -435,7 +437,7 @@ export function Licences({ user: _user }: Props) {
                   )}
 
                   {/* Expiry */}
-                  <span className={`text-[13px] font-medium ml-auto ${daysLeftColor(k.expires_at)}`}>
+                  <span className={`text-[13px] font-medium ml-auto ${daysLeftColor(k.expires_at)}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {daysLeft(k.expires_at, lang)}
                   </span>
 
@@ -480,17 +482,17 @@ export function Licences({ user: _user }: Props) {
               </svg>
             </div>
             <div>
-              <h2 className="text-[18px] font-black text-text leading-none">{lang === 'en' ? 'Credit codes' : 'Codes de crédits'}</h2>
+              <h2 className="text-[16px] font-black text-text leading-none">{lang === 'en' ? 'Credit codes' : 'Codes de crédits'}</h2>
               <p className="text-[13px] text-text2 mt-0.5">{lang === 'en' ? 'Generate codes that users can redeem for credits' : 'Génère des codes que les utilisateurs peuvent échanger contre des crédits'}</p>
             </div>
           </div>
 
           {/* Create form */}
           <div className="sf-card p-6 space-y-5">
-            <p className="text-[15px] font-bold text-text mb-1">{lang === 'en' ? 'New code' : 'Nouveau code'}</p>
+            <p className="text-[13px] font-bold text-text mb-1">{lang === 'en' ? 'New code' : 'Nouveau code'}</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="space-y-2">
-                <p className="text-[12px] text-text2 uppercase tracking-wider">Code</p>
+                <p className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>Code</p>
                 <Input value={ccGenCode} onChange={e => setCcGenCode(e.target.value.toUpperCase())}
                   className="font-mono text-[13px]" />
                 <button onClick={() => setCcGenCode(generateCreditCode())}
@@ -502,15 +504,15 @@ export function Licences({ user: _user }: Props) {
                 </button>
               </div>
               <div className="space-y-2">
-                <p className="text-[12px] text-text2 uppercase tracking-wider">{lang === 'en' ? 'Amount (credits)' : 'Montant (crédits)'}</p>
+                <p className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{lang === 'en' ? 'Amount (credits)' : 'Montant (crédits)'}</p>
                 <Input type="number" value={ccAmount} onChange={e => setCcAmount(Number(e.target.value))}
-                  min={1} step={1} className="text-[13px]" />
+                  min={1} step={1} className="text-[13px]" style={{ fontVariantNumeric: 'tabular-nums' }} />
                 {!ccAmountValid && (
                   <p className="text-[12px] text-danger">{lang === 'en' ? 'Enter a whole number ≥ 1.' : 'Saisis un nombre entier ≥ 1.'}</p>
                 )}
               </div>
               <div className="space-y-2">
-                <p className="text-[12px] text-text2 uppercase tracking-wider">Notes</p>
+                <p className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>Notes</p>
                 <Input value={ccNotes} onChange={e => setCcNotes(e.target.value)}
                   placeholder={lang === 'en' ? 'Optional…' : 'Optionnel…'} className="text-[13px]" />
               </div>
@@ -532,17 +534,19 @@ export function Licences({ user: _user }: Props) {
               </div>
             ) : creditCodes.length === 0 ? (
               <div className="sf-empty">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>
-                </svg>
-                <p>{lang === 'en' ? 'No codes created.' : 'Aucun code créé.'}</p>
+                <div className="sf-empty-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>
+                  </svg>
+                </div>
+                <p className="sf-empty-title">{lang === 'en' ? 'No codes created.' : 'Aucun code créé.'}</p>
               </div>
             ) : (
               <div className="divide-y divide-border">
                 {creditCodes.map(c => (
                   <div key={c.id} className="flex items-center gap-3 px-5 py-3.5">
                     <code className="flex-1 font-mono text-[13px] text-text">{c.code}</code>
-                    <span className="text-[13px] font-bold text-accent">+{c.amount} {lang === 'en' ? 'credits' : 'crédits'}</span>
+                    <span className="text-[13px] font-bold text-accent" style={{ fontVariantNumeric: 'tabular-nums' }}>+{c.amount} {lang === 'en' ? 'credits' : 'crédits'}</span>
                     {c.used_by ? (
                       <span className="sf-badge sf-badge-muted">{lang === 'en' ? 'Used' : 'Utilisé'}</span>
                     ) : c.is_active ? (
