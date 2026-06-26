@@ -556,6 +556,7 @@ const Phones          = lazy(() => import('@/pages/Phones').then(m => ({ default
 
 const TikTokPosting   = lazy(() => import('@/pages/TikTokPosting'))
 const Publish        = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
+const Stats          = lazy(() => import('@/pages/Stats').then(m => ({ default: m.Stats })))
 const BankHub        = lazy(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
 const Montage        = lazy(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
 const Remix          = lazy(() => import('@/pages/Remix').then(m => ({ default: m.Remix })))
@@ -861,6 +862,7 @@ function AppContent({ user }: { user: User }) {
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
       case 'hub':          return <Hub          user={user} onNavigate={handleNavigate} />
+      case 'stats':        return <Stats        user={user} />
       case 'scaleia':      return <ScaleIA />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
