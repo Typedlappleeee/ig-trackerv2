@@ -903,7 +903,7 @@ const isElectron = typeof window !== 'undefined' && !!window.electronAPI
 const FORCE_LOGOUT_VER = 'sf_v4'
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user, loading, isPasswordRecovery, clearPasswordRecovery } = useAuth()
   const [splashDone, setSplashDone] = useState(false)
 
   // Force re-login for all users (version bump invalidates old sessions)
@@ -915,14 +915,15 @@ export default function App() {
   }, [])
 
   // Web: show landing when not logged in (Electron keeps the auth page directly)
-  if (!isElectron && !loading && !user) return <ChunkErrorBoundary><Suspense fallback={<FullPageLoader />}><Landing /></Suspense></ChunkErrorBoundary>
+  if (!isElectron && !loading && !user && !isPasswordRecovery) return <ChunkErrorBoundary><Suspense fallback={<FullPageLoader />}><Landing /></Suspense></ChunkErrorBoundary>
 
   return (
     <>
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       {splashDone && (
-        loading        ? <FullPageLoader /> :
-        !user          ? <AuthPage />       :
+        loading             ? <FullPageLoader /> :
+        isPasswordRecovery  ? <AuthPage initialTab="reset" onResetDone={clearPasswordRecovery} /> :
+        !user               ? <AuthPage />       :
         <LangProvider><OrgProvider user={user}><AppContent user={user} /></OrgProvider></LangProvider>
       )}
       <FlameOverlay />

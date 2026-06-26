@@ -36,8 +36,13 @@ function SFLogoMark() {
   )
 }
 
-export function AuthPage() {
-  const [tab, setTab]           = useState<Tab>('login')
+interface AuthPageProps {
+  initialTab?: Tab
+  onResetDone?: () => void
+}
+
+export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
+  const [tab, setTab]           = useState<Tab>(initialTab ?? 'login')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm]   = useState('')
@@ -47,16 +52,6 @@ export function AuthPage() {
   const [showPwd, setShowPwd]   = useState(false)
 
   const clearMessages = () => { setError(null); setSuccess(null) }
-
-  // Detect recovery token in URL hash → switch to reset password view
-  useEffect(() => {
-    const hash = window.location.hash
-    if (hash.includes('type=recovery') || hash.includes('type=signup')) {
-      setTab('reset')
-      // Clean URL so the token isn't visible
-      window.history.replaceState(null, '', window.location.pathname)
-    }
-  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -89,8 +84,11 @@ export function AuthPage() {
         if (password.length < 6) throw new Error('Le mot de passe doit faire au moins 6 caractères.')
         const { error } = await supabase.auth.updateUser({ password })
         if (error) throw error
-        setSuccess('Mot de passe mis à jour ! Tu peux maintenant te connecter.')
-        setTimeout(() => switchTab('login'), 2500)
+        setSuccess('Mot de passe mis à jour ! Connexion en cours…')
+        setTimeout(() => {
+          onResetDone?.()
+          switchTab('login')
+        }, 2000)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Une erreur est survenue.'
