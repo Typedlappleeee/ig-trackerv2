@@ -79,41 +79,50 @@ interface NavSection { title: string; items: NavItem[]; defaultOpen?: boolean }
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: 'Principal',
+    title: 'Pilotage',
     defaultOpen: true,
     items: [
-      { id: 'phones',         label: 'navPhones',         icon: '📱' },
-
-      { id: 'bank',           label: 'navBank',            icon: '🗂' },
+      { id: 'phones',      label: 'navPhones',       icon: '📱' },
+      { id: 'stats',       label: 'navStats',        icon: '📊' },
+      { id: 'history',     label: 'navHistory',      icon: '🕑' },
     ],
   },
   {
-    title: 'Instagram',
+    title: 'Publier',
     defaultOpen: true,
     items: [
-      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
-      { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
+      { id: 'storylink',   label: 'navStoryLink',    icon: '🔗' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'warmup',      label: 'navWarmup',       icon: '🔥', dev: true },
+      { id: 'tasks',       label: 'navTasks',        icon: '⚡' },
+      { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
+    ],
+  },
+  {
+    title: 'Contenu',
+    defaultOpen: true,
+    items: [
+      { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
+    ],
+  },
+  {
+    title: 'Studio vidéo',
+    defaultOpen: true,
+    items: [
+      { id: 'remix',       label: 'navRemix',        icon: '🔀' },
+      { id: 'repurpose',   label: 'navRepurpose',    icon: '🧬' },
+      { id: 'spoof',       label: 'navSpoof',        icon: '🛡️' },
+      { id: 'subtitles',   label: 'navSubtitles',    icon: '💬' },
+      { id: 'montage',     label: 'navMontage',      icon: '🎬' },
+      { id: 'mixer',       label: 'navMixer',        icon: '🎞️', dev: true },
     ],
   },
   {
     title: 'TikTok',
     defaultOpen: true,
     items: [
-      { id: 'tiktokposting', label: 'navTikTokPosting', icon: '🎵', isNew: true },
-    ],
-  },
-  {
-    title: 'Outils vidéo',
-    defaultOpen: true,
-    items: [
-      { id: 'remix',       label: 'navRemix',       icon: '🔀' },
-      { id: 'spoof',       label: 'navSpoof',       icon: '🛡️', isNew: true },
-      { id: 'mixer',       label: 'navMixer',       icon: '🎞️', dev: true },
-      { id: 'subtitles',   label: 'navSubtitles',   icon: '💬', isNew: true },
+      { id: 'tiktokposting', label: 'navTikTokPosting', icon: '🎵' },
     ],
   },
 ]
@@ -608,6 +617,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     // Scanner + Tâches automatiques : réservés aux owner/admin (pas member/viewer)
     if (id === 'tasks') return effectiveRole === 'owner' || effectiveRole === 'admin'
     if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub' || id === 'stats') return true
+    // Pilotage en lecture seule + outils vidéo annexes : visibles par tous les rôles
+    if (id === 'history' || id === 'montage' || id === 'repurpose') return true
     return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
   }
 
