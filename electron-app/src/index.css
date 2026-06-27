@@ -849,7 +849,9 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--base);
+  background:
+    radial-gradient(1100px 380px at 50% -12%, rgba(99,102,241,0.055), transparent 70%),
+    var(--base);
   overflow: hidden;
 }
 
@@ -2187,11 +2189,11 @@ html[data-glass="off"] #root::after { display: none; }
 }
 .sf-sidebar-section:hover { opacity: 0.85; }
 .sf-sidebar-section-label {
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 750;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: rgba(99,102,241,0.55);
+  letter-spacing: 0.11em;
+  color: rgba(165,180,252,0.62);
   flex-shrink: 0;
 }
 .sf-sidebar-section-line {
