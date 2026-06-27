@@ -542,10 +542,9 @@ export async function postStoryServer(
   if (stickerBtn) {
     await shellExec(bearer, phoneId, `input tap ${stickerBtn[0]} ${stickerBtn[1]}`)
   } else {
-    // Repli : barre verticale en haut à droite de l'éditeur — le sticker (smiley)
-    // est le 2ᵉ icône, SOUS « Aa ». L'ancien repli (y≈5%) tapait sur « Aa » →
-    // ouvrait le mode texte. On vise plus bas et plus à droite.
-    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.88)} ${Math.floor(sh * 0.16)}`)
+    // Repli : barre verticale haut-droite — ordre : Aa (texte) ≈ y5%, sticker
+    // (smiley) ≈ y10.5%, musique ≈ y16%. On vise le sticker, pile entre les deux.
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.88)} ${Math.floor(sh * 0.105)}`)
   }
   await sleep(3500) // extra time for tray to fully load
 
