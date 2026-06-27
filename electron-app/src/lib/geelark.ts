@@ -2290,6 +2290,34 @@ export async function editInstagramProfileNative(
   })
 }
 
+// Édition de profil TikTok native (tiktokEdit). avatar = URL d'image 1:1.
+export async function editTikTokProfileNative(
+  bearer: string,
+  phoneId: string,
+  fields: { nickName?: string; bio?: string; avatarUrl?: string; site?: string },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('✏️ Création de la tâche d\'édition de profil TikTok…')
+    const res = await geelarkFetch('POST', '/rpa/task/tiktokEdit', {
+      id: phoneId,
+      scheduleAt: Math.floor(Date.now() / 1000) + 5,
+      name: 'ScaleFlow profile edit',
+      ...(fields.nickName?.trim() ? { nickName: fields.nickName.trim().slice(0, 30) } : {}),
+      ...(fields.bio != null      ? { bio: fields.bio.slice(0, 160) } : {}),
+      ...(fields.avatarUrl?.trim()? { avatar: fields.avatarUrl.trim() } : {}),
+      ...(fields.site?.trim()     ? { site: fields.site.trim() } : {}),
+    }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — édition en cours…`)
+    return pollRpaTask(bearer, taskId, log, 8 * 60_000)
+  })
+}
+
 export async function warmupAccount(
   bearer: string,
   phoneId: string,

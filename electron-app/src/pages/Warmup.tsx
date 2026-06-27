@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, warmupAccountNative, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, loginInstagramAccount, stopPhone,
+  fetchAllPhones, warmupAccount, warmupAccountNative, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -313,12 +313,18 @@ export function Warmup({ user }: WarmupProps) {
       }
       updateJob(phone.id, { status: 'running' })
       try {
-        const result = await editInstagramProfileNative(bearer, phone.id, {
-          nickname:  config.profileName,
-          username:  config.username,
-          biography: config.bio,
-          avatarUrl: config.profilePicUrl,
-        }, msg => addLog(phone.id, msg))
+        const result = warmupPlatform === 'tiktok'
+          ? await editTikTokProfileNative(bearer, phone.id, {
+              nickName:  config.profileName,
+              bio:       config.bio,
+              avatarUrl: config.profilePicUrl,
+            }, msg => addLog(phone.id, msg))
+          : await editInstagramProfileNative(bearer, phone.id, {
+              nickname:  config.profileName,
+              username:  config.username,
+              biography: config.bio,
+              avatarUrl: config.profilePicUrl,
+            }, msg => addLog(phone.id, msg))
         updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
@@ -426,30 +432,36 @@ export function Warmup({ user }: WarmupProps) {
     )
   }
 
-  const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
+  const TABS: { id: Tab; label: string; icon: JSX.Element }[] = ([
     { id: 'login',    label: 'Log In',    icon: <IconKey size={13} /> },
     { id: 'massEdit', label: 'Mass Edit', icon: <IconPencil size={13} /> },
     { id: 'warmup',   label: 'Warmup',    icon: <IconFlame size={13} /> },
-  ]
+  ] as { id: Tab; label: string; icon: JSX.Element }[])
+    // L'auto-login TikTok n'est pas encore dispo → on masque l'onglet pour TikTok.
+    .filter(tab => !(warmupPlatform === 'tiktok' && tab.id === 'login'))
 
   const jobShowing = running || (jobs.length > 0 && (doneCount + errorCount) === jobs.length)
 
   return (
     <div className="sf-page anim-page">
 
-      {/* Popup de choix de plateforme pour le warmup */}
-      {activeTab === 'warmup' && !warmupPlatformChosen && (
+      {/* Popup de choix de plateforme — niveau page (Login / Mass Edit / Warmup) */}
+      {!warmupPlatformChosen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,14,0.8)', backdropFilter: 'blur(6px)' }}>
           <div className="sf-card sf-anim-scale-in" style={{ width: '100%', maxWidth: 440, padding: '30px 30px 26px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)' }}>Quelle plateforme chauffer ?</h2>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 22 }}>Choisis la plateforme pour cette session de warmup.</p>
+            <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)' }}>Quelle plateforme ?</h2>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 22 }}>Choisis la plateforme pour cette session.</p>
             <div style={{ display: 'flex', gap: 14 }}>
               {([
-                { k: 'instagram', label: 'Instagram', emoji: '📸', desc: 'Warmup IA + recherche par mot-clé' },
-                { k: 'tiktok',    label: 'TikTok',    emoji: '🎵', desc: 'Recherche + like / follow / commentaire IA' },
+                { k: 'instagram', label: 'Instagram', emoji: '📸', desc: 'Login + Mass Edit + Warmup' },
+                { k: 'tiktok',    label: 'TikTok',    emoji: '🎵', desc: 'Mass Edit + Warmup (login bientôt)' },
               ] as const).map(p => (
                 <button key={p.k}
-                  onClick={() => { setWarmupPlatform(p.k); setWarmupPlatformChosen(true) }}
+                  onClick={() => {
+                    setWarmupPlatform(p.k); setWarmupPlatformChosen(true)
+                    // L'onglet Login n'existe pas pour TikTok → bascule vers Warmup.
+                    if (p.k === 'tiktok' && activeTab === 'login') setActiveTab('warmup')
+                  }}
                   className="cursor-pointer"
                   style={{ flex: 1, padding: '22px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1.5px solid var(--border)' }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.background = 'rgba(99,102,241,0.06)' }}
