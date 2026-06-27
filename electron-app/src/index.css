@@ -1129,33 +1129,34 @@ select.sf-input option:checked {
   border-radius: var(--r-lg);
   border: 1px solid var(--border);
   background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 .sf-table {
   width: 100%;
   border-collapse: collapse;
 }
 .sf-table th {
-  padding: 10px 16px;
+  padding: 11px 16px;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 750;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--text-4);
+  letter-spacing: 0.1em;
+  color: var(--text-3);
   text-align: left;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-bottom: 1px solid var(--border-md);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
   white-space: nowrap;
   user-select: none;
 }
 .sf-table td {
-  padding: 11px 16px;
+  padding: 12px 16px;
   font-size: 13px;
   color: var(--text-2);
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
-.sf-table tbody tr { transition: background 120ms; }
-.sf-table tbody tr:hover td { background: rgba(255,255,255,0.025); }
+.sf-table tbody tr { transition: background 130ms ease; }
+.sf-table tbody tr:hover td { background: rgba(99,102,241,0.055); }
 .sf-table tbody tr:last-child td { border-bottom: none; }
 
 /* ── Empty state ───────────────────────────────────────────────────────────── */
