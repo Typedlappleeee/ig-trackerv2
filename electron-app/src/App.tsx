@@ -572,6 +572,7 @@ const Spoof          = lazy(() => import('@/pages/Spoof').then(m => ({ default: 
 const Licences       = lazy(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
 const Support        = lazy(() => import('@/pages/Support').then(m => ({ default: m.Support })))
 const History        = lazy(() => import('@/pages/History').then(m => ({ default: m.History })))
+const Reports        = lazy(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
 const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazy(() => import('@/pages/StoryLink'))
@@ -877,6 +878,7 @@ function AppContent({ user }: { user: User }) {
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
       case 'history':      return <History     user={user} />
+      case 'reports':      return <Reports     user={user} />
 
     }
   })()

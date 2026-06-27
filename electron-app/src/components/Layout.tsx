@@ -63,6 +63,7 @@ export type Page =
   | 'settings' | 'licences'
   | 'scaleia'
   | 'history'
+  | 'reports'
   | 'tiktokposting'
 
 interface LayoutProps {
@@ -86,6 +87,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'phones',      label: 'navPhones',       icon: '📱' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'history',     label: 'navHistory',      icon: '🕑' },
+      { id: 'reports',     label: 'navReports',      icon: '📊', beta: true },
     ],
   },
   {
@@ -133,6 +135,7 @@ const ICONS = {
   sparkles:  'M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z',
   scissors:  'M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm12 0a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM8.586 12.586l7.07 7.07M15.657 12.586l-7.07 7.07',
   refresh:   'M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15',
+  chart:     'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
   edit:      'M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
   settings:  'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
   building:  'M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4',
@@ -175,6 +178,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   community:       'chat',
   support:         'chat',
   history:         'refresh',
+  reports:         'chart',
   tiktokposting:   'zap',
 }
 
@@ -658,6 +662,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     support:     t('pageSupport'),
     settings:    t('pageSettings'),
     licences:    t('pageLicences'),
+    reports:     t('navReports'),
   }
 
   return (
