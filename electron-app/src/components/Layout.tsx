@@ -692,20 +692,21 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
         {/* ── Logo area ─────────────────────────────────────────────────── */}
         <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
-          {/* Logo box */}
-          <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
+          {/* Logo box — solid gradient mark with glow */}
+          <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
             <div style={{
-              width: 28, height: 28, borderRadius: 8,
-              background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(99,102,241,0.06))',
-              border: '1px solid rgba(99,102,241,0.25)',
+              width: 32, height: 32, borderRadius: 10,
+              background: 'linear-gradient(135deg,#818CF8 0%,#6366F1 45%,#7C3AED 100%)',
+              boxShadow: '0 6px 18px -4px rgba(99,102,241,0.7), inset 0 1px 0 rgba(255,255,255,0.35)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff',
             }}>
-              <SFLogo size={18} />
+              <SFLogo size={19} />
             </div>
           </div>
 
           {!collapsed && (
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <span style={{ flex: 1, fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.025em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
               <span style={{ background: 'linear-gradient(90deg, #E9EAF0, #D8D5CD)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scale</span>
               <span style={{ background: 'linear-gradient(90deg, #6366F1, #818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
             </span>
