@@ -311,8 +311,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
       {/* subtle ambient glow */}
       <div style={{
-        position: 'fixed', top: 0, left: '30%', width: 700, height: 300,
-        background: 'radial-gradient(ellipse, rgba(99,102,241,0.04), transparent 65%)',
+        position: 'fixed', top: 0, left: '30%', width: 760, height: 320,
+        background: 'radial-gradient(ellipse, rgba(124,58,237,0.07), transparent 65%)',
         filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0,
       }} />
 
@@ -331,8 +331,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
               margin: '0 0 6px', fontFamily: SANS,
             }}>{dateLabel}</p>
             <h1 style={{
-              margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em',
-              color: IVORY, fontFamily: SANS, lineHeight: 1.1,
+              margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.04em',
+              color: IVORY, fontFamily: SANS, lineHeight: 1.05,
             }}>
               {greeting},&nbsp;
               <span style={{ color: GOLD_L }}>{firstName}</span>
