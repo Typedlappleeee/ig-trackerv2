@@ -38,15 +38,16 @@ function defaultStart(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// Action supplémentaire (même type que l'action principale) : son propre lot de
-// médias, sa propre heure de départ et son propre intervalle → un « segment ».
-interface ExtraAction {
+// Étape de séquence ajoutée AVANT ou APRÈS l'action principale (warmup, story
+// ou publication). Devient un élément de recurring_tasks.steps[].
+type SeqStepType = 'publication' | 'story' | 'warmup'
+interface SeqStep {
   id: string
+  type: SeqStepType
+  position: 'before' | 'after'
   media: { url: string; title: string }[]
   caption: string
-  recurValue: number
-  recurUnit: RecurUnit
-  startAt: string
+  warmupMinutes: number
 }
 
 export function TaskWizard({ user, onSaved, onClose }: {
@@ -81,16 +82,51 @@ export function TaskWizard({ user, onSaved, onClose }: {
   const [autoRemove, setAutoRemove] = useState(false)
   const recurHours = toHours(recurValue, recurUnit)
 
-  // Actions supplémentaires (segments) — vide = tâche simple à une action.
-  const [extras, setExtras]     = useState<ExtraAction[]>([])
-  const [extraPickerId, setExtraPickerId] = useState<string | null>(null)
-  const addExtra = () => setExtras(prev => [...prev, {
-    id: Math.random().toString(36).slice(2), media: [], caption: '',
-    recurValue, recurUnit, startAt,
+  // Séquence : étapes supplémentaires avant/après l'action principale.
+  const [seqSteps, setSeqSteps] = useState<SeqStep[]>([])
+  const [stepPickerId, setStepPickerId] = useState<string | null>(null)
+  const addSeqStep = (t: SeqStepType, pos: 'before' | 'after') => setSeqSteps(prev => [...prev, {
+    id: Math.random().toString(36).slice(2), type: t, position: pos, media: [], caption: '', warmupMinutes: 5,
   }])
-  const patchExtra = (id: string, patch: Partial<ExtraAction>) =>
-    setExtras(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
-  const removeExtra = (id: string) => setExtras(prev => prev.filter(e => e.id !== id))
+  const patchSeqStep = (id: string, patch: Partial<SeqStep>) =>
+    setSeqSteps(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
+  const removeSeqStep = (id: string) => setSeqSteps(prev => prev.filter(e => e.id !== id))
+
+  // Rend les cartes d'étapes d'une position donnée (avant / après l'action principale).
+  function seqStepCards(pos: 'before' | 'after') {
+    return seqSteps.filter(s => s.position === pos).map(s => (
+      <div key={s.id} style={{ padding: '11px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${HAIR}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: IVORY }}>
+            {s.type === 'warmup' ? '🔥 Warmup' : s.type === 'story' ? '🔗 Story' : '🎬 Publication'} · {pos === 'before' ? 'avant' : 'après'}
+          </span>
+          <button onClick={() => removeSeqStep(s.id)} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED, fontSize: 17, lineHeight: 1 }}>×</button>
+        </div>
+        {s.type === 'warmup' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <span style={{ fontSize: 11, color: MUTED }}>Durée</span>
+            <input type="number" min={1} value={s.warmupMinutes} onChange={e => patchSeqStep(s.id, { warmupMinutes: Math.max(1, Number(e.target.value) || 1) })} style={{ ...input, width: 72, height: 32, textAlign: 'center' }} />
+            <span style={{ fontSize: 11, color: MUTED }}>minutes</span>
+          </div>
+        ) : (
+          <>
+            <button onClick={() => setStepPickerId(s.id)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ marginTop: 8 }}>+ {s.type === 'story' ? 'Images' : 'Vidéos'} ({s.media.length})</button>
+            {s.media.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {s.media.map((m, j) => (
+                  <span key={j} style={{ fontSize: 10.5, padding: '3px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.1)', border: `1px solid ${HAIR}`, color: ACCENT_L, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {m.title.slice(0, 14)}
+                    <button onClick={() => patchSeqStep(s.id, { media: s.media.filter((_, k) => k !== j) })} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input value={s.caption} onChange={e => patchSeqStep(s.id, { caption: e.target.value })} placeholder={s.type === 'story' ? 'Texte sticker (optionnel)' : 'Légende (optionnel)'} style={{ ...input, marginTop: 8, height: 32 }} />
+          </>
+        )}
+      </div>
+    ))
+  }
 
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState<string | null>(null)
@@ -122,30 +158,40 @@ export function TaskWizard({ user, onSaved, onClose }: {
     phoneList.length > 0,                    // step 1 : comptes
     media.length > 0 && linksOk,             // step 2 : contenu (+ liens story)
     true,                                    // step 3 : récurrence
+    true,                                    // step 4 : finalisation
   ][step]
 
   async function save() {
-    if (extras.some(e => e.media.length === 0)) {
-      setError('Chaque action ajoutée doit avoir au moins un média.'); return
+    const badStep = seqSteps.find(s => s.type !== 'warmup' && s.media.length === 0)
+    if (badStep) {
+      setError(`L'étape ${badStep.type === 'story' ? 'Story' : 'Publication'} ajoutée doit avoir au moins un média.`); return
     }
     setSaving(true); setError(null)
     try {
       const autoName = name.trim() || `Tâche ${type === 'story' ? 'Story' : 'Reels'} ${platform === 'tiktok' ? 'TikTok' : 'IG'} — ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}`
-      // Plusieurs actions → segments (chaque action = un segment indépendant).
-      const buildSeg = (m: { url: string; title: string }[], cap: string, rv: number, ru: RecurUnit, st: string) => ({
-        id: Math.random().toString(36).slice(2),
-        type, videos: m.map(x => ({ token: x.url, title: x.title })), caption: cap,
-        story_texts: [], mode, delay_minutes: 0, reels_trial: false,
-        auto_remove_videos: autoRemove, recur_hours: toHours(rv, ru),
-        next_run_at: new Date(st).toISOString(),
-      })
-      const segments = extras.length > 0
-        ? [buildSeg(media, caption, recurValue, recurUnit, startAt),
-           ...extras.map(e => buildSeg(e.media, e.caption, e.recurValue, e.recurUnit, e.startAt))]
-        : []
-      const minNext = segments.length
-        ? Math.min(...segments.map(s => new Date(s.next_run_at).getTime()))
-        : new Date(startAt).getTime()
+      // Séquence → recurring_tasks.steps[] (ordre : avant → principale → après).
+      const linksByPhone = phoneList.reduce((acc, p) => { const v = (links[p.id] ?? '').trim(); if (v) acc[p.id] = v; return acc }, {} as Record<string, string>)
+      const toStep = (t: SeqStepType, m: { url: string; title: string }[], cap: string, warm: number) => {
+        const mediaTokens = m.map(x => ({ token: x.url, title: x.title }))
+        return {
+          id: Math.random().toString(36).slice(2),
+          type: t,
+          ...(t === 'story'
+            ? { images: mediaTokens, story_texts: cap.trim() ? [cap.trim()] : [], phone_links: linksByPhone }
+            : t === 'warmup'
+            ? { warmup_minutes: Math.max(1, warm) }
+            : { videos: mediaTokens, reels_trial: false }),
+          caption: t === 'publication' ? cap : '',
+          mode,
+          delay_minutes: 0,
+          delay_after_minutes: 0,
+          auto_remove_videos: autoRemove,
+        }
+      }
+      const mainStep = toStep(type, media, caption, 5)
+      const before = seqSteps.filter(s => s.position === 'before').map(s => toStep(s.type, s.media, s.caption, s.warmupMinutes))
+      const after  = seqSteps.filter(s => s.position === 'after').map(s => toStep(s.type, s.media, s.caption, s.warmupMinutes))
+      const steps = seqSteps.length > 0 ? [...before, mainStep, ...after] : []
       const payload: Record<string, unknown> = {
         user_id: user.id,
         org_id:  currentOrg?.id ?? null,
@@ -163,27 +209,22 @@ export function TaskWizard({ user, onSaved, onClose }: {
         mode,
         delay_minutes: 0,
         recur_hours: recurHours,
-        next_run_at: new Date(isFinite(minNext) ? minNext : Date.now()).toISOString(),
+        next_run_at: new Date(startAt).toISOString(),
         reels_trial: false,
         auto_remove_videos: autoRemove,
-        steps: [],
-        segments,
+        steps,
       }
-      // Insert avec repli si des colonnes récentes manquent (platform/segments/steps/…)
+      // Insert avec repli si des colonnes récentes manquent (platform/steps/…)
       let { error: err } = await supabase.from('recurring_tasks').insert(payload)
       if (err && /platform/i.test(err.message)) {
         const { platform: _p, ...rest } = payload
         ;({ error: err } = await supabase.from('recurring_tasks').insert(rest))
         if (!err) setError('⚠ Programmation TikTok limitée tant que la migration platform n\'est pas appliquée.')
       }
-      if (err && /segments/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
-        const { segments: _sg, ...rest } = payload
-        ;({ error: err } = await supabase.from('recurring_tasks').insert(rest))
-        if (!err && extras.length) setError('⚠ Actions multiples non sauvegardées (migration segments manquante) — seule la 1ʳᵉ action a été gardée.')
-      }
       if (err && /(steps|story_texts|auto_remove_videos)/i.test(err.message)) {
-        const { steps: _s, story_texts: _st, auto_remove_videos: _a, platform: _p2, segments: _sg2, ...rest } = payload
+        const { steps: _s, story_texts: _st, auto_remove_videos: _a, platform: _p2, ...rest } = payload
         ;({ error: err } = await supabase.from('recurring_tasks').insert(rest))
+        if (!err && seqSteps.length) setError('⚠ Séquence non sauvegardée (migration steps manquante) — seule l\'action principale a été gardée.')
       }
       if (err) throw err
       onSaved()
@@ -193,7 +234,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
     }
   }
 
-  const STEPS = ['Type', 'Comptes', 'Contenu', 'Récurrence']
+  const STEPS = ['Type', 'Comptes', 'Contenu', 'Récurrence', 'Finalisation']
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(6,6,8,0.9)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
@@ -206,14 +247,14 @@ export function TaskWizard({ user, onSaved, onClose }: {
           }}
           onClose={() => setShowPicker(false)} />
       )}
-      {extraPickerId && (
+      {stepPickerId && (
         <BankPicker user={user} mode="multi" resolveMode="signed-url"
           onSelect={(paths, titles) => {
             const add = paths.map((url, i) => ({ url, title: titles?.[i] ?? 'Média' }))
-            setExtras(prev => prev.map(e => e.id === extraPickerId ? { ...e, media: [...e.media, ...add] } : e))
-            setExtraPickerId(null)
+            setSeqSteps(prev => prev.map(e => e.id === stepPickerId ? { ...e, media: [...e.media, ...add] } : e))
+            setStepPickerId(null)
           }}
-          onClose={() => setExtraPickerId(null)} />
+          onClose={() => setStepPickerId(null)} />
       )}
       <div className="anim-scale-in" onClick={e => e.stopPropagation()}
         style={{ width: '100%', maxWidth: 600, maxHeight: 'calc(100vh - 48px)', background: '#0F1014', border: `1px solid ${HAIR}`, borderRadius: 16, display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.65)' }}>
@@ -408,54 +449,54 @@ export function TaskWizard({ user, onSaved, onClose }: {
                 </span>
               </button>
 
-              {/* Actions supplémentaires (segments) */}
-              <div>
-                <p style={lbl}>Autres actions (optionnel)</p>
-                <p style={{ fontSize: 11, color: FAINT, margin: '-4px 0 10px' }}>
-                  Ajoute d'autres {isStory ? 'stories' : 'posts'} à d'autres heures (ex : un le matin, un le soir).
-                </p>
-                {extras.map((e, i) => (
-                  <div key={e.id} style={{ padding: '11px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${HAIR}`, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: IVORY }}>Action {i + 2}</span>
-                      <button onClick={() => removeExtra(e.id)} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED, fontSize: 17, lineHeight: 1 }}>×</button>
-                    </div>
-                    <button onClick={() => setExtraPickerId(e.id)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">+ {isStory ? 'Images' : 'Vidéos'} ({e.media.length})</button>
-                    {e.media.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                        {e.media.map((m, j) => (
-                          <span key={j} style={{ fontSize: 10.5, padding: '3px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.1)', border: `1px solid ${HAIR}`, color: ACCENT_L, display: 'flex', alignItems: 'center', gap: 5 }}>
-                            {m.title.slice(0, 14)}
-                            <button onClick={() => patchExtra(e.id, { media: e.media.filter((_, k) => k !== j) })} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED }}>×</button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <input value={e.caption} onChange={ev => patchExtra(e.id, { caption: ev.target.value })}
-                      placeholder={isStory ? 'Texte sticker (optionnel)' : 'Légende (optionnel)'} style={{ ...input, marginTop: 8, height: 32 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11, color: MUTED }}>Départ</span>
-                      <input type="datetime-local" value={e.startAt} onChange={ev => patchExtra(e.id, { startAt: ev.target.value })} style={{ ...input, height: 32, flex: 1, minWidth: 165 }} />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                      <span style={{ fontSize: 11, color: MUTED }}>Toutes les</span>
-                      <input type="number" min={1} value={e.recurValue} onChange={ev => patchExtra(e.id, { recurValue: Math.max(1, Number(ev.target.value) || 1) })} style={{ ...input, width: 64, height: 32, textAlign: 'center' }} />
-                      <select value={e.recurUnit} onChange={ev => patchExtra(e.id, { recurUnit: ev.target.value as RecurUnit })} className="cursor-pointer" style={{ ...input, width: 110, height: 32 }}>
-                        <option value="minutes">minutes</option>
-                        <option value="heures">heures</option>
-                        <option value="jours">jours</option>
-                      </select>
+              <div style={{ padding: '10px 14px', borderRadius: 9, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 11.5, color: OK }}>
+                Récap : {type === 'story' ? 'Story' : 'Reels'} {platform === 'tiktok' ? 'TikTok' : 'Instagram'} · {phoneList.length} compte(s) · {media.length} média(s) · départ {new Date(startAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · toutes les {recurValue} {recurUnit}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4 — Finalisation : lancer ou ajouter des étapes (séquence) */}
+          {step === 4 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{ fontSize: 12.5, color: MUTED, margin: 0 }}>
+                Ta tâche est prête. Tu peux la lancer telle quelle, ou ajouter des étapes
+                <b style={{ color: IVORY }}> avant</b> ou <b style={{ color: IVORY }}>après</b> (warmup, story, publication).
+              </p>
+
+              {/* Séquence */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {seqStepCards('before')}
+
+                {/* Action principale (toujours au centre) */}
+                <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>{type === 'story' ? '🔗' : '🎬'}</span>
+                    <div>
+                      <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, margin: 0 }}>Action principale — {type === 'story' ? 'Story' : 'Reels'} {platform === 'tiktok' ? 'TikTok' : 'IG'}</p>
+                      <p style={{ fontSize: 10.5, color: FAINT, margin: '2px 0 0' }}>{media.length} média(s) · {phoneList.length} compte(s)</p>
                     </div>
                   </div>
-                ))}
-                <button onClick={addExtra} className="cursor-pointer"
-                  style={{ width: '100%', padding: '10px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, background: 'rgba(99,102,241,0.08)', border: '1px dashed rgba(99,102,241,0.35)', color: ACCENT_L }}>
-                  + Ajouter une action
-                </button>
+                </div>
+
+                {seqStepCards('after')}
               </div>
 
-              <div style={{ padding: '10px 14px', borderRadius: 9, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 11.5, color: OK }}>
-                Récap : {type === 'story' ? 'Story' : 'Reels'} {platform === 'tiktok' ? 'TikTok' : 'Instagram'} · {phoneList.length} compte(s) · {media.length} média(s) · départ {new Date(startAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · toutes les {recurValue} {recurUnit}{extras.length > 0 ? ` · +${extras.length} action(s)` : ''}
+              {/* Ajouter une étape */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px dashed ${HAIR}` }}>
+                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: ACCENT, margin: 0 }}>Ajouter une étape</p>
+                {([
+                  { t: 'warmup' as const,      emoji: '🔥', label: 'Warmup' },
+                  { t: 'story' as const,       emoji: '🔗', label: 'Story' },
+                  { t: 'publication' as const, emoji: '🎬', label: 'Publication' },
+                ]).map(o => (
+                  <div key={o.t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ flex: 1, fontSize: 12.5, color: IVORY }}>{o.emoji} {o.label}</span>
+                    <button onClick={() => addSeqStep(o.t, 'before')} className="cursor-pointer"
+                      style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, color: MUTED }}>Avant</button>
+                    <button onClick={() => addSeqStep(o.t, 'after')} className="cursor-pointer"
+                      style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, color: MUTED }}>Après</button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -467,9 +508,9 @@ export function TaskWizard({ user, onSaved, onClose }: {
         <div style={{ display: 'flex', gap: 10, padding: '14px 22px', borderTop: `1px solid ${HAIR}` }}>
           {step > 0 && <button onClick={() => setStep(s => s - 1)} className="sf-btn sf-btn-ghost cursor-pointer">Retour</button>}
           <div style={{ flex: 1 }} />
-          {step < 3
+          {step < 4
             ? <button onClick={() => canNext && setStep(s => s + 1)} disabled={!canNext} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: canNext ? 1 : 0.4 }}>Continuer</button>
-            : <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: saving ? 0.6 : 1 }}>{saving ? 'Création…' : 'Créer la tâche'}</button>}
+            : <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: saving ? 0.6 : 1 }}>{saving ? 'Création…' : 'Terminer et lancer la tâche'}</button>}
         </div>
       </div>
     </div>
