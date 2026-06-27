@@ -45,9 +45,14 @@ interface SeqStep {
   id: string
   type: SeqStepType
   position: 'before' | 'after'
-  media: { url: string; title: string }[]
-  caption: string
-  warmupMinutes: number
+  media: { url: string; title: string }[]   // vidéos (publication) ou images (story)
+  caption: string                            // légende (publication)
+  warmupMinutes: number                      // durée warmup
+  warmupKeyword: string                      // niche / mot-clé de recherche warmup
+  mode: 'seq' | 'random'                      // distribution du pool (story = aléatoire par défaut)
+  storyTexts: string[]                        // pool de textes sticker (story)
+  phoneLinks: Record<string, string>          // 1 lien CTA par téléphone (story)
+  autoRemove: boolean                         // usage unique (retire les médias utilisés)
 }
 
 export function TaskWizard({ user, onSaved, onClose }: {
@@ -86,7 +91,14 @@ export function TaskWizard({ user, onSaved, onClose }: {
   const [seqSteps, setSeqSteps] = useState<SeqStep[]>([])
   const [stepPickerId, setStepPickerId] = useState<string | null>(null)
   const addSeqStep = (t: SeqStepType, pos: 'before' | 'after') => setSeqSteps(prev => [...prev, {
-    id: Math.random().toString(36).slice(2), type: t, position: pos, media: [], caption: '', warmupMinutes: 5,
+    id: Math.random().toString(36).slice(2), type: t, position: pos, media: [], caption: '',
+    warmupMinutes: 5, warmupKeyword: '',
+    mode: t === 'story' ? 'random' : 'seq',
+    storyTexts: [],
+    phoneLinks: t === 'story'
+      ? phones.filter(p => selPhones.has(p.id)).reduce((a, p) => { const v = (links[p.id] ?? '').trim(); if (v) a[p.id] = v; return a }, {} as Record<string, string>)
+      : {},
+    autoRemove: false,
   }])
   const patchSeqStep = (id: string, patch: Partial<SeqStep>) =>
     setSeqSteps(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
@@ -95,34 +107,109 @@ export function TaskWizard({ user, onSaved, onClose }: {
   // Rend les cartes d'étapes d'une position donnée (avant / après l'action principale).
   function seqStepCards(pos: 'before' | 'after') {
     return seqSteps.filter(s => s.position === pos).map(s => (
-      <div key={s.id} style={{ padding: '11px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${HAIR}` }}>
+      <div key={s.id} style={{ padding: '11px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${HAIR}`, display: 'flex', flexDirection: 'column', gap: 9 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: IVORY }}>
             {s.type === 'warmup' ? '🔥 Warmup' : s.type === 'story' ? '🔗 Story' : '🎬 Publication'} · {pos === 'before' ? 'avant' : 'après'}
           </span>
           <button onClick={() => removeSeqStep(s.id)} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED, fontSize: 17, lineHeight: 1 }}>×</button>
         </div>
-        {s.type === 'warmup' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-            <span style={{ fontSize: 11, color: MUTED }}>Durée</span>
-            <input type="number" min={1} value={s.warmupMinutes} onChange={e => patchSeqStep(s.id, { warmupMinutes: Math.max(1, Number(e.target.value) || 1) })} style={{ ...input, width: 72, height: 32, textAlign: 'center' }} />
-            <span style={{ fontSize: 11, color: MUTED }}>minutes</span>
-          </div>
-        ) : (
+
+        {/* ── WARMUP : durée + niche/mot-clé ── */}
+        {s.type === 'warmup' && (
           <>
-            <button onClick={() => setStepPickerId(s.id)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ marginTop: 8 }}>+ {s.type === 'story' ? 'Images' : 'Vidéos'} ({s.media.length})</button>
-            {s.media.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                {s.media.map((m, j) => (
-                  <span key={j} style={{ fontSize: 10.5, padding: '3px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.1)', border: `1px solid ${HAIR}`, color: ACCENT_L, display: 'flex', alignItems: 'center', gap: 5 }}>
-                    {m.title.slice(0, 14)}
-                    <button onClick={() => patchSeqStep(s.id, { media: s.media.filter((_, k) => k !== j) })} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED }}>×</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: MUTED }}>Durée</span>
+              <input type="number" min={1} max={120} value={s.warmupMinutes} onChange={e => patchSeqStep(s.id, { warmupMinutes: Math.max(1, Number(e.target.value) || 1) })} style={{ ...input, width: 72, height: 32, textAlign: 'center' }} />
+              <span style={{ fontSize: 11, color: MUTED }}>minutes</span>
+            </div>
+            <div>
+              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 4px' }}>Niche / mot-clé recherché</p>
+              <input value={s.warmupKeyword} onChange={e => patchSeqStep(s.id, { warmupKeyword: e.target.value })} placeholder="Ex : french girl, fitness…" style={{ ...input, height: 32 }} />
+            </div>
+          </>
+        )}
+
+        {/* ── PUBLICATION / STORY : médias ── */}
+        {s.type !== 'warmup' && (
+          <>
+            <div>
+              <button onClick={() => setStepPickerId(s.id)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">+ {s.type === 'story' ? 'Images' : 'Vidéos'} ({s.media.length})</button>
+              {s.media.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {s.media.map((m, j) => (
+                    <span key={j} style={{ fontSize: 10.5, padding: '3px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.1)', border: `1px solid ${HAIR}`, color: ACCENT_L, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {m.title.slice(0, 14)}
+                      <button onClick={() => patchSeqStep(s.id, { media: s.media.filter((_, k) => k !== j) })} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED }}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Distribution : séquentiel / aléatoire (photo story aléatoire dans le pool) + usage unique */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10.5, color: MUTED }}>Distribution :</span>
+              {(['seq', 'random'] as const).map(m => (
+                <button key={m} onClick={() => patchSeqStep(s.id, { mode: m })} className="cursor-pointer"
+                  style={{ padding: '4px 10px', fontSize: 10.5, fontWeight: 600, borderRadius: 6, border: `1px solid ${s.mode === m ? 'rgba(99,102,241,0.5)' : HAIR}`, background: s.mode === m ? 'rgba(99,102,241,0.15)' : 'transparent', color: s.mode === m ? ACCENT_L : MUTED }}>
+                  {m === 'seq' ? 'Séquentiel' : 'Aléatoire'}
+                </button>
+              ))}
+              <button onClick={() => patchSeqStep(s.id, { autoRemove: !s.autoRemove })} className="cursor-pointer"
+                style={{ marginLeft: 'auto', padding: '4px 10px', fontSize: 10.5, fontWeight: 600, borderRadius: 6, border: `1px solid ${s.autoRemove ? 'rgba(245,158,11,0.45)' : HAIR}`, background: s.autoRemove ? 'rgba(245,158,11,0.12)' : 'transparent', color: s.autoRemove ? '#F59E0B' : MUTED }}>
+                Usage unique
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── PUBLICATION : légende ── */}
+        {s.type === 'publication' && (
+          <input value={s.caption} onChange={e => patchSeqStep(s.id, { caption: e.target.value })} placeholder="Légende (optionnel)" style={{ ...input, height: 32 }} />
+        )}
+
+        {/* ── STORY : 1 lien CTA par téléphone ── */}
+        {s.type === 'story' && (
+          <div>
+            <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 5px' }}>Lien CTA par compte (1 lien / téléphone)</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 150, overflowY: 'auto' }}>
+              {phones.filter(p => selPhones.has(p.id)).map(p => {
+                const v = s.phoneLinks[p.id] ?? ''
+                return (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 10.5, color: MUTED, width: 92, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.ig_username ? `@${p.ig_username}` : p.phone_name}</span>
+                    <input type="url" value={v} onChange={e => patchSeqStep(s.id, { phoneLinks: { ...s.phoneLinks, [p.id]: e.target.value } })} placeholder="https://…"
+                      style={{ ...input, flex: 1, height: 28, fontSize: 11, borderColor: v.trim() ? 'rgba(52,211,153,0.4)' : 'rgba(245,158,11,0.4)' }} />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── STORY : pool de textes sticker ── */}
+        {s.type === 'story' && (
+          <div>
+            <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 5px' }}>Textes sticker (pool, optionnel)</p>
+            <input
+              placeholder="Tape un texte puis Entrée…"
+              onKeyDown={e => {
+                const val = (e.target as HTMLInputElement).value.trim()
+                if (e.key === 'Enter' && val) { e.preventDefault(); patchSeqStep(s.id, { storyTexts: [...s.storyTexts, val] }); (e.target as HTMLInputElement).value = '' }
+              }}
+              style={{ ...input, height: 32 }} />
+            {s.storyTexts.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                {s.storyTexts.map((txt, k) => (
+                  <span key={k} style={{ fontSize: 10.5, padding: '3px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.1)', border: `1px solid ${HAIR}`, color: ACCENT_L, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {txt.slice(0, 20)}
+                    <button onClick={() => patchSeqStep(s.id, { storyTexts: s.storyTexts.filter((_, j) => j !== k) })} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED }}>×</button>
                   </span>
                 ))}
               </div>
             )}
-            <input value={s.caption} onChange={e => patchSeqStep(s.id, { caption: e.target.value })} placeholder={s.type === 'story' ? 'Texte sticker (optionnel)' : 'Légende (optionnel)'} style={{ ...input, marginTop: 8, height: 32 }} />
-          </>
+          </div>
         )}
       </div>
     ))
@@ -171,26 +258,21 @@ export function TaskWizard({ user, onSaved, onClose }: {
       const autoName = name.trim() || `Tâche ${type === 'story' ? 'Story' : 'Reels'} ${platform === 'tiktok' ? 'TikTok' : 'IG'} — ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}`
       // Séquence → recurring_tasks.steps[] (ordre : avant → principale → après).
       const linksByPhone = phoneList.reduce((acc, p) => { const v = (links[p.id] ?? '').trim(); if (v) acc[p.id] = v; return acc }, {} as Record<string, string>)
-      const toStep = (t: SeqStepType, m: { url: string; title: string }[], cap: string, warm: number) => {
-        const mediaTokens = m.map(x => ({ token: x.url, title: x.title }))
-        return {
-          id: Math.random().toString(36).slice(2),
-          type: t,
-          ...(t === 'story'
-            ? { images: mediaTokens, story_texts: cap.trim() ? [cap.trim()] : [], phone_links: linksByPhone }
-            : t === 'warmup'
-            ? { warmup_minutes: Math.max(1, warm) }
-            : { videos: mediaTokens, reels_trial: false }),
-          caption: t === 'publication' ? cap : '',
-          mode,
-          delay_minutes: 0,
-          delay_after_minutes: 0,
-          auto_remove_videos: autoRemove,
-        }
+      const rnd = () => Math.random().toString(36).slice(2)
+      const tokens = (m: { url: string; title: string }[]) => m.map(x => ({ token: x.url, title: x.title }))
+      // Action principale (au centre de la séquence).
+      const mainStep = type === 'story'
+        ? { id: rnd(), type: 'story', images: tokens(media), story_texts: caption.trim() ? [caption.trim()] : [], phone_links: linksByPhone, mode, auto_remove_videos: autoRemove, caption: '', delay_minutes: 0, delay_after_minutes: 0 }
+        : { id: rnd(), type: 'publication', videos: tokens(media), caption, reels_trial: false, mode, auto_remove_videos: autoRemove, delay_minutes: 0, delay_after_minutes: 0 }
+      // Étapes ajoutées (warmup / story / publication) avec tous leurs champs.
+      const mkExtra = (s: SeqStep) => {
+        const base = { id: rnd(), type: s.type, mode: s.mode, delay_minutes: 0, delay_after_minutes: 0, auto_remove_videos: s.autoRemove }
+        if (s.type === 'warmup') return { ...base, warmup_minutes: Math.max(1, s.warmupMinutes), warmup_keyword: s.warmupKeyword.trim(), caption: '' }
+        if (s.type === 'story')  return { ...base, images: tokens(s.media), story_texts: s.storyTexts, phone_links: s.phoneLinks, caption: '' }
+        return { ...base, videos: tokens(s.media), reels_trial: false, caption: s.caption }
       }
-      const mainStep = toStep(type, media, caption, 5)
-      const before = seqSteps.filter(s => s.position === 'before').map(s => toStep(s.type, s.media, s.caption, s.warmupMinutes))
-      const after  = seqSteps.filter(s => s.position === 'after').map(s => toStep(s.type, s.media, s.caption, s.warmupMinutes))
+      const before = seqSteps.filter(s => s.position === 'before').map(mkExtra)
+      const after  = seqSteps.filter(s => s.position === 'after').map(mkExtra)
       const steps = seqSteps.length > 0 ? [...before, mainStep, ...after] : []
       const payload: Record<string, unknown> = {
         user_id: user.id,
