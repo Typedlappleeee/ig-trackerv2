@@ -13,8 +13,6 @@ import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { pollAllNow } from '@/lib/igStatsPoller'
-import { computeHealth, HEALTH_COLORS } from '@/lib/accountHealth'
-import { sendNotification } from '@/lib/notify'
 import { useToast } from '@/components/Toast'
 import {
   ACCENT, ACCENT_L, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT,
@@ -237,52 +235,16 @@ export function Stats({ user }: StatsProps) {
   const followersDelta = deltaOf(followersSeries, totals.followers)
   const viewsDelta     = deltaOf(viewsSeries, totals.views)
 
-  // Per-account leaderboard with sparkline + growth + health score
+  // Per-account leaderboard with sparkline + growth
   const leaderboard = useMemo(() => {
     return phones.map(p => {
       const phoneSnaps = snaps.filter(s => s.phone_id === p.id)
       const spark = phoneSnaps.map(s => s.followers)
       const firstFollowers = phoneSnaps.find(s => s.followers > 0)?.followers ?? null
-      const firstViews = phoneSnaps.find(s => s.total_views > 0)?.total_views ?? null
       const growth = firstFollowers !== null ? (p.followers ?? 0) - firstFollowers : null
-      const health = computeHealth({
-        igStatus:       p.ig_status,
-        followersNow:   p.followers ?? 0,
-        followersStart: firstFollowers,
-        viewsNow:       p.total_views ?? 0,
-        viewsStart:     firstViews,
-      })
-      return { phone: p, spark, growth, health }
-    }).sort((a, b) => a.health.score - b.health.score) // les plus à risque en haut
+      return { phone: p, spark, growth }
+    }).sort((a, b) => (b.phone.followers ?? 0) - (a.phone.followers ?? 0))
   }, [phones, snaps])
-
-  // Distribution santé + comptes à risque
-  const health = useMemo(() => {
-    const counts = { ok: 0, watch: 0, risk: 0 }
-    for (const r of leaderboard) counts[r.health.level]++
-    const atRisk = leaderboard.filter(r => r.health.level === 'risk')
-    return { counts, atRisk }
-  }, [leaderboard])
-
-  // Détecteur de ban : alerte (1×/jour/compte) les comptes qui passent « à risque »
-  useEffect(() => {
-    if (loading || health.atRisk.length === 0) return
-    const today = new Date().toISOString().slice(0, 10)
-    const key = 'sf-risk-alerted'
-    let alerted: Record<string, string> = {}
-    try { alerted = JSON.parse(localStorage.getItem(key) ?? '{}') } catch { /* ignore */ }
-    const fresh = health.atRisk.filter(r => alerted[r.phone.id] !== today)
-    if (fresh.length === 0) return
-    for (const r of fresh) alerted[r.phone.id] = today
-    localStorage.setItem(key, JSON.stringify(alerted))
-    const names = fresh.map(r => r.phone.ig_username ? `@${r.phone.ig_username}` : r.phone.phone_name)
-    sendNotification({
-      userId: user.id, orgId: currentOrg?.id ?? null,
-      event: 'ban_risk',
-      subject: `🚨 ${fresh.length} compte(s) à risque`,
-      message: `Comptes en danger détectés : ${names.join(', ')}.\nRaisons principales : ${fresh[0].health.flags.map(f => f.label).join(' · ')}.\nRalentis la cadence, vérifie le statut et envisage un warmup.`,
-    })
-  }, [loading, health, user.id, currentOrg?.id])
 
   async function refresh() {
     if (refreshing) return
@@ -357,49 +319,6 @@ export function Stats({ user }: StatsProps) {
               </div>
             </div>
 
-            {/* Santé des comptes — détecteur de ban/shadowban */}
-            <div style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 12, padding: '16px 18px', marginBottom: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: IVORY }}>🛡️ Santé des comptes</p>
-                <div style={{ display: 'flex', gap: 14 }}>
-                  {(['ok', 'watch', 'risk'] as const).map(lvl => (
-                    <div key={lvl} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: HEALTH_COLORS[lvl].color }} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: IVORY, fontVariantNumeric: 'tabular-nums' }}>{health.counts[lvl]}</span>
-                      <span style={{ fontSize: 11.5, color: FAINT }}>{HEALTH_COLORS[lvl].label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {health.atRisk.length === 0 ? (
-                <p style={{ fontSize: 12.5, color: FAINT }}>Aucun compte à risque détecté. ✅</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {health.atRisk.slice(0, 8).map(r => (
-                    <div key={r.phone.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 9,
-                      background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)',
-                    }}>
-                      <span style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: IVORY, minWidth: 0, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {r.phone.ig_username ? `@${r.phone.ig_username}` : r.phone.phone_name}
-                      </span>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-                        {r.health.flags.map((f, idx) => (
-                          <span key={idx} style={{
-                            fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 6,
-                            color: f.severity === 'severe' ? 'var(--danger)' : 'var(--warn)',
-                            background: f.severity === 'severe' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
-                            border: `1px solid ${f.severity === 'severe' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}`,
-                          }}>{f.label}</span>
-                        ))}
-                      </div>
-                      <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 800, color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>{r.health.score}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Leaderboard */}
             <div style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 12, overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px', borderBottom: `1px solid ${HAIR}` }}>
@@ -422,7 +341,6 @@ export function Stats({ user }: StatsProps) {
                   }}>
                     <span style={{ color: FAINT, fontWeight: 700, fontSize: 12 }}>{i + 1}</span>
                     <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span title={HEALTH_COLORS[row.health.level].label} style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: HEALTH_COLORS[row.health.level].color }} />
                       <Sparkline data={row.spark} color={up ? OK : ERR} />
                       <div style={{ minWidth: 0 }}>
                         <p style={{ fontWeight: 600, color: IVORY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

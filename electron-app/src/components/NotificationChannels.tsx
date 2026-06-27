@@ -21,7 +21,6 @@ const EVENT_DEFS: { key: string; label: string; desc: string }[] = [
   { key: 'task_paused', label: 'Tâche mise en pause', desc: 'Crédits épuisés ou pool de vidéos vide' },
   { key: 'post_failed', label: 'Publication échouée', desc: 'Un post programmé a échoué' },
   { key: 'batch_done',  label: 'Batch terminé',       desc: 'Un mass posting se termine' },
-  { key: 'ban_risk',    label: 'Compte à risque',     desc: 'Détecteur de ban/shadowban (à venir)' },
 ]
 
 function Field({ label, hint, value, onChange, placeholder, type = 'text' }: {
