@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, warmupAccountNative, updateInstagramProfile, loginInstagramAccount, stopPhone,
+  fetchAllPhones, warmupAccount, warmupAccountNative, updateInstagramProfile, editInstagramProfileNative, loginInstagramAccount, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -152,6 +152,7 @@ export function Warmup({ user }: WarmupProps) {
   const [editUsername, setEditUsername] = useState('')
   const [editBio,      setEditBio]      = useState('')
   const [editPicUrl,   setEditPicUrl]   = useState('')
+  const [editNative,   setEditNative]   = useState(true)  // édition native (RPA) vs ADB
   const [editPicFile,  setEditPicFile]  = useState<string | null>(null)
 
   // ── WARMUP state ──────────────────────────────────────────────────────────
@@ -308,8 +309,18 @@ export function Warmup({ user }: WarmupProps) {
       }
       updateJob(phone.id, { status: 'running' })
       try {
-        await updateInstagramProfile(bearer, phone.id, config, msg => addLog(phone.id, msg))
-        updateJob(phone.id, abortRef.current.abort ? { status: 'error', error: 'Annulé' } : { status: 'done' })
+        if (editNative) {
+          const result = await editInstagramProfileNative(bearer, phone.id, {
+            nickname:  config.profileName,
+            username:  config.username,
+            biography: config.bio,
+            avatarUrl: config.profilePicUrl,
+          }, msg => addLog(phone.id, msg))
+          updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
+        } else {
+          await updateInstagramProfile(bearer, phone.id, config, msg => addLog(phone.id, msg))
+          updateJob(phone.id, abortRef.current.abort ? { status: 'error', error: 'Annulé' } : { status: 'done' })
+        }
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
@@ -977,17 +988,33 @@ export function Warmup({ user }: WarmupProps) {
             {activeTab === 'massEdit' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="sf-anim-slide-up">
 
-                {/* Bug banner */}
-                <div style={{
-                  padding: '14px 16px', borderRadius: 10,
-                  background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.22)',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                }}>
-                  <span style={{ flexShrink: 0, color: 'var(--err)', display: 'inline-flex' }}><IconConstruction size={20} /></span>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--err)', margin: 0 }}>Bug rencontré — fonctionnalité indisponible</p>
-                    <p style={{ fontSize: 12, color: 'rgba(248,113,113,0.65)', margin: '3px 0 0' }}>Mass Edit est temporairement désactivé en raison d'un bug. Un correctif est en cours.</p>
+                {/* Moteur d'édition : natif (RPA GeeLark, fiable) vs classique (ADB) */}
+                <div className="sf-card" style={{ padding: '14px 16px' }}>
+                  <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
+                    Moteur d'édition
+                  </p>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {([
+                      { v: true,  label: 'Natif (GeeLark)', desc: 'Fiable — RPA serveur' },
+                      { v: false, label: 'Classique (ADB)', desc: 'Taps scriptés (instable)' },
+                    ]).map(opt => (
+                      <button key={String(opt.v)} onClick={() => setEditNative(opt.v)}
+                        className="cursor-pointer"
+                        style={{
+                          flex: 1, padding: '10px 12px', borderRadius: 9, textAlign: 'left',
+                          background: editNative === opt.v ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${editNative === opt.v ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                        }}>
+                        <p style={{ fontSize: 12.5, fontWeight: 700, color: editNative === opt.v ? 'var(--accent-l)' : 'var(--text-2)' }}>{opt.label}</p>
+                        <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{opt.desc}</p>
+                      </button>
+                    ))}
                   </div>
+                  {editNative && (
+                    <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 8 }}>
+                      En mode natif, la photo de profil doit être une <b>URL d'image</b> accessible.
+                    </p>
+                  )}
                 </div>
 
                 {/* Profile fields card */}
