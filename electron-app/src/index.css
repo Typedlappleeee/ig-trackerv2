@@ -909,10 +909,10 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
 
 /* ── Cards ─────────────────────────────────────────────────────────────────── */
 .sf-card {
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255,255,255,0.035);
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255,255,255,0.04);
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 .sf-card:hover {
@@ -931,7 +931,7 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
 }
 
 .sf-stat-card {
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 20px 22px;
@@ -1525,7 +1525,7 @@ select.sf-input option:checked {
 
 /* ── Premium stat card ─────────────────────────────────────────────────────── */
 .sf-stat-card {
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 20px 22px;
