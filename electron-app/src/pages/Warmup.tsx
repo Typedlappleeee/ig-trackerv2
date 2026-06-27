@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, updateInstagramProfile, loginInstagramAccount, stopPhone,
+  fetchAllPhones, warmupAccount, warmupAccountNative, updateInstagramProfile, loginInstagramAccount, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -159,6 +159,9 @@ export function Warmup({ user }: WarmupProps) {
   const [likePosts,       setLikePosts]       = useState(true)
   const [watchReels,      setWatchReels]      = useState(true)
   const [followSuggested, setFollowSuggested] = useState(false)
+  // Warmup natif (RPA GeeLark) vs classique (ADB)
+  const [warmupNative,    setWarmupNative]    = useState(true)
+  const [warmupKeyword,   setWarmupKeyword]   = useState('')
 
   // ── Job / execution state ─────────────────────────────────────────────────
   const [jobs,    setJobs]    = useState<PhoneJob[]>([])
@@ -336,7 +339,9 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      const result = await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
+      const result = warmupNative
+        ? await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)), keyword: warmupKeyword }, msg => addLog(phone.id, msg))
+        : await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
@@ -1118,6 +1123,45 @@ export function Warmup({ user }: WarmupProps) {
                   </div>
 
                   <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+                    {/* Mode : natif (RPA GeeLark) vs classique (ADB) */}
+                    <div>
+                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
+                        Moteur de warmup
+                      </p>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {([
+                          { v: true,  label: 'Natif (IA GeeLark)', desc: 'Fiable, piloté serveur' },
+                          { v: false, label: 'Classique (ADB)',    desc: 'Like/Reels/Follow scriptés' },
+                        ]).map(opt => (
+                          <button key={String(opt.v)} onClick={() => setWarmupNative(opt.v)}
+                            className="cursor-pointer"
+                            style={{
+                              flex: 1, padding: '10px 12px', borderRadius: 9, textAlign: 'left',
+                              background: warmupNative === opt.v ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
+                              border: `1px solid ${warmupNative === opt.v ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                            }}>
+                            <p style={{ fontSize: 12.5, fontWeight: 700, color: warmupNative === opt.v ? 'var(--accent-l)' : 'var(--text-2)' }}>{opt.label}</p>
+                            <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{opt.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                      {warmupNative && (
+                        <div style={{ marginTop: 12 }}>
+                          <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6 }}>
+                            Mot-clé d'intérêt (optionnel) — oriente le warmup IA vers une niche
+                          </p>
+                          <input
+                            type="text" value={warmupKeyword} onChange={e => setWarmupKeyword(e.target.value)}
+                            placeholder="fitness, cuisine, gaming…"
+                            style={{ width: '100%', padding: '9px 12px', fontSize: 13, color: 'var(--text-1)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 9, outline: 'none' }}
+                          />
+                          <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 6 }}>
+                            En mode natif, la durée ci-dessous fixe le <b>nombre de vidéos parcourues</b> (1-100).
+                          </p>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Duration picker */}
                     <div>
