@@ -294,7 +294,6 @@ export function Mixer({ user }: MixerProps) {
   const [jobs,    setJobs]    = useState<MixJob[]>([])
   const [running, setRunning] = useState(false)
   const [error,   setError]   = useState('')
-  const [devNoticeOpen, setDevNoticeOpen] = useState(true)
   const [saveFolder, setSaveFolder] = useState<string | null>(null)
 
   const removeVideo   = (id: string) => setSelVideos(p => p.filter(v => v.id !== id))
@@ -412,22 +411,6 @@ export function Mixer({ user }: MixerProps) {
 
   return (
     <div className="anim-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--base)' }}>
-
-      {/* ── Avertissement : en développement ── */}
-      {devNoticeOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(14,14,22,0.85)', backdropFilter: 'blur(6px)' }}>
-          <div className="sf-card sf-anim-slide-up" style={{ maxWidth: 440, padding: '40px 48px', textAlign: 'center', borderColor: 'rgba(251,191,36,0.22)', background: 'rgba(251,191,36,0.03)' }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: WARN }}>
-              <IconClapperboard size={26} />
-            </div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: TEXT_1, marginBottom: 10 }}>En développement</h2>
-            <p style={{ fontSize: 13, color: TEXT_2, lineHeight: 1.65 }}>Cette fonctionnalité est encore en développement — il peut y avoir des bugs.</p>
-            <button onClick={() => setDevNoticeOpen(false)} className="sf-btn sf-btn-primary cursor-pointer" style={{ marginTop: 24 }}>
-              Continuer
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Premium Header ── */}
       <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
