@@ -639,19 +639,21 @@ function AppContent({ user }: { user: User }) {
   // who finished onboarding before this column existed.
   useEffect(() => {
     let cancelled = false
-    // 6s timeout — if Supabase hangs (paused project, network issue) don't block forever
-    const fallback = setTimeout(() => { if (!cancelled) setOnboarding(true) }, 6000)
+    // Sur lenteur/erreur Supabase, NE PAS piéger un utilisateur existant dans
+    // l'onboarding (écran "rentre ton bearer"). Par défaut → on n'onboarde pas ;
+    // l'onboarding ne s'affiche QUE si la requête réussit et confirme un compte neuf.
+    const fallback = setTimeout(() => { if (!cancelled) setOnboarding(false) }, 6000)
     Promise.resolve(
       supabase.from('app_config').select('bearer_token, onboarded_at').eq('user_id', user.id).maybeSingle()
     ).then(({ data, error }) => {
         clearTimeout(fallback)
         if (cancelled) return
-        if (error) console.error('[app_config] read error:', error)
+        if (error) { console.error('[app_config] read error:', error); setOnboarding(false); return }
         const finished = !!(data && (data.onboarded_at || data.bearer_token))
         setOnboarding(!finished)
         if (finished && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
       })
-      .catch(() => { clearTimeout(fallback); if (!cancelled) setOnboarding(true) })
+      .catch(() => { clearTimeout(fallback); if (!cancelled) setOnboarding(false) })
     return () => { cancelled = true; clearTimeout(fallback) }
   }, [user.id])
 
