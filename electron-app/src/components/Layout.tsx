@@ -22,32 +22,23 @@ const CREDIT_AUTO_RECHARGE = 10_000
 const CREDIT_MAX_DISPLAY   = 150_000
 
 function SFLogo({ size = 28 }: { size?: number }) {
+  // Logo officiel ScaleFlow : carré arrondi à contour violet dégradé + « S » bold.
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" overflow="visible">
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
       <defs>
-        <linearGradient id="sfl-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#E9EAF0"/>
-          <stop offset="50%"  stopColor="#6366F1"/>
-          <stop offset="100%" stopColor="#4F46E5"/>
+        <linearGradient id="sfl-border" x1="14" y1="8" x2="86" y2="92" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#A78BFA"/>
+          <stop offset="48%"  stopColor="#7C3AED"/>
+          <stop offset="100%" stopColor="#6D28D9"/>
         </linearGradient>
-        <filter id="sfl-glow" x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="sRGB">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
-          <feColorMatrix in="blur" type="matrix"
-            values="0 0 0 0 0.79  0 0 0 0 0.71  0 0 0 0 0.52   0 0 0 1 0" result="colored"/>
-          <feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
       </defs>
-      {/* Glow halo */}
-      <path
-        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="#3730A3" strokeWidth="22" strokeLinecap="round" fill="none" opacity="0.3"
-      />
-      {/* Main S */}
-      <path
-        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sfl-g)" strokeWidth="16" strokeLinecap="round" fill="none"
-        filter="url(#sfl-glow)"
-      />
+      {/* Tuile arrondie : intérieur clair, contour violet dégradé */}
+      <rect x="9.5" y="9.5" width="81" height="81" rx="26"
+        fill="#F5F4F9" stroke="url(#sfl-border)" strokeWidth="9.5"/>
+      {/* « S » bold */}
+      <text x="50" y="53" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="62"
+        letterSpacing="-2" fill="#17171D">S</text>
     </svg>
   )
 }
@@ -692,17 +683,13 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
         {/* ── Logo area ─────────────────────────────────────────────────── */}
         <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
-          {/* Logo box — solid gradient mark with glow */}
-          <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 10,
-              background: 'linear-gradient(135deg,#818CF8 0%,#6366F1 45%,#7C3AED 100%)',
-              boxShadow: '0 6px 18px -4px rgba(99,102,241,0.7), inset 0 1px 0 rgba(255,255,255,0.35)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff',
-            }}>
-              <SFLogo size={19} />
-            </div>
+          {/* Logo officiel ScaleFlow + halo violet */}
+          <div style={{
+            position: 'relative', width: 32, height: 32, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            filter: 'drop-shadow(0 4px 12px rgba(124,58,237,0.5))',
+          }}>
+            <SFLogo size={32} />
           </div>
 
           {!collapsed && (
