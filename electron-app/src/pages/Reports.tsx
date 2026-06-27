@@ -31,7 +31,7 @@ const DEFAULT_CFG: TrackingConfig = {
   enabled: false,
   sync_time: '12:00',
   rapidapi_key: '',
-  rapidapi_url: 'https://instagram-scraper-2025.p.rapidapi.com/userreels/?username_or_id={username}',
+  rapidapi_url: 'https://instagram-scraper-api2.p.rapidapi.com/v1/reels?username_or_id_or_url={username}',
 }
 
 function parisToday(): string { return new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) }

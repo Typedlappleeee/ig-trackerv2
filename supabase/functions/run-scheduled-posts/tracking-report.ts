@@ -20,6 +20,10 @@ interface TrackingConfig {
 
 const MAX_PER_INVOCATION = 60   // comptes traités par passage (≈ 1 tick / minute)
 
+// URL par défaut de l'endpoint Reels (publique, non secrète). La CLÉ, elle, vient
+// du secret Supabase RAPIDAPI_KEY (jamais dans le code) → rien à coller par client.
+const DEFAULT_REELS_URL = 'https://instagram-scraper-api2.p.rapidapi.com/v1/reels?username_or_id_or_url={username}'
+
 function parisDate(d: Date): string {
   // "YYYY-MM-DD" en heure de Paris (fr-CA donne ce format).
   return d.toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' })
@@ -93,11 +97,22 @@ export async function runAccountSync(db: any, nowIso: string, deadlineMs: number
     }
     if (!owners.length) return 0
 
+    // Clé/URL globales agence (secret serveur) → fallback si pas définies par owner.
+    // Aucun client n'a à coller quoi que ce soit : on met RAPIDAPI_KEY une seule fois.
+    const envKey = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
+    const envUrl = (Deno.env.get('RAPIDAPI_URL') ?? '').trim()
+
     const startOfDayIso = new Date(`${today}T00:00:00+02:00`).toISOString()
 
     for (const owner of owners) {
       if (synced >= MAX_PER_INVOCATION || Date.now() > deadlineMs) break
       try {
+        // Clé/URL effectives : réglage du propriétaire sinon secret serveur.
+        const effCfg: TrackingConfig = {
+          ...owner.cfg,
+          rapidapi_key: owner.cfg.rapidapi_key || envKey,
+          rapidapi_url: owner.cfg.rapidapi_url || envUrl || DEFAULT_REELS_URL,
+        }
         // Comptes du propriétaire.
         let pq = db.from('phones').select('id, geelark_id, ig_username, group_name').not('ig_username', 'is', null)
         pq = owner.org_id ? pq.eq('org_id', owner.org_id) : pq.eq('user_id', owner.user_id).is('org_id', null)
@@ -130,7 +145,7 @@ export async function runAccountSync(db: any, nowIso: string, deadlineMs: number
           let reel_url: string | null = null, reel_thumb: string | null = null
 
           // Niveau API (optionnel) : vidéo + stats si postée aujourd'hui.
-          const reel = await fetchLatestReel(owner.cfg, username)
+          const reel = await fetchLatestReel(effCfg, username)
           if (reel && reel.postedAt && parisDate(new Date(reel.postedAt)) === today) {
             posted = true; posted_via = 'instagram'; posted_at = reel.postedAt
             views = reel.views; likes = reel.likes; comments = reel.comments
