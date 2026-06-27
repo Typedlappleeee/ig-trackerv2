@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, warmupAccountNative, updateInstagramProfile, editInstagramProfileNative, loginInstagramAccount, stopPhone,
+  fetchAllPhones, warmupAccount, warmupAccountNative, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, loginInstagramAccount, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
+import { BankPicker } from '@/pages/Bank'
 import { logActivity } from '@/lib/activityLog'
 import { useT, useLang } from '@/lib/i18n'
 
@@ -151,6 +152,7 @@ export function Warmup({ user }: WarmupProps) {
   const [editUsername, setEditUsername] = useState('')
   const [editBio,      setEditBio]      = useState('')
   const [editPicUrl,   setEditPicUrl]   = useState('')
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [editPicFile,  setEditPicFile]  = useState<string | null>(null)
 
   // ── WARMUP state ──────────────────────────────────────────────────────────
@@ -159,6 +161,7 @@ export function Warmup({ user }: WarmupProps) {
   const [watchReels,      setWatchReels]      = useState(true)
   const [followSuggested, setFollowSuggested] = useState(false)
   const [warmupKeyword,   setWarmupKeyword]   = useState('')
+  const [warmupPlatform,  setWarmupPlatform]  = useState<'instagram' | 'tiktok'>('instagram')
 
   // ── Job / execution state ─────────────────────────────────────────────────
   const [jobs,    setJobs]    = useState<PhoneJob[]>([])
@@ -341,11 +344,13 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      // Mot-clé renseigné → recherche du mot puis visionnage (ADB).
-      // Sinon → warmup général fiable (RPA GeeLark). Choix transparent pour l'utilisateur.
-      const result = warmupKeyword.trim()
-        ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
-        : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)) }, msg => addLog(phone.id, msg))
+      const result = warmupPlatform === 'tiktok'
+        // TikTok : warmup natif avec vraie recherche par mot-clé (action search video)
+        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes }, msg => addLog(phone.id, msg))
+        // Instagram : mot-clé → recherche ADB ; sinon → warmup IA natif général
+        : warmupKeyword.trim()
+          ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
+          : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)) }, msg => addLog(phone.id, msg))
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
@@ -426,6 +431,21 @@ export function Warmup({ user }: WarmupProps) {
 
   return (
     <div className="sf-page anim-page">
+
+      {/* Sélecteur d'avatar depuis la banque (Mass Edit) */}
+      {showAvatarPicker && (
+        <BankPicker
+          user={user}
+          mode="single"
+          resolveMode="signed-url"
+          onSelect={(paths) => {
+            const url = paths?.[0]
+            if (url) { setEditPicUrl(url); setEditPicFile(null) }
+            setShowAvatarPicker(false)
+          }}
+          onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
 
       {/* ── Page header ───────────────────────────────────────────────────────── */}
       <div className="sf-page-header">
@@ -1029,10 +1049,15 @@ export function Warmup({ user }: WarmupProps) {
                         {t('warmupProfilePic')}
                       </label>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input type="text" placeholder="https://… ou laisser vide"
+                        <input type="text" placeholder="Choisir depuis la banque →"
                           value={editPicUrl} onChange={e => { setEditPicUrl(e.target.value); setEditPicFile(null) }}
                           className="sf-input" style={{ flex: 1, fontSize: 12 }}
                         />
+                        <button onClick={() => setShowAvatarPicker(true)}
+                          className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+                          style={{ flexShrink: 0, gap: 5 }}>
+                          <IconFolderOpen size={14} /> Banque
+                        </button>
                         {!isWeb && (
                           <button onClick={async () => {
                             const p = await window.electronAPI?.pickAnyFile?.({ filters: [{ name: 'Images', extensions: ['jpg','jpeg','png','webp'] }] })
@@ -1103,6 +1128,31 @@ export function Warmup({ user }: WarmupProps) {
                   </div>
 
                   <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+                    {/* Plateforme */}
+                    <div>
+                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
+                        Plateforme
+                      </p>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {([
+                          { k: 'instagram', label: 'Instagram', emoji: '📸' },
+                          { k: 'tiktok',    label: 'TikTok',    emoji: '🎵' },
+                        ] as const).map(p => (
+                          <button key={p.k} onClick={() => setWarmupPlatform(p.k)}
+                            className="cursor-pointer"
+                            style={{
+                              flex: 1, padding: '10px 12px', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                              fontSize: 13, fontWeight: 700,
+                              background: warmupPlatform === p.k ? 'rgba(99,102,241,0.14)' : 'rgba(255,255,255,0.02)',
+                              border: `1px solid ${warmupPlatform === p.k ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
+                              color: warmupPlatform === p.k ? 'var(--accent-l)' : 'var(--text-2)',
+                            }}>
+                            <span>{p.emoji}</span>{p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
                     {/* Centre d'intérêt (optionnel) — détermine en coulisses le mode de warmup */}
                     <div>

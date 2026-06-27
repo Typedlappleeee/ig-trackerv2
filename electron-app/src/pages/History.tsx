@@ -34,6 +34,8 @@ const TYPE_LABELS: Record<string, string> = {
   posting:      'Posting',
   story:        'Story',
   mass_story:   'Mass Story',
+  tiktok:       'TikTok',
+  warmup:       'Warmup',
 }
 
 function StatusPill({ status }: { status: string }) {

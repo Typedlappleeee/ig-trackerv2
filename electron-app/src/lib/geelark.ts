@@ -2189,6 +2189,41 @@ export async function warmupAccountNative(
   })
 }
 
+// Warmup TikTok natif via /task/add (taskType:2). Contrairement à Instagram,
+// TikTok expose une vraie recherche : action "search video" + mots-clés.
+//   - mot-clé fourni → cherche la vidéo par mot-clé puis la regarde
+//   - sinon → parcourt le fil ("browse video")
+export async function warmupTikTokNative(
+  bearer: string,
+  phoneId: string,
+  config: { keyword?: string; durationMin: number },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 30 * 60_000, '30min', log, async () => {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    const kw = config.keyword?.trim()
+    const duration = Math.max(1, Math.min(120, Math.round(config.durationMin)))
+    log(`🔥 Warmup TikTok (${kw ? `recherche « ${kw} »` : 'fil général'}, ${duration} min)…`)
+    const res = await geelarkFetch('POST', '/task/add', {
+      taskType: 2,
+      list: [{
+        scheduleAt: Math.floor(Date.now() / 1000) + 5,
+        envId:      phoneId,
+        action:     kw ? 'search video' : 'browse video',
+        ...(kw ? { keywords: [kw] } : {}),
+        duration,
+      }],
+    }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
+    const ids = ((res['data'] as Record<string, unknown>)?.['taskIds'] ?? []) as string[]
+    const taskId = ids[0]
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — warmup en cours…`)
+    return pollRpaTask(bearer, taskId, log, 25 * 60_000)
+  })
+}
+
 // Édition de profil Instagram native (instagramEdit). Remplace le tap-ADB fragile.
 // avatarUrl doit être une URL d'image accessible (resourceUrl GeeLark ou URL publique).
 export async function editInstagramProfileNative(

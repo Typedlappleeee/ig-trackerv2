@@ -907,12 +907,13 @@ export function MassPosting({ user }: MassPostingProps) {
         message: `${okN}/${assignments.length} compte(s) publiés avec succès${errN ? ` · ${errN} échec(s)` : ''}.`,
       })).catch(() => {})
 
-      // Log run for the Hub "posts this week" counter (post_runs table, not scheduled_posts)
-      if (okN > 0) {
+      // Historique + compteur Hub : on enregistre TOUJOURS le run (même 0 succès)
+      // pour que l'Historique soit fiable. (table post_runs, fire-and-forget)
+      if (assignments.length > 0) {
         supabase.from('post_runs').insert({
           user_id:   user.id,
           org_id:    currentOrg?.id ?? null,
-          type:      'mass_posting',
+          type:      platform === 'tiktok' ? 'tiktok' : 'mass_posting',
           ok_count:  okN,
           err_count: errN,
           total:     assignments.length,
