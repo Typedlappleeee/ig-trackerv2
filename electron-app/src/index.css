@@ -1216,7 +1216,7 @@ select.sf-input option:checked {
   padding: 24px;
 }
 .sf-modal {
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 38%);
   border: 1px solid var(--border-md);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-lg), 0 0 60px -20px rgba(99,102,241,0.2);
