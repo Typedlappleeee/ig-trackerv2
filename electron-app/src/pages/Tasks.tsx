@@ -40,6 +40,7 @@ import { BankPicker } from '@/pages/Bank'
 import { postInstagramStory, stopPhone } from '@/lib/geelark'
 import { registerStartedPhones } from '@/lib/phoneWatch'
 import { pushNotification } from '@/lib/notificationStore'
+import { TaskWizard } from '@/components/TaskWizard'
 
 type TaskType = 'publication' | 'story'
 
@@ -3103,6 +3104,7 @@ export function Tasks({ user }: { user: User }) {
   const [loading, setLoading]       = useState(true)
   const [tab, setTab]               = useState<TaskTab>('upcoming')
   const [showCreate, setShowCreate] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
   const [editTask, setEditTask]     = useState<RecurringTask | null>(null)
   const [deleteTask, setDeleteTask] = useState<RecurringTask | null>(null)
   const [toggling, setToggling]         = useState<string | null>(null)
@@ -3313,14 +3315,21 @@ export function Tasks({ user }: { user: User }) {
             </div>
           </div>
 
-          <div className="sf-anim-slide-up sf-d100">
+          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
-              onClick={() => { setEditTask(null); setShowCreate(true) }}
+              onClick={() => { setEditTask(null); setShowWizard(true) }}
               className="sf-btn sf-btn-primary cursor-pointer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               <IconPlus />
               Nouvelle tâche
+            </button>
+            <button
+              onClick={() => { setEditTask(null); setShowCreate(true) }}
+              className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+              title="Mode avancé : séquences multi-étapes (publication + story + warmup)"
+            >
+              Avancé
             </button>
           </div>
         </div>
@@ -3406,7 +3415,7 @@ export function Tasks({ user }: { user: User }) {
           <TaskSkeleton />
         ) : tasks.length === 0 && history.length === 0 ? (
           <div className="sf-card" style={{ marginTop: 8 }}>
-            <EmptyState onNew={() => { setEditTask(null); setShowCreate(true) }} />
+            <EmptyState onNew={() => { setEditTask(null); setShowWizard(true) }} />
           </div>
         ) : tab === 'upcoming' ? (
           /* ── À venir ──────────────────────────────────────────────────── */
@@ -3428,7 +3437,7 @@ export function Tasks({ user }: { user: User }) {
               icon={<IconBolt size={34} color="rgba(99,102,241,0.55)" />}
               title="Aucune tâche"
               text="Crée ta première tâche automatique."
-              onNew={() => { setEditTask(null); setShowCreate(true) }}
+              onNew={() => { setEditTask(null); setShowWizard(true) }}
             />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
@@ -3479,6 +3488,14 @@ export function Tasks({ user }: { user: User }) {
       </div>
 
       {/* ── Create / Edit modal ───────────────────────────────────────────── */}
+      {showWizard && (
+        <TaskWizard
+          user={user}
+          onSaved={() => { setShowWizard(false); void load() }}
+          onClose={() => setShowWizard(false)}
+        />
+      )}
+
       {showCreate && (
         <CreateTaskModal
           user={user}

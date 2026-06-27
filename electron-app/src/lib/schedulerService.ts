@@ -39,6 +39,7 @@ export interface ScheduledPost {
   bearer_token:    string
   reels_trial:     boolean
   recur_hours:     number | null
+  platform?:       'instagram' | 'tiktok'
   result:          { logs: string[] } | null
   error_msg:       string | null
   created_at:      string
@@ -59,6 +60,7 @@ export interface CreateScheduledPostInput {
   bearerToken:     string
   reelsTrial:      boolean
   recurHours?:     number | null
+  platform?:       'instagram' | 'tiktok'
 }
 
 // ── DB operations ──────────────────────────────────────────────────────────────
@@ -82,6 +84,7 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
     bearer_token:     '',
     reels_trial:      input.reelsTrial,
     recur_hours:      input.recurHours ?? null,
+    platform:         input.platform ?? 'instagram',
   }).select().single()
   if (error) throw new Error(error.message)
   return data as ScheduledPost
@@ -345,31 +348,50 @@ async function executeScheduledPostInner(
     onLog('📤 Envoi des tâches de posting…')
     const taskIds: string[] = []
     let failedCount = 0
+    const isTikTok = post.platform === 'tiktok'
 
-    for (let i = 0; i < phones.length; i++) {
-      const phone = phones[i]
-      if (i > 0 && delay_minutes > 0) {
-        onLog(`⏳ Délai ${delay_minutes} min entre comptes…`)
-        await sleep(delay_minutes * 60_000)
-      }
-      const videoIdx = mode === 'random'
-        ? Math.floor(Math.random() * videos.length)
-        : i % videos.length
-      const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
-        id:          phone.geelark_id,
-        scheduleAt:  Math.floor(Date.now() / 1000),
-        description: caption,
-        video:       [videos[videoIdx].token],
-        ...(reels_trial ? { shareType: 2 } : {}),
-      }) as any
-      onLog(`📦 Réponse GeelarK (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'} data=${JSON.stringify(res.data ?? null)}`)
-      const taskId = res.data?.id ?? res.data?.taskId ?? res.taskId ?? res.id ?? null
-      if (res.code === 0) {
-        if (taskId) taskIds.push(taskId)
-        onLog(`✅ Tâche créée : ${phone.ig_username ?? phone.phone_name}`)
+    if (isTikTok) {
+      // TikTok : un seul /task/add (taskType:1) qui batch tous les comptes.
+      const now = Math.floor(Date.now() / 1000)
+      const list = phones.map((phone, i) => {
+        const videoIdx = mode === 'random' ? Math.floor(Math.random() * videos.length) : i % videos.length
+        return { scheduleAt: now + i * delay_minutes * 60, envId: phone.geelark_id, video: videos[videoIdx].token, videoDesc: caption }
+      })
+      const res = await gPost(bearer, '/task/add', { taskType: 1, list }) as any
+      const ids: string[] = res?.data?.taskIds ?? []
+      if (res.code === 0 && Array.isArray(ids) && ids.length > 0) {
+        taskIds.push(...ids)
+        onLog(`✅ ${ids.length} tâche(s) TikTok créée(s)`)
       } else {
-        failedCount++
-        onLog(`❌ Tâche refusée (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'}`)
+        failedCount = phones.length
+        onLog(`❌ TikTok /task/add refusé: code=${res.code} msg=${res.msg ?? '?'}`)
+      }
+    } else {
+      for (let i = 0; i < phones.length; i++) {
+        const phone = phones[i]
+        if (i > 0 && delay_minutes > 0) {
+          onLog(`⏳ Délai ${delay_minutes} min entre comptes…`)
+          await sleep(delay_minutes * 60_000)
+        }
+        const videoIdx = mode === 'random'
+          ? Math.floor(Math.random() * videos.length)
+          : i % videos.length
+        const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
+          id:          phone.geelark_id,
+          scheduleAt:  Math.floor(Date.now() / 1000),
+          description: caption,
+          video:       [videos[videoIdx].token],
+          ...(reels_trial ? { shareType: 2 } : {}),
+        }) as any
+        onLog(`📦 Réponse GeelarK (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'} data=${JSON.stringify(res.data ?? null)}`)
+        const taskId = res.data?.id ?? res.data?.taskId ?? res.taskId ?? res.id ?? null
+        if (res.code === 0) {
+          if (taskId) taskIds.push(taskId)
+          onLog(`✅ Tâche créée : ${phone.ig_username ?? phone.phone_name}`)
+        } else {
+          failedCount++
+          onLog(`❌ Tâche refusée (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'}`)
+        }
       }
     }
 

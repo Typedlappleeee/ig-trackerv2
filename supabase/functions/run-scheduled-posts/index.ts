@@ -512,6 +512,7 @@ Deno.serve(async (req) => {
         delay_minutes:   task.delay_minutes ?? 0,
         mode:            task.mode ?? 'seq',
         bearer_token:    '',
+        platform:        task.platform ?? 'instagram',
         reels_trial:     steps.length > 0
           ? !!(steps.find(s => s.type === 'publication')?.reels_trial)
           : (task.reels_trial ?? false),
@@ -538,14 +539,14 @@ Deno.serve(async (req) => {
     summary['recurring_tasks'] = `error: ${err instanceof Error ? err.message : String(err)}`
   }
 
-  // 2. Posts dus — UNIQUEMENT ceux issus de tâches récurrentes (task_id NOT NULL).
-  // Les posts manuels (Programmation tab, task_id IS NULL) sont exécutés côté client.
+  // 2. Posts dus — programmés manuels ET issus de tâches récurrentes.
+  // Exécutés CÔTÉ SERVEUR pour fonctionner PC éteint. Le claim atomique (étape 3)
+  // empêche la double exécution si l'app cliente est aussi ouverte.
   // type='story' exclu : stories passent par automation UI (~2 min/tel) côté app.
   let duePostsQuery = db.from('scheduled_posts')
     .select('*')
     .eq('status', 'pending')
     .neq('type', 'story')
-    .not('task_id', 'is', null)
     .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(2)
@@ -611,7 +612,25 @@ Deno.serve(async (req) => {
       for (let vi = 0; vi < videos.length; vi++) {
         resolvedTokens.push(await resolveVideoToken(db, bearer, videos[vi]))
       }
-      for (let i = 0; i < phones.length; i++) {
+      // TikTok : un seul /task/add (taskType:1) batché. Sinon : boucle IG ci-dessous.
+      if (post.platform === 'tiktok') {
+        const list = phones.map((phone, i) => {
+          const vIdx = post.mode === 'random' ? Math.floor(Math.random() * videos.length) : i % videos.length
+          usedVideoIndices.add(vIdx)
+          return { scheduleAt: baseTs + i * delayMin * 60, envId: phone.geelark_id, video: resolvedTokens[vIdx], videoDesc: post.caption }
+        })
+        const res = await gPost(bearer, '/task/add', { taskType: 1, list })
+        const ids: string[] = res.data?.taskIds ?? []
+        if (res.code === 0 && Array.isArray(ids) && ids.length > 0) {
+          ids.forEach((tid, idx) => { taskIds.push(tid); if (phones[idx]) taskPhoneMap.set(tid, phones[idx]) })
+          log(`✅ ${ids.length} tâche(s) TikTok créée(s)`)
+        } else {
+          failedCount = phones.length
+          log(`❌ TikTok /task/add refusé: code=${res.code} msg=${res.msg ?? '?'}`)
+        }
+      }
+
+      for (let i = 0; post.platform !== 'tiktok' && i < phones.length; i++) {
         const phone = phones[i]
         const videoIdx = post.mode === 'random'
           ? Math.floor(Math.random() * videos.length)

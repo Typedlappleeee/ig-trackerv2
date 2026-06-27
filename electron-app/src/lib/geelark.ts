@@ -2193,17 +2193,45 @@ export async function warmupAccountNative(
 // TikTok expose une vraie recherche : action "search video" + mots-clés.
 //   - mot-clé fourni → cherche la vidéo par mot-clé puis la regarde
 //   - sinon → parcourt le fil ("browse video")
+// Lance une tâche RPA TikTok simple (like/follow/comment) et la suit jusqu'au bout.
+async function runTikTokRpa(
+  bearer: string, phoneId: string, path: string, extra: Record<string, unknown>,
+  log: (m: string) => void, label: string,
+): Promise<void> {
+  try {
+    log(`   ▶ ${label}…`)
+    const res = await geelarkFetch('POST', path, {
+      id: phoneId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'ScaleFlow', ...extra,
+    }, bearer)
+    if (res['code'] !== 0) { log(`   ⚠ ${label}: ${res['msg'] ?? res['code']}`); return }
+    const tid = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (tid) await pollRpaTask(bearer, tid, log, 15 * 60_000)
+  } catch (e) {
+    log(`   ⚠ ${label}: ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
+export interface TikTokWarmupConfig {
+  keyword?:     string
+  durationMin:  number
+  like?:        boolean   // tiktokRandomStar
+  follow?:      boolean   // tiktokRandomFollow
+  comment?:     boolean   // tiktokRandomComment (IA)
+}
+
 export async function warmupTikTokNative(
   bearer: string,
   phoneId: string,
-  config: { keyword?: string; durationMin: number },
+  config: TikTokWarmupConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
-  return withPhoneAutoStop(bearer, phoneId, 30 * 60_000, '30min', log, async () => {
+  return withPhoneAutoStop(bearer, phoneId, 35 * 60_000, '35min', log, async () => {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     const kw = config.keyword?.trim()
     const duration = Math.max(1, Math.min(120, Math.round(config.durationMin)))
+
+    // 1. Parcours / recherche (taskType 2)
     log(`🔥 Warmup TikTok (${kw ? `recherche « ${kw} »` : 'fil général'}, ${duration} min)…`)
     const res = await geelarkFetch('POST', '/task/add', {
       taskType: 2,
@@ -2220,7 +2248,14 @@ export async function warmupTikTokNative(
     const taskId = ids[0]
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — warmup en cours…`)
-    return pollRpaTask(bearer, taskId, log, 25 * 60_000)
+    await pollRpaTask(bearer, taskId, log, 25 * 60_000)
+
+    // 2. Engagement optionnel (même session) — like / follow / commentaire IA
+    if (config.like)    await runTikTokRpa(bearer, phoneId, '/rpa/task/tiktokRandomStar',    { likeProbability: 30 },   log, 'J\'aime aléatoires')
+    if (config.follow)  await runTikTokRpa(bearer, phoneId, '/rpa/task/tiktokRandomFollow',  { followProbability: 20 }, log, 'Abonnements aléatoires')
+    if (config.comment) await runTikTokRpa(bearer, phoneId, '/rpa/task/tiktokRandomComment', { useAi: 1 },              log, 'Commentaires IA')
+
+    return { ok: true }
   })
 }
 
@@ -2246,6 +2281,34 @@ export async function editInstagramProfileNative(
       ...(fields.avatarUrl?.trim()  ? { profilePicture: [fields.avatarUrl.trim()] } : {}),
       ...(fields.linkURL?.trim()    ? { linkURL: fields.linkURL.trim() } : {}),
       ...(fields.linkTitle?.trim()  ? { linkTitle: fields.linkTitle.trim() } : {}),
+    }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — édition en cours…`)
+    return pollRpaTask(bearer, taskId, log, 8 * 60_000)
+  })
+}
+
+// Édition de profil TikTok native (tiktokEdit). avatar = URL d'image 1:1.
+export async function editTikTokProfileNative(
+  bearer: string,
+  phoneId: string,
+  fields: { nickName?: string; bio?: string; avatarUrl?: string; site?: string },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('✏️ Création de la tâche d\'édition de profil TikTok…')
+    const res = await geelarkFetch('POST', '/rpa/task/tiktokEdit', {
+      id: phoneId,
+      scheduleAt: Math.floor(Date.now() / 1000) + 5,
+      name: 'ScaleFlow profile edit',
+      ...(fields.nickName?.trim() ? { nickName: fields.nickName.trim().slice(0, 30) } : {}),
+      ...(fields.bio != null      ? { bio: fields.bio.slice(0, 160) } : {}),
+      ...(fields.avatarUrl?.trim()? { avatar: fields.avatarUrl.trim() } : {}),
+      ...(fields.site?.trim()     ? { site: fields.site.trim() } : {}),
     }, bearer)
     if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string

@@ -297,8 +297,10 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
             <div>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1 }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}>
                 Programmer une Story
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(99,102,241,0.12)', border: `1px solid ${HAIR}`, color: ACCENT_L }}>📸 Instagram</span>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, color: 'rgba(233,234,240,0.3)' }}>🎵 TikTok · bientôt</span>
               </p>
               <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'rgba(233,234,240,0.42)' }}>
                 Photos + sticker lien • automation GéeLark • app doit être ouverte à l'heure

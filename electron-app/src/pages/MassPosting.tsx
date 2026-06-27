@@ -484,7 +484,6 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function scheduleMassPost(scheduledAt: Date) {
-    if (platform === 'tiktok')      { log('Programmation TikTok bientôt disponible — utilise « Publier maintenant » pour TikTok.', 'warn'); return }
     if (!bearer)                    { log('Missing GéeLark token — Settings', 'error'); return }
     if (phoneList.length === 0)     { log('Select at least one phone', 'warn'); return }
     if (selectedVideos.length === 0){ log('Select at least one video', 'warn'); return }
@@ -546,6 +545,7 @@ export function MassPosting({ user }: MassPostingProps) {
           phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
           videos: videosToSchedule.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
           caption, delayMinutes: 0, mode, bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
+          platform,
         })
       } catch (err: any) {
         await refundOnFailure(`Programmation échouée : ${err.message}`)

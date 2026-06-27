@@ -45,6 +45,7 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
   const [schedAt, setSchedAt]           = useState(defaultSchedValue(60))
   const [delayMin, setDelayMin]         = useState(0)
   const [reelsTrial, setReelsTrial]     = useState(false)
+  const [platform, setPlatform]         = useState<'instagram' | 'tiktok'>('instagram')
   const [submitting, setSubmitting]     = useState(false)
   const [progress, setProgress]         = useState('')
   const [error, setError]               = useState<string | null>(null)
@@ -127,6 +128,7 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
         mode,
         bearerToken:   bearer,
         reelsTrial,
+        platform,
       })
       onCreated()
     } catch (e: any) {
@@ -178,6 +180,29 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
               Token GéeLark manquant — ajoute-le dans Paramètres → Connexions avant de programmer.
             </div>
           )}
+
+          {/* ── Plateforme ─────────────────────────────────────────────────── */}
+          <section>
+            <span style={labelStyle}>Plateforme</span>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              {([
+                { k: 'instagram', label: 'Instagram', emoji: '📸' },
+                { k: 'tiktok',    label: 'TikTok',    emoji: '🎵' },
+              ] as const).map(p => (
+                <button key={p.k} type="button" onClick={() => setPlatform(p.k)}
+                  className="cursor-pointer"
+                  style={{
+                    flex: 1, padding: '9px 12px', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                    fontSize: 13, fontWeight: 700,
+                    background: platform === p.k ? 'rgba(99,102,241,0.14)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${platform === p.k ? 'rgba(99,102,241,0.4)' : HAIR}`,
+                    color: platform === p.k ? GOLD : MUTED,
+                  }}>
+                  <span>{p.emoji}</span>{p.label}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {/* ── Téléphones ─────────────────────────────────────────────────── */}
           <section>
