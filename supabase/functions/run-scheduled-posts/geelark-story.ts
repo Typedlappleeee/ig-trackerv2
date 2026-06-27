@@ -536,13 +536,16 @@ export async function postStoryServer(
   log('🔗 Ajout du sticker lien…')
   xml = await dumpXml(bearer, phoneId)
   const stickerBtn =
-    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button') ??
-    findByText(xml, 'Sticker', 'Autocollant', 'Stickers')
+    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker_picker_button', 'creation_sticker_button') ??
+    findByText(xml, 'Sticker', 'Autocollant', 'Stickers', 'Autocollants', 'Add sticker', 'Add a sticker', 'Ajouter un autocollant') ??
+    findByTextPartial(xml, 'sticker', 'autocollant')
   if (stickerBtn) {
     await shellExec(bearer, phoneId, `input tap ${stickerBtn[0]} ${stickerBtn[1]}`)
   } else {
-    // Sticker icon (smiley face) — top-right toolbar of the story editor
-    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.05)}`)
+    // Repli : barre verticale en haut à droite de l'éditeur — le sticker (smiley)
+    // est le 2ᵉ icône, SOUS « Aa ». L'ancien repli (y≈5%) tapait sur « Aa » →
+    // ouvrait le mode texte. On vise plus bas et plus à droite.
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.88)} ${Math.floor(sh * 0.16)}`)
   }
   await sleep(3500) // extra time for tray to fully load
 
