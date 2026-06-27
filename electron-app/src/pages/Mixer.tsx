@@ -326,6 +326,33 @@ export function Mixer({ user }: MixerProps) {
     }))
   }
 
+  // Enregistre une vidéo terminée dans la banque. Sur le web, la vidéo est déjà
+  // dans le storage (job.storagePath) → simple insert. Sur Electron, on upload
+  // d'abord le fichier local. Idempotent (ne ré-enregistre pas).
+  const saveJobToBank = async (job: MixJob): Promise<boolean> => {
+    if (job.savedToBank) return true
+    try {
+      let storagePath = job.storagePath ?? null
+      let thumbnailPath: string | null = null
+      if (!storagePath && job.localPath && !job.localPath.startsWith('http')) {
+        const scope = currentOrg?.id ? { mode: 'org' as const, id: currentOrg.id } : { mode: 'user' as const, id: user.id }
+        const up = await uploadVideoFromPath(job.localPath, scope)
+        storagePath = up.storagePath
+        thumbnailPath = up.thumbnailPath
+      }
+      if (!storagePath) return false
+      const { error } = await supabase.from('content_bank').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        title: `Mixer — ${job.videoItem.title}`,
+        file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
+        folder: saveFolder, tags: [], notes: '',
+      })
+      if (error) return false
+      updateJob(job.id, { savedToBank: true })
+      return true
+    } catch { return false }
+  }
+
   const startMix = async () => {
     setError('')
     const newJobs = buildJobs()
@@ -364,8 +391,11 @@ export function Mixer({ user }: MixerProps) {
               return 'localvideo://' + n.split('/').map(encodeURIComponent).join('/')
             })()
 
-        updateJob(job.id, { status: 'done', outputUrl: localUrl, localPath: res.outputPath, storagePath: (res as any).storagePath })
+        const storagePath = (res as any).storagePath
+        updateJob(job.id, { status: 'done', outputUrl: localUrl, localPath: res.outputPath, storagePath })
         supabase.from('caption_bank').update({ used_count: (job.caption.used_count ?? 0) + 1 }).eq('id', job.caption.id).then(() => {})
+        // Enregistrement automatique dans la banque.
+        await saveJobToBank({ ...job, status: 'done', outputUrl: localUrl, localPath: res.outputPath, storagePath })
       } catch (e: unknown) {
         updateJob(job.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
@@ -651,7 +681,7 @@ export function Mixer({ user }: MixerProps) {
 
       {/* ── Results strip ── */}
       {jobs.length > 0 && (
-        <div className="sf-anim-slide-up" style={{ flexShrink: 0, height: 228, borderTop: '1px solid var(--border)', padding: '14px 20px', overflowX: 'auto', background: 'var(--surface)' }}>
+        <div className="sf-anim-slide-up" style={{ flexShrink: 0, height: 250, borderTop: '1px solid var(--border)', padding: '14px 20px 24px', overflowX: 'auto', background: 'var(--surface)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexShrink: 0 }}>
             <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Résultats</p>
             {running && <div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />}
@@ -682,25 +712,10 @@ export function Mixer({ user }: MixerProps) {
                   {job.status === 'done' && job.outputUrl && (
                     <div style={{ position: 'absolute', bottom: 4, right: 4, display: 'flex', gap: 3 }}>
                       {/* Save to bank */}
-                      {job.localPath && !job.savedToBank && (
+                      {(job.storagePath || job.localPath) && !job.savedToBank && (
                         <button
                           title="Enregistrer dans la banque"
-                          onClick={async e => {
-                            e.stopPropagation()
-                            try {
-                              const scope = currentOrg?.id ? { mode: 'org' as const, id: currentOrg.id } : { mode: 'user' as const, id: user.id }
-                              const { storagePath, thumbnailPath } = await uploadVideoFromPath(job.localPath!, scope)
-                              const { error } = await supabase.from('content_bank').insert({
-                                user_id: user.id, org_id: currentOrg?.id ?? null,
-                                title: `Mixer — ${job.videoItem.title}`,
-                                file_url: null,
-                                storage_path: storagePath,
-                                thumbnail_path: thumbnailPath,
-                                folder: saveFolder, tags: [], notes: '',
-                              })
-                              if (!error) updateJob(job.id, { savedToBank: true })
-                            } catch { /* ignore upload errors */ }
-                          }}
+                          onClick={e => { e.stopPropagation(); void saveJobToBank(job) }}
                           className="sf-press cursor-pointer"
                           style={{ background: ACCENT, borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg>

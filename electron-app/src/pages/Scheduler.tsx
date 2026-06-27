@@ -847,21 +847,6 @@ export function Scheduler({ user, onNavigate }: Props) {
           </div>
         )}
 
-        {/* ── Info banner ─────────────────────────────────────────────────────── */}
-        <div className="sf-reveal sf-d300" style={{
-          marginTop: 28,
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-          padding: '12px 16px',
-          background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)',
-          borderRadius: 11,
-        }}>
-          <span style={{ flexShrink: 0, marginTop: 1 }}>
-            <IconInfo size={14} color="rgba(99,102,241,0.7)" />
-          </span>
-          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
-            {t('schedulerAutoBanner')}
-          </p>
-        </div>
       </div>
 
       {/* ── Confirm cancel ───────────────────────────────────────────────────── */}
