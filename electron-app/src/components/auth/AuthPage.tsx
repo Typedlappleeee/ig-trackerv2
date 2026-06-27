@@ -6,32 +6,22 @@ import { Input }  from '@/components/ui/Input'
 type Tab = 'login' | 'register' | 'forgot' | 'reset'
 
 function SFLogoMark() {
+  // Logo officiel ScaleFlow : tuile arrondie, contour violet dégradé, « S » bold.
   return (
-    <svg width="38" height="38" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="46" height="46" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ filter: 'drop-shadow(0 6px 18px rgba(124,58,237,0.5))' }}>
       <defs>
-        <linearGradient id="auth-g" x1="0.3" y1="0" x2="0.7" y2="1">
-          <stop offset="0%"   stopColor="#60aaff"/>
-          <stop offset="50%"  stopColor="#8866ff"/>
-          <stop offset="100%" stopColor="#aa44ff"/>
+        <linearGradient id="auth-border" x1="14" y1="8" x2="86" y2="92" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#A78BFA"/>
+          <stop offset="48%"  stopColor="#7C3AED"/>
+          <stop offset="100%" stopColor="#6D28D9"/>
         </linearGradient>
-        <filter id="auth-glow" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="7" result="b"/>
-          <feColorMatrix in="b" type="matrix" values="1 0 0 0 0.35  0 0 0 0 0.2  0 0 0 0 1  0 0 0 1 0" result="c"/>
-          <feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id="auth-bloom" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="16" result="b2"/>
-          <feColorMatrix in="b2" type="matrix" values="1 0 0 0 0.3  0 0 0 0 0.15  0 0 0 0 1  0 0 0 0.5 0"/>
-        </filter>
       </defs>
-      <text x="100" y="148" textAnchor="middle"
-        fontFamily="'Arial Rounded MT Bold','Arial Black','Helvetica Neue',Arial,sans-serif"
-        fontWeight="900" fontSize="148" fill="url(#auth-g)"
-        filter="url(#auth-bloom)">S</text>
-      <text x="100" y="148" textAnchor="middle"
-        fontFamily="'Arial Rounded MT Bold','Arial Black','Helvetica Neue',Arial,sans-serif"
-        fontWeight="900" fontSize="148" fill="url(#auth-g)"
-        filter="url(#auth-glow)">S</text>
+      <rect x="9.5" y="9.5" width="81" height="81" rx="26"
+        fill="#F5F4F9" stroke="url(#auth-border)" strokeWidth="9.5"/>
+      <text x="50" y="53" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="62"
+        letterSpacing="-2" fill="#17171D">S</text>
     </svg>
   )
 }

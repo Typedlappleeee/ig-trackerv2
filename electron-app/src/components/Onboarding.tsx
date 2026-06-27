@@ -19,37 +19,22 @@ function openExternal(url: string) {
 }
 
 function SFLogoMark() {
+  // Logo officiel ScaleFlow : tuile arrondie, contour violet dégradé, « S » bold.
   return (
-    <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
+    <svg width="34" height="34" viewBox="0 0 100 100" fill="none"
+      style={{ filter: 'drop-shadow(0 5px 14px rgba(124,58,237,0.5))' }}>
       <defs>
-        <linearGradient id="ob-main" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#1d4ed8"/>
-          <stop offset="28%"  stopColor="#3b5af0"/>
-          <stop offset="58%"  stopColor="#6366F1"/>
-          <stop offset="100%" stopColor="#a855f7"/>
-        </linearGradient>
-        <linearGradient id="ob-depth" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#0c1f6e"/>
-          <stop offset="55%"  stopColor="#2e1065"/>
-          <stop offset="100%" stopColor="#3b0764"/>
-        </linearGradient>
-        <linearGradient id="ob-arr" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#db2777"/>
-          <stop offset="100%" stopColor="#A5B4FC"/>
+        <linearGradient id="ob-border" x1="14" y1="8" x2="86" y2="92" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#A78BFA"/>
+          <stop offset="48%"  stopColor="#7C3AED"/>
+          <stop offset="100%" stopColor="#6D28D9"/>
         </linearGradient>
       </defs>
-      <path
-        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#ob-depth)" strokeWidth="18" strokeLinecap="round" fill="none"
-        transform="translate(2.5,4.5)" opacity="0.65"
-      />
-      <path
-        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#ob-main)" strokeWidth="16" strokeLinecap="round" fill="none"
-      />
-      <line x1="66" y1="22" x2="88" y2="2" stroke="url(#ob-arr)" strokeWidth="11" strokeLinecap="round"/>
-      <line x1="77" y1="1" x2="90" y2="1" stroke="#A5B4FC" strokeWidth="9" strokeLinecap="round"/>
-      <line x1="90" y1="1" x2="90" y2="15" stroke="#A5B4FC" strokeWidth="9" strokeLinecap="round"/>
+      <rect x="9.5" y="9.5" width="81" height="81" rx="26"
+        fill="#F5F4F9" stroke="url(#ob-border)" strokeWidth="9.5"/>
+      <text x="50" y="53" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="62"
+        letterSpacing="-2" fill="#17171D">S</text>
     </svg>
   )
 }
