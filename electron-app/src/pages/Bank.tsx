@@ -1992,7 +1992,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
     <div
       draggable={!selectionMode}
       onDragStart={e => e.dataTransfer.setData('bank-item-id', item.id)}
-      className="group cursor-default select-none rounded-xl overflow-hidden transition-all"
+      className="group cursor-default select-none rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_30px_-10px_rgba(124,58,237,0.45)]"
       style={{
         background: 'var(--surface)',
         border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
