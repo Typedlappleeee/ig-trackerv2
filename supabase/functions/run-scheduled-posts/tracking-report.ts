@@ -16,6 +16,13 @@ interface TrackingConfig {
   window_hours?: number     // (compat) non utilisé pour le dashboard journalier
   rapidapi_key?: string
   rapidapi_url?: string     // doit contenir {username}
+  force_run?: string        // ISO : "lancer maintenant" déclenché par un admin
+}
+
+// Un "force_run" récent (< 90 min) rend le sync éligible hors de l'heure prévue,
+// et force la re-synchro des comptes traités AVANT ce timestamp (refresh).
+function isForced(cfg: TrackingConfig, now: Date): boolean {
+  return !!cfg.force_run && (now.getTime() - new Date(cfg.force_run).getTime()) < 90 * 60 * 1000
 }
 
 const MAX_PER_INVOCATION = 60   // comptes traités par passage (≈ 1 tick / minute)
@@ -85,15 +92,16 @@ export async function runAccountSync(db: any, nowIso: string, deadlineMs: number
     // Propriétaires avec tracking activé dont l'heure de sync est passée.
     // deno-lint-ignore no-explicit-any
     const owners: { user_id: string | null; org_id: string | null; cfg: TrackingConfig }[] = []
+    const eligible = (cfg: TrackingConfig) => cfg.enabled && (hhmm >= (cfg.sync_time || '12:00') || isForced(cfg, now))
     const { data: apps } = await db.from('app_config').select('user_id, tracking_config').not('tracking_config', 'is', null)
     for (const a of (apps ?? [])) {
       const cfg = (a.tracking_config ?? {}) as TrackingConfig
-      if (cfg.enabled && hhmm >= (cfg.sync_time || '12:00')) owners.push({ user_id: a.user_id, org_id: null, cfg })
+      if (eligible(cfg)) owners.push({ user_id: a.user_id, org_id: null, cfg })
     }
     const { data: orgs } = await db.from('org_config').select('org_id, tracking_config').not('tracking_config', 'is', null)
     for (const o of (orgs ?? [])) {
       const cfg = (o.tracking_config ?? {}) as TrackingConfig
-      if (cfg.enabled && hhmm >= (cfg.sync_time || '12:00')) owners.push({ user_id: null, org_id: o.org_id, cfg })
+      if (eligible(cfg)) owners.push({ user_id: null, org_id: o.org_id, cfg })
     }
     if (!owners.length) return 0
 
@@ -120,8 +128,11 @@ export async function runAccountSync(db: any, nowIso: string, deadlineMs: number
         if (!phones || !phones.length) continue
 
         // Déjà synchronisés aujourd'hui ? (reprise par lots)
+        // Si "force_run" : on ne compte "fait" que les comptes synchronisés APRÈS
+        // le clic → ceux d'avant sont re-synchronisés (refresh immédiat).
         let dq = db.from('account_daily').select('phone_id').eq('day', today).not('synced_at', 'is', null)
         dq = owner.org_id ? dq.eq('org_id', owner.org_id) : dq.eq('user_id', owner.user_id)
+        if (isForced(owner.cfg, now)) dq = dq.gte('synced_at', owner.cfg.force_run as string)
         const { data: doneRows } = await dq
         const doneSet = new Set((doneRows ?? []).map((r: { phone_id: string }) => r.phone_id))
         const pending = phones.filter((p: { id: string }) => !doneSet.has(p.id))

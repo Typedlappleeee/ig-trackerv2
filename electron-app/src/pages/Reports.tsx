@@ -16,8 +16,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 interface TrackingConfig {
   enabled: boolean
   sync_time: string
-  rapidapi_key: string
-  rapidapi_url: string
+  force_run?: string
 }
 interface DailyRow {
   id: string; phone_id: string; ig_username: string; va: string | null
@@ -30,8 +29,6 @@ interface DailyRow {
 const DEFAULT_CFG: TrackingConfig = {
   enabled: false,
   sync_time: '12:00',
-  rapidapi_key: '',
-  rapidapi_url: 'https://instagram-scraper-api2.p.rapidapi.com/v1/reels?username_or_id_or_url={username}',
 }
 
 function parisToday(): string { return new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) }
@@ -57,6 +54,8 @@ export function Reports({ user }: { user: User }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
   const [showCfg, setShowCfg] = useState(false)
+  const [launching, setLaunching] = useState(false)
+  const [launched, setLaunched]   = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -80,6 +79,16 @@ export function Reports({ user }: { user: User }) {
     const { error } = await supabase.from(table).upsert({ [keyCol]: keyVal, tracking_config: cfg }, { onConflict: keyCol })
     setSaving(false)
     if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  }
+
+  // « Lancer maintenant » : déclenche la synchro hors de l'heure prévue.
+  // Le cron (chaque minute) la détecte et la lance dans la minute qui suit.
+  async function launchNow() {
+    setLaunching(true); setLaunched(false)
+    const next = { ...cfg, enabled: true, force_run: new Date().toISOString() }
+    setCfg(next)
+    await supabase.from(table).upsert({ [keyCol]: keyVal, tracking_config: next }, { onConflict: keyCol })
+    setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 6000)
   }
 
   // Groupement par VA (client).
@@ -127,21 +136,17 @@ export function Reports({ user }: { user: User }) {
               <input type="time" value={cfg.sync_time} onChange={e => setCfg(c => ({ ...c, sync_time: e.target.value }))} className="sf-input" style={{ width: 130, height: 32 }} />
             </div>
 
-            <div style={{ marginBottom: 14 }}>
-              <p style={lbl}>Clé API Instagram (RapidAPI) — optionnel</p>
-              <input type="password" value={cfg.rapidapi_key} onChange={e => setCfg(c => ({ ...c, rapidapi_key: e.target.value }))} placeholder="x-rapidapi-key…" className="sf-input" style={{ width: '100%' }} />
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <p style={lbl}>URL de l'endpoint Reels</p>
-              <input value={cfg.rapidapi_url} onChange={e => setCfg(c => ({ ...c, rapidapi_url: e.target.value }))} placeholder="https://….p.rapidapi.com/…?username_or_id={username}" className="sf-input" style={{ width: '100%' }} />
-              <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '5px 0 0', lineHeight: 1.5 }}>
-                Doit contenir <code style={{ color: 'var(--accent-l)' }}>{'{username}'}</code>. <b>Sans clé</b>, le suivi marche quand même (posté/pas posté via ScaleFlow) mais sans vues/likes/commentaires.
+            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)', marginBottom: 16 }}>
+              <p style={{ fontSize: 11.5, color: 'var(--text-2)', margin: 0, lineHeight: 1.5 }}>
+                🔑 L'API Instagram est <b>gérée côté serveur</b> (clé agence) — rien à coller ici. Vues/likes/commentaires arrivent automatiquement. Sans clé serveur, le suivi marche quand même en « posté / pas posté ».
               </p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: saving ? 0.6 : 1 }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+              <button onClick={launchNow} disabled={launching} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: launching ? 0.6 : 1 }}>{launching ? 'Lancement…' : '⚡ Lancer maintenant'}</button>
               {saved && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Enregistré</span>}
+              {launched && <span style={{ fontSize: 12, color: 'var(--accent-l)' }}>⚡ Lancé — données dans quelques minutes (recharge la page)</span>}
             </div>
           </div>
         )}
