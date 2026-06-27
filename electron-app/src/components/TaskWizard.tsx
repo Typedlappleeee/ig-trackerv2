@@ -15,12 +15,28 @@ import { ACCENT, ACCENT_L, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HA
 type Platform = 'instagram' | 'tiktok'
 type TaskType = 'publication' | 'story'
 
-const RECUR_PRESETS: { label: string; hours: number }[] = [
-  { label: '1×/jour',     hours: 24 },
-  { label: '2×/jour',     hours: 12 },
-  { label: '4×/jour',     hours: 6 },
-  { label: 'Toutes les heures', hours: 1 },
+type RecurUnit = 'minutes' | 'heures' | 'jours'
+
+const RECUR_PRESETS: { label: string; value: number; unit: RecurUnit }[] = [
+  { label: '1×/jour',           value: 1,  unit: 'jours' },
+  { label: '2×/jour',           value: 12, unit: 'heures' },
+  { label: '4×/jour',           value: 6,  unit: 'heures' },
+  { label: 'Toutes les heures', value: 1,  unit: 'heures' },
 ]
+
+// Convertit valeur + unité → heures (ce que consomme le cron via recur_hours).
+function toHours(value: number, unit: RecurUnit): number {
+  const v = Math.max(1, value || 1)
+  return unit === 'minutes' ? v / 60 : unit === 'jours' ? v * 24 : v
+}
+
+// Valeur datetime-local par défaut : maintenant (arrondi à la minute).
+function defaultStart(): string {
+  const d = new Date()
+  d.setSeconds(0, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 export function TaskWizard({ user, onSaved, onClose }: {
   user: User
@@ -47,9 +63,12 @@ export function TaskWizard({ user, onSaved, onClose }: {
 
   // Récurrence
   const [name, setName]         = useState('')
-  const [recurHours, setRecurHours] = useState(24)
+  const [recurValue, setRecurValue] = useState(1)
+  const [recurUnit, setRecurUnit]   = useState<RecurUnit>('jours')
+  const [startAt, setStartAt]       = useState(defaultStart)
   const [mode, setMode]         = useState<'seq' | 'random'>('seq')
   const [autoRemove, setAutoRemove] = useState(false)
+  const recurHours = toHours(recurValue, recurUnit)
 
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState<string | null>(null)
@@ -104,7 +123,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
         mode,
         delay_minutes: 0,
         recur_hours: recurHours,
-        next_run_at: new Date().toISOString(),
+        next_run_at: new Date(startAt).toISOString(),
         reels_trial: false,
         auto_remove_videos: autoRemove,
         steps: [],
@@ -280,14 +299,34 @@ export function TaskWizard({ user, onSaved, onClose }: {
                 <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex : Posts quotidiens…" style={input} />
               </div>
               <div>
-                <p style={lbl}>Fréquence</p>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {RECUR_PRESETS.map(r => (
-                    <button key={r.hours} onClick={() => setRecurHours(r.hours)} className="cursor-pointer"
-                      style={{ padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, background: recurHours === r.hours ? 'rgba(99,102,241,0.14)' : 'rgba(255,255,255,0.02)', border: `1px solid ${recurHours === r.hours ? 'rgba(99,102,241,0.4)' : HAIR}`, color: recurHours === r.hours ? ACCENT_L : MUTED }}>
-                      {r.label}
-                    </button>
-                  ))}
+                <p style={lbl}>Démarrage — 1er post</p>
+                <input type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} style={input} />
+                <p style={{ fontSize: 10.5, color: FAINT, margin: '6px 0 0' }}>Le tout premier post partira exactement à cette heure.</p>
+              </div>
+              <div>
+                <p style={lbl}>Répéter — fréquence</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {RECUR_PRESETS.map(r => {
+                    const on = recurValue === r.value && recurUnit === r.unit
+                    return (
+                      <button key={r.label} onClick={() => { setRecurValue(r.value); setRecurUnit(r.unit) }} className="cursor-pointer"
+                        style={{ padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, background: on ? 'rgba(99,102,241,0.14)' : 'rgba(255,255,255,0.02)', border: `1px solid ${on ? 'rgba(99,102,241,0.4)' : HAIR}`, color: on ? ACCENT_L : MUTED }}>
+                        {r.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: MUTED }}>Toutes les</span>
+                  <input type="number" min={1} value={recurValue}
+                    onChange={e => setRecurValue(Math.max(1, Number(e.target.value) || 1))}
+                    style={{ ...input, width: 74, textAlign: 'center' }} />
+                  <select value={recurUnit} onChange={e => setRecurUnit(e.target.value as RecurUnit)}
+                    className="cursor-pointer" style={{ ...input, width: 130 }}>
+                    <option value="minutes">minutes</option>
+                    <option value="heures">heures</option>
+                    <option value="jours">jours</option>
+                  </select>
                 </div>
               </div>
               {!isStory && media.length > 1 && (
@@ -314,7 +353,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
                 </span>
               </button>
               <div style={{ padding: '10px 14px', borderRadius: 9, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 11.5, color: OK }}>
-                Récap : {type === 'story' ? 'Story' : 'Reels'} {platform === 'tiktok' ? 'TikTok' : 'Instagram'} · {phoneList.length} compte(s) · {media.length} média(s) · {RECUR_PRESETS.find(r => r.hours === recurHours)?.label ?? `${recurHours}h`}
+                Récap : {type === 'story' ? 'Story' : 'Reels'} {platform === 'tiktok' ? 'TikTok' : 'Instagram'} · {phoneList.length} compte(s) · {media.length} média(s) · départ {new Date(startAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · toutes les {recurValue} {recurUnit}
               </div>
             </div>
           )}
