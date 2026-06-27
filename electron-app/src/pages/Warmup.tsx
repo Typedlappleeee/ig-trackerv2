@@ -141,7 +141,6 @@ export function Warmup({ user }: WarmupProps) {
   const [activeTab, setActiveTab] = useState<Tab>('login')
 
   // ── Avertissement développement ───────────────────────────────────────────
-  const [devNoticeOpen, setDevNoticeOpen] = useState(true)
 
   // ── LOG IN state ──────────────────────────────────────────────────────────
   const [loginCreds, setLoginCreds] = useState<Record<string, LoginCred>>({})
@@ -152,7 +151,6 @@ export function Warmup({ user }: WarmupProps) {
   const [editUsername, setEditUsername] = useState('')
   const [editBio,      setEditBio]      = useState('')
   const [editPicUrl,   setEditPicUrl]   = useState('')
-  const [editNative,   setEditNative]   = useState(true)  // édition native (RPA) vs ADB
   const [editPicFile,  setEditPicFile]  = useState<string | null>(null)
 
   // ── WARMUP state ──────────────────────────────────────────────────────────
@@ -160,8 +158,6 @@ export function Warmup({ user }: WarmupProps) {
   const [likePosts,       setLikePosts]       = useState(true)
   const [watchReels,      setWatchReels]      = useState(true)
   const [followSuggested, setFollowSuggested] = useState(false)
-  // Warmup natif (RPA GeeLark) vs classique (ADB)
-  const [warmupNative,    setWarmupNative]    = useState(true)
   const [warmupKeyword,   setWarmupKeyword]   = useState('')
 
   // ── Job / execution state ─────────────────────────────────────────────────
@@ -309,18 +305,13 @@ export function Warmup({ user }: WarmupProps) {
       }
       updateJob(phone.id, { status: 'running' })
       try {
-        if (editNative) {
-          const result = await editInstagramProfileNative(bearer, phone.id, {
-            nickname:  config.profileName,
-            username:  config.username,
-            biography: config.bio,
-            avatarUrl: config.profilePicUrl,
-          }, msg => addLog(phone.id, msg))
-          updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-        } else {
-          await updateInstagramProfile(bearer, phone.id, config, msg => addLog(phone.id, msg))
-          updateJob(phone.id, abortRef.current.abort ? { status: 'error', error: 'Annulé' } : { status: 'done' })
-        }
+        const result = await editInstagramProfileNative(bearer, phone.id, {
+          nickname:  config.profileName,
+          username:  config.username,
+          biography: config.bio,
+          avatarUrl: config.profilePicUrl,
+        }, msg => addLog(phone.id, msg))
+        updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
@@ -350,9 +341,11 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      const result = warmupNative
-        ? await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)) }, msg => addLog(phone.id, msg))
-        : await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
+      // Mot-clé renseigné → recherche du mot puis visionnage (ADB).
+      // Sinon → warmup général fiable (RPA GeeLark). Choix transparent pour l'utilisateur.
+      const result = warmupKeyword.trim()
+        ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
+        : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)) }, msg => addLog(phone.id, msg))
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
@@ -433,22 +426,6 @@ export function Warmup({ user }: WarmupProps) {
 
   return (
     <div className="sf-page anim-page">
-
-      {/* ── Avertissement : en développement ── */}
-      {devNoticeOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(14,14,22,0.85)', backdropFilter: 'blur(6px)' }}>
-          <div className="sf-card sf-anim-slide-up" style={{ maxWidth: 440, padding: '40px 48px', textAlign: 'center', borderColor: 'rgba(245,158,11,0.22)', background: 'rgba(245,158,11,0.03)' }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#F59E0B' }}>
-              <IconBolt size={26} />
-            </div>
-            <h2 style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ivory)', marginBottom: 10 }}>En développement</h2>
-            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65 }}>Cette fonctionnalité est encore en développement — il peut y avoir des bugs.</p>
-            <button onClick={() => setDevNoticeOpen(false)} className="sf-btn sf-btn-primary cursor-pointer" style={{ marginTop: 24 }}>
-              Continuer
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Page header ───────────────────────────────────────────────────────── */}
       <div className="sf-page-header">
@@ -988,34 +965,10 @@ export function Warmup({ user }: WarmupProps) {
             {activeTab === 'massEdit' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="sf-anim-slide-up">
 
-                {/* Moteur d'édition : natif (RPA GeeLark, fiable) vs classique (ADB) */}
-                <div className="sf-card" style={{ padding: '14px 16px' }}>
-                  <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
-                    Moteur d'édition
-                  </p>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {([
-                      { v: true,  label: 'Natif (GeeLark)', desc: 'Fiable — RPA serveur' },
-                      { v: false, label: 'Classique (ADB)', desc: 'Taps scriptés (instable)' },
-                    ]).map(opt => (
-                      <button key={String(opt.v)} onClick={() => setEditNative(opt.v)}
-                        className="cursor-pointer"
-                        style={{
-                          flex: 1, padding: '10px 12px', borderRadius: 9, textAlign: 'left',
-                          background: editNative === opt.v ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
-                          border: `1px solid ${editNative === opt.v ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
-                        }}>
-                        <p style={{ fontSize: 12.5, fontWeight: 700, color: editNative === opt.v ? 'var(--accent-l)' : 'var(--text-2)' }}>{opt.label}</p>
-                        <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{opt.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                  {editNative && (
-                    <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 8 }}>
-                      En mode natif, la photo de profil doit être une <b>URL d'image</b> accessible.
-                    </p>
-                  )}
-                </div>
+                {/* Note : la photo doit être une URL d'image accessible */}
+                <p style={{ fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.5, padding: '0 2px' }}>
+                  La photo de profil doit être une <b>URL d'image</b> accessible.
+                </p>
 
                 {/* Profile fields card */}
                 <div className="sf-card" style={{ overflow: 'hidden' }}>
@@ -1151,43 +1104,19 @@ export function Warmup({ user }: WarmupProps) {
 
                   <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                    {/* Mode : natif (RPA GeeLark) vs classique (ADB) */}
+                    {/* Centre d'intérêt (optionnel) — détermine en coulisses le mode de warmup */}
                     <div>
                       <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
-                        Moteur de warmup
+                        Centre d'intérêt (optionnel)
                       </p>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {([
-                          { v: true,  label: 'IA général (GeeLark)', desc: 'Fiable, sans recherche · durée = nb de vidéos (1-100)' },
-                          { v: false, label: 'Recherche mot-clé (ADB)', desc: 'Cherche le mot puis regarde les Reels des résultats' },
-                        ]).map(opt => (
-                          <button key={String(opt.v)} onClick={() => setWarmupNative(opt.v)}
-                            className="cursor-pointer"
-                            style={{
-                              flex: 1, padding: '10px 12px', borderRadius: 9, textAlign: 'left',
-                              background: warmupNative === opt.v ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
-                              border: `1px solid ${warmupNative === opt.v ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
-                            }}>
-                            <p style={{ fontSize: 12.5, fontWeight: 700, color: warmupNative === opt.v ? 'var(--accent-l)' : 'var(--text-2)' }}>{opt.label}</p>
-                            <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{opt.desc}</p>
-                          </button>
-                        ))}
-                      </div>
-                      {!warmupNative && (
-                        <div style={{ marginTop: 12 }}>
-                          <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6 }}>
-                            Mot-clé à rechercher sur Instagram (le téléphone tape ce mot puis regarde les Reels des résultats)
-                          </p>
-                          <input
-                            type="text" value={warmupKeyword} onChange={e => setWarmupKeyword(e.target.value)}
-                            placeholder="french girl, fitness, gaming…"
-                            style={{ width: '100%', padding: '9px 12px', fontSize: 13, color: 'var(--text-1)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 9, outline: 'none' }}
-                          />
-                          <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 6 }}>
-                            Laisse vide pour un warmup générique (fil d'actualité).
-                          </p>
-                        </div>
-                      )}
+                      <input
+                        type="text" value={warmupKeyword} onChange={e => setWarmupKeyword(e.target.value)}
+                        placeholder="french girl, fitness, cuisine…"
+                        style={{ width: '100%', padding: '10px 12px', fontSize: 13, color: 'var(--text-1)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 9, outline: 'none' }}
+                      />
+                      <p style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 6, lineHeight: 1.4 }}>
+                        Si renseigné, le compte cherche ce thème puis regarde les vidéos correspondantes. Sinon, warmup général du fil d'actualité.
+                      </p>
                     </div>
 
                     {/* Duration picker */}
