@@ -47,8 +47,7 @@ interface SeqStep {
   position: 'before' | 'after'
   media: { url: string; title: string }[]   // vidéos (publication) ou images (story)
   caption: string                            // légende (publication)
-  warmupMinutes: number                      // durée warmup
-  warmupKeyword: string                      // niche / mot-clé de recherche warmup
+  warmupMinutes: number                      // durée warmup (natif, sans recherche)
   mode: 'seq' | 'random'                      // distribution du pool (story = aléatoire par défaut)
   storyTexts: string[]                        // pool de textes sticker (story)
   phoneLinks: Record<string, string>          // 1 lien CTA par téléphone (story)
@@ -92,7 +91,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
   const [stepPickerId, setStepPickerId] = useState<string | null>(null)
   const addSeqStep = (t: SeqStepType, pos: 'before' | 'after') => setSeqSteps(prev => [...prev, {
     id: Math.random().toString(36).slice(2), type: t, position: pos, media: [], caption: '',
-    warmupMinutes: 5, warmupKeyword: '',
+    warmupMinutes: 5,
     mode: t === 'story' ? 'random' : 'seq',
     storyTexts: [],
     phoneLinks: t === 'story'
@@ -115,19 +114,13 @@ export function TaskWizard({ user, onSaved, onClose }: {
           <button onClick={() => removeSeqStep(s.id)} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED, fontSize: 17, lineHeight: 1 }}>×</button>
         </div>
 
-        {/* ── WARMUP : durée + niche/mot-clé ── */}
+        {/* ── WARMUP : durée (natif, sans recherche) ── */}
         {s.type === 'warmup' && (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, color: MUTED }}>Durée</span>
-              <input type="number" min={1} max={120} value={s.warmupMinutes} onChange={e => patchSeqStep(s.id, { warmupMinutes: Math.max(1, Number(e.target.value) || 1) })} style={{ ...input, width: 72, height: 32, textAlign: 'center' }} />
-              <span style={{ fontSize: 11, color: MUTED }}>minutes</span>
-            </div>
-            <div>
-              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 4px' }}>Niche / mot-clé recherché</p>
-              <input value={s.warmupKeyword} onChange={e => patchSeqStep(s.id, { warmupKeyword: e.target.value })} placeholder="Ex : french girl, fitness…" style={{ ...input, height: 32 }} />
-            </div>
-          </>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: MUTED }}>Durée</span>
+            <input type="number" min={1} max={120} value={s.warmupMinutes} onChange={e => patchSeqStep(s.id, { warmupMinutes: Math.max(1, Number(e.target.value) || 1) })} style={{ ...input, width: 72, height: 32, textAlign: 'center' }} />
+            <span style={{ fontSize: 11, color: MUTED }}>minutes</span>
+          </div>
         )}
 
         {/* ── PUBLICATION / STORY : médias ── */}
@@ -279,7 +272,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
       // Étapes ajoutées (warmup / story / publication) avec tous leurs champs.
       const mkExtra = (s: SeqStep) => {
         const base = { id: rnd(), type: s.type, mode: s.mode, delay_minutes: 0, delay_after_minutes: 0, auto_remove_videos: s.autoRemove }
-        if (s.type === 'warmup') return { ...base, warmup_minutes: Math.max(1, s.warmupMinutes), warmup_keyword: s.warmupKeyword.trim(), caption: '' }
+        if (s.type === 'warmup') return { ...base, warmup_minutes: Math.max(1, s.warmupMinutes), caption: '' }
         if (s.type === 'story')  return { ...base, images: tokens(s.media), story_texts: s.storyTexts, phone_links: s.phoneLinks, caption: '' }
         return { ...base, videos: tokens(s.media), reels_trial: false, caption: s.caption }
       }

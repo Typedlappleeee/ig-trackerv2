@@ -1202,21 +1202,6 @@ export function Warmup({ user }: WarmupProps) {
                       </div>
                     )}
 
-                    {/* Centre d'intérêt (optionnel) — détermine en coulisses le mode de warmup */}
-                    <div>
-                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
-                        Centre d'intérêt (optionnel)
-                      </p>
-                      <input
-                        type="text" value={warmupKeyword} onChange={e => setWarmupKeyword(e.target.value)}
-                        placeholder="french girl, fitness, cuisine…"
-                        style={{ width: '100%', padding: '10px 12px', fontSize: 13, color: 'var(--text-1)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 9, outline: 'none' }}
-                      />
-                      <p style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 6, lineHeight: 1.4 }}>
-                        Si renseigné, le compte cherche ce thème puis regarde les vidéos correspondantes. Sinon, warmup général du fil d'actualité.
-                      </p>
-                    </div>
-
                     {/* Duration picker */}
                     <div>
                       <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
