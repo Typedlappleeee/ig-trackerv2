@@ -2011,7 +2011,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
         {/* Gradient overlay */}
         <div
           className="absolute inset-0 pointer-events-none transition-opacity"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }}
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 45%, rgba(0,0,0,0.12) 100%)' }}
         />
 
         {/* Hover tint */}
@@ -2086,10 +2086,6 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
           </div>
         )}
 
-        {/* Title at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2.5 pointer-events-none">
-          <p className="text-[11px] font-semibold text-white truncate leading-tight">{item.title}</p>
-        </div>
       </div>
 
       {/* Footer: title + ⋮ menu button */}
