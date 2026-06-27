@@ -38,6 +38,17 @@ function defaultStart(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+// Action supplémentaire (même type que l'action principale) : son propre lot de
+// médias, sa propre heure de départ et son propre intervalle → un « segment ».
+interface ExtraAction {
+  id: string
+  media: { url: string; title: string }[]
+  caption: string
+  recurValue: number
+  recurUnit: RecurUnit
+  startAt: string
+}
+
 export function TaskWizard({ user, onSaved, onClose }: {
   user: User
   onSaved: () => void
@@ -69,6 +80,17 @@ export function TaskWizard({ user, onSaved, onClose }: {
   const [mode, setMode]         = useState<'seq' | 'random'>('seq')
   const [autoRemove, setAutoRemove] = useState(false)
   const recurHours = toHours(recurValue, recurUnit)
+
+  // Actions supplémentaires (segments) — vide = tâche simple à une action.
+  const [extras, setExtras]     = useState<ExtraAction[]>([])
+  const [extraPickerId, setExtraPickerId] = useState<string | null>(null)
+  const addExtra = () => setExtras(prev => [...prev, {
+    id: Math.random().toString(36).slice(2), media: [], caption: '',
+    recurValue, recurUnit, startAt,
+  }])
+  const patchExtra = (id: string, patch: Partial<ExtraAction>) =>
+    setExtras(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
+  const removeExtra = (id: string) => setExtras(prev => prev.filter(e => e.id !== id))
 
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState<string | null>(null)
@@ -103,9 +125,27 @@ export function TaskWizard({ user, onSaved, onClose }: {
   ][step]
 
   async function save() {
+    if (extras.some(e => e.media.length === 0)) {
+      setError('Chaque action ajoutée doit avoir au moins un média.'); return
+    }
     setSaving(true); setError(null)
     try {
       const autoName = name.trim() || `Tâche ${type === 'story' ? 'Story' : 'Reels'} ${platform === 'tiktok' ? 'TikTok' : 'IG'} — ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}`
+      // Plusieurs actions → segments (chaque action = un segment indépendant).
+      const buildSeg = (m: { url: string; title: string }[], cap: string, rv: number, ru: RecurUnit, st: string) => ({
+        id: Math.random().toString(36).slice(2),
+        type, videos: m.map(x => ({ token: x.url, title: x.title })), caption: cap,
+        story_texts: [], mode, delay_minutes: 0, reels_trial: false,
+        auto_remove_videos: autoRemove, recur_hours: toHours(rv, ru),
+        next_run_at: new Date(st).toISOString(),
+      })
+      const segments = extras.length > 0
+        ? [buildSeg(media, caption, recurValue, recurUnit, startAt),
+           ...extras.map(e => buildSeg(e.media, e.caption, e.recurValue, e.recurUnit, e.startAt))]
+        : []
+      const minNext = segments.length
+        ? Math.min(...segments.map(s => new Date(s.next_run_at).getTime()))
+        : new Date(startAt).getTime()
       const payload: Record<string, unknown> = {
         user_id: user.id,
         org_id:  currentOrg?.id ?? null,
@@ -123,20 +163,26 @@ export function TaskWizard({ user, onSaved, onClose }: {
         mode,
         delay_minutes: 0,
         recur_hours: recurHours,
-        next_run_at: new Date(startAt).toISOString(),
+        next_run_at: new Date(isFinite(minNext) ? minNext : Date.now()).toISOString(),
         reels_trial: false,
         auto_remove_videos: autoRemove,
         steps: [],
+        segments,
       }
-      // Insert avec repli si des colonnes récentes manquent (platform/steps/…)
+      // Insert avec repli si des colonnes récentes manquent (platform/segments/steps/…)
       let { error: err } = await supabase.from('recurring_tasks').insert(payload)
       if (err && /platform/i.test(err.message)) {
         const { platform: _p, ...rest } = payload
         ;({ error: err } = await supabase.from('recurring_tasks').insert(rest))
         if (!err) setError('⚠ Programmation TikTok limitée tant que la migration platform n\'est pas appliquée.')
       }
+      if (err && /segments/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
+        const { segments: _sg, ...rest } = payload
+        ;({ error: err } = await supabase.from('recurring_tasks').insert(rest))
+        if (!err && extras.length) setError('⚠ Actions multiples non sauvegardées (migration segments manquante) — seule la 1ʳᵉ action a été gardée.')
+      }
       if (err && /(steps|story_texts|auto_remove_videos)/i.test(err.message)) {
-        const { steps: _s, story_texts: _st, auto_remove_videos: _a, platform: _p2, ...rest } = payload
+        const { steps: _s, story_texts: _st, auto_remove_videos: _a, platform: _p2, segments: _sg2, ...rest } = payload
         ;({ error: err } = await supabase.from('recurring_tasks').insert(rest))
       }
       if (err) throw err
@@ -159,6 +205,15 @@ export function TaskWizard({ user, onSaved, onClose }: {
             setShowPicker(false)
           }}
           onClose={() => setShowPicker(false)} />
+      )}
+      {extraPickerId && (
+        <BankPicker user={user} mode="multi" resolveMode="signed-url"
+          onSelect={(paths, titles) => {
+            const add = paths.map((url, i) => ({ url, title: titles?.[i] ?? 'Média' }))
+            setExtras(prev => prev.map(e => e.id === extraPickerId ? { ...e, media: [...e.media, ...add] } : e))
+            setExtraPickerId(null)
+          }}
+          onClose={() => setExtraPickerId(null)} />
       )}
       <div className="anim-scale-in" onClick={e => e.stopPropagation()}
         style={{ width: '100%', maxWidth: 600, maxHeight: 'calc(100vh - 48px)', background: '#0F1014', border: `1px solid ${HAIR}`, borderRadius: 16, display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.65)' }}>
@@ -352,8 +407,55 @@ export function TaskWizard({ user, onSaved, onClose }: {
                   <span style={{ position: 'absolute', top: 2, left: autoRemove ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff' }} />
                 </span>
               </button>
+
+              {/* Actions supplémentaires (segments) */}
+              <div>
+                <p style={lbl}>Autres actions (optionnel)</p>
+                <p style={{ fontSize: 11, color: FAINT, margin: '-4px 0 10px' }}>
+                  Ajoute d'autres {isStory ? 'stories' : 'posts'} à d'autres heures (ex : un le matin, un le soir).
+                </p>
+                {extras.map((e, i) => (
+                  <div key={e.id} style={{ padding: '11px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${HAIR}`, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: IVORY }}>Action {i + 2}</span>
+                      <button onClick={() => removeExtra(e.id)} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED, fontSize: 17, lineHeight: 1 }}>×</button>
+                    </div>
+                    <button onClick={() => setExtraPickerId(e.id)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">+ {isStory ? 'Images' : 'Vidéos'} ({e.media.length})</button>
+                    {e.media.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                        {e.media.map((m, j) => (
+                          <span key={j} style={{ fontSize: 10.5, padding: '3px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.1)', border: `1px solid ${HAIR}`, color: ACCENT_L, display: 'flex', alignItems: 'center', gap: 5 }}>
+                            {m.title.slice(0, 14)}
+                            <button onClick={() => patchExtra(e.id, { media: e.media.filter((_, k) => k !== j) })} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED }}>×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input value={e.caption} onChange={ev => patchExtra(e.id, { caption: ev.target.value })}
+                      placeholder={isStory ? 'Texte sticker (optionnel)' : 'Légende (optionnel)'} style={{ ...input, marginTop: 8, height: 32 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, color: MUTED }}>Départ</span>
+                      <input type="datetime-local" value={e.startAt} onChange={ev => patchExtra(e.id, { startAt: ev.target.value })} style={{ ...input, height: 32, flex: 1, minWidth: 165 }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                      <span style={{ fontSize: 11, color: MUTED }}>Toutes les</span>
+                      <input type="number" min={1} value={e.recurValue} onChange={ev => patchExtra(e.id, { recurValue: Math.max(1, Number(ev.target.value) || 1) })} style={{ ...input, width: 64, height: 32, textAlign: 'center' }} />
+                      <select value={e.recurUnit} onChange={ev => patchExtra(e.id, { recurUnit: ev.target.value as RecurUnit })} className="cursor-pointer" style={{ ...input, width: 110, height: 32 }}>
+                        <option value="minutes">minutes</option>
+                        <option value="heures">heures</option>
+                        <option value="jours">jours</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+                <button onClick={addExtra} className="cursor-pointer"
+                  style={{ width: '100%', padding: '10px', borderRadius: 9, fontSize: 12.5, fontWeight: 600, background: 'rgba(99,102,241,0.08)', border: '1px dashed rgba(99,102,241,0.35)', color: ACCENT_L }}>
+                  + Ajouter une action
+                </button>
+              </div>
+
               <div style={{ padding: '10px 14px', borderRadius: 9, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 11.5, color: OK }}>
-                Récap : {type === 'story' ? 'Story' : 'Reels'} {platform === 'tiktok' ? 'TikTok' : 'Instagram'} · {phoneList.length} compte(s) · {media.length} média(s) · départ {new Date(startAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · toutes les {recurValue} {recurUnit}
+                Récap : {type === 'story' ? 'Story' : 'Reels'} {platform === 'tiktok' ? 'TikTok' : 'Instagram'} · {phoneList.length} compte(s) · {media.length} média(s) · départ {new Date(startAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · toutes les {recurValue} {recurUnit}{extras.length > 0 ? ` · +${extras.length} action(s)` : ''}
               </div>
             </div>
           )}
