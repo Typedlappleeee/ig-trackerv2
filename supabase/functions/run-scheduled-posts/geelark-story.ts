@@ -569,6 +569,17 @@ export async function postStoryServer(
   await sleep(3500) // extra time for tray to fully load
 
   xml = await dumpXml(bearer, phoneId)
+  // Garde-fou : on DOIT être dans le tiroir de stickers (barre de recherche /
+  // option « Lien » présente). Sinon (mode texte ouvert par erreur), on
+  // ABANDONNE sans rien taper — pour ne JAMAIS écrire le lien comme texte.
+  const trayOpen =
+    findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input', 'sticker_tray', 'stickers_recycler_view', 'sticker_grid_recycler_view') ??
+    findByTextPartial(xml, 'search', 'recherch') ??
+    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN')
+  if (!trayOpen) {
+    log('   ❌ Tiroir de stickers non ouvert (écran texte ?) — abandon sans saisie')
+    return { ok: false, error: 'Le tiroir de stickers ne s\'est pas ouvert (Instagram a affiché un autre écran). Story non publiée pour éviter d\'écrire le lien en texte.' }
+  }
   const linkSticker =
     findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
     findByTextPartial(xml, 'link', 'lien') ??
@@ -622,10 +633,15 @@ export async function postStoryServer(
   // ── 5. Type the URL (+ optional custom label) ──────────────────────────────
   log('⌨️  Saisie de l\'URL…')
   xml = await dumpXml(bearer, phoneId)
-  const urlField: [number, number] =
+  // Garde-fou : on ne tape l'URL QUE si le vrai champ URL est détecté.
+  // Pas de coordonnée « au hasard » → on n'écrit jamais le lien dans la story.
+  const urlField =
     findByResourceId(xml, 'link_url', 'url_edit_text', 'web_url', 'link_edit_text') ??
-    findByText(xml, 'URL', 'https://') ??
-    [cx, Math.floor(sh * 0.32)]
+    findByText(xml, 'URL', 'https://')
+  if (!urlField) {
+    log('   ❌ Champ URL du sticker lien introuvable — abandon sans saisie')
+    return { ok: false, error: 'Champ URL du sticker lien introuvable. Story non publiée pour éviter d\'écrire le lien au mauvais endroit.' }
+  }
   await shellExec(bearer, phoneId, `input tap ${urlField[0]} ${urlField[1]}`)
   await sleep(900)
   await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkUrl)}"`)
