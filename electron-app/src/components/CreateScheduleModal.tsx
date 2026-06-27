@@ -44,7 +44,7 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform 
   const [caption, setCaption]           = useState('')
   const [mode, setMode]                 = useState<'seq' | 'random'>('seq')
   const [schedAt, setSchedAt]           = useState(defaultSchedValue(60))
-  const [delayMin, setDelayMin]         = useState(0)
+  const delayMin = 0   // délai entre comptes retiré de l'UI (toujours 0)
   const [reelsTrial, setReelsTrial]     = useState(false)
   const [platform, setPlatform]         = useState<'instagram' | 'tiktok'>(initialPlatform ?? 'instagram')
   const [submitting, setSubmitting]     = useState(false)
@@ -334,19 +334,6 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform 
                     {m.l}
                   </button>
                 ))}
-              </div>
-            </div>
-            <div>
-              <span style={labelStyle}>Délai entre comptes</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" min={0} max={120} value={delayMin}
-                  onChange={e => setDelayMin(Math.max(0, Math.min(120, Number(e.target.value) || 0)))}
-                  style={{
-                    width: 64, height: 34, padding: '0 10px', fontSize: 13, textAlign: 'center',
-                    background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, outline: 'none',
-                  }}
-                />
-                <span style={{ fontSize: 11, color: MUTED }}>min</span>
               </div>
             </div>
             <div>
