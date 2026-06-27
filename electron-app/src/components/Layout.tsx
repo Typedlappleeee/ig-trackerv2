@@ -3,7 +3,6 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
 import { useT } from '@/lib/i18n'
-import { canSeeTab } from '@/lib/permissions'
 import { useToast }  from '@/components/Toast'
 import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
@@ -22,32 +21,34 @@ const CREDIT_AUTO_RECHARGE = 10_000
 const CREDIT_MAX_DISPLAY   = 150_000
 
 function SFLogo({ size = 28 }: { size?: number }) {
+  // Logo officiel ScaleFlow : tuile sombre + « S » néon lumineux (violet→rose).
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" overflow="visible">
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
       <defs>
-        <linearGradient id="sfl-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#E9EAF0"/>
-          <stop offset="50%"  stopColor="#6366F1"/>
-          <stop offset="100%" stopColor="#4F46E5"/>
+        <linearGradient id="sfl-tile" x1="50" y1="6" x2="50" y2="94" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#23233f"/>
+          <stop offset="100%" stopColor="#0a0a15"/>
         </linearGradient>
-        <filter id="sfl-glow" x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="sRGB">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
-          <feColorMatrix in="blur" type="matrix"
-            values="0 0 0 0 0.79  0 0 0 0 0.71  0 0 0 0 0.52   0 0 0 1 0" result="colored"/>
-          <feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>
+        <linearGradient id="sfl-s" x1="50" y1="24" x2="50" y2="78" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#E7ECFF"/>
+          <stop offset="50%"  stopColor="#C4B5FD"/>
+          <stop offset="100%" stopColor="#F5B8F5"/>
+        </linearGradient>
+        <filter id="sfl-neon" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge>
         </filter>
       </defs>
-      {/* Glow halo */}
-      <path
-        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="#3730A3" strokeWidth="22" strokeLinecap="round" fill="none" opacity="0.3"
-      />
-      {/* Main S */}
-      <path
-        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sfl-g)" strokeWidth="16" strokeLinecap="round" fill="none"
-        filter="url(#sfl-glow)"
-      />
+      <rect x="6" y="6" width="88" height="88" rx="27"
+        fill="url(#sfl-tile)" stroke="rgba(150,130,255,0.28)" strokeWidth="1.5"/>
+      {/* halo néon */}
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="#A855F7" filter="url(#sfl-neon)" opacity="0.9">S</text>
+      {/* S net */}
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="url(#sfl-s)">S</text>
     </svg>
   )
 }
@@ -94,7 +95,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'tasks',       label: 'navTasks',        icon: '⚡' },
+      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
     ],
   },
@@ -592,18 +593,13 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     setShowAddAccount(true)
   }
 
-  const effectiveRole = demoMode ? 'member' : role
-  const effectivePerms = demoMode ? {} : perms
   const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
 
   const isVisibleTab = (id: Page): boolean => {
+    // Pages internes / superadmin uniquement.
     if (id === 'licences' || id === 'tiktokposting') return effectiveSuperAdmin
-    // Scanner + Tâches automatiques : réservés aux owner/admin (pas member/viewer)
-    if (id === 'tasks') return effectiveRole === 'owner' || effectiveRole === 'admin'
-    if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub' || id === 'stats') return true
-    // Pilotage en lecture seule + outils vidéo annexes : visibles par tous les rôles
-    if (id === 'history' || id === 'montage' || id === 'repurpose') return true
-    return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
+    // Tous les onglets fonctionnels sont visibles pour tout le monde.
+    return true
   }
 
   // Auto-redirect to the hub when the current page isn’t accessible in this org
@@ -692,20 +688,17 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
         {/* ── Logo area ─────────────────────────────────────────────────── */}
         <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
-          {/* Logo box */}
-          <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: 8,
-              background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(99,102,241,0.06))',
-              border: '1px solid rgba(99,102,241,0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <SFLogo size={18} />
-            </div>
+          {/* Logo officiel ScaleFlow + halo violet */}
+          <div style={{
+            position: 'relative', width: 32, height: 32, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            filter: 'drop-shadow(0 4px 12px rgba(124,58,237,0.5))',
+          }}>
+            <SFLogo size={32} />
           </div>
 
           {!collapsed && (
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <span style={{ flex: 1, fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.025em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
               <span style={{ background: 'linear-gradient(90deg, #E9EAF0, #D8D5CD)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scale</span>
               <span style={{ background: 'linear-gradient(90deg, #6366F1, #818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
             </span>

@@ -6,32 +6,33 @@ import { Input }  from '@/components/ui/Input'
 type Tab = 'login' | 'register' | 'forgot' | 'reset'
 
 function SFLogoMark() {
+  // Logo officiel ScaleFlow : tuile sombre + « S » néon lumineux (violet→rose).
   return (
-    <svg width="38" height="38" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="48" height="48" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ filter: 'drop-shadow(0 8px 24px rgba(124,58,237,0.55))' }}>
       <defs>
-        <linearGradient id="auth-g" x1="0.3" y1="0" x2="0.7" y2="1">
-          <stop offset="0%"   stopColor="#60aaff"/>
-          <stop offset="50%"  stopColor="#8866ff"/>
-          <stop offset="100%" stopColor="#aa44ff"/>
+        <linearGradient id="auth-tile" x1="50" y1="6" x2="50" y2="94" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#23233f"/>
+          <stop offset="100%" stopColor="#0a0a15"/>
         </linearGradient>
-        <filter id="auth-glow" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="7" result="b"/>
-          <feColorMatrix in="b" type="matrix" values="1 0 0 0 0.35  0 0 0 0 0.2  0 0 0 0 1  0 0 0 1 0" result="c"/>
-          <feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id="auth-bloom" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="16" result="b2"/>
-          <feColorMatrix in="b2" type="matrix" values="1 0 0 0 0.3  0 0 0 0 0.15  0 0 0 0 1  0 0 0 0.5 0"/>
+        <linearGradient id="auth-s" x1="50" y1="24" x2="50" y2="78" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#E7ECFF"/>
+          <stop offset="50%"  stopColor="#C4B5FD"/>
+          <stop offset="100%" stopColor="#F5B8F5"/>
+        </linearGradient>
+        <filter id="auth-neon" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge>
         </filter>
       </defs>
-      <text x="100" y="148" textAnchor="middle"
-        fontFamily="'Arial Rounded MT Bold','Arial Black','Helvetica Neue',Arial,sans-serif"
-        fontWeight="900" fontSize="148" fill="url(#auth-g)"
-        filter="url(#auth-bloom)">S</text>
-      <text x="100" y="148" textAnchor="middle"
-        fontFamily="'Arial Rounded MT Bold','Arial Black','Helvetica Neue',Arial,sans-serif"
-        fontWeight="900" fontSize="148" fill="url(#auth-g)"
-        filter="url(#auth-glow)">S</text>
+      <rect x="6" y="6" width="88" height="88" rx="27"
+        fill="url(#auth-tile)" stroke="rgba(150,130,255,0.28)" strokeWidth="1.5"/>
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="#A855F7" filter="url(#auth-neon)" opacity="0.9">S</text>
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="url(#auth-s)">S</text>
     </svg>
   )
 }

@@ -403,6 +403,9 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [showCreate, setShowCreate] = useState(false)
   const [showStoryCreate, setShowStoryCreate] = useState(false)
   const [showTypeChoice, setShowTypeChoice] = useState(false)
+  const [showPlatformChoice, setShowPlatformChoice] = useState(false)
+  const [reelPlatform, setReelPlatform] = useState<'instagram' | 'tiktok'>(
+    (localStorage.getItem('sf-mp-platform') as 'instagram' | 'tiktok' | null) ?? 'instagram')
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]     = useState<{ id: string; msgs: string[] } | null>(null)
   const timersRef                 = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -894,9 +897,82 @@ export function Scheduler({ user, onNavigate }: Props) {
       {showCreate && (
         <CreateScheduleModal
           user={user}
+          initialPlatform={reelPlatform}
           onCreated={() => { setShowCreate(false); reload() }}
           onClose={() => setShowCreate(false)}
         />
+      )}
+
+      {/* ── Platform chooser : Instagram ou TikTok (pour un Reel) ─────────── */}
+      {showPlatformChoice && (
+        <div
+          tabIndex={-1}
+          ref={el => el?.focus()}
+          onKeyDown={e => { if (e.key === 'Escape') setShowPlatformChoice(false) }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9000, outline: 'none',
+            background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(10px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowPlatformChoice(false) }}
+        >
+          <div className="anim-scale-in" style={{
+            width: '100%', maxWidth: 460,
+            background: '#13141A', border: '1px solid rgba(233,234,240,0.08)',
+            borderRadius: 12, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+          }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(233,234,240,0.08)' }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ivory)' }}>
+                Où veux-tu publier ?
+              </p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 20 }}>
+              {([
+                { k: 'instagram' as const, emoji: '📸', label: 'Instagram', desc: 'Reels — publication native' },
+                { k: 'tiktok'    as const, emoji: '🎵', label: 'TikTok',    desc: 'Vidéos — publication native' },
+              ]).map(p => (
+                <button
+                  key={p.k}
+                  onClick={() => {
+                    setReelPlatform(p.k)
+                    localStorage.setItem('sf-mp-platform', p.k)
+                    setShowPlatformChoice(false)
+                    setShowCreate(true)
+                  }}
+                  className="cursor-pointer"
+                  style={{
+                    padding: '22px 14px', borderRadius: 10, textAlign: 'center',
+                    background: reelPlatform === p.k ? 'rgba(99,102,241,0.1)' : 'rgba(233,234,240,0.025)',
+                    border: `1px solid ${reelPlatform === p.k ? 'rgba(99,102,241,0.4)' : 'rgba(233,234,240,0.1)'}`,
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.13)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.45)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = reelPlatform === p.k ? 'rgba(99,102,241,0.1)' : 'rgba(233,234,240,0.025)'; e.currentTarget.style.borderColor = reelPlatform === p.k ? 'rgba(99,102,241,0.4)' : 'rgba(233,234,240,0.1)' }}
+                >
+                  <div style={{ fontSize: 36, lineHeight: 1, marginBottom: 10 }}>{p.emoji}</div>
+                  <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--ivory)' }}>{p.label}</p>
+                  <p style={{ margin: 0, fontSize: 11, lineHeight: 1.4, color: 'var(--muted)' }}>{p.desc}</p>
+                </button>
+              ))}
+            </div>
+            <div style={{ padding: '0 20px 16px', display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => { setShowPlatformChoice(false); setShowTypeChoice(true) }}
+                className="sf-btn sf-btn-ghost cursor-pointer"
+                style={{ flex: 1 }}
+              >
+                Retour
+              </button>
+              <button
+                onClick={() => setShowPlatformChoice(false)}
+                className="sf-btn sf-btn-ghost cursor-pointer"
+                style={{ flex: 1 }}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Create modal — Story ─────────────────────────────────────────────── */}
@@ -934,7 +1010,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 20 }}>
               {/* Reel */}
               <button
-                onClick={() => { setShowTypeChoice(false); setShowCreate(true) }}
+                onClick={() => { setShowTypeChoice(false); setShowPlatformChoice(true) }}
                 className="cursor-pointer"
                 style={{
                   padding: '20px 16px', borderRadius: 10, textAlign: 'left',

@@ -19,37 +19,33 @@ function openExternal(url: string) {
 }
 
 function SFLogoMark() {
+  // Logo officiel ScaleFlow : tuile sombre + « S » néon lumineux (violet→rose).
   return (
-    <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
+    <svg width="36" height="36" viewBox="0 0 100 100" fill="none"
+      style={{ filter: 'drop-shadow(0 6px 18px rgba(124,58,237,0.55))' }}>
       <defs>
-        <linearGradient id="ob-main" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#1d4ed8"/>
-          <stop offset="28%"  stopColor="#3b5af0"/>
-          <stop offset="58%"  stopColor="#6366F1"/>
-          <stop offset="100%" stopColor="#a855f7"/>
+        <linearGradient id="ob-tile" x1="50" y1="6" x2="50" y2="94" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#23233f"/>
+          <stop offset="100%" stopColor="#0a0a15"/>
         </linearGradient>
-        <linearGradient id="ob-depth" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#0c1f6e"/>
-          <stop offset="55%"  stopColor="#2e1065"/>
-          <stop offset="100%" stopColor="#3b0764"/>
+        <linearGradient id="ob-s" x1="50" y1="24" x2="50" y2="78" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#E7ECFF"/>
+          <stop offset="50%"  stopColor="#C4B5FD"/>
+          <stop offset="100%" stopColor="#F5B8F5"/>
         </linearGradient>
-        <linearGradient id="ob-arr" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#db2777"/>
-          <stop offset="100%" stopColor="#A5B4FC"/>
-        </linearGradient>
+        <filter id="ob-neon" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge>
+        </filter>
       </defs>
-      <path
-        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#ob-depth)" strokeWidth="18" strokeLinecap="round" fill="none"
-        transform="translate(2.5,4.5)" opacity="0.65"
-      />
-      <path
-        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#ob-main)" strokeWidth="16" strokeLinecap="round" fill="none"
-      />
-      <line x1="66" y1="22" x2="88" y2="2" stroke="url(#ob-arr)" strokeWidth="11" strokeLinecap="round"/>
-      <line x1="77" y1="1" x2="90" y2="1" stroke="#A5B4FC" strokeWidth="9" strokeLinecap="round"/>
-      <line x1="90" y1="1" x2="90" y2="15" stroke="#A5B4FC" strokeWidth="9" strokeLinecap="round"/>
+      <rect x="6" y="6" width="88" height="88" rx="27"
+        fill="url(#ob-tile)" stroke="rgba(150,130,255,0.28)" strokeWidth="1.5"/>
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="#A855F7" filter="url(#ob-neon)" opacity="0.9">S</text>
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="url(#ob-s)">S</text>
     </svg>
   )
 }

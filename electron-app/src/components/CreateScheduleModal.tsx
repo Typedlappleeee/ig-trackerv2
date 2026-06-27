@@ -22,10 +22,11 @@ const SERIF = "'Inter', system-ui, sans-serif"
 
 interface SelVideo { url: string; title: string }
 
-export function CreateScheduleModal({ user, onCreated, onClose }: {
+export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform }: {
   user:      User
   onCreated: () => void
   onClose:   () => void
+  initialPlatform?: 'instagram' | 'tiktok'
 }) {
   const { currentOrg, role, perms } = useOrg()
   const conns = useConnections(user)
@@ -45,7 +46,7 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
   const [schedAt, setSchedAt]           = useState(defaultSchedValue(60))
   const [delayMin, setDelayMin]         = useState(0)
   const [reelsTrial, setReelsTrial]     = useState(false)
-  const [platform, setPlatform]         = useState<'instagram' | 'tiktok'>('instagram')
+  const [platform, setPlatform]         = useState<'instagram' | 'tiktok'>(initialPlatform ?? 'instagram')
   const [submitting, setSubmitting]     = useState(false)
   const [progress, setProgress]         = useState('')
   const [error, setError]               = useState<string | null>(null)
@@ -181,7 +182,8 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
             </div>
           )}
 
-          {/* ── Plateforme ─────────────────────────────────────────────────── */}
+          {/* ── Plateforme (masquée si déjà choisie via le popup d'entrée) ─── */}
+          {!initialPlatform && (
           <section>
             <span style={labelStyle}>Plateforme</span>
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
@@ -203,6 +205,7 @@ export function CreateScheduleModal({ user, onCreated, onClose }: {
               ))}
             </div>
           </section>
+          )}
 
           {/* ── Téléphones ─────────────────────────────────────────────────── */}
           <section>

@@ -1992,7 +1992,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
     <div
       draggable={!selectionMode}
       onDragStart={e => e.dataTransfer.setData('bank-item-id', item.id)}
-      className="group cursor-default select-none rounded-xl overflow-hidden transition-all"
+      className="group cursor-default select-none rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_30px_-10px_rgba(124,58,237,0.45)]"
       style={{
         background: 'var(--surface)',
         border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
@@ -2011,7 +2011,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
         {/* Gradient overlay */}
         <div
           className="absolute inset-0 pointer-events-none transition-opacity"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }}
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 45%, rgba(0,0,0,0.12) 100%)' }}
         />
 
         {/* Hover tint */}
@@ -2086,10 +2086,6 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
           </div>
         )}
 
-        {/* Title at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2.5 pointer-events-none">
-          <p className="text-[11px] font-semibold text-white truncate leading-tight">{item.title}</p>
-        </div>
       </div>
 
       {/* Footer: title + ⋮ menu button */}
