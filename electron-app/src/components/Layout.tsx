@@ -3,7 +3,6 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
 import { useT } from '@/lib/i18n'
-import { canSeeTab } from '@/lib/permissions'
 import { useToast }  from '@/components/Toast'
 import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
@@ -96,7 +95,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'storylink',   label: 'navStoryLink',    icon: '🔗' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'tasks',       label: 'navTasks',        icon: '⚡' },
+      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
     ],
   },
@@ -594,18 +593,13 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     setShowAddAccount(true)
   }
 
-  const effectiveRole = demoMode ? 'member' : role
-  const effectivePerms = demoMode ? {} : perms
   const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
 
   const isVisibleTab = (id: Page): boolean => {
+    // Pages internes / superadmin uniquement.
     if (id === 'licences' || id === 'tiktokposting') return effectiveSuperAdmin
-    // Scanner + Tâches automatiques : réservés aux owner/admin (pas member/viewer)
-    if (id === 'tasks') return effectiveRole === 'owner' || effectiveRole === 'admin'
-    if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub' || id === 'stats') return true
-    // Pilotage en lecture seule + outils vidéo annexes : visibles par tous les rôles
-    if (id === 'history' || id === 'montage' || id === 'repurpose') return true
-    return effectiveRole ? canSeeTab(effectiveRole, effectivePerms, id as import('@/lib/supabase').PageKey) : true
+    // Tous les onglets fonctionnels sont visibles pour tout le monde.
+    return true
   }
 
   // Auto-redirect to the hub when the current page isn’t accessible in this org
