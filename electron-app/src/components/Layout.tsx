@@ -600,9 +600,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   const isVisibleTab = (id: Page): boolean => {
     // Pages internes / superadmin uniquement.
-    if (id === 'licences' || id === 'tiktokposting') return effectiveSuperAdmin
-    // Rapports : réservé aux owner/admin (en solo, l'utilisateur est son propre admin).
-    if (id === 'reports') return !role || role === 'owner' || role === 'admin'
+    // Rapports : réservé à l'admin ScaleFlow (superadmin plateforme).
+    if (id === 'licences' || id === 'tiktokposting' || id === 'reports') return effectiveSuperAdmin
     // Tous les autres onglets sont visibles pour tout le monde.
     return true
   }
