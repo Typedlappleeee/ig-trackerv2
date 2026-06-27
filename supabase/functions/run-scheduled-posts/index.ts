@@ -512,6 +512,7 @@ Deno.serve(async (req) => {
         delay_minutes:   task.delay_minutes ?? 0,
         mode:            task.mode ?? 'seq',
         bearer_token:    '',
+        platform:        task.platform ?? 'instagram',
         reels_trial:     steps.length > 0
           ? !!(steps.find(s => s.type === 'publication')?.reels_trial)
           : (task.reels_trial ?? false),
