@@ -13,7 +13,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { postStoryServer } from './geelark-story.ts'
 import { notifyOwner } from './notify.ts'
-import { runTrackingReports } from './tracking-report.ts'
+import { runAccountSync } from './tracking-report.ts'
 
 const GEELARK = 'https://openapi.geelark.com/open/v1'
 
@@ -151,11 +151,11 @@ Deno.serve(async (req) => {
   const fnStart = Date.now()
   const summary: Record<string, string> = {}
 
-  // ── Étape 0-tracking : rapports « VA posting » aux heures configurées ──
-  // Best-effort, ne bloque jamais le reste du cron.
+  // ── Étape 0-tracking : sync journalier des comptes (par lots) ──
+  // Plafonné à ~60s pour ne pas affamer le posting. Best-effort.
   try {
-    const n = await runTrackingReports(db, nowIso)
-    if (n > 0) summary['tracking_reports'] = `${n} rapport(s) généré(s)`
+    const n = await runAccountSync(db, nowIso, Date.now() + 60_000)
+    if (n > 0) summary['account_sync'] = `${n} compte(s) synchronisé(s)`
   } catch { /* ignore */ }
 
   // Résout le bearer GeeLark d'un (org_id, user_id) avec cache mémoire.

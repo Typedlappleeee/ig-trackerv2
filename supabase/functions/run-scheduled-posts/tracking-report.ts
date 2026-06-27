@@ -1,39 +1,31 @@
-// Génération des rapports de tracking « VA posting ».
+// Sync journalier des comptes pour le dashboard "Aujourd'hui".
 //
-// Appelé chaque minute par le cron. Aux heures configurées (fuseau Europe/Paris),
-// pour chaque propriétaire (org ou user) ayant activé le tracking :
-//   1. on liste ses comptes (phones avec ig_username),
-//   2. on vérifie sur Instagram (API RapidAPI) si un Reel a été posté dans le
-//      créneau + on récupère vues/likes/commentaires,
-//   3. on croise avec l'historique de posting de ScaleFlow (scheduled_posts),
-//   4. on enregistre un rapport groupé par VA (group_name) dans tracking_reports.
+// Appelé chaque minute par le cron. Une fois passée l'heure de sync configurée
+// (heure de Paris, déf. 12:00), traite les comptes PAR LOTS (anti-timeout) :
+//   - GRATUIT : "a posté aujourd'hui ?" via l'historique de posting ScaleFlow.
+//   - OPTIONNEL (si clé API) : la vidéo + vues/likes/commentaires via une API
+//     Instagram type RapidAPI (1 requête/compte/jour).
+// Résultat stocké dans account_daily (1 ligne par compte/jour), lu par l'app.
 //
-// Best-effort : ne jette jamais (ne doit pas casser le cron).
+// Scalable à 1000+ comptes : cap par invocation + reprise au tick suivant.
+// Best-effort : ne jette jamais (ne casse pas le cron).
 
 interface TrackingConfig {
   enabled?: boolean
-  times?: string[]          // ["09:30","20:00"] en heure de Paris
-  window_hours?: number     // ancienneté max d'un Reel pour compter "posté" (défaut 14)
+  sync_time?: string        // "12:00" (heure de Paris)
+  window_hours?: number     // (compat) non utilisé pour le dashboard journalier
   rapidapi_key?: string
   rapidapi_url?: string     // doit contenir {username}
 }
 
-interface AccountResult {
-  username: string
-  va: string
-  status: 'posted' | 'not_posted'
-  source: 'instagram' | 'scaleflow' | 'none'
-  posted_at: string | null
-  views: number | null
-  likes: number | null
-  comments: number | null
-}
+const MAX_PER_INVOCATION = 60   // comptes traités par passage (≈ 1 tick / minute)
 
-function parisParts(nowIso: string): { hhmm: string; dateLabel: string } {
-  const d = new Date(nowIso)
-  const hhmm = d.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false })
-  const dateLabel = d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: '2-digit', month: 'long' })
-  return { hhmm, dateLabel }
+function parisDate(d: Date): string {
+  // "YYYY-MM-DD" en heure de Paris (fr-CA donne ce format).
+  return d.toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' })
+}
+function parisHHMM(d: Date): string {
+  return d.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 // deno-lint-ignore no-explicit-any
@@ -42,21 +34,27 @@ function pickItems(j: any): any[] | null {
   return Array.isArray(c) ? c : null
 }
 
+interface ReelInfo { postedAt: string | null; views: number; likes: number; comments: number; url: string | null; thumb: string | null }
+
 // deno-lint-ignore no-explicit-any
-function reelStats(reel: any): { postedAt: string | null; views: number; likes: number; comments: number } {
+function reelInfo(reel: any): ReelInfo {
   const n = reel?.media ?? reel?.node ?? reel ?? {}
   const tsRaw = Number(n.taken_at ?? n.taken_at_timestamp ?? n.device_timestamp ?? n?.caption?.created_at ?? n.created_at ?? 0)
   const tsMs = tsRaw > 1e12 ? tsRaw : tsRaw * 1000
   const num = (...v: unknown[]) => { for (const x of v) { const k = Number(x); if (Number.isFinite(k) && k > 0) return k } return 0 }
+  const code = n.code ?? n.shortcode ?? n.pk ?? null
+  const thumb = n.thumbnail_url ?? n?.image_versions2?.candidates?.[0]?.url ?? n?.image_versions?.items?.[0]?.url ?? n.display_url ?? null
   return {
     postedAt: tsRaw ? new Date(tsMs).toISOString() : null,
     views:    num(n.play_count, n.view_count, n.ig_play_count, n.video_view_count, n.views),
     likes:    num(n.like_count, n.likes),
     comments: num(n.comment_count, n.comments),
+    url:      code ? `https://www.instagram.com/reel/${code}/` : null,
+    thumb:    thumb ?? null,
   }
 }
 
-async function fetchLatestReel(cfg: TrackingConfig, username: string): Promise<ReturnType<typeof reelStats> | null> {
+async function fetchLatestReel(cfg: TrackingConfig, username: string): Promise<ReelInfo | null> {
   if (!cfg.rapidapi_key || !cfg.rapidapi_url || !cfg.rapidapi_url.includes('{username}')) return null
   try {
     const url = cfg.rapidapi_url.replace('{username}', encodeURIComponent(username))
@@ -66,106 +64,96 @@ async function fetchLatestReel(cfg: TrackingConfig, username: string): Promise<R
     const j = await r.json().catch(() => null)
     const items = pickItems(j)
     if (!items || !items.length) return null
-    // Reel le plus récent (par timestamp).
-    let best = reelStats(items[0])
-    for (const it of items) {
-      const s = reelStats(it)
-      if ((s.postedAt ?? '') > (best.postedAt ?? '')) best = s
-    }
+    let best = reelInfo(items[0])
+    for (const it of items) { const s = reelInfo(it); if ((s.postedAt ?? '') > (best.postedAt ?? '')) best = s }
     return best
   } catch { return null }
 }
 
 // deno-lint-ignore no-explicit-any
-export async function runTrackingReports(db: any, nowIso: string): Promise<number> {
-  let generated = 0
+export async function runAccountSync(db: any, nowIso: string, deadlineMs: number): Promise<number> {
+  let synced = 0
   try {
-    const { hhmm, dateLabel } = parisParts(nowIso)
+    const now = new Date(nowIso)
+    const today = parisDate(now)
+    const hhmm = parisHHMM(now)
 
-    // Configs actives (user + org).
+    // Propriétaires avec tracking activé dont l'heure de sync est passée.
     // deno-lint-ignore no-explicit-any
     const owners: { user_id: string | null; org_id: string | null; cfg: TrackingConfig }[] = []
     const { data: apps } = await db.from('app_config').select('user_id, tracking_config').not('tracking_config', 'is', null)
     for (const a of (apps ?? [])) {
       const cfg = (a.tracking_config ?? {}) as TrackingConfig
-      if (cfg.enabled && Array.isArray(cfg.times) && cfg.times.includes(hhmm)) owners.push({ user_id: a.user_id, org_id: null, cfg })
+      if (cfg.enabled && hhmm >= (cfg.sync_time || '12:00')) owners.push({ user_id: a.user_id, org_id: null, cfg })
     }
     const { data: orgs } = await db.from('org_config').select('org_id, tracking_config').not('tracking_config', 'is', null)
     for (const o of (orgs ?? [])) {
       const cfg = (o.tracking_config ?? {}) as TrackingConfig
-      if (cfg.enabled && Array.isArray(cfg.times) && cfg.times.includes(hhmm)) owners.push({ user_id: null, org_id: o.org_id, cfg })
+      if (cfg.enabled && hhmm >= (cfg.sync_time || '12:00')) owners.push({ user_id: null, org_id: o.org_id, cfg })
     }
     if (!owners.length) return 0
 
-    const periodEnd = new Date(nowIso)
-    for (const owner of owners) {
-      try {
-        const windowH = Math.max(1, Number(owner.cfg.window_hours) || 14)
-        const periodStart = new Date(periodEnd.getTime() - windowH * 3600_000)
+    const startOfDayIso = new Date(`${today}T00:00:00+02:00`).toISOString()
 
+    for (const owner of owners) {
+      if (synced >= MAX_PER_INVOCATION || Date.now() > deadlineMs) break
+      try {
         // Comptes du propriétaire.
-        let pq = db.from('phones').select('geelark_id, ig_username, group_name').not('ig_username', 'is', null)
+        let pq = db.from('phones').select('id, geelark_id, ig_username, group_name').not('ig_username', 'is', null)
         pq = owner.org_id ? pq.eq('org_id', owner.org_id) : pq.eq('user_id', owner.user_id).is('org_id', null)
         const { data: phones } = await pq
         if (!phones || !phones.length) continue
 
-        // Historique ScaleFlow : posts "done" exécutés dans le créneau.
-        let sq = db.from('scheduled_posts').select('phones, executed_at, status').eq('status', 'done').gte('executed_at', periodStart.toISOString())
+        // Déjà synchronisés aujourd'hui ? (reprise par lots)
+        let dq = db.from('account_daily').select('phone_id').eq('day', today).not('synced_at', 'is', null)
+        dq = owner.org_id ? dq.eq('org_id', owner.org_id) : dq.eq('user_id', owner.user_id)
+        const { data: doneRows } = await dq
+        const doneSet = new Set((doneRows ?? []).map((r: { phone_id: string }) => r.phone_id))
+        const pending = phones.filter((p: { id: string }) => !doneSet.has(p.id))
+        if (!pending.length) continue
+
+        // Historique ScaleFlow du jour (posté via l'app) — gratuit, fiable.
+        let sq = db.from('scheduled_posts').select('phones').eq('status', 'done').gte('executed_at', startOfDayIso)
         sq = owner.org_id ? sq.eq('org_id', owner.org_id) : sq.eq('user_id', owner.user_id)
         const { data: donePosts } = await sq
-        const doneGeelark = new Set<string>()
+        const postedGeelark = new Set<string>()
         for (const p of (donePosts ?? [])) {
-          const arr = Array.isArray(p.phones) ? p.phones : []
-          for (const ph of arr) { if (ph?.geelark_id) doneGeelark.add(String(ph.geelark_id)) }
+          for (const ph of (Array.isArray(p.phones) ? p.phones : [])) { if (ph?.geelark_id) postedGeelark.add(String(ph.geelark_id)) }
         }
 
-        // Évaluation par compte.
-        const results: AccountResult[] = []
-        for (const ph of phones) {
+        for (const ph of pending) {
+          if (synced >= MAX_PER_INVOCATION || Date.now() > deadlineMs) break
           const username = String(ph.ig_username)
           const va = (ph.group_name && String(ph.group_name).trim()) || 'Sans groupe'
-          let status: AccountResult['status'] = 'not_posted'
-          let source: AccountResult['source'] = 'none'
-          let posted_at: string | null = null
+          let posted = false, posted_via: string | null = null, posted_at: string | null = null
           let views: number | null = null, likes: number | null = null, comments: number | null = null
+          let reel_url: string | null = null, reel_thumb: string | null = null
 
-          // 1) Instagram réel.
+          // Niveau API (optionnel) : vidéo + stats si postée aujourd'hui.
           const reel = await fetchLatestReel(owner.cfg, username)
-          if (reel && reel.postedAt && new Date(reel.postedAt) >= periodStart) {
-            status = 'posted'; source = 'instagram'; posted_at = reel.postedAt
+          if (reel && reel.postedAt && parisDate(new Date(reel.postedAt)) === today) {
+            posted = true; posted_via = 'instagram'; posted_at = reel.postedAt
             views = reel.views; likes = reel.likes; comments = reel.comments
-          } else if (doneGeelark.has(String(ph.geelark_id))) {
-            // 2) Repli : ScaleFlow a posté pour ce compte dans le créneau.
-            status = 'posted'; source = 'scaleflow'
+            reel_url = reel.url; reel_thumb = reel.thumb
           }
-          results.push({ username, va, status, source, posted_at, views, likes, comments })
+          // Niveau gratuit : posté via ScaleFlow aujourd'hui.
+          if (!posted && postedGeelark.has(String(ph.geelark_id))) { posted = true; posted_via = 'scaleflow' }
+
+          const row = {
+            user_id: owner.user_id, org_id: owner.org_id, phone_id: ph.id, ig_username: username, va, day: today,
+            posted, posted_via, posted_at, views, likes, comments, reel_url, reel_thumb,
+            synced_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          }
+          // Upsert manuel (l'index unique est sur une expression → pas d'onConflict PostgREST).
+          let eq = db.from('account_daily').select('id').eq('phone_id', ph.id).eq('day', today)
+          eq = owner.org_id ? eq.eq('org_id', owner.org_id) : eq.eq('user_id', owner.user_id)
+          const { data: ex } = await eq.maybeSingle()
+          if (ex?.id) await db.from('account_daily').update(row).eq('id', ex.id)
+          else await db.from('account_daily').insert(row)
+          synced++
         }
-
-        // Groupement par VA.
-        const vaMap = new Map<string, AccountResult[]>()
-        for (const r of results) { const l = vaMap.get(r.va) ?? []; l.push(r); vaMap.set(r.va, l) }
-        const vas = [...vaMap.entries()].map(([name, accounts]) => ({
-          name,
-          posted: accounts.filter(a => a.status === 'posted').length,
-          total: accounts.length,
-          accounts,
-        })).sort((a, b) => a.name.localeCompare(b.name))
-
-        const posted = results.filter(r => r.status === 'posted').length
-        const period = hhmm < '13:00' ? 'Matin' : 'Soir'
-        const label = `${period} — ${dateLabel} · ${hhmm}`
-
-        const { error } = await db.from('tracking_reports').insert({
-          user_id: owner.user_id, org_id: owner.org_id,
-          slot: hhmm, label,
-          period_start: periodStart.toISOString(), period_end: periodEnd.toISOString(),
-          total_accounts: results.length, posted, not_posted: results.length - posted,
-          data: { vas, totals: { posted, total: results.length } },
-        })
-        // L'index unique (propriétaire, slot, jour) évite les doublons → on ignore l'erreur de conflit.
-        if (!error) generated++
-      } catch { /* compte suivant */ }
+      } catch { /* propriétaire suivant */ }
     }
   } catch { /* best-effort */ }
-  return generated
+  return synced
 }
