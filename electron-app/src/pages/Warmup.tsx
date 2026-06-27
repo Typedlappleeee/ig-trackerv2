@@ -97,9 +97,6 @@ function IconFolderOpen({ size = 15 }: { size?: number }) {
 function IconPaperclip({ size = 12 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
 }
-function IconConstruction({ size = 20 }: { size?: number }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><rect x="2" y="6" width="20" height="8" rx="1"/><path d="M17 14v7"/><path d="M7 14v7"/><path d="M17 3v3"/><path d="M7 3v3"/><path d="M10 14 2.3 6.3"/><path d="m14 6 7.7 7.7"/><path d="m8 6 8 8"/></svg>
-}
 function IconRefresh({ size = 13 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
 }
@@ -1142,19 +1139,6 @@ export function Warmup({ user }: WarmupProps) {
             {/* ── WARMUP tab ── */}
             {activeTab === 'warmup' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="sf-anim-slide-up">
-
-                {/* Bug banner */}
-                <div style={{
-                  padding: '14px 16px', borderRadius: 10,
-                  background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.22)',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                }}>
-                  <span style={{ flexShrink: 0, color: 'var(--err)', display: 'inline-flex' }}><IconConstruction size={20} /></span>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--err)', margin: 0 }}>{t('warmupBugTitle')}</p>
-                    <p style={{ fontSize: 12, color: 'rgba(248,113,113,0.65)', margin: '3px 0 0' }}>{t('warmupBugDesc')}</p>
-                  </div>
-                </div>
 
                 {/* Config card */}
                 <div className="sf-card" style={{ overflow: 'hidden' }}>

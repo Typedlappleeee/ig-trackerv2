@@ -810,8 +810,9 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
   --border-accent: rgba(99,102,241,0.22);
 
   --accent:      #6366F1;
-  --accent-lt:   #6366F1;
-  --accent-glow: #6366F1;
+  --accent-lt:   #818CF8;
+  --accent-l:    #818CF8;
+  --accent-glow: #A5B4FC;
   --accent-dim:  rgba(99,102,241,0.12);
   --accent-dim2: rgba(99,102,241,0.06);
 
@@ -871,11 +872,11 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
   border-radius: 0 0 1px 1px;
 }
 .sf-page-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 21px;
+  font-weight: 800;
   color: var(--text-1);
-  letter-spacing: -0.035em;
-  line-height: 1.2;
+  letter-spacing: -0.04em;
+  line-height: 1.18;
 }
 .sf-page-sub {
   font-size: 12.5px;
