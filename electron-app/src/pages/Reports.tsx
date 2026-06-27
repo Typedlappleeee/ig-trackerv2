@@ -11,7 +11,6 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
-import { canAccessPhoneGroup } from '@/lib/permissions'
 
 interface TrackingConfig {
   enabled: boolean
@@ -42,7 +41,7 @@ function fmtTime(iso: string | null): string {
 }
 
 export function Reports({ user }: { user: User }) {
-  const { currentOrg, role, perms } = useOrg()
+  const { currentOrg } = useOrg()
   const table  = currentOrg ? 'org_config' : 'app_config'
   const keyCol = currentOrg ? 'org_id' : 'user_id'
   const keyVal = currentOrg ? currentOrg.id : user.id
@@ -65,12 +64,12 @@ export function Reports({ user }: { user: User }) {
     const [{ data: cfgData }, { data: dData }] = await Promise.all([cfgQ, dQ])
     const tc = (cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>
     setCfg({ ...DEFAULT_CFG, ...tc })
-    // Chaque client ne voit que les comptes de ses groupes autorisés.
-    const visible = ((dData ?? []) as DailyRow[]).filter(r => !role || canAccessPhoneGroup(role, perms, r.va))
-    setRows(visible)
+    // Page réservée au superadmin ScaleFlow → on affiche tous les comptes (pas de
+    // filtre par groupe : sinon un rôle org restrictif masquerait tout).
+    setRows((dData ?? []) as DailyRow[])
     setShowCfg(prev => prev || !tc.enabled)
     setLoading(false)
-  }, [table, keyCol, keyVal, currentOrg?.id, user.id, day, role, perms])
+  }, [table, keyCol, keyVal, currentOrg?.id, user.id, day])
 
   useEffect(() => { load() }, [load])
 
