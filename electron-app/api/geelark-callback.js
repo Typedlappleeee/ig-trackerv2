@@ -49,6 +49,7 @@ module.exports = async (req, res) => {
 
     const nowIso = new Date().toISOString()
     let matched = 0
+    // (a) Posts programmés côté serveur — repérés par result.geelark_task_ids.
     for (const post of running ?? []) {
       const result = typeof post.result === 'string' ? safeParse(post.result) : (post.result ?? {})
       const taskIds = Array.isArray(result?.geelark_task_ids) ? result.geelark_task_ids.map(String) : []
@@ -61,6 +62,12 @@ module.exports = async (req, res) => {
       if (Date.now() <= cur) {
         await db.from('scheduled_posts').update({ stop_phones_at: nowIso }).eq('id', post.id).then(() => {}, () => {})
       }
+    }
+    // (b) Flux « Publier maintenant » (client) — repérés par task_id dans le
+    // watchdog : on avance stop_at → le cron coupe le téléphone dans la minute.
+    for (const id of ids) {
+      await db.from('phone_power_watch').update({ stop_at: nowIso })
+        .eq('task_id', id).gt('stop_at', nowIso).then(() => {}, () => {})
     }
     return res.status(200).json({ ok: true, matched })
   } catch (err) {

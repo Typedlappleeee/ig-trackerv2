@@ -9,7 +9,7 @@ import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { takeScreenshot } from '@/lib/geelark'
-import { registerStartedPhones, unregisterPhones } from '@/lib/phoneWatch'
+import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
@@ -705,6 +705,7 @@ export function MassPosting({ user }: MassPostingProps) {
               if (!tid) { setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no task id' }); return }
               taskIds[asgn.phone.geelark_id] = tid
               activeTasksRef.current = [...activeTasksRef.current, tid]
+              setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
               setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
               log(`  Tâche TikTok créée pour ${asgn.phone.phone_name}`, 'ok')
               armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
@@ -738,6 +739,7 @@ export function MassPosting({ user }: MassPostingProps) {
             const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
             taskIds[asgn.phone.geelark_id] = tid
             activeTasksRef.current = [...activeTasksRef.current, tid]
+            setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
             setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
             log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
             armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
