@@ -342,7 +342,7 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets)
 
-    const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested }
+    const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested, keyword: warmupKeyword.trim() || undefined }
 
     await pLimit(targets, MAX_CONCURRENCY, async phone => {
       if (abortRef.current.abort) {
@@ -351,7 +351,7 @@ export function Warmup({ user }: WarmupProps) {
       }
       updateJob(phone.id, { status: 'running' })
       const result = warmupNative
-        ? await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)), keyword: warmupKeyword }, msg => addLog(phone.id, msg))
+        ? await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)) }, msg => addLog(phone.id, msg))
         : await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, 'Extinction du téléphone…')
@@ -1158,8 +1158,8 @@ export function Warmup({ user }: WarmupProps) {
                       </p>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {([
-                          { v: true,  label: 'Natif (IA GeeLark)', desc: 'Fiable, piloté serveur' },
-                          { v: false, label: 'Classique (ADB)',    desc: 'Like/Reels/Follow scriptés' },
+                          { v: true,  label: 'IA général (GeeLark)', desc: 'Fiable, sans recherche · durée = nb de vidéos (1-100)' },
+                          { v: false, label: 'Recherche mot-clé (ADB)', desc: 'Cherche le mot puis regarde les Reels des résultats' },
                         ]).map(opt => (
                           <button key={String(opt.v)} onClick={() => setWarmupNative(opt.v)}
                             className="cursor-pointer"
@@ -1173,18 +1173,18 @@ export function Warmup({ user }: WarmupProps) {
                           </button>
                         ))}
                       </div>
-                      {warmupNative && (
+                      {!warmupNative && (
                         <div style={{ marginTop: 12 }}>
                           <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6 }}>
-                            Mot-clé d'intérêt (optionnel) — oriente le warmup IA vers une niche
+                            Mot-clé à rechercher sur Instagram (le téléphone tape ce mot puis regarde les Reels des résultats)
                           </p>
                           <input
                             type="text" value={warmupKeyword} onChange={e => setWarmupKeyword(e.target.value)}
-                            placeholder="fitness, cuisine, gaming…"
+                            placeholder="french girl, fitness, gaming…"
                             style={{ width: '100%', padding: '9px 12px', fontSize: 13, color: 'var(--text-1)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 9, outline: 'none' }}
                           />
                           <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 6 }}>
-                            En mode natif, la durée ci-dessous fixe le <b>nombre de vidéos parcourues</b> (1-100).
+                            Laisse vide pour un warmup générique (fil d'actualité).
                           </p>
                         </div>
                       )}
