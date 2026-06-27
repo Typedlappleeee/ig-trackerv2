@@ -1402,36 +1402,23 @@ export function Phones({ user }: PhonesProps) {
                   )}
                 </div>
 
-                {/* Group filter — pill tabs */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
-                  <button
-                    onClick={() => setGroupFilter('all')}
-                    className={`sf-btn sf-btn-ghost sf-btn-sm${groupFilter === 'all' ? '' : ''}`}
-                    style={{
-                      background: groupFilter === 'all' ? 'rgba(99,102,241,0.18)' : 'transparent',
-                      color: groupFilter === 'all' ? 'var(--accent-l)' : 'rgba(233,234,240,0.52)',
-                      border: groupFilter === 'all' ? '1px solid rgba(99,102,241,0.28)' : '1px solid transparent',
-                      fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    {t('phonesAllGroups')}
-                  </button>
+                {/* Group filter — dropdown */}
+                <select
+                  value={groupFilter}
+                  onChange={e => setGroupFilter(e.target.value)}
+                  className="sf-input cursor-pointer"
+                  style={{
+                    width: 'auto', minWidth: 150, maxWidth: 220, height: 32, fontSize: 12,
+                    fontWeight: 600, flexShrink: 0,
+                    color: groupFilter === 'all' ? 'rgba(233,234,240,0.7)' : 'var(--accent-l)',
+                    borderColor: groupFilter === 'all' ? undefined : 'rgba(99,102,241,0.4)',
+                  }}
+                >
+                  <option value="all">{t('phonesAllGroups')}</option>
                   {groups.map(g => (
-                    <button
-                      key={g}
-                      onClick={() => setGroupFilter(g)}
-                      className="sf-btn sf-btn-ghost sf-btn-sm"
-                      style={{
-                        background: groupFilter === g ? 'rgba(99,102,241,0.18)' : 'transparent',
-                        color: groupFilter === g ? 'var(--accent-l)' : 'rgba(233,234,240,0.52)',
-                        border: groupFilter === g ? '1px solid rgba(99,102,241,0.28)' : '1px solid transparent',
-                        fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {g}
-                    </button>
+                    <option key={g} value={g}>{g}</option>
                   ))}
-                </div>
+                </select>
 
                 {/* Status filter pills */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
