@@ -483,6 +483,24 @@ export async function postStoryServer(
     return false
   }
 
+  // Ferme un popup d'info Instagram (« Introducing story-to-story sharing »,
+  // « New feature », etc.) en tapant OK / J'ai compris. Ne touche JAMAIS à
+  // « View settings ». Best-effort : si aucun popup, ne fait rien et le flow
+  // continue normalement.
+  async function dismissInfoPopup() {
+    const x = await dumpXml(bearer, phoneId)
+    const pt =
+      findByResourceId(x, 'bb_primary_action', 'primary_button', 'dialog_primary_button', 'negative_button') ??
+      findByText(x, 'OK', 'Ok', 'Got it', 'J\'ai compris', 'Compris', 'Not now', 'Plus tard', 'Dismiss', 'Ignorer')
+    if (pt) {
+      log('   ✓ Popup d\'info Instagram détectée — fermeture (OK)…')
+      await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`)
+      await sleep(1500)
+      return true
+    }
+    return false
+  }
+
   await dismissPermissionDialog()
 
   // ── 3. Pick the uploaded image from the gallery ────────────────────────────
@@ -531,6 +549,10 @@ export async function postStoryServer(
   log(`   👆 Tap galerie: ${firstThumb[0]},${firstThumb[1]}`)
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
+
+  // Sur l'écran d'édition, Instagram peut afficher un popup d'info
+  // (« story-to-story sharing »…) qui bloque tout → on le ferme s'il est là.
+  await dismissInfoPopup()
 
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')

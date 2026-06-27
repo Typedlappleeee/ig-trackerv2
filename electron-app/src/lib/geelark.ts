@@ -1287,6 +1287,20 @@ async function _postInstagramStoryInner(
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
 
+  // Popup d'info Instagram (« Introducing story-to-story sharing »…) qui bloque
+  // l'écran d'édition → on tape OK s'il est là, sinon on continue normalement.
+  {
+    const px = await dumpXml(bearer, phoneId)
+    const okPt =
+      findByResourceId(px, 'bb_primary_action', 'primary_button', 'dialog_primary_button', 'negative_button') ??
+      findByText(px, 'OK', 'Ok', 'Got it', 'J\'ai compris', 'Compris', 'Not now', 'Plus tard', 'Dismiss', 'Ignorer')
+    if (okPt) {
+      log('   ✓ Popup d\'info Instagram — fermeture (OK)…')
+      await shellExec(bearer, phoneId, `input tap ${okPt[0]} ${okPt[1]}`)
+      await sleep(1500)
+    }
+  }
+
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')
   xml = await dumpXml(bearer, phoneId)
