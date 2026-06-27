@@ -27,17 +27,26 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
 
   const load = useCallback(async () => {
     setLoading(true)
-    // 7s timeout — if Supabase hangs, unblock the app rather than spinning forever
-    const timeout = new Promise<{ data: null; error: Error }>(res =>
-      setTimeout(() => res({ data: null, error: new Error('org load timeout') }), 7000)
-    )
-    const { data: members, error } = await Promise.race([
+    // Réessais : un timeout transitoire ne doit PAS faire perdre l'organisation
+    // (sinon l'app retombe en "solo" et n'affiche aucune donnée org → écran vide).
+    // 3 tentatives, 8s chacune, petit backoff entre.
+    const runOnce = (ms: number) => Promise.race([
       Promise.resolve(supabase.from('organization_members').select('*, organizations(*)').eq('user_id', user.id)),
-      timeout,
+      new Promise<{ data: null; error: Error }>(res =>
+        setTimeout(() => res({ data: null, error: new Error('org load timeout') }), ms)),
     ])
+    let members: any[] | null = null
+    let error: Error | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = await runOnce(8000)
+      if (!r.error) { members = (r.data as any[]) ?? []; error = null; break }
+      error = r.error as Error
+      console.warn(`[orgContext] tentative ${attempt + 1}/3 échouée: ${error.message}`)
+      if (attempt < 2) await new Promise(res => setTimeout(res, 800 * (attempt + 1)))
+    }
 
     if (error) {
-      console.error('[orgContext] load error:', error)
+      console.error('[orgContext] load error (après réessais):', error)
       setLoadError(true)
       setLoading(false)
       return
