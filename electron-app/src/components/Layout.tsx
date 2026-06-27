@@ -22,23 +22,34 @@ const CREDIT_AUTO_RECHARGE = 10_000
 const CREDIT_MAX_DISPLAY   = 150_000
 
 function SFLogo({ size = 28 }: { size?: number }) {
-  // Logo officiel ScaleFlow : carré arrondi à contour violet dégradé + « S » bold.
+  // Logo officiel ScaleFlow : tuile sombre + « S » néon lumineux (violet→rose).
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
       <defs>
-        <linearGradient id="sfl-border" x1="14" y1="8" x2="86" y2="92" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#A78BFA"/>
-          <stop offset="48%"  stopColor="#7C3AED"/>
-          <stop offset="100%" stopColor="#6D28D9"/>
+        <linearGradient id="sfl-tile" x1="50" y1="6" x2="50" y2="94" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#23233f"/>
+          <stop offset="100%" stopColor="#0a0a15"/>
         </linearGradient>
+        <linearGradient id="sfl-s" x1="50" y1="24" x2="50" y2="78" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#E7ECFF"/>
+          <stop offset="50%"  stopColor="#C4B5FD"/>
+          <stop offset="100%" stopColor="#F5B8F5"/>
+        </linearGradient>
+        <filter id="sfl-neon" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge>
+        </filter>
       </defs>
-      {/* Tuile arrondie : intérieur clair, contour violet dégradé */}
-      <rect x="9.5" y="9.5" width="81" height="81" rx="26"
-        fill="#F5F4F9" stroke="url(#sfl-border)" strokeWidth="9.5"/>
-      {/* « S » bold */}
-      <text x="50" y="53" textAnchor="middle" dominantBaseline="central"
-        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="62"
-        letterSpacing="-2" fill="#17171D">S</text>
+      <rect x="6" y="6" width="88" height="88" rx="27"
+        fill="url(#sfl-tile)" stroke="rgba(150,130,255,0.28)" strokeWidth="1.5"/>
+      {/* halo néon */}
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="#A855F7" filter="url(#sfl-neon)" opacity="0.9">S</text>
+      {/* S net */}
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="url(#sfl-s)">S</text>
     </svg>
   )
 }

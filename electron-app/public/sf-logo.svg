@@ -1,14 +1,25 @@
 <svg width="200" height="200" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="sf-border" x1="14" y1="8" x2="86" y2="92" gradientUnits="userSpaceOnUse">
-      <stop offset="0%"   stop-color="#A78BFA"/>
-      <stop offset="48%"  stop-color="#7C3AED"/>
-      <stop offset="100%" stop-color="#6D28D9"/>
+    <linearGradient id="sf-tile" x1="50" y1="6" x2="50" y2="94" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#23233f"/>
+      <stop offset="100%" stop-color="#0a0a15"/>
     </linearGradient>
+    <linearGradient id="sf-s" x1="50" y1="24" x2="50" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#E7ECFF"/>
+      <stop offset="50%"  stop-color="#C4B5FD"/>
+      <stop offset="100%" stop-color="#F5B8F5"/>
+    </linearGradient>
+    <filter id="sf-neon" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge>
+    </filter>
   </defs>
-  <rect x="9.5" y="9.5" width="81" height="81" rx="26"
-    fill="#F5F4F9" stroke="url(#sf-border)" stroke-width="9.5"/>
-  <text x="50" y="53" text-anchor="middle" dominant-baseline="central"
-    font-family="'Inter','Arial Black',system-ui,sans-serif" font-weight="900" font-size="62"
-    letter-spacing="-2" fill="#17171D">S</text>
+  <rect x="6" y="6" width="88" height="88" rx="27"
+    fill="url(#sf-tile)" stroke="rgba(150,130,255,0.28)" stroke-width="1.5"/>
+  <text x="50" y="54" text-anchor="middle" dominant-baseline="central"
+    font-family="'Inter','Arial Black',system-ui,sans-serif" font-weight="900" font-size="58"
+    letter-spacing="-2" fill="#A855F7" filter="url(#sf-neon)" opacity="0.9">S</text>
+  <text x="50" y="54" text-anchor="middle" dominant-baseline="central"
+    font-family="'Inter','Arial Black',system-ui,sans-serif" font-weight="900" font-size="58"
+    letter-spacing="-2" fill="url(#sf-s)">S</text>
 </svg>

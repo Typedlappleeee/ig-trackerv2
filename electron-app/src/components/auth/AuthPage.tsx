@@ -6,22 +6,33 @@ import { Input }  from '@/components/ui/Input'
 type Tab = 'login' | 'register' | 'forgot' | 'reset'
 
 function SFLogoMark() {
-  // Logo officiel ScaleFlow : tuile arrondie, contour violet dégradé, « S » bold.
+  // Logo officiel ScaleFlow : tuile sombre + « S » néon lumineux (violet→rose).
   return (
-    <svg width="46" height="46" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style={{ filter: 'drop-shadow(0 6px 18px rgba(124,58,237,0.5))' }}>
+    <svg width="48" height="48" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ filter: 'drop-shadow(0 8px 24px rgba(124,58,237,0.55))' }}>
       <defs>
-        <linearGradient id="auth-border" x1="14" y1="8" x2="86" y2="92" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#A78BFA"/>
-          <stop offset="48%"  stopColor="#7C3AED"/>
-          <stop offset="100%" stopColor="#6D28D9"/>
+        <linearGradient id="auth-tile" x1="50" y1="6" x2="50" y2="94" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#23233f"/>
+          <stop offset="100%" stopColor="#0a0a15"/>
         </linearGradient>
+        <linearGradient id="auth-s" x1="50" y1="24" x2="50" y2="78" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#E7ECFF"/>
+          <stop offset="50%"  stopColor="#C4B5FD"/>
+          <stop offset="100%" stopColor="#F5B8F5"/>
+        </linearGradient>
+        <filter id="auth-neon" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge>
+        </filter>
       </defs>
-      <rect x="9.5" y="9.5" width="81" height="81" rx="26"
-        fill="#F5F4F9" stroke="url(#auth-border)" strokeWidth="9.5"/>
-      <text x="50" y="53" textAnchor="middle" dominantBaseline="central"
-        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="62"
-        letterSpacing="-2" fill="#17171D">S</text>
+      <rect x="6" y="6" width="88" height="88" rx="27"
+        fill="url(#auth-tile)" stroke="rgba(150,130,255,0.28)" strokeWidth="1.5"/>
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="#A855F7" filter="url(#auth-neon)" opacity="0.9">S</text>
+      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
+        letterSpacing="-2" fill="url(#auth-s)">S</text>
     </svg>
   )
 }
