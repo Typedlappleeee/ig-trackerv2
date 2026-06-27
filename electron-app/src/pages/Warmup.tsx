@@ -162,6 +162,11 @@ export function Warmup({ user }: WarmupProps) {
   const [followSuggested, setFollowSuggested] = useState(false)
   const [warmupKeyword,   setWarmupKeyword]   = useState('')
   const [warmupPlatform,  setWarmupPlatform]  = useState<'instagram' | 'tiktok'>('instagram')
+  const [warmupPlatformChosen, setWarmupPlatformChosen] = useState(false)
+  // Engagement TikTok
+  const [ttLike,    setTtLike]    = useState(true)
+  const [ttFollow,  setTtFollow]  = useState(false)
+  const [ttComment, setTtComment] = useState(false)
 
   // ── Job / execution state ─────────────────────────────────────────────────
   const [jobs,    setJobs]    = useState<PhoneJob[]>([])
@@ -345,8 +350,8 @@ export function Warmup({ user }: WarmupProps) {
       }
       updateJob(phone.id, { status: 'running' })
       const result = warmupPlatform === 'tiktok'
-        // TikTok : warmup natif avec vraie recherche par mot-clé (action search video)
-        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes }, msg => addLog(phone.id, msg))
+        // TikTok : warmup natif (recherche/parcours) + engagement (like/follow/commentaire IA)
+        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment }, msg => addLog(phone.id, msg))
         // Instagram : mot-clé → recherche ADB ; sinon → warmup IA natif général
         : warmupKeyword.trim()
           ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
@@ -431,6 +436,33 @@ export function Warmup({ user }: WarmupProps) {
 
   return (
     <div className="sf-page anim-page">
+
+      {/* Popup de choix de plateforme pour le warmup */}
+      {activeTab === 'warmup' && !warmupPlatformChosen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,14,0.8)', backdropFilter: 'blur(6px)' }}>
+          <div className="sf-card sf-anim-scale-in" style={{ width: '100%', maxWidth: 440, padding: '30px 30px 26px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)' }}>Quelle plateforme chauffer ?</h2>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 22 }}>Choisis la plateforme pour cette session de warmup.</p>
+            <div style={{ display: 'flex', gap: 14 }}>
+              {([
+                { k: 'instagram', label: 'Instagram', emoji: '📸', desc: 'Warmup IA + recherche par mot-clé' },
+                { k: 'tiktok',    label: 'TikTok',    emoji: '🎵', desc: 'Recherche + like / follow / commentaire IA' },
+              ] as const).map(p => (
+                <button key={p.k}
+                  onClick={() => { setWarmupPlatform(p.k); setWarmupPlatformChosen(true) }}
+                  className="cursor-pointer"
+                  style={{ flex: 1, padding: '22px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1.5px solid var(--border)' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.background = 'rgba(99,102,241,0.06)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ fontSize: 38, lineHeight: 1, marginBottom: 12 }}>{p.emoji}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{p.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 5, lineHeight: 1.4 }}>{p.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sélecteur d'avatar depuis la banque (Mass Edit) */}
       {showAvatarPicker && (
@@ -1129,30 +1161,50 @@ export function Warmup({ user }: WarmupProps) {
 
                   <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                    {/* Plateforme */}
-                    <div>
-                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
-                        Plateforme
-                      </p>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {([
-                          { k: 'instagram', label: 'Instagram', emoji: '📸' },
-                          { k: 'tiktok',    label: 'TikTok',    emoji: '🎵' },
-                        ] as const).map(p => (
-                          <button key={p.k} onClick={() => setWarmupPlatform(p.k)}
-                            className="cursor-pointer"
-                            style={{
-                              flex: 1, padding: '10px 12px', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                              fontSize: 13, fontWeight: 700,
-                              background: warmupPlatform === p.k ? 'rgba(99,102,241,0.14)' : 'rgba(255,255,255,0.02)',
-                              border: `1px solid ${warmupPlatform === p.k ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
-                              color: warmupPlatform === p.k ? 'var(--accent-l)' : 'var(--text-2)',
-                            }}>
-                            <span>{p.emoji}</span>{p.label}
-                          </button>
-                        ))}
-                      </div>
+                    {/* Bandeau plateforme + bouton changer */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Plateforme :</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
+                        {warmupPlatform === 'tiktok' ? '🎵 TikTok' : '📸 Instagram'}
+                      </span>
+                      <button onClick={() => setWarmupPlatformChosen(false)}
+                        className="cursor-pointer"
+                        style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.28)', color: 'var(--accent-l)' }}>
+                        Changer
+                      </button>
                     </div>
+
+                    {/* Engagement TikTok */}
+                    {warmupPlatform === 'tiktok' && (
+                      <div>
+                        <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
+                          Engagement (optionnel)
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {([
+                            { v: ttLike,    set: setTtLike,    icon: <IconHeart size={15} />,    label: 'J\'aime aléatoires', desc: 'Like des vidéos parcourues' },
+                            { v: ttFollow,  set: setTtFollow,  icon: <IconUserPlus size={15} />, label: 'Abonnements aléatoires', desc: 'Suit quelques comptes' },
+                            { v: ttComment, set: setTtComment, icon: <IconSparkles size={15} />, label: 'Commentaires IA', desc: 'Commente avec une IA' },
+                          ]).map((a, i) => (
+                            <button key={i} onClick={() => a.set(!a.v)} className="cursor-pointer"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 9, textAlign: 'left',
+                                background: a.v ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
+                                border: `1px solid ${a.v ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
+                              }}>
+                              <span style={{ color: a.v ? 'var(--accent-l)' : 'var(--text-4)' }}>{a.icon}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: 12.5, fontWeight: 600, color: a.v ? 'var(--text-1)' : 'var(--text-2)' }}>{a.label}</p>
+                                <p style={{ fontSize: 10.5, color: 'var(--text-4)' }}>{a.desc}</p>
+                              </div>
+                              <span style={{ flexShrink: 0, width: 32, height: 18, borderRadius: 99, position: 'relative', background: a.v ? 'var(--accent)' : 'rgba(255,255,255,0.1)' }}>
+                                <span style={{ position: 'absolute', top: 2, left: a.v ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Centre d'intérêt (optionnel) — détermine en coulisses le mode de warmup */}
                     <div>

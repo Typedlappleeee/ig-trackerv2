@@ -306,6 +306,8 @@ export default function StoryLink({ user }: { user: User }) {
   const { role, perms, currentOrg } = useOrg()
   const credits = useCredits()
 
+  const [storyPlatformChosen, setStoryPlatformChosen] = useState(false)
+
   // ── Phones ────────────────────────────────────────────────────────────────
   const [phones, setPhones]           = useState<GeelarkPhone[]>([])
   const [loadingPhones, setLoading]   = useState(false)
@@ -621,6 +623,32 @@ export default function StoryLink({ user }: { user: User }) {
 
   return (
     <div className="sf-page anim-page">
+      {/* Popup de choix de plateforme — Story = Instagram uniquement pour le moment */}
+      {!storyPlatformChosen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,14,0.8)', backdropFilter: 'blur(6px)' }}>
+          <div className="sf-card sf-anim-scale-in" style={{ width: '100%', maxWidth: 440, padding: '30px 30px 26px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: 19, fontWeight: 800, color: TEXT_1 }}>Story — quelle plateforme ?</h2>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 22 }}>Les stories sont disponibles sur Instagram.</p>
+            <div style={{ display: 'flex', gap: 14 }}>
+              <button
+                onClick={() => setStoryPlatformChosen(true)}
+                className="cursor-pointer"
+                style={{ flex: 1, padding: '22px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1.5px solid rgba(99,102,241,0.4)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.06)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}>
+                <div style={{ fontSize: 38, lineHeight: 1, marginBottom: 12 }}>📸</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1 }}>Instagram</div>
+                <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 5 }}>Story + sticker lien</div>
+              </button>
+              <div style={{ flex: 1, padding: '22px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.01)', border: '1.5px solid var(--border)', opacity: 0.5 }}>
+                <div style={{ fontSize: 38, lineHeight: 1, marginBottom: 12 }}>🎵</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-3)' }}>TikTok</div>
+                <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 5 }}>Bientôt</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {showBankPicker && (
         <BankPicker user={user} mode="multi" resolveMode="signed-url"
           onSelect={(paths, titles) => {
