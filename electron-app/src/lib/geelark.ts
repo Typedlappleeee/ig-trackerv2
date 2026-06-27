@@ -393,6 +393,7 @@ export interface WarmupConfig {
   likePosts:       boolean
   watchReels:      boolean
   followSuggested: boolean
+  keyword?:        string   // si présent : recherche ce mot puis regarde les Reels des résultats
 }
 
 // Parse bounds string "[x1,y1][x2,y2]" → center point
@@ -1547,7 +1548,7 @@ async function _postInstagramStoryInner(
 async function runWarmupActions(
   bearer: string,
   phoneId: string,
-  config: Pick<WarmupConfig, 'browseMinutes' | 'likePosts' | 'watchReels' | 'followSuggested'>,
+  config: Pick<WarmupConfig, 'browseMinutes' | 'likePosts' | 'watchReels' | 'followSuggested' | 'keyword'>,
   log: (m: string) => void,
   abortSignal: { abort: boolean },
 ) {
@@ -1589,6 +1590,66 @@ async function runWarmupActions(
       log('   ↻ Instagram pas encore visible — nouvel essai…')
       await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
       await sleep(2000)
+    }
+  }
+
+  // ── Recherche par mot-clé (optionnel) ──────────────────────────────────────
+  // Ouvre l'onglet Recherche, tape le mot-clé, ouvre l'onglet Reels des
+  // résultats puis lance le premier → la boucle de visionnage ci-dessous swipe
+  // alors dans des Reels liés au mot-clé au lieu du fil générique.
+  if (config.keyword?.trim() && !abortSignal.abort) {
+    const kw = config.keyword.trim()
+    log(`🔎 Recherche du mot-clé « ${kw} »…`)
+    try {
+      const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
+      const sm = sizeOut.match(/(\d+)x(\d+)/)
+      const sw = sm ? parseInt(sm[1]) : 1080
+      const sh = sm ? parseInt(sm[2]) : 2340
+      // 1. Onglet Recherche / Explorer
+      let xml = await dumpXml(bearer, phoneId)
+      const searchTab =
+        findByResourceId(xml, 'search_tab', 'tab_search', 'feed_tab_search', 'action_bar_search_edit_text') ??
+        findByText(xml, 'Search', 'Recherche', 'Explore', 'Explorer')
+      if (searchTab) await shellExec(bearer, phoneId, `input tap ${searchTab[0]} ${searchTab[1]}`)
+      else await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.30)} ${Math.floor(sh * 0.965)}`)
+      await sleep(2500)
+
+      // 2. Barre de recherche
+      xml = await dumpXml(bearer, phoneId)
+      const searchBox =
+        findByResourceId(xml, 'action_bar_search_edit_text', 'echo_text', 'search_edit_text', 'search_bar') ??
+        findByText(xml, 'Search', 'Recherche', 'Rechercher')
+      if (searchBox) await shellExec(bearer, phoneId, `input tap ${searchBox[0]} ${searchBox[1]}`)
+      else await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.5)} ${Math.floor(sh * 0.07)}`)
+      await sleep(1500)
+
+      // 3. Saisie + validation
+      await shellExec(bearer, phoneId, `input text "${escapeForInputText(kw)}"`)
+      await sleep(2000)
+      await shellExec(bearer, phoneId, 'input keyevent 66') // ENTER → lance la recherche
+      await sleep(3500)
+
+      // 4. Onglet "Reels" des résultats si présent
+      xml = await dumpXml(bearer, phoneId)
+      const reelsTab = findByText(xml, 'Reels', 'Réels') ?? findByResourceId(xml, 'tab_clips', 'clips_tab')
+      if (reelsTab) { await shellExec(bearer, phoneId, `input tap ${reelsTab[0]} ${reelsTab[1]}`); await sleep(2500) }
+
+      // 5. Ouvre le premier résultat (grille) pour passer en visionnage plein écran
+      xml = await dumpXml(bearer, phoneId)
+      const firstThumb = (() => {
+        const re = /resource-id="[^"]*(?:image_button|media_thumbnail|grid_item|clips_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+        let best: [number, number] | null = null, score = Infinity, m: RegExpExecArray | null
+        while ((m = re.exec(xml)) !== null) {
+          const x1 = +m[1], y1 = +m[2], s = y1 * 10000 + x1
+          if (s < score) { score = s; best = [Math.floor((x1 + +m[3]) / 2), Math.floor((y1 + +m[4]) / 2)] }
+        }
+        return best ?? [Math.floor(sw * 0.17), Math.floor(sh * 0.35)] as [number, number]
+      })()
+      await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
+      await sleep(3500)
+      log('   ✅ Résultats ouverts — visionnage des Reels du mot-clé')
+    } catch (e) {
+      log(`   ⚠️ Recherche échouée (${e instanceof Error ? e.message : String(e)}) — warmup générique`)
     }
   }
 
@@ -2122,6 +2183,41 @@ export async function warmupAccountNative(
     }, bearer)
     if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — warmup en cours…`)
+    return pollRpaTask(bearer, taskId, log, 25 * 60_000)
+  })
+}
+
+// Warmup TikTok natif via /task/add (taskType:2). Contrairement à Instagram,
+// TikTok expose une vraie recherche : action "search video" + mots-clés.
+//   - mot-clé fourni → cherche la vidéo par mot-clé puis la regarde
+//   - sinon → parcourt le fil ("browse video")
+export async function warmupTikTokNative(
+  bearer: string,
+  phoneId: string,
+  config: { keyword?: string; durationMin: number },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 30 * 60_000, '30min', log, async () => {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    const kw = config.keyword?.trim()
+    const duration = Math.max(1, Math.min(120, Math.round(config.durationMin)))
+    log(`🔥 Warmup TikTok (${kw ? `recherche « ${kw} »` : 'fil général'}, ${duration} min)…`)
+    const res = await geelarkFetch('POST', '/task/add', {
+      taskType: 2,
+      list: [{
+        scheduleAt: Math.floor(Date.now() / 1000) + 5,
+        envId:      phoneId,
+        action:     kw ? 'search video' : 'browse video',
+        ...(kw ? { keywords: [kw] } : {}),
+        duration,
+      }],
+    }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
+    const ids = ((res['data'] as Record<string, unknown>)?.['taskIds'] ?? []) as string[]
+    const taskId = ids[0]
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — warmup en cours…`)
     return pollRpaTask(bearer, taskId, log, 25 * 60_000)

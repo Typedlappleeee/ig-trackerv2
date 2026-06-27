@@ -63,3 +63,12 @@ export async function unregisterPhones(geelarkIds: string[]): Promise<void> {
     await supabase.from('phone_power_watch').delete().in('geelark_id', ids)
   } catch { /* best-effort */ }
 }
+
+// Relie une ligne du watchdog à la tâche RPA GeeLark. Le webhook de fin de
+// tâche pourra alors avancer l'extinction du téléphone (sinon le +5 min reste).
+export async function setPhoneTaskId(geelarkId: string, taskId: string): Promise<void> {
+  if (!geelarkId || !taskId) return
+  try {
+    await supabase.from('phone_power_watch').update({ task_id: taskId }).eq('geelark_id', geelarkId)
+  } catch { /* best-effort */ }
+}

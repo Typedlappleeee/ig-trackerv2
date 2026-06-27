@@ -9,7 +9,7 @@ import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { takeScreenshot } from '@/lib/geelark'
-import { registerStartedPhones, unregisterPhones } from '@/lib/phoneWatch'
+import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
@@ -705,6 +705,7 @@ export function MassPosting({ user }: MassPostingProps) {
               if (!tid) { setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no task id' }); return }
               taskIds[asgn.phone.geelark_id] = tid
               activeTasksRef.current = [...activeTasksRef.current, tid]
+              setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
               setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
               log(`  Tâche TikTok créée pour ${asgn.phone.phone_name}`, 'ok')
               armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
@@ -738,6 +739,7 @@ export function MassPosting({ user }: MassPostingProps) {
             const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
             taskIds[asgn.phone.geelark_id] = tid
             activeTasksRef.current = [...activeTasksRef.current, tid]
+            setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
             setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
             log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
             armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
@@ -905,12 +907,13 @@ export function MassPosting({ user }: MassPostingProps) {
         message: `${okN}/${assignments.length} compte(s) publiés avec succès${errN ? ` · ${errN} échec(s)` : ''}.`,
       })).catch(() => {})
 
-      // Log run for the Hub "posts this week" counter (post_runs table, not scheduled_posts)
-      if (okN > 0) {
+      // Historique + compteur Hub : on enregistre TOUJOURS le run (même 0 succès)
+      // pour que l'Historique soit fiable. (table post_runs, fire-and-forget)
+      if (assignments.length > 0) {
         supabase.from('post_runs').insert({
           user_id:   user.id,
           org_id:    currentOrg?.id ?? null,
-          type:      'mass_posting',
+          type:      platform === 'tiktok' ? 'tiktok' : 'mass_posting',
           ok_count:  okN,
           err_count: errN,
           total:     assignments.length,

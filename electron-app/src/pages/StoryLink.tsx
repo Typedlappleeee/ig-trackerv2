@@ -513,6 +513,18 @@ export default function StoryLink({ user }: { user: User }) {
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
 
+    // Historique : on enregistre TOUJOURS le run (réussi ou non) pour que la
+    // page Historique soit fiable. (table post_runs, fire-and-forget)
+    const totalRun = jobs.length || counts.length
+    supabase.from('post_runs').insert({
+      user_id:   user.id,
+      org_id:    currentOrg?.id ?? null,
+      type:      'story',
+      ok_count:  okCount,
+      err_count: Math.max(0, totalRun - okCount),
+      total:     totalRun,
+    }).then(() => {}, () => {})
+
     // Reset après un run réussi : vide pool photos, textes et sélection téléphones
     if (okCount > 0) {
       setTimeout(() => {
