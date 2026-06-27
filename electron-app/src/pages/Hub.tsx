@@ -74,11 +74,10 @@ function KpiCard({ label, value, icon, loading, accent, delay = 0 }: {
 }) {
   return (
     <div
-      className="sf-card-lift"
+      className="sf-card sf-card-lift"
       style={{
         flex: 1, minWidth: 0,
-        padding: '18px 22px',
-        background: BG2,
+        padding: 20,
         border: `1px solid ${accent ? 'rgba(99,102,241,0.22)' : HAIR}`,
         borderRadius: 12,
         animation: `hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) ${delay}s both`,
@@ -87,9 +86,9 @@ function KpiCard({ label, value, icon, loading, accent, delay = 0 }: {
         overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <span style={{
-          fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
+          fontSize: 11, fontWeight: 600, letterSpacing: '0.04em',
           textTransform: 'uppercase', color: MUTED, fontFamily: SANS,
         }}>{label}</span>
         <span style={{ color: accent ? GOLD : 'rgba(233,234,240,0.18)' }}>
@@ -105,7 +104,7 @@ function KpiCard({ label, value, icon, loading, accent, delay = 0 }: {
         <p style={{
           fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em',
           color: accent ? GOLD_L : IVORY, margin: 0, lineHeight: 1,
-          fontFamily: SANS,
+          fontFamily: SANS, fontVariantNumeric: 'tabular-nums',
         }}>{value}</p>
       )}
     </div>
@@ -132,20 +131,16 @@ function QuickBtn({ label, icon, primary, onClick }: {
 // ── Status badge ───────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const t = useT()
-  const cfg: Record<string, { color: string; bg: string; label: string }> = {
-    done:      { color: OK,        bg: 'rgba(52,211,153,0.1)',   label: t('hubStatusDone') },
-    failed:    { color: ERR,       bg: 'rgba(248,113,113,0.1)',  label: t('hubStatusFailed') },
-    pending:   { color: GOLD_L,    bg: 'rgba(99,102,241,0.12)',  label: t('hubStatusPending') },
-    running:   { color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   label: t('hubStatusRunning') },
-    cancelled: { color: MUTED,     bg: 'rgba(233,234,240,0.05)', label: t('hubStatusCancelled') },
+  const cfg: Record<string, { variant: string; label: string }> = {
+    done:      { variant: 'ok',     label: t('hubStatusDone') },
+    failed:    { variant: 'danger', label: t('hubStatusFailed') },
+    pending:   { variant: 'accent', label: t('hubStatusPending') },
+    running:   { variant: 'warn',   label: t('hubStatusRunning') },
+    cancelled: { variant: 'muted',  label: t('hubStatusCancelled') },
   }
   const c = cfg[status] ?? cfg.cancelled
   return (
-    <span style={{
-      fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em',
-      textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4,
-      color: c.color, background: c.bg, whiteSpace: 'nowrap',
-    }}>{c.label}</span>
+    <span className={`sf-badge sf-badge-${c.variant}`} style={{ whiteSpace: 'nowrap' }}>{c.label}</span>
   )
 }
 
@@ -168,11 +163,11 @@ function ToolChip({ label, icon, onClick }: { label: string; icon: string; onCli
 function SectionHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <div style={{
-      padding: '16px 22px 14px',
+      padding: '16px 20px',
       borderBottom: `1px solid ${HAIR}`,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
-      <span style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, fontFamily: SANS }}>{title}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: IVORY, fontFamily: SANS }}>{title}</span>
       {action && onAction && (
         <button
           onClick={onAction}
@@ -312,7 +307,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   })
 
   return (
-    <div style={{ minHeight: '100%', background: BG, padding: '40px 48px 80px', boxSizing: 'border-box' }}>
+    <div style={{ minHeight: '100%', background: BG, padding: '28px 28px 80px', boxSizing: 'border-box' }}>
 
       {/* subtle ambient glow */}
       <div style={{
@@ -326,17 +321,17 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
-          marginBottom: 32,
+          gap: 10, marginBottom: 24,
           animation: 'hub-fade-up 0.45s cubic-bezier(0.16,1,0.3,1) both',
         }}>
           <div>
             <p style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: '0.09em',
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.04em',
               textTransform: 'uppercase', color: 'rgba(99,102,241,0.6)',
-              margin: '0 0 5px', fontFamily: SANS,
+              margin: '0 0 6px', fontFamily: SANS,
             }}>{dateLabel}</p>
             <h1 style={{
-              margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em',
+              margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em',
               color: IVORY, fontFamily: SANS, lineHeight: 1.1,
             }}>
               {greeting},&nbsp;
@@ -345,8 +340,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           </div>
           <button
             onClick={load}
-            className="sf-btn sf-btn-ghost"
-            style={{ fontSize: 12, height: 32, gap: 7, padding: '0 12px' }}
+            className="sf-btn sf-btn-secondary sf-btn-sm"
+            style={{ gap: 7 }}
           >
             <SvgIcon d={ICONS.refresh} size={13} color="currentColor" />
             {t('hubRefresh')}
@@ -354,7 +349,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
         </div>
 
         {/* ── KPI row ──────────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 14, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
           <KpiCard label={t('hubKpiPhones')}    value={loading ? '…' : phoneCount} icon="phone"    delay={0.05} />
           <KpiCard label={t('hubKpiVideos')}    value={loading ? '…' : videoCount} icon="video"    delay={0.10} />
           <KpiCard label={t('hubKpiWeekPosts')} value={loading ? '…' : weekPosts} icon="send"    delay={0.15} />
@@ -364,7 +359,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
         {/* ── Quick actions ──────────────────────────────────────────────── */}
         <div style={{
-          display: 'flex', gap: 10, marginBottom: 32, flexWrap: 'wrap',
+          display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap',
           animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both',
         }}>
           <QuickBtn label="Mass Posting"  icon="zap"      primary onClick={() => { playNav(); onNavigate('massposting') }} />
@@ -377,24 +372,22 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 24 }}>
 
           {/* Upcoming posts */}
-          <div style={{
-            background: BG2, border: `1px solid ${HAIR}`, borderRadius: 10, overflow: 'hidden',
+          <div className="sf-card" style={{
+            padding: 0, borderRadius: 12, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.30s both',
           }}>
             <SectionHead title={t('hubUpcoming')} action={t('hubSeeAll')} onAction={() => { playNav(); onNavigate('scheduler') }} />
             {loading ? (
-              <div style={{ padding: '24px 22px', color: FAINT, fontSize: 12, fontFamily: SANS }}>{t('hubLoading')}</div>
+              <div style={{ padding: '24px 20px', color: FAINT, fontSize: 13, fontFamily: SANS }}>{t('hubLoading')}</div>
             ) : upcoming.length === 0 ? (
-              <div style={{ padding: '32px 22px', textAlign: 'center' }}>
-                <p style={{ color: FAINT, fontSize: 12.5, margin: '0 0 14px', fontFamily: SANS }}>{t('hubNoUpcoming')}</p>
+              <div style={{ padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <span style={{ color: 'rgba(233,234,240,0.18)' }}>
+                  <SvgIcon d={ICONS.calendar} size={26} color="currentColor" strokeWidth={1.4} />
+                </span>
+                <p style={{ color: FAINT, fontSize: 12.5, margin: 0, fontFamily: SANS }}>{t('hubNoUpcoming')}</p>
                 <button
                   onClick={() => { playNav(); onNavigate('scheduler') }}
-                  style={{
-                    fontSize: 12, padding: '8px 16px', borderRadius: 7, cursor: 'pointer',
-                    border: `1px solid rgba(99,102,241,0.35)`,
-                    background: 'rgba(99,102,241,0.08)', color: GOLD_L,
-                    fontWeight: 600, fontFamily: SANS,
-                  }}
+                  className="sf-btn sf-btn-secondary sf-btn-sm"
                 >{t('hubSchedulePost')}</button>
               </div>
             ) : (
@@ -402,7 +395,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                 const phones = Array.isArray(post.phones) ? post.phones : []
                 return (
                   <div key={post.id} style={{
-                    padding: '12px 22px',
+                    padding: '12px 20px',
                     borderBottom: i < upcoming.length - 1 ? `1px solid ${HAIR}` : 'none',
                     display: 'flex', alignItems: 'center', gap: 12,
                   }}>
@@ -417,12 +410,12 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                       <p style={{
                         margin: '0 0 2px', fontSize: 13, fontWeight: 600, color: IVORY,
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        fontFamily: SANS,
+                        fontFamily: SANS, fontVariantNumeric: 'tabular-nums',
                       }}>
                         {phones.length} {t('hubAccounts')}
                         {post.caption ? ` · ${post.caption.slice(0, 38)}${post.caption.length > 38 ? '…' : ''}` : ''}
                       </p>
-                      <p style={{ margin: 0, fontSize: 11.5, color: FAINT, fontFamily: SANS }}>
+                      <p style={{ margin: 0, fontSize: 12, color: FAINT, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
                         {fmtScheduledTime(post.scheduled_at)} · {timeUntil(post.scheduled_at)}
                       </p>
                     </div>
@@ -433,15 +426,18 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           </div>
 
           {/* Recent activity */}
-          <div style={{
-            background: BG2, border: `1px solid ${HAIR}`, borderRadius: 10, overflow: 'hidden',
+          <div className="sf-card" style={{
+            padding: 0, borderRadius: 12, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.35s both',
           }}>
             <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('history') }} />
             {loading ? (
-              <div style={{ padding: '24px 22px', color: FAINT, fontSize: 12, fontFamily: SANS }}>{t('hubLoading')}</div>
+              <div style={{ padding: '24px 20px', color: FAINT, fontSize: 13, fontFamily: SANS }}>{t('hubLoading')}</div>
             ) : recent.length === 0 ? (
-              <div style={{ padding: '32px 22px', textAlign: 'center' }}>
+              <div style={{ padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <span style={{ color: 'rgba(233,234,240,0.18)' }}>
+                  <SvgIcon d={ICONS.layers} size={26} color="currentColor" strokeWidth={1.4} />
+                </span>
                 <p style={{ color: FAINT, fontSize: 12.5, margin: 0, fontFamily: SANS }}>{t('hubNoActivity')}</p>
               </div>
             ) : (
@@ -460,7 +456,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                 const key = item.kind === 'scheduled' ? `sp-${item.data.id}` : `pr-${item.data.id}`
                 return (
                   <div key={key} style={{
-                    padding: '12px 22px',
+                    padding: '12px 20px',
                     borderBottom: i < recent.length - 1 ? `1px solid ${HAIR}` : 'none',
                     display: 'flex', alignItems: 'center', gap: 12,
                   }}>
@@ -476,9 +472,9 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                       <p style={{
                         margin: '0 0 2px', fontSize: 13, fontWeight: 600, color: IVORY,
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        fontFamily: SANS,
+                        fontFamily: SANS, fontVariantNumeric: 'tabular-nums',
                       }}>{label}</p>
-                      <p style={{ margin: 0, fontSize: 11.5, color: FAINT, fontFamily: SANS }}>{date}</p>
+                      <p style={{ margin: 0, fontSize: 12, color: FAINT, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>{date}</p>
                     </div>
                     <StatusBadge status={status} />
                   </div>
@@ -495,8 +491,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
         <div style={{ animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.4s both' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
             <span style={{
-              fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
-              textTransform: 'uppercase', color: FAINT, fontFamily: SANS,
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.04em',
+              textTransform: 'uppercase', color: MUTED, fontFamily: SANS,
             }}>{t('hubAllTools')}</span>
             <div style={{ flex: 1, height: 1, background: HAIR }} />
           </div>

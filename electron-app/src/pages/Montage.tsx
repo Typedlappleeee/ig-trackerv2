@@ -199,7 +199,7 @@ function ClipBlock({
       {/* Label */}
       <div className="px-3 h-full flex flex-col justify-center overflow-hidden">
         <p className="text-white text-[11px] font-semibold truncate leading-tight">{clip.item.title}</p>
-        <p className="text-white/60 text-[9px] leading-tight">
+        <p className="text-white/60 text-[9px] leading-tight" style={{ fontVariantNumeric: 'tabular-nums' }}>
           {clip.trimStart > 0 ? `${fmtTime(clip.trimStart)}→` : ''}{fmtTime(clip.trimEnd > 0 ? clip.trimEnd : raw)} · {fmtTime(dur)}
           {clip.speed !== 1 ? ` · ${clip.speed}×` : ''}
         </p>
@@ -258,7 +258,7 @@ function PropertiesPanel({
   const end = clip.trimEnd > 0 ? clip.trimEnd : raw
 
   return (
-    <div className="p-3 space-y-4 overflow-auto h-full text-xs">
+    <div className="p-3 space-y-4 overflow-auto h-full text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
       <div>
         <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider mb-1">{t('montageClipLabel')}</p>
         <p className="font-medium text-text text-sm truncate">{clip.item.title}</p>
@@ -809,7 +809,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                   style={{ font: 'inherit', color: 'inherit' }}
                   placeholder={t('montageProjectName')} />
               </h1>
-              <p className="sf-page-sub" style={{ fontSize: 10, marginTop: 1 }}>
+              <p className="sf-page-sub" style={{ fontSize: 10, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
                 <span className="sf-badge sf-badge-violet" style={{ fontSize: 8, padding: '1px 5px', marginRight: 4 }}>{preset}</span>
                 {PRESET_DIMS[preset]} · {fmtTime(total)}
               </p>
@@ -908,9 +908,11 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
             <div className="flex-1 overflow-auto py-1">
               {bankLoading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
               : filteredBank.length === 0 ? (
-                <div className="px-3 py-6 text-center text-[11px] text-text2 space-y-2 flex flex-col items-center">
-                  <IconClapperboard size={24} />
-                  <p>{bankItems.length === 0 ? t('montageBankEmpty') : t('montageBankNoResults')}</p>
+                <div className="px-4 py-8 text-center space-y-2 flex flex-col items-center sf-anim-scale-in">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818CF8' }}>
+                    <IconClapperboard size={22} />
+                  </div>
+                  <p className="text-[12.5px]" style={{ color: 'var(--text-3)' }}>{bankItems.length === 0 ? t('montageBankEmpty') : t('montageBankNoResults')}</p>
                 </div>
               ) : filteredBank.map((item, idx) => (
                 <button key={item.id} onClick={() => addClip(item)}
@@ -927,7 +929,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                   <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0"><VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-medium text-text truncate">{item.title}</p>
-                    <p className="text-[9px] text-text2">{item.duration ? fmtTime(item.duration) : '?s'}</p>
+                    <p className="text-[9px] text-text2" style={{ fontVariantNumeric: 'tabular-nums' }}>{item.duration ? fmtTime(item.duration) : '?s'}</p>
                   </div>
                   <span className="opacity-0 group-hover:opacity-100 flex-shrink-0" style={{ color: 'var(--accent)', fontSize: 16, fontWeight: 300, lineHeight: 1 }}>+</span>
                 </button>
@@ -1116,7 +1118,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                     placeholder={t('montageGlobalCaptionDesc')}
                     className="w-full bg-surface border border-border rounded px-2 py-1.5 text-[11px] text-text focus:outline-none focus:border-accent resize-none" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   <p className="text-[10px] text-text2">Total: <span className="text-accent font-medium">{fmtTime(total)}</span></p>
                   <div className="sf-progress">
                     <div className="sf-progress-bar" style={{ width: `${Math.min(100, (total / 90) * 100)}%` }} />
@@ -1147,7 +1149,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
                     Stop
                   </button>
-                  <span className="text-xs text-white/70 bg-black/40 px-2 py-1 rounded">
+                  <span className="text-xs text-white/70 bg-black/40 px-2 py-1 rounded" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     Clip {playingIndex + 1}/{clips.length}
                   </span>
                 </div>
@@ -1227,11 +1229,11 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
 
           {/* Time display + clip count */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="text-xs text-text2 font-mono">
+            <span className="text-xs text-text2 font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {fmtTime(playhead)} / <span style={{ color: 'var(--accent)' }}>{fmtTime(total)}</span>
             </span>
             {clips.length > 0 && (
-              <span className="sf-badge sf-badge-violet" style={{ fontSize: 9, padding: '1px 5px' }}>
+              <span className="sf-badge sf-badge-violet" style={{ fontSize: 9, padding: '1px 5px', fontVariantNumeric: 'tabular-nums' }}>
                 {clips.length} clip{clips.length > 1 ? 's' : ''}
               </span>
             )}
@@ -1246,7 +1248,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
               <div className="h-full rounded-full" style={{ width: `${((scale - 10) / 190) * 100}%`, background: 'var(--accent)' }} />
             </div>
             <button onClick={() => setScale(s => Math.min(200, s + 10))} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" style={{ width: 22, height: 22, minWidth: 0, fontSize: 14 }}>+</button>
-            <span className="text-[10px] text-text2 w-10">{scale}px/s</span>
+            <span className="text-[10px] text-text2 w-10" style={{ fontVariantNumeric: 'tabular-nums' }}>{scale}px/s</span>
           </div>
         </div>
 

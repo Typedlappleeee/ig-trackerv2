@@ -174,9 +174,9 @@ function VideoSourcePanel({
       {/* File list */}
       <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-2" style={{ minHeight: 0 }}>
         {paths.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2" style={{ minHeight: 80 }}>
+          <div className="sf-empty flex-1 flex flex-col items-center justify-center gap-2" style={{ minHeight: 80, padding: 16 }}>
             <span className="text-text3 opacity-20"><IconClapperboard size={28} /></span>
-            <p className="text-[10px] text-text3 opacity-40">{t('massRemixNoVideo')}</p>
+            <p className="sf-empty-title" style={{ fontSize: 12.5 }}>{t('massRemixNoVideo')}</p>
           </div>
         ) : paths.map((p, i) => (
           <div key={i} className="group flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors"
@@ -1339,10 +1339,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       {fileName(job.originalPath)}
                     </span>
                     <span className={`sf-badge flex-shrink-0 ${
-                      job.status === 'done' ? 'sf-badge-green'
-                      : job.status === 'error' ? 'sf-badge-red'
-                      : job.status === 'pending' ? ''
-                      : 'sf-badge-violet'
+                      job.status === 'done' ? 'sf-badge-ok'
+                      : job.status === 'error' ? 'sf-badge-danger'
+                      : job.status === 'pending' ? 'sf-badge-muted'
+                      : 'sf-badge-accent'
                     }`} style={{ fontSize: 9, padding: '2px 6px' }}>
                       {STATUS_LABEL[job.status]}
                     </span>
@@ -1544,18 +1544,18 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           <div className="flex items-center gap-2 sf-anim-slide-up sf-d100">
             {/* Live stats badges */}
             {!isMobile && originals.length > 0 && (
-              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, fontWeight: 700 }}>
+              <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                 {originals.length} orig.
               </span>
             )}
             {!isMobile && secondaries.length > 0 && (
-              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, fontWeight: 700 }}>
+              <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                 {secondaries.length} phase 1
               </span>
             )}
             {/* Credit cost indicator */}
             {!isMobile && canLaunch && (
-              <span className="sf-badge sf-badge-violet" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, fontVariantNumeric: 'tabular-nums' }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                 {copies * CREDIT_COSTS.remix} crédit{copies * CREDIT_COSTS.remix > 1 ? 's' : ''}
               </span>

@@ -595,6 +595,14 @@ function AppContent({ user }: { user: User }) {
     setWatchScope({ orgId: currentOrg?.id ?? null, userId: user.id })
     return () => setWatchScope(null)
   }, [currentOrg?.id, user.id])
+
+  // Enregistre automatiquement le webhook GeeLark dès que le token est connu
+  // (web uniquement, throttlé 1×/jour) — fini les téléphones qui traînent.
+  useEffect(() => {
+    if (!conns.bearer) return
+    import('@/lib/geelarkWebhook').then(({ ensureWebhookRegistered }) =>
+      ensureWebhookRegistered(conns.bearer)).catch(() => {})
+  }, [conns.bearer])
   const [page, setPage]                     = useState<Page>('hub')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)

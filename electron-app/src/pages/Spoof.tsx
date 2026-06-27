@@ -235,7 +235,7 @@ export function Spoof({ user }: { user: User }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h1 className="sf-page-title">Spoof</h1>
               {running && (
-                <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <span className="sf-badge sf-badge-accent" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
                   Traitement…
                 </span>
@@ -254,7 +254,7 @@ export function Spoof({ user }: { user: User }) {
           <div className="anim-stagger" style={{ width: 290, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 0 }}>
 
             {/* Source videos */}
-            <div style={{ padding: '16px 14px 0' }}>
+            <div style={{ padding: '16px 16px 0' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>Vidéos source</div>
 
               <button
@@ -290,10 +290,10 @@ export function Spoof({ user }: { user: User }) {
               )}
             </div>
 
-            <div className="sf-divider" style={{ margin: '14px 0' }} />
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* iPhone model */}
-            <div style={{ padding: '0 14px' }}>
+            <div style={{ padding: '0 16px' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>Modèle iPhone</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 {Object.entries(PRESETS).map(([key, label]) => (
@@ -316,10 +316,10 @@ export function Spoof({ user }: { user: User }) {
               </div>
             </div>
 
-            <div className="sf-divider" style={{ margin: '14px 0' }} />
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* GPS location */}
-            <div style={{ padding: '0 14px' }}>
+            <div style={{ padding: '0 16px' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>🏙 Localisation GPS</div>
               <select
                 value={gpsCity}
@@ -340,10 +340,10 @@ export function Spoof({ user }: { user: User }) {
               </select>
             </div>
 
-            <div className="sf-divider" style={{ margin: '14px 0' }} />
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* Custom date */}
-            <div style={{ padding: '0 14px' }}>
+            <div style={{ padding: '0 16px' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>Date de création</div>
               <input
                 type="date"
@@ -355,10 +355,10 @@ export function Spoof({ user }: { user: User }) {
               />
             </div>
 
-            <div className="sf-divider" style={{ margin: '14px 0' }} />
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* Copies per video */}
-            <div style={{ padding: '0 14px' }}>
+            <div style={{ padding: '0 16px' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>
                 Copies par vidéo
                 <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>chaque copie = métadonnées uniques</span>
@@ -370,7 +370,7 @@ export function Spoof({ user }: { user: User }) {
                   className="sf-btn cursor-pointer"
                   style={{ width: 34, height: 34, fontSize: 18, lineHeight: 1, borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: copies <= 1 ? 0.5 : 1 }}
                 >−</button>
-                <div style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#818CF8' }}>{copies}</div>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#818CF8', fontVariantNumeric: 'tabular-nums' }}>{copies}</div>
                 <button
                   onClick={() => setCopies(c => Math.min(20, c + 1))}
                   disabled={running || copies >= 20}
@@ -379,23 +379,23 @@ export function Spoof({ user }: { user: User }) {
                 >+</button>
               </div>
               {selectedVideos.length > 0 && (
-                <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 6, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 6, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
                   {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> export{totalOutputs > 1 ? 's' : ''}
                 </div>
               )}
             </div>
 
-            <div className="sf-divider" style={{ margin: '14px 0' }} />
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* Bank destination */}
-            <div style={{ padding: '0 14px' }}>
+            <div style={{ padding: '0 16px' }}>
               <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de destination" />
             </div>
 
-            <div className="sf-divider" style={{ margin: '14px 0' }} />
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* Visual adjustments collapsible */}
-            <div style={{ padding: '0 14px' }}>
+            <div style={{ padding: '0 16px' }}>
               <button
                 onClick={() => setShowAdjustments(v => !v)}
                 className="cursor-pointer"
@@ -431,7 +431,7 @@ export function Spoof({ user }: { user: User }) {
                     <div key={label}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>{label}</span>
-                        <span style={{ fontSize: 11, color: '#6366F1', fontWeight: 700 }}>{value}</span>
+                        <span style={{ fontSize: 11, color: '#6366F1', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
                       </div>
                       <input
                         type="range"
@@ -473,10 +473,10 @@ export function Spoof({ user }: { user: User }) {
             </div>
 
             {/* Credits + Run button */}
-            <div style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
               {selectedVideos.length > 0 && !running && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <span className="sf-badge sf-badge-violet" style={{ fontSize: 10 }}>
+                  <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
                     {creditCost} crédit{creditCost > 1 ? 's' : ''} · {totalOutputs} export{totalOutputs > 1 ? 's' : ''}
                   </span>
                 </div>
@@ -498,7 +498,7 @@ export function Spoof({ user }: { user: User }) {
                 {running ? (
                   <>
                     <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(248,113,113,0.3)', borderTopColor: '#f87171', animation: 'spin 0.9s linear infinite' }} />
-                    Traitement {doneCount}/{totalOutputs}…
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>Traitement {doneCount}/{totalOutputs}…</span>
                   </>
                 ) : (
                   <>
@@ -552,7 +552,7 @@ export function Spoof({ user }: { user: User }) {
                         height: 32, padding: '0 14px', fontSize: 11, fontWeight: 700, borderRadius: 8,
                         background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
                         color: '#818CF8', border: '1px solid rgba(99,102,241,0.32)',
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        display: 'inline-flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums',
                         opacity: (savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')) ? 0.5 : 1,
                       }}
                     >
@@ -689,8 +689,8 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
             {job.storagePath && (
               job.savedToBank ? (
                 <span
-                  className="sf-btn"
-                  style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                  className="sf-badge sf-badge-ok"
+                  style={{ height: 30, fontSize: 10, padding: '0 10px', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
                   Enregistré
@@ -713,8 +713,9 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
       {/* Injected metadata — lets you verify / compare what changed per video */}
       {isDone && job.meta && (
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '6px 14px',
-          padding: '10px 12px', borderRadius: 9, background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)',
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '6px 16px',
+          padding: '12px', borderRadius: 9, background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)',
+          fontVariantNumeric: 'tabular-nums',
         }}>
           {META_ROWS.map(({ label, key }) => (
             <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
@@ -766,7 +767,7 @@ function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
         </span>
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
           <thead>
             <tr>
               <th style={{ textAlign: 'left', color: 'var(--text-4)', fontWeight: 600, paddingBottom: 8, paddingRight: 12, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Champ</th>

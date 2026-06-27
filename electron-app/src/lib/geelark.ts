@@ -2073,6 +2073,92 @@ async function _loginInstagramAccountInner(
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
+// ── Native GeeLark RPA helpers (fiables — pilotées côté serveur GeeLark) ──────
+// Sonde une tâche RPA jusqu'à complétion. Statuts GeeLark : 3=Done, 4=Failed, 7=Cancelled.
+async function pollRpaTask(
+  bearer: string,
+  taskId: string,
+  log: (m: string) => void,
+  timeoutMs: number,
+): Promise<{ ok: boolean; error?: string }> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    await sleep(15000)
+    let q: Record<string, unknown>
+    try { q = await geelarkFetch('POST', '/task/query', { ids: [taskId] }, bearer) }
+    catch { continue }
+    const d = (q['data'] ?? q) as Record<string, unknown>
+    const items = ((d['items'] ?? d['list'] ?? d['tasks'] ?? d['records'] ?? []) as Array<Record<string, unknown>>)
+    const it = items.find(x => String(x['id'] ?? x['taskId']) === String(taskId)) ?? items[0]
+    if (!it) continue
+    const st = Number(it['status'])
+    if (st === 3) { log('   ✅ Tâche terminée'); return { ok: true } }
+    if ([4, 7, 8].includes(st)) return { ok: false, error: (it['failDesc'] as string) ?? `statut ${st}` }
+  }
+  // Timeout : la tâche tourne peut-être encore côté GeeLark — on considère OK (best-effort).
+  log('   ⏳ Délai dépassé — la tâche peut continuer côté GeeLark.')
+  return { ok: true }
+}
+
+// Warmup IA natif (instagramWarmup) — GeeLark pilote un warmup humain côté serveur.
+// Bien plus fiable que la version ADB. `browseVideo` = nb de vidéos parcourues (1-100).
+export async function warmupAccountNative(
+  bearer: string,
+  phoneId: string,
+  config: { browseVideo: number; keyword?: string },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 30 * 60_000, '30min', log, async () => {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    const browseVideo = Math.max(1, Math.min(100, Math.round(config.browseVideo)))
+    log(`🔥 Création de la tâche de warmup IA (${browseVideo} vidéos${config.keyword ? `, mot-clé « ${config.keyword} »` : ''})…`)
+    const res = await geelarkFetch('POST', '/rpa/task/instagramWarmup', {
+      id: phoneId,
+      scheduleAt: Math.floor(Date.now() / 1000) + 5,
+      browseVideo,
+      ...(config.keyword?.trim() ? { keyword: config.keyword.trim() } : {}),
+      name: 'ScaleFlow warmup',
+    }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — warmup en cours…`)
+    return pollRpaTask(bearer, taskId, log, 25 * 60_000)
+  })
+}
+
+// Édition de profil Instagram native (instagramEdit). Remplace le tap-ADB fragile.
+// avatarUrl doit être une URL d'image accessible (resourceUrl GeeLark ou URL publique).
+export async function editInstagramProfileNative(
+  bearer: string,
+  phoneId: string,
+  fields: { nickname?: string; username?: string; biography?: string; avatarUrl?: string; linkURL?: string; linkTitle?: string },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('✏️ Création de la tâche d\'édition de profil…')
+    const res = await geelarkFetch('POST', '/rpa/task/instagramEdit', {
+      id: phoneId,
+      scheduleAt: Math.floor(Date.now() / 1000) + 5,
+      name: 'ScaleFlow profile edit',
+      ...(fields.nickname?.trim()   ? { nickname: fields.nickname.trim() } : {}),
+      ...(fields.username?.trim()   ? { username: fields.username.trim() } : {}),
+      ...(fields.biography != null  ? { biography: fields.biography } : {}),
+      ...(fields.avatarUrl?.trim()  ? { profilePicture: [fields.avatarUrl.trim()] } : {}),
+      ...(fields.linkURL?.trim()    ? { linkURL: fields.linkURL.trim() } : {}),
+      ...(fields.linkTitle?.trim()  ? { linkTitle: fields.linkTitle.trim() } : {}),
+    }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — édition en cours…`)
+    return pollRpaTask(bearer, taskId, log, 8 * 60_000)
+  })
+}
+
 export async function warmupAccount(
   bearer: string,
   phoneId: string,

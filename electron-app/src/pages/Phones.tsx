@@ -1248,7 +1248,7 @@ export function Phones({ user }: PhonesProps) {
 
             {/* Plan limit badge */}
             {phoneLimit !== Infinity && (
-              <span className={phones.length >= phoneLimit ? 'sf-badge sf-badge-red' : 'sf-badge sf-badge-violet'}>
+              <span className={phones.length >= phoneLimit ? 'sf-badge sf-badge-red' : 'sf-badge sf-badge-violet'} style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {phones.length} / {phoneLimit}
               </span>
             )}
@@ -1663,7 +1663,7 @@ export function Phones({ user }: PhonesProps) {
               )}
 
               {!loading && visible.length > 0 && (
-                <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', marginTop: 14, textAlign: 'center' }}>
+                <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', marginTop: 14, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
                   {visible.length} {t('phonesCountOf')} {phones.length} {phones.length > 1 ? t('phonesPhonesPlural') : t('phonesPhonesSuffix')}
                 </p>
               )}
@@ -1789,7 +1789,7 @@ export function Phones({ user }: PhonesProps) {
                         <div>
                           <p style={{ fontSize: 13, fontWeight: 600, color: ACCENT, margin: 0 }}>@{p.ig_username}</p>
                           {(p.followers || p.following) ? (
-                            <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.45)', margin: '2px 0 0' }}>
+                            <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.45)', margin: '2px 0 0', fontVariantNumeric: 'tabular-nums' }}>
                               {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} ${t('phonesIgFollowers')}` : ''}
                               {p.followers && p.following ? ' · ' : ''}
                               {p.following ? `${p.following} ${t('phonesIgFollowing')}` : ''}
@@ -1854,7 +1854,7 @@ export function Phones({ user }: PhonesProps) {
             whiteSpace: 'nowrap',
           }}>
             {/* Count pill */}
-            <span className="sf-badge sf-badge-violet" style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px' }}>
+            <span className="sf-badge sf-badge-violet" style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', fontVariantNumeric: 'tabular-nums' }}>
               {selectedIds.size} {fr('sélectionné(s)', 'selected')}
             </span>
 

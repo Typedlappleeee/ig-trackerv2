@@ -230,7 +230,7 @@ function CaptionBankPicker({
         <div style={{ padding: '14px 18px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
             <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0 }}>Banque de captions</p>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0' }}>{selected.size} sélectionné{selected.size !== 1 ? 's' : ''}</p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0', fontVariantNumeric: 'tabular-nums' }}>{selected.size} sélectionné{selected.size !== 1 ? 's' : ''}</p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', lineHeight: 1, display: 'flex' }}><IconX /></button>
         </div>
@@ -722,7 +722,7 @@ export default function StoryLink({ user }: { user: User }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <span className="sf-section-label" style={{ margin: 0 }}>Comptes</span>
               {selected.size > 0 && (
-                <span className="sf-badge sf-badge-violet" style={{ fontSize: 10 }}>
+                <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
                   {selected.size} sélectionné{selected.size > 1 ? 's' : ''}
                 </span>
               )}
@@ -822,7 +822,7 @@ export default function StoryLink({ user }: { user: User }) {
 
                   {/* Job status badge */}
                   {j && (
-                    <span className={`sf-badge ${j.status === 'ok' ? 'sf-badge-green' : j.status === 'error' ? 'sf-badge-red' : j.status === 'running' ? 'sf-badge-violet' : ''}`}
+                    <span className={`sf-badge ${j.status === 'ok' ? 'sf-badge-ok' : j.status === 'error' ? 'sf-badge-danger' : j.status === 'running' ? 'sf-badge-accent' : ''}`}
                       style={{ fontSize: 9, flexShrink: 0 }}>
                       {j.status === 'idle' ? '' : j.status}
                     </span>
@@ -1012,8 +1012,8 @@ export default function StoryLink({ user }: { user: User }) {
               </div>
               {selectedIds.length > 0 && (
                 <span
-                  className={`sf-badge ${missingLinkIds.length > 0 ? 'sf-badge-red' : 'sf-badge-green'}`}
-                  style={{ flexShrink: 0 }}
+                  className={`sf-badge ${missingLinkIds.length > 0 ? 'sf-badge-danger' : 'sf-badge-ok'}`}
+                  style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
                 >
                   {selectedIds.length - missingLinkIds.length}/{selectedIds.length} liens
                 </span>
@@ -1028,7 +1028,7 @@ export default function StoryLink({ user }: { user: User }) {
                 color: 'rgba(251,191,36,0.9)', fontSize: 12,
               }}>
                 <span style={{ flexShrink: 0, marginTop: 1, color: '#fbbf24' }}><IconWarn /></span>
-                <span>
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} dans l’aperçu avant de publier.
                 </span>
               </div>
@@ -1081,7 +1081,7 @@ export default function StoryLink({ user }: { user: User }) {
             ) : photoPool.length === 0 ? (
               <p style={{ fontSize: 12, color: 'var(--text-4)' }}>Ajoute des photos dans le pool</p>
             ) : (
-              <p style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
                 {selectedIds.length} compte{selectedIds.length > 1 ? 's' : ''} · {photoPool.length} photo{photoPool.length > 1 ? 's' : ''}{textPool.length > 0 ? ` · ${textPool.length} texte${textPool.length > 1 ? 's' : ''}` : ''}
               </p>
             )}
@@ -1124,7 +1124,7 @@ export default function StoryLink({ user }: { user: User }) {
                     </span>
                     {/* Status badge */}
                     {j && j.status !== 'idle' && (
-                      <span className={`sf-badge ${j.status === 'ok' ? 'sf-badge-green' : j.status === 'error' ? 'sf-badge-red' : j.status === 'running' ? 'sf-badge-violet' : ''}`}
+                      <span className={`sf-badge ${j.status === 'ok' ? 'sf-badge-ok' : j.status === 'error' ? 'sf-badge-danger' : j.status === 'running' ? 'sf-badge-accent' : ''}`}
                         style={{ fontSize: 9 }}>
                         {j.status}
                       </span>
@@ -1247,7 +1247,7 @@ export default function StoryLink({ user }: { user: User }) {
             }}>
               <div>
                 <p style={{ fontSize: 14.5, fontWeight: 700, color: TEXT_1, margin: 0 }}>Programmer les stories</p>
-                <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0' }}>
+                <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0', fontVariantNumeric: 'tabular-nums' }}>
                   {selectedIds.length} compte{selectedIds.length > 1 ? 's' : ''} · {photoPool.length} photo{photoPool.length > 1 ? 's' : ''} · assignations figées au moment de la programmation
                 </p>
               </div>

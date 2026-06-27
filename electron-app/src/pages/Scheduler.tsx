@@ -252,7 +252,7 @@ function StatusPill({ status }: { status: ScheduleStatus }) {
   }
   const { cls, icon } = cfg[status]
   return (
-    <span className={cls} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+    <span className={cls} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums' }}>
       {icon}
       {STATUS_LABELS[status]}
     </span>
@@ -288,7 +288,7 @@ function StatChip({ icon, label }: { icon: JSX.Element; label: string }) {
       display: 'inline-flex', alignItems: 'center', gap: 5,
       background: 'rgba(255,255,255,0.04)', color: 'var(--muted)',
       border: '1px solid rgba(255,255,255,0.055)', borderRadius: 6,
-      padding: '3px 9px', fontSize: 11,
+      padding: '3px 9px', fontSize: 11, fontVariantNumeric: 'tabular-nums',
     }}>
       {icon}
       {label}
@@ -637,7 +637,7 @@ export function Scheduler({ user, onNavigate }: Props) {
       <div className="sf-page-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '24px 28px 0', borderBottom: 'none' }}>
 
         {/* Title row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             {/* Icon */}
             <div className="sf-anim-scale-spring" style={{
@@ -655,7 +655,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
                 {t('schedulerTitle')}
               </h1>
-              <p className="sf-page-sub">
+              <p className="sf-page-sub" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {posts.length} {posts.length !== 1 ? t('schedulerTaskCountPlural') : t('schedulerTaskCount')}
               </p>
             </div>
@@ -664,13 +664,13 @@ export function Scheduler({ user, onNavigate }: Props) {
           {/* Right: stat chips + schedule button */}
           <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {pending.length > 0 && (
-              <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums' }}>
                 <IconClock size={11} color="var(--accent-l)" />
                 {pending.length} {t('schedulerPendingCount')}
               </span>
             )}
             {history.length > 0 && (
-              <span className="sf-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span className="sf-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums' }}>
                 <IconCheck size={11} color="rgba(148,163,184,0.52)" />
                 {history.length} {t('schedulerTabHistory')}
               </span>
@@ -726,6 +726,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                   color: tab === tabItem.id ? 'var(--accent)' : 'rgba(148,163,184,0.4)',
                   borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
                   transition: 'background 0.15s, color 0.15s',
+                  fontVariantNumeric: 'tabular-nums',
                 }}>
                   {tabItem.count}
                 </span>
@@ -925,18 +926,18 @@ export function Scheduler({ user, onNavigate }: Props) {
             background: '#13141A', border: '1px solid rgba(233,234,240,0.08)',
             borderRadius: 12, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
           }}>
-            <div style={{ padding: '18px 22px 14px', borderBottom: '1px solid rgba(233,234,240,0.08)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(233,234,240,0.08)' }}>
               <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ivory)' }}>
                 Que veux-tu programmer ?
               </p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 20 }}>
               {/* Reel */}
               <button
                 onClick={() => { setShowTypeChoice(false); setShowCreate(true) }}
                 className="cursor-pointer"
                 style={{
-                  padding: '22px 16px', borderRadius: 10, textAlign: 'left',
+                  padding: '20px 16px', borderRadius: 10, textAlign: 'left',
                   background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.25)',
                   transition: 'all 0.15s',
                 }}
@@ -956,7 +957,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                 onClick={() => { setShowTypeChoice(false); setShowStoryCreate(true) }}
                 className="cursor-pointer"
                 style={{
-                  padding: '22px 16px', borderRadius: 10, textAlign: 'left',
+                  padding: '20px 16px', borderRadius: 10, textAlign: 'left',
                   background: 'rgba(233,234,240,0.025)', border: '1px solid rgba(233,234,240,0.1)',
                   transition: 'all 0.15s',
                 }}
@@ -975,7 +976,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                 </p>
               </button>
             </div>
-            <div style={{ padding: '0 18px 16px' }}>
+            <div style={{ padding: '0 20px 16px' }}>
               <button
                 onClick={() => setShowTypeChoice(false)}
                 className="sf-btn sf-btn-ghost cursor-pointer"
@@ -1095,7 +1096,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           borderRadius: 8,
           padding: '4px 10px',
           color: 'var(--accent-l)', fontSize: 12.5, fontWeight: 700,
-          letterSpacing: '-0.01em',
+          letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums',
         }}>
           <IconClock size={13} color="var(--accent-l)" />
           {fmtScheduledTime(post.scheduled_at)}
@@ -1104,7 +1105,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           <span style={{
             fontSize: 12, color: 'var(--muted)',
             borderLeft: '1px solid rgba(255,255,255,0.08)',
-            paddingLeft: 10,
+            paddingLeft: 10, fontVariantNumeric: 'tabular-nums',
           }}>
             {timeUntil(post.scheduled_at)}
           </span>
@@ -1167,7 +1168,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             </span>
           ))}
           {post.phones.length > 6 && (
-            <span className="sf-badge sf-badge-violet" style={{ borderRadius: 5, padding: '2px 8px', fontSize: 11 }}>
+            <span className="sf-badge sf-badge-violet" style={{ borderRadius: 5, padding: '2px 8px', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
               +{post.phones.length - 6} {t('schedulerMoreItems')}
             </span>
           )}
@@ -1185,7 +1186,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 background: 'none', border: 'none', cursor: 'pointer',
                 color: 'rgba(99,102,241,0.8)', fontSize: 12, fontWeight: 600, padding: 0,
-                transition: 'color 0.12s',
+                transition: 'color 0.12s', fontVariantNumeric: 'tabular-nums',
               }}
             >
               <IconChevron size={11} color="rgba(99,102,241,0.8)" rotated={false} />

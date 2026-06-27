@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, updateInstagramProfile, loginInstagramAccount, stopPhone,
+  fetchAllPhones, warmupAccount, warmupAccountNative, updateInstagramProfile, editInstagramProfileNative, loginInstagramAccount, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -152,6 +152,7 @@ export function Warmup({ user }: WarmupProps) {
   const [editUsername, setEditUsername] = useState('')
   const [editBio,      setEditBio]      = useState('')
   const [editPicUrl,   setEditPicUrl]   = useState('')
+  const [editNative,   setEditNative]   = useState(true)  // édition native (RPA) vs ADB
   const [editPicFile,  setEditPicFile]  = useState<string | null>(null)
 
   // ── WARMUP state ──────────────────────────────────────────────────────────
@@ -159,6 +160,9 @@ export function Warmup({ user }: WarmupProps) {
   const [likePosts,       setLikePosts]       = useState(true)
   const [watchReels,      setWatchReels]      = useState(true)
   const [followSuggested, setFollowSuggested] = useState(false)
+  // Warmup natif (RPA GeeLark) vs classique (ADB)
+  const [warmupNative,    setWarmupNative]    = useState(true)
+  const [warmupKeyword,   setWarmupKeyword]   = useState('')
 
   // ── Job / execution state ─────────────────────────────────────────────────
   const [jobs,    setJobs]    = useState<PhoneJob[]>([])
@@ -305,8 +309,18 @@ export function Warmup({ user }: WarmupProps) {
       }
       updateJob(phone.id, { status: 'running' })
       try {
-        await updateInstagramProfile(bearer, phone.id, config, msg => addLog(phone.id, msg))
-        updateJob(phone.id, abortRef.current.abort ? { status: 'error', error: 'Annulé' } : { status: 'done' })
+        if (editNative) {
+          const result = await editInstagramProfileNative(bearer, phone.id, {
+            nickname:  config.profileName,
+            username:  config.username,
+            biography: config.bio,
+            avatarUrl: config.profilePicUrl,
+          }, msg => addLog(phone.id, msg))
+          updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
+        } else {
+          await updateInstagramProfile(bearer, phone.id, config, msg => addLog(phone.id, msg))
+          updateJob(phone.id, abortRef.current.abort ? { status: 'error', error: 'Annulé' } : { status: 'done' })
+        }
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
@@ -336,7 +350,9 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      const result = await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
+      const result = warmupNative
+        ? await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)), keyword: warmupKeyword }, msg => addLog(phone.id, msg))
+        : await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
@@ -464,13 +480,13 @@ export function Warmup({ user }: WarmupProps) {
             {onlineCount > 0
               ? <span className="sf-ping-dot" />
               : <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />}
-            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)' }}>
+            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
               <span style={{ color: onlineCount > 0 ? 'var(--ok)' : 'var(--text-4)', fontWeight: 700 }}>{onlineCount}</span>
               /{phones.length} {t('warmupOnline')}
             </span>
           </div>
           {selected.size > 0 && (
-            <span className="sf-badge sf-badge-violet" style={{ fontSize: 12, padding: '4px 10px' }}>
+            <span className="sf-badge sf-badge-accent" style={{ fontSize: 12, padding: '4px 10px', fontVariantNumeric: 'tabular-nums' }}>
               {selected.size} {t('warmupSelected')}{lang === 'fr' && selected.size !== 1 ? 's' : ''}
             </span>
           )}
@@ -502,7 +518,7 @@ export function Warmup({ user }: WarmupProps) {
                   <span style={{ color: 'var(--accent-l)', display: 'flex' }}><IconSmartphone size={15} /></span>
                   <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{t('warmupPhoneList')}</span>
                   {phones.length > 0 && (
-                    <span className="sf-badge sf-badge-violet">{phones.length}</span>
+                    <span className="sf-badge sf-badge-accent" style={{ fontVariantNumeric: 'tabular-nums' }}>{phones.length}</span>
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -545,7 +561,7 @@ export function Warmup({ user }: WarmupProps) {
                   <div style={{
                     padding: '0 10px', height: 32, display: 'flex', alignItems: 'center',
                     borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)',
-                    fontSize: 11, fontFamily: 'monospace', color: 'var(--text-4)', flexShrink: 0,
+                    fontSize: 11, fontFamily: 'monospace', color: 'var(--text-4)', flexShrink: 0, fontVariantNumeric: 'tabular-nums',
                   }}>
                     {visiblePhones.length}/{phones.length}
                   </div>
@@ -640,7 +656,7 @@ export function Warmup({ user }: WarmupProps) {
 
                       {/* Job status badge */}
                       {job && job.status !== 'idle' && (
-                        <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-green' : job.status === 'error' ? 'sf-badge-red' : 'sf-badge-violet'}`}
+                        <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-ok' : job.status === 'error' ? 'sf-badge-danger' : 'sf-badge-accent'}`}
                           style={{ fontSize: 10, flexShrink: 0 }}>
                           {job.status === 'done' ? t('warmupDoneLabel') : job.status === 'error' ? t('warmupErrLabel') : t('warmupRunLabel')}
                         </span>
@@ -690,7 +706,7 @@ export function Warmup({ user }: WarmupProps) {
                             : `${doneCount}/${jobs.length} ${t('warmupSuccessPartial')} · ${errorCount} ${t('warmupErrors')}`}
                       </p>
                       {running && (
-                        <p style={{ fontSize: 11, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 2 }}>
+                        <p style={{ fontSize: 11, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                           {doneCount} {t('warmupDoneLabel').toLowerCase()} · {runningCount} {lang === 'en' ? 'active' : 'actif'} · {idleCount} {lang === 'en' ? 'waiting' : 'en attente'}
                         </p>
                       )}
@@ -710,7 +726,7 @@ export function Warmup({ user }: WarmupProps) {
                       <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                         {t('warmupProgression')}
                       </span>
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-l)' }}>{progress}%</span>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-l)', fontVariantNumeric: 'tabular-nums' }}>{progress}%</span>
                     </div>
                     <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                       <div style={{
@@ -761,7 +777,7 @@ export function Warmup({ user }: WarmupProps) {
                               </p>
                             )}
                           </div>
-                          <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-green' : job.status === 'error' ? 'sf-badge-red' : job.status === 'running' ? 'sf-badge-violet' : ''}`}
+                          <span className={`sf-badge ${job.status === 'done' ? 'sf-badge-ok' : job.status === 'error' ? 'sf-badge-danger' : job.status === 'running' ? 'sf-badge-accent' : 'sf-badge-muted'}`}
                             style={{ fontSize: 9, flexShrink: 0 }}>
                             {job.status}
                           </span>
@@ -972,17 +988,33 @@ export function Warmup({ user }: WarmupProps) {
             {activeTab === 'massEdit' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="sf-anim-slide-up">
 
-                {/* Bug banner */}
-                <div style={{
-                  padding: '14px 16px', borderRadius: 10,
-                  background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.22)',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                }}>
-                  <span style={{ flexShrink: 0, color: 'var(--err)', display: 'inline-flex' }}><IconConstruction size={20} /></span>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--err)', margin: 0 }}>Bug rencontré — fonctionnalité indisponible</p>
-                    <p style={{ fontSize: 12, color: 'rgba(248,113,113,0.65)', margin: '3px 0 0' }}>Mass Edit est temporairement désactivé en raison d'un bug. Un correctif est en cours.</p>
+                {/* Moteur d'édition : natif (RPA GeeLark, fiable) vs classique (ADB) */}
+                <div className="sf-card" style={{ padding: '14px 16px' }}>
+                  <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
+                    Moteur d'édition
+                  </p>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {([
+                      { v: true,  label: 'Natif (GeeLark)', desc: 'Fiable — RPA serveur' },
+                      { v: false, label: 'Classique (ADB)', desc: 'Taps scriptés (instable)' },
+                    ]).map(opt => (
+                      <button key={String(opt.v)} onClick={() => setEditNative(opt.v)}
+                        className="cursor-pointer"
+                        style={{
+                          flex: 1, padding: '10px 12px', borderRadius: 9, textAlign: 'left',
+                          background: editNative === opt.v ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${editNative === opt.v ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                        }}>
+                        <p style={{ fontSize: 12.5, fontWeight: 700, color: editNative === opt.v ? 'var(--accent-l)' : 'var(--text-2)' }}>{opt.label}</p>
+                        <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{opt.desc}</p>
+                      </button>
+                    ))}
                   </div>
+                  {editNative && (
+                    <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 8 }}>
+                      En mode natif, la photo de profil doit être une <b>URL d'image</b> accessible.
+                    </p>
+                  )}
                 </div>
 
                 {/* Profile fields card */}
@@ -1034,7 +1066,7 @@ export function Warmup({ user }: WarmupProps) {
                         value={editBio} onChange={e => setEditBio(e.target.value)}
                         className="sf-input sf-textarea" style={{ fontSize: 12, resize: 'none' }}
                       />
-                      <p style={{ fontSize: 10, marginTop: 3, fontFamily: 'monospace', color: editBio.length > 150 ? 'var(--err)' : 'var(--text-4)' }}>
+                      <p style={{ fontSize: 10, marginTop: 3, fontFamily: 'monospace', color: editBio.length > 150 ? 'var(--err)' : 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>
                         {editBio.length}/150
                       </p>
                     </div>
@@ -1119,6 +1151,45 @@ export function Warmup({ user }: WarmupProps) {
 
                   <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+                    {/* Mode : natif (RPA GeeLark) vs classique (ADB) */}
+                    <div>
+                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
+                        Moteur de warmup
+                      </p>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {([
+                          { v: true,  label: 'Natif (IA GeeLark)', desc: 'Fiable, piloté serveur' },
+                          { v: false, label: 'Classique (ADB)',    desc: 'Like/Reels/Follow scriptés' },
+                        ]).map(opt => (
+                          <button key={String(opt.v)} onClick={() => setWarmupNative(opt.v)}
+                            className="cursor-pointer"
+                            style={{
+                              flex: 1, padding: '10px 12px', borderRadius: 9, textAlign: 'left',
+                              background: warmupNative === opt.v ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
+                              border: `1px solid ${warmupNative === opt.v ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                            }}>
+                            <p style={{ fontSize: 12.5, fontWeight: 700, color: warmupNative === opt.v ? 'var(--accent-l)' : 'var(--text-2)' }}>{opt.label}</p>
+                            <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{opt.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                      {warmupNative && (
+                        <div style={{ marginTop: 12 }}>
+                          <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6 }}>
+                            Mot-clé d'intérêt (optionnel) — oriente le warmup IA vers une niche
+                          </p>
+                          <input
+                            type="text" value={warmupKeyword} onChange={e => setWarmupKeyword(e.target.value)}
+                            placeholder="fitness, cuisine, gaming…"
+                            style={{ width: '100%', padding: '9px 12px', fontSize: 13, color: 'var(--text-1)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 9, outline: 'none' }}
+                          />
+                          <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 6 }}>
+                            En mode natif, la durée ci-dessous fixe le <b>nombre de vidéos parcourues</b> (1-100).
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Duration picker */}
                     <div>
                       <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
@@ -1202,7 +1273,7 @@ export function Warmup({ user }: WarmupProps) {
                     ].map(({ label, value, color }) => (
                       <div key={label} style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
                         <p style={{ fontSize: 9, fontFamily: 'monospace', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{label}</p>
-                        <p style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace', color }}>{value}</p>
+                        <p style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace', color, fontVariantNumeric: 'tabular-nums' }}>{value}</p>
                       </div>
                     ))}
                   </div>

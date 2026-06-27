@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { uploadVideoFromBlob } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { BankPicker } from '@/pages/Bank'
+import { ACCENT, ACCENT_L, TEXT_1, TEXT_2, TEXT_3, HAIR, BG_2, OK, WARN, ERR } from '@/lib/theme'
 
 interface SubtitlesProps { user: User }
 
@@ -326,45 +327,42 @@ export function Subtitles({ user }: SubtitlesProps) {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full overflow-y-auto" style={{ padding: '28px 32px', gap: 24 }}>
+    <div className="flex flex-col h-full overflow-y-auto sf-anim-slide-up" style={{ padding: 24, gap: 20, maxWidth: 1100, margin: '0 auto', width: '100%' }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap" style={{ gap: 10 }}>
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Sous-titres Auto</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'rgba(148,163,184,0.5)' }}>
+          <h1 style={{ fontSize: 21, fontWeight: 800, color: TEXT_1, letterSpacing: '-0.01em' }}>Sous-titres Auto</h1>
+          <p style={{ fontSize: 13, color: TEXT_2, marginTop: 2 }}>
             Groq Whisper transcrit · FFmpeg incruste
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold"
-          style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8' }}>
-          Powered by Groq Whisper
-        </div>
+        <span className="sf-badge sf-badge-accent">Powered by Groq Whisper</span>
       </div>
 
       {/* Groq key warning */}
       {!groqKey && (
-        <div className="rounded-xl px-4 py-3 text-sm flex items-center gap-3"
-          style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)', color: '#fbbf24' }}>
+        <div className="flex items-center" style={{ gap: 12, padding: '12px 16px', borderRadius: 12, fontSize: 13, background: 'rgba(251,191,36,0.08)', border: `1px solid rgba(251,191,36,0.22)`, color: WARN }}>
           <WarningIcon />
-          Clé Groq manquante — ajoute-la dans <strong className="mx-1">Paramètres → API</strong>
+          Clé Groq manquante — ajoute-la dans <strong style={{ margin: '0 4px' }}>Paramètres → API</strong>
         </div>
       )}
 
-      <div className="grid gap-5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
         {/* ── Left: drop zone ── */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col" style={{ gap: 12 }}>
           <div
             onDragOver={e => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
             onClick={pickFile}
-            className="cursor-pointer rounded-2xl transition-all"
+            className="cursor-pointer transition-all"
             style={{
               minHeight: 200,
-              border: dragging ? '2px solid #6366F1' : '2px dashed rgba(99,102,241,0.22)',
-              background: dragging ? 'rgba(99,102,241,0.07)' : previewUrl ? 'transparent' : 'rgba(15,23,42,0.5)',
+              borderRadius: 14,
+              border: dragging ? `2px solid ${ACCENT}` : `2px dashed rgba(99,102,241,0.22)`,
+              background: dragging ? 'rgba(99,102,241,0.07)' : previewUrl ? 'transparent' : 'rgba(255,255,255,0.02)',
               overflow: 'hidden',
             }}
           >
@@ -376,14 +374,13 @@ export function Subtitles({ user }: SubtitlesProps) {
                 controls muted
               />
             ) : (
-              <div className="flex flex-col items-center justify-center gap-3 h-full py-12 select-none">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <div className="flex flex-col items-center justify-center h-full select-none" style={{ gap: 12, padding: '48px 0' }}>
+                <div className="flex items-center justify-center" style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(99,102,241,0.1)', border: `1px solid rgba(99,102,241,0.2)` }}>
                   <VideoIcon />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-white">Dépose ta vidéo ici</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>ou clique pour choisir</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1 }}>Dépose ta vidéo ici</p>
+                  <p style={{ fontSize: 12.5, color: TEXT_3, marginTop: 2 }}>ou clique pour choisir</p>
                 </div>
               </div>
             )}
@@ -392,8 +389,8 @@ export function Subtitles({ user }: SubtitlesProps) {
           {/* Bank picker button */}
           <button
             onClick={() => setShowBankPicker(true)}
-            className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center gap-2"
-            style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8' }}
+            className="sf-btn sf-btn-secondary"
+            style={{ width: '100%' }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
@@ -402,13 +399,13 @@ export function Subtitles({ user }: SubtitlesProps) {
           </button>
 
           {videoName && (
-            <p className="text-xs text-center truncate" style={{ color: 'rgba(148,163,184,0.4)' }}>{videoName}</p>
+            <p className="text-center truncate" style={{ fontSize: 12, color: TEXT_3 }}>{videoName}</p>
           )}
           <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={onFileInput} />
         </div>
 
         {/* ── Right: options ── */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col" style={{ gap: 16 }}>
           <SectionCard title="Paramètres">
 
             <Row label="Langue">
@@ -420,26 +417,26 @@ export function Subtitles({ user }: SubtitlesProps) {
             </Row>
 
             <Row label="Mots / segment">
-              <div className="flex gap-1.5">
+              <div className="flex" style={{ gap: 6 }}>
                 {[1, 2, 3, 4, 5].map(n => (
-                  <button key={n} onClick={() => setPerGroup(n)} className="w-9 h-9 rounded-lg text-sm font-bold transition-all cursor-pointer"
+                  <button key={n} onClick={() => setPerGroup(n)} className="transition-all cursor-pointer"
                     style={perGroup === n
-                      ? { background: '#6366F1', color: '#fff' }
-                      : { background: 'rgba(255,255,255,0.05)', color: 'rgba(148,163,184,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                      ? { width: 36, height: 36, borderRadius: 9, fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
+                      : { width: 36, height: 36, borderRadius: 9, fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', background: 'rgba(255,255,255,0.03)', color: TEXT_2, border: `1px solid ${HAIR}` }
                     }>{n}</button>
                 ))}
               </div>
             </Row>
 
             <Row label="Style">
-              <div className="flex gap-2">
+              <div className="flex" style={{ gap: 8 }}>
                 {(['box', 'outline', 'shadow'] as Style[]).map(s => {
                   const labels = { box: 'Fond noir', outline: 'Contour', shadow: 'Ombre' }
                   return (
-                    <button key={s} onClick={() => setStyle(s)} className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                    <button key={s} onClick={() => setStyle(s)} className="transition-all cursor-pointer"
                       style={style === s
-                        ? { background: '#6366F1', color: '#fff' }
-                        : { background: 'rgba(255,255,255,0.05)', color: 'rgba(148,163,184,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                        ? { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
+                        : { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.03)', color: TEXT_2, border: `1px solid ${HAIR}` }
                       }>{labels[s]}</button>
                   )
                 })}
@@ -447,14 +444,14 @@ export function Subtitles({ user }: SubtitlesProps) {
             </Row>
 
             <Row label="Position">
-              <div className="flex gap-2">
+              <div className="flex" style={{ gap: 8 }}>
                 {(['top', 'center', 'bottom'] as Position[]).map(p => {
                   const labels = { top: 'Haut', center: 'Centre', bottom: 'Bas' }
                   return (
-                    <button key={p} onClick={() => setPosition(p)} className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                    <button key={p} onClick={() => setPosition(p)} className="transition-all cursor-pointer"
                       style={position === p
-                        ? { background: '#6366F1', color: '#fff' }
-                        : { background: 'rgba(255,255,255,0.05)', color: 'rgba(148,163,184,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                        ? { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
+                        : { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.03)', color: TEXT_2, border: `1px solid ${HAIR}` }
                       }>{labels[p]}</button>
                   )
                 })}
@@ -470,7 +467,7 @@ export function Subtitles({ user }: SubtitlesProps) {
               <div className="flex gap-2 items-center">
                 {['#ffffff', '#ffff00', '#00ff88', '#ff6b6b'].map(c => (
                   <button key={c} onClick={() => setFontColor(c)} className="w-7 h-7 rounded-full transition-all cursor-pointer flex-shrink-0"
-                    style={{ background: c, boxShadow: fontColor === c ? '0 0 0 3px #6366F1' : 'none', transform: fontColor === c ? 'scale(1.2)' : 'scale(1)' }} />
+                    style={{ background: c, boxShadow: fontColor === c ? `0 0 0 3px ${ACCENT}` : 'none', transform: fontColor === c ? 'scale(1.2)' : 'scale(1)' }} />
                 ))}
                 <input type="color" value={fontColor} onChange={e => setFontColor(e.target.value)}
                   className="w-7 h-7 rounded-full cursor-pointer border-0 flex-shrink-0" style={{ padding: 0 }} />
@@ -478,18 +475,18 @@ export function Subtitles({ user }: SubtitlesProps) {
             </Row>
 
             <Row label="Format">
-              <div className="flex gap-1.5 flex-wrap">
+              <div className="flex flex-wrap" style={{ gap: 6 }}>
                 {(['keep', '9:16', '1:1', '16:9'] as const).map(p => (
-                  <button key={p} onClick={() => setPreset(p)} className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                  <button key={p} onClick={() => setPreset(p)} className="transition-all cursor-pointer"
                     style={preset === p
-                      ? { background: '#6366F1', color: '#fff' }
-                      : { background: 'rgba(255,255,255,0.05)', color: 'rgba(148,163,184,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                      ? { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
+                      : { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', background: 'rgba(255,255,255,0.03)', color: TEXT_2, border: `1px solid ${HAIR}` }
                     }>{p === 'keep' ? 'Original' : p}</button>
                 ))}
               </div>
             </Row>
 
-            <div style={{ marginTop: 4, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ marginTop: 4, paddingTop: 16, borderTop: `1px solid ${HAIR}` }}>
               <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de destination" />
             </div>
           </SectionCard>
@@ -498,11 +495,8 @@ export function Subtitles({ user }: SubtitlesProps) {
 
       {/* Generate button */}
       <button onClick={generate} disabled={!canGenerate}
-        className="w-full py-3.5 rounded-xl font-black text-sm tracking-wide transition-all cursor-pointer"
-        style={canGenerate
-          ? { background: 'linear-gradient(130deg,#6366F1,#818CF8)', color: '#fff', boxShadow: '0 8px 24px rgba(99,102,241,0.3)' }
-          : { background: 'rgba(99,102,241,0.1)', color: 'rgba(148,163,184,0.3)', cursor: 'not-allowed' }
-        }
+        className="sf-btn sf-btn-primary sf-btn-lg"
+        style={{ width: '100%' }}
       >
         {phase === 'fetching'      ? 'Lecture vidéo…' :
          phase === 'transcribing'  ? 'Transcription Whisper…' :
@@ -512,77 +506,67 @@ export function Subtitles({ user }: SubtitlesProps) {
 
       {/* Status */}
       {isRunning && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-          style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.15)' }}>
+        <div className="flex items-center sf-anim-slide-up" style={{ gap: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(99,102,241,0.07)', border: `1px solid rgba(99,102,241,0.15)` }}>
           <SpinnerIcon />
-          <span className="text-sm text-white">{status}</span>
+          <span style={{ fontSize: 13, color: TEXT_1 }}>{status}</span>
         </div>
       )}
 
       {/* Error */}
       {phase === 'error' && error && (
-        <div className="px-4 py-3 rounded-xl text-sm"
-          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+        <div className="sf-anim-slide-up" style={{ padding: '12px 16px', borderRadius: 12, fontSize: 13, background: 'rgba(248,113,113,0.08)', border: `1px solid rgba(248,113,113,0.22)`, color: ERR }}>
           {error}
         </div>
       )}
 
       {/* Result */}
       {phase === 'done' && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between px-4 py-2.5 rounded-xl"
-            style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)' }}>
-            <span className="text-sm font-semibold" style={{ color: '#4ade80' }}>{status}</span>
-            <button onClick={download}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition-all"
-              style={{ background: '#22c55e', color: '#fff', boxShadow: '0 4px 14px rgba(34,197,94,0.3)' }}>
+        <div className="flex flex-col sf-anim-slide-up" style={{ gap: 16 }}>
+          <div className="flex items-center justify-between flex-wrap" style={{ gap: 12, padding: '10px 16px', borderRadius: 12, background: 'rgba(52,211,153,0.07)', border: `1px solid rgba(52,211,153,0.22)` }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: OK }}>{status}</span>
+            <button onClick={download} className="sf-btn sf-btn-sm" style={{ background: OK, color: '#06140d', fontWeight: 700 }}>
               <DownloadIcon /> Télécharger
             </button>
           </div>
 
           {/* Save to bank */}
-          <div className="rounded-xl p-3.5 flex items-center gap-3 flex-wrap"
-            style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)' }}>
-            <div style={{ flex: 1, fontSize: 12, color: 'var(--text-3)' }}>
-              <span style={{ color: 'var(--text-4)' }}>Dossier : </span>
-              <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
+          <div className="flex items-center flex-wrap sf-card" style={{ gap: 12, padding: 16 }}>
+            <div style={{ flex: 1, fontSize: 12.5, color: TEXT_2 }}>
+              <span style={{ color: TEXT_3 }}>Dossier : </span>
+              <span style={{ color: ACCENT_L, fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
             </div>
             {savedToBank ? (
-              <span className="flex items-center gap-2 px-4 rounded-lg text-sm font-bold"
-                style={{ height: 36, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
+              <span className="sf-badge sf-badge-ok" style={{ height: 28 }}>
                 <CheckIcon /> Enregistré dans la banque
               </span>
             ) : (
-              <button onClick={saveToBank} disabled={saving}
-                className="flex items-center gap-2 px-4 rounded-lg text-sm font-bold cursor-pointer transition-all"
-                style={{ height: 36, background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))', color: '#818cf8', border: '1px solid rgba(99,102,241,0.32)', opacity: saving ? 0.6 : 1 }}>
+              <button onClick={saveToBank} disabled={saving} className="sf-btn sf-btn-secondary sf-btn-sm">
                 {saving
-                  ? <><span style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818cf8', animation: 'spin 0.9s linear infinite', display: 'inline-block' }} /> Enregistrement…</>
+                  ? <><span style={{ width: 13, height: 13, borderRadius: '50%', border: `2px solid rgba(129,140,248,0.3)`, borderTopColor: ACCENT_L, animation: 'spin 0.9s linear infinite', display: 'inline-block' }} /> Enregistrement…</>
                   : <><SaveIcon /> Enregistrer dans la banque</>
                 }
               </button>
             )}
           </div>
 
-          <div className="grid gap-4" style={{ gridTemplateColumns: outputUrl ? '1fr 1fr' : '1fr' }}>
+          <div className="grid" style={{ gridTemplateColumns: outputUrl ? '1fr 1fr' : '1fr', gap: 16 }}>
             {outputUrl && (
-              <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(99,102,241,0.15)' }}>
-                <p className="text-xs font-semibold px-3 pt-3 pb-2" style={{ color: 'rgba(148,163,184,0.4)' }}>APERÇU</p>
+              <div className="overflow-hidden" style={{ borderRadius: 14, border: `1px solid ${HAIR}`, background: BG_2 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: TEXT_2, padding: '12px 12px 8px' }}>Aperçu</p>
                 <video src={outputUrl} controls style={{ width: '100%', maxHeight: 300, objectFit: 'contain', background: '#000' }} />
               </div>
             )}
             {segments.length > 0 && (
-              <div className="rounded-2xl p-4 flex flex-col gap-1.5 overflow-y-auto"
-                style={{ maxHeight: 300, background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <p className="text-xs font-semibold mb-2" style={{ color: 'rgba(148,163,184,0.4)' }}>
-                  TRANSCRIPTION ({segments.length} segments)
+              <div className="flex flex-col overflow-y-auto sf-card" style={{ gap: 6, padding: 16, maxHeight: 300 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: TEXT_2, marginBottom: 8 }}>
+                  Transcription · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{segments.length}</span> segments
                 </p>
                 {segments.map((seg, i) => (
-                  <div key={i} className="flex gap-3 items-baseline">
-                    <span className="text-xs tabular-nums flex-shrink-0" style={{ color: '#6366F1' }}>
+                  <div key={i} className="flex items-baseline" style={{ gap: 12 }}>
+                    <span className="flex-shrink-0" style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: ACCENT }}>
                       {formatTime(seg.start)}
                     </span>
-                    <span className="text-sm text-white">{seg.text}</span>
+                    <span style={{ fontSize: 13, color: TEXT_1 }}>{seg.text}</span>
                   </div>
                 ))}
               </div>
@@ -608,9 +592,8 @@ export function Subtitles({ user }: SubtitlesProps) {
 // ── Sub-components ────────────────────────────────────────────────────────────
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl p-4 flex flex-col gap-3"
-      style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.06)' }}>
-      <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>{title}</p>
+    <div className="sf-card flex flex-col" style={{ gap: 16, padding: 20 }}>
+      <p style={{ fontSize: 13, fontWeight: 700, color: TEXT_1 }}>{title}</p>
       {children}
     </div>
   )
@@ -618,8 +601,8 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium" style={{ color: 'rgba(148,163,184,0.5)' }}>{label}</label>
+    <div className="flex flex-col" style={{ gap: 8 }}>
+      <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: TEXT_2 }}>{label}</label>
       {children}
     </div>
   )
