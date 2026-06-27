@@ -91,6 +91,19 @@ export function Spoof({ user }: { user: User }) {
   const [copies, setCopies]               = useState(1)
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
+  const [autoMode, setAutoMode]           = useState(false)
+
+  // Réglages aléatoires (modérés) générés par vidéo en mode automatique.
+  const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+  const randomAdjustments = () => ({
+    brightness: randInt(-12, 12),
+    saturation: randInt(-12, 12),
+    contrast:   randInt(-12, 12),
+    noise:      randInt(3, 12),
+    vignette:   Math.random() < 0.5,
+    flipH:      Math.random() < 0.5,
+    zoomPct:    randInt(1, 8),
+  })
 
   function updateJob(id: string, patch: Partial<SpoofJob>) {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
@@ -154,6 +167,9 @@ export function Spoof({ user }: { user: User }) {
       for (const job of initialJobs) {
         updateJob(job.id, { status: 'processing' })
 
+        // Mode automatique : chaque vidéo/copie reçoit ses propres réglages aléatoires.
+        const adj = autoMode ? randomAdjustments() : { brightness, saturation, contrast, noise, vignette, flipH, zoomPct }
+
         const resolvedCity = gpsCity === 'random'
           ? GPS_CITY_KEYS[Math.floor(Math.random() * GPS_CITY_KEYS.length)]
           : gpsCity === 'random_france'
@@ -171,7 +187,7 @@ export function Spoof({ user }: { user: User }) {
               preset,
               gpsCity: resolvedCity,
               customDate: customDate.replace(/-/g, ':'),
-              adjustments: { brightness, saturation, contrast, noise, vignette, flipH, zoomPct },
+              adjustments: adj,
               supabaseToken: session?.access_token,
               supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
             }),
@@ -420,6 +436,23 @@ export function Spoof({ user }: { user: User }) {
 
               {showAdjustments && (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* Mode automatique : réglages aléatoires par vidéo */}
+                  <button onClick={() => setAutoMode(v => !v)} disabled={running} className="cursor-pointer"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 11px', borderRadius: 9, background: autoMode ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)', border: `1px solid ${autoMode ? 'rgba(99,102,241,0.35)' : 'var(--border)'}` }}>
+                    <div style={{ textAlign: 'left' }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>⚡ Automatique</p>
+                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>Réglages aléatoires différents pour chaque vidéo</p>
+                    </div>
+                    <span style={{ width: 32, height: 18, borderRadius: 99, position: 'relative', background: autoMode ? 'var(--accent)' : 'rgba(255,255,255,0.12)', flexShrink: 0 }}>
+                      <span style={{ position: 'absolute', top: 2, left: autoMode ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
+                    </span>
+                  </button>
+                  {autoMode && (
+                    <p style={{ fontSize: 11, color: 'var(--accent-l)', margin: '0 0 2px', lineHeight: 1.5 }}>
+                      Chaque vidéo reçoit ses propres valeurs aléatoires (luminosité, saturation, contraste, grain, zoom, flip, vignette). Les réglages manuels ci-dessous sont ignorés.
+                    </p>
+                  )}
+
                   {/* Sliders */}
                   {([
                     { label: 'Luminosité', value: brightness, set: setBrightness, min: -50, max: 50 },
@@ -438,7 +471,7 @@ export function Spoof({ user }: { user: User }) {
                         min={min}
                         max={max}
                         value={value}
-                        disabled={running}
+                        disabled={running || autoMode}
                         onChange={e => (set as (v: number) => void)(Number(e.target.value))}
                         style={{ width: '100%', accentColor: '#6366F1', cursor: 'pointer' }}
                       />
@@ -454,7 +487,7 @@ export function Spoof({ user }: { user: User }) {
                       <button
                         key={label}
                         onClick={() => (set as (v: boolean) => void)(!value)}
-                        disabled={running}
+                        disabled={running || autoMode}
                         className="cursor-pointer"
                         style={{
                           flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
