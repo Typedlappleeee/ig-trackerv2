@@ -2,7 +2,17 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl  = (import.meta.env.VITE_SUPABASE_URL  as string) || 'https://fvmkmkspfksscgqyvysl.supabase.co'
-const supabaseKey  = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'sb_publishable_hip63djbBYnu3EsSx2gA4w_0tgjweEo'
+
+// Clé API publishable (nouveau format Supabase). Publique par design (déjà
+// embarquée côté client), donc la coder en dur est sûr.
+// IMPORTANT : Supabase désactive progressivement les anciennes clés JWT (eyJ…).
+// Si la variable d'env contient encore une ancienne clé legacy (ou est vide),
+// on l'IGNORE et on utilise la nouvelle clé qui marche — sinon la PROD casse
+// (login OK mais aucune donnée ne charge) alors que l'utilisateur n'a rien
+// changé. Testée OK sur /rest/v1 (HTTP 200).
+const PUBLISHABLE_KEY = 'sb_publishable_hip63djbBYnu3EsSx2gA4w_0tgjweEo'
+const envKey       = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+const supabaseKey  = (envKey && envKey.startsWith('sb_')) ? envKey : PUBLISHABLE_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
