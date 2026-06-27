@@ -483,24 +483,6 @@ export async function postStoryServer(
     return false
   }
 
-  // Ferme un popup d'info Instagram (« Introducing story-to-story sharing »,
-  // « New feature », etc.) en tapant OK / J'ai compris. Ne touche JAMAIS à
-  // « View settings ». Best-effort : si aucun popup, ne fait rien et le flow
-  // continue normalement.
-  async function dismissInfoPopup() {
-    const x = await dumpXml(bearer, phoneId)
-    const pt =
-      findByResourceId(x, 'bb_primary_action', 'primary_button', 'dialog_primary_button', 'negative_button') ??
-      findByText(x, 'OK', 'Ok', 'Got it', 'J\'ai compris', 'Compris', 'Not now', 'Plus tard', 'Dismiss', 'Ignorer')
-    if (pt) {
-      log('   ✓ Popup d\'info Instagram détectée — fermeture (OK)…')
-      await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`)
-      await sleep(1500)
-      return true
-    }
-    return false
-  }
-
   await dismissPermissionDialog()
 
   // ── 3. Pick the uploaded image from the gallery ────────────────────────────
@@ -550,10 +532,6 @@ export async function postStoryServer(
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
 
-  // Sur l'écran d'édition, Instagram peut afficher un popup d'info
-  // (« story-to-story sharing »…) qui bloque tout → on le ferme s'il est là.
-  await dismissInfoPopup()
-
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')
   xml = await dumpXml(bearer, phoneId)
@@ -569,17 +547,6 @@ export async function postStoryServer(
   await sleep(3500) // extra time for tray to fully load
 
   xml = await dumpXml(bearer, phoneId)
-  // Garde-fou : on DOIT être dans le tiroir de stickers (barre de recherche /
-  // option « Lien » présente). Sinon (mode texte ouvert par erreur), on
-  // ABANDONNE sans rien taper — pour ne JAMAIS écrire le lien comme texte.
-  const trayOpen =
-    findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input', 'sticker_tray', 'stickers_recycler_view', 'sticker_grid_recycler_view') ??
-    findByTextPartial(xml, 'search', 'recherch') ??
-    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN')
-  if (!trayOpen) {
-    log('   ❌ Tiroir de stickers non ouvert (écran texte ?) — abandon sans saisie')
-    return { ok: false, error: 'Le tiroir de stickers ne s\'est pas ouvert (Instagram a affiché un autre écran). Story non publiée pour éviter d\'écrire le lien en texte.' }
-  }
   const linkSticker =
     findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
     findByTextPartial(xml, 'link', 'lien') ??
@@ -633,15 +600,10 @@ export async function postStoryServer(
   // ── 5. Type the URL (+ optional custom label) ──────────────────────────────
   log('⌨️  Saisie de l\'URL…')
   xml = await dumpXml(bearer, phoneId)
-  // Garde-fou : on ne tape l'URL QUE si le vrai champ URL est détecté.
-  // Pas de coordonnée « au hasard » → on n'écrit jamais le lien dans la story.
-  const urlField =
+  const urlField: [number, number] =
     findByResourceId(xml, 'link_url', 'url_edit_text', 'web_url', 'link_edit_text') ??
-    findByText(xml, 'URL', 'https://')
-  if (!urlField) {
-    log('   ❌ Champ URL du sticker lien introuvable — abandon sans saisie')
-    return { ok: false, error: 'Champ URL du sticker lien introuvable. Story non publiée pour éviter d\'écrire le lien au mauvais endroit.' }
-  }
+    findByText(xml, 'URL', 'https://') ??
+    [cx, Math.floor(sh * 0.32)]
   await shellExec(bearer, phoneId, `input tap ${urlField[0]} ${urlField[1]}`)
   await sleep(900)
   await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkUrl)}"`)
