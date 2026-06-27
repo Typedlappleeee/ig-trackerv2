@@ -611,7 +611,25 @@ Deno.serve(async (req) => {
       for (let vi = 0; vi < videos.length; vi++) {
         resolvedTokens.push(await resolveVideoToken(db, bearer, videos[vi]))
       }
-      for (let i = 0; i < phones.length; i++) {
+      // TikTok : un seul /task/add (taskType:1) batché. Sinon : boucle IG ci-dessous.
+      if (post.platform === 'tiktok') {
+        const list = phones.map((phone, i) => {
+          const vIdx = post.mode === 'random' ? Math.floor(Math.random() * videos.length) : i % videos.length
+          usedVideoIndices.add(vIdx)
+          return { scheduleAt: baseTs + i * delayMin * 60, envId: phone.geelark_id, video: resolvedTokens[vIdx], videoDesc: post.caption }
+        })
+        const res = await gPost(bearer, '/task/add', { taskType: 1, list })
+        const ids: string[] = res.data?.taskIds ?? []
+        if (res.code === 0 && Array.isArray(ids) && ids.length > 0) {
+          ids.forEach((tid, idx) => { taskIds.push(tid); if (phones[idx]) taskPhoneMap.set(tid, phones[idx]) })
+          log(`✅ ${ids.length} tâche(s) TikTok créée(s)`)
+        } else {
+          failedCount = phones.length
+          log(`❌ TikTok /task/add refusé: code=${res.code} msg=${res.msg ?? '?'}`)
+        }
+      }
+
+      for (let i = 0; post.platform !== 'tiktok' && i < phones.length; i++) {
         const phone = phones[i]
         const videoIdx = post.mode === 'random'
           ? Math.floor(Math.random() * videos.length)
