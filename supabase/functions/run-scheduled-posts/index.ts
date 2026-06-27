@@ -538,14 +538,14 @@ Deno.serve(async (req) => {
     summary['recurring_tasks'] = `error: ${err instanceof Error ? err.message : String(err)}`
   }
 
-  // 2. Posts dus — UNIQUEMENT ceux issus de tâches récurrentes (task_id NOT NULL).
-  // Les posts manuels (Programmation tab, task_id IS NULL) sont exécutés côté client.
+  // 2. Posts dus — programmés manuels ET issus de tâches récurrentes.
+  // Exécutés CÔTÉ SERVEUR pour fonctionner PC éteint. Le claim atomique (étape 3)
+  // empêche la double exécution si l'app cliente est aussi ouverte.
   // type='story' exclu : stories passent par automation UI (~2 min/tel) côté app.
   let duePostsQuery = db.from('scheduled_posts')
     .select('*')
     .eq('status', 'pending')
     .neq('type', 'story')
-    .not('task_id', 'is', null)
     .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(2)
