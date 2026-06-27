@@ -224,8 +224,20 @@ export function TaskWizard({ user, onSaved, onClose }: {
     q.then(({ data }) => {
       const ps = (data ?? []).filter(p => !role || canAccessPhoneGroup(role, perms, p.group_name)) as Phone[]
       setPhones(ps)
-      // pré-remplir les liens story depuis la DB
-      setLinks(prev => { const n = { ...prev }; for (const p of ps) if (p.link && !(p.id in n)) n[p.id] = p.link; return n })
+      // Auto-remplissage du lien CTA par compte : on prend le lien déjà
+      // enregistré sur le téléphone (colonne phones.link), sinon celui défini
+      // depuis l'onglet Story (localStorage sf-story-link-<geelark_id|uuid>).
+      setLinks(prev => {
+        const n = { ...prev }
+        for (const p of ps) {
+          if ((n[p.id] ?? '').trim()) continue
+          const fromDb = (p.link ?? '').trim()
+          const fromLs = (localStorage.getItem(`sf-story-link-${p.geelark_id}`) ?? localStorage.getItem(`sf-story-link-${p.id}`) ?? '').trim()
+          const v = fromDb || fromLs
+          if (v) n[p.id] = v
+        }
+        return n
+      })
     })
   }, [currentOrg?.id, user.id])
 
