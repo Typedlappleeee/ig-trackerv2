@@ -106,7 +106,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'remix',       label: 'navRemix',        icon: '🔀' },
       { id: 'spoof',       label: 'navSpoof',        icon: '🛡️' },
       { id: 'subtitles',   label: 'navSubtitles',    icon: '💬' },
-      { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
       { id: 'mixer',       label: 'navMixer',        icon: '🎞️', dev: true },
     ],
   },
