@@ -336,6 +336,34 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   const [bearer, setBearer]             = useState('')
   const [groqKey, setGroqKey]           = useState(DEFAULT_GROQ_KEY)
   const [anthropicKey, setAnthropicKey] = useState('')
+  const [webhookMsg, setWebhookMsg]     = useState<{ ok: boolean; text: string } | null>(null)
+  const [webhookBusy, setWebhookBusy]   = useState(false)
+
+  async function registerWebhook() {
+    if (!bearer) { setWebhookMsg({ ok: false, text: 'Renseigne d\'abord ton token GéeLark.' }); return }
+    setWebhookBusy(true); setWebhookMsg(null)
+    try {
+      const callbackUrl = `${window.location.origin}/api/geelark-callback`
+      const r = await fetch('/api/geelark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method: 'POST',
+          url: 'https://openapi.geelark.com/open/v1/callback/set',
+          headers: { Authorization: `Bearer ${bearer}` },
+          body: { url: callbackUrl },
+        }),
+      })
+      const j = await r.json()
+      const code = j?.data?.code ?? j?.code
+      if (j.ok && (code === 0 || code === undefined)) setWebhookMsg({ ok: true, text: `Webhook activé → ${callbackUrl}` })
+      else setWebhookMsg({ ok: false, text: `Échec : ${j?.data?.msg ?? j?.error ?? 'erreur inconnue'}` })
+    } catch (e) {
+      setWebhookMsg({ ok: false, text: `Erreur réseau : ${e instanceof Error ? e.message : String(e)}` })
+    } finally {
+      setWebhookBusy(false)
+    }
+  }
 
   useEffect(() => { if (initialPanel) setPanel(initialPanel) }, [initialPanel])
   useEffect(() => { if (initialTab)   setGenTab(initialTab)  }, [initialTab])
@@ -1291,6 +1319,24 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       ))}
                     </div>
                   </div>
+
+                  {/* Webhooks GéeLark */}
+                  {!currentOrg || canEditOrgConnexions ? (
+                    <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>Webhooks GéeLark</h3>
+                      <p style={{ fontSize: 12.5, color: S.text3, lineHeight: 1.5, margin: 0 }}>
+                        Quand une tâche se termine, GéeLark prévient ScaleFlow instantanément → les téléphones s'éteignent plus vite (le garde-fou serveur reste actif en secours).
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <button onClick={registerWebhook} disabled={webhookBusy} className="sf-btn sf-btn-primary sf-btn-sm" style={{ opacity: webhookBusy ? 0.6 : 1 }}>
+                          {webhookBusy ? 'Activation…' : 'Activer les webhooks'}
+                        </button>
+                        {webhookMsg && (
+                          <span style={{ fontSize: 12, fontWeight: 600, color: webhookMsg.ok ? '#34D399' : '#F87171' }}>{webhookMsg.text}</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {/* AI API Keys */}
                   <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
