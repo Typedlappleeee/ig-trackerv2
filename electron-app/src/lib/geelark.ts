@@ -1263,19 +1263,25 @@ async function _postInstagramStoryInner(
   // Tap the first (most-recent) gallery image — the one we just uploaded.
   // Parse ALL grid items and pick the topmost-leftmost one (smallest y then x),
   // because the XML order doesn't always match the visual left→right order.
+  // IMPORTANT : la 1ʳᵉ case de « Recents » est l'APPAREIL PHOTO — on l'exclut,
+  // sinon on déclenche la caméra au lieu de sélectionner l'image.
   xml = await dumpXml(bearer, phoneId)
   const firstThumb = (() => {
-    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"([^>]*?)bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
     let best: [number, number] | null = null
     let bestScore = Infinity
+    let cameraX2 = 0, cameraYc = 0
     let m: RegExpExecArray | null
     while ((m = re.exec(xml)) !== null) {
-      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
+      const attrs = m[1]
+      const x1 = +m[2], y1 = +m[3], x2 = +m[4], y2 = +m[5]
+      if (/camera|appareil|cam[ée]ra|capture|prendre une photo|take photo/i.test(attrs)) { cameraX2 = x2; cameraYc = Math.floor((y1 + y2) / 2); continue }
       const score = y1 * 10000 + x1 // top row first, then leftmost
       if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
     }
-    // Fallback: top-left of the grid (below the gallery header)
-    return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)] as [number, number]
+    if (best) return best
+    if (cameraX2) return [Math.floor(cameraX2 + sw * 0.16), cameraYc || Math.floor(sh * 0.30)] as [number, number]
+    return [Math.floor(sw * 0.42), Math.floor(sh * 0.30)] as [number, number]
   })()
   log(`   👆 Tap galerie: ${firstThumb[0]},${firstThumb[1]}`)
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)

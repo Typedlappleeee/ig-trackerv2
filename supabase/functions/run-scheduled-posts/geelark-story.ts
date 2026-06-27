@@ -503,19 +503,30 @@ export async function postStoryServer(
   // Tap the first (most-recent) gallery image — the one we just uploaded.
   // Parse ALL grid items and pick the topmost-leftmost one (smallest y then x),
   // because the XML order doesn't always match the visual left→right order.
+  // IMPORTANT : la 1ʳᵉ case de « Recents » est l'APPAREIL PHOTO (prendre une
+  // photo) — il faut l'EXCLURE, sinon on déclenche la caméra au lieu de l'image.
   xml = await dumpXml(bearer, phoneId)
   const firstThumb: [number, number] = (() => {
-    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+    // m[1] = attributs entre resource-id et bounds (contient content-desc) →
+    // sert à repérer/exclure la tuile caméra. m[2..5] = bounds.
+    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"([^>]*?)bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
     let best: [number, number] | null = null
     let bestScore = Infinity
+    let cameraX2 = 0, cameraYc = 0
     let m: RegExpExecArray | null
     while ((m = re.exec(xml)) !== null) {
-      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
+      const attrs = m[1]
+      const x1 = +m[2], y1 = +m[3], x2 = +m[4], y2 = +m[5]
+      const isCamera = /camera|appareil|cam[ée]ra|capture|prendre une photo|take photo/i.test(attrs)
+      if (isCamera) { cameraX2 = x2; cameraYc = Math.floor((y1 + y2) / 2); continue }  // on saute la caméra
       const score = y1 * 10000 + x1 // top row first, then leftmost
       if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
     }
-    // Fallback: top-left of the grid (below the gallery header)
-    return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)]
+    if (best) return best
+    // Repli 1 : si on a repéré la caméra, l'image est la case juste à sa droite.
+    if (cameraX2) return [Math.floor(cameraX2 + sw * 0.16), cameraYc || Math.floor(sh * 0.30)]
+    // Repli 2 : 2ᵉ colonne de la 1ʳᵉ rangée (on évite la colonne caméra à gauche).
+    return [Math.floor(sw * 0.42), Math.floor(sh * 0.30)]
   })()
   log(`   👆 Tap galerie: ${firstThumb[0]},${firstThumb[1]}`)
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
