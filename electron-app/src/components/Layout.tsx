@@ -189,6 +189,91 @@ function SidebarDivider() {
   )
 }
 
+// ── Badge global « config recommandée » (topbar) ────────────────────────────
+// Affiché partout dans l'app : rappelle la config fiable pour l'automatisation
+// (Stories, etc.) + bouton « copier » pour transmettre la consigne aux agences.
+const RECO_LINES = [
+  'Android 15',
+  'Instagram version 433.0.0.42.68 (recommandée par GeeLark pour l\'automatisation)',
+  'Téléphone (cloud phone) en anglais',
+]
+const RECO_TEXT =
+  '✅ Config recommandée pour que l\'automatisation marche à coup sûr :\n' +
+  RECO_LINES.map(l => `• ${l}`).join('\n') +
+  '\n\nUne config différente (autre version d\'Instagram, téléphone dans une autre langue) peut faire échouer l\'automatisation.'
+
+function RecoBadge() {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard?.writeText(RECO_TEXT).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    }).catch(() => {})
+  }
+  return (
+    <div
+      style={{ position: 'relative', display: 'inline-flex' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-label="Config recommandée pour l'automatisation"
+        className="cursor-pointer"
+        style={{
+          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 15, fontWeight: 900, lineHeight: 1, color: '#fff',
+          background: '#ef4444', border: '1px solid rgba(255,255,255,0.25)',
+          boxShadow: '0 0 0 3px rgba(239,68,68,0.20), 0 2px 8px rgba(239,68,68,0.40)',
+        }}
+      >
+        ?
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 200,
+            width: 320, padding: '14px 15px', borderRadius: 12,
+            background: '#15171c', border: '1px solid rgba(239,68,68,0.35)',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#F1F0F7', marginBottom: 9, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ fontSize: 15 }}>⚠️</span>
+            Config recommandée
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {RECO_LINES.map(l => (
+              <div key={l} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 12, color: 'rgba(233,234,240,0.82)', fontWeight: 600 }}>
+                <span style={{ color: '#22c55e', flexShrink: 0 }}>✓</span>
+                <span>{l}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)', marginTop: 10, lineHeight: 1.5 }}>
+            Une autre version d'Instagram ou un téléphone dans une autre langue peut faire échouer l'automatisation.
+          </div>
+          <button
+            onClick={copy}
+            className="cursor-pointer"
+            style={{
+              marginTop: 11, width: '100%', fontSize: 12, fontWeight: 700, padding: '8px 11px', borderRadius: 8,
+              background: copied ? 'rgba(34,197,94,0.14)' : 'rgba(99,102,241,0.12)',
+              border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : 'rgba(99,102,241,0.4)'}`,
+              color: copied ? '#22c55e' : '#818CF8',
+            }}
+          >
+            {copied ? '✓ Consigne copiée' : 'Copier la consigne à envoyer'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Sidebar NavItem (module-level: stable identity across Layout renders) ────
 interface SidebarNavItemProps {
   id: Page
@@ -982,6 +1067,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
           {/* Right side */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+
+            {/* Badge config recommandée (global, survol/clic) */}
+            <RecoBadge />
 
             {/* Subscription expiry warning */}
             {license.source === 'own' && license.daysLeft !== null && license.daysLeft <= 1 && (
