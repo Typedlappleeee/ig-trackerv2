@@ -300,95 +300,6 @@ function CaptionBankPicker({
   )
 }
 
-// ── Bannière « config recommandée » ───────────────────────────────────────────
-// L'automation story tape sur les boutons d'Instagram en lisant l'écran. Pour
-// que ce soit fiable, le cloud phone doit être dans une config standard. On
-// l'affiche aux agences + bouton « copier » pour transmettre la consigne.
-const STORY_RECO_LINES = [
-  'Android 15',
-  'Marque : Samsung',
-  'Instagram version 433.0.0.42.68 (recommandée par GeeLark pour l\'automatisation)',
-  'Téléphone (cloud phone) en anglais',
-]
-const STORY_RECO_TEXT =
-  '✅ Config recommandée pour que les Stories automatiques marchent à coup sûr :\n' +
-  STORY_RECO_LINES.map(l => `• ${l}`).join('\n') +
-  '\n\nUne config différente (autre marque, autre version d\'Instagram, téléphone dans une autre langue) peut faire échouer l\'ajout du sticker lien.'
-
-function StoryRecoBadge() {
-  const [open, setOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    navigator.clipboard?.writeText(STORY_RECO_TEXT).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    }).catch(() => {})
-  }
-  return (
-    <div
-      style={{ position: 'relative', display: 'inline-flex' }}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      {/* Badge « ! » rouge bien voyant */}
-      <button
-        onClick={() => setOpen(v => !v)}
-        aria-label="Config recommandée pour les Stories"
-        className="cursor-pointer"
-        style={{
-          width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 17, fontWeight: 900, lineHeight: 1, color: '#fff',
-          background: '#ef4444', border: '1px solid rgba(255,255,255,0.25)',
-          boxShadow: '0 0 0 3px rgba(239,68,68,0.22), 0 2px 8px rgba(239,68,68,0.45)',
-        }}
-      >
-        !
-      </button>
-
-      {/* Popover */}
-      {open && (
-        <div
-          style={{
-            position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 120,
-            width: 320, padding: '14px 15px', borderRadius: 12,
-            background: 'var(--surface, #15171c)', border: '1px solid rgba(239,68,68,0.35)',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 800, color: TEXT_1, marginBottom: 9, display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ color: '#ef4444', fontSize: 15 }}>⚠️</span>
-            Config recommandée — Stories
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {STORY_RECO_LINES.map(l => (
-              <div key={l} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>
-                <span style={{ color: '#22c55e', flexShrink: 0 }}>✓</span>
-                <span>{l}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 10, lineHeight: 1.5 }}>
-            Une autre marque, une autre version d'Instagram ou un téléphone dans une autre langue peut faire échouer le sticker lien.
-          </div>
-          <button
-            onClick={copy}
-            className="cursor-pointer"
-            style={{
-              marginTop: 11, width: '100%', fontSize: 12, fontWeight: 700, padding: '8px 11px', borderRadius: 8,
-              background: copied ? 'rgba(34,197,94,0.14)' : 'rgba(99,102,241,0.12)',
-              border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : 'rgba(99,102,241,0.4)'}`,
-              color: copied ? '#22c55e' : 'var(--accent)',
-            }}
-          >
-            {copied ? '✓ Consigne copiée' : 'Copier la consigne à envoyer'}
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function StoryLink({ user }: { user: User }) {
   const conns  = useConnections(user)
   const bearer = conns.bearer
@@ -782,9 +693,6 @@ export default function StoryLink({ user }: { user: User }) {
         </div>
 
         <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          {/* Badge config recommandée (rouge, survol/clic) */}
-          <StoryRecoBadge />
-
           {/* Dry-run toggle */}
           <button
             onClick={() => setDryRun(v => !v)}
