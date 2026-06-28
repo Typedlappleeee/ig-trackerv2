@@ -232,6 +232,30 @@ async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   return output
 }
 
+// Diagnostic : logge chaque nœud cliquable (resource-id court + content-desc +
+// texte + centre x,y). Indispensable pour calibrer les taps sur les versions /
+// langues d'Instagram où la détection par resource-id/texte échoue.
+function logClickables(xml: string, log: (m: string) => void, tag: string): void {
+  const re = /<node\b[^>]*\/?>/g
+  let m: RegExpExecArray | null
+  const lines: string[] = []
+  while ((m = re.exec(xml)) !== null) {
+    const el = m[0]
+    if (!/clickable="true"/.test(el)) continue
+    const rid = (/resource-id="([^"]*)"/.exec(el)?.[1] ?? '').split('/').pop() ?? ''
+    const desc = /content-desc="([^"]*)"/.exec(el)?.[1] ?? ''
+    const txt = /text="([^"]*)"/.exec(el)?.[1] ?? ''
+    const b = /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(el)
+    if (!b) continue
+    const cx = Math.floor((+b[1] + +b[3]) / 2)
+    const cy = Math.floor((+b[2] + +b[4]) / 2)
+    if (!rid && !desc && !txt) continue
+    lines.push(`      • [${rid}|${desc}|${txt}] @${cx},${cy}`)
+  }
+  log(`   🔬 ${tag} — ${lines.length} éléments cliquables :`)
+  for (const l of lines.slice(0, 50)) log(l)
+}
+
 // Escape text for use inside an Android `input text "..."` shell command.
 // Rules: the string is passed as a double-quoted shell argument, so only
 // the chars special in that context need escaping.  Single quote ' is
@@ -585,13 +609,16 @@ export async function postStoryServer(
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')
   xml = await dumpXml(bearer, phoneId)
+  logClickables(xml, log, 'Composer story (barre d\'outils)')
   const stickerBtn =
     findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker_picker_button', 'creation_sticker_button') ??
     findByText(xml, 'Sticker', 'Autocollant', 'Stickers', 'Autocollants', 'Add sticker', 'Add a sticker', 'Ajouter un autocollant') ??
     findByTextPartial(xml, 'sticker', 'autocollant')
   if (stickerBtn) {
+    log(`   👆 Bouton sticker: ${stickerBtn[0]},${stickerBtn[1]}`)
     await shellExec(bearer, phoneId, `input tap ${stickerBtn[0]} ${stickerBtn[1]}`)
   } else {
+    log(`   ⚠️ Bouton sticker non détecté → repli coord ${Math.floor(sw * 0.88)},${Math.floor(sh * 0.14)}`)
     // Repli : barre verticale haut-droite — le sticker (smiley) est le 2ᵉ icône,
     // sous « Aa ». ~88% en largeur, ~14% en hauteur.
     await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.88)} ${Math.floor(sh * 0.14)}`)
@@ -599,6 +626,7 @@ export async function postStoryServer(
   await sleep(3500) // extra time for tray to fully load
 
   xml = await dumpXml(bearer, phoneId)
+  logClickables(xml, log, 'Tray des stickers')
 
   // Sélection du sticker « Lien ». Le tray des stickers a un libellé/ordre qui varie
   // selon la version d'Instagram et la langue → on privilégie la BARRE DE RECHERCHE
