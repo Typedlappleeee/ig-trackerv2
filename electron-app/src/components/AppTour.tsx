@@ -23,6 +23,11 @@ const STEP_ICON_PATHS: Record<string, string> = {
   zap:     'M13 2L3 14h9l-1 8 10-12h-9l1-8z',
   folder:  'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z',
   rocket:  'M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5',
+  phone:    'M12 18h.01M8 21h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z',
+  link:     'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
+  calendar: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z',
+  flame:    'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z',
+  shield:   'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
 }
 
 function StepIcon({ name, size, color }: { name: string; size: number; color: string }) {
@@ -37,15 +42,43 @@ const STEPS: TourStep[] = [
   {
     iconName: 'welcome',
     title: 'Bienvenue sur ScaleFlow',
-    desc: 'ScaleFlow automatise ta présence sur Instagram — posting, remix, stats et plus. Ce tour rapide te montre les fonctionnalités clés.',
+    desc: 'ScaleFlow automatise ta présence sur Instagram — posting, stories, remix, warmup et plus. Ce tour rapide te montre les onglets clés.',
+    color: '#6366F1',
+  },
+  {
+    iconName: 'phone',
+    title: 'Téléphones',
+    desc: 'Connecte et gère tous tes cloud phones GeeLark : groupes, comptes Instagram, démarrage. C’est ta base pour tout le reste.',
+    page: 'phones',
     color: '#6366F1',
   },
   {
     iconName: 'send',
-    title: 'Mass Posting',
-    desc: 'Poste automatiquement une vidéo sur plusieurs comptes Instagram en même temps. Sélectionne tes téléphones, ta vidéo, et lance.',
-    page: 'massposting',
+    title: 'Posting',
+    desc: 'Poste une vidéo sur plusieurs comptes Instagram en même temps. Sélectionne tes téléphones, ta vidéo, et lance.',
+    page: 'posting',
     color: '#6366F1',
+  },
+  {
+    iconName: 'link',
+    title: 'Story',
+    desc: 'Publie ou programme des stories avec sticker lien sur tous tes comptes, automatiquement.',
+    page: 'storylink',
+    color: '#0EA5E9',
+  },
+  {
+    iconName: 'calendar',
+    title: 'Scheduler',
+    desc: 'Programme tes posts à l’avance. ScaleFlow publie tout seul à l’heure prévue, même PC éteint.',
+    page: 'scheduler',
+    color: '#8B5CF6',
+  },
+  {
+    iconName: 'flame',
+    title: 'Warmup',
+    desc: 'Chauffe tes comptes (scroll, likes, navigation naturelle) pour un comportement humain et limiter les blocages.',
+    page: 'warmup',
+    color: '#F97316',
   },
   {
     iconName: 'video',
@@ -55,10 +88,10 @@ const STEPS: TourStep[] = [
     color: '#059669',
   },
   {
-    iconName: 'zap',
-    title: 'CloneVid',
-    desc: 'Clone et transforme tes vidéos avec zoom, couleurs, crop et overlay texte. Parfait pour le anti-ban à grande échelle.',
-    page: 'repurpose',
+    iconName: 'shield',
+    title: 'Spoof',
+    desc: 'Rend chaque vidéo unique (métadonnées, luminosité, grain, zoom, teinte…) sans toucher au texte à l’écran. Anti-ban.',
+    page: 'spoof',
     color: '#D97706',
   },
   {

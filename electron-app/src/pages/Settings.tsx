@@ -1842,7 +1842,7 @@ function SubscriptionPanel() {
           {[
             ['Posting', `1 ${t('creditsCost')} ${t('perPhone')}`],
             ['Mass Posting', `2 ${t('creditsCosts')} ${t('perPhone')}`],
-            [lang === 'en' ? 'CloneVid' : 'CloneVid', `0.5 ${t('creditsCost')}`],
+            ['Spoof', `0.5 ${t('creditsCost')}`],
             [lang === 'en' ? 'Video Remix' : 'Remix vidéo', `0.5 ${t('creditsCost')}`],
           ].map(([op, cost]) => (
             <div key={op} className="flex justify-between">

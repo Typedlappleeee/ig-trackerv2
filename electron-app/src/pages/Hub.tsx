@@ -292,7 +292,6 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     { id: 'scheduler',   label: t('navScheduler'),   icon: 'calendar' },
     { id: 'bank',        label: t('navBank'),        icon: 'video' },
     { id: 'warmup',      label: t('navWarmup'),      icon: 'flame',    dev: true },
-    { id: 'repurpose',   label: t('navRepurpose'),   icon: 'refresh' },
     { id: 'remix',       label: t('navRemix'),       icon: 'layers' },
     { id: 'aitools',     label: t('navAiTools'),     icon: 'sparkles' },
     { id: 'storylink',   label: t('navStoryLink'),   icon: 'link' },
