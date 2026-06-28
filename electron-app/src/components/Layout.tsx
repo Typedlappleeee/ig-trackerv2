@@ -599,10 +599,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
 
   const isVisibleTab = (id: Page): boolean => {
-    // Pages internes / superadmin uniquement.
-    if (id === 'licences' || id === 'tiktokposting') return effectiveSuperAdmin
-    // Rapports : masqué pour l'instant (tant que le backend n'est pas en place).
-    if (id === 'reports') return false
+    // Pages internes / superadmin ScaleFlow uniquement (Rapports inclus).
+    if (id === 'licences' || id === 'tiktokposting' || id === 'reports') return effectiveSuperAdmin
     // Tous les autres onglets sont visibles pour tout le monde.
     return true
   }
