@@ -438,9 +438,29 @@ export async function postStoryServer(
   // Verify we actually reached the camera. If we're still on the home feed
   // (the deep link was ignored on this IG build), tap the "Your story" avatar.
   let xml = await dumpXml(bearer, phoneId)
+
+  // Certaines versions d'IG ouvrent un menu « Create » (Reel / Post / Story /
+  // Live…) au lieu d'aller direct à la caméra story. Dans ce cas, il faut taper
+  // la ligne « Story » (sinon l'automation part dans Reels).
+  const looksLikeCreateMenu = !!findByText(xml, 'Story', 'Histoire')
+    && !!(findByText(xml, 'Reel', 'Reels') || findByText(xml, 'Post', 'Publication') || findByText(xml, 'Live', 'En direct'))
+  if (looksLikeCreateMenu) {
+    const storyRow = findByText(xml, 'Story', 'Histoire', 'Votre story') ?? findByTextPartial(xml, 'story', 'histoire')
+    if (storyRow) {
+      log('   📋 Menu « Create » détecté — tap sur « Story »…')
+      await shellExec(bearer, phoneId, `input tap ${storyRow[0]} ${storyRow[1]}`)
+      await sleep(5000)
+      xml = await dumpXml(bearer, phoneId)
+    }
+  }
+
+  // Sur l'écran caméra/story ? (on NE matche PAS « Reel/Live » pour ne pas
+  // confondre avec le menu « Create »).
   const onCamera =
-    findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'capture_button', 'camera_shutter_button') ??
-    findByText(xml, 'Gallery', 'Galerie', 'Story', 'Boomerang', 'Layout')
+    findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'capture_button',
+      'camera_shutter_button', 'camera_shutter', 'shutter_button', 'story_camera', 'camera_capture_button') ??
+    findByText(xml, 'Gallery', 'Galerie', 'Add to story', 'Ajouter à la story', 'Recents', 'Récents', 'Boomerang', 'Layout') ??
+    findByTextPartial(xml, 'add to story', 'votre story', 'recents', 'récents')
   if (!onCamera) {
     log('   ↩︎ Deep link ignoré — tap sur l\'avatar « Your story »…')
     // Open the regular home feed first.
