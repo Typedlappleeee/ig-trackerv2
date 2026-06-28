@@ -300,6 +300,84 @@ function CaptionBankPicker({
   )
 }
 
+// ── Bannière « config recommandée » ───────────────────────────────────────────
+// L'automation story tape sur les boutons d'Instagram en lisant l'écran. Pour
+// que ce soit fiable, le cloud phone doit être dans une config standard. On
+// l'affiche aux agences + bouton « copier » pour transmettre la consigne.
+const STORY_RECO_LINES = [
+  'Android 15',
+  'Marque : Samsung',
+  'Instagram version 433.0.0.42.68 (recommandée par GeeLark pour l\'automatisation)',
+  'Téléphone (cloud phone) en anglais',
+]
+const STORY_RECO_TEXT =
+  '✅ Config recommandée pour que les Stories automatiques marchent à coup sûr :\n' +
+  STORY_RECO_LINES.map(l => `• ${l}`).join('\n') +
+  '\n\nUne config différente (autre marque, autre version d\'Instagram, téléphone dans une autre langue) peut faire échouer l\'ajout du sticker lien.'
+
+function StoryRecoBanner() {
+  const LS_KEY = 'sf-story-reco-dismissed'
+  const [hidden, setHidden] = useState(() => localStorage.getItem(LS_KEY) === '1')
+  const [copied, setCopied] = useState(false)
+  if (hidden) return null
+  const copy = () => {
+    navigator.clipboard?.writeText(STORY_RECO_TEXT).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    }).catch(() => {})
+  }
+  return (
+    <div style={{
+      flexShrink: 0, margin: '12px 16px 0', padding: '12px 14px', borderRadius: 12,
+      background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.28)',
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+    }}>
+      <div style={{ fontSize: 18, lineHeight: '22px', flexShrink: 0 }}>📱</div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, marginBottom: 6 }}>
+          Config recommandée pour que les Stories marchent à coup sûr
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px' }}>
+          {STORY_RECO_LINES.map(l => (
+            <span key={l} style={{
+              fontSize: 11.5, fontWeight: 600, color: 'var(--text-2)',
+              padding: '4px 9px', borderRadius: 7,
+              background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`,
+            }}>{l}</span>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 8 }}>
+          Une autre marque, une autre version d'Instagram ou un téléphone dans une autre langue peut faire échouer le sticker lien.
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+        <button
+          onClick={copy}
+          className="cursor-pointer"
+          style={{
+            fontSize: 11.5, fontWeight: 600, padding: '6px 11px', borderRadius: 7,
+            background: copied ? 'rgba(34,197,94,0.14)' : 'rgba(99,102,241,0.12)',
+            border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : 'rgba(99,102,241,0.4)'}`,
+            color: copied ? '#22c55e' : 'var(--accent)', whiteSpace: 'nowrap',
+          }}
+        >
+          {copied ? '✓ Copié' : 'Copier la consigne'}
+        </button>
+        <button
+          onClick={() => { localStorage.setItem(LS_KEY, '1'); setHidden(true) }}
+          className="cursor-pointer"
+          style={{
+            fontSize: 11, fontWeight: 500, padding: '5px 11px', borderRadius: 7,
+            background: 'transparent', border: `1px solid ${HAIR}`, color: 'var(--text-4)',
+          }}
+        >
+          Masquer
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function StoryLink({ user }: { user: User }) {
   const conns  = useConnections(user)
   const bearer = conns.bearer
@@ -750,6 +828,8 @@ export default function StoryLink({ user }: { user: User }) {
           )}
         </div>
       </header>
+
+      <StoryRecoBanner />
 
       {/* ── Body: 3-column split ─────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'grid', gridTemplateColumns: '272px 1fr 304px', minHeight: 0 }}>
