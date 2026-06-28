@@ -1231,9 +1231,24 @@ async function _postInstagramStoryInner(
   let onComposer = false
   log('🚀 Share-to-Story (image pré-chargée)…')
   {
-    const idOut = await shellExec(bearer, phoneId,
-      `content query --uri content://media/external/images/media --projection _id --where "_data='${imgPath}'" 2>/dev/null | tail -1`)
-    const idm = /_id=(\d+)/.exec(idOut.output)
+    // MediaStore indexe le chemin CANONIQUE (/storage/emulated/0/…), pas le
+    // symlink /sdcard/… → un WHERE _data='/sdcard/…' ne matche jamais. On
+    // interroge donc par nom de fichier (LIKE '%/nom'), le plus récent d'abord,
+    // ce qui est indépendant du préfixe de chemin et du modèle de téléphone.
+    const fileName = imgPath.split('/').pop() ?? 'sf_story.jpg'
+    const canonical = imgPath.replace(/^\/sdcard\//, '/storage/emulated/0/')
+    let idm: RegExpExecArray | null = null
+    for (const where of [
+      `_data='${canonical}'`,
+      `_data LIKE '%/${fileName}'`,
+      `_display_name='${fileName}'`,
+    ]) {
+      const idOut = await shellExec(bearer, phoneId,
+        `content query --uri content://media/external/images/media --projection _id ` +
+        `--where "${where}" --sort "date_added DESC" 2>/dev/null | head -1`)
+      idm = /_id=(\d+)/.exec(idOut.output)
+      if (idm) break
+    }
     if (idm) {
       const contentUri = `content://media/external/images/media/${idm[1]}`
       await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
@@ -1243,7 +1258,8 @@ async function _postInstagramStoryInner(
         `-t image/jpeg --es source_application "com.instagram.android" ` +
         `--eu android.intent.extra.STREAM ${contentUri} com.instagram.android`)
       await sleep(8000)
-      xml = await dumpXml(bearer, phoneId)
+      xml = await dumpXml(bearer, phoneId, log)
+      logClickables(xml, log, 'Éditeur story (Share-to-Story)')
       onComposer = !!(
         findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker_picker_button') ??
         findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story', 'Close Friends', 'Amis proches') ??
