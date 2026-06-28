@@ -1183,7 +1183,37 @@ async function _postInstagramStoryInner(
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null`)
   await sleep(6000)
 
-  // ── 2. Open Instagram + the story camera ───────────────────────────────────
+  // ── 2. « Share to Story » : ouvre IG avec l'image DÉJÀ chargée dans le ──────
+  // compositeur → saute toute la navigation. Repli sur le flow classique sinon.
+  let xml = ''
+  let onComposer = false
+  log('🚀 Share-to-Story (image pré-chargée)…')
+  {
+    const idOut = await shellExec(bearer, phoneId,
+      `content query --uri content://media/external/images/media --projection _id --where "_data='${imgPath}'" 2>/dev/null | tail -1`)
+    const idm = /_id=(\d+)/.exec(idOut.output)
+    if (idm) {
+      const contentUri = `content://media/external/images/media/${idm[1]}`
+      await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+      await sleep(1000)
+      await shellExec(bearer, phoneId,
+        `am start -a com.instagram.share.ADD_TO_STORY --grant-read-uri-permission ` +
+        `-t image/jpeg --es source_application "com.instagram.android" ` +
+        `--eu android.intent.extra.STREAM ${contentUri} com.instagram.android`)
+      await sleep(8000)
+      xml = await dumpXml(bearer, phoneId)
+      onComposer = !!(
+        findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker_picker_button') ??
+        findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story', 'Close Friends', 'Amis proches') ??
+        findByTextPartial(xml, 'sticker', 'autocollant', 'your story', 'votre story'))
+      log(onComposer ? '   ✅ Story ouverte avec l\'image (Share-to-Story)' : '   ↩︎ Share-to-Story ignoré — flow classique')
+    } else {
+      log('   ↩︎ Content URI introuvable — flow classique')
+    }
+  }
+
+  if (!onComposer) {
+  // ── 2bis. Ouverture classique (flow de secours) ────────────────────────────
   log('📲 Lancement Instagram…')
   await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
   await sleep(1200)
@@ -1197,7 +1227,7 @@ async function _postInstagramStoryInner(
 
   // Verify we actually reached the camera. If we're still on the home feed
   // (the deep link was ignored on this IG build), tap the "Your story" avatar.
-  let xml = await dumpXml(bearer, phoneId)
+  xml = await dumpXml(bearer, phoneId)
 
   // Certaines versions d'IG ouvrent un menu « Create » (Reel / Post / Story /
   // Live…) au lieu de la caméra story → il faut taper « Story » (sinon Reels).
@@ -1303,6 +1333,7 @@ async function _postInstagramStoryInner(
   log(`   👆 Tap galerie: ${firstThumb[0]},${firstThumb[1]}`)
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
+  } // fin du flow classique (if !onComposer) — sinon l'image est déjà chargée
 
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')
