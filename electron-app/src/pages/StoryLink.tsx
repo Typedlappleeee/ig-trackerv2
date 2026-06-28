@@ -315,11 +315,9 @@ const STORY_RECO_TEXT =
   STORY_RECO_LINES.map(l => `• ${l}`).join('\n') +
   '\n\nUne config différente (autre marque, autre version d\'Instagram, téléphone dans une autre langue) peut faire échouer l\'ajout du sticker lien.'
 
-function StoryRecoBanner() {
-  const LS_KEY = 'sf-story-reco-dismissed'
-  const [hidden, setHidden] = useState(() => localStorage.getItem(LS_KEY) === '1')
+function StoryRecoBadge() {
+  const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  if (hidden) return null
   const copy = () => {
     navigator.clipboard?.writeText(STORY_RECO_TEXT).then(() => {
       setCopied(true)
@@ -327,53 +325,66 @@ function StoryRecoBanner() {
     }).catch(() => {})
   }
   return (
-    <div style={{
-      flexShrink: 0, margin: '12px 16px 0', padding: '12px 14px', borderRadius: 12,
-      background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.28)',
-      display: 'flex', alignItems: 'flex-start', gap: 12,
-    }}>
-      <div style={{ fontSize: 18, lineHeight: '22px', flexShrink: 0 }}>📱</div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, marginBottom: 6 }}>
-          Config recommandée pour que les Stories marchent à coup sûr
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px' }}>
-          {STORY_RECO_LINES.map(l => (
-            <span key={l} style={{
-              fontSize: 11.5, fontWeight: 600, color: 'var(--text-2)',
-              padding: '4px 9px', borderRadius: 7,
-              background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`,
-            }}>{l}</span>
-          ))}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 8 }}>
-          Une autre marque, une autre version d'Instagram ou un téléphone dans une autre langue peut faire échouer le sticker lien.
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-        <button
-          onClick={copy}
-          className="cursor-pointer"
+    <div
+      style={{ position: 'relative', display: 'inline-flex' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {/* Badge « ! » rouge bien voyant */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-label="Config recommandée pour les Stories"
+        className="cursor-pointer"
+        style={{
+          width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 17, fontWeight: 900, lineHeight: 1, color: '#fff',
+          background: '#ef4444', border: '1px solid rgba(255,255,255,0.25)',
+          boxShadow: '0 0 0 3px rgba(239,68,68,0.22), 0 2px 8px rgba(239,68,68,0.45)',
+        }}
+      >
+        !
+      </button>
+
+      {/* Popover */}
+      {open && (
+        <div
           style={{
-            fontSize: 11.5, fontWeight: 600, padding: '6px 11px', borderRadius: 7,
-            background: copied ? 'rgba(34,197,94,0.14)' : 'rgba(99,102,241,0.12)',
-            border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : 'rgba(99,102,241,0.4)'}`,
-            color: copied ? '#22c55e' : 'var(--accent)', whiteSpace: 'nowrap',
+            position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 120,
+            width: 320, padding: '14px 15px', borderRadius: 12,
+            background: 'var(--surface, #15171c)', border: '1px solid rgba(239,68,68,0.35)',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
           }}
         >
-          {copied ? '✓ Copié' : 'Copier la consigne'}
-        </button>
-        <button
-          onClick={() => { localStorage.setItem(LS_KEY, '1'); setHidden(true) }}
-          className="cursor-pointer"
-          style={{
-            fontSize: 11, fontWeight: 500, padding: '5px 11px', borderRadius: 7,
-            background: 'transparent', border: `1px solid ${HAIR}`, color: 'var(--text-4)',
-          }}
-        >
-          Masquer
-        </button>
-      </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: TEXT_1, marginBottom: 9, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ color: '#ef4444', fontSize: 15 }}>⚠️</span>
+            Config recommandée — Stories
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {STORY_RECO_LINES.map(l => (
+              <div key={l} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>
+                <span style={{ color: '#22c55e', flexShrink: 0 }}>✓</span>
+                <span>{l}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 10, lineHeight: 1.5 }}>
+            Une autre marque, une autre version d'Instagram ou un téléphone dans une autre langue peut faire échouer le sticker lien.
+          </div>
+          <button
+            onClick={copy}
+            className="cursor-pointer"
+            style={{
+              marginTop: 11, width: '100%', fontSize: 12, fontWeight: 700, padding: '8px 11px', borderRadius: 8,
+              background: copied ? 'rgba(34,197,94,0.14)' : 'rgba(99,102,241,0.12)',
+              border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : 'rgba(99,102,241,0.4)'}`,
+              color: copied ? '#22c55e' : 'var(--accent)',
+            }}
+          >
+            {copied ? '✓ Consigne copiée' : 'Copier la consigne à envoyer'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -771,6 +782,9 @@ export default function StoryLink({ user }: { user: User }) {
         </div>
 
         <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          {/* Badge config recommandée (rouge, survol/clic) */}
+          <StoryRecoBadge />
+
           {/* Dry-run toggle */}
           <button
             onClick={() => setDryRun(v => !v)}
@@ -828,8 +842,6 @@ export default function StoryLink({ user }: { user: User }) {
           )}
         </div>
       </header>
-
-      <StoryRecoBanner />
 
       {/* ── Body: 3-column split ─────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'grid', gridTemplateColumns: '272px 1fr 304px', minHeight: 0 }}>
