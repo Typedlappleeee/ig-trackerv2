@@ -599,53 +599,56 @@ export async function postStoryServer(
   await sleep(3500) // extra time for tray to fully load
 
   xml = await dumpXml(bearer, phoneId)
-  const linkSticker =
-    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
-    findByTextPartial(xml, 'link', 'lien') ??
-    findByResourceId(xml, 'link_sticker', 'sticker_link')
-  if (linkSticker) {
-    await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
-  } else {
-    // Search the sticker tray for "link"/"lien" via the built-in search bar
-    const searchPt =
-      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input') ??
-      findByTextPartial(xml, 'search', 'recherch', 'cherch')
-    if (searchPt) {
-      await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
-      await sleep(900)
-      // Try "lien" first (French IG), then "link"
-      await shellExec(bearer, phoneId, `input text "lien"`)
-      await sleep(2000)
-      let xml2 = await dumpXml(bearer, phoneId)
-      let lk2 =
+
+  // Sélection du sticker « Lien ». Le tray des stickers a un libellé/ordre qui varie
+  // selon la version d'Instagram et la langue → on privilégie la BARRE DE RECHERCHE
+  // (présente sur toutes les versions récentes) plutôt qu'un tap direct fragile sur la
+  // grille (qui a déjà cliqué « Mention » par erreur).  Repli : tap direct sur « LINK ».
+  let linkTapped = false
+
+  // 4a. Recherche via la barre de recherche du tray ─────────────────────────
+  const searchPt =
+    findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input', 'search_edit_text') ??
+    findByTextPartial(xml, 'search', 'recherch', 'cherch')
+  if (searchPt) {
+    log('   🔎 Recherche du sticker « Lien »…')
+    await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
+    await sleep(1000)
+    // « lien » d'abord (IG en français), puis « link » (IG en anglais)
+    for (const term of ['lien', 'link']) {
+      await shellExec(bearer, phoneId, 'input keyevent KEYCODE_MOVE_END')
+      // Efface le terme précédent (jusqu'à 8 caractères) avant de retaper
+      await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67')
+      await sleep(300)
+      await shellExec(bearer, phoneId, `input text "${term}"`)
+      await sleep(2200)
+      const xml2 = await dumpXml(bearer, phoneId)
+      const lk2 =
         findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
-        findByTextPartial(xml2, 'link', 'lien') ??
         findByResourceId(xml2, 'link_sticker', 'sticker_link')
-      if (!lk2) {
-        // Clear and try English "link"
-        await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long del to clear
-        await sleep(400)
-        await shellExec(bearer, phoneId, `input text "link"`)
-        await sleep(2000)
-        xml2 = await dumpXml(bearer, phoneId)
-        lk2 =
-          findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
-          findByTextPartial(xml2, 'link', 'lien') ??
-          findByResourceId(xml2, 'link_sticker', 'sticker_link')
-      }
       if (lk2) {
         await shellExec(bearer, phoneId, `input tap ${lk2[0]} ${lk2[1]}`)
-      } else {
-        log('   ❌ Sticker lien introuvable après recherche')
-        return { ok: false, error: 'Sticker lien introuvable — le sticker "Lien" est peut-être absent de ce compte Instagram' }
+        linkTapped = true
+        break
       }
-    } else {
-      // No search bar found — try tapping top-left of the tray then searching
-      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.5)} ${Math.floor(sh * 0.35)}`)
-      await sleep(600)
-      log('   ❌ Barre de recherche de stickers introuvable')
-      return { ok: false, error: 'Sticker lien introuvable — barre de recherche non détectée' }
     }
+  }
+
+  // 4b. Repli : tap direct sur « LINK » dans la grille (barre de recherche absente
+  //     ou recherche infructueuse).
+  if (!linkTapped) {
+    const linkSticker =
+      findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
+      findByResourceId(xml, 'link_sticker', 'sticker_link')
+    if (linkSticker) {
+      await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
+      linkTapped = true
+    }
+  }
+
+  if (!linkTapped) {
+    log('   ❌ Sticker lien introuvable')
+    return { ok: false, error: 'Sticker lien introuvable — le sticker « Lien » est peut-être absent de ce compte Instagram' }
   }
   await sleep(2500)
 
