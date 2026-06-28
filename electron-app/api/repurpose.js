@@ -161,7 +161,9 @@ async function handleSpoof(req, res) {
     const {
       brightness = 0, saturation = 0, contrast = 0,
       noise = 0, vignette = false, flipH = false, zoomPct = 0,
+      gamma = 1, hue = 0, sharpen = 0, panX = 0, panY = 0, speed = 1,
     } = adjustments
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
     // Per-export encoding variation — every file has a different CRF, audio bitrate,
     // GOP size, and a tiny sub-pixel noise so the compressed bitstream differs.
@@ -200,13 +202,19 @@ async function handleSpoof(req, res) {
       '-metadata', `copyright=© ${dateDash.slice(0, 4)} ${meta.make}`,
     )
 
-    // Build video filter chain — always re-encode for true binary uniqueness
+    // Build video filter chain — always re-encode for true binary uniqueness.
+    // NB : aucun filtre n'altère le texte à l'écran (pas de flip/miroir par défaut,
+    // pas d'overlay/drawtext) — uniquement des micro-variations imperceptibles.
     const filters = []
     const eqParts = []
     if (brightness !== 0) eqParts.push(`brightness=${(brightness / 100).toFixed(3)}`)
     if (saturation !== 0) eqParts.push(`saturation=${((saturation + 50) / 50).toFixed(3)}`)
     if (contrast !== 0) eqParts.push(`contrast=${(1.0 + contrast / 100).toFixed(3)}`)
+    if (gamma && gamma !== 1) eqParts.push(`gamma=${clamp(gamma, 0.5, 1.5).toFixed(3)}`)
     if (eqParts.length > 0) filters.push(`eq=${eqParts.join(':')}`)
+
+    // Teinte (hue) — micro décalage colorimétrique, invisible mais binairement unique
+    if (hue && hue !== 0) filters.push(`hue=h=${clamp(hue, -20, 20)}`)
 
     if (noise > 0) {
       const strength = Math.round((noise / 100) * 50)
@@ -217,15 +225,35 @@ async function handleSpoof(req, res) {
       const seed = Math.floor(Math.random() * 65536)
       filters.push(`noise=all_seed=${seed}:all_strength=1`)
     }
+
+    // Netteté subtile (unsharp) — modifie chaque pixel sans toucher la lisibilité
+    if (sharpen && sharpen > 0) filters.push(`unsharp=5:5:${clamp(sharpen, 0, 1.5).toFixed(2)}:5:5:0`)
+
     if (zoomPct > 0) {
       const factor = (zoomPct / 100).toFixed(4)
-      filters.push(`crop=in_w*(1-${factor}):in_h*(1-${factor}),scale=in_w/(1-${factor}):in_h/(1-${factor})`)
+      // Recadrage avec léger décalage (pan) dans la marge disponible — la position
+      // panX/panY est une fraction (0.5 = centré) de la marge de crop, bornée pour
+      // rester dans l'image.
+      const fx = clamp(0.5 + panX / 100, 0, 1).toFixed(4)
+      const fy = clamp(0.5 + panY / 100, 0, 1).toFixed(4)
+      filters.push(
+        `crop=in_w*(1-${factor}):in_h*(1-${factor}):in_w*${factor}*${fx}:in_h*${factor}*${fy},` +
+        `scale=in_w/(1-${factor}):in_h/(1-${factor})`,
+      )
     }
     if (flipH) filters.push('hflip')
     if (vignette) filters.push('vignette=PI/5')
 
+    // Micro-vitesse — change légèrement la durée (signal d'unicité fort) en gardant
+    // l'audio synchro via atempo. Sans toucher au contenu visuel.
+    const spd = clamp(Number(speed) || 1, 0.9, 1.1)
+    if (spd !== 1) filters.push(`setpts=PTS/${spd.toFixed(4)}`)
+
     // Force even dimensions — libx264 + yuv420p reject odd width/height
     filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
+
+    // Audio : atempo accordé à la micro-vitesse pour garder le son synchro.
+    if (spd !== 1) ffArgs.push('-af', `atempo=${spd.toFixed(4)}`)
 
     ffArgs.push(
       '-vf', filters.join(','),
