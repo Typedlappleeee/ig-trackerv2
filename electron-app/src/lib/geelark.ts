@@ -451,10 +451,27 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
   return null
 }
 
-async function dumpXml(bearer: string, phoneId: string): Promise<string> {
+// Robust uiautomator dump. Sur OPPO/ColorOS (et pendant les animations), la
+// commande renvoie souvent « ERROR: null root node… » ou une hiérarchie vide ;
+// le `&&` original sautait alors le `cat` et on récupérait du vide → 0 nœud.
+// Ici on dump TOUJOURS dans un fichier, on cat le fichier quoi qu'il arrive,
+// et on réessaie (avec --compressed) tant qu'on n'a pas un vrai arbre de nœuds.
+async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => void): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
-  const { output } = await shellExec(bearer, phoneId, `uiautomator dump ${f} && cat ${f}`)
-  return output
+  let last = ''
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const flag = attempt >= 2 ? '--compressed ' : ''
+    const { output } = await shellExec(
+      bearer, phoneId,
+      `uiautomator dump ${flag}${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
+    )
+    last = output
+    const nodes = (output.match(/<node\b/g) || []).length
+    if (output.includes('<hierarchy') && nodes > 1) return output
+    if (log) log(`   ⏳ dump uiautomator incomplet (essai ${attempt + 1}/4 — ${nodes} nœud(s)) — nouvel essai…`)
+    await sleep(1300)
+  }
+  return last
 }
 
 // Diagnostic : logge chaque nœud cliquable (resource-id court + content-desc +
@@ -477,7 +494,8 @@ function logClickables(xml: string, log: (m: string) => void, tag: string): void
     if (!rid && !desc && !txt) continue
     lines.push(`      • [${rid}|${desc}|${txt}] @${cx},${cy}`)
   }
-  log(`   🔬 ${tag} — ${lines.length} éléments cliquables :`)
+  const totalNodes = (xml.match(/<node\b/g) || []).length
+  log(`   🔬 ${tag} — ${lines.length} cliquables / ${totalNodes} nœuds au total :`)
   for (const l of lines.slice(0, 50)) log(l)
 }
 
@@ -1361,7 +1379,7 @@ async function _postInstagramStoryInner(
 
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')
-  xml = await dumpXml(bearer, phoneId)
+  xml = await dumpXml(bearer, phoneId, log)
   logClickables(xml, log, 'Composer story (barre d\'outils)')
   const stickerBtn =
     findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker_picker_button', 'creation_sticker_button') ??
@@ -1378,7 +1396,7 @@ async function _postInstagramStoryInner(
   }
   await sleep(3500) // extra time for tray to fully load
 
-  xml = await dumpXml(bearer, phoneId)
+  xml = await dumpXml(bearer, phoneId, log)
   logClickables(xml, log, 'Tray des stickers')
 
   // Sélection du sticker « Lien ». Le libellé/ordre du tray varie selon la version
