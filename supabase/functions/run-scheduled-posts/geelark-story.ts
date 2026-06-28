@@ -226,52 +226,10 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
   return null
 }
 
-// Robust uiautomator dump. Sur OPPO/ColorOS (et pendant les animations), la
-// commande renvoie souvent « ERROR: null root node… » ou une hiérarchie vide ;
-// le `&&` original sautait alors le `cat` et on récupérait du vide → 0 nœud.
-// Ici on dump TOUJOURS dans un fichier, on cat le fichier quoi qu'il arrive,
-// et on réessaie (avec --compressed) tant qu'on n'a pas un vrai arbre de nœuds.
-async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => void): Promise<string> {
+async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
-  let last = ''
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const flag = attempt >= 2 ? '--compressed ' : ''
-    const { output } = await shellExec(
-      bearer, phoneId,
-      `uiautomator dump ${flag}${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
-    )
-    last = output
-    const nodes = (output.match(/<node\b/g) || []).length
-    if (output.includes('<hierarchy') && nodes > 1) return output
-    if (log) log(`   ⏳ dump uiautomator incomplet (essai ${attempt + 1}/4 — ${nodes} nœud(s)) — nouvel essai…`)
-    await sleep(1300)
-  }
-  return last
-}
-
-// Diagnostic : logge chaque nœud cliquable (resource-id court + content-desc +
-// texte + centre x,y). Indispensable pour calibrer les taps sur les versions /
-// langues d'Instagram où la détection par resource-id/texte échoue.
-function logClickables(xml: string, log: (m: string) => void, tag: string): void {
-  const re = /<node\b[^>]*\/?>/g
-  let m: RegExpExecArray | null
-  const lines: string[] = []
-  while ((m = re.exec(xml)) !== null) {
-    const el = m[0]
-    if (!/clickable="true"/.test(el)) continue
-    const rid = (/resource-id="([^"]*)"/.exec(el)?.[1] ?? '').split('/').pop() ?? ''
-    const desc = /content-desc="([^"]*)"/.exec(el)?.[1] ?? ''
-    const txt = /text="([^"]*)"/.exec(el)?.[1] ?? ''
-    const b = /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(el)
-    if (!b) continue
-    const cx = Math.floor((+b[1] + +b[3]) / 2)
-    const cy = Math.floor((+b[2] + +b[4]) / 2)
-    if (!rid && !desc && !txt) continue
-    lines.push(`      • [${rid}|${desc}|${txt}] @${cx},${cy}`)
-  }
-  const totalNodes = (xml.match(/<node\b/g) || []).length
-  log(`   🔬 ${tag} — ${lines.length} cliquables / ${totalNodes} nœuds au total :`)
-  for (const l of lines.slice(0, 50)) log(l)
+  const { output } = await shellExec(bearer, phoneId, `uiautomator dump ${f} && cat ${f}`)
+  return output
 }
 
 // Escape text for use inside an Android `input text "..."` shell command.
@@ -465,55 +423,7 @@ export async function postStoryServer(
     `touch -m '${imgPath}' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
   await sleep(4000)
 
-  // ── 2. « Share to Story » : ouvre IG avec l'image DÉJÀ chargée dans le ──────
-  // compositeur de story → saute TOUTE la navigation (caméra/galerie/menu
-  // Create/avatar). On vérifie qu'on arrive bien sur le compositeur ; sinon on
-  // bascule sur l'ancien flow (navigation manuelle).
-  let xml = ''
-  let onComposer = false
-  log('🚀 Share-to-Story (image pré-chargée)…')
-  {
-    // MediaStore indexe le chemin CANONIQUE (/storage/emulated/0/…), pas le
-    // symlink /sdcard/… → un WHERE _data='/sdcard/…' ne matche jamais. On
-    // interroge donc par nom de fichier (LIKE '%/nom'), le plus récent d'abord,
-    // ce qui est indépendant du préfixe de chemin et du modèle de téléphone.
-    const fileName = imgPath.split('/').pop() ?? 'sf_story.jpg'
-    const canonical = imgPath.replace(/^\/sdcard\//, '/storage/emulated/0/')
-    let idm: RegExpExecArray | null = null
-    for (const where of [
-      `_data='${canonical}'`,
-      `_data LIKE '%/${fileName}'`,
-      `_display_name='${fileName}'`,
-    ]) {
-      const idOut = await shellExec(bearer, phoneId,
-        `content query --uri content://media/external/images/media --projection _id ` +
-        `--where "${where}" --sort "date_added DESC" 2>/dev/null | head -1`)
-      idm = /_id=(\d+)/.exec(idOut.output)
-      if (idm) break
-    }
-    if (idm) {
-      const contentUri = `content://media/external/images/media/${idm[1]}`
-      await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
-      await sleep(1000)
-      await shellExec(bearer, phoneId,
-        `am start -a com.instagram.share.ADD_TO_STORY --grant-read-uri-permission ` +
-        `-t image/jpeg --es source_application "com.instagram.android" ` +
-        `--eu android.intent.extra.STREAM ${contentUri} com.instagram.android`)
-      await sleep(8000)
-      xml = await dumpXml(bearer, phoneId, log)
-      logClickables(xml, log, 'Éditeur story (Share-to-Story)')
-      onComposer = !!(
-        findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker_picker_button') ??
-        findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story', 'Close Friends', 'Amis proches') ??
-        findByTextPartial(xml, 'sticker', 'autocollant', 'your story', 'votre story'))
-      log(onComposer ? '   ✅ Story ouverte avec l\'image (Share-to-Story)' : '   ↩︎ Share-to-Story ignoré — flow classique')
-    } else {
-      log('   ↩︎ Content URI introuvable — flow classique')
-    }
-  }
-
-  if (!onComposer) {
-  // ── 2bis. Ouverture classique (flow de secours) ────────────────────────────
+  // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
   await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
   await sleep(1200)
@@ -527,30 +437,10 @@ export async function postStoryServer(
 
   // Verify we actually reached the camera. If we're still on the home feed
   // (the deep link was ignored on this IG build), tap the "Your story" avatar.
-  xml = await dumpXml(bearer, phoneId)
-
-  // Certaines versions d'IG ouvrent un menu « Create » (Reel / Post / Story /
-  // Live…) au lieu d'aller direct à la caméra story. Dans ce cas, il faut taper
-  // la ligne « Story » (sinon l'automation part dans Reels).
-  const looksLikeCreateMenu = !!findByText(xml, 'Story', 'Histoire')
-    && !!(findByText(xml, 'Reel', 'Reels') || findByText(xml, 'Post', 'Publication') || findByText(xml, 'Live', 'En direct'))
-  if (looksLikeCreateMenu) {
-    const storyRow = findByText(xml, 'Story', 'Histoire', 'Votre story') ?? findByTextPartial(xml, 'story', 'histoire')
-    if (storyRow) {
-      log('   📋 Menu « Create » détecté — tap sur « Story »…')
-      await shellExec(bearer, phoneId, `input tap ${storyRow[0]} ${storyRow[1]}`)
-      await sleep(5000)
-      xml = await dumpXml(bearer, phoneId)
-    }
-  }
-
-  // Sur l'écran caméra/story ? (on NE matche PAS « Reel/Live » pour ne pas
-  // confondre avec le menu « Create »).
+  let xml = await dumpXml(bearer, phoneId)
   const onCamera =
-    findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'capture_button',
-      'camera_shutter_button', 'camera_shutter', 'shutter_button', 'story_camera', 'camera_capture_button') ??
-    findByText(xml, 'Gallery', 'Galerie', 'Add to story', 'Ajouter à la story', 'Recents', 'Récents', 'Boomerang', 'Layout') ??
-    findByTextPartial(xml, 'add to story', 'votre story', 'recents', 'récents')
+    findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'capture_button', 'camera_shutter_button') ??
+    findByText(xml, 'Gallery', 'Galerie', 'Story', 'Boomerang', 'Layout')
   if (!onCamera) {
     log('   ↩︎ Deep link ignoré — tap sur l\'avatar « Your story »…')
     // Open the regular home feed first.
@@ -615,102 +505,84 @@ export async function postStoryServer(
   // because the XML order doesn't always match the visual left→right order.
   xml = await dumpXml(bearer, phoneId)
   const firstThumb: [number, number] = (() => {
-    // m[1] = attributs entre resource-id et bounds (contient content-desc) →
-    // sert à EXCLURE la tuile appareil photo (1ʳᵉ case de « Recents »), sinon on
-    // déclenche la caméra au lieu de sélectionner l'image.
-    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"([^>]*?)bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
     let best: [number, number] | null = null
     let bestScore = Infinity
-    let cameraX2 = 0, cameraYc = 0
     let m: RegExpExecArray | null
     while ((m = re.exec(xml)) !== null) {
-      const attrs = m[1]
-      const x1 = +m[2], y1 = +m[3], x2 = +m[4], y2 = +m[5]
-      if (/camera|appareil|cam[ée]ra|capture|prendre une photo|take photo/i.test(attrs)) { cameraX2 = x2; cameraYc = Math.floor((y1 + y2) / 2); continue }
+      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
       const score = y1 * 10000 + x1 // top row first, then leftmost
       if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
     }
-    if (best) return best
-    // Repli : si on a repéré la caméra, l'image est la case juste à sa droite.
-    if (cameraX2) return [Math.floor(cameraX2 + sw * 0.16), cameraYc || Math.floor(sh * 0.30)]
-    return [Math.floor(sw * 0.42), Math.floor(sh * 0.30)]
+    // Fallback: top-left of the grid (below the gallery header)
+    return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)]
   })()
   log(`   👆 Tap galerie: ${firstThumb[0]},${firstThumb[1]}`)
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
-  } // fin du flow classique (if !onComposer) — sinon l'image est déjà chargée
 
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')
-  xml = await dumpXml(bearer, phoneId, log)
-  logClickables(xml, log, 'Composer story (barre d\'outils)')
+  xml = await dumpXml(bearer, phoneId)
   const stickerBtn =
-    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker_picker_button', 'creation_sticker_button') ??
-    findByText(xml, 'Sticker', 'Autocollant', 'Stickers', 'Autocollants', 'Add sticker', 'Add a sticker', 'Ajouter un autocollant') ??
-    findByTextPartial(xml, 'sticker', 'autocollant')
+    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button') ??
+    findByText(xml, 'Sticker', 'Autocollant', 'Stickers')
   if (stickerBtn) {
-    log(`   👆 Bouton sticker: ${stickerBtn[0]},${stickerBtn[1]}`)
     await shellExec(bearer, phoneId, `input tap ${stickerBtn[0]} ${stickerBtn[1]}`)
   } else {
-    log(`   ⚠️ Bouton sticker non détecté → repli coord ${Math.floor(sw * 0.88)},${Math.floor(sh * 0.14)}`)
-    // Repli : barre verticale haut-droite — le sticker (smiley) est le 2ᵉ icône,
-    // sous « Aa ». ~88% en largeur, ~14% en hauteur.
-    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.88)} ${Math.floor(sh * 0.14)}`)
+    // Sticker icon (smiley face) — top-right toolbar of the story editor
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.05)}`)
   }
   await sleep(3500) // extra time for tray to fully load
 
-  xml = await dumpXml(bearer, phoneId, log)
-  logClickables(xml, log, 'Tray des stickers')
-
-  // Sélection du sticker « Lien ». Le tray des stickers a un libellé/ordre qui varie
-  // selon la version d'Instagram et la langue → on privilégie la BARRE DE RECHERCHE
-  // (présente sur toutes les versions récentes) plutôt qu'un tap direct fragile sur la
-  // grille (qui a déjà cliqué « Mention » par erreur).  Repli : tap direct sur « LINK ».
-  let linkTapped = false
-
-  // 4a. Recherche via la barre de recherche du tray ─────────────────────────
-  const searchPt =
-    findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input', 'search_edit_text') ??
-    findByTextPartial(xml, 'search', 'recherch', 'cherch')
-  if (searchPt) {
-    log('   🔎 Recherche du sticker « Lien »…')
-    await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
-    await sleep(1000)
-    // « lien » d'abord (IG en français), puis « link » (IG en anglais)
-    for (const term of ['lien', 'link']) {
-      await shellExec(bearer, phoneId, 'input keyevent KEYCODE_MOVE_END')
-      // Efface le terme précédent (jusqu'à 8 caractères) avant de retaper
-      await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67')
-      await sleep(300)
-      await shellExec(bearer, phoneId, `input text "${term}"`)
-      await sleep(2200)
-      const xml2 = await dumpXml(bearer, phoneId)
-      const lk2 =
+  xml = await dumpXml(bearer, phoneId)
+  const linkSticker =
+    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
+    findByTextPartial(xml, 'link', 'lien') ??
+    findByResourceId(xml, 'link_sticker', 'sticker_link')
+  if (linkSticker) {
+    await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
+  } else {
+    // Search the sticker tray for "link"/"lien" via the built-in search bar
+    const searchPt =
+      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input') ??
+      findByTextPartial(xml, 'search', 'recherch', 'cherch')
+    if (searchPt) {
+      await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
+      await sleep(900)
+      // Try "lien" first (French IG), then "link"
+      await shellExec(bearer, phoneId, `input text "lien"`)
+      await sleep(2000)
+      let xml2 = await dumpXml(bearer, phoneId)
+      let lk2 =
         findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
+        findByTextPartial(xml2, 'link', 'lien') ??
         findByResourceId(xml2, 'link_sticker', 'sticker_link')
+      if (!lk2) {
+        // Clear and try English "link"
+        await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long del to clear
+        await sleep(400)
+        await shellExec(bearer, phoneId, `input text "link"`)
+        await sleep(2000)
+        xml2 = await dumpXml(bearer, phoneId)
+        lk2 =
+          findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
+          findByTextPartial(xml2, 'link', 'lien') ??
+          findByResourceId(xml2, 'link_sticker', 'sticker_link')
+      }
       if (lk2) {
         await shellExec(bearer, phoneId, `input tap ${lk2[0]} ${lk2[1]}`)
-        linkTapped = true
-        break
+      } else {
+        log('   ❌ Sticker lien introuvable après recherche')
+        return { ok: false, error: 'Sticker lien introuvable — le sticker "Lien" est peut-être absent de ce compte Instagram' }
       }
+    } else {
+      // No search bar found — try tapping top-left of the tray then searching
+      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.5)} ${Math.floor(sh * 0.35)}`)
+      await sleep(600)
+      log('   ❌ Barre de recherche de stickers introuvable')
+      return { ok: false, error: 'Sticker lien introuvable — barre de recherche non détectée' }
     }
-  }
-
-  // 4b. Repli : tap direct sur « LINK » dans la grille (barre de recherche absente
-  //     ou recherche infructueuse).
-  if (!linkTapped) {
-    const linkSticker =
-      findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
-      findByResourceId(xml, 'link_sticker', 'sticker_link')
-    if (linkSticker) {
-      await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
-      linkTapped = true
-    }
-  }
-
-  if (!linkTapped) {
-    log('   ❌ Sticker lien introuvable')
-    return { ok: false, error: 'Sticker lien introuvable — le sticker « Lien » est peut-être absent de ce compte Instagram' }
   }
   await sleep(2500)
 
