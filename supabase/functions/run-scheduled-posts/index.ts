@@ -14,6 +14,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { postStoryServer } from './geelark-story.ts'
 import { notifyOwner } from './notify.ts'
 import { runAccountSync } from './tracking-report.ts'
+import { runStatsSync } from './stats-sync.ts'
 
 const GEELARK = 'https://openapi.geelark.com/open/v1'
 
@@ -156,6 +157,13 @@ Deno.serve(async (req) => {
   try {
     const n = await runAccountSync(db, nowIso, Date.now() + 60_000)
     if (n > 0) summary['account_sync'] = `${n} compte(s) synchronisé(s)`
+  } catch { /* ignore */ }
+
+  // ── Étape 0-stats : sync serveur des stats (followers/posts) par lots ──
+  // Plafonné à ~40s. No-op si RAPIDAPI_KEY absent (le poller client prend le relais).
+  try {
+    const n = await runStatsSync(db, nowIso, Date.now() + 40_000)
+    if (n > 0) summary['stats_sync'] = `${n} compte(s) stats`
   } catch { /* ignore */ }
 
   // Résout le bearer GeeLark d'un (org_id, user_id) avec cache mémoire.
