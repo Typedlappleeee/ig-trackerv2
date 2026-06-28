@@ -93,16 +93,26 @@ export function Spoof({ user }: { user: User }) {
   const [running, setRunning]             = useState(false)
   const [autoMode, setAutoMode]           = useState(false)
 
-  // Réglages aléatoires (modérés) générés par vidéo en mode automatique.
-  const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+  // Réglages aléatoires (modérés) générés PAR VIDÉO en mode automatique.
+  // Objectif : un max de petits détails uniques entre chaque vidéo SANS jamais
+  // toucher la lisibilité du texte à l'écran → donc PAS de flip horizontal
+  // (le miroir inverse le texte). Tout le reste reste imperceptible à l'œil.
+  const randInt   = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+  const randFloat = (min: number, max: number, d = 3) => +(Math.random() * (max - min) + min).toFixed(d)
   const randomAdjustments = () => ({
-    brightness: randInt(-12, 12),
+    brightness: randInt(-10, 10),
     saturation: randInt(-12, 12),
-    contrast:   randInt(-12, 12),
-    noise:      randInt(3, 12),
-    vignette:   Math.random() < 0.5,
-    flipH:      Math.random() < 0.5,
-    zoomPct:    randInt(1, 8),
+    contrast:   randInt(-10, 10),
+    gamma:      randFloat(0.92, 1.08),   // gamma léger
+    hue:        randInt(-6, 6),          // teinte ±6°
+    noise:      randInt(4, 12),          // grain/pixels
+    sharpen:    randFloat(0, 0.5, 2),    // netteté subtile
+    zoomPct:    randInt(2, 7),           // léger zoom
+    panX:       randInt(-20, 20),        // recadrage horizontal (% de la marge)
+    panY:       randInt(-20, 20),        // recadrage vertical
+    speed:      randFloat(0.97, 1.03),   // micro-vitesse
+    vignette:   Math.random() < 0.35,
+    flipH:      false,                   // JAMAIS — le miroir casse le texte
   })
 
   function updateJob(id: string, patch: Partial<SpoofJob>) {
@@ -449,7 +459,7 @@ export function Spoof({ user }: { user: User }) {
                   </button>
                   {autoMode && (
                     <p style={{ fontSize: 11, color: 'var(--accent-l)', margin: '0 0 2px', lineHeight: 1.5 }}>
-                      Chaque vidéo reçoit ses propres valeurs aléatoires (luminosité, saturation, contraste, grain, zoom, flip, vignette). Les réglages manuels ci-dessous sont ignorés.
+                      Chaque vidéo reçoit ses propres micro-variations (luminosité, gamma, teinte, saturation, contraste, grain/pixels, netteté, zoom, recadrage, micro-vitesse, vignette). Pas de miroir → le texte à l'écran reste intact. Les réglages manuels ci-dessous sont ignorés.
                     </p>
                   )}
 
