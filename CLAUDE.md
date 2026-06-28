@@ -6,13 +6,17 @@
 
 | Action | Coût |
 |--------|------|
-| Posting (1 téléphone) | 1 crédit |
+| Posting (par téléphone) | 2 crédits |
 | Mass Posting (par téléphone) | 2 crédits |
 | Story / StoryLink (par téléphone) | 1 crédit |
-| Remix (par vidéo) | 0.5 crédit |
-| CloneVid (par vidéo) | 0.5 crédit |
+| Remix (par vidéo) | gratuit |
+| Spoof / CloneVid (par vidéo) | gratuit |
 | **Tâche automatique — quotidien** | **50 crédits/jour** |
 | **Tâche automatique — par exécution** | **2 crédits × nb téléphones** |
+
+> Règle : poster une vidéo coûte 2 crédits (single, mass **ou** programmé — même
+> tarif pour éviter le bypass). Une story coûte 1 crédit. Les outils vidéo
+> (remix, spoof) sont gratuits.
 
 ### Tâches automatiques (recurring_tasks) — règles de facturation
 

@@ -150,13 +150,15 @@ export function Spoof({ user }: { user: User }) {
 
     const totalOutputs = selectedVideos.length * copies
     const creditCost = totalOutputs * CREDIT_COSTS.clone_vid
-    const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
-    if (!creditRes.ok) {
-      const balance = creditRes.balance ?? credits.balance
-      alert(`Crédits insuffisants — ${creditCost} crédits requis. Solde: ${balance}`)
-      return
+    if (creditCost > 0) {
+      const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+      if (!creditRes.ok) {
+        const balance = creditRes.balance ?? credits.balance
+        alert(`Crédits insuffisants — ${creditCost} crédits requis. Solde: ${balance}`)
+        return
+      }
+      if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
     }
-    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
 
     // Each source video produces `copies` independent spoofed outputs — every
     // copy gets its own unique metadata (GPS, date, camera id, encoding…).

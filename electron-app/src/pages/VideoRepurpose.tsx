@@ -283,7 +283,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
   async function startGeneration() {
     if (!sources.length || running) return
     const creditCost = totalJobs * CREDIT_COSTS.clone_vid
-    if (!isSuperAdmin) {
+    if (!isSuperAdmin && creditCost > 0) {
       const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
         const balanceDisplay = creditRes.balance ?? credits.balance

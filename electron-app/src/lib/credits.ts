@@ -22,10 +22,10 @@ export const PLAN_MAX_MASS_POSTING: Record<string, number> = {
 }
 
 export const CREDIT_COSTS = {
-  remix:        0.5,  // per remix (MassRemix)
-  clone_vid:    0.5,  // per video (CloneVid / VideoRepurpose)
-  posting:      1,    // per phone (Posting)
-  mass_posting: 2,    // per phone (MassPosting)
+  remix:        0,    // gratuit (outil vidéo)
+  clone_vid:    0,    // gratuit (Spoof / outil vidéo)
+  posting:      2,    // per phone (Posting) — 2 crédits par vidéo postée
+  mass_posting: 2,    // per phone (MassPosting) — idem posting (anti-bypass)
   story:        1,    // per phone (Story / StoryLink)
   // Tâches automatiques (recurring_tasks) :
   //   task_daily  : 50 crédits/jour par tâche active, débités à minuit UTC.

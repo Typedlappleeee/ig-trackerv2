@@ -1840,10 +1840,10 @@ function SubscriptionPanel() {
         <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(0,0,0,0.2)' }}>
           <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">{t('operationCosts')}</p>
           {[
-            ['Posting', `1 ${t('creditsCost')} ${t('perPhone')}`],
+            ['Posting', `2 ${t('creditsCosts')} ${t('perPhone')}`],
             ['Mass Posting', `2 ${t('creditsCosts')} ${t('perPhone')}`],
-            ['Spoof', `0.5 ${t('creditsCost')}`],
-            [lang === 'en' ? 'Video Remix' : 'Remix vidéo', `0.5 ${t('creditsCost')}`],
+            ['Story', `1 ${t('creditsCost')} ${t('perPhone')}`],
+            [lang === 'en' ? 'Video tools (Remix, Spoof…)' : 'Outils vidéo (Remix, Spoof…)', lang === 'en' ? 'Free' : 'Gratuit'],
           ].map(([op, cost]) => (
             <div key={op} className="flex justify-between">
               <span className="text-[13px] text-text2">{op}</span>

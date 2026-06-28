@@ -454,14 +454,14 @@ export function MassRemix({ user }: MassRemixProps) {
 
     const n = prePlanned ? prePlanned.length : Math.max(1, copies)
     const creditCost = n * CREDIT_COSTS.remix
-    console.log('[credits] ownerId:', credits.ownerId, 'cost:', creditCost)
-    const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
-    console.log('[credits] result:', creditRes)
-    if (!creditRes.ok) {
-      alert(`${t('massRemixInsufficientCredits')} — ${creditCost} crédit(s) requis pour ${n} remix. Solde: ${creditRes.balance ?? 0}`)
-      return
+    if (creditCost > 0) {
+      const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+      if (!creditRes.ok) {
+        alert(`${t('massRemixInsufficientCredits')} — ${creditCost} crédit(s) requis pour ${n} remix. Solde: ${creditRes.balance ?? 0}`)
+        return
+      }
+      if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
     }
-    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
 
     const folder = exportMode === 'folder' ? outputFolder : null
     const basePairs = prePlanned ?? Array.from({ length: n }, (_, i) => ({
