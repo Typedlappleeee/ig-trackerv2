@@ -702,6 +702,7 @@ export function Phones({ user }: PhonesProps) {
   const [phones, setPhones]           = useState<Phone[]>([])
   const [loading, setLoading]         = useState(true)
   const [syncing, setSyncing]         = useState(false)
+  const [showIgBulk, setShowIgBulk]   = useState(false)
   const [error, setError]             = useState<string | null>(null)
   const [filter, setFilter]           = useState<'all' | 'online' | 'offline'>('all')
   const [search, setSearch]           = useState('')
@@ -1246,6 +1247,16 @@ export function Phones({ user }: PhonesProps) {
               {syncing ? t('phonesSyncing') : t('phonesSyncGeelark')}
             </button>
 
+            {/* Bulk Instagram usernames editor */}
+            <button
+              onClick={() => setShowIgBulk(true)}
+              className="sf-btn sf-btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+              title={fr('Définir les @ Instagram de tous les comptes', 'Set Instagram @ for all accounts')}
+            >
+              <span style={{ fontWeight: 800 }}>@</span> {fr('Comptes IG', 'IG accounts')}
+            </button>
+
             {/* Plan limit badge */}
             {phoneLimit !== Infinity && (
               <span className={phones.length >= phoneLimit ? 'sf-badge sf-badge-red' : 'sf-badge sf-badge-violet'} style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -1656,6 +1667,11 @@ export function Phones({ user }: PhonesProps) {
               )}
             </div>
 
+            {/* ── Bulk Instagram usernames editor ─────────────────────── */}
+            {showIgBulk && (
+              <IgBulkModal phones={phones} saveIgUsername={saveIgUsername} onClose={() => setShowIgBulk(false)} />
+            )}
+
             {/* ── Right detail panel ──────────────────────────────────── */}
             {selectedPhone && (() => {
               const p   = selectedPhone
@@ -1923,5 +1939,66 @@ export function Phones({ user }: PhonesProps) {
         )}
       </div>
     </>
+  )
+}
+
+// ── Bulk Instagram usernames editor ──────────────────────────────────────────
+function IgBulkModal({ phones, saveIgUsername, onClose }: {
+  phones: Phone[]
+  saveIgUsername: (id: string, u: string) => Promise<void>
+  onClose: () => void
+}) {
+  const [vals, setVals]       = useState<Record<string, string>>(() => Object.fromEntries(phones.map(p => [p.id, p.ig_username ?? ''])))
+  const [search, setSearch]   = useState('')
+  const [saving, setSaving]   = useState(false)
+  const [savedCount, setSaved] = useState<number | null>(null)
+
+  const visible = phones.filter(p => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return p.phone_name?.toLowerCase().includes(q) || (vals[p.id] ?? '').toLowerCase().includes(q)
+  })
+
+  async function saveAll() {
+    setSaving(true)
+    let n = 0
+    for (const p of phones) {
+      const v = (vals[p.id] ?? '').trim().replace(/^@+/, '')
+      if (v !== (p.ig_username ?? '')) { await saveIgUsername(p.id, v); n++ }
+    }
+    setSaving(false); setSaved(n)
+    setTimeout(onClose, 900)
+  }
+
+  return createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} className="sf-card" style={{ width: '100%', maxWidth: 560, maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>@ Comptes Instagram</p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' }}>Renseigne le @ de chaque compte — le suivi (Stats / Rapports) s'appuie dessus.</p>
+          </div>
+          <button onClick={onClose} className="cursor-pointer" style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: '12px 20px 8px' }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un téléphone…" className="sf-input" style={{ width: '100%' }} />
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {visible.map(p => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.phone_name}</span>
+              <span style={{ color: 'var(--accent-l)', fontWeight: 700 }}>@</span>
+              <input value={vals[p.id] ?? ''} onChange={e => setVals(v => ({ ...v, [p.id]: e.target.value }))} placeholder="username" className="sf-input" style={{ width: 190, height: 32 }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, alignItems: 'center' }}>
+          {savedCount !== null && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ {savedCount} mis à jour</span>}
+          <button onClick={onClose} className="sf-btn sf-btn-ghost cursor-pointer">Fermer</button>
+          <button onClick={saveAll} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer">{saving ? 'Enregistrement…' : 'Tout enregistrer'}</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
