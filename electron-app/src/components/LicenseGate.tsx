@@ -21,7 +21,7 @@ const PLANS = [
     price:   '$49.99',
     credits: '3 750',
     perAccount: '~25 comptes · 2,00$/compte',
-    phones:  '50 téléphones',
+    phones:  '100 téléphones',
     posting: 'Mass posting 10 comptes',
     accent:  '#818CF8',
   },

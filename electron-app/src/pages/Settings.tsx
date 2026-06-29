@@ -1745,7 +1745,7 @@ function SubscriptionPanel() {
 
   const planLabel   = license.plan === 'organisation' ? 'Organisation' : license.plan === 'pro' ? 'Pro' : license.plan === 'standard' ? 'Standard' : '—'
   const planCredits = license.plan === 'organisation' ? 11000 : license.plan === 'pro' ? 5500 : license.plan === 'standard' ? 2500 : 0
-  const maxPhones   = license.plan === 'organisation' ? '∞' : license.plan === 'pro' ? '200' : license.plan === 'standard' ? '50' : '—'
+  const maxPhones   = license.plan === 'organisation' ? '∞' : license.plan === 'pro' ? '200' : license.plan === 'standard' ? '100' : '—'
 
   const locale = lang === 'en' ? 'en-US' : 'fr-FR'
 
@@ -1919,7 +1919,7 @@ function SubscriptionPanel() {
               {[
                 `3 750 ${t('creditsCosts')} ${t('perMonth')}`,
                 lang === 'en' ? '≈ 25 accounts · $2.00 / account' : '≈ 25 comptes · 2,00$ / compte',
-                `50 ${t('perPhones')} max`,
+                `100 ${t('perPhones')} max`,
                 lang === 'en' ? 'Base tools (no content creation)' : 'Outils de base (sans création de contenu)',
                 `Mass Posting — 10 ${lang === 'en' ? 'accounts' : 'comptes'}`,
                 'Support 24/7',

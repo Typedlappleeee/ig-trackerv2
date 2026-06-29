@@ -12,7 +12,7 @@ export const PLAN_MONTHLY_CREDITS: Record<string, number> = {
 
 // Max phones per plan (Infinity = unlimited)
 export const PLAN_MAX_PHONES: Record<string, number> = {
-  standard:     50,
+  standard:     100,
   pro:          200,
   organisation: Infinity,
 }
