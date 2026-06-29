@@ -1,10 +1,13 @@
 import { createContext, useContext } from 'react'
 import { supabase } from './supabase'
 
+// Crédits mensuels par plan. Cibles : Standard 25 comptes, Pro 75, Org 150
+// (2 vidéos + 1 story / compte / jour ≈ 150 crédits/compte/mois). Valeur
+// dégressive : plus le plan est gros, moins le crédit coûte.
 export const PLAN_MONTHLY_CREDITS: Record<string, number> = {
-  standard:     2500,
-  pro:          5500,
-  organisation: 11000,
+  standard:     3750,
+  pro:          11250,
+  organisation: 22500,
 }
 
 // Max phones per plan (Infinity = unlimited)
