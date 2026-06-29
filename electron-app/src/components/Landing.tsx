@@ -797,10 +797,10 @@ const PLANS: PlanDef[] = [
 
 const CREDIT_PACKS = [
   { name: 'Mini',  credits: '1 000',  price: '12,99$',  note: '~6 comptes / mois'   },
-  { name: 'Plus',  credits: '2 500',  price: '26,99$',  note: '~16 comptes / mois'  },
-  { name: 'Mega',  credits: '6 000',  price: '49,99$',  note: '40 comptes · Populaire' },
-  { name: 'Giga',  credits: '15 000', price: '104,99$', note: '100 comptes / mois'  },
-  { name: 'Ultra', credits: '40 000', price: '209,99$', note: '266 comptes · Top valeur' },
+  { name: 'Plus',  credits: '2 500',  price: '27,99$',  note: '~16 comptes / mois'  },
+  { name: 'Mega',  credits: '6 000',  price: '54,99$',  note: '40 comptes · Populaire' },
+  { name: 'Giga',  credits: '15 000', price: '119,99$', note: '100 comptes / mois'  },
+  { name: 'Ultra', credits: '40 000', price: '289,99$', note: '266 comptes · Top valeur' },
 ]
 
 // ── Pricing — luxe : carte "Pro" inversée en ivoire ──────────────────────────
