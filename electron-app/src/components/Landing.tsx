@@ -796,11 +796,11 @@ const PLANS: PlanDef[] = [
 ]
 
 const CREDIT_PACKS = [
-  { name: 'Mini',  credits: '1 000',  price: '17,99$',  note: '~6 comptes / mois'   },
-  { name: 'Plus',  credits: '2 500',  price: '39,99$',  note: '~16 comptes / mois'  },
-  { name: 'Mega',  credits: '6 000',  price: '89,99$',  note: '40 comptes · Populaire' },
-  { name: 'Giga',  credits: '15 000', price: '199,99$', note: '100 comptes / mois'  },
-  { name: 'Ultra', credits: '40 000', price: '499,99$', note: '266 comptes · Top valeur' },
+  { name: 'Mini',  credits: '1 000',  price: '12,99$',  note: '~6 comptes / mois'   },
+  { name: 'Plus',  credits: '2 500',  price: '26,99$',  note: '~16 comptes / mois'  },
+  { name: 'Mega',  credits: '6 000',  price: '49,99$',  note: '40 comptes · Populaire' },
+  { name: 'Giga',  credits: '15 000', price: '104,99$', note: '100 comptes / mois'  },
+  { name: 'Ultra', credits: '40 000', price: '209,99$', note: '266 comptes · Top valeur' },
 ]
 
 // ── Pricing — luxe : carte "Pro" inversée en ivoire ──────────────────────────
@@ -951,11 +951,18 @@ function PricingSection() {
           })}
         </div>
 
-        {/* Hypothèse d'usage pour l'estimation « comptes » */}
+        {/* Hypothèse d'usage pour l'estimation « comptes » — bien mise en avant */}
         <FadeIn>
-          <p style={{ textAlign: 'center', margin: '0 0 56px', fontFamily: SANS, fontSize: 12.5, color: FAINT, lineHeight: 1.6, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto' }}>
-            Estimation comptes basée sur une <strong style={{ color: 'rgba(233,234,240,0.7)' }}>utilisation standard : 2 posts + 1 story par jour et par compte</strong> (≈ 150 crédits/compte/mois — 2 crédits par post, 1 crédit par story). Les outils vidéo (Remix, Spoof) sont gratuits. Les crédits non utilisés se cumulent d'un mois sur l'autre.
-          </p>
+          <div style={{
+            margin: '0 auto 56px', maxWidth: 680, padding: '18px 22px', borderRadius: 14,
+            background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.35)',
+            display: 'flex', alignItems: 'center', gap: 14,
+          }}>
+            <span style={{ fontSize: 22, flexShrink: 0 }}>📊</span>
+            <p style={{ textAlign: 'left', margin: 0, fontFamily: SANS, fontSize: 14, color: IVORY, lineHeight: 1.6 }}>
+              Estimation comptes basée sur une <strong style={{ color: GOLD }}>utilisation standard : 2 posts + 1 story par jour et par compte</strong> (≈ 150 crédits/compte/mois — 2 crédits/post, 1 crédit/story). Les outils vidéo (Remix, Spoof) sont <strong style={{ color: GOLD }}>gratuits</strong>, et les crédits non utilisés <strong style={{ color: GOLD }}>se cumulent</strong> d'un mois sur l'autre.
+            </p>
+          </div>
         </FadeIn>
 
         {/* ── Credit packs — ligne éditoriale ── */}
