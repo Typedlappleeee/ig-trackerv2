@@ -464,6 +464,10 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   ))}
                 </div>
 
+                <p className="text-[9.5px] mt-2 px-1" style={{ color: '#6b5fa0', fontStyle: 'italic', lineHeight: 1.5 }}>
+                  * Estimation comptes : utilisation standard 2 posts + 1 story / jour / compte (≈ 150 crédits/compte/mois). Crédits cumulables d'un mois sur l'autre.
+                </p>
+
                 {/* Telegram CTA */}
                 <a
                   href={TELEGRAM_URL}

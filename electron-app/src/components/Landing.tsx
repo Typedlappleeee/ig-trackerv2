@@ -942,6 +942,13 @@ function PricingSection() {
           })}
         </div>
 
+        {/* Hypothèse d'usage pour l'estimation « comptes » */}
+        <FadeIn>
+          <p style={{ textAlign: 'center', margin: '0 0 56px', fontFamily: SANS, fontSize: 12.5, color: FAINT, lineHeight: 1.6, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto' }}>
+            Estimation comptes basée sur une <strong style={{ color: 'rgba(233,234,240,0.7)' }}>utilisation standard : 2 posts + 1 story par jour et par compte</strong> (≈ 150 crédits/compte/mois — 2 crédits par post, 1 crédit par story). Les outils vidéo (Remix, Spoof) sont gratuits. Les crédits non utilisés se cumulent d'un mois sur l'autre.
+          </p>
+        </FadeIn>
+
         {/* ── Credit packs — ligne éditoriale ── */}
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
