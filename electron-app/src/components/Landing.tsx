@@ -751,6 +751,7 @@ const PLANS: PlanDef[] = [
     originalMonthly: '', discount: '', yearlyBilled: '',
     btnLabel: 'Choisir Standard',
     features: [
+      { text: '100 téléphones max',              included: true  },
       { text: 'Accès aux outils de base',       included: true  },
       { text: 'Mass Posting (10 comptes max)',   included: true  },
       { text: 'Création de contenu (Remix, Spoof…)', included: false },
@@ -767,6 +768,7 @@ const PLANS: PlanDef[] = [
     popular: true,
     btnLabel: 'Choisir Pro',
     features: [
+      { text: '200 téléphones max',              included: true  },
       { text: 'Accès à tous les outils',         included: true  },
       { text: 'Création de contenu (Remix, Spoof…) — gratuit', included: true  },
       { text: 'Mass Posting illimité',            included: true  },
@@ -783,6 +785,7 @@ const PLANS: PlanDef[] = [
     bestValue: true,
     btnLabel: 'Choisir Organisation',
     features: [
+      { text: 'Téléphones illimités',            included: true  },
       { text: 'Accès à tous les outils',         included: true  },
       { text: 'Création de contenu (Remix, Spoof…) — gratuit', included: true  },
       { text: 'Mass Posting illimité',            included: true  },
