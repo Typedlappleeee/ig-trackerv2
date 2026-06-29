@@ -1920,7 +1920,7 @@ function SubscriptionPanel() {
                 `3 750 ${t('creditsCosts')} ${t('perMonth')}`,
                 lang === 'en' ? '≈ 25 accounts · $2.00 / account' : '≈ 25 comptes · 2,00$ / compte',
                 `50 ${t('perPhones')} max`,
-                lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
+                lang === 'en' ? 'Base tools (no content creation)' : 'Outils de base (sans création de contenu)',
                 `Mass Posting — 10 ${lang === 'en' ? 'accounts' : 'comptes'}`,
                 'Support 24/7',
               ].map(f => (
@@ -1955,7 +1955,8 @@ function SubscriptionPanel() {
                 `11 250 ${t('creditsCosts')} ${t('perMonth')}`,
                 lang === 'en' ? '≈ 75 accounts · $1.33 / account' : '≈ 75 comptes · 1,33$ / compte',
                 `200 ${t('perPhones')} max`,
-                lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
+                lang === 'en' ? 'Content creation included — free' : 'Création de contenu incluse — gratuit',
+                lang === 'en' ? 'Multi-member organisations' : 'Organisations multi-membres',
                 `Mass Posting ${lang === 'en' ? 'unlimited' : 'illimité'}`,
                 'Support 24/7',
               ].map(f => (

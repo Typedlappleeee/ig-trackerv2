@@ -752,10 +752,9 @@ const PLANS: PlanDef[] = [
     btnLabel: 'Choisir Standard',
     features: [
       { text: 'Accès aux outils de base',       included: true  },
-      { text: 'Fonctionnalités sélectives',      included: true  },
       { text: 'Mass Posting (10 comptes max)',   included: true  },
+      { text: 'Création de contenu (Remix, Spoof…)', included: false },
       { text: 'Support prioritaire',             included: false },
-      { text: 'Remix & Spoof',                included: false },
       { text: 'Organisations multi-membres',     included: false },
     ],
   },
@@ -769,11 +768,10 @@ const PLANS: PlanDef[] = [
     btnLabel: 'Choisir Pro',
     features: [
       { text: 'Accès à tous les outils',         included: true  },
-      { text: 'Toutes les fonctionnalités',       included: true  },
+      { text: 'Création de contenu (Remix, Spoof…) — gratuit', included: true  },
       { text: 'Mass Posting illimité',            included: true  },
       { text: 'Support prioritaire',              included: true  },
-      { text: 'Remix & Spoof',                 included: true  },
-      { text: 'Organisations multi-membres',      included: false },
+      { text: 'Organisations multi-membres',      included: true  },
     ],
   },
   {
@@ -786,10 +784,9 @@ const PLANS: PlanDef[] = [
     btnLabel: 'Choisir Organisation',
     features: [
       { text: 'Accès à tous les outils',         included: true  },
-      { text: 'Toutes les fonctionnalités',       included: true  },
+      { text: 'Création de contenu (Remix, Spoof…) — gratuit', included: true  },
       { text: 'Mass Posting illimité',            included: true  },
-      { text: 'Support prioritaire',              included: true  },
-      { text: 'Remix & Spoof',                 included: true  },
+      { text: 'Support prioritaire 24/7',         included: true  },
       { text: 'Organisations multi-membres',      included: true  },
     ],
   },

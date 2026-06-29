@@ -13,7 +13,7 @@ import {
   markAllRead, clearNotifications, unreadCount,
   type AppNotification,
 } from '@/lib/notificationStore'
-import { useLicense } from '@/lib/license'
+import { useLicense, effectivePlan } from '@/lib/license'
 import { useCredits } from '@/lib/credits'
 import { AuthPage }   from '@/components/auth/AuthPage'
 
@@ -683,9 +683,17 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   const effectiveSuperAdmin = demoMode ? false : license?.isSuperAdmin === true
 
+  // Outils de création de contenu — réservés à partir de Pro (Standard n'y a pas
+  // accès). Sur Pro et Organisation, ils sont disponibles (et gratuits en crédits).
+  const CONTENT_CREATION_TABS = new Set<Page>(['remix', 'spoof', 'subtitles', 'mixer', 'montage', 'aitools'])
+  const planNow = effectivePlan(license)
+  const hasContentCreation = effectiveSuperAdmin || planNow === 'pro' || planNow === 'organisation'
+
   const isVisibleTab = (id: Page): boolean => {
     // Pages internes / superadmin ScaleFlow uniquement (Rapports + Tâches inclus).
     if (id === 'licences' || id === 'tiktokposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
+    // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
+    if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Tous les autres onglets sont visibles pour tout le monde.
     return true
   }

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useCredits } from '@/lib/credits'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
-import { useLicense } from '@/lib/license'
+import { useLicense, effectivePlan } from '@/lib/license'
 import { timeUntil, fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import type { Page } from '@/components/Layout'
@@ -285,6 +285,10 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const dateLabel = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
 
   const isSuperAdmin = license?.isSuperAdmin === true
+  // Création de contenu réservée à partir de Pro (cf. Layout).
+  const planNow = effectivePlan(license)
+  const hasContentCreation = isSuperAdmin || planNow === 'pro' || planNow === 'organisation'
+  const CONTENT_CREATION_IDS = new Set(['remix', 'spoof', 'subtitles', 'mixer', 'montage', 'aitools'])
   const allToolShortcuts: { id: Page; label: string; icon: string; superAdminOnly?: boolean; dev?: boolean }[] = [
     { id: 'phones',      label: t('navPhones'),      icon: 'phone' },
     { id: 'posting',     label: t('navPosting'),     icon: 'send' },
@@ -301,6 +305,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     if (tool.superAdminOnly && !isSuperAdmin) return false
     if (tool.dev && !isSuperAdmin) return false
     if (tool.id === 'licences') return false
+    if (CONTENT_CREATION_IDS.has(tool.id) && !hasContentCreation) return false
     if (role && !canSeeTab(role, perms, tool.id as import('@/lib/supabase').PageKey)) return false
     return true
   })
