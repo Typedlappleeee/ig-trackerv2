@@ -760,7 +760,7 @@ const PLANS: PlanDef[] = [
     ],
   },
   {
-    name: 'Pro', tagline: 'Scale ton output',
+    name: 'Pro', tagline: 'Scale ton agence',
     credits: '11 250 crédits / mois',
     perAccount: '≈ 75 comptes · 1,33$ / compte',
     monthlyPrice: '99,99$', yearlyPrice: '59,99$',
@@ -796,16 +796,16 @@ const PLANS: PlanDef[] = [
 ]
 
 const CREDIT_PACKS = [
-  { name: 'Mini',  credits: '1 000',  price: '19,99$',  note: '' },
-  { name: 'Plus',  credits: '2 500',  price: '44,99$',  note: '' },
-  { name: 'Mega',  credits: '6 000',  price: '99,99$',  note: 'Populaire' },
-  { name: 'Giga',  credits: '15 000', price: '224,99$', note: '' },
-  { name: 'Ultra', credits: '40 000', price: '549,99$', note: 'Meilleure valeur' },
+  { name: 'Mini',  credits: '1 000',  price: '17,99$',  note: '~6 comptes / mois'   },
+  { name: 'Plus',  credits: '2 500',  price: '39,99$',  note: '~16 comptes / mois'  },
+  { name: 'Mega',  credits: '6 000',  price: '89,99$',  note: '40 comptes · Populaire' },
+  { name: 'Giga',  credits: '15 000', price: '199,99$', note: '100 comptes / mois'  },
+  { name: 'Ultra', credits: '40 000', price: '499,99$', note: '266 comptes · Top valeur' },
 ]
 
 // ── Pricing — luxe : carte "Pro" inversée en ivoire ──────────────────────────
 function PricingSection() {
-  const [yearly, setYearly] = useState(true)
+  const [yearly, setYearly] = useState(false)
 
   return (
     <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '120px 24px' }}>
@@ -888,11 +888,20 @@ function PricingSection() {
                   <p style={{ margin: '0 0 6px', fontFamily: SANS, fontSize: 11, color: inverted ? 'rgba(10,10,12,0.45)' : FAINT, minHeight: 14 }}>
                     {yearly && p.yearlyBilled ? p.yearlyBilled : ' '}
                   </p>
-                  <p style={{ margin: '0 0 6px', fontFamily: SANS, fontSize: 11.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: inverted ? 'rgba(10,10,12,0.6)' : 'rgba(99,102,241,0.7)' }}>
+                  <p style={{ margin: '0 0 8px', fontFamily: SANS, fontSize: 11.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: inverted ? 'rgba(10,10,12,0.6)' : 'rgba(99,102,241,0.7)' }}>
                     {p.credits}
                   </p>
-                  <p style={{ margin: '0 0 28px', fontFamily: SANS, fontSize: 12, fontWeight: 700, color: inverted ? '#0F1014' : GOLD }}>
-                    {p.perAccount}
+                  <div style={{
+                    margin: '0 0 10px', padding: '9px 12px', borderRadius: 10,
+                    background: inverted ? 'rgba(10,10,12,0.06)' : 'rgba(99,102,241,0.12)',
+                    border: `1px solid ${inverted ? 'rgba(10,10,12,0.15)' : 'rgba(99,102,241,0.3)'}`,
+                  }}>
+                    <p style={{ margin: 0, fontFamily: SANS, fontSize: 15, fontWeight: 900, color: inverted ? '#0F1014' : IVORY, lineHeight: 1.2 }}>
+                      {p.perAccount}
+                    </p>
+                  </div>
+                  <p style={{ margin: '0 0 24px', fontFamily: SANS, fontSize: 10.5, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT, lineHeight: 1.4 }}>
+                    Base : 2 posts + 1 story / jour / compte
                   </p>
 
                   <div style={{ height: 1, background: inverted ? 'rgba(10,10,12,0.12)' : HAIR, marginBottom: 24 }} />

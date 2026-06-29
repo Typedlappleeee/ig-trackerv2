@@ -53,11 +53,11 @@ export function scheduledPostCost(type: string, phoneCount: number): number {
 // pousser l'abo mensuel, mais dégressifs (plus gros pack = meilleur tarif).
 // Le meilleur pack (Ultra 0,0138$/cr) reste juste au-dessus du Standard.
 export const CREDIT_PACKS = [
-  { credits: 1000,  price: 19.99,  label: '1 000 crédits',  perCr: 0.020  },
-  { credits: 2500,  price: 44.99,  label: '2 500 crédits',  perCr: 0.018  },
-  { credits: 6000,  price: 99.99,  label: '6 000 crédits',  perCr: 0.0167 },
-  { credits: 15000, price: 224.99, label: '15 000 crédits', perCr: 0.015  },
-  { credits: 40000, price: 549.99, label: '40 000 crédits', perCr: 0.0138 },
+  { credits: 1000,  price: 17.99,  label: '1 000 crédits',  perCr: 0.018  },
+  { credits: 2500,  price: 39.99,  label: '2 500 crédits',  perCr: 0.016  },
+  { credits: 6000,  price: 89.99,  label: '6 000 crédits',  perCr: 0.015  },
+  { credits: 15000, price: 199.99, label: '15 000 crédits', perCr: 0.0133 },
+  { credits: 40000, price: 499.99, label: '40 000 crédits', perCr: 0.0125 },
 ]
 
 export interface CreditState {
