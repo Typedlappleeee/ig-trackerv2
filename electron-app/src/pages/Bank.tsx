@@ -220,6 +220,48 @@ function TagsModal({ item, onSave, onClose }: {
   )
 }
 
+// Description par vidéo — pré-remplit la légende au moment de poster.
+function DescriptionModal({ item, onSave, onClose }: {
+  item: ContentItem
+  onSave: (id: string, description: string) => void
+  onClose: () => void
+}) {
+  const t = useT()
+  const [val, setVal] = useState(item.description ?? '')
+  return (
+    <div className="sf-modal-bg" onClick={onClose}>
+      <div className="sf-modal w-96 anim-scale-in" onClick={e => e.stopPropagation()}>
+        <div className="sf-modal-header">
+          <h3 className="sf-modal-title">Description de la vidéo</h3>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label={t('cancel')}>
+            <IconX size={15} />
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          <textarea
+            autoFocus
+            rows={5}
+            placeholder="Légende qui sera pré-remplie quand tu postes cette vidéo… (facultatif)"
+            className="sf-input w-full resize-none"
+            value={val}
+            maxLength={2200}
+            onChange={e => setVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] text-text3">Facultatif — sert de légende par défaut au post.</p>
+            <span className="text-[11px] text-text3" style={{ fontVariantNumeric: 'tabular-nums' }}>{val.length}/2200</span>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" onClick={onClose}>{t('cancel')}</button>
+            <button className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" onClick={() => { onSave(item.id, val.trim()); onClose() }}>{t('save')}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const MIGRATION_SQL = `-- Colle dans Supabase → SQL Editor → Run
 alter table public.content_bank add column if not exists folder text default null;`
 
@@ -423,6 +465,7 @@ export function Bank({ user }: BankProps) {
   const [renameItem, setRenameItem] = useState<ContentItem | null>(null)
   const [moveItem, setMoveItem]     = useState<ContentItem | null>(null)
   const [tagsItem, setTagsItem]     = useState<ContentItem | null>(null)
+  const [descItem, setDescItem]     = useState<ContentItem | null>(null)
 
   const dropRef = useRef<HTMLDivElement>(null)
   const dragCounter = useRef(0)
@@ -667,6 +710,15 @@ export function Bank({ user }: BankProps) {
       return
     }
     setItems(prev => prev.map(i => i.id === id ? { ...i, title: newTitle } : i))
+  }
+
+  async function descItemSave(id: string, description: string) {
+    const { error: err } = await supabase.from('content_bank').update({ description }).eq('id', id)
+    if (err) {
+      toast.show({ title: 'Description échouée', body: err.message, kind: 'error' })
+      return
+    }
+    setItems(prev => prev.map(i => i.id === id ? { ...i, description } : i))
   }
 
   async function moveItemSave(id: string, folder: string | null) {
@@ -1432,6 +1484,11 @@ export function Bank({ user }: BankProps) {
               action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
+              icon: <IconPencil size={12} />,
+              label: 'Description',
+              action: () => { setDescItem(ctxMenu.item); setCtxMenu(null) }
+            },
+            {
               icon: <IconDownload size={12} />,
               label: 'Télécharger',
               action: async () => {
@@ -1603,6 +1660,9 @@ export function Bank({ user }: BankProps) {
       )}
       {tagsItem && (
         <TagsModal item={tagsItem} onSave={saveTagsSave} onClose={() => setTagsItem(null)} />
+      )}
+      {descItem && (
+        <DescriptionModal item={descItem} onSave={descItemSave} onClose={() => setDescItem(null)} />
       )}
 
       {/* ── ConfirmDialog — single item delete ── */}
@@ -2121,7 +2181,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
 export interface BankPickerProps {
   user: User
   mode: 'single' | 'multi'
-  onSelect: (paths: string[], titles?: string[]) => void
+  onSelect: (paths: string[], titles?: string[], descriptions?: string[]) => void
   onClose: () => void
   // 'signed-url': just create a signed URL (fast, no download) — for MassPosting
   // 'full': download to local path/blob URL — for Remix/FFmpeg (default)
@@ -2191,7 +2251,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     if (mode === 'single') {
       const paths = await resolvePaths([item])
       setResolving(null)
-      if (paths.length > 0) onSelect(paths, [item.title])
+      if (paths.length > 0) onSelect(paths, [item.title], [item.description ?? ''])
       return
     }
     setSelected(prev => {
@@ -2206,7 +2266,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     const its = items.filter(i => selected.has(i.id))
     const paths = await resolvePaths(its)
     setResolving(null)
-    onSelect(paths, its.map(i => i.title))
+    onSelect(paths, its.map(i => i.title), its.map(i => i.description ?? ''))
   }
 
   return (

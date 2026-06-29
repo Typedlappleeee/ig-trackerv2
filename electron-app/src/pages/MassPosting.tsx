@@ -1795,7 +1795,11 @@ export function MassPosting({ user }: MassPostingProps) {
           user={user}
           mode="multi"
           resolveMode="signed-url"
-          onSelect={(paths) => {
+          onSelect={(paths, _titles, descriptions) => {
+            // Si la 1ʳᵉ vidéo choisie a une description et que la légende est
+            // vide, on pré-remplit la légende avec (anti-écrasement du texte saisi).
+            const firstDesc = descriptions?.find(d => d && d.trim())
+            if (firstDesc && !caption.trim()) setCaption(firstDesc.trim())
             const newVideos: SelectedVideo[] = paths
               .filter(p => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))
               .map(p => ({
