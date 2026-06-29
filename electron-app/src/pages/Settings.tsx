@@ -1917,7 +1917,8 @@ function SubscriptionPanel() {
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
-                `2 500 ${t('creditsCosts')} ${t('perMonth')}`,
+                `3 750 ${t('creditsCosts')} ${t('perMonth')}`,
+                lang === 'en' ? '≈ 25 accounts · $2.00 / account' : '≈ 25 comptes · 2,00$ / compte',
                 `50 ${t('perPhones')} max`,
                 lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
                 `Mass Posting — 10 ${lang === 'en' ? 'accounts' : 'comptes'}`,
@@ -1954,7 +1955,8 @@ function SubscriptionPanel() {
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
-                `5 500 ${t('creditsCosts')} ${t('perMonth')}`,
+                `11 250 ${t('creditsCosts')} ${t('perMonth')}`,
+                lang === 'en' ? '≈ 75 accounts · $1.33 / account' : '≈ 75 comptes · 1,33$ / compte',
                 `200 ${t('perPhones')} max`,
                 lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
                 `Mass Posting ${lang === 'en' ? 'unlimited' : 'illimité'}`,
@@ -1988,7 +1990,8 @@ function SubscriptionPanel() {
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
-                `11 000 ${t('creditsCosts')} ${t('perMonth')}`,
+                `22 500 ${t('creditsCosts')} ${t('perMonth')}`,
+                lang === 'en' ? '150 accounts · $1.00 / account' : '150 comptes · 1,00$ / compte',
                 lang === 'en' ? 'Unlimited phones' : 'Téléphones illimités',
                 lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
                 `Mass Posting ${lang === 'en' ? 'unlimited' : 'illimité'}`,
@@ -2007,16 +2010,22 @@ function SubscriptionPanel() {
             </a>
           </div>
         </div>
+        <p className="text-[10.5px] mt-3" style={{ color: 'var(--text-4)', fontStyle: 'italic' }}>
+          {lang === 'en'
+            ? '* Account estimate based on standard usage: 2 posts + 1 story per day per account (≈ 150 credits/account/month — 2 credits/post, 1 credit/story).'
+            : '* Estimation comptes basée sur une utilisation standard : 2 posts + 1 story par jour et par compte (≈ 150 crédits/compte/mois — 2 crédits/post, 1 crédit/story).'}
+        </p>
 
         {/* Credit packs */}
         <div className="mt-6">
           <p className="text-[11px] font-semibold uppercase mb-3" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('creditPacks')}</p>
-          <div className="grid grid-cols-4 gap-3 anim-stagger">
+          <div className="grid grid-cols-5 gap-3 anim-stagger">
             {[
-              { cr: '1 000',  price: '19$',  label: 'Mini Pack'  },
-              { cr: '5 000',  price: '79$',  label: 'Mega Pack'  },
-              { cr: '15 000', price: '179$', label: 'Giga Pack'  },
-              { cr: '50 000', price: '499$', label: 'Ultra Pack' },
+              { cr: '1 000',  price: '19,99$',  label: 'Mini Pack'  },
+              { cr: '2 500',  price: '44,99$',  label: 'Plus Pack'  },
+              { cr: '6 000',  price: '99,99$',  label: 'Mega Pack'  },
+              { cr: '15 000', price: '224,99$', label: 'Giga Pack'  },
+              { cr: '40 000', price: '549,99$', label: 'Ultra Pack' },
             ].map(pk => (
               <a key={pk.cr} href="https://t.me/justquentin" target="_blank" rel="noreferrer"
                 className="sf-card sf-card-lift p-3.5 text-center no-underline"
