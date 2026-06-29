@@ -178,6 +178,7 @@ export function Licences({ user: _user }: Props) {
     const { error } = await supabase.from('license_keys').insert({
       key: genKey,
       expires_at: expiresAt,
+      duration_days: duration,   // null = à vie ; sinon la durée se cumule à l'activation
       plan,
       notes: notes || null,
     })

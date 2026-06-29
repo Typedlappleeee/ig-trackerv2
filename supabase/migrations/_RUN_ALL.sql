@@ -79,5 +79,13 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.org_owner_plan(uuid) TO authenticated;
 
+-- ════════════════ 4. CLÉS DE LICENCE CUMULABLES ════════════════════
+-- Durée (jours) figée sur la clé → à l'activation, la durée s'ajoute au temps
+-- restant (26 j restants + clé 30 j = 56 j).
+alter table public.license_keys add column if not exists duration_days integer;
+update public.license_keys
+  set duration_days = greatest(0, ceil(extract(epoch from (expires_at - created_at)) / 86400))::int
+  where duration_days is null and expires_at is not null;
+
 -- Recharge le cache PostgREST pour que les nouvelles tables/fonctions soient vues.
 notify pgrst, 'reload schema';
