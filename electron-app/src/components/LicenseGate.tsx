@@ -27,8 +27,7 @@ const PLANS = [
   },
   {
     name:          'Pro',
-    price:         '$59.99',
-    originalPrice: '$99.99',
+    price:         '$99.99',
     credits:       '11 250',
     perAccount:    '~75 comptes · 1,33$/compte',
     phones:        '200 téléphones',
@@ -38,8 +37,7 @@ const PLANS = [
   },
   {
     name:          'Organisation',
-    price:         '$89.99',
-    originalPrice: '$149.99',
+    price:         '$149.99',
     credits:       '22 500',
     perAccount:    '150 comptes · 1,00$/compte',
     phones:        'Téléphones illimités',
@@ -455,8 +453,14 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                           <span className="text-white font-black text-sm">{p.price}<span className="text-[10px] text-[#6b5fa0] font-normal">/mois</span></span>
                         </span>
                       </div>
+                      {(p as any).perAccount && (
+                        <div className="text-[11px] font-bold mb-1.5 px-2 py-1 rounded-md inline-block"
+                          style={{ color: '#c4b5fd', background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                          {(p as any).perAccount}
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                        {[`${p.credits} crédits/mois`, (p as any).perAccount, p.phones, p.posting, 'Support 24/7', ...(p.extra ? [p.extra] : [])].filter(Boolean).map(f => (
+                        {[`${p.credits} crédits/mois`, p.phones, p.posting, 'Support 24/7', ...(p.extra ? [p.extra] : [])].filter(Boolean).map(f => (
                           <span key={f} className="text-[10px]" style={{ color: '#6b5fa0' }}>· {f}</span>
                         ))}
                       </div>

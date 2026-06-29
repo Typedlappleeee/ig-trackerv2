@@ -1944,14 +1944,11 @@ function SubscriptionPanel() {
             <div>
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#818CF8' }}>Pro</p>
-                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40%</span>
               </div>
               <div className="flex items-baseline gap-1 mt-1.5">
-                <span className="text-[12px] line-through" style={{ color: 'rgba(148,163,184,0.35)' }}>99,99$</span>
-                <span className="text-2xl font-black text-white">59,99$</span>
+                <span className="text-2xl font-black text-white">99,99$</span>
                 <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
-              <p className="text-[10px] mt-0.5" style={{ color: '#fb923c' }}>jusqu’au 1er juillet</p>
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
@@ -1979,14 +1976,11 @@ function SubscriptionPanel() {
             <div>
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#22C55E' }}>Organisation</p>
-                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40%</span>
               </div>
               <div className="flex items-baseline gap-1 mt-1.5">
-                <span className="text-[12px] line-through" style={{ color: 'rgba(148,163,184,0.35)' }}>149,99$</span>
-                <span className="text-2xl font-black text-white">89,99$</span>
+                <span className="text-2xl font-black text-white">149,99$</span>
                 <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
-              <p className="text-[10px] mt-0.5" style={{ color: '#fb923c' }}>jusqu’au 1er juillet</p>
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
@@ -2021,11 +2015,11 @@ function SubscriptionPanel() {
           <p className="text-[11px] font-semibold uppercase mb-3" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('creditPacks')}</p>
           <div className="grid grid-cols-5 gap-3 anim-stagger">
             {[
-              { cr: '1 000',  price: '19,99$',  label: 'Mini Pack'  },
-              { cr: '2 500',  price: '44,99$',  label: 'Plus Pack'  },
-              { cr: '6 000',  price: '99,99$',  label: 'Mega Pack'  },
-              { cr: '15 000', price: '224,99$', label: 'Giga Pack'  },
-              { cr: '40 000', price: '549,99$', label: 'Ultra Pack' },
+              { cr: '1 000',  price: '17,99$',  label: 'Mini Pack'  },
+              { cr: '2 500',  price: '39,99$',  label: 'Plus Pack'  },
+              { cr: '6 000',  price: '89,99$',  label: 'Mega Pack'  },
+              { cr: '15 000', price: '199,99$', label: 'Giga Pack'  },
+              { cr: '40 000', price: '499,99$', label: 'Ultra Pack' },
             ].map(pk => (
               <a key={pk.cr} href="https://t.me/justquentin" target="_blank" rel="noreferrer"
                 className="sf-card sf-card-lift p-3.5 text-center no-underline"
