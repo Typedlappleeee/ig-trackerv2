@@ -2019,10 +2019,10 @@ function SubscriptionPanel() {
           <div className="grid grid-cols-5 gap-3 anim-stagger">
             {[
               { cr: '1 000',  price: '12,99$',  label: 'Mini Pack'  },
-              { cr: '2 500',  price: '26,99$',  label: 'Plus Pack'  },
-              { cr: '6 000',  price: '49,99$',  label: 'Mega Pack'  },
-              { cr: '15 000', price: '104,99$', label: 'Giga Pack'  },
-              { cr: '40 000', price: '209,99$', label: 'Ultra Pack' },
+              { cr: '2 500',  price: '27,99$',  label: 'Plus Pack'  },
+              { cr: '6 000',  price: '54,99$',  label: 'Mega Pack'  },
+              { cr: '15 000', price: '119,99$', label: 'Giga Pack'  },
+              { cr: '40 000', price: '289,99$', label: 'Ultra Pack' },
             ].map(pk => (
               <a key={pk.cr} href="https://t.me/justquentin" target="_blank" rel="noreferrer"
                 className="sf-card sf-card-lift p-3.5 text-center no-underline"
