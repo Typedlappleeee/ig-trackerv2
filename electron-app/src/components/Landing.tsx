@@ -735,6 +735,7 @@ type PlanFeature = { text: string; included: boolean }
 interface PlanDef {
   name: string; tagline: string
   credits: string
+  perAccount: string
   monthlyPrice: string; yearlyPrice: string
   originalMonthly: string; discount: string; yearlyBilled: string
   popular?: boolean; bestValue?: boolean
@@ -745,6 +746,7 @@ const PLANS: PlanDef[] = [
   {
     name: 'Standard', tagline: 'Pour débuter',
     credits: '3 750 crédits / mois',
+    perAccount: '≈ 25 comptes · 2,00$ / compte',
     monthlyPrice: '49,99$', yearlyPrice: '49,99$',
     originalMonthly: '', discount: '', yearlyBilled: '',
     btnLabel: 'Choisir Standard',
@@ -760,6 +762,7 @@ const PLANS: PlanDef[] = [
   {
     name: 'Pro', tagline: 'Scale ton output',
     credits: '11 250 crédits / mois',
+    perAccount: '≈ 75 comptes · 1,33$ / compte',
     monthlyPrice: '99,99$', yearlyPrice: '59,99$',
     originalMonthly: '99,99$', discount: '−40%', yearlyBilled: '719,88$ facturé annuellement',
     popular: true,
@@ -776,6 +779,7 @@ const PLANS: PlanDef[] = [
   {
     name: 'Organisation', tagline: 'Puissance illimitée',
     credits: '22 500 crédits / mois',
+    perAccount: '150 comptes · 1,00$ / compte',
     monthlyPrice: '149,99$', yearlyPrice: '89,99$',
     originalMonthly: '149,99$', discount: '−40%', yearlyBilled: '1 079,88$ facturé annuellement',
     bestValue: true,
@@ -884,8 +888,11 @@ function PricingSection() {
                   <p style={{ margin: '0 0 6px', fontFamily: SANS, fontSize: 11, color: inverted ? 'rgba(10,10,12,0.45)' : FAINT, minHeight: 14 }}>
                     {yearly && p.yearlyBilled ? p.yearlyBilled : ' '}
                   </p>
-                  <p style={{ margin: '0 0 28px', fontFamily: SANS, fontSize: 11.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: inverted ? 'rgba(10,10,12,0.6)' : 'rgba(99,102,241,0.7)' }}>
+                  <p style={{ margin: '0 0 6px', fontFamily: SANS, fontSize: 11.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: inverted ? 'rgba(10,10,12,0.6)' : 'rgba(99,102,241,0.7)' }}>
                     {p.credits}
+                  </p>
+                  <p style={{ margin: '0 0 28px', fontFamily: SANS, fontSize: 12, fontWeight: 700, color: inverted ? '#0F1014' : GOLD }}>
+                    {p.perAccount}
                   </p>
 
                   <div style={{ height: 1, background: inverted ? 'rgba(10,10,12,0.12)' : HAIR, marginBottom: 24 }} />
