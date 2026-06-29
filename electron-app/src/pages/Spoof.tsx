@@ -206,7 +206,21 @@ export function Spoof({ user }: { user: User }) {
           })
           const data = await res.json()
           if (data.ok) {
-            updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta })
+            // Auto-enregistrement dans la banque dès qu'une vidéo est prête
+            // (dossier choisi, ou racine si aucun) — plus besoin de cliquer.
+            let savedOk = false
+            if (data.storagePath) {
+              const { error: bankErr } = await supabase.from('content_bank').insert({
+                user_id: user.id, org_id: currentOrg?.id ?? null,
+                title: `Spoof — ${job.name}`,
+                file_url: null, storage_path: data.storagePath, thumbnail_path: null,
+                folder: saveFolder, tags: ['spoof'],
+                notes: data.appliedMeta ? `${data.appliedMeta.model} · ${data.appliedMeta.city}` : '',
+              })
+              savedOk = !bankErr
+              if (bankErr) console.error('[Spoof] auto-save bank failed', bankErr)
+            }
+            updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta, savedToBank: savedOk })
           } else {
             updateJob(job.id, { status: 'error', error: data.error ?? 'Erreur inconnue' })
           }

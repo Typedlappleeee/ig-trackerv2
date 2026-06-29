@@ -252,20 +252,24 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
   return (
     <>
       {/* ── Bank picker overlay ─────────────────────────────────────────────── */}
+      {/* z-index 10001 : le picker partage la classe sf-modal-bg (z 9000) que ce
+          modal-ci, donc sans contexte d'empilement dédié il s'affiche DERRIÈRE. */}
       {showBank && (
-        <BankPicker
-          user={user}
-          mode="multi"
-          resolveMode="signed-url"
-          onSelect={(paths, titles) => {
-            setPhotoPool(prev => [
-              ...prev,
-              ...paths.map((url, i) => ({ url, name: titles?.[i] ?? `photo ${prev.length + i + 1}` })),
-            ])
-            setShowBank(false)
-          }}
-          onClose={() => setShowBank(false)}
-        />
+        <div style={{ position: 'relative', zIndex: 10001 }}>
+          <BankPicker
+            user={user}
+            mode="multi"
+            resolveMode="signed-url"
+            onSelect={(paths, titles) => {
+              setPhotoPool(prev => [
+                ...prev,
+                ...paths.map((url, i) => ({ url, name: titles?.[i] ?? `photo ${prev.length + i + 1}` })),
+              ])
+              setShowBank(false)
+            }}
+            onClose={() => setShowBank(false)}
+          />
+        </div>
       )}
 
       {/* ── Modal backdrop ──────────────────────────────────────────────────── */}
