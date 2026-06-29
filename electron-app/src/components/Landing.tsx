@@ -792,10 +792,11 @@ const PLANS: PlanDef[] = [
 ]
 
 const CREDIT_PACKS = [
-  { name: 'Mini',  credits: '1 000',  price: '19$',  note: '' },
-  { name: 'Mega',  credits: '5 000',  price: '79$',  note: 'Populaire' },
-  { name: 'Giga',  credits: '15 000', price: '179$', note: '' },
-  { name: 'Ultra', credits: '50 000', price: '499$', note: 'Meilleure valeur' },
+  { name: 'Mini',  credits: '1 000',  price: '19,99$',  note: '' },
+  { name: 'Plus',  credits: '2 500',  price: '44,99$',  note: '' },
+  { name: 'Mega',  credits: '6 000',  price: '99,99$',  note: 'Populaire' },
+  { name: 'Giga',  credits: '15 000', price: '224,99$', note: '' },
+  { name: 'Ultra', credits: '40 000', price: '549,99$', note: 'Meilleure valeur' },
 ]
 
 // ── Pricing — luxe : carte "Pro" inversée en ivoire ──────────────────────────
