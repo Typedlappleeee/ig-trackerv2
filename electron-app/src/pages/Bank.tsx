@@ -220,6 +220,17 @@ function TagsModal({ item, onSave, onClose }: {
   )
 }
 
+// Description d'un item : préfère la colonne `description` si présente, sinon
+// retombe sur `notes` (où on stocke aussi la description, sans migration).
+// Ignore les valeurs sentinelles de dossier.
+export function getItemDesc(item: ContentItem): string {
+  const d = (item.description ?? '').trim()
+  if (d) return d
+  const n = (item.notes ?? '').trim()
+  if (n === '__sf_folder__' || n === '__sf_drive_folder__') return ''
+  return n
+}
+
 // Description par vidéo — pré-remplit la légende au moment de poster.
 function DescriptionModal({ item, onSave, onClose }: {
   item: ContentItem
@@ -227,7 +238,7 @@ function DescriptionModal({ item, onSave, onClose }: {
   onClose: () => void
 }) {
   const t = useT()
-  const [val, setVal] = useState(item.description ?? '')
+  const [val, setVal] = useState(getItemDesc(item))
   return (
     <div className="sf-modal-bg" onClick={onClose}>
       <div className="sf-modal w-96 anim-scale-in" onClick={e => e.stopPropagation()}>
@@ -713,12 +724,18 @@ export function Bank({ user }: BankProps) {
   }
 
   async function descItemSave(id: string, description: string) {
-    const { error: err } = await supabase.from('content_bank').update({ description }).eq('id', id)
+    // On stocke la description dans `notes` (colonne déjà existante) → aucune
+    // migration requise. On tente d'abord `description` si elle existe ; sinon
+    // on retombe sur `notes`. Lecture : description ?? notes (cf. getItemDesc).
+    let { error: err } = await supabase.from('content_bank').update({ description, notes: description }).eq('id', id)
+    if (err && /description/.test(err.message)) {
+      ({ error: err } = await supabase.from('content_bank').update({ notes: description }).eq('id', id))
+    }
     if (err) {
       toast.show({ title: 'Description échouée', body: err.message, kind: 'error' })
       return
     }
-    setItems(prev => prev.map(i => i.id === id ? { ...i, description } : i))
+    setItems(prev => prev.map(i => i.id === id ? { ...i, description, notes: description } : i))
   }
 
   async function moveItemSave(id: string, folder: string | null) {
@@ -2251,7 +2268,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     if (mode === 'single') {
       const paths = await resolvePaths([item])
       setResolving(null)
-      if (paths.length > 0) onSelect(paths, [item.title], [item.description ?? ''])
+      if (paths.length > 0) onSelect(paths, [item.title], [getItemDesc(item)])
       return
     }
     setSelected(prev => {
@@ -2266,7 +2283,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     const its = items.filter(i => selected.has(i.id))
     const paths = await resolvePaths(its)
     setResolving(null)
-    onSelect(paths, its.map(i => i.title), its.map(i => i.description ?? ''))
+    onSelect(paths, its.map(i => i.title), its.map(i => getItemDesc(i)))
   }
 
   return (

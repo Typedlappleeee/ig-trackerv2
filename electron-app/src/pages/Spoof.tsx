@@ -127,7 +127,9 @@ export function Spoof({ user }: { user: User }) {
       file_url: null,
       storage_path: job.storagePath,
       thumbnail_path: null,
-      folder: saveFolder, tags: ['spoof'], notes: job.meta ? `${job.meta.model} · ${job.meta.city}` : '',
+      folder: saveFolder,
+      tags: ['spoof', ...(job.meta ? [job.meta.model, job.meta.city].filter(Boolean) : [])],
+      notes: '',
     })
     if (error) { alert('Échec de l\'enregistrement : ' + error.message); return false }
     updateJob(job.id, { savedToBank: true })
@@ -214,8 +216,10 @@ export function Spoof({ user }: { user: User }) {
                 user_id: user.id, org_id: currentOrg?.id ?? null,
                 title: `Spoof — ${job.name}`,
                 file_url: null, storage_path: data.storagePath, thumbnail_path: null,
-                folder: saveFolder, tags: ['spoof'],
-                notes: data.appliedMeta ? `${data.appliedMeta.model} · ${data.appliedMeta.city}` : '',
+                folder: saveFolder,
+                // meta dans les tags (pas dans notes, qui sert de description/légende).
+                tags: ['spoof', ...(data.appliedMeta ? [data.appliedMeta.model, data.appliedMeta.city].filter(Boolean) : [])],
+                notes: '',
               })
               savedOk = !bankErr
               if (bankErr) console.error('[Spoof] auto-save bank failed', bankErr)
