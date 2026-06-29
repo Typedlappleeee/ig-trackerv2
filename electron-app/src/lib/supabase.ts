@@ -149,6 +149,7 @@ export interface ContentItem {
   duration:       number | null
   tags:           string[]
   notes:          string
+  description?:   string   // légende propre à la vidéo — pré-remplit le post
   used_count:     number
   created_at:     string
   updated_at:     string
