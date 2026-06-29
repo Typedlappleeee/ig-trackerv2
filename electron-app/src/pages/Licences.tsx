@@ -175,13 +175,13 @@ export function Licences({ user: _user }: Props) {
     const expiresAt = duration !== null
       ? new Date(Date.now() + duration * 86_400_000).toISOString()
       : null
-    const { error } = await supabase.from('license_keys').insert({
-      key: genKey,
-      expires_at: expiresAt,
-      duration_days: duration,   // null = à vie ; sinon la durée se cumule à l'activation
-      plan,
-      notes: notes || null,
-    })
+    const baseRow = { key: genKey, expires_at: expiresAt, plan, notes: notes || null }
+    // duration_days permet le cumul des durées à l'activation. Si la migration
+    // n'a pas encore été lancée (colonne absente), on réessaie sans → pas de blocage.
+    let { error } = await supabase.from('license_keys').insert({ ...baseRow, duration_days: duration })
+    if (error && /duration_days/.test(error.message)) {
+      ({ error } = await supabase.from('license_keys').insert(baseRow))
+    }
     setCreating(false)
     if (error) {
       toast.show({ title: lang === 'en' ? 'Key creation failed' : 'Création de la clé échouée', body: error.message, kind: 'error' })
