@@ -20,6 +20,7 @@ const PLANS = [
     name:    'Standard',
     price:   '$49.99',
     credits: '3 750',
+    perAccount: '~25 comptes · 2,00$/compte',
     phones:  '50 téléphones',
     posting: 'Mass posting 10 comptes',
     accent:  '#818CF8',
@@ -29,6 +30,7 @@ const PLANS = [
     price:         '$59.99',
     originalPrice: '$99.99',
     credits:       '11 250',
+    perAccount:    '~75 comptes · 1,33$/compte',
     phones:        '200 téléphones',
     posting:       'Mass posting illimité',
     accent:        '#c084fc',
@@ -39,6 +41,7 @@ const PLANS = [
     price:         '$89.99',
     originalPrice: '$149.99',
     credits:       '22 500',
+    perAccount:    '150 comptes · 1,00$/compte',
     phones:        'Téléphones illimités',
     posting:       'Mass posting illimité',
     accent:        '#34d399',
@@ -453,7 +456,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                        {[`${p.credits} crédits/mois`, p.phones, p.posting, 'Support 24/7', ...(p.extra ? [p.extra] : [])].map(f => (
+                        {[`${p.credits} crédits/mois`, (p as any).perAccount, p.phones, p.posting, 'Support 24/7', ...(p.extra ? [p.extra] : [])].filter(Boolean).map(f => (
                           <span key={f} className="text-[10px]" style={{ color: '#6b5fa0' }}>· {f}</span>
                         ))}
                       </div>
