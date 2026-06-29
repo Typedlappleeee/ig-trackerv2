@@ -2004,22 +2004,25 @@ function SubscriptionPanel() {
             </a>
           </div>
         </div>
-        <p className="text-[10.5px] mt-3" style={{ color: 'var(--text-4)', fontStyle: 'italic' }}>
-          {lang === 'en'
-            ? '* Account estimate based on standard usage: 2 posts + 1 story per day per account (≈ 150 credits/account/month — 2 credits/post, 1 credit/story).'
-            : '* Estimation comptes basée sur une utilisation standard : 2 posts + 1 story par jour et par compte (≈ 150 crédits/compte/mois — 2 crédits/post, 1 crédit/story).'}
-        </p>
+        <div className="mt-3 flex items-center gap-3 p-3.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.32)' }}>
+          <span className="text-[18px] flex-shrink-0">📊</span>
+          <p className="text-[12.5px] font-medium" style={{ color: 'var(--text-1)', lineHeight: 1.5 }}>
+            {lang === 'en'
+              ? <>Account estimate based on <strong style={{ color: '#a5b4fc' }}>standard usage: 2 posts + 1 story per day per account</strong> (≈ 150 credits/account/month — 2 cr/post, 1 cr/story). Video tools (Remix, Spoof) are free; unused credits roll over.</>
+              : <>Estimation comptes basée sur une <strong style={{ color: '#a5b4fc' }}>utilisation standard : 2 posts + 1 story par jour et par compte</strong> (≈ 150 crédits/compte/mois — 2 cr/post, 1 cr/story). Les outils vidéo (Remix, Spoof) sont gratuits ; les crédits non utilisés se cumulent.</>}
+          </p>
+        </div>
 
         {/* Credit packs */}
         <div className="mt-6">
           <p className="text-[11px] font-semibold uppercase mb-3" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>{t('creditPacks')}</p>
           <div className="grid grid-cols-5 gap-3 anim-stagger">
             {[
-              { cr: '1 000',  price: '17,99$',  label: 'Mini Pack'  },
-              { cr: '2 500',  price: '39,99$',  label: 'Plus Pack'  },
-              { cr: '6 000',  price: '89,99$',  label: 'Mega Pack'  },
-              { cr: '15 000', price: '199,99$', label: 'Giga Pack'  },
-              { cr: '40 000', price: '499,99$', label: 'Ultra Pack' },
+              { cr: '1 000',  price: '12,99$',  label: 'Mini Pack'  },
+              { cr: '2 500',  price: '26,99$',  label: 'Plus Pack'  },
+              { cr: '6 000',  price: '49,99$',  label: 'Mega Pack'  },
+              { cr: '15 000', price: '104,99$', label: 'Giga Pack'  },
+              { cr: '40 000', price: '209,99$', label: 'Ultra Pack' },
             ].map(pk => (
               <a key={pk.cr} href="https://t.me/justquentin" target="_blank" rel="noreferrer"
                 className="sf-card sf-card-lift p-3.5 text-center no-underline"
