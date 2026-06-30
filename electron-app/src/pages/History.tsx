@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { canManageOrg } from '@/lib/permissions'
 import { fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import {
@@ -68,12 +69,17 @@ function IconBox({ ok }: { ok: boolean }) {
 const PAGE_SIZE = 30
 
 export function History({ user }: { user: User }) {
-  const { currentOrg } = useOrg()
+  const { currentOrg, role } = useOrg()
   const [items,     setItems]   = useState<HistoryItem[]>([])
   const [loading,   setLoading] = useState(true)
   const [hasMore,   setHasMore] = useState(false)
   const [page,      setPage]    = useState(0)
   const [filter,    setFilter]  = useState<'all' | 'scheduled' | 'direct'>('all')
+  const [confirming, setConfirming] = useState(false)
+  const [clearing,   setClearing]   = useState(false)
+
+  // Solo users own their personal data; in an org only owner/admin can wipe.
+  const canClear = role === null || canManageOrg(role)
 
   const load = useCallback(async (pageIdx: number, reset: boolean) => {
     setLoading(true)
@@ -125,6 +131,32 @@ export function History({ user }: { user: User }) {
     load(next, false)
   }
 
+  async function clearHistory() {
+    setClearing(true)
+    try {
+      const scoped = (table: string) => {
+        const q = supabase.from(table).delete()
+        return currentOrg
+          ? q.eq('org_id', currentOrg.id)
+          : q.eq('user_id', user.id).is('org_id', null)
+      }
+
+      // Only finished scheduled posts — keep pending/running ones intact.
+      await scoped('scheduled_posts').in('status', ['done', 'failed', 'cancelled'])
+      await scoped('post_runs')
+
+      setItems([])
+      setHasMore(false)
+      setConfirming(false)
+      setPage(0)
+      load(0, true)
+    } catch (e) {
+      console.error('[History] clear failed:', e)
+    } finally {
+      setClearing(false)
+    }
+  }
+
   const filterBtn = (f: typeof filter, label: string) => (
     <button
       onClick={() => setFilter(f)}
@@ -157,6 +189,49 @@ export function History({ user }: { user: User }) {
           <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: IVORY, fontFamily: SANS, letterSpacing: '-0.01em' }}>Historique</h1>
           <p style={{ margin: 0, fontSize: 13, color: MUTED, fontFamily: SANS, marginTop: 2 }}>Tous vos posts — programmés et directs</p>
         </div>
+
+        {canClear && items.length > 0 && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {confirming ? (
+              <>
+                <span style={{ fontSize: 12, color: MUTED, fontFamily: SANS }}>Effacer tout l'historique ?</span>
+                <button
+                  onClick={clearHistory}
+                  disabled={clearing}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: SANS,
+                    cursor: clearing ? 'default' : 'pointer', opacity: clearing ? 0.6 : 1,
+                    background: 'rgba(248,113,113,0.16)', color: ERR,
+                    border: '1px solid rgba(248,113,113,0.4)',
+                  }}
+                >{clearing ? 'Suppression…' : 'Oui, effacer'}</button>
+                <button
+                  onClick={() => setConfirming(false)}
+                  disabled={clearing}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
+                    cursor: 'pointer', background: 'transparent', color: MUTED, border: `1px solid ${HAIR}`,
+                  }}
+                >Annuler</button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirming(true)}
+                style={{
+                  marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
+                  cursor: 'pointer', background: 'transparent', color: MUTED, border: `1px solid ${HAIR}`,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                Vider l'historique
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filter tabs */}
