@@ -340,11 +340,21 @@ function NeonTunnel() {
   return <canvas ref={ref} aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} />
 }
 
+// Vidéos affichées dans les téléphones de la démo. Dépose tes fichiers dans
+// electron-app/public/showcase/ (1.mp4 … 8.mp4) et ils s'affichent ici.
+// Si un fichier manque, on retombe proprement sur le dégradé.
+const SHOWCASE_VIDEOS: string[] = [
+  '/showcase/1.mp4', '/showcase/2.mp4', '/showcase/3.mp4', '/showcase/4.mp4',
+  '/showcase/5.mp4', '/showcase/6.mp4', '/showcase/7.mp4', '/showcase/8.mp4',
+]
+
 // ── Mini-téléphone qui poste tout seul ───────────────────────────────────────
 function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: string }) {
   const cycle = 6                       // durée d'un cycle (s)
   const delay = -(i * 0.85)             // décalage → effet de vague
   const a = (name: string) => `${name} ${cycle}s linear ${delay}s infinite`
+  const [videoOk, setVideoOk] = useState(true)
+  const src = SHOWCASE_VIDEOS[i % SHOWCASE_VIDEOS.length]
   return (
     <div style={{ animation: `sf-float-soft ${7 + (i % 4)}s ease-in-out ${i * 0.3}s infinite`, flexShrink: 0 }}>
       <div style={{
@@ -354,13 +364,22 @@ function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: strin
       }}>
         {/* écran */}
         <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden', background: '#0a0a0d' }}>
-          {/* reel */}
+          {/* reel — vraie vidéo si dispo, sinon dégradé */}
           <div style={{ position: 'absolute', inset: 0, background: grad }} />
+          {videoOk && src && (
+            <video
+              src={src} autoPlay muted loop playsInline
+              onError={() => setVideoOk(false)}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          )}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.35), transparent 30%, transparent 60%, rgba(0,0,0,0.7))' }} />
-          {/* play */}
-          <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: '#fff', fontSize: 12, marginLeft: 2 }}>▶</span>
-          </div>
+          {/* play (uniquement sur le dégradé) */}
+          {!(videoOk && src) && (
+            <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: '#fff', fontSize: 12, marginLeft: 2 }}>▶</span>
+            </div>
+          )}
           {/* top bar IG */}
           <div style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#a855f7)' }} />
@@ -414,6 +433,60 @@ function AutoPostShowcase() {
         <div style={{ display: 'flex', gap: 26, width: 'max-content', padding: '0 26px', animation: 'sf-conveyor 38s linear infinite' }}>
           {[...phones, ...phones].map((p, idx) => <AutoPhone key={idx} i={idx} grad={p.grad} handle={p.handle} />)}
         </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Compteur qui s'incrémente quand il entre à l'écran ────────────────────────
+function CountUp({ to, prefix = '', suffix = '', duration = 1900 }: { to: number; prefix?: string; suffix?: string; duration?: number }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [val, setVal] = useState(0)
+  const started = useRef(false)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !started.current) {
+        started.current = true
+        const start = performance.now()
+        const tick = (now: number) => {
+          const p = Math.min((now - start) / duration, 1)
+          const eased = 1 - Math.pow(1 - p, 3)
+          setVal(Math.round(eased * to))
+          if (p < 1) requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+        obs.disconnect()
+      }
+    }, { threshold: 0.4 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [to, duration])
+  return <span ref={ref}>{prefix}{val.toLocaleString('fr-FR')}{suffix}</span>
+}
+
+// ── Bandeau de stats animées ──────────────────────────────────────────────────
+function StatsBanner() {
+  const stats = [
+    { to: 500, suffix: '+', label: 'comptes pilotés en parallèle' },
+    { to: 1200, suffix: '+', label: 'publications automatisées / jour' },
+    { to: 100, suffix: '%', label: 'autonome — même PC éteint' },
+    { to: 24, suffix: '/7', label: 'cloud phones qui tournent' },
+  ]
+  return (
+    <section style={{ position: 'relative', padding: '70px 24px', background: BG, borderTop: `1px solid ${HAIR}`, borderBottom: `1px solid ${HAIR}` }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 60% 120% at 50% 0%, rgba(99,102,241,0.08), transparent)', pointerEvents: 'none' }} />
+      <div style={{ maxWidth: 1080, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, position: 'relative' }}>
+        {stats.map((s, i) => (
+          <FadeIn key={i} delay={i * 0.08}>
+            <div style={{ textAlign: 'center', padding: '8px 12px' }}>
+              <div style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px,4.6vw,56px)', letterSpacing: '-0.03em', lineHeight: 1, background: 'linear-gradient(135deg,#E9EAF0,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontVariantNumeric: 'tabular-nums' }}>
+                <CountUp to={s.to} suffix={s.suffix} />
+              </div>
+              <div style={{ fontFamily: SANS, fontSize: 12.5, color: FAINT, marginTop: 10, lineHeight: 1.4 }}>{s.label}</div>
+            </div>
+          </FadeIn>
+        ))}
       </div>
     </section>
   )
@@ -1505,6 +1578,9 @@ export function Landing() {
 
       {/* ── Démo animée : les téléphones postent tout seuls ──────────────────── */}
       <AutoPostShowcase />
+
+      {/* ── Stats animées ────────────────────────────────────────────────────── */}
+      <StatsBanner />
 
       {/* ── Manifeste ────────────────────────────────────────────────────────── */}
       <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px' }}>
