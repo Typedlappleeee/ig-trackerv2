@@ -108,5 +108,20 @@ alter table public.phones add column if not exists account_state text;
 -- Nombre de posts faits aujourd'hui (par compte/jour).
 alter table public.account_daily add column if not exists posts_today integer default 0;
 
+-- ════════════════ 7. SUPPRESSION HISTORIQUE (vider l'historique) ════
+-- Permet à un utilisateur de supprimer son propre historique, et à un admin/
+-- propriétaire d'org de vider l'historique de l'org.
+drop policy if exists "sched_delete" on public.scheduled_posts;
+create policy "sched_delete" on public.scheduled_posts for delete using (
+  auth.uid() = user_id
+  or (org_id is not null and public.is_org_admin(org_id))
+);
+
+drop policy if exists "post_runs_delete_org" on public.post_runs;
+create policy "post_runs_delete_org" on public.post_runs for delete using (
+  auth.uid() = user_id
+  or (org_id is not null and public.is_org_admin(org_id))
+);
+
 -- Recharge le cache PostgREST pour que les nouvelles tables/fonctions soient vues.
 notify pgrst, 'reload schema';
