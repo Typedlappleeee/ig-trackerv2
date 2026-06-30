@@ -98,7 +98,12 @@ export function Reports({ user }: { user: User }) {
     // Infos live depuis phones (followers, pp, dernier post, statut).
     let pQ = supabase.from('phones').select('id, followers, pp_url, last_post_at, account_state').not('ig_username', 'is', null)
     pQ = currentOrg ? pQ.eq('org_id', currentOrg.id) : pQ.eq('user_id', user.id).is('org_id', null)
-    const [{ data: cfgData }, { data: dData }, { data: pData }] = await Promise.all([cfgQ, dQ, pQ])
+    // Courbe : depuis les données STOCKÉES (account_daily, posts faits ce jour-là).
+    // AUCUN appel API ici (sinon on crame le quota RapidAPI à chaque chargement).
+    const from30 = new Date(new Date(day + 'T12:00:00').getTime() - 29 * 86_400_000).toLocaleDateString('fr-CA')
+    let tQ = supabase.from('account_daily').select('day, views, posted').eq('posted', true).gte('day', from30).lte('day', day)
+    tQ = currentOrg ? tQ.eq('org_id', currentOrg.id) : tQ.eq('user_id', user.id).is('org_id', null)
+    const [{ data: cfgData }, { data: dData }, { data: pData }, { data: tData }] = await Promise.all([cfgQ, dQ, pQ, tQ])
     const tc = (cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>
     setCfg({ ...DEFAULT_CFG, ...tc })
     // deno-lint-ignore no-explicit-any
@@ -109,31 +114,18 @@ export function Reports({ user }: { user: User }) {
       const p = pMap.get(r.phone_id)
       return { ...r, followers: p?.followers ?? null, pp_url: p?.pp_url ?? null, last_post_at: p?.last_post_at ?? null, account_state: p?.account_state ?? null }
     }))
+    // Série 30 j depuis account_daily.
+    const byDay = new Map<string, number>()
+    for (const r of (tData ?? []) as { day: string; views: number | null }[]) byDay.set(r.day, (byDay.get(r.day) ?? 0) + (r.views ?? 0))
+    const series: TrendPoint[] = []
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(new Date(day + 'T12:00:00').getTime() - i * 86_400_000).toLocaleDateString('fr-CA')
+      series.push({ day: d, views: byDay.get(d) ?? 0 })
+    }
+    setTrend(series)
     setShowCfg(prev => prev || !tc.enabled)
     setLoading(false)
   }, [table, keyCol, keyVal, currentOrg?.id, user.id, day])
-
-  // Courbe : vues des reels par DATE DE PUBLICATION (via l'edge function).
-  // Appel séparé (N appels API) pour ne pas bloquer l'affichage de la page.
-  const loadTrend = useCallback(async () => {
-    try {
-      const { data } = await supabase.functions.invoke('run-scheduled-posts', {
-        body: { trend: 'posting-views', org_id: currentOrg?.id ?? null, user_id: currentOrg ? null : user.id },
-      })
-      const buckets = ((data as { buckets?: Record<string, number> })?.buckets) ?? {}
-      const series: TrendPoint[] = []
-      // Mêmes clés de date (Paris) que l'edge function, sinon rien ne matche.
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date(new Date(day + 'T12:00:00').getTime() - i * 86_400_000)
-          .toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' })
-        series.push({ day: d, views: buckets[d] ?? 0 })
-      }
-      setTrend(series)
-      console.log('[Reports] trend buckets', buckets)
-    } catch { /* silencieux */ }
-  }, [currentOrg?.id, user.id, day])
-
-  useEffect(() => { loadTrend() }, [loadTrend])
 
   useEffect(() => { load() }, [load])
 
@@ -161,8 +153,7 @@ export function Reports({ user }: { user: User }) {
         console.log('[Reports] sync result', data)
       }
     } catch (e) { setLaunchMsg('❌ ' + String(e)); console.error('[Reports] sync exception', e) }
-    await load()   // recharge les données fraîchement synchronisées
-    loadTrend()    // recalcule la courbe
+    await load()   // recharge les données fraîchement synchronisées (+ courbe)
     setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 10000)
   }
 
