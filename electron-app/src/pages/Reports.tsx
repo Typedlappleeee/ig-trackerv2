@@ -81,14 +81,19 @@ export function Reports({ user }: { user: User }) {
     if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
   }
 
-  // « Lancer maintenant » : déclenche la synchro hors de l'heure prévue.
-  // Le cron (chaque minute) la détecte et la lance dans la minute qui suit.
+  // « Lancer maintenant » : déclenche la synchro IMMÉDIATEMENT (appel direct de
+  // l'edge function) puis recharge — pas d'attente du cron.
   async function launchNow() {
     setLaunching(true); setLaunched(false)
     const next = { ...cfg, enabled: true, force_run: new Date().toISOString() }
     setCfg(next)
     await supabase.from(table).upsert({ [keyCol]: keyVal, tracking_config: next }, { onConflict: keyCol })
-    setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 6000)
+    try {
+      const { error } = await supabase.functions.invoke('run-scheduled-posts', { body: { sync: 'accounts' } })
+      if (error) console.error('[Reports] sync error', error)
+    } catch (e) { console.error('[Reports] sync exception', e) }
+    await load()   // recharge les données fraîchement synchronisées
+    setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 4000)
   }
 
   // Test RapidAPI : appelle l'edge function en mode diagnostic et affiche le détail.
@@ -202,10 +207,10 @@ export function Reports({ user }: { user: User }) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: saving ? 0.6 : 1 }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
-              <button onClick={launchNow} disabled={launching} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: launching ? 0.6 : 1 }}>{launching ? 'Lancement…' : '⚡ Lancer maintenant'}</button>
+              <button onClick={launchNow} disabled={launching} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: launching ? 0.6 : 1 }}>{launching ? '⏳ Synchro en cours…' : '⚡ Lancer maintenant'}</button>
               <button onClick={testApi} disabled={testing} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: testing ? 0.6 : 1 }}>{testing ? 'Test…' : '🔍 Tester l\'API'}</button>
               {saved && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Enregistré</span>}
-              {launched && <span style={{ fontSize: 12, color: 'var(--accent-l)' }}>⚡ Lancé — données dans quelques minutes (recharge la page)</span>}
+              {launched && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Synchronisé</span>}
             </div>
           </div>
         )}
