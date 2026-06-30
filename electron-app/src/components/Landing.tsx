@@ -116,8 +116,10 @@ const GLOBAL_CSS = `
   .sf-plan-card:hover { transform: translateY(-12px); box-shadow: 0 36px 80px -24px rgba(99,102,241,0.45); z-index: 2; }
   @keyframes sf-aurora-a { 0%,100%{transform:translate(-12%,-8%) scale(1)} 50%{transform:translate(14%,10%) scale(1.25)} }
   @keyframes sf-aurora-b { 0%,100%{transform:translate(10%,6%) scale(1.1)} 50%{transform:translate(-14%,-10%) scale(0.9)} }
-  @keyframes sf-smoke-a { 0%,100%{transform:translate(0,0) scale(1);opacity:0.7} 50%{transform:translate(8%,-6%) scale(1.3);opacity:1} }
-  @keyframes sf-smoke-b { 0%,100%{transform:translate(0,0) scale(1.15);opacity:0.8} 50%{transform:translate(-10%,7%) scale(0.95);opacity:1} }
+  @keyframes sf-smoke-a { 0%{transform:translate(-6%,4%) scale(1) rotate(0deg);opacity:0.5} 50%{transform:translate(16%,-12%) scale(1.45) rotate(8deg);opacity:1} 100%{transform:translate(-6%,4%) scale(1) rotate(0deg);opacity:0.5} }
+  @keyframes sf-smoke-b { 0%{transform:translate(6%,-3%) scale(1.2) rotate(0deg);opacity:0.55} 50%{transform:translate(-18%,12%) scale(0.9) rotate(-10deg);opacity:1} 100%{transform:translate(6%,-3%) scale(1.2) rotate(0deg);opacity:0.55} }
+  @keyframes sf-smoke-c { 0%{transform:translateX(-30%) scale(1.1);opacity:0.4} 50%{transform:translateX(30%) scale(1.3);opacity:0.9} 100%{transform:translateX(-30%) scale(1.1);opacity:0.4} }
+  @keyframes sf-smoke-rise { 0%{transform:translateY(12%) scale(1);opacity:0.3} 50%{transform:translateY(-14%) scale(1.35);opacity:0.85} 100%{transform:translateY(12%) scale(1);opacity:0.3} }
   .sf-shine { position: relative; overflow: hidden; }
   .sf-shine::after { content:''; position:absolute; top:0; bottom:0; left:0; width:60%; pointer-events:none;
     background: linear-gradient(100deg, transparent, rgba(255,255,255,0.28), transparent);
@@ -300,22 +302,28 @@ const ENTRY_TILES: EntryTile[] = [
   { key:'b4', w:265, h:162, bottom:'2%', right:'1%', ry:18,  rx:-32, delay:0.45 },
 ]
 
-// ── Fond noir + fumée qui dérive ──────────────────────────────────────────────
-function SmokeBackground() {
+// ── Fond noir + fumée qui dérive (plus vivante) ───────────────────────────────
+let _smokeId = 0
+function SmokeBackground({ tint = false }: { tint?: boolean }) {
+  const id = useRef(`sf-smk-${_smokeId++}`).current
+  const indigo = tint ? 'rgba(99,102,241,0.08)' : 'rgba(120,120,150,0.07)'
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 1, background: '#040405' }}>
-      {/* volutes de fumée (charcoal, très douces) */}
-      <div style={{ position: 'absolute', top: '8%', left: '12%', width: 640, height: 640, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,140,160,0.10), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-a 30s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', bottom: '2%', right: '8%', width: 720, height: 720, borderRadius: '50%', background: 'radial-gradient(circle, rgba(100,100,120,0.09), transparent 62%)', filter: 'blur(80px)', animation: 'sf-smoke-b 36s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '38%', left: '46%', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(120,120,150,0.07), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-a 44s ease-in-out infinite reverse' }} />
+      {/* volutes de fumée — plusieurs nappes, mouvements variés */}
+      <div style={{ position: 'absolute', top: '6%',  left: '8%',  width: 640, height: 640, borderRadius: '50%', background: 'radial-gradient(circle, rgba(150,150,170,0.11), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-a 26s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '0%', right: '6%', width: 740, height: 740, borderRadius: '50%', background: 'radial-gradient(circle, rgba(105,105,130,0.10), transparent 62%)', filter: 'blur(85px)', animation: 'sf-smoke-b 32s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '34%', left: '40%', width: 600, height: 600, borderRadius: '50%', background: `radial-gradient(circle, ${indigo}, transparent 62%)`, filter: 'blur(75px)', animation: 'sf-smoke-rise 38s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '55%', left: '20%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(130,130,160,0.08), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-c 30s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '12%', right: '24%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(110,110,140,0.07), transparent 62%)', filter: 'blur(65px)', animation: 'sf-smoke-a 42s ease-in-out infinite reverse' }} />
       {/* texture de fumée animée (turbulence) */}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.05, mixBlendMode: 'screen' }}>
-        <filter id="sf-smoke-noise">
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.06, mixBlendMode: 'screen' }}>
+        <filter id={id}>
           <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="2" seed="4">
-            <animate attributeName="baseFrequency" dur="44s" values="0.011;0.02;0.011" repeatCount="indefinite" />
+            <animate attributeName="baseFrequency" dur="34s" values="0.011;0.022;0.011" repeatCount="indefinite" />
           </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale="14" />
         </filter>
-        <rect width="100%" height="100%" filter="url(#sf-smoke-noise)" />
+        <rect width="100%" height="100%" filter={`url(#${id})`} />
       </svg>
     </div>
   )
@@ -702,6 +710,9 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
       overflow: 'hidden', cursor: 'none',
       background: BG,
     }}>
+      {/* Fond fumée */}
+      <SmokeBackground tint />
+
       {/* Brand top center */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', justifyContent: 'center', padding: '24px 0', pointerEvents: 'none', opacity: visible ? 1 : 0, transition: 'opacity 0.5s 0.1s' }}>
         <Wordmark size={14} />
