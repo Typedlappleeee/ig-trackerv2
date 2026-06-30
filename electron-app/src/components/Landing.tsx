@@ -112,6 +112,8 @@ const GLOBAL_CSS = `
   }
   @keyframes sf-float-soft { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
   @keyframes sf-conveyor { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+  .sf-plan-card { transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s; }
+  .sf-plan-card:hover { transform: translateY(-12px); box-shadow: 0 36px 80px -24px rgba(99,102,241,0.45); z-index: 2; }
   @keyframes sf-tile-in {
     from { opacity: 0; transform: translateY(18px) scale(0.96); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -309,14 +311,14 @@ function NeonTunnel() {
       const cx = w / 2, cy = h / 2
       const maxR = Math.hypot(w, h) * 0.6
       ctx.clearRect(0, 0, w, h)
-      t += 0.0021
+      t += 0.0008
       for (let i = 0; i < RINGS; i++) {
         const p = ((i / RINGS) + (t % 1)) % 1           // 0→1 en boucle
         const r = Math.pow(p, 1.7) * maxR               // accélère vers l'extérieur
         const alpha = Math.min(p * 3, 1) * (1 - p) * 1.4 // apparaît puis s'estompe
         if (alpha <= 0.012) continue
         const color = colors[i % colors.length]
-        const rot = t * 1.1 + p * 0.7                   // rotation + torsion avec la profondeur
+        const rot = t * 0.5 + p * 0.6                   // rotation + torsion avec la profondeur
         ctx.beginPath()
         for (let s = 0; s <= SIDES; s++) {
           const a = rot + (s / SIDES) * Math.PI * 2 - Math.PI / 2
@@ -1100,15 +1102,15 @@ function PricingSection() {
           {PLANS.map((p, i) => {
             const inverted = p.popular
             return (
-              <FadeIn key={p.name} delay={i * 0.08} style={{ display: 'flex' }}>
+              <FadeIn key={p.name} delay={i * 0.08} style={{ display: 'flex', flex: 1 }}>
                 <div
+                  className="sf-plan-card"
                   style={{
                     position: 'relative',
                     background: inverted ? IVORY : BG,
                     display: 'flex', flexDirection: 'column',
                     padding: '40px 34px',
                     flex: 1,
-                    transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)',
                   }}
                 >
                   {/* Tag */}
