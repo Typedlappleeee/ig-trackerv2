@@ -60,6 +60,56 @@ export function deepArray(obj: any, keys: string[]): any[] | null {
   return Array.isArray(obj) ? obj : null
 }
 
+// Première valeur SCALAIRE (string/bool/number) pour une des clés.
+// deno-lint-ignore no-explicit-any
+export function deepVal(obj: any, keys: string[]): unknown {
+  const stack = [obj]; let guard = 0
+  while (stack.length && guard++ < 8000) {
+    const cur = stack.shift()
+    if (cur && typeof cur === 'object') {
+      for (const k of Object.keys(cur)) {
+        const v = (cur as Record<string, unknown>)[k]
+        if (keys.includes(k) && v != null && typeof v !== 'object') return v
+        if (v && typeof v === 'object') stack.push(v)
+      }
+    }
+  }
+  return null
+}
+// deno-lint-ignore no-explicit-any
+export function deepStr(obj: any, keys: string[]): string { const v = deepVal(obj, keys); return typeof v === 'string' ? v : '' }
+// deno-lint-ignore no-explicit-any
+export function deepBool(obj: any, keys: string[]): boolean { return deepVal(obj, keys) === true }
+
+export interface ProfileInfo {
+  username: string; fullName: string; pp: string
+  followers: number; following: number; posts: number
+  isPrivate: boolean; isVerified: boolean; bio: string
+}
+
+// deno-lint-ignore no-explicit-any
+export function parseProfile(j: any): ProfileInfo | null {
+  if (!j) return null
+  const username  = deepStr(j, ['username'])
+  const pp        = deepStr(j, ['profile_pic_url_hd', 'profile_pic_url', 'hd_profile_pic_url_info'])
+  const fullName  = deepStr(j, ['full_name'])
+  const followers = deepNum(j, ['follower_count', 'followers', 'followers_count', 'edge_followed_by'])
+  const following = deepNum(j, ['following_count', 'edge_follow'])
+  const posts     = deepNum(j, ['media_count', 'post_count', 'edge_owner_to_timeline_media'])
+  const isPrivate = deepBool(j, ['is_private'])
+  const isVerified = deepBool(j, ['is_verified'])
+  const bio       = deepStr(j, ['biography'])
+  if (!username && !followers && !pp) return null
+  return { username, fullName, pp, followers, following, posts, isPrivate, isVerified, bio }
+}
+
+// Les N derniers reels avec miniature + stats.
+// deno-lint-ignore no-explicit-any
+export function parseReels(j: any, limit = 15): ReelInfo[] {
+  const items = deepArray(j, ['items', 'reels', 'edges', 'data']) ?? []
+  return items.slice(0, limit).map(reelInfo).filter(r => r.thumb || r.views || r.postedAt)
+}
+
 // deno-lint-ignore no-explicit-any
 export function parseInfo(j: any): { followers: number; following: number; posts: number } | null {
   if (!j) return null

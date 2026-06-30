@@ -58,6 +58,22 @@ export function Reports({ user }: { user: User }) {
   const [launched, setLaunched]   = useState(false)
   const [launchMsg, setLaunchMsg] = useState('')
   const [testing, setTesting]     = useState(false)
+  // Modal détail compte
+  const [detailRow, setDetailRow] = useState<DailyRow | null>(null)
+  // deno-lint-ignore no-explicit-any
+  const [detail, setDetail]       = useState<any>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  async function openDetail(a: DailyRow) {
+    setDetailRow(a); setDetail(null); setDetailLoading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('run-scheduled-posts', {
+        body: { detail: 'account', username: a.ig_username },
+      })
+      if (error) { setDetail({ error: error.message }); }
+      else setDetail(data)
+    } catch (e) { setDetail({ error: String(e) }) } finally { setDetailLoading(false) }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -267,7 +283,7 @@ export function Reports({ user }: { user: User }) {
                   {/* Cartes comptes */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
                     {accounts.slice().sort((a, b) => Number(b.posted) - Number(a.posted)).map(a => (
-                      <div key={a.id} className="sf-card sf-card-lift" style={{
+                      <div key={a.id} onClick={() => openDetail(a)} className="sf-card sf-card-lift cursor-pointer" style={{
                         padding: 11, display: 'flex', gap: 11, alignItems: 'center',
                         borderColor: a.posted ? 'rgba(34,197,94,0.22)' : 'var(--border)',
                         background: a.posted ? 'rgba(34,197,94,0.04)' : undefined,
@@ -306,6 +322,89 @@ export function Reports({ user }: { user: User }) {
           </div>
         )}
       </div>
+
+      {detailRow && (
+        <AccountDetailModal row={detailRow} data={detail} loading={detailLoading} onClose={() => setDetailRow(null)} />
+      )}
     </div>
   )
 }
+
+// ── Modal détail d'un compte ────────────────────────────────────────────────
+// deno-lint-ignore no-explicit-any
+function AccountDetailModal({ row, data, loading, onClose }: { row: DailyRow; data: any; loading: boolean; onClose: () => void }) {
+  const p = data?.profile
+  const reels: ReelInfo[] = data?.reels ?? []
+  const notFound = data && data.found === false
+  return (
+    <div className="sf-modal-bg" onClick={onClose} style={{ zIndex: 9000 }}>
+      <div className="sf-modal anim-scale-in" onClick={e => e.stopPropagation()} style={{ width: 'min(720px, 94vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+        {/* En-tête profil */}
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 14, alignItems: 'center' }}>
+          <div style={{ width: 60, height: 60, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>
+            {p?.pp ? <img src={p.pp} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 22 }}>👤</div>}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)' }}>@{row.ig_username}</span>
+              {p?.isVerified && <span title="Vérifié" style={{ fontSize: 13 }}>☑️</span>}
+              {p?.isPrivate && <span className="sf-badge" style={{ fontSize: 10 }}>Privé</span>}
+              {notFound && <span className="sf-badge" style={{ fontSize: 10, background: 'rgba(239,68,68,0.15)', color: 'var(--err)', border: '1px solid rgba(239,68,68,0.3)' }}>⚠ Introuvable (banni/désactivé ?)</span>}
+              {data?.lowReach && <span className="sf-badge" style={{ fontSize: 10, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>⚠ Portée faible (shadowban ?)</span>}
+            </div>
+            {p?.fullName && <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>{p.fullName}</p>}
+            {p?.bio && <p style={{ fontSize: 11.5, color: 'var(--text-4)', margin: '4px 0 0', lineHeight: 1.4, maxHeight: 34, overflow: 'hidden' }}>{p.bio}</p>}
+          </div>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label="Fermer" style={{ flexShrink: 0 }}>✕</button>
+        </div>
+
+        {/* Stats profil */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border)' }}>
+          {[
+            { l: 'Abonnés', v: p ? fmt(p.followers) : '—' },
+            { l: 'Abonnements', v: p ? fmt(p.following) : '—' },
+            { l: 'Publications', v: p ? fmt(p.posts) : '—' },
+            { l: 'Vues moy./reel', v: data?.avgViews ? fmt(data.avgViews) : '—' },
+          ].map(s => (
+            <div key={s.l} style={{ padding: '12px 8px', textAlign: 'center', borderRight: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums' }}>{s.v}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Grille des reels */}
+        <div style={{ padding: 16, overflowY: 'auto' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)', margin: '0 0 12px' }}>
+            Derniers reels {reels.length > 0 && `(${reels.length})`}
+          </p>
+          {loading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+              {Array.from({ length: 6 }).map((_, i) => <div key={i} className="sf-skeleton" style={{ aspectRatio: '9/16', borderRadius: 10 }} />)}
+            </div>
+          ) : reels.length === 0 ? (
+            <p style={{ fontSize: 12.5, color: 'var(--text-4)', textAlign: 'center', padding: '20px 0' }}>{notFound ? 'Compte introuvable via l\'API.' : 'Aucun reel trouvé.'}</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+              {reels.map((r, i) => (
+                <a key={i} href={r.url ?? undefined} target="_blank" rel="noreferrer" className="sf-card-lift" style={{ display: 'block', borderRadius: 10, overflow: 'hidden', textDecoration: 'none', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                  <div style={{ aspectRatio: '9/16', background: 'rgba(255,255,255,0.04)', position: 'relative' }}>
+                    {r.thumb ? <img src={r.thumb} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 22, opacity: 0.4 }}>🎬</div>}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      👁 {fmt(r.views)}
+                    </div>
+                  </div>
+                  <div style={{ padding: '5px 7px', fontSize: 9.5, color: 'var(--text-3)', display: 'flex', justifyContent: 'space-between', fontVariantNumeric: 'tabular-nums' }}>
+                    <span>❤ {fmt(r.likes)}</span><span>💬 {fmt(r.comments)}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface ReelInfo { postedAt: string | null; views: number; likes: number; comments: number; url: string | null; thumb: string | null }

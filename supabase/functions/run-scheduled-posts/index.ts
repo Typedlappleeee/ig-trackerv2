@@ -204,6 +204,27 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(out, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
 
+    // ── Détail d'un compte (modal Rapports) : profil + 15 derniers reels ───
+    if (body?.detail === 'account') {
+      const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
+      const uname = String(body.username ?? '').replace(/^@/, '')
+      const { igPost, parseProfile, parseReels } = await import('./ig-rapidapi.ts')
+      const [profJson, infoJson, reelsJson] = await Promise.all([
+        igPost(key, 'profile', uname),
+        igPost(key, 'userInfo', uname),
+        igPost(key, 'reels', uname, { maxId: '' }),
+      ])
+      const profile = parseProfile(profJson) ?? parseProfile(infoJson)
+      const reels = parseReels(reelsJson, 15)
+      // Heuristique « portée faible » (indicatif) : vues moyennes très basses
+      // par rapport aux abonnés → possible shadowban.
+      const avgViews = reels.length ? Math.round(reels.reduce((s, r) => s + r.views, 0) / reels.length) : 0
+      const lowReach = !!(profile && profile.followers > 200 && avgViews > 0 && avgViews < profile.followers * 0.05)
+      return new Response(JSON.stringify({ found: !!profile, profile, reels, avgViews, lowReach }), {
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
+
     // ── Sync immédiat des comptes (bouton « Lancer maintenant ») ───────────
     // Lance UNIQUEMENT la synchro Rapports + stats, sans attendre le cron, et
     // renvoie tout de suite le nombre de comptes traités.
