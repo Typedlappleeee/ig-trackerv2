@@ -36,6 +36,15 @@ drop policy if exists ad_select on public.account_daily;
 create policy ad_select on public.account_daily for select using (
   user_id = auth.uid() or (org_id is not null and public.is_org_member(org_id))
 );
+-- Le client marque "posté" en direct après un mass posting → besoin insert/update.
+drop policy if exists ad_insert on public.account_daily;
+create policy ad_insert on public.account_daily for insert with check (
+  user_id = auth.uid() or (org_id is not null and public.is_org_member(org_id))
+);
+drop policy if exists ad_update on public.account_daily;
+create policy ad_update on public.account_daily for update using (
+  user_id = auth.uid() or (org_id is not null and public.is_org_member(org_id))
+);
 
 -- ════════════════ 2. STATS DE POSTING (Hub / Historique) ════════════
 CREATE TABLE IF NOT EXISTS post_runs (
@@ -86,6 +95,10 @@ alter table public.license_keys add column if not exists duration_days integer;
 update public.license_keys
   set duration_days = greatest(0, ceil(extract(epoch from (expires_at - created_at)) / 86400))::int
   where duration_days is null and expires_at is not null;
+
+-- ════════════════ 5. DESCRIPTION PAR VIDÉO (banque) ════════════════
+-- Légende propre à chaque vidéo, pré-remplie au moment de poster.
+alter table public.content_bank add column if not exists description text default '';
 
 -- Recharge le cache PostgREST pour que les nouvelles tables/fonctions soient vues.
 notify pgrst, 'reload schema';
