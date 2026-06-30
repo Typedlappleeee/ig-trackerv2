@@ -74,7 +74,8 @@ export interface ReelInfo { postedAt: string | null; views: number; likes: numbe
 
 // deno-lint-ignore no-explicit-any
 export function reelInfo(reel: any): ReelInfo {
-  const n = reel?.media ?? reel?.node ?? reel ?? {}
+  // instagram120 reels : result.edges[].node.media → on déballe node.media.
+  const n = reel?.node?.media ?? reel?.media ?? reel?.node ?? reel ?? {}
   const tsRaw = Number(n.taken_at ?? n.taken_at_timestamp ?? n.device_timestamp ?? n?.caption?.created_at ?? n.created_at ?? 0)
   const tsMs = tsRaw > 1e12 ? tsRaw : tsRaw * 1000
   const num = (...v: unknown[]) => { for (const x of v) { const k = Number(x); if (Number.isFinite(k) && k > 0) return k } return 0 }
