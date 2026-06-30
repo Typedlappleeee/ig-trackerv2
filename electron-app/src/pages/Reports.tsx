@@ -125,9 +125,28 @@ export function Reports({ user }: { user: User }) {
   for (const r of rows) { const k = r.va || 'Sans groupe'; const l = vaMap.get(k) ?? []; l.push(r); vaMap.set(k, l) }
   const vas = [...vaMap.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   const totalPosted = rows.filter(r => r.posted).length
+  const totalViews = rows.reduce((s, r) => s + (r.views ?? 0), 0)
+  const totalLikes = rows.reduce((s, r) => s + (r.likes ?? 0), 0)
+  const totalComments = rows.reduce((s, r) => s + (r.comments ?? 0), 0)
+  const postedPct = rows.length ? Math.round((totalPosted / rows.length) * 100) : 0
   const lastSync = rows.reduce<string | null>((m, r) => (r.synced_at && (!m || r.synced_at > m)) ? r.synced_at : m, null)
+  const isToday = day === parisToday()
+  const fmtDayLabel = new Date(day + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)', marginBottom: 8 }
+
+  const StatCard = ({ icon, label, value, sub, accent }: { icon: string; label: string; value: string; sub?: string; accent?: string }) => (
+    <div className="sf-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 15 }}>{icon}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>{label}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+        <span style={{ fontSize: 24, fontWeight: 800, color: accent ?? 'var(--text-1)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+        {sub && <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{sub}</span>}
+      </div>
+    </div>
+  )
 
   return (
     <div className="sf-page">
@@ -145,6 +164,16 @@ export function Reports({ user }: { user: User }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
+
+        {/* KPI row */}
+        {!loading && rows.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 22 }}>
+            <StatCard icon="📅" label={isToday ? "Aujourd'hui" : 'Ce jour'} value={`${rows.length}`} sub="comptes suivis" />
+            <StatCard icon="✅" label="Ont posté" value={`${totalPosted}/${rows.length}`} sub={`${postedPct}%`} accent={postedPct >= 80 ? 'var(--ok)' : postedPct >= 40 ? '#fbbf24' : 'var(--err)'} />
+            <StatCard icon="👁" label="Vues totales" value={fmt(totalViews)} accent="var(--accent-l)" />
+            <StatCard icon="💬" label="Engagement" value={fmt(totalLikes + totalComments)} sub={`❤ ${fmt(totalLikes)} · 💬 ${fmt(totalComments)}`} />
+          </div>
+        )}
 
         {/* Config */}
         {showCfg && (
@@ -181,62 +210,81 @@ export function Reports({ user }: { user: User }) {
           </div>
         )}
 
-        {/* En-tête du jour */}
+        {/* Libellé du jour */}
         {!loading && rows.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-            <span className="sf-badge sf-badge-accent" style={{ fontSize: 12 }}>{totalPosted}/{rows.length} comptes ont posté</span>
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>👁 {fmt(rows.reduce((s, r) => s + (r.views ?? 0), 0))} vues au total</span>
-          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-4)', margin: '0 0 16px', textTransform: 'capitalize' }}>{fmtDayLabel}</p>
         )}
 
         {/* Contenu */}
         {loading ? (
-          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Chargement…</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 900 }}>
+            {[0, 1, 2].map(i => <div key={i} className="sf-card sf-skeleton" style={{ height: 64 }} />)}
+          </div>
         ) : rows.length === 0 ? (
-          <div className="sf-card" style={{ padding: '32px 24px', textAlign: 'center', maxWidth: 640 }}>
-            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucune donnée pour ce jour</p>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0 }}>
-              {cfg.enabled ? `La synchro tourne chaque jour à ${cfg.sync_time}. Reviens après cette heure.` : 'Active le suivi quotidien ci-dessus.'}
+          <div className="sf-card" style={{ padding: '40px 24px', textAlign: 'center', maxWidth: 640, margin: '0 auto' }}>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>📭</div>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucune donnée pour ce jour</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
+              {cfg.enabled
+                ? `La synchro tourne chaque jour à ${cfg.sync_time}. Tu peux aussi cliquer « ⚡ Lancer maintenant » dans Configurer.`
+                : 'Active le suivi quotidien dans Configurer pour commencer.'}
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 900 }}>
-            {vas.map(([vaName, accounts]) => (
-              <div key={vaName}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--accent-l)' }}>{vaName}</span>
-                  <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>{accounts.filter(a => a.posted).length}/{accounts.length} postés</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-                  {accounts.map(a => (
-                    <div key={a.id} className="sf-card" style={{ padding: 10, display: 'flex', gap: 10, alignItems: 'center', opacity: a.posted ? 1 : 0.6 }}>
-                      <div style={{ width: 46, height: 60, borderRadius: 8, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {a.reel_thumb
-                          ? <img src={a.reel_thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : <span style={{ fontSize: 20 }}>{a.posted ? '🎬' : '—'}</span>}
-                      </div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {a.posted ? '✅' : '❌'} @{a.ig_username}
-                        </p>
-                        {a.posted ? (
-                          <>
-                            {(a.views != null) ? (
-                              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }}>👁 {fmt(a.views)} · ❤ {fmt(a.likes)} · 💬 {fmt(a.comments)}</p>
-                            ) : (
-                              <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '4px 0 0' }}>posté{a.posted_via === 'scaleflow' ? ' via ScaleFlow' : ''}</p>
-                            )}
-                            {a.posted_at && <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '2px 0 0' }}>{fmtTime(a.posted_at)}{a.reel_url && <> · <a href={a.reel_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-l)' }}>voir</a></>}</p>}
-                          </>
-                        ) : (
-                          <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '4px 0 0' }}>Pas de vidéo</p>
-                        )}
-                      </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 26, maxWidth: 960 }}>
+            {vas.map(([vaName, accounts]) => {
+              const postedN = accounts.filter(a => a.posted).length
+              const pct = Math.round((postedN / accounts.length) * 100)
+              return (
+                <div key={vaName}>
+                  {/* En-tête groupe + barre de progression */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)' }}>{vaName}</span>
+                    <div style={{ flex: 1, height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', maxWidth: 220 }}>
+                      <div style={{ height: '100%', width: `${pct}%`, borderRadius: 99, background: pct >= 80 ? 'var(--ok)' : pct >= 40 ? '#fbbf24' : 'var(--err)', transition: 'width 0.4s' }} />
                     </div>
-                  ))}
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>{postedN}/{accounts.length} postés</span>
+                  </div>
+                  {/* Cartes comptes */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                    {accounts.slice().sort((a, b) => Number(b.posted) - Number(a.posted)).map(a => (
+                      <div key={a.id} className="sf-card sf-card-lift" style={{
+                        padding: 11, display: 'flex', gap: 11, alignItems: 'center',
+                        borderColor: a.posted ? 'rgba(34,197,94,0.22)' : 'var(--border)',
+                        background: a.posted ? 'rgba(34,197,94,0.04)' : undefined,
+                      }}>
+                        <div style={{ width: 48, height: 62, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                          {a.reel_thumb
+                            ? <img src={a.reel_thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <span style={{ fontSize: 18, opacity: 0.5 }}>{a.posted ? '🎬' : '—'}</span>}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: a.posted ? 'var(--ok)' : 'var(--err)' }} />
+                            <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{a.ig_username}</p>
+                          </div>
+                          {a.posted ? (
+                            <>
+                              {(a.views != null) ? (
+                                <p style={{ fontSize: 11, color: 'var(--text-2)', margin: '5px 0 0', fontVariantNumeric: 'tabular-nums' }}>👁 {fmt(a.views)} · ❤ {fmt(a.likes)} · 💬 {fmt(a.comments)}</p>
+                              ) : (
+                                <p style={{ fontSize: 10.5, color: 'var(--ok)', margin: '5px 0 0' }}>Posté{a.posted_via === 'scaleflow' ? ' via ScaleFlow' : ''}</p>
+                              )}
+                              <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '2px 0 0' }}>
+                                {a.posted_at && fmtTime(a.posted_at)}
+                                {a.reel_url && <> · <a href={a.reel_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-l)' }}>voir le reel</a></>}
+                              </p>
+                            </>
+                          ) : (
+                            <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '5px 0 0' }}>Pas encore posté</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
