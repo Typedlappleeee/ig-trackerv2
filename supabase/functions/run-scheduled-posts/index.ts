@@ -152,6 +152,34 @@ Deno.serve(async (req) => {
   const fnStart = Date.now()
   const summary: Record<string, string> = {}
 
+  // ── Diagnostic RapidAPI ──────────────────────────────────────────────────
+  // Appelé avec un body { diag: 'rapidapi', username } → teste un vrai appel et
+  // renvoie le détail (clé présente ? statut HTTP ? extrait de réponse ?).
+  {
+    let body: Record<string, unknown> | null = null
+    try { body = await req.clone().json() } catch { /* pas de body (cron) */ }
+    if (body?.diag === 'rapidapi') {
+      const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
+      const infoTpl = (Deno.env.get('RAPIDAPI_INFO_URL') ?? '').trim()
+        || 'https://instagram-scraper-api2.p.rapidapi.com/v1/info?username_or_id_or_url={username}'
+      const reelsTpl = (Deno.env.get('RAPIDAPI_URL') ?? '').trim()
+        || 'https://instagram-scraper-api2.p.rapidapi.com/v1/reels?username_or_id_or_url={username}'
+      const uname = String(body.username ?? 'instagram').replace(/^@/, '')
+      const out: Record<string, unknown> = { keyPresent: !!key, keyLength: key.length, username: uname }
+      const probe = async (label: string, tpl: string) => {
+        try {
+          const url = tpl.replace('{username}', encodeURIComponent(uname))
+          const host = new URL(url).host
+          const r = await fetch(url, { headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': host } })
+          const txt = await r.text()
+          out[label] = { host, status: r.status, ok: r.ok, sample: txt.slice(0, 350) }
+        } catch (e) { out[label] = { error: String(e) } }
+      }
+      if (key) { await probe('info', infoTpl); await probe('reels', reelsTpl) }
+      return new Response(JSON.stringify(out, null, 2), { headers: { 'Content-Type': 'application/json' } })
+    }
+  }
+
   // ── Étape 0-tracking : sync journalier des comptes (par lots) ──
   // Plafonné à ~60s pour ne pas affamer le posting. Best-effort.
   try {

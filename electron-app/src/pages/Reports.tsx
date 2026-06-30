@@ -55,6 +55,7 @@ export function Reports({ user }: { user: User }) {
   const [showCfg, setShowCfg] = useState(false)
   const [launching, setLaunching] = useState(false)
   const [launched, setLaunched]   = useState(false)
+  const [testing, setTesting]     = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -88,6 +89,20 @@ export function Reports({ user }: { user: User }) {
     setCfg(next)
     await supabase.from(table).upsert({ [keyCol]: keyVal, tracking_config: next }, { onConflict: keyCol })
     setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 6000)
+  }
+
+  // Test RapidAPI : appelle l'edge function en mode diagnostic et affiche le détail.
+  async function testApi() {
+    setTesting(true)
+    try {
+      const uname = rows[0]?.ig_username || 'instagram'
+      const { data, error } = await supabase.functions.invoke('run-scheduled-posts', {
+        body: { diag: 'rapidapi', username: uname },
+      })
+      if (error) { alert('Échec invocation edge function :\n' + error.message + '\n\n(As-tu redéployé run-scheduled-posts ?)'); return }
+      console.log('[Reports] diag RapidAPI', data)
+      alert('Résultat test RapidAPI (compte @' + uname + ') :\n\n' + JSON.stringify(data, null, 2))
+    } catch (e) { alert('Erreur : ' + String(e)) } finally { setTesting(false) }
   }
 
   // Groupement par VA (client).
@@ -144,6 +159,7 @@ export function Reports({ user }: { user: User }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: saving ? 0.6 : 1 }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
               <button onClick={launchNow} disabled={launching} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: launching ? 0.6 : 1 }}>{launching ? 'Lancement…' : '⚡ Lancer maintenant'}</button>
+              <button onClick={testApi} disabled={testing} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: testing ? 0.6 : 1 }}>{testing ? 'Test…' : '🔍 Tester l\'API'}</button>
               {saved && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Enregistré</span>}
               {launched && <span style={{ fontSize: 12, color: 'var(--accent-l)' }}>⚡ Lancé — données dans quelques minutes (recharge la page)</span>}
             </div>
