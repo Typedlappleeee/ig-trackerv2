@@ -114,6 +114,8 @@ const GLOBAL_CSS = `
   @keyframes sf-conveyor { from{transform:translateX(0)} to{transform:translateX(-50%)} }
   .sf-plan-card { transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s; }
   .sf-plan-card:hover { transform: translateY(-12px); box-shadow: 0 36px 80px -24px rgba(99,102,241,0.45); z-index: 2; }
+  @keyframes sf-aurora-a { 0%,100%{transform:translate(-12%,-8%) scale(1)} 50%{transform:translate(14%,10%) scale(1.25)} }
+  @keyframes sf-aurora-b { 0%,100%{transform:translate(10%,6%) scale(1.1)} 50%{transform:translate(-14%,-10%) scale(0.9)} }
   @keyframes sf-tile-in {
     from { opacity: 0; transform: translateY(18px) scale(0.96); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -437,6 +439,17 @@ function AutoPostShowcase() {
         </div>
       </div>
     </section>
+  )
+}
+
+// ── Fond aurora animé (dégradés qui dérivent) ─────────────────────────────────
+function Aurora() {
+  return (
+    <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+      <div style={{ position: 'absolute', top: '-20%', left: '5%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.18), transparent 65%)', filter: 'blur(40px)', animation: 'sf-aurora-a 18s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '-25%', right: '0%', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.15), transparent 65%)', filter: 'blur(50px)', animation: 'sf-aurora-b 22s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '30%', right: '30%', width: 380, height: 380, borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,0.10), transparent 65%)', filter: 'blur(40px)', animation: 'sf-aurora-a 26s ease-in-out infinite reverse' }} />
+    </div>
   )
 }
 
@@ -1621,8 +1634,9 @@ export function Landing() {
       <StatsBanner />
 
       {/* ── Manifeste ────────────────────────────────────────────────────────── */}
-      <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px' }}>
-        <div style={{ maxWidth: 880, margin: '0 auto', textAlign: 'center' }}>
+      <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px', overflow: 'hidden' }}>
+        <Aurora />
+        <div style={{ maxWidth: 880, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 1 }}>
           <FadeIn>
             <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 38 }}>Manifeste</MicroLabel>
           </FadeIn>
