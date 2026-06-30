@@ -189,11 +189,13 @@ Deno.serve(async (req) => {
         } catch (e) { out[label] = { error: String(e) }; return null }
       }
       if (key) {
+        const profileJson = await probe('profile', 'profile', {})
         const infoJson = await probe('userInfo', 'userInfo', {})
         const reelsJson = await probe('reels', 'reels', { maxId: '' })
         // Valeurs RÉELLEMENT extraites par le parseur → confirme que ça marchera.
         try {
           const { parseInfo, deepArray, reelInfo } = await import('./ig-rapidapi.ts')
+          out.parsedProfile = parseInfo(profileJson)
           out.parsedInfo = parseInfo(infoJson)
           const items = deepArray(reelsJson, ['items', 'reels', 'edges', 'data'])
           out.parsedReels = { count: items?.length ?? 0, latest: items?.length ? reelInfo(items[0]) : null }

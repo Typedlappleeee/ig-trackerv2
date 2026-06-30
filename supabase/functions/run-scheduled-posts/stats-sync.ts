@@ -41,7 +41,9 @@ export async function runStatsSync(db: any, nowIso: string, deadlineMs: number):
 
     for (const p of pending) {
       if (done >= MAX_PER_INVOCATION || Date.now() > deadlineMs) break
-      const info = parseInfo(await igPost(key, 'userInfo', String(p.ig_username)))
+      // `profile` renvoie en général les compteurs ; repli sur `userInfo`.
+      let info = parseInfo(await igPost(key, 'profile', String(p.ig_username)))
+      if (!info) info = parseInfo(await igPost(key, 'userInfo', String(p.ig_username)))
       if (!info) continue
       // phones : valeurs live (total_views préservé — l'API info ne le donne pas).
       await db.from('phones').update({
