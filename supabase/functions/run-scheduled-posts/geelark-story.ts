@@ -226,10 +226,24 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
   return null
 }
 
-async function dumpXml(bearer: string, phoneId: string): Promise<string> {
+// Dump uiautomator robuste (cf. client) : cat systématique + réessais → corrige
+// les échecs intermittents de story dus à un dump vide.
+async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => void): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
-  const { output } = await shellExec(bearer, phoneId, `uiautomator dump ${f} && cat ${f}`)
-  return output
+  let last = ''
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const flag = attempt >= 2 ? '--compressed ' : ''
+    const { output } = await shellExec(
+      bearer, phoneId,
+      `uiautomator dump ${flag}${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
+    )
+    last = output
+    const nodes = (output.match(/<node\b/g) || []).length
+    if (output.includes('<hierarchy') && nodes > 1) return output
+    log?.(`   ⏳ Lecture d'écran incomplète (essai ${attempt + 1}/4) — nouvel essai…`)
+    await sleep(1300)
+  }
+  return last
 }
 
 // Escape text for use inside an Android `input text "..."` shell command.
