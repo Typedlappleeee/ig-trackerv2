@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { supabase } from '@/lib/supabase'
-import { uploadVideoFromBlob } from '@/lib/storage'
+import { uploadVideoFromBlob, getSignedUrl, deleteStorageObjects } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { BankPicker } from '@/pages/Bank'
 import { ACCENT, ACCENT_L, TEXT_1, TEXT_2, TEXT_3, HAIR, BG_2, OK, WARN, ERR } from '@/lib/theme'
@@ -179,6 +179,10 @@ export function Subtitles({ user }: SubtitlesProps) {
     setError('')
     setSegments([])
 
+    // Temp Storage object uploaded only to feed the transcription proxy (web local
+    // files). Cleaned up once transcription is done — it's not the bank copy.
+    const tempPaths: (string | null)[] = []
+
     try {
       // ── Step 1 + 2: transcription ────────────────────────────────────────────
       // Bank URL → pass URL to server proxy (no bytes sent from client)
@@ -209,9 +213,37 @@ export function Subtitles({ user }: SubtitlesProps) {
           filename,
           language: lang !== 'auto' ? lang : undefined,
         })
+      } else if (isWeb) {
+        // Web + local file: Vercel rejects request bodies > 4.5 MB, so base64 over
+        // /api/groq returns 413. Instead, upload the file to Storage and hand the
+        // proxy a signed URL it can fetch server-side (no body size limit).
+        console.log('[Subtitles] → chemin upload+URL (web, fichier local)')
+        setStatus('Envoi de la vidéo…')
+        let blob: Blob
+        if (fileRef.current) blob = fileRef.current
+        else if (videoSrc) {
+          const r = await fetch(videoSrc)
+          if (!r.ok) throw new Error(`Téléchargement échoué (${r.status})`)
+          blob = await r.blob()
+        } else throw new Error('Aucune source vidéo')
+
+        const scope = currentOrg?.id
+          ? { mode: 'org' as const, id: currentOrg.id }
+          : { mode: 'user' as const, id: user.id }
+        const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, filename, scope)
+        tempPaths.push(storagePath, thumbnailPath)
+        const signed = await getSignedUrl(storagePath)
+        if (!signed) throw new Error('URL signée indisponible')
+        setStatus('Transcription via URL…')
+        transcriptRes = await (window.electronAPI as any).groqTranscription({
+          apiKey:   groqKey,
+          videoUrl: signed,
+          filename,
+          language: lang !== 'auto' ? lang : undefined,
+        })
       } else {
-        // Local file: read bytes then send
-        console.log('[Subtitles] → chemin audioBytes (fichier local ou blob URL)')
+        // Electron + local file: read bytes then send over IPC (no HTTP body limit)
+        console.log('[Subtitles] → chemin audioBytes (Electron, fichier local)')
         let audioBytes: ArrayBuffer
         if (fileRef.current) {
           audioBytes = await fileRef.current.arrayBuffer()
@@ -219,7 +251,7 @@ export function Subtitles({ user }: SubtitlesProps) {
         } else if (videoSrc) {
           setStatus('Lecture de la vidéo…')
           // readFileBytes only works for local paths, not for URLs
-          if (window.electronAPI && !isWeb && !videoSrc.startsWith('http')) {
+          if (window.electronAPI && !videoSrc.startsWith('http')) {
             const r = await window.electronAPI.readFileBytes(videoSrc)
             if (!r.ok || !r.bytes) throw new Error((r as any).error ?? 'Lecture échouée')
             audioBytes = r.bytes as ArrayBuffer
@@ -271,6 +303,8 @@ export function Subtitles({ user }: SubtitlesProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setPhase('error')
+    } finally {
+      if (tempPaths.length) deleteStorageObjects(tempPaths).catch(() => {})
     }
   }
 
