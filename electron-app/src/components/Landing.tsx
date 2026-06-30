@@ -302,20 +302,31 @@ const ENTRY_TILES: EntryTile[] = [
   { key:'b4', w:265, h:162, bottom:'2%', right:'1%', ry:18,  rx:-32, delay:0.45 },
 ]
 
-// ── Fond noir + fumée douce qui dérive (nappes floues, naturel) ───────────────
+// ── Fond noir + fumée naturelle (nappes floues + nuage basse fréquence) ───────
+let _smokeId = 0
 function SmokeBackground({ tint = false, subtle = false }: { tint?: boolean; subtle?: boolean }) {
-  const indigo = tint ? 'rgba(99,102,241,0.07)' : 'rgba(120,120,150,0.07)'
-  const k = subtle ? 0.45 : 1   // facteur d'intensité (version discrète)
-  const wisp = (a: number) => `rgba(150,150,175,${(a * k).toFixed(3)})`
+  const id = useRef(`sf-smk-${_smokeId++}`).current
+  const indigo = tint ? 'rgba(99,102,241,0.10)' : 'rgba(120,120,150,0.10)'
+  const k = subtle ? 0.5 : 1
+  const wisp = (a: number) => `rgba(155,155,180,${(a * k).toFixed(3)})`
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 1, background: '#040405' }}>
-      {/* Nappes de fumée — grandes, très floues, lentes → effet vapeur naturel.
-          Pas de texture granuleuse (ça faisait du « bruit » pas naturel). */}
-      <div style={{ position: 'absolute', top: '4%',  left: '4%',  width: 760, height: 760, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.10)}, transparent 64%)`, filter: 'blur(95px)', animation: 'sf-smoke-a 34s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', bottom: '-4%', right: '2%', width: 860, height: 860, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.09)}, transparent 64%)`, filter: 'blur(110px)', animation: 'sf-smoke-b 42s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '30%', left: '38%', width: 700, height: 700, borderRadius: '50%', background: `radial-gradient(circle, ${indigo}, transparent 64%)`, filter: 'blur(100px)', animation: 'sf-smoke-rise 48s ease-in-out infinite' }} />
-      {!subtle && <div style={{ position: 'absolute', top: '52%', left: '14%', width: 620, height: 620, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.07)}, transparent 64%)`, filter: 'blur(95px)', animation: 'sf-smoke-c 38s ease-in-out infinite' }} />}
-      {!subtle && <div style={{ position: 'absolute', top: '8%', right: '20%', width: 560, height: 560, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.06)}, transparent 64%)`, filter: 'blur(90px)', animation: 'sf-smoke-a 52s ease-in-out infinite reverse' }} />}
+      {/* Nappes douces qui dérivent */}
+      <div style={{ position: 'absolute', top: '4%',  left: '4%',  width: 760, height: 760, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.14)}, transparent 64%)`, filter: 'blur(90px)', animation: 'sf-smoke-a 34s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '-4%', right: '2%', width: 860, height: 860, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.13)}, transparent 64%)`, filter: 'blur(100px)', animation: 'sf-smoke-b 42s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '30%', left: '38%', width: 700, height: 700, borderRadius: '50%', background: `radial-gradient(circle, ${indigo}, transparent 64%)`, filter: 'blur(95px)', animation: 'sf-smoke-rise 48s ease-in-out infinite' }} />
+      {!subtle && <div style={{ position: 'absolute', top: '52%', left: '14%', width: 620, height: 620, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.10)}, transparent 64%)`, filter: 'blur(90px)', animation: 'sf-smoke-c 38s ease-in-out infinite' }} />}
+      {/* Nuage de fumée basse fréquence, flou + qui dérive → naturel (pas du grain) */}
+      <div style={{ position: 'absolute', inset: '-15%', opacity: subtle ? 0.10 : 0.22, mixBlendMode: 'screen', filter: 'blur(7px)', animation: 'sf-smoke-c 26s ease-in-out infinite' }}>
+        <svg width="100%" height="100%" preserveAspectRatio="none">
+          <filter id={id}>
+            <feTurbulence type="fractalNoise" baseFrequency="0.0042" numOctaves="2" seed="7">
+              <animate attributeName="baseFrequency" dur="40s" values="0.0042;0.0065;0.0042" repeatCount="indefinite" />
+            </feTurbulence>
+          </filter>
+          <rect width="100%" height="100%" filter={`url(#${id})`} />
+        </svg>
+      </div>
     </div>
   )
 }
