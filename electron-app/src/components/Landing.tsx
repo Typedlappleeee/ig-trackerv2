@@ -508,33 +508,6 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
         filter: 'blur(60px)', pointerEvents: 'none', zIndex: 1,
       }} />
 
-      {/* Wall tiles — monochrome */}
-      {ENTRY_TILES.map((tile, idx) => (
-        <div
-          key={tile.key}
-          style={{
-            position: 'absolute',
-            top: tile.top, bottom: tile.bottom,
-            left: tile.left, right: tile.right,
-            animation: `sf-float ${7 + idx * 0.25}s ease-in-out ${tile.delay}s infinite, sf-tile-in 1s cubic-bezier(0.16,1,0.3,1) ${tile.delay + 0.1}s both`,
-            zIndex: 2,
-          }}
-        >
-          <div style={{
-            width: tile.w, height: tile.h,
-            ['--ry' as string]: `${tile.ry}deg`, ['--rx' as string]: `${tile.rx}deg`,
-            animation: `sf-tile-rot ${14 + idx * 0.5}s ease-in-out ${tile.delay}s infinite`,
-            borderRadius: 4,
-            overflow: 'hidden',
-            border: `1px solid ${HAIR}`,
-            background: 'linear-gradient(160deg, #0B0B0E 0%, #0C0D11 100%)',
-            boxShadow: '0 8px 48px rgba(0,0,0,0.7)',
-          }}>
-            {ENTRY_IMAGES[idx] && <img src={ENTRY_IMAGES[idx]!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'grayscale(0.7) brightness(0.6)' }} />}
-          </div>
-        </div>
-      ))}
-
       {/* Vignette */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3,
