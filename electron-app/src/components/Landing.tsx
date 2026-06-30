@@ -116,6 +116,8 @@ const GLOBAL_CSS = `
   .sf-plan-card:hover { transform: translateY(-12px); box-shadow: 0 36px 80px -24px rgba(99,102,241,0.45); z-index: 2; }
   @keyframes sf-aurora-a { 0%,100%{transform:translate(-12%,-8%) scale(1)} 50%{transform:translate(14%,10%) scale(1.25)} }
   @keyframes sf-aurora-b { 0%,100%{transform:translate(10%,6%) scale(1.1)} 50%{transform:translate(-14%,-10%) scale(0.9)} }
+  @keyframes sf-smoke-a { 0%,100%{transform:translate(0,0) scale(1);opacity:0.7} 50%{transform:translate(8%,-6%) scale(1.3);opacity:1} }
+  @keyframes sf-smoke-b { 0%,100%{transform:translate(0,0) scale(1.15);opacity:0.8} 50%{transform:translate(-10%,7%) scale(0.95);opacity:1} }
   .sf-shine { position: relative; overflow: hidden; }
   .sf-shine::after { content:''; position:absolute; top:0; bottom:0; left:0; width:60%; pointer-events:none;
     background: linear-gradient(100deg, transparent, rgba(255,255,255,0.28), transparent);
@@ -298,57 +300,25 @@ const ENTRY_TILES: EntryTile[] = [
   { key:'b4', w:265, h:162, bottom:'2%', right:'1%', ry:18,  rx:-32, delay:0.45 },
 ]
 
-// ── Tunnel néon animé (canvas) — anneaux qui foncent vers l'extérieur ─────────
-function NeonTunnel() {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const canvas = ref.current; if (!canvas) return
-    const ctx = canvas.getContext('2d'); if (!ctx) return
-    const colors = ['#6366F1', '#a855f7', '#ec4899', '#3b82f6'] // indigo · violet · rose · bleu
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    let raf = 0, t = 0
-    const resize = () => {
-      canvas.width = canvas.clientWidth * dpr
-      canvas.height = canvas.clientHeight * dpr
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    }
-    resize()
-    window.addEventListener('resize', resize)
-    const RINGS = 18, SIDES = 3
-    const draw = () => {
-      const w = canvas.clientWidth, h = canvas.clientHeight
-      const cx = w / 2, cy = h / 2
-      const maxR = Math.hypot(w, h) * 0.6
-      ctx.clearRect(0, 0, w, h)
-      t += 0.0008
-      for (let i = 0; i < RINGS; i++) {
-        const p = ((i / RINGS) + (t % 1)) % 1           // 0→1 en boucle
-        const r = Math.pow(p, 1.7) * maxR               // accélère vers l'extérieur
-        const alpha = Math.min(p * 3, 1) * (1 - p) * 1.4 // apparaît puis s'estompe
-        if (alpha <= 0.012) continue
-        const color = colors[i % colors.length]
-        const rot = t * 0.5 + p * 0.6                   // rotation + torsion avec la profondeur
-        ctx.beginPath()
-        for (let s = 0; s <= SIDES; s++) {
-          const a = rot + (s / SIDES) * Math.PI * 2 - Math.PI / 2
-          const x = cx + Math.cos(a) * r
-          const y = cy + Math.sin(a) * r * 0.9
-          s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
-        }
-        ctx.strokeStyle = color
-        ctx.globalAlpha = alpha * 0.5
-        ctx.lineWidth = 1.3
-        ctx.shadowColor = color
-        ctx.shadowBlur = 14
-        ctx.stroke()
-      }
-      ctx.globalAlpha = 1; ctx.shadowBlur = 0
-      raf = requestAnimationFrame(draw)
-    }
-    draw()
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
-  }, [])
-  return <canvas ref={ref} aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} />
+// ── Fond noir + fumée qui dérive ──────────────────────────────────────────────
+function SmokeBackground() {
+  return (
+    <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 1, background: '#040405' }}>
+      {/* volutes de fumée (charcoal, très douces) */}
+      <div style={{ position: 'absolute', top: '8%', left: '12%', width: 640, height: 640, borderRadius: '50%', background: 'radial-gradient(circle, rgba(140,140,160,0.10), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-a 30s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '2%', right: '8%', width: 720, height: 720, borderRadius: '50%', background: 'radial-gradient(circle, rgba(100,100,120,0.09), transparent 62%)', filter: 'blur(80px)', animation: 'sf-smoke-b 36s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '38%', left: '46%', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(120,120,150,0.07), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-a 44s ease-in-out infinite reverse' }} />
+      {/* texture de fumée animée (turbulence) */}
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.05, mixBlendMode: 'screen' }}>
+        <filter id="sf-smoke-noise">
+          <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="2" seed="4">
+            <animate attributeName="baseFrequency" dur="44s" values="0.011;0.02;0.011" repeatCount="indefinite" />
+          </feTurbulence>
+        </filter>
+        <rect width="100%" height="100%" filter="url(#sf-smoke-noise)" />
+      </svg>
+    </div>
+  )
 }
 
 // Vidéos affichées dans les téléphones de la démo. Dépose tes fichiers dans
@@ -527,20 +497,8 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
       alignItems: 'center', justifyContent: 'center',
     }}>
 
-      {/* Tunnel néon animé */}
-      <NeonTunnel />
-
-      {/* Perspective lines from center */}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} preserveAspectRatio="none">
-        {[
-          ['0%','0%'], ['100%','0%'], ['0%','100%'], ['100%','100%'],
-          ['50%','0%'], ['50%','100%'], ['0%','50%'], ['100%','50%'],
-          ['25%','0%'], ['75%','0%'], ['25%','100%'], ['75%','100%'],
-          ['0%','25%'], ['0%','75%'], ['100%','25%'], ['100%','75%'],
-        ].map(([x, y], i) => (
-          <line key={i} x1="50%" y1="50%" x2={x} y2={y} stroke={`rgba(233,234,240,${i < 4 ? 0.07 : 0.035})`} strokeWidth="1" />
-        ))}
-      </svg>
+      {/* Fond noir + fumée */}
+      <SmokeBackground />
 
       {/* Ambient glow */}
       <div style={{
