@@ -760,17 +760,24 @@ Deno.serve(async (req) => {
       }
       if (!bearer) bearer = post.bearer_token || ''   // rétro-compat anciennes lignes
       if (!bearer) throw new Error('Aucun token GéeLark configuré')
+      log(`🔑 Token GéeLark résolu (${post.org_id ? 'organisation' : 'utilisateur'}).`)
 
       const phones: PhoneRec[] = typeof post.phones === 'string' ? JSON.parse(post.phones) : post.phones
       const videos: VideoRec[] = typeof post.videos === 'string' ? JSON.parse(post.videos) : post.videos
       const geelarkIds = phones.map(p => p.geelark_id)
       const delayMin: number = post.delay_minutes ?? 0
+      log(`🗓 Exécution serveur — ${post.platform ?? 'instagram'} · ${phones.length} compte(s) · ${videos.length} vidéo(s)${delayMin ? ` · ${delayMin} min d'écart` : ''}.`)
 
       // 5. Démarrage des téléphones
-      log(`▶ [serveur] Démarrage de ${phones.length} téléphone(s)…`)
+      log(`▶ Démarrage de ${phones.length} téléphone(s)…`)
       const startRes = await gPost(bearer, '/phone/start', { ids: geelarkIds })
-      if (startRes.code !== 0) log(`⚠ Démarrage: ${startRes.msg ?? startRes.code}`)
+      if (startRes.code !== 0) log(`⚠ Démarrage refusé : code=${startRes.code} msg=${startRes.msg ?? '?'} (téléphone déjà arrêté/inexistant ?)`)
+      else log(`   ✅ Commande de démarrage envoyée.`)
+      log(`⏳ Attente du boot (30 s)…`)
       await sleep(30_000)
+
+      // Résolution des vidéos (upload vers GeeLark)
+      log(`🎬 Préparation de ${videos.length} vidéo(s)…`)
 
       // 6. Tâches RPA — scheduleAt décalé au lieu de sleep entre comptes
       const taskIds: string[] = []
@@ -791,8 +798,14 @@ Deno.serve(async (req) => {
       // Pre-resolve video tokens (upload Supabase URLs to GeeLark once, deduplicated)
       const resolvedTokens: string[] = []
       for (let vi = 0; vi < videos.length; vi++) {
-        resolvedTokens.push(await resolveVideoToken(db, bearer, videos[vi]))
+        try {
+          resolvedTokens.push(await resolveVideoToken(db, bearer, videos[vi]))
+        } catch (e) {
+          log(`❌ Échec préparation vidéo #${vi + 1} : ${e instanceof Error ? e.message : String(e)}`)
+          throw e
+        }
       }
+      log(`   ✅ ${resolvedTokens.length} vidéo(s) prête(s) sur GéeLark.`)
       // TikTok : un seul /task/add (taskType:1) batché. Sinon : boucle IG ci-dessous.
       if (post.platform === 'tiktok') {
         const list = phones.map((phone, i) => {
