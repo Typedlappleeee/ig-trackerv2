@@ -216,6 +216,23 @@ Deno.serve(async (req) => {
       ])
       const profile = parseProfile(profJson) ?? parseProfile(infoJson)
       const reels = parseReels(reelsJson, 15)
+      // Images : le CDN Instagram bloque les <img> directs côté navigateur. On
+      // récupère pp + miniatures CÔTÉ SERVEUR et on les renvoie en data-URL
+      // (s'affichent partout, sans dépendre d'un proxy Vercel).
+      const toDataUrl = async (url: string | null): Promise<string | null> => {
+        if (!url) return null
+        try {
+          const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.instagram.com/' } })
+          if (!r.ok) return null
+          const ct = r.headers.get('content-type') ?? 'image/jpeg'
+          const buf = new Uint8Array(await r.arrayBuffer())
+          let bin = ''
+          for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
+          return `data:${ct};base64,${btoa(bin)}`
+        } catch { return null }
+      }
+      if (profile?.pp) profile.pp = (await toDataUrl(profile.pp)) ?? profile.pp
+      await Promise.all(reels.map(async (r) => { r.thumb = await toDataUrl(r.thumb) }))
       // Heuristique « portée faible » (indicatif) : vues moyennes très basses
       // par rapport aux abonnés → possible shadowban.
       const avgViews = reels.length ? Math.round(reels.reduce((s, r) => s + r.views, 0) / reels.length) : 0
