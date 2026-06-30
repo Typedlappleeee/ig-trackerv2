@@ -203,6 +203,17 @@ Deno.serve(async (req) => {
       }
       return new Response(JSON.stringify(out, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
+
+    // ── Sync immédiat des comptes (bouton « Lancer maintenant ») ───────────
+    // Lance UNIQUEMENT la synchro Rapports + stats, sans attendre le cron, et
+    // renvoie tout de suite le nombre de comptes traités.
+    if (body?.sync === 'accounts') {
+      const a = await runAccountSync(db, nowIso, Date.now() + 28_000).catch(() => 0)
+      const s = await runStatsSync(db, nowIso, Date.now() + 22_000).catch(() => 0)
+      return new Response(JSON.stringify({ accountsSynced: a, statsSynced: s }), {
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
   }
 
   // ── Étape 0-tracking : sync journalier des comptes (par lots) ──
