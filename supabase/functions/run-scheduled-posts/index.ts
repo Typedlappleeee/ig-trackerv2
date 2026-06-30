@@ -119,7 +119,18 @@ async function resolveImageUrl(
   return t
 }
 
+// En-têtes CORS — nécessaires pour pouvoir appeler la fonction depuis le
+// navigateur (ex. bouton « Tester l'API » dans Rapports).
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 Deno.serve(async (req) => {
+  // Préflight CORS du navigateur.
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const cronSecret  = Deno.env.get('CRON_SECRET') ?? ''
@@ -145,7 +156,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (!authorized) return new Response('Unauthorized', { status: 401 })
+  if (!authorized) return new Response('Unauthorized', { status: 401, headers: CORS })
 
   const db = createClient(supabaseUrl, serviceKey)
   const nowIso = new Date().toISOString()
@@ -176,7 +187,7 @@ Deno.serve(async (req) => {
         } catch (e) { out[label] = { error: String(e) } }
       }
       if (key) { await probe('info', infoTpl); await probe('reels', reelsTpl) }
-      return new Response(JSON.stringify(out, null, 2), { headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify(out, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
   }
 
@@ -988,6 +999,6 @@ Deno.serve(async (req) => {
   }
 
   return new Response(JSON.stringify({ processed: Object.keys(summary).length, summary }), {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   })
 })
