@@ -55,6 +55,7 @@ export function Reports({ user }: { user: User }) {
   const [showCfg, setShowCfg] = useState(false)
   const [launching, setLaunching] = useState(false)
   const [launched, setLaunched]   = useState(false)
+  const [launchMsg, setLaunchMsg] = useState('')
   const [testing, setTesting]     = useState(false)
 
   const load = useCallback(async () => {
@@ -84,16 +85,22 @@ export function Reports({ user }: { user: User }) {
   // « Lancer maintenant » : déclenche la synchro IMMÉDIATEMENT (appel direct de
   // l'edge function) puis recharge — pas d'attente du cron.
   async function launchNow() {
-    setLaunching(true); setLaunched(false)
+    setLaunching(true); setLaunched(false); setLaunchMsg('')
     const next = { ...cfg, enabled: true, force_run: new Date().toISOString() }
     setCfg(next)
     await supabase.from(table).upsert({ [keyCol]: keyVal, tracking_config: next }, { onConflict: keyCol })
     try {
-      const { error } = await supabase.functions.invoke('run-scheduled-posts', { body: { sync: 'accounts' } })
-      if (error) console.error('[Reports] sync error', error)
-    } catch (e) { console.error('[Reports] sync exception', e) }
+      const { data, error } = await supabase.functions.invoke('run-scheduled-posts', { body: { sync: 'accounts' } })
+      if (error) { setLaunchMsg('❌ ' + error.message); console.error('[Reports] sync error', error) }
+      else {
+        // deno-lint-ignore no-explicit-any
+        const a = (data as any)?.accountsSynced
+        setLaunchMsg(typeof a === 'number' ? `✓ ${a} compte(s) synchronisé(s)` : '✓ Synchronisé')
+        console.log('[Reports] sync result', data)
+      }
+    } catch (e) { setLaunchMsg('❌ ' + String(e)); console.error('[Reports] sync exception', e) }
     await load()   // recharge les données fraîchement synchronisées
-    setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 4000)
+    setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 10000)
   }
 
   // Test RapidAPI : appelle l'edge function en mode diagnostic et affiche le détail.
@@ -210,7 +217,7 @@ export function Reports({ user }: { user: User }) {
               <button onClick={launchNow} disabled={launching} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: launching ? 0.6 : 1 }}>{launching ? '⏳ Synchro en cours…' : '⚡ Lancer maintenant'}</button>
               <button onClick={testApi} disabled={testing} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: testing ? 0.6 : 1 }}>{testing ? 'Test…' : '🔍 Tester l\'API'}</button>
               {saved && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Enregistré</span>}
-              {launched && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Synchronisé</span>}
+              {launched && <span style={{ fontSize: 12, color: launchMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{launchMsg || '✓ Synchronisé'}</span>}
             </div>
           </div>
         )}
