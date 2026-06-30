@@ -50,17 +50,24 @@ export async function runStatsSync(db: any, nowIso: string, deadlineMs: number):
       const lastPost = reels.reduce<string | null>((m, r) => (r.postedAt && (!m || r.postedAt > m)) ? r.postedAt : m, null)
       const avgViews = reels.length ? Math.round(reels.reduce((s, r) => s + r.views, 0) / reels.length) : 0
 
-      // Statut du compte : banni si introuvable (ni profil ni reels), shadow
-      // (indicatif) si portée anormalement basse, sinon ok.
-      const banned = !prof && reels.length === 0
+      // Statut du compte — PRUDENT : on ne marque "banni" QUE si on a une vraie
+      // réponse vide. Si l'appel API a échoué (quota/429, réseau), prof ET reels
+      // sont null → on NE TOUCHE PAS account_state (sinon faux "banni" en masse).
+      const apiFailed = !prof && reels.length === 0
       const shadow = !!(prof && prof.followers > 200 && avgViews > 0 && avgViews < prof.followers * 0.05)
-      const account_state = banned ? 'banned' : shadow ? 'shadow' : 'ok'
+      // Si on a au moins un profil OU des reels → compte vivant → ok/shadow.
+      const account_state = prof || reels.length ? (shadow ? 'shadow' : 'ok') : null
+
+      // Si l'API a échoué, on saute ce compte SANS rien écraser (ni stats ni statut).
+      if (apiFailed) { done++; continue }
 
       // Mise à jour phones (résilient si les nouvelles colonnes n'existent pas).
       const baseUpd: Record<string, unknown> = prof
         ? { followers: prof.followers, following: prof.following, video_count: prof.posts }
         : {}
-      const fullUpd = { ...baseUpd, pp_url: prof?.pp || null, last_post_at: lastPost, account_state }
+      const fullUpd: Record<string, unknown> = { ...baseUpd, last_post_at: lastPost }
+      if (prof?.pp) fullUpd.pp_url = prof.pp
+      if (account_state) fullUpd.account_state = account_state
       let { error: uErr } = await db.from('phones').update(fullUpd).eq('id', p.id)
       if (uErr && /pp_url|last_post_at|account_state/.test(uErr.message || '')) {
         if (Object.keys(baseUpd).length) await db.from('phones').update(baseUpd).eq('id', p.id)
