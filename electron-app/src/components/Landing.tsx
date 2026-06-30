@@ -305,18 +305,17 @@ const ENTRY_TILES: EntryTile[] = [
 // ── Fond noir + fumée SOMBRE qui dérive (charbon, l'écran reste noir) ──────────
 function SmokeBackground({ tint = false, subtle = false }: { tint?: boolean; subtle?: boolean }) {
   const k = subtle ? 0.6 : 1
-  // Volutes charbon : à peine plus claires que le noir → fumée sombre, écran noir.
-  const smoke = (a: number) => `rgba(34,35,46,${(a * k).toFixed(3)})`
-  const tinted = tint ? `rgba(48,46,78,${(0.8 * k).toFixed(3)})` : smoke(0.8)
+  // Charbon foncé MAIS visible sur le noir → fumée sombre. Pas de vignette
+  // (elle masquait la fumée qui est sur les bords).
+  const smoke = (a: number) => `rgba(64,66,86,${(a * k).toFixed(3)})`
+  const tinted = tint ? `rgba(78,72,120,${(0.85 * k).toFixed(3)})` : smoke(0.85)
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 1, background: '#040405' }}>
-      <div style={{ position: 'absolute', top: '2%',  left: '2%',  width: 820, height: 820, borderRadius: '50%', background: `radial-gradient(circle, ${smoke(0.95)}, transparent 66%)`, filter: 'blur(80px)', animation: 'sf-smoke-a 34s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', bottom: '-6%', right: '0%', width: 920, height: 920, borderRadius: '50%', background: `radial-gradient(circle, ${smoke(0.9)}, transparent 66%)`, filter: 'blur(90px)', animation: 'sf-smoke-b 42s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '28%', left: '36%', width: 760, height: 760, borderRadius: '50%', background: `radial-gradient(circle, ${tinted}, transparent 66%)`, filter: 'blur(85px)', animation: 'sf-smoke-rise 48s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '50%', left: '8%', width: 700, height: 700, borderRadius: '50%', background: `radial-gradient(circle, ${smoke(0.85)}, transparent 66%)`, filter: 'blur(80px)', animation: 'sf-smoke-c 38s ease-in-out infinite' }} />
-      {!subtle && <div style={{ position: 'absolute', top: '6%', right: '16%', width: 640, height: 640, borderRadius: '50%', background: `radial-gradient(circle, ${smoke(0.75)}, transparent 66%)`, filter: 'blur(75px)', animation: 'sf-smoke-a 52s ease-in-out infinite reverse' }} />}
-      {/* vignette : garde les bords bien noirs */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 80% at 50% 50%, transparent 30%, #040405 100%)' }} />
+      <div style={{ position: 'absolute', top: '0%',  left: '0%',  width: 820, height: 820, borderRadius: '50%', background: `radial-gradient(circle, ${smoke(0.95)}, transparent 68%)`, filter: 'blur(75px)', animation: 'sf-smoke-a 34s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '-4%', right: '2%', width: 900, height: 900, borderRadius: '50%', background: `radial-gradient(circle, ${smoke(0.9)}, transparent 68%)`, filter: 'blur(80px)', animation: 'sf-smoke-b 42s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '30%', left: '38%', width: 760, height: 760, borderRadius: '50%', background: `radial-gradient(circle, ${tinted}, transparent 68%)`, filter: 'blur(78px)', animation: 'sf-smoke-rise 48s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '48%', left: '10%', width: 700, height: 700, borderRadius: '50%', background: `radial-gradient(circle, ${smoke(0.8)}, transparent 68%)`, filter: 'blur(75px)', animation: 'sf-smoke-c 38s ease-in-out infinite' }} />
+      {!subtle && <div style={{ position: 'absolute', top: '8%', right: '18%', width: 640, height: 640, borderRadius: '50%', background: `radial-gradient(circle, ${smoke(0.75)}, transparent 68%)`, filter: 'blur(70px)', animation: 'sf-smoke-a 52s ease-in-out infinite reverse' }} />}
     </div>
   )
 }
