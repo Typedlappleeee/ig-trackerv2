@@ -22,6 +22,7 @@ interface DailyRow {
   posted: boolean; posted_via: string | null; posted_at: string | null
   reel_url: string | null; reel_thumb: string | null
   views: number | null; likes: number | null; comments: number | null
+  posts_today?: number | null
   synced_at: string | null
   // mergés depuis phones (sync stats)
   followers?: number | null
@@ -36,13 +37,13 @@ const DEFAULT_CFG: TrackingConfig = {
   sync_time: '12:00',
 }
 
-// Sur le web, le CDN Instagram bloque les <img> directs → on passe par le
-// proxy serveur /api/img. En Electron, l'URL directe marche (pas de CORS).
+// Images Instagram : proxy via l'edge function Supabase (fiable, sans Vercel).
 const _isWeb = typeof window !== 'undefined' && !(window as unknown as { electronAPI?: unknown }).electronAPI
+const _imgBase = `${import.meta.env.VITE_SUPABASE_URL ?? ''}/functions/v1/run-scheduled-posts`
 function igimg(u: string | null | undefined): string | undefined {
   if (!u) return undefined
   if (!_isWeb || !/^https?:\/\//i.test(u)) return u
-  return `/api/img?url=${encodeURIComponent(u)}`
+  return `${_imgBase}?img=${encodeURIComponent(u)}`
 }
 
 function parisToday(): string { return new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) }
@@ -98,9 +99,10 @@ export function Reports({ user }: { user: User }) {
     // Infos live depuis phones (followers, pp, dernier post, statut).
     let pQ = supabase.from('phones').select('id, followers, pp_url, last_post_at, account_state').not('ig_username', 'is', null)
     pQ = currentOrg ? pQ.eq('org_id', currentOrg.id) : pQ.eq('user_id', user.id).is('org_id', null)
-    // Tendance des vues : account_daily des 30 derniers jours.
+    // Tendance des vues : SEULEMENT les vues des posts faits ce jour-là (posted),
+    // pas le cumul du dernier reel de chaque compte.
     const from30 = new Date(new Date(day + 'T12:00:00').getTime() - 29 * 86_400_000).toLocaleDateString('fr-CA')
-    let tQ = supabase.from('account_daily').select('day, views').gte('day', from30).lte('day', day)
+    let tQ = supabase.from('account_daily').select('day, views, posted').eq('posted', true).gte('day', from30).lte('day', day)
     tQ = currentOrg ? tQ.eq('org_id', currentOrg.id) : tQ.eq('user_id', user.id).is('org_id', null)
     const [{ data: cfgData }, { data: dData }, { data: pData }, { data: tData }] = await Promise.all([cfgQ, dQ, pQ, tQ])
     const tc = (cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>
@@ -385,7 +387,9 @@ export function Reports({ user }: { user: User }) {
                             <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Stats indisponibles</p>
                           )}
                           <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '2px 0 0' }}>
-                            {a.posted ? <span style={{ color: 'var(--ok)' }}>✓ Posté{a.posted_at ? ` ${fmtTime(a.posted_at)}` : ''}</span> : 'Pas posté aujourd\'hui'}
+                            {a.posted
+                              ? <span style={{ color: 'var(--ok)' }}>✓ {(a.posts_today ?? 0) > 1 ? `${a.posts_today} posts aujourd'hui` : 'Posté aujourd\'hui'}{a.posted_at ? ` · ${fmtTime(a.posted_at)}` : ''}</span>
+                              : 'Pas posté aujourd\'hui'}
                             {a.reel_url && <> · <a href={a.reel_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-l)' }}>voir le reel</a></>}
                           </p>
                         </div>
@@ -408,10 +412,16 @@ export function Reports({ user }: { user: User }) {
 
 // ── Modal détail d'un compte ────────────────────────────────────────────────
 // deno-lint-ignore no-explicit-any
+function fmtReelDate(iso: string | null): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
 function AccountDetailModal({ row, data, loading, onClose }: { row: DailyRow; data: any; loading: boolean; onClose: () => void }) {
   const p = data?.profile
   const reels: ReelInfo[] = data?.reels ?? []
   const notFound = data && data.found === false
+  const today = parisToday()
+  const postsToday = reels.filter(r => r.postedAt && r.postedAt.slice(0, 10) === today).length
   return (
     <div className="sf-modal-bg" onClick={onClose} style={{ zIndex: 9000 }}>
       <div className="sf-modal anim-scale-in" onClick={e => e.stopPropagation()} style={{ width: 'min(720px, 94vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
@@ -427,6 +437,7 @@ function AccountDetailModal({ row, data, loading, onClose }: { row: DailyRow; da
               {p?.isPrivate && <span className="sf-badge" style={{ fontSize: 10 }}>Privé</span>}
               {notFound && <span className="sf-badge" style={{ fontSize: 10, background: 'rgba(239,68,68,0.15)', color: 'var(--err)', border: '1px solid rgba(239,68,68,0.3)' }}>⚠ Introuvable (banni/désactivé ?)</span>}
               {data?.lowReach && <span className="sf-badge" style={{ fontSize: 10, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>⚠ Portée faible (shadowban ?)</span>}
+              {postsToday > 0 && <span className="sf-badge" style={{ fontSize: 10, background: 'rgba(34,197,94,0.14)', color: 'var(--ok)', border: '1px solid rgba(34,197,94,0.3)' }}>✓ {postsToday} post{postsToday > 1 ? 's' : ''} aujourd'hui</span>}
             </div>
             {p?.fullName && <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>{p.fullName}</p>}
             {p?.bio && <p style={{ fontSize: 11.5, color: 'var(--text-4)', margin: '4px 0 0', lineHeight: 1.4, maxHeight: 34, overflow: 'hidden' }}>{p.bio}</p>}
@@ -470,9 +481,14 @@ function AccountDetailModal({ row, data, loading, onClose }: { row: DailyRow; da
                       👁 {fmt(r.views)}
                     </div>
                   </div>
-                  <div style={{ padding: '5px 7px', fontSize: 9.5, color: 'var(--text-3)', display: 'flex', justifyContent: 'space-between', fontVariantNumeric: 'tabular-nums' }}>
+                  <div style={{ padding: '5px 7px 2px', fontSize: 9.5, color: 'var(--text-3)', display: 'flex', justifyContent: 'space-between', fontVariantNumeric: 'tabular-nums' }}>
                     <span>❤ {fmt(r.likes)}</span><span>💬 {fmt(r.comments)}</span>
                   </div>
+                  {r.postedAt && (
+                    <div style={{ padding: '0 7px 5px', fontSize: 9, color: r.postedAt.slice(0, 10) === today ? 'var(--ok)' : 'var(--text-4)', fontWeight: r.postedAt.slice(0, 10) === today ? 700 : 400 }}>
+                      📅 {r.postedAt.slice(0, 10) === today ? "Aujourd'hui" : fmtReelDate(r.postedAt)}
+                    </div>
+                  )}
                 </a>
               ))}
             </div>

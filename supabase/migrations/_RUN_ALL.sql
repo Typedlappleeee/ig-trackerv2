@@ -105,5 +105,8 @@ alter table public.phones add column if not exists pp_url        text;
 alter table public.phones add column if not exists last_post_at  timestamptz;
 alter table public.phones add column if not exists account_state text;
 
+-- Nombre de posts faits aujourd'hui (par compte/jour).
+alter table public.account_daily add column if not exists posts_today integer default 0;
+
 -- Recharge le cache PostgREST pour que les nouvelles tables/fonctions soient vues.
 notify pgrst, 'reload schema';
