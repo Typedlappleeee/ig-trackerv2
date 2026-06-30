@@ -23,8 +23,13 @@ interface DailyRow {
   reel_url: string | null; reel_thumb: string | null
   views: number | null; likes: number | null; comments: number | null
   synced_at: string | null
-  followers?: number | null   // mergé depuis phones (sync stats)
+  // mergés depuis phones (sync stats)
+  followers?: number | null
+  pp_url?: string | null
+  last_post_at?: string | null
+  account_state?: string | null   // 'ok' | 'banned' | 'shadow'
 }
+interface TrendPoint { day: string; views: number }
 
 const DEFAULT_CFG: TrackingConfig = {
   enabled: false,
@@ -72,6 +77,7 @@ export function Reports({ user }: { user: User }) {
   // deno-lint-ignore no-explicit-any
   const [detail, setDetail]       = useState<any>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [trend, setTrend] = useState<TrendPoint[]>([])
 
   async function openDetail(a: DailyRow) {
     setDetailRow(a); setDetail(null); setDetailLoading(true)
@@ -89,16 +95,33 @@ export function Reports({ user }: { user: User }) {
     const cfgQ = supabase.from(table).select('tracking_config').eq(keyCol, keyVal).maybeSingle()
     let dQ = supabase.from('account_daily').select('*').eq('day', day)
     dQ = currentOrg ? dQ.eq('org_id', currentOrg.id) : dQ.eq('user_id', user.id).is('org_id', null)
-    // Followers (live) depuis phones, mergés par phone_id.
-    let pQ = supabase.from('phones').select('id, followers').not('ig_username', 'is', null)
+    // Infos live depuis phones (followers, pp, dernier post, statut).
+    let pQ = supabase.from('phones').select('id, followers, pp_url, last_post_at, account_state').not('ig_username', 'is', null)
     pQ = currentOrg ? pQ.eq('org_id', currentOrg.id) : pQ.eq('user_id', user.id).is('org_id', null)
-    const [{ data: cfgData }, { data: dData }, { data: pData }] = await Promise.all([cfgQ, dQ, pQ])
+    // Tendance des vues : account_daily des 30 derniers jours.
+    const from30 = new Date(new Date(day + 'T12:00:00').getTime() - 29 * 86_400_000).toLocaleDateString('fr-CA')
+    let tQ = supabase.from('account_daily').select('day, views').gte('day', from30).lte('day', day)
+    tQ = currentOrg ? tQ.eq('org_id', currentOrg.id) : tQ.eq('user_id', user.id).is('org_id', null)
+    const [{ data: cfgData }, { data: dData }, { data: pData }, { data: tData }] = await Promise.all([cfgQ, dQ, pQ, tQ])
     const tc = (cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>
     setCfg({ ...DEFAULT_CFG, ...tc })
-    const folMap = new Map<string, number | null>((pData ?? []).map((p: { id: string; followers: number | null }) => [p.id, p.followers]))
+    // deno-lint-ignore no-explicit-any
+    const pMap = new Map<string, any>((pData ?? []).map((p: { id: string }) => [p.id, p]))
     // Page réservée au superadmin ScaleFlow → on affiche tous les comptes (pas de
     // filtre par groupe : sinon un rôle org restrictif masquerait tout).
-    setRows(((dData ?? []) as DailyRow[]).map(r => ({ ...r, followers: folMap.get(r.phone_id) ?? null })))
+    setRows(((dData ?? []) as DailyRow[]).map(r => {
+      const p = pMap.get(r.phone_id)
+      return { ...r, followers: p?.followers ?? null, pp_url: p?.pp_url ?? null, last_post_at: p?.last_post_at ?? null, account_state: p?.account_state ?? null }
+    }))
+    // Agrège les vues par jour pour la courbe.
+    const byDay = new Map<string, number>()
+    for (const r of (tData ?? []) as { day: string; views: number | null }[]) byDay.set(r.day, (byDay.get(r.day) ?? 0) + (r.views ?? 0))
+    const series: TrendPoint[] = []
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(new Date(day + 'T12:00:00').getTime() - i * 86_400_000).toLocaleDateString('fr-CA')
+      series.push({ day: d, views: byDay.get(d) ?? 0 })
+    }
+    setTrend(series)
     setShowCfg(prev => prev || !tc.enabled)
     setLoading(false)
   }, [table, keyCol, keyVal, currentOrg?.id, user.id, day])
@@ -178,6 +201,44 @@ export function Reports({ user }: { user: User }) {
 
   const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)', marginBottom: 8 }
 
+  // Courbe des vues par jour (SVG, sans lib).
+  const ViewsChart = ({ data }: { data: TrendPoint[] }) => {
+    const W = 760, H = 150, P = 6
+    const max = Math.max(1, ...data.map(d => d.views))
+    const n = data.length
+    const pts = data.map((d, i) => {
+      const x = P + (n > 1 ? (i / (n - 1)) : 0) * (W - 2 * P)
+      const y = H - P - (d.views / max) * (H - 2 * P)
+      return [x, y] as [number, number]
+    })
+    const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+    const area = `${line} L${pts[n - 1][0].toFixed(1)},${H - P} L${pts[0][0].toFixed(1)},${H - P} Z`
+    const lastV = data[n - 1]?.views ?? 0
+    const prevV = data[n - 2]?.views ?? 0
+    const delta = lastV - prevV
+    return (
+      <div className="sf-card" style={{ padding: '16px 18px', marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>Vues par jour · 30 jours</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
+            {fmt(lastV)} aujourd'hui {delta !== 0 && <span style={{ color: delta > 0 ? 'var(--ok)' : 'var(--err)', fontSize: 11 }}>{delta > 0 ? '▲' : '▼'} {fmt(Math.abs(delta))}</span>}
+          </span>
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 150, display: 'block' }}>
+          <defs>
+            <linearGradient id="rpt-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(99,102,241,0.35)" />
+              <stop offset="100%" stopColor="rgba(99,102,241,0)" />
+            </linearGradient>
+          </defs>
+          <path d={area} fill="url(#rpt-grad)" />
+          <path d={line} fill="none" stroke="#818CF8" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          {pts.map(([x, y], i) => data[i].views > 0 && i === n - 1 ? <circle key={i} cx={x} cy={y} r="3.5" fill="#818CF8" /> : null)}
+        </svg>
+      </div>
+    )
+  }
+
   const StatCard = ({ icon, label, value, sub, accent }: { icon: string; label: string; value: string; sub?: string; accent?: string }) => (
     <div className="sf-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -218,6 +279,9 @@ export function Reports({ user }: { user: User }) {
             <StatCard icon="💬" label="Engagement" value={fmt(totalLikes + totalComments)} sub={`❤ ${fmt(totalLikes)} · 💬 ${fmt(totalComments)}`} />
           </div>
         )}
+
+        {/* Courbe des vues */}
+        {!loading && rows.length > 0 && trend.some(t => t.views > 0) && <ViewsChart data={trend} />}
 
         {/* Config */}
         {showCfg && (
@@ -305,7 +369,10 @@ export function Reports({ user }: { user: User }) {
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: a.posted ? 'var(--ok)' : 'rgba(255,255,255,0.18)' }} title={a.posted ? "Posté aujourd'hui" : "Pas posté aujourd'hui"} />
-                            <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{a.ig_username}</p>
+                            <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>@{a.ig_username}</p>
+                            {a.account_state === 'banned' && <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', flexShrink: 0 }}>BANNI</span>}
+                            {a.account_state === 'shadow' && <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)', flexShrink: 0 }}>SHADOW?</span>}
+                            {(!a.account_state || a.account_state === 'ok') && <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(34,197,94,0.12)', color: 'var(--ok)', border: '1px solid rgba(34,197,94,0.25)', flexShrink: 0 }}>OK</span>}
                           </div>
                           {/* Followers (live) */}
                           {a.followers != null && a.followers > 0 && (
