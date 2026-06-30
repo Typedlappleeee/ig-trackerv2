@@ -174,7 +174,8 @@ Deno.serve(async (req) => {
       const host = (Deno.env.get('RAPIDAPI_HOST') ?? '').trim() || 'instagram120.p.rapidapi.com'
       const uname = String(body.username ?? 'instagram').replace(/^@/, '')
       const out: Record<string, unknown> = { keyPresent: !!key, keyLength: key.length, host, username: uname }
-      const probe = async (label: string, endpoint: string, payload: Record<string, unknown>) => {
+      // deno-lint-ignore no-explicit-any
+      const probe = async (label: string, endpoint: string, payload: Record<string, unknown>): Promise<any> => {
         try {
           const r = await fetch(`https://${host}/api/instagram/${endpoint}`, {
             method: 'POST',
@@ -182,10 +183,22 @@ Deno.serve(async (req) => {
             body: JSON.stringify({ username: uname, ...payload }),
           })
           const txt = await r.text()
-          out[label] = { status: r.status, ok: r.ok, sample: txt.slice(0, 600) }
-        } catch (e) { out[label] = { error: String(e) } }
+          let json: unknown = null; try { json = JSON.parse(txt) } catch { /* non-json */ }
+          out[label] = { status: r.status, ok: r.ok, sample: txt.slice(0, 500) }
+          return json
+        } catch (e) { out[label] = { error: String(e) }; return null }
       }
-      if (key) { await probe('userInfo', 'userInfo', {}); await probe('reels', 'reels', { maxId: '' }) }
+      if (key) {
+        const infoJson = await probe('userInfo', 'userInfo', {})
+        const reelsJson = await probe('reels', 'reels', { maxId: '' })
+        // Valeurs RÉELLEMENT extraites par le parseur → confirme que ça marchera.
+        try {
+          const { parseInfo, deepArray, reelInfo } = await import('./ig-rapidapi.ts')
+          out.parsedInfo = parseInfo(infoJson)
+          const items = deepArray(reelsJson, ['items', 'reels', 'edges', 'data'])
+          out.parsedReels = { count: items?.length ?? 0, latest: items?.length ? reelInfo(items[0]) : null }
+        } catch (e) { out.parseError = String(e) }
+      }
       return new Response(JSON.stringify(out, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
   }
