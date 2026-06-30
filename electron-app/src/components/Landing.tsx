@@ -302,28 +302,20 @@ const ENTRY_TILES: EntryTile[] = [
   { key:'b4', w:265, h:162, bottom:'2%', right:'1%', ry:18,  rx:-32, delay:0.45 },
 ]
 
-// ── Fond noir + fumée qui dérive (plus vivante) ───────────────────────────────
-let _smokeId = 0
-function SmokeBackground({ tint = false }: { tint?: boolean }) {
-  const id = useRef(`sf-smk-${_smokeId++}`).current
-  const indigo = tint ? 'rgba(99,102,241,0.08)' : 'rgba(120,120,150,0.07)'
+// ── Fond noir + fumée douce qui dérive (nappes floues, naturel) ───────────────
+function SmokeBackground({ tint = false, subtle = false }: { tint?: boolean; subtle?: boolean }) {
+  const indigo = tint ? 'rgba(99,102,241,0.07)' : 'rgba(120,120,150,0.07)'
+  const k = subtle ? 0.45 : 1   // facteur d'intensité (version discrète)
+  const wisp = (a: number) => `rgba(150,150,175,${(a * k).toFixed(3)})`
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 1, background: '#040405' }}>
-      {/* volutes de fumée — plusieurs nappes, mouvements variés */}
-      <div style={{ position: 'absolute', top: '6%',  left: '8%',  width: 640, height: 640, borderRadius: '50%', background: 'radial-gradient(circle, rgba(150,150,170,0.11), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-a 26s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', bottom: '0%', right: '6%', width: 740, height: 740, borderRadius: '50%', background: 'radial-gradient(circle, rgba(105,105,130,0.10), transparent 62%)', filter: 'blur(85px)', animation: 'sf-smoke-b 32s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '34%', left: '40%', width: 600, height: 600, borderRadius: '50%', background: `radial-gradient(circle, ${indigo}, transparent 62%)`, filter: 'blur(75px)', animation: 'sf-smoke-rise 38s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '55%', left: '20%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(130,130,160,0.08), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-c 30s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '12%', right: '24%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(110,110,140,0.07), transparent 62%)', filter: 'blur(65px)', animation: 'sf-smoke-a 42s ease-in-out infinite reverse' }} />
-      {/* texture de fumée animée (turbulence qui morphe) */}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.09, mixBlendMode: 'screen' }}>
-        <filter id={id}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="4">
-            <animate attributeName="baseFrequency" dur="30s" values="0.012;0.024;0.012" repeatCount="indefinite" />
-          </feTurbulence>
-        </filter>
-        <rect width="100%" height="100%" filter={`url(#${id})`} />
-      </svg>
+      {/* Nappes de fumée — grandes, très floues, lentes → effet vapeur naturel.
+          Pas de texture granuleuse (ça faisait du « bruit » pas naturel). */}
+      <div style={{ position: 'absolute', top: '4%',  left: '4%',  width: 760, height: 760, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.10)}, transparent 64%)`, filter: 'blur(95px)', animation: 'sf-smoke-a 34s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '-4%', right: '2%', width: 860, height: 860, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.09)}, transparent 64%)`, filter: 'blur(110px)', animation: 'sf-smoke-b 42s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '30%', left: '38%', width: 700, height: 700, borderRadius: '50%', background: `radial-gradient(circle, ${indigo}, transparent 64%)`, filter: 'blur(100px)', animation: 'sf-smoke-rise 48s ease-in-out infinite' }} />
+      {!subtle && <div style={{ position: 'absolute', top: '52%', left: '14%', width: 620, height: 620, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.07)}, transparent 64%)`, filter: 'blur(95px)', animation: 'sf-smoke-c 38s ease-in-out infinite' }} />}
+      {!subtle && <div style={{ position: 'absolute', top: '8%', right: '20%', width: 560, height: 560, borderRadius: '50%', background: `radial-gradient(circle, ${wisp(0.06)}, transparent 64%)`, filter: 'blur(90px)', animation: 'sf-smoke-a 52s ease-in-out infinite reverse' }} />}
     </div>
   )
 }
@@ -642,7 +634,7 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
       onKeyDown={e => { if (e.key === 'Enter') onClick() }}
       style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: hovered ? IVORY : 'transparent',
+        background: hovered ? '#D6D7DE' : 'transparent',
         cursor: 'none', position: 'relative', overflow: 'hidden', zIndex: 1,
         transition: 'background 0.55s cubic-bezier(0.16,1,0.3,1)',
       }}
@@ -709,8 +701,8 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
       overflow: 'hidden', cursor: 'none',
       background: BG,
     }}>
-      {/* Fond fumée */}
-      <SmokeBackground tint />
+      {/* Fond fumée discret */}
+      <SmokeBackground tint subtle />
 
       {/* Brand top center */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', justifyContent: 'center', padding: '24px 0', pointerEvents: 'none', opacity: visible ? 1 : 0, transition: 'opacity 0.5s 0.1s' }}>
