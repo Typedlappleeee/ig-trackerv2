@@ -269,6 +269,29 @@ Deno.serve(async (req) => {
         headers: { ...CORS, 'Content-Type': 'application/json' },
       })
     }
+
+    // ── Courbe des vues : vues des reels regroupées par DATE DE PUBLICATION ──
+    // (sur les derniers reels de chaque compte du périmètre).
+    if (body?.trend === 'posting-views') {
+      const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
+      const orgId = (body.org_id as string) ?? null
+      const uid = (body.user_id as string) ?? null
+      let pq = db.from('phones').select('ig_username').not('ig_username', 'is', null)
+      pq = orgId ? pq.eq('org_id', orgId) : pq.eq('user_id', uid).is('org_id', null)
+      const { data: phones } = await pq
+      const { igPost, parseReels } = await import('./ig-rapidapi.ts')
+      const buckets: Record<string, number> = {}
+      const list = (phones ?? []).slice(0, 60)
+      await Promise.all(list.map(async (ph: { ig_username: string }) => {
+        const reels = parseReels(await igPost(key, 'reels', ph.ig_username, { maxId: '' }), 15)
+        for (const r of reels) {
+          if (!r.postedAt) continue
+          const d = new Date(r.postedAt).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' })
+          buckets[d] = (buckets[d] ?? 0) + r.views
+        }
+      }))
+      return new Response(JSON.stringify({ buckets }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
   }
 
   // ── Étape 0-tracking : sync journalier des comptes (par lots) ──

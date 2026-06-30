@@ -99,12 +99,7 @@ export function Reports({ user }: { user: User }) {
     // Infos live depuis phones (followers, pp, dernier post, statut).
     let pQ = supabase.from('phones').select('id, followers, pp_url, last_post_at, account_state').not('ig_username', 'is', null)
     pQ = currentOrg ? pQ.eq('org_id', currentOrg.id) : pQ.eq('user_id', user.id).is('org_id', null)
-    // Tendance des vues : SEULEMENT les vues des posts faits ce jour-là (posted),
-    // pas le cumul du dernier reel de chaque compte.
-    const from30 = new Date(new Date(day + 'T12:00:00').getTime() - 29 * 86_400_000).toLocaleDateString('fr-CA')
-    let tQ = supabase.from('account_daily').select('day, views, posted').eq('posted', true).gte('day', from30).lte('day', day)
-    tQ = currentOrg ? tQ.eq('org_id', currentOrg.id) : tQ.eq('user_id', user.id).is('org_id', null)
-    const [{ data: cfgData }, { data: dData }, { data: pData }, { data: tData }] = await Promise.all([cfgQ, dQ, pQ, tQ])
+    const [{ data: cfgData }, { data: dData }, { data: pData }] = await Promise.all([cfgQ, dQ, pQ])
     const tc = (cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>
     setCfg({ ...DEFAULT_CFG, ...tc })
     // deno-lint-ignore no-explicit-any
@@ -115,18 +110,28 @@ export function Reports({ user }: { user: User }) {
       const p = pMap.get(r.phone_id)
       return { ...r, followers: p?.followers ?? null, pp_url: p?.pp_url ?? null, last_post_at: p?.last_post_at ?? null, account_state: p?.account_state ?? null }
     }))
-    // Agrège les vues par jour pour la courbe.
-    const byDay = new Map<string, number>()
-    for (const r of (tData ?? []) as { day: string; views: number | null }[]) byDay.set(r.day, (byDay.get(r.day) ?? 0) + (r.views ?? 0))
-    const series: TrendPoint[] = []
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(new Date(day + 'T12:00:00').getTime() - i * 86_400_000).toLocaleDateString('fr-CA')
-      series.push({ day: d, views: byDay.get(d) ?? 0 })
-    }
-    setTrend(series)
     setShowCfg(prev => prev || !tc.enabled)
     setLoading(false)
   }, [table, keyCol, keyVal, currentOrg?.id, user.id, day])
+
+  // Courbe : vues des reels par DATE DE PUBLICATION (via l'edge function).
+  // Appel séparé (N appels API) pour ne pas bloquer l'affichage de la page.
+  const loadTrend = useCallback(async () => {
+    try {
+      const { data } = await supabase.functions.invoke('run-scheduled-posts', {
+        body: { trend: 'posting-views', org_id: currentOrg?.id ?? null, user_id: currentOrg ? null : user.id },
+      })
+      const buckets = ((data as { buckets?: Record<string, number> })?.buckets) ?? {}
+      const series: TrendPoint[] = []
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(new Date(day + 'T12:00:00').getTime() - i * 86_400_000).toLocaleDateString('fr-CA')
+        series.push({ day: d, views: buckets[d] ?? 0 })
+      }
+      setTrend(series)
+    } catch { /* silencieux */ }
+  }, [currentOrg?.id, user.id, day])
+
+  useEffect(() => { loadTrend() }, [loadTrend])
 
   useEffect(() => { load() }, [load])
 
@@ -416,6 +421,52 @@ function fmtReelDate(iso: string | null): string {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
+
+// Vignette d'un reel + bouton info (ⓘ) qui affiche date complète + stats.
+function ReelCard({ r, today }: { r: ReelInfo; today: string }) {
+  const [info, setInfo] = useState(false)
+  const isToday = (r.postedAt ?? '').slice(0, 10) === today
+  const fullDate = r.postedAt ? new Date(r.postedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' }) : 'Date inconnue'
+  return (
+    <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+      <a href={r.url ?? undefined} target="_blank" rel="noreferrer" className="sf-card-lift" style={{ display: 'block', textDecoration: 'none' }}>
+        <div style={{ aspectRatio: '9/16', background: 'rgba(255,255,255,0.04)', position: 'relative' }}>
+          {r.thumb ? <img src={igimg(r.thumb)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 22, opacity: 0.4 }}>🎬</div>}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: '#fff', fontSize: 10.5, fontWeight: 700 }}>👁 {fmt(r.views)}</div>
+        </div>
+        <div style={{ padding: '5px 7px 2px', fontSize: 9.5, color: 'var(--text-3)', display: 'flex', justifyContent: 'space-between', fontVariantNumeric: 'tabular-nums' }}>
+          <span>❤ {fmt(r.likes)}</span><span>💬 {fmt(r.comments)}</span>
+        </div>
+        {r.postedAt && (
+          <div style={{ padding: '0 7px 6px', fontSize: 9, color: isToday ? 'var(--ok)' : 'var(--text-4)', fontWeight: isToday ? 700 : 400 }}>
+            📅 {isToday ? "Aujourd'hui" : fmtReelDate(r.postedAt)}
+          </div>
+        )}
+      </a>
+      {/* Bouton info */}
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setInfo(v => !v) }}
+        aria-label="Infos du reel"
+        style={{
+          position: 'absolute', top: 5, right: 5, width: 20, height: 20, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800,
+          background: 'rgba(0,0,0,0.55)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', cursor: 'pointer',
+        }}
+      >ⓘ</button>
+      {info && (
+        <div onClick={(e) => { e.stopPropagation(); setInfo(false) }} style={{
+          position: 'absolute', inset: 0, background: 'rgba(10,11,14,0.92)', padding: 10, display: 'flex',
+          flexDirection: 'column', justifyContent: 'center', gap: 4, fontSize: 10.5, color: 'var(--text-2)', cursor: 'pointer',
+        }}>
+          <div style={{ fontWeight: 700, color: isToday ? 'var(--ok)' : 'var(--text-1)', marginBottom: 2 }}>📅 {fullDate}</div>
+          <div>👁 {fmt(r.views)} vues</div>
+          <div>❤ {fmt(r.likes)} · 💬 {fmt(r.comments)}</div>
+          {r.url && <div style={{ color: 'var(--accent-l)', marginTop: 4 }}>Ouvrir le reel ↗</div>}
+        </div>
+      )}
+    </div>
+  )
+}
 function AccountDetailModal({ row, data, loading, onClose }: { row: DailyRow; data: any; loading: boolean; onClose: () => void }) {
   const p = data?.profile
   const reels: ReelInfo[] = data?.reels ?? []
@@ -473,24 +524,7 @@ function AccountDetailModal({ row, data, loading, onClose }: { row: DailyRow; da
             <p style={{ fontSize: 12.5, color: 'var(--text-4)', textAlign: 'center', padding: '20px 0' }}>{notFound ? 'Compte introuvable via l\'API.' : 'Aucun reel trouvé.'}</p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
-              {reels.map((r, i) => (
-                <a key={i} href={r.url ?? undefined} target="_blank" rel="noreferrer" className="sf-card-lift" style={{ display: 'block', borderRadius: 10, overflow: 'hidden', textDecoration: 'none', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-                  <div style={{ aspectRatio: '9/16', background: 'rgba(255,255,255,0.04)', position: 'relative' }}>
-                    {r.thumb ? <img src={igimg(r.thumb)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 22, opacity: 0.4 }}>🎬</div>}
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      👁 {fmt(r.views)}
-                    </div>
-                  </div>
-                  <div style={{ padding: '5px 7px 2px', fontSize: 9.5, color: 'var(--text-3)', display: 'flex', justifyContent: 'space-between', fontVariantNumeric: 'tabular-nums' }}>
-                    <span>❤ {fmt(r.likes)}</span><span>💬 {fmt(r.comments)}</span>
-                  </div>
-                  {r.postedAt && (
-                    <div style={{ padding: '0 7px 5px', fontSize: 9, color: r.postedAt.slice(0, 10) === today ? 'var(--ok)' : 'var(--text-4)', fontWeight: r.postedAt.slice(0, 10) === today ? 700 : 400 }}>
-                      📅 {r.postedAt.slice(0, 10) === today ? "Aujourd'hui" : fmtReelDate(r.postedAt)}
-                    </div>
-                  )}
-                </a>
-              ))}
+              {reels.map((r, i) => <ReelCard key={i} r={r} today={today} />)}
             </div>
           )}
         </div>
