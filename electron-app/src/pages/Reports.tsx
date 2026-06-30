@@ -37,13 +37,12 @@ const DEFAULT_CFG: TrackingConfig = {
   sync_time: '12:00',
 }
 
-// Images Instagram : proxy via l'edge function Supabase (fiable, sans Vercel).
+// Images Instagram : proxy Vercel /api/img (déployé automatiquement, fiable).
 const _isWeb = typeof window !== 'undefined' && !(window as unknown as { electronAPI?: unknown }).electronAPI
-const _imgBase = `${import.meta.env.VITE_SUPABASE_URL ?? ''}/functions/v1/run-scheduled-posts`
 function igimg(u: string | null | undefined): string | undefined {
   if (!u) return undefined
   if (!_isWeb || !/^https?:\/\//i.test(u)) return u
-  return `${_imgBase}?img=${encodeURIComponent(u)}`
+  return `/api/img?url=${encodeURIComponent(u)}`
 }
 
 function parisToday(): string { return new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) }
@@ -123,11 +122,14 @@ export function Reports({ user }: { user: User }) {
       })
       const buckets = ((data as { buckets?: Record<string, number> })?.buckets) ?? {}
       const series: TrendPoint[] = []
+      // Mêmes clés de date (Paris) que l'edge function, sinon rien ne matche.
       for (let i = 29; i >= 0; i--) {
-        const d = new Date(new Date(day + 'T12:00:00').getTime() - i * 86_400_000).toLocaleDateString('fr-CA')
+        const d = new Date(new Date(day + 'T12:00:00').getTime() - i * 86_400_000)
+          .toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' })
         series.push({ day: d, views: buckets[d] ?? 0 })
       }
       setTrend(series)
+      console.log('[Reports] trend buckets', buckets)
     } catch { /* silencieux */ }
   }, [currentOrg?.id, user.id, day])
 
@@ -160,6 +162,7 @@ export function Reports({ user }: { user: User }) {
       }
     } catch (e) { setLaunchMsg('❌ ' + String(e)); console.error('[Reports] sync exception', e) }
     await load()   // recharge les données fraîchement synchronisées
+    loadTrend()    // recalcule la courbe
     setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 10000)
   }
 
@@ -287,8 +290,8 @@ export function Reports({ user }: { user: User }) {
           </div>
         )}
 
-        {/* Courbe des vues */}
-        {!loading && rows.length > 0 && trend.some(t => t.views > 0) && <ViewsChart data={trend} />}
+        {/* Courbe des vues — toujours visible quand il y a des comptes */}
+        {!loading && rows.length > 0 && <ViewsChart data={trend.length ? trend : Array.from({ length: 30 }, (_, i) => ({ day: String(i), views: 0 }))} />}
 
         {/* Config */}
         {showCfg && (
@@ -368,10 +371,11 @@ export function Reports({ user }: { user: User }) {
                         borderColor: a.posted ? 'rgba(34,197,94,0.22)' : 'var(--border)',
                         background: a.posted ? 'rgba(34,197,94,0.04)' : undefined,
                       }}>
-                        <div style={{ width: 48, height: 62, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                          {a.reel_thumb
-                            ? <img src={igimg(a.reel_thumb)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <span style={{ fontSize: 18, opacity: 0.5 }}>{a.posted ? '🎬' : '—'}</span>}
+                        {/* Avatar = photo de profil (rond) */}
+                        <div style={{ width: 46, height: 46, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
+                          {a.pp_url
+                            ? <img src={igimg(a.pp_url)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-3)' }}>{a.ig_username.charAt(0).toUpperCase()}</span>}
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
