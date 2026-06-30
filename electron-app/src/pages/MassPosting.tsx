@@ -919,6 +919,30 @@ export function MassPosting({ user }: MassPostingProps) {
           total:     assignments.length,
         }) // fire-and-forget, non-blocking
       }
+
+      // Dashboard Rapports : marque chaque compte publié comme "posté aujourd'hui"
+      // (détection gratuite et immédiate, sans API — fiable pour le posting direct).
+      ;(async () => {
+        try {
+          const day = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' })
+          const orgId = currentOrg?.id ?? null
+          const donePhones = phoneList.filter(p =>
+            finalStatuses.get(p.id)?.status === 'done' && p.ig_username)
+          for (const p of donePhones) {
+            const row = {
+              user_id: orgId ? null : user.id, org_id: orgId,
+              phone_id: p.id, ig_username: p.ig_username, va: p.group_name || null, day,
+              posted: true, posted_via: 'scaleflow', posted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+            let q = supabase.from('account_daily').select('id').eq('phone_id', p.id).eq('day', day)
+            q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', user.id)
+            const { data: ex } = await q.maybeSingle()
+            if (ex?.id) await supabase.from('account_daily').update(row).eq('id', ex.id)
+            else await supabase.from('account_daily').insert(row)
+          }
+        } catch (e) { console.error('[MassPosting] account_daily write failed', e) }
+      })()
       log('Done! Resetting in 5s…', 'ok')
       await new Promise(r => setTimeout(r, 5000))
       resetMassPosting()
