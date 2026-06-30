@@ -216,6 +216,19 @@ Deno.serve(async (req) => {
           out.parsedInfo = parseInfo(infoJson)
           const items = deepArray(reelsJson, ['items', 'reels', 'edges', 'data'])
           out.parsedReels = { count: items?.length ?? 0, latest: items?.length ? reelInfo(items[0]) : null }
+          // STRUCTURE BRUTE du 1er reel (pour voir le champ de date exact).
+          if (items?.length) {
+            // deno-lint-ignore no-explicit-any
+            const first: any = items[0]
+            const media = first?.node?.media ?? first?.media ?? first?.node ?? first
+            // liste des clés + toutes les clés "date-ish" avec leur valeur
+            // deno-lint-ignore no-explicit-any
+            const dateish: Record<string, unknown> = {}
+            for (const k of Object.keys(media ?? {})) {
+              if (/taken|created|publish|timestamp|date|time/i.test(k)) dateish[k] = (media as Record<string, unknown>)[k]
+            }
+            out.firstReel = { keys: Object.keys(media ?? {}), dateish, mediaSample: JSON.stringify(media).slice(0, 700) }
+          }
         } catch (e) { out.parseError = String(e) }
       }
       return new Response(JSON.stringify(out, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } })
