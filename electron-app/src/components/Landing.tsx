@@ -121,6 +121,8 @@ const GLOBAL_CSS = `
     background: linear-gradient(100deg, transparent, rgba(255,255,255,0.28), transparent);
     transform: translateX(-200%) skewX(-18deg); }
   .sf-shine:hover::after { animation: sf-beam 0.85s cubic-bezier(0.16,1,0.3,1); }
+  .sf-flow-text { background: linear-gradient(90deg,#818CF8,#a855f7,#ec4899,#818CF8); background-size: 220% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; animation: sf-flow-move 7s linear infinite; }
+  @keyframes sf-flow-move { to { background-position: 220% center; } }
   @keyframes sf-tile-in {
     from { opacity: 0; transform: translateY(18px) scale(0.96); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -458,28 +460,6 @@ function Aurora() {
   )
 }
 
-// ── Bandeau défilant de mots-clés ─────────────────────────────────────────────
-function KeywordMarquee() {
-  const words = ['MASS POSTING', 'STORIES AVEC LIEN', 'REMIX', 'SPOOF', 'WARMUP', 'PROGRAMMATION', 'RAPPORTS', 'MULTI-COMPTES', 'PC ÉTEINT', 'SANS SURVEILLANCE']
-  const Row = () => (
-    <>
-      {words.map((w, i) => (
-        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 30, flexShrink: 0 }}>
-          <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 'clamp(18px,2vw,26px)', letterSpacing: '-0.01em', color: 'rgba(233,234,240,0.92)', whiteSpace: 'nowrap' }}>{w}</span>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, flexShrink: 0 }} />
-        </span>
-      ))}
-    </>
-  )
-  return (
-    <section aria-hidden style={{ position: 'relative', padding: '26px 0', background: BG, borderTop: `1px solid ${HAIR}`, borderBottom: `1px solid ${HAIR}`, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', gap: 30, width: 'max-content', animation: 'sf-marquee 28s linear infinite' }}>
-        <Row /><Row />
-      </div>
-    </section>
-  )
-}
-
 // ── Compteur qui s'incrémente quand il entre à l'écran ────────────────────────
 function CountUp({ to, prefix = '', suffix = '', duration = 1900 }: { to: number; prefix?: string; suffix?: string; duration?: number }) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -725,7 +705,7 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
             color: hovered ? '#0F1014' : IVORY,
             transition: 'color 0.45s',
           }}>{word}</span>
-          <span style={{
+          <span className={hovered ? undefined : 'sf-flow-text'} style={{
             fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400,
             fontSize: 'clamp(42px, 7.9vw, 112px)', letterSpacing: '-0.01em',
             color: hovered ? '#0F1014' : GOLD,
@@ -1629,9 +1609,6 @@ export function Landing() {
       {stage === 'site' && <>
 
       <SiteHero onStudio={onStudio} />
-
-      {/* ── Bandeau défilant de mots-clés ────────────────────────────────────── */}
-      <KeywordMarquee />
 
       {/* ── Stats animées ────────────────────────────────────────────────────── */}
       <StatsBanner />
