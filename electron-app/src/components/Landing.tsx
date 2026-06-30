@@ -1080,8 +1080,9 @@ function PricingSection() {
   const [yearly, setYearly] = useState(false)
 
   return (
-    <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '120px 24px' }}>
-      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+    <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '120px 24px', overflow: 'hidden' }}>
+      <Aurora />
+      <div style={{ maxWidth: 1080, margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
@@ -1623,9 +1624,6 @@ export function Landing() {
       {stage === 'site' && <>
 
       <SiteHero onStudio={onStudio} />
-
-      {/* ── Démo animée : les téléphones postent tout seuls ──────────────────── */}
-      <AutoPostShowcase />
 
       {/* ── Bandeau défilant de mots-clés ────────────────────────────────────── */}
       <KeywordMarquee />
