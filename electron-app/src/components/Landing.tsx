@@ -888,16 +888,16 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
           </div>
         </FadeIn>
 
-        {/* Stats row */}
+        {/* Stats row — chiffres animés au scroll */}
         <FadeIn delay={0.34}>
           <div style={{ display: 'flex', gap: 0, marginTop: 70, flexWrap: 'wrap', justifyContent: 'center' }}>
             {[
-              { n: '50+',  l: 'Téléphones pilotés en parallèle' },
-              { n: '10K',  l: 'Publications chaque mois' },
-              { n: '24/7', l: 'Scheduler autonome dans le cloud' },
+              { node: <CountUp to={50} suffix="+" />,  l: 'Téléphones pilotés en parallèle' },
+              { node: <CountUp to={10} suffix="K" />,  l: 'Publications chaque mois' },
+              { node: <>24/7</>,                        l: 'Scheduler autonome dans le cloud' },
             ].map((s, i, a) => (
-              <div key={s.n} style={{ padding: '0 44px', textAlign: 'center', borderRight: i < a.length - 1 ? `1px solid ${HAIR}` : 'none' }}>
-                <div style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 'clamp(30px, 3.4vw, 44px)', color: IVORY, lineHeight: 1 }}>{s.n}</div>
+              <div key={i} style={{ padding: '0 44px', textAlign: 'center', borderRight: i < a.length - 1 ? `1px solid ${HAIR}` : 'none' }}>
+                <div style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 'clamp(30px, 3.4vw, 44px)', color: IVORY, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.node}</div>
                 <div style={{ fontFamily: SANS, fontSize: 9.5, fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: FAINT, marginTop: 10, maxWidth: 170 }}>{s.l}</div>
               </div>
             ))}
@@ -1609,9 +1609,6 @@ export function Landing() {
       {stage === 'site' && <>
 
       <SiteHero onStudio={onStudio} />
-
-      {/* ── Stats animées ────────────────────────────────────────────────────── */}
-      <StatsBanner />
 
       {/* ── Manifeste ────────────────────────────────────────────────────────── */}
       <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px', overflow: 'hidden' }}>
