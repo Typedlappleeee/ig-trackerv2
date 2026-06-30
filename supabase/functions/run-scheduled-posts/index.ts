@@ -391,6 +391,17 @@ Deno.serve(async (req) => {
     if (filterUserId) staleQuery = staleQuery.eq('user_id', filterUserId)
     const { data: stalePosts } = await staleQuery
 
+    // Marque un post échoué en CONSERVANT ses logs + en ajoutant l'explication.
+    // deno-lint-ignore no-explicit-any
+    const healFail = async (sp: any, errorMsg: string, logLine: string) => {
+      const res = (sp.result ?? {}) as Record<string, any>
+      const prevLogs: string[] = Array.isArray(res.logs) ? res.logs : []
+      prevLogs.push(logLine)
+      await db.from('scheduled_posts')
+        .update({ status: 'failed', error_msg: errorMsg, result: { ...res, logs: prevLogs } })
+        .eq('id', sp.id)
+    }
+
     for (const sp of stalePosts ?? []) {
       const res = (sp.result ?? {}) as Record<string, any>
       const taskIds: string[] = Array.isArray(res.geelark_task_ids) ? res.geelark_task_ids : []
@@ -400,9 +411,8 @@ Deno.serve(async (req) => {
 
       // Pas de task_ids connus → on ne peut pas vérifier : ancien comportement (failed).
       if (taskIds.length === 0) {
-        await db.from('scheduled_posts')
-          .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
-          .eq('id', sp.id)
+        await healFail(sp, 'Interrompu — exécution abandonnée (timeout serveur)',
+          '⛔ Auto-heal : post bloqué >30 min sans tâche GeeLark enregistrée → l\'invocation serveur a probablement été coupée avant de lancer les tâches (budget serverless). Marqué échoué.')
         continue
       }
 
@@ -420,9 +430,8 @@ Deno.serve(async (req) => {
       if (!bearer) {
         // Impossible de vérifier sans bearer → on tranche selon l'âge.
         if (veryOld) {
-          await db.from('scheduled_posts')
-            .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
-            .eq('id', sp.id)
+          await healFail(sp, 'Interrompu — exécution abandonnée (timeout serveur)',
+            '⛔ Auto-heal : impossible de vérifier le statut (token GeeLark introuvable) et post bloqué >1h30 → marqué échoué. Vérifie que ton token GeeLark est bien configuré.')
         }
         continue
       }
@@ -441,9 +450,8 @@ Deno.serve(async (req) => {
       // GeeLark ne renvoie rien d'exploitable → on tranche selon l'âge.
       if (seen === 0) {
         if (veryOld) {
-          await db.from('scheduled_posts')
-            .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
-            .eq('id', sp.id)
+          await healFail(sp, 'Interrompu — exécution abandonnée (timeout serveur)',
+            `⛔ Auto-heal : GeeLark ne renvoie aucun statut pour les ${taskIds.length} tâche(s) et post bloqué >1h30 → marqué échoué.`)
         }
         continue
       }
@@ -463,16 +471,14 @@ Deno.serve(async (req) => {
         summary[`heal:${sp.id}`] = `recovered → done (${success} ok)`
       } else if (failed > 0 && pending === 0) {
         if (geelarkIds.length > 0) await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
-        await db.from('scheduled_posts')
-          .update({ status: 'failed', error_msg: `Échec GeeLark (${failed}/${seen} tâche(s) échouée(s))` })
-          .eq('id', sp.id)
+        await healFail(sp, `Échec GeeLark (${failed}/${seen} tâche(s) échouée(s))`,
+          `❌ GeeLark : ${failed}/${seen} tâche(s) en échec (compte non connecté, vidéo refusée, ou blocage Instagram). Vérifie les comptes concernés.`)
         summary[`heal:${sp.id}`] = `failed (${failed} ko)`
       } else if (veryOld) {
         // Trop vieux et toujours indéterminé → abandon.
         if (geelarkIds.length > 0) await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
-        await db.from('scheduled_posts')
-          .update({ status: 'failed', error_msg: 'Interrompu — exécution abandonnée (timeout serveur)' })
-          .eq('id', sp.id)
+        await healFail(sp, 'Interrompu — exécution abandonnée (timeout serveur)',
+          '⛔ Auto-heal : statut toujours indéterminé après 1h30 → abandon.')
       }
     }
   } catch (err) {
