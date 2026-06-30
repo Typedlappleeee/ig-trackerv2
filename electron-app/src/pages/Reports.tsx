@@ -100,8 +100,23 @@ export function Reports({ user }: { user: User }) {
         body: { diag: 'rapidapi', username: uname },
       })
       if (error) { alert('Échec invocation edge function :\n' + error.message + '\n\n(As-tu redéployé run-scheduled-posts ?)'); return }
-      console.log('[Reports] diag RapidAPI', data)
-      alert('Résultat test RapidAPI (compte @' + uname + ') :\n\n' + JSON.stringify(data, null, 2))
+      console.log('[Reports] diag RapidAPI (complet)', data)
+      // deno-lint-ignore no-explicit-any
+      const d = data as any
+      const pp = d?.parsedProfile, pi = d?.parsedInfo, pr = d?.parsedReels
+      const fol = pp?.followers || pi?.followers || 0
+      const folSrc = pp?.followers ? 'profile' : pi?.followers ? 'userInfo' : '—'
+      const summary =
+        `Test RapidAPI @${uname}\n\n` +
+        `Clé présente : ${d?.keyPresent ? 'oui' : 'NON'}\n` +
+        `Statuts HTTP : profile=${d?.profile?.status} · userInfo=${d?.userInfo?.status} · reels=${d?.reels?.status}\n\n` +
+        `➡ Followers détectés : ${fol}  (source: ${folSrc})\n` +
+        `➡ Following : ${pp?.following || pi?.following || 0}\n` +
+        `➡ Posts : ${pp?.posts || pi?.posts || 0}\n` +
+        `➡ Reels trouvés : ${pr?.count ?? 0}\n` +
+        `➡ Vues dernier reel : ${pr?.latest?.views ?? '—'}\n\n` +
+        `(Détail complet dans la console — F12.)`
+      alert(summary)
     } catch (e) { alert('Erreur : ' + String(e)) } finally { setTesting(false) }
   }
 
