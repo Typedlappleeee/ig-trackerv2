@@ -315,13 +315,12 @@ function SmokeBackground({ tint = false }: { tint?: boolean }) {
       <div style={{ position: 'absolute', top: '34%', left: '40%', width: 600, height: 600, borderRadius: '50%', background: `radial-gradient(circle, ${indigo}, transparent 62%)`, filter: 'blur(75px)', animation: 'sf-smoke-rise 38s ease-in-out infinite' }} />
       <div style={{ position: 'absolute', top: '55%', left: '20%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(130,130,160,0.08), transparent 62%)', filter: 'blur(70px)', animation: 'sf-smoke-c 30s ease-in-out infinite' }} />
       <div style={{ position: 'absolute', top: '12%', right: '24%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(110,110,140,0.07), transparent 62%)', filter: 'blur(65px)', animation: 'sf-smoke-a 42s ease-in-out infinite reverse' }} />
-      {/* texture de fumée animée (turbulence) */}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.06, mixBlendMode: 'screen' }}>
+      {/* texture de fumée animée (turbulence qui morphe) */}
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.09, mixBlendMode: 'screen' }}>
         <filter id={id}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="2" seed="4">
-            <animate attributeName="baseFrequency" dur="34s" values="0.011;0.022;0.011" repeatCount="indefinite" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="4">
+            <animate attributeName="baseFrequency" dur="30s" values="0.012;0.024;0.012" repeatCount="indefinite" />
           </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" scale="14" />
         </filter>
         <rect width="100%" height="100%" filter={`url(#${id})`} />
       </svg>
