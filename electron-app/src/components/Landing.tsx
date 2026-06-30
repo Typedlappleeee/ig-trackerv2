@@ -116,6 +116,11 @@ const GLOBAL_CSS = `
   .sf-plan-card:hover { transform: translateY(-12px); box-shadow: 0 36px 80px -24px rgba(99,102,241,0.45); z-index: 2; }
   @keyframes sf-aurora-a { 0%,100%{transform:translate(-12%,-8%) scale(1)} 50%{transform:translate(14%,10%) scale(1.25)} }
   @keyframes sf-aurora-b { 0%,100%{transform:translate(10%,6%) scale(1.1)} 50%{transform:translate(-14%,-10%) scale(0.9)} }
+  .sf-shine { position: relative; overflow: hidden; }
+  .sf-shine::after { content:''; position:absolute; top:0; bottom:0; left:0; width:60%; pointer-events:none;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.28), transparent);
+    transform: translateX(-200%) skewX(-18deg); }
+  .sf-shine:hover::after { animation: sf-beam 0.85s cubic-bezier(0.16,1,0.3,1); }
   @keyframes sf-tile-in {
     from { opacity: 0; transform: translateY(18px) scale(0.96); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -885,7 +890,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
               }}>
               Entrer au Studio <Icon name="arrow-right" size={14} />
             </button>
-            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
+            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" className="sf-shine"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 12,
                 padding: '17px 38px',
@@ -1197,7 +1202,7 @@ function PricingSection() {
                   </ul>
 
                   {/* CTA */}
-                  <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
+                  <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" className="sf-shine"
                     style={{
                       display: 'block', textAlign: 'center', marginTop: 34,
                       padding: '15px',
