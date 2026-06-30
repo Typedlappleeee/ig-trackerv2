@@ -1,12 +1,14 @@
 // Affichage des images Instagram (pp, miniatures). Le CDN IG bloque les <img>
-// directs depuis le navigateur → sur le web on passe par le proxy /api/img.
+// directs depuis le navigateur → sur le web on passe par le proxy de l'edge
+// function Supabase (déployée et fiable, indépendante de Vercel).
 // En Electron, l'URL directe marche (pas de CORS).
 const _isWeb = typeof window !== 'undefined' && !(window as unknown as { electronAPI?: unknown }).electronAPI
+const _imgBase = `${import.meta.env.VITE_SUPABASE_URL ?? ''}/functions/v1/run-scheduled-posts`
 
 export function igImg(u?: string | null): string | undefined {
   if (!u) return undefined
   if (!_isWeb || !/^https?:\/\//i.test(u)) return u   // data: / electron → direct
-  return `/api/img?url=${encodeURIComponent(u)}`
+  return `${_imgBase}?img=${encodeURIComponent(u)}`
 }
 
 // Temps relatif court : "2 h", "3 j", "à l'instant".

@@ -131,6 +131,23 @@ Deno.serve(async (req) => {
   // Préflight CORS du navigateur.
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
+  // Proxy image public (pp, miniatures de reels) — AVANT l'auth car les <img>
+  // n'envoient pas de token. Whitelist stricte (CDN Instagram / Supabase).
+  {
+    const imgUrl = new URL(req.url).searchParams.get('img')
+    if (imgUrl) {
+      if (!/(cdninstagram|fbcdn|instagram\.com|supabase\.co)/i.test(imgUrl)) {
+        return new Response('forbidden', { status: 403, headers: CORS })
+      }
+      try {
+        const r = await fetch(imgUrl, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.instagram.com/' } })
+        if (!r.ok) return new Response('', { status: r.status, headers: CORS })
+        const ct = r.headers.get('content-type') ?? 'image/jpeg'
+        return new Response(await r.arrayBuffer(), { headers: { ...CORS, 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' } })
+      } catch { return new Response('', { status: 502, headers: CORS }) }
+    }
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const cronSecret  = Deno.env.get('CRON_SECRET') ?? ''

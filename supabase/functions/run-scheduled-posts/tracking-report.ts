@@ -37,14 +37,20 @@ function parisHHMM(d: Date): string {
   return d.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-async function fetchLatestReel(cfg: TrackingConfig, username: string): Promise<ReelInfo | null> {
-  if (!cfg.rapidapi_key) return null
+// Renvoie le dernier reel + le nombre de reels postés "aujourd'hui" (Paris).
+async function fetchReels(cfg: TrackingConfig, username: string, today: string): Promise<{ latest: ReelInfo | null; postsToday: number }> {
+  if (!cfg.rapidapi_key) return { latest: null, postsToday: 0 }
   const j = await igPost(cfg.rapidapi_key, 'reels', username, { maxId: '' })
   const items = deepArray(j, ['items', 'reels', 'edges', 'data'])
-  if (!items || !items.length) return null
+  if (!items || !items.length) return { latest: null, postsToday: 0 }
   let best = reelInfo(items[0])
-  for (const it of items) { const s = reelInfo(it); if ((s.postedAt ?? '') > (best.postedAt ?? '')) best = s }
-  return best
+  let postsToday = 0
+  for (const it of items) {
+    const s = reelInfo(it)
+    if ((s.postedAt ?? '') > (best.postedAt ?? '')) best = s
+    if (s.postedAt && parisDate(new Date(s.postedAt)) === today) postsToday++
+  }
+  return { latest: best, postsToday }
 }
 
 // deno-lint-ignore no-explicit-any
@@ -119,31 +125,39 @@ export async function runAccountSync(db: any, nowIso: string, deadlineMs: number
           let views: number | null = null, likes: number | null = null, comments: number | null = null
           let reel_url: string | null = null, reel_thumb: string | null = null
 
-          // On stocke TOUJOURS la dernière vidéo + ses stats (pour afficher la
-          // perf de chaque compte), et on marque "posté aujourd'hui" en plus si
-          // le dernier reel date d'aujourd'hui.
-          const reel = await fetchLatestReel(effCfg, username)
+          // On stocke TOUJOURS la dernière vidéo + ses stats, le nombre de posts
+          // du jour, et on marque "posté aujourd'hui" si au moins un reel d'auj.
+          const { latest: reel, postsToday } = await fetchReels(effCfg, username, today)
+          let posts_today = postsToday
           if (reel) {
             views = reel.views; likes = reel.likes; comments = reel.comments
             reel_url = reel.url; reel_thumb = reel.thumb
-            if (reel.postedAt && parisDate(new Date(reel.postedAt)) === today) {
+            if (postsToday > 0) {
               posted = true; posted_via = 'instagram'; posted_at = reel.postedAt
             }
           }
           // Niveau gratuit : posté via ScaleFlow aujourd'hui.
-          if (!posted && postedGeelark.has(String(ph.geelark_id))) { posted = true; posted_via = 'scaleflow' }
+          if (!posted && postedGeelark.has(String(ph.geelark_id))) { posted = true; posted_via = 'scaleflow'; if (!posts_today) posts_today = 1 }
 
           const row = {
             user_id: owner.user_id, org_id: owner.org_id, phone_id: ph.id, ig_username: username, va, day: today,
-            posted, posted_via, posted_at, views, likes, comments, reel_url, reel_thumb,
+            posted, posted_via, posted_at, views, likes, comments, reel_url, reel_thumb, posts_today,
             synced_at: new Date().toISOString(), updated_at: new Date().toISOString(),
           }
           // Upsert manuel (l'index unique est sur une expression → pas d'onConflict PostgREST).
+          // Résilient si la colonne posts_today n'existe pas encore.
+          // deno-lint-ignore no-explicit-any
+          const rowNoCount: any = { ...row }; delete rowNoCount.posts_today
           let eq = db.from('account_daily').select('id').eq('phone_id', ph.id).eq('day', today)
           eq = owner.org_id ? eq.eq('org_id', owner.org_id) : eq.eq('user_id', owner.user_id)
           const { data: ex } = await eq.maybeSingle()
-          if (ex?.id) await db.from('account_daily').update(row).eq('id', ex.id)
-          else await db.from('account_daily').insert(row)
+          const writeRow = async (r: Record<string, unknown>) => ex?.id
+            ? db.from('account_daily').update(r).eq('id', ex.id)
+            : db.from('account_daily').insert(r)
+          {
+            const { error: wErr } = await writeRow(row)
+            if (wErr && /posts_today/.test(wErr.message || '')) await writeRow(rowNoCount)
+          }
           synced++
         }
       } catch { /* propriétaire suivant */ }
