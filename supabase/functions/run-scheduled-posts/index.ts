@@ -171,22 +171,21 @@ Deno.serve(async (req) => {
     try { body = await req.clone().json() } catch { /* pas de body (cron) */ }
     if (body?.diag === 'rapidapi') {
       const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
-      const infoTpl = (Deno.env.get('RAPIDAPI_INFO_URL') ?? '').trim()
-        || 'https://instagram-scraper-api2.p.rapidapi.com/v1/info?username_or_id_or_url={username}'
-      const reelsTpl = (Deno.env.get('RAPIDAPI_URL') ?? '').trim()
-        || 'https://instagram-scraper-api2.p.rapidapi.com/v1/reels?username_or_id_or_url={username}'
+      const host = (Deno.env.get('RAPIDAPI_HOST') ?? '').trim() || 'instagram120.p.rapidapi.com'
       const uname = String(body.username ?? 'instagram').replace(/^@/, '')
-      const out: Record<string, unknown> = { keyPresent: !!key, keyLength: key.length, username: uname }
-      const probe = async (label: string, tpl: string) => {
+      const out: Record<string, unknown> = { keyPresent: !!key, keyLength: key.length, host, username: uname }
+      const probe = async (label: string, endpoint: string, payload: Record<string, unknown>) => {
         try {
-          const url = tpl.replace('{username}', encodeURIComponent(uname))
-          const host = new URL(url).host
-          const r = await fetch(url, { headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': host } })
+          const r = await fetch(`https://${host}/api/instagram/${endpoint}`, {
+            method: 'POST',
+            headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': host, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: uname, ...payload }),
+          })
           const txt = await r.text()
-          out[label] = { host, status: r.status, ok: r.ok, sample: txt.slice(0, 350) }
+          out[label] = { status: r.status, ok: r.ok, sample: txt.slice(0, 600) }
         } catch (e) { out[label] = { error: String(e) } }
       }
-      if (key) { await probe('info', infoTpl); await probe('reels', reelsTpl) }
+      if (key) { await probe('userInfo', 'userInfo', {}); await probe('reels', 'reels', { maxId: '' }) }
       return new Response(JSON.stringify(out, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
   }

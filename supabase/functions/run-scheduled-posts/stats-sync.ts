@@ -9,36 +9,10 @@
 //   son dernier snapshot a < STALE_HOURS). Batché pour tenir 1000+ comptes.
 // Best-effort : ne jette jamais, no-op si pas de clé.
 
+import { igPost, parseInfo } from './ig-rapidapi.ts'
+
 const STALE_HOURS = 22
 const MAX_PER_INVOCATION = 40
-// Endpoint "user info" (public, non secret). Surchargable via RAPIDAPI_INFO_URL.
-const DEFAULT_INFO_URL = 'https://instagram-scraper-api2.p.rapidapi.com/v1/info?username_or_id_or_url={username}'
-
-// deno-lint-ignore no-explicit-any
-function num(...v: unknown[]): number {
-  for (const x of v) { const k = Number(x); if (Number.isFinite(k) && k >= 0) return k }
-  return 0
-}
-
-// deno-lint-ignore no-explicit-any
-function parseInfo(j: any): { followers: number; following: number; posts: number } | null {
-  const d = j?.data ?? j?.user ?? j ?? {}
-  const followers = num(d.follower_count, d.followers, d.followers_count, d.edge_followed_by?.count)
-  const following = num(d.following_count, d.following, d.edge_follow?.count)
-  const posts     = num(d.media_count, d.posts, d.post_count, d.edge_owner_to_timeline_media?.count)
-  if (!followers && !following && !posts) return null
-  return { followers, following, posts }
-}
-
-async function fetchInfo(key: string, url: string, username: string): Promise<ReturnType<typeof parseInfo>> {
-  try {
-    const u = url.replace('{username}', encodeURIComponent(username))
-    const host = new URL(u).host
-    const r = await fetch(u, { headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': host } })
-    if (!r.ok) return null
-    return parseInfo(await r.json().catch(() => null))
-  } catch { return null }
-}
 
 // deno-lint-ignore no-explicit-any
 export async function runStatsSync(db: any, nowIso: string, deadlineMs: number): Promise<number> {
@@ -46,7 +20,6 @@ export async function runStatsSync(db: any, nowIso: string, deadlineMs: number):
   try {
     const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
     if (!key) return 0   // pas de clé → on laisse le poller client gérer
-    const url = (Deno.env.get('RAPIDAPI_INFO_URL') ?? '').trim() || DEFAULT_INFO_URL
 
     const now = new Date(nowIso)
     const staleBefore = new Date(now.getTime() - STALE_HOURS * 3600_000).toISOString()
@@ -68,7 +41,7 @@ export async function runStatsSync(db: any, nowIso: string, deadlineMs: number):
 
     for (const p of pending) {
       if (done >= MAX_PER_INVOCATION || Date.now() > deadlineMs) break
-      const info = await fetchInfo(key, url, String(p.ig_username))
+      const info = parseInfo(await igPost(key, 'userInfo', String(p.ig_username)))
       if (!info) continue
       // phones : valeurs live (total_views préservé — l'API info ne le donne pas).
       await db.from('phones').update({
