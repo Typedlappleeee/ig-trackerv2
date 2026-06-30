@@ -189,7 +189,11 @@ export function Reports({ user }: { user: User }) {
         `➡ Following : ${pp?.following || pi?.following || 0}\n` +
         `➡ Posts : ${pp?.posts || pi?.posts || 0}\n` +
         `➡ Reels trouvés : ${pr?.count ?? 0}\n` +
-        `➡ Vues dernier reel : ${pr?.latest?.views ?? '—'}\n\n` +
+        `➡ Vues dernier reel : ${pr?.latest?.views ?? '—'}\n` +
+        `➡ Date dernier reel : ${pr?.latest?.postedAt ?? 'NULL'}\n\n` +
+        `── Champs date du reel ──\n` +
+        `dateish: ${JSON.stringify(d?.firstReel?.dateish ?? {})}\n\n` +
+        `clés du reel: ${(d?.firstReel?.keys ?? []).join(', ')}\n\n` +
         `(Détail complet dans la console — F12.)`
       alert(summary)
     } catch (e) { alert('Erreur : ' + String(e)) } finally { setTesting(false) }
