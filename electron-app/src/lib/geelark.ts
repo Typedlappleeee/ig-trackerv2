@@ -451,10 +451,27 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
   return null
 }
 
-async function dumpXml(bearer: string, phoneId: string): Promise<string> {
+// Dump uiautomator robuste : `uiautomator dump` échoue par intermittence
+// (« ERROR: null root node… », pendant une animation, sur certaines images
+// Android) — et le `&&` d'origine sautait alors le `cat` → écran vide → taps à
+// côté. Ici on cat TOUJOURS, et on réessaie (puis --compressed) tant que l'arbre
+// de nœuds est vide. Corrige la majorité des échecs intermittents de story.
+async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => void): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
-  const { output } = await shellExec(bearer, phoneId, `uiautomator dump ${f} && cat ${f}`)
-  return output
+  let last = ''
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const flag = attempt >= 2 ? '--compressed ' : ''
+    const { output } = await shellExec(
+      bearer, phoneId,
+      `uiautomator dump ${flag}${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
+    )
+    last = output
+    const nodes = (output.match(/<node\b/g) || []).length
+    if (output.includes('<hierarchy') && nodes > 1) return output
+    log?.(`   ⏳ Lecture d'écran incomplète (essai ${attempt + 1}/4) — nouvel essai…`)
+    await sleep(1300)
+  }
+  return last
 }
 
 // Find every EditText node in the dump, with its current text and center point.
