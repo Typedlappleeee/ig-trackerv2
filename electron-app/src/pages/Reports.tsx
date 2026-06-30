@@ -23,6 +23,7 @@ interface DailyRow {
   reel_url: string | null; reel_thumb: string | null
   views: number | null; likes: number | null; comments: number | null
   synced_at: string | null
+  followers?: number | null   // mergé depuis phones (sync stats)
 }
 
 const DEFAULT_CFG: TrackingConfig = {
@@ -63,12 +64,16 @@ export function Reports({ user }: { user: User }) {
     const cfgQ = supabase.from(table).select('tracking_config').eq(keyCol, keyVal).maybeSingle()
     let dQ = supabase.from('account_daily').select('*').eq('day', day)
     dQ = currentOrg ? dQ.eq('org_id', currentOrg.id) : dQ.eq('user_id', user.id).is('org_id', null)
-    const [{ data: cfgData }, { data: dData }] = await Promise.all([cfgQ, dQ])
+    // Followers (live) depuis phones, mergés par phone_id.
+    let pQ = supabase.from('phones').select('id, followers').not('ig_username', 'is', null)
+    pQ = currentOrg ? pQ.eq('org_id', currentOrg.id) : pQ.eq('user_id', user.id).is('org_id', null)
+    const [{ data: cfgData }, { data: dData }, { data: pData }] = await Promise.all([cfgQ, dQ, pQ])
     const tc = (cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>
     setCfg({ ...DEFAULT_CFG, ...tc })
+    const folMap = new Map<string, number | null>((pData ?? []).map((p: { id: string; followers: number | null }) => [p.id, p.followers]))
     // Page réservée au superadmin ScaleFlow → on affiche tous les comptes (pas de
     // filtre par groupe : sinon un rôle org restrictif masquerait tout).
-    setRows((dData ?? []) as DailyRow[])
+    setRows(((dData ?? []) as DailyRow[]).map(r => ({ ...r, followers: folMap.get(r.phone_id) ?? null })))
     setShowCfg(prev => prev || !tc.enabled)
     setLoading(false)
   }, [table, keyCol, keyVal, currentOrg?.id, user.id, day])
@@ -140,6 +145,7 @@ export function Reports({ user }: { user: User }) {
   const totalViews = rows.reduce((s, r) => s + (r.views ?? 0), 0)
   const totalLikes = rows.reduce((s, r) => s + (r.likes ?? 0), 0)
   const totalComments = rows.reduce((s, r) => s + (r.comments ?? 0), 0)
+  const totalFollowers = rows.reduce((s, r) => s + (r.followers ?? 0), 0)
   const postedPct = rows.length ? Math.round((totalPosted / rows.length) * 100) : 0
   const lastSync = rows.reduce<string | null>((m, r) => (r.synced_at && (!m || r.synced_at > m)) ? r.synced_at : m, null)
   const isToday = day === parisToday()
@@ -179,9 +185,10 @@ export function Reports({ user }: { user: User }) {
 
         {/* KPI row */}
         {!loading && rows.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 22 }}>
-            <StatCard icon="📅" label={isToday ? "Aujourd'hui" : 'Ce jour'} value={`${rows.length}`} sub="comptes suivis" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: 12, marginBottom: 22 }}>
+            <StatCard icon="📅" label={isToday ? "Aujourd'hui" : 'Ce jour'} value={`${rows.length}`} sub="comptes" />
             <StatCard icon="✅" label="Ont posté" value={`${totalPosted}/${rows.length}`} sub={`${postedPct}%`} accent={postedPct >= 80 ? 'var(--ok)' : postedPct >= 40 ? '#fbbf24' : 'var(--err)'} />
+            <StatCard icon="👥" label="Followers" value={fmt(totalFollowers)} accent="var(--text-1)" />
             <StatCard icon="👁" label="Vues totales" value={fmt(totalViews)} accent="var(--accent-l)" />
             <StatCard icon="💬" label="Engagement" value={fmt(totalLikes + totalComments)} sub={`❤ ${fmt(totalLikes)} · 💬 ${fmt(totalComments)}`} />
           </div>
@@ -272,24 +279,23 @@ export function Reports({ user }: { user: User }) {
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: a.posted ? 'var(--ok)' : 'var(--err)' }} />
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: a.posted ? 'var(--ok)' : 'rgba(255,255,255,0.18)' }} title={a.posted ? "Posté aujourd'hui" : "Pas posté aujourd'hui"} />
                             <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{a.ig_username}</p>
                           </div>
-                          {a.posted ? (
-                            <>
-                              {(a.views != null) ? (
-                                <p style={{ fontSize: 11, color: 'var(--text-2)', margin: '5px 0 0', fontVariantNumeric: 'tabular-nums' }}>👁 {fmt(a.views)} · ❤ {fmt(a.likes)} · 💬 {fmt(a.comments)}</p>
-                              ) : (
-                                <p style={{ fontSize: 10.5, color: 'var(--ok)', margin: '5px 0 0' }}>Posté{a.posted_via === 'scaleflow' ? ' via ScaleFlow' : ''}</p>
-                              )}
-                              <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '2px 0 0' }}>
-                                {a.posted_at && fmtTime(a.posted_at)}
-                                {a.reel_url && <> · <a href={a.reel_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-l)' }}>voir le reel</a></>}
-                              </p>
-                            </>
-                          ) : (
-                            <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '5px 0 0' }}>Pas encore posté</p>
+                          {/* Followers (live) */}
+                          {a.followers != null && a.followers > 0 && (
+                            <p style={{ fontSize: 10.5, color: 'var(--text-3)', margin: '4px 0 0', fontVariantNumeric: 'tabular-nums' }}>👥 {fmt(a.followers)} followers</p>
                           )}
+                          {/* Dernière vidéo + stats (toujours affichées si dispo) */}
+                          {a.views != null ? (
+                            <p style={{ fontSize: 11, color: 'var(--text-2)', margin: '3px 0 0', fontVariantNumeric: 'tabular-nums' }}>👁 {fmt(a.views)} · ❤ {fmt(a.likes)} · 💬 {fmt(a.comments)}</p>
+                          ) : (
+                            <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Stats indisponibles</p>
+                          )}
+                          <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '2px 0 0' }}>
+                            {a.posted ? <span style={{ color: 'var(--ok)' }}>✓ Posté{a.posted_at ? ` ${fmtTime(a.posted_at)}` : ''}</span> : 'Pas posté aujourd\'hui'}
+                            {a.reel_url && <> · <a href={a.reel_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-l)' }}>voir le reel</a></>}
+                          </p>
                         </div>
                       </div>
                     ))}

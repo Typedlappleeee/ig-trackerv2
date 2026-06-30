@@ -119,12 +119,16 @@ export async function runAccountSync(db: any, nowIso: string, deadlineMs: number
           let views: number | null = null, likes: number | null = null, comments: number | null = null
           let reel_url: string | null = null, reel_thumb: string | null = null
 
-          // Niveau API (optionnel) : vidéo + stats si postée aujourd'hui.
+          // On stocke TOUJOURS la dernière vidéo + ses stats (pour afficher la
+          // perf de chaque compte), et on marque "posté aujourd'hui" en plus si
+          // le dernier reel date d'aujourd'hui.
           const reel = await fetchLatestReel(effCfg, username)
-          if (reel && reel.postedAt && parisDate(new Date(reel.postedAt)) === today) {
-            posted = true; posted_via = 'instagram'; posted_at = reel.postedAt
+          if (reel) {
             views = reel.views; likes = reel.likes; comments = reel.comments
             reel_url = reel.url; reel_thumb = reel.thumb
+            if (reel.postedAt && parisDate(new Date(reel.postedAt)) === today) {
+              posted = true; posted_via = 'instagram'; posted_at = reel.postedAt
+            }
           }
           // Niveau gratuit : posté via ScaleFlow aujourd'hui.
           if (!posted && postedGeelark.has(String(ph.geelark_id))) { posted = true; posted_via = 'scaleflow' }
