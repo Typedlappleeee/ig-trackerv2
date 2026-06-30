@@ -101,6 +101,17 @@ const GLOBAL_CSS = `
     0%,100% { transform: perspective(1100px) rotateY(var(--ry)) rotateX(var(--rx)); }
     50%     { transform: perspective(1100px) rotateY(calc(var(--ry) + 10deg)) rotateX(calc(var(--rx) - 4deg)); }
   }
+  /* Animation "le téléphone poste tout seul" */
+  @keyframes sf-upbar   { 0%{width:0%} 40%{width:100%} 100%{width:100%} }
+  @keyframes sf-uploading { 0%,38%{opacity:1} 44%,100%{opacity:0} }
+  @keyframes sf-posted  { 0%,40%{opacity:0;transform:translateY(4px) scale(0.85)} 47%,90%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0} }
+  @keyframes sf-phone-flash {
+    0%,40% { box-shadow: 0 14px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06); }
+    48%    { box-shadow: 0 14px 40px rgba(0,0,0,0.6), 0 0 26px 1px rgba(34,197,94,0.55); }
+    72%,100%{ box-shadow: 0 14px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06); }
+  }
+  @keyframes sf-float-soft { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+  @keyframes sf-conveyor { from{transform:translateX(0)} to{transform:translateX(-50%)} }
   @keyframes sf-tile-in {
     from { opacity: 0; transform: translateY(18px) scale(0.96); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -298,7 +309,7 @@ function NeonTunnel() {
       const cx = w / 2, cy = h / 2
       const maxR = Math.hypot(w, h) * 0.6
       ctx.clearRect(0, 0, w, h)
-      t += 0.0042
+      t += 0.0021
       for (let i = 0; i < RINGS; i++) {
         const p = ((i / RINGS) + (t % 1)) % 1           // 0→1 en boucle
         const r = Math.pow(p, 1.7) * maxR               // accélère vers l'extérieur
@@ -327,6 +338,85 @@ function NeonTunnel() {
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
   }, [])
   return <canvas ref={ref} aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} />
+}
+
+// ── Mini-téléphone qui poste tout seul ───────────────────────────────────────
+function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: string }) {
+  const cycle = 6                       // durée d'un cycle (s)
+  const delay = -(i * 0.85)             // décalage → effet de vague
+  const a = (name: string) => `${name} ${cycle}s linear ${delay}s infinite`
+  return (
+    <div style={{ animation: `sf-float-soft ${7 + (i % 4)}s ease-in-out ${i * 0.3}s infinite`, flexShrink: 0 }}>
+      <div style={{
+        width: 132, height: 270, borderRadius: 22, padding: 6, position: 'relative',
+        background: 'linear-gradient(160deg,#141318,#0c0c10)', border: '1px solid rgba(255,255,255,0.07)',
+        animation: a('sf-phone-flash'),
+      }}>
+        {/* écran */}
+        <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden', background: '#0a0a0d' }}>
+          {/* reel */}
+          <div style={{ position: 'absolute', inset: 0, background: grad }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.35), transparent 30%, transparent 60%, rgba(0,0,0,0.7))' }} />
+          {/* play */}
+          <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: '#fff', fontSize: 12, marginLeft: 2 }}>▶</span>
+          </div>
+          {/* top bar IG */}
+          <div style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#a855f7)' }} />
+            <span style={{ fontSize: 8.5, fontWeight: 700, color: '#fff' }}>{handle}</span>
+          </div>
+          {/* statut "en cours" */}
+          <div style={{ position: 'absolute', bottom: 10, left: 8, right: 8, animation: a('sf-uploading') }}>
+            <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 4, letterSpacing: '0.03em' }}>PUBLICATION…</div>
+            <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#6366F1,#a855f7)', animation: a('sf-upbar') }} />
+            </div>
+          </div>
+          {/* statut "publié" */}
+          <div style={{ position: 'absolute', bottom: 12, left: 8, right: 8, display: 'flex', alignItems: 'center', gap: 5, animation: a('sf-posted') }}>
+            <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#22c55e', color: '#fff', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
+            <span style={{ fontSize: 9, fontWeight: 800, color: '#22c55e' }}>Publié</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AutoPostShowcase() {
+  const grads = [
+    'linear-gradient(160deg,#3b2f6b,#1a1733)', 'linear-gradient(160deg,#5b2350,#231024)',
+    'linear-gradient(160deg,#22405e,#0e1c2b)', 'linear-gradient(160deg,#4a2d63,#1d1230)',
+    'linear-gradient(160deg,#5e3a22,#2b1a0e)', 'linear-gradient(160deg,#264e3a,#0e1f17)',
+    'linear-gradient(160deg,#3a2d63,#15122e)', 'linear-gradient(160deg,#5e2240,#280f1d)',
+  ]
+  const handles = ['@luna.fit', '@kayavibes', '@mia.daily', '@nora.x', '@ava.glow', '@zoe.life', '@lea.studio', '@emma.co']
+  const phones = Array.from({ length: 8 }, (_, i) => ({ i, grad: grads[i % grads.length], handle: handles[i % handles.length] }))
+  return (
+    <section style={{ position: 'relative', padding: '110px 0 120px', overflow: 'hidden', background: BG }}>
+      {/* glow */}
+      <div aria-hidden style={{ position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%,-50%)', width: 900, height: 500, background: 'radial-gradient(ellipse closest-side, rgba(99,102,241,0.10), transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
+      <FadeIn>
+        <div style={{ textAlign: 'center', maxWidth: 720, margin: '0 auto 56px', padding: '0 24px', position: 'relative' }}>
+          <MicroLabel color="rgba(99,102,241,0.6)" style={{ marginBottom: 22 }}>Automatisation en direct</MicroLabel>
+          <h2 style={{ margin: '0 0 14px', lineHeight: 1.04 }}>
+            <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px,4.4vw,54px)', letterSpacing: '-0.03em', color: IVORY }}>Des dizaines de comptes.<br /></span>
+            <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px,4.6vw,58px)', color: GOLD }}>Ça poste tout seul.</span>
+          </h2>
+          <p style={{ fontFamily: SANS, fontSize: 'clamp(14px,1.4vw,17px)', color: FAINT, lineHeight: 1.6, maxWidth: 540, margin: '0 auto' }}>
+            Tu choisis tes vidéos, tu lances. ScaleFlow pilote tous tes cloud phones et publie sur Instagram — en parallèle, sans surveillance.
+          </p>
+        </div>
+      </FadeIn>
+      {/* Bande défilante de téléphones */}
+      <div style={{ position: 'relative', maskImage: 'linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)', WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)' }}>
+        <div style={{ display: 'flex', gap: 26, width: 'max-content', padding: '0 26px', animation: 'sf-conveyor 38s linear infinite' }}>
+          {[...phones, ...phones].map((p, idx) => <AutoPhone key={idx} i={idx} grad={p.grad} handle={p.handle} />)}
+        </div>
+      </div>
+    </section>
+  )
 }
 
 // ── Stage 1 — Entrée cinématique ─────────────────────────────────────────────
@@ -381,7 +471,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           <div style={{
             width: tile.w, height: tile.h,
             ['--ry' as string]: `${tile.ry}deg`, ['--rx' as string]: `${tile.rx}deg`,
-            animation: `sf-tile-rot ${9 + idx * 0.4}s ease-in-out ${tile.delay}s infinite`,
+            animation: `sf-tile-rot ${14 + idx * 0.5}s ease-in-out ${tile.delay}s infinite`,
             borderRadius: 4,
             overflow: 'hidden',
             border: `1px solid ${HAIR}`,
@@ -1412,6 +1502,9 @@ export function Landing() {
       {stage === 'site' && <>
 
       <SiteHero onStudio={onStudio} />
+
+      {/* ── Démo animée : les téléphones postent tout seuls ──────────────────── */}
+      <AutoPostShowcase />
 
       {/* ── Manifeste ────────────────────────────────────────────────────────── */}
       <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px' }}>
