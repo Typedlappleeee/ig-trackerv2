@@ -130,6 +130,9 @@ export interface Phone {
   total_views:  number
   video_count:  number
   bio:          string | null
+  pp_url?:        string | null    // photo de profil (sync stats)
+  last_post_at?:  string | null    // date du dernier reel
+  account_state?: string | null    // 'ok' | 'banned' | 'shadow'
   remark:       string | null
   link:         string | null
   synced_at:    string

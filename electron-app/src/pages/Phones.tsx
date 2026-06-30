@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
+import { igImg } from '@/lib/igimg'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -615,13 +616,30 @@ const PhoneCard = memo(function PhoneCard({
 
       {/* Avatar + name */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{
-          width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: `linear-gradient(135deg, ${col}26, ${col}10)`,
-          border: `1px solid ${col}40`, color: col, fontSize: 18, fontWeight: 700,
-        }}>
-          {phone.phone_name.charAt(0).toUpperCase()}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          {phone.pp_url ? (
+            <img src={igImg(phone.pp_url)} alt="" referrerPolicy="no-referrer" style={{
+              width: 46, height: 46, borderRadius: 13, objectFit: 'cover', border: `1px solid ${col}40`,
+            }} />
+          ) : (
+            <div style={{
+              width: 46, height: 46, borderRadius: 13,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: `linear-gradient(135deg, ${col}26, ${col}10)`,
+              border: `1px solid ${col}40`, color: col, fontSize: 18, fontWeight: 700,
+            }}>
+              {phone.phone_name.charAt(0).toUpperCase()}
+            </div>
+          )}
+          {/* Pastille statut compte */}
+          {(phone.account_state === 'banned' || phone.account_state === 'shadow') && (
+            <span title={phone.account_state === 'banned' ? 'Compte non joignable (banni ?)' : 'Portée faible (shadowban ?)'} style={{
+              position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9,
+              background: phone.account_state === 'banned' ? '#ef4444' : '#fbbf24',
+              border: '2px solid var(--surface, #15171c)', color: '#fff',
+            }}>{phone.account_state === 'banned' ? '✕' : '!'}</span>
+          )}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
