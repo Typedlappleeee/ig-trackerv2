@@ -31,6 +31,15 @@ const DEFAULT_CFG: TrackingConfig = {
   sync_time: '12:00',
 }
 
+// Sur le web, le CDN Instagram bloque les <img> directs → on passe par le
+// proxy serveur /api/img. En Electron, l'URL directe marche (pas de CORS).
+const _isWeb = typeof window !== 'undefined' && !(window as unknown as { electronAPI?: unknown }).electronAPI
+function igimg(u: string | null | undefined): string | undefined {
+  if (!u) return undefined
+  if (!_isWeb || !/^https?:\/\//i.test(u)) return u
+  return `/api/img?url=${encodeURIComponent(u)}`
+}
+
 function parisToday(): string { return new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) }
 function fmt(n: number | null): string {
   if (n == null) return '—'
@@ -290,7 +299,7 @@ export function Reports({ user }: { user: User }) {
                       }}>
                         <div style={{ width: 48, height: 62, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                           {a.reel_thumb
-                            ? <img src={a.reel_thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ? <img src={igimg(a.reel_thumb)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             : <span style={{ fontSize: 18, opacity: 0.5 }}>{a.posted ? '🎬' : '—'}</span>}
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
@@ -342,7 +351,7 @@ function AccountDetailModal({ row, data, loading, onClose }: { row: DailyRow; da
         {/* En-tête profil */}
         <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 14, alignItems: 'center' }}>
           <div style={{ width: 60, height: 60, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>
-            {p?.pp ? <img src={p.pp} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 22 }}>👤</div>}
+            {p?.pp ? <img src={igimg(p.pp)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 22 }}>👤</div>}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
@@ -389,7 +398,7 @@ function AccountDetailModal({ row, data, loading, onClose }: { row: DailyRow; da
               {reels.map((r, i) => (
                 <a key={i} href={r.url ?? undefined} target="_blank" rel="noreferrer" className="sf-card-lift" style={{ display: 'block', borderRadius: 10, overflow: 'hidden', textDecoration: 'none', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
                   <div style={{ aspectRatio: '9/16', background: 'rgba(255,255,255,0.04)', position: 'relative' }}>
-                    {r.thumb ? <img src={r.thumb} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 22, opacity: 0.4 }}>🎬</div>}
+                    {r.thumb ? <img src={igimg(r.thumb)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 22, opacity: 0.4 }}>🎬</div>}
                     <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
                       👁 {fmt(r.views)}
                     </div>
