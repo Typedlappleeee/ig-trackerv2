@@ -25,11 +25,9 @@ function isForced(cfg: TrackingConfig, now: Date): boolean {
   return !!cfg.force_run && (now.getTime() - new Date(cfg.force_run).getTime()) < 90 * 60 * 1000
 }
 
-const MAX_PER_INVOCATION = 60   // comptes traités par passage (≈ 1 tick / minute)
+import { igPost, deepArray, reelInfo, type ReelInfo } from './ig-rapidapi.ts'
 
-// URL par défaut de l'endpoint Reels (publique, non secrète). La CLÉ, elle, vient
-// du secret Supabase RAPIDAPI_KEY (jamais dans le code) → rien à coller par client.
-const DEFAULT_REELS_URL = 'https://instagram-scraper-api2.p.rapidapi.com/v1/reels?username_or_id_or_url={username}'
+const MAX_PER_INVOCATION = 60   // comptes traités par passage (≈ 1 tick / minute)
 
 function parisDate(d: Date): string {
   // "YYYY-MM-DD" en heure de Paris (fr-CA donne ce format).
@@ -39,46 +37,14 @@ function parisHHMM(d: Date): string {
   return d.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-// deno-lint-ignore no-explicit-any
-function pickItems(j: any): any[] | null {
-  const c = j?.data?.items ?? j?.items ?? j?.data?.reels ?? j?.reels ?? (Array.isArray(j?.data) ? j.data : null) ?? (Array.isArray(j) ? j : null)
-  return Array.isArray(c) ? c : null
-}
-
-interface ReelInfo { postedAt: string | null; views: number; likes: number; comments: number; url: string | null; thumb: string | null }
-
-// deno-lint-ignore no-explicit-any
-function reelInfo(reel: any): ReelInfo {
-  const n = reel?.media ?? reel?.node ?? reel ?? {}
-  const tsRaw = Number(n.taken_at ?? n.taken_at_timestamp ?? n.device_timestamp ?? n?.caption?.created_at ?? n.created_at ?? 0)
-  const tsMs = tsRaw > 1e12 ? tsRaw : tsRaw * 1000
-  const num = (...v: unknown[]) => { for (const x of v) { const k = Number(x); if (Number.isFinite(k) && k > 0) return k } return 0 }
-  const code = n.code ?? n.shortcode ?? n.pk ?? null
-  const thumb = n.thumbnail_url ?? n?.image_versions2?.candidates?.[0]?.url ?? n?.image_versions?.items?.[0]?.url ?? n.display_url ?? null
-  return {
-    postedAt: tsRaw ? new Date(tsMs).toISOString() : null,
-    views:    num(n.play_count, n.view_count, n.ig_play_count, n.video_view_count, n.views),
-    likes:    num(n.like_count, n.likes),
-    comments: num(n.comment_count, n.comments),
-    url:      code ? `https://www.instagram.com/reel/${code}/` : null,
-    thumb:    thumb ?? null,
-  }
-}
-
 async function fetchLatestReel(cfg: TrackingConfig, username: string): Promise<ReelInfo | null> {
-  if (!cfg.rapidapi_key || !cfg.rapidapi_url || !cfg.rapidapi_url.includes('{username}')) return null
-  try {
-    const url = cfg.rapidapi_url.replace('{username}', encodeURIComponent(username))
-    const host = new URL(url).host
-    const r = await fetch(url, { headers: { 'x-rapidapi-key': cfg.rapidapi_key, 'x-rapidapi-host': host } })
-    if (!r.ok) return null
-    const j = await r.json().catch(() => null)
-    const items = pickItems(j)
-    if (!items || !items.length) return null
-    let best = reelInfo(items[0])
-    for (const it of items) { const s = reelInfo(it); if ((s.postedAt ?? '') > (best.postedAt ?? '')) best = s }
-    return best
-  } catch { return null }
+  if (!cfg.rapidapi_key) return null
+  const j = await igPost(cfg.rapidapi_key, 'reels', username, { maxId: '' })
+  const items = deepArray(j, ['items', 'reels', 'edges', 'data'])
+  if (!items || !items.length) return null
+  let best = reelInfo(items[0])
+  for (const it of items) { const s = reelInfo(it); if ((s.postedAt ?? '') > (best.postedAt ?? '')) best = s }
+  return best
 }
 
 // deno-lint-ignore no-explicit-any
@@ -108,18 +74,16 @@ export async function runAccountSync(db: any, nowIso: string, deadlineMs: number
     // Clé/URL globales agence (secret serveur) → fallback si pas définies par owner.
     // Aucun client n'a à coller quoi que ce soit : on met RAPIDAPI_KEY une seule fois.
     const envKey = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
-    const envUrl = (Deno.env.get('RAPIDAPI_URL') ?? '').trim()
 
     const startOfDayIso = new Date(`${today}T00:00:00+02:00`).toISOString()
 
     for (const owner of owners) {
       if (synced >= MAX_PER_INVOCATION || Date.now() > deadlineMs) break
       try {
-        // Clé/URL effectives : réglage du propriétaire sinon secret serveur.
+        // Clé effective : réglage du propriétaire sinon secret serveur RAPIDAPI_KEY.
         const effCfg: TrackingConfig = {
           ...owner.cfg,
           rapidapi_key: owner.cfg.rapidapi_key || envKey,
-          rapidapi_url: owner.cfg.rapidapi_url || envUrl || DEFAULT_REELS_URL,
         }
         // Comptes du propriétaire.
         let pq = db.from('phones').select('id, geelark_id, ig_username, group_name').not('ig_username', 'is', null)
