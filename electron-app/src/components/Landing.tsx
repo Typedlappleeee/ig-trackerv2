@@ -97,6 +97,10 @@ const GLOBAL_CSS = `
     0%,100% { transform: translateY(0px); }
     50%     { transform: translateY(-10px); }
   }
+  @keyframes sf-tile-rot {
+    0%,100% { transform: perspective(1100px) rotateY(var(--ry)) rotateX(var(--rx)); }
+    50%     { transform: perspective(1100px) rotateY(calc(var(--ry) + 10deg)) rotateX(calc(var(--rx) - 4deg)); }
+  }
   @keyframes sf-tile-in {
     from { opacity: 0; transform: translateY(18px) scale(0.96); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -272,6 +276,59 @@ const ENTRY_TILES: EntryTile[] = [
   { key:'b4', w:265, h:162, bottom:'2%', right:'1%', ry:18,  rx:-32, delay:0.45 },
 ]
 
+// ── Tunnel néon animé (canvas) — anneaux qui foncent vers l'extérieur ─────────
+function NeonTunnel() {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const canvas = ref.current; if (!canvas) return
+    const ctx = canvas.getContext('2d'); if (!ctx) return
+    const colors = ['#6366F1', '#a855f7', '#ec4899', '#3b82f6'] // indigo · violet · rose · bleu
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    let raf = 0, t = 0
+    const resize = () => {
+      canvas.width = canvas.clientWidth * dpr
+      canvas.height = canvas.clientHeight * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+    resize()
+    window.addEventListener('resize', resize)
+    const RINGS = 18, SIDES = 3
+    const draw = () => {
+      const w = canvas.clientWidth, h = canvas.clientHeight
+      const cx = w / 2, cy = h / 2
+      const maxR = Math.hypot(w, h) * 0.6
+      ctx.clearRect(0, 0, w, h)
+      t += 0.0042
+      for (let i = 0; i < RINGS; i++) {
+        const p = ((i / RINGS) + (t % 1)) % 1           // 0→1 en boucle
+        const r = Math.pow(p, 1.7) * maxR               // accélère vers l'extérieur
+        const alpha = Math.min(p * 3, 1) * (1 - p) * 1.4 // apparaît puis s'estompe
+        if (alpha <= 0.012) continue
+        const color = colors[i % colors.length]
+        const rot = t * 1.1 + p * 0.7                   // rotation + torsion avec la profondeur
+        ctx.beginPath()
+        for (let s = 0; s <= SIDES; s++) {
+          const a = rot + (s / SIDES) * Math.PI * 2 - Math.PI / 2
+          const x = cx + Math.cos(a) * r
+          const y = cy + Math.sin(a) * r * 0.9
+          s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+        }
+        ctx.strokeStyle = color
+        ctx.globalAlpha = alpha * 0.5
+        ctx.lineWidth = 1.3
+        ctx.shadowColor = color
+        ctx.shadowBlur = 14
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0
+      raf = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
+  }, [])
+  return <canvas ref={ref} aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} />
+}
+
 // ── Stage 1 — Entrée cinématique ─────────────────────────────────────────────
 function TunnelHero({ onEnter }: { onEnter: () => void }) {
   const [hover, setHover] = useState(false)
@@ -284,6 +341,9 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
     }}>
+
+      {/* Tunnel néon animé */}
+      <NeonTunnel />
 
       {/* Perspective lines from center */}
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} preserveAspectRatio="none">
@@ -320,7 +380,8 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
         >
           <div style={{
             width: tile.w, height: tile.h,
-            transform: `perspective(1100px) rotateY(${tile.ry}deg) rotateX(${tile.rx}deg)`,
+            ['--ry' as string]: `${tile.ry}deg`, ['--rx' as string]: `${tile.rx}deg`,
+            animation: `sf-tile-rot ${9 + idx * 0.4}s ease-in-out ${tile.delay}s infinite`,
             borderRadius: 4,
             overflow: 'hidden',
             border: `1px solid ${HAIR}`,
