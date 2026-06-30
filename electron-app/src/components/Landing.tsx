@@ -438,6 +438,28 @@ function AutoPostShowcase() {
   )
 }
 
+// ── Bandeau défilant de mots-clés ─────────────────────────────────────────────
+function KeywordMarquee() {
+  const words = ['MASS POSTING', 'STORIES AVEC LIEN', 'REMIX', 'SPOOF', 'WARMUP', 'PROGRAMMATION', 'RAPPORTS', 'MULTI-COMPTES', 'PC ÉTEINT', 'SANS SURVEILLANCE']
+  const Row = () => (
+    <>
+      {words.map((w, i) => (
+        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 30, flexShrink: 0 }}>
+          <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 'clamp(18px,2vw,26px)', letterSpacing: '-0.01em', color: 'rgba(233,234,240,0.92)', whiteSpace: 'nowrap' }}>{w}</span>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, flexShrink: 0 }} />
+        </span>
+      ))}
+    </>
+  )
+  return (
+    <section aria-hidden style={{ position: 'relative', padding: '26px 0', background: BG, borderTop: `1px solid ${HAIR}`, borderBottom: `1px solid ${HAIR}`, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 30, width: 'max-content', animation: 'sf-marquee 28s linear infinite' }}>
+        <Row /><Row />
+      </div>
+    </section>
+  )
+}
+
 // ── Compteur qui s'incrémente quand il entre à l'écran ────────────────────────
 function CountUp({ to, prefix = '', suffix = '', duration = 1900 }: { to: number; prefix?: string; suffix?: string; duration?: number }) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -903,11 +925,16 @@ const FEATURES: { num: string; title: string; serif: string; text: string; icon:
 
 function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number }) {
   const [hover, setHover] = useState(false)
+  const [pos, setPos] = useState({ x: 50, y: 50 })
   return (
     <FadeIn delay={index * 0.05}>
       <div
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
+        onMouseMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          setPos({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 })
+        }}
         style={{
           display: 'grid',
           gridTemplateColumns: '80px 1fr 110px',
@@ -922,8 +949,14 @@ function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number })
           overflow: 'hidden',
         }}
       >
+        {/* spotlight qui suit le curseur */}
+        <div aria-hidden style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: `radial-gradient(420px circle at ${pos.x}% ${pos.y}%, rgba(99,102,241,0.14), transparent 60%)`,
+          opacity: hover ? 1 : 0, transition: 'opacity 0.3s',
+        }} />
         {/* gold line indicator */}
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: GOLD, transform: hover ? 'scaleY(1)' : 'scaleY(0)', transformOrigin: 'top', transition: 'transform 0.4s cubic-bezier(0.16,1,0.3,1)' }} />
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: GOLD, transform: hover ? 'scaleY(1)' : 'scaleY(0)', transformOrigin: 'top', transition: 'transform 0.4s cubic-bezier(0.16,1,0.3,1)', zIndex: 1 }} />
 
         <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 19, color: hover ? GOLD : FAINT, transition: 'color 0.3s' }}>{f.num}</span>
 
@@ -1578,6 +1611,9 @@ export function Landing() {
 
       {/* ── Démo animée : les téléphones postent tout seuls ──────────────────── */}
       <AutoPostShowcase />
+
+      {/* ── Bandeau défilant de mots-clés ────────────────────────────────────── */}
+      <KeywordMarquee />
 
       {/* ── Stats animées ────────────────────────────────────────────────────── */}
       <StatsBanner />
