@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
+import { igImg, timeAgo } from '@/lib/igimg'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
@@ -99,17 +100,24 @@ const PhoneRow = memo(function PhoneRow({ phone, checked, videoIndex, videoTitle
       onMouseEnter={e => { if (!checked && !isActive) e.currentTarget.style.background = 'rgba(233,234,240,0.03)' }}
       onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'rgba(99,102,241,0.09)' : checked ? 'rgba(99,102,241,0.06)' : 'transparent' }}
     >
-      {/* Avatar */}
-      <div style={{
-        width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 800, borderRadius: 8,
-        border: `1px solid ${checked || isActive ? 'rgba(99,102,241,0.45)' : HAIR}`,
-        color: checked || isActive ? ACCENT : FAINT,
-        background: checked || isActive ? 'rgba(99,102,241,0.08)' : 'transparent',
-        transition: 'all 0.15s',
-      }}>
-        {initials}
-      </div>
+      {/* Avatar — photo de profil si dispo, sinon initiales */}
+      {phone.pp_url ? (
+        <img src={igImg(phone.pp_url)} alt="" referrerPolicy="no-referrer" style={{
+          width: 30, height: 30, flexShrink: 0, borderRadius: 8, objectFit: 'cover',
+          border: `1px solid ${checked || isActive ? 'rgba(99,102,241,0.45)' : HAIR}`,
+        }} />
+      ) : (
+        <div style={{
+          width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, fontWeight: 800, borderRadius: 8,
+          border: `1px solid ${checked || isActive ? 'rgba(99,102,241,0.45)' : HAIR}`,
+          color: checked || isActive ? ACCENT : FAINT,
+          background: checked || isActive ? 'rgba(99,102,241,0.08)' : 'transparent',
+          transition: 'all 0.15s',
+        }}>
+          {initials}
+        </div>
+      )}
 
       <div style={{ minWidth: 0, flex: 1 }}>
         <p style={{ fontSize: 12, fontWeight: 600, color: checked || isActive ? IVORY : 'rgba(233,234,240,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -117,6 +125,20 @@ const PhoneRow = memo(function PhoneRow({ phone, checked, videoIndex, videoTitle
         </p>
         {phone.ig_username && (
           <p style={{ fontSize: 10, color: checked || isActive ? 'rgba(99,102,241,0.7)' : FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{phone.ig_username}</p>
+        )}
+        {/* Statut compte + dernier post */}
+        {(phone.account_state === 'banned' || phone.account_state === 'shadow' || phone.last_post_at) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+            {phone.account_state === 'banned' && (
+              <span style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 5px', borderRadius: 5, background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>⚠ BANNI</span>
+            )}
+            {phone.account_state === 'shadow' && (
+              <span style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 5px', borderRadius: 5, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>⚠ SHADOW?</span>
+            )}
+            {phone.last_post_at && (
+              <span style={{ fontSize: 9, color: FAINT }}>📅 {timeAgo(phone.last_post_at)}</span>
+            )}
+          </div>
         )}
         {ts && ts.status !== 'idle' && ts.status !== 'pending' && (
           <span className={STATUS_BADGE[ts.status] ?? 'sf-badge sf-badge-muted'} style={{ marginTop: 3, display: 'inline-flex', fontSize: 9 }}>

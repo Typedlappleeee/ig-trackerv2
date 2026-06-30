@@ -100,5 +100,10 @@ update public.license_keys
 -- Légende propre à chaque vidéo, pré-remplie au moment de poster.
 alter table public.content_bank add column if not exists description text default '';
 
+-- ════════════════ 6. INFOS COMPTE (pp, dernier post, statut) ════════
+alter table public.phones add column if not exists pp_url        text;
+alter table public.phones add column if not exists last_post_at  timestamptz;
+alter table public.phones add column if not exists account_state text;
+
 -- Recharge le cache PostgREST pour que les nouvelles tables/fonctions soient vues.
 notify pgrst, 'reload schema';
