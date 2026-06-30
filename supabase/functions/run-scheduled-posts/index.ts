@@ -201,7 +201,11 @@ Deno.serve(async (req) => {
           })
           const txt = await r.text()
           let json: unknown = null; try { json = JSON.parse(txt) } catch { /* non-json */ }
-          out[label] = { status: r.status, ok: r.ok, sample: txt.slice(0, 500) }
+          // Quota RapidAPI (en-têtes x-ratelimit-*).
+          const quota: Record<string, string> = {}
+          r.headers.forEach((v, k) => { if (/ratelimit/i.test(k)) quota[k] = v })
+          out[label] = { status: r.status, ok: r.ok, quota, sample: txt.slice(0, 500) }
+          if (Object.keys(quota).length) out.quota = quota
           return json
         } catch (e) { out[label] = { error: String(e) }; return null }
       }

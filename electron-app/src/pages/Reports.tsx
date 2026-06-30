@@ -182,6 +182,7 @@ export function Reports({ user }: { user: User }) {
         `➡ Reels trouvés : ${pr?.count ?? 0}\n` +
         `➡ Vues dernier reel : ${pr?.latest?.views ?? '—'}\n` +
         `➡ Date dernier reel : ${pr?.latest?.postedAt ?? 'NULL'}\n\n` +
+        `── QUOTA RapidAPI ──\n${Object.entries(d?.quota ?? {}).map(([k, v]) => `${k}: ${v}`).join('\n') || 'non renvoyé par l\'API'}\n\n` +
         `── Champs date du reel ──\n` +
         `dateish: ${JSON.stringify(d?.firstReel?.dateish ?? {})}\n\n` +
         `clés du reel: ${(d?.firstReel?.keys ?? []).join(', ')}\n\n` +
