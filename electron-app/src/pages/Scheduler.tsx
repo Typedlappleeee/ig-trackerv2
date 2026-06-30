@@ -1067,7 +1067,8 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
   onReschedule?: () => void
 }) {
   const t = useT()
-  const [showLogs, setShowLogs] = useState(false)
+  // Logs dépliés d'office quand le post a échoué → on voit tout de suite pourquoi.
+  const [showLogs, setShowLogs] = useState(post.status === 'failed')
   const [hovered, setHovered]   = useState(false)
   const isPending   = post.status === 'pending'
   // A 'running' post not executing in THIS session is stuck (app closed mid-run) — allow stopping it
