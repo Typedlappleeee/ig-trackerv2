@@ -43,22 +43,37 @@ async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown
   const url = `${BASE}${path}`
   const headers = bearer ? authHeaders(bearer) : undefined
 
-  if (window.electronAPI?.geelarkRequest) {
-    const result = await window.electronAPI.geelarkRequest({ method, url, headers, body })
-    if (!result.ok) throw new Error(result.error ?? 'Network error')
-    return result.data as Record<string, unknown>
+  // Retente les coupures TRANSITOIRES (blip réseau, proxy Vercel 5xx/429/timeout).
+  // Une story enchaîne des dizaines d'appels shell : sans ça, un seul hoquet réseau
+  // fait échouer toute la story (« GéeLark inaccessible »). On ne retente PAS les
+  // vraies erreurs API (code métier renvoyé par GéeLark), gérées plus haut.
+  const TRANSIENT = /network error|failed to fetch|proxy http (5\d\d|429|408)|timeout|econnre|socket hang/i
+  let lastErr: unknown
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      if (window.electronAPI?.geelarkRequest) {
+        const result = await window.electronAPI.geelarkRequest({ method, url, headers, body })
+        if (!result.ok) throw new Error(result.error ?? 'Network error')
+        return result.data as Record<string, unknown>
+      }
+      // Web fallback: route through Vercel proxy (bypasses CORS)
+      const res = await fetch('/api/geelark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method, url, headers: headers ?? {}, body }),
+      })
+      if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
+      const result = await res.json()
+      if (!result.ok) throw new Error(result.error ?? 'Network error')
+      return result.data as Record<string, unknown>
+    } catch (e) {
+      lastErr = e
+      const msg = e instanceof Error ? e.message : String(e)
+      if (!TRANSIENT.test(msg) || attempt === 3) throw e
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+    }
   }
-
-  // Web fallback: route through Vercel proxy (bypasses CORS)
-  const res = await fetch('/api/geelark', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ method, url, headers: headers ?? {}, body }),
-  })
-  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
-  const result = await res.json()
-  if (!result.ok) throw new Error(result.error ?? 'Network error')
-  return result.data as Record<string, unknown>
+  throw lastErr
 }
 
 // Fetch all phones (paginates automatically).
@@ -1373,22 +1388,28 @@ async function _postInstagramStoryInner(
   if (/^https?:\/\//i.test(config.imageUrl)) {
     const dlPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
     const urlEsc = config.imageUrl.replace(/'/g, `'\\''`)
-    log('   📤 Téléchargement direct par le téléphone…')
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera; ` +
-      `curl -L -s -o '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
-      `wget -q -O '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
-      `toybox wget -O '${dlPath}' '${urlEsc}' 2>/dev/null; true`)
-    const ckd = await shellExec(bearer, phoneId, `wc -c < '${dlPath}' 2>/dev/null || echo 0`)
-    const szd = parseInt(ckd.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    if (szd >= 2000) {
-      imgPath = dlPath
-      outExt = _imgExt
-      sz = szd
-      log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
-    } else {
-      log(`   ⚠️ Téléchargement direct échoué (${szd} o) — bascule sur base64…`)
-      await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
+    // Jusqu'à 3 tentatives : le téléchargement direct rate parfois (DNS/proxy du
+    // téléphone pas encore prêt juste après le boot) → une seule tentative faisait
+    // échouer la story. On réessaie avant de basculer sur le base64.
+    for (let dlTry = 0; dlTry < 3 && sz < 2000; dlTry++) {
+      log(`   📤 Téléchargement direct par le téléphone${dlTry ? ` (essai ${dlTry + 1}/3)` : ''}…`)
+      await shellExec(bearer, phoneId,
+        `mkdir -p /sdcard/DCIM/Camera; ` +
+        `curl -L -s -o '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+        `wget -q -O '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+        `toybox wget -O '${dlPath}' '${urlEsc}' 2>/dev/null; true`)
+      const ckd = await shellExec(bearer, phoneId, `wc -c < '${dlPath}' 2>/dev/null || echo 0`)
+      const szd = parseInt(ckd.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+      if (szd >= 2000) {
+        imgPath = dlPath
+        outExt = _imgExt
+        sz = szd
+        log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
+      } else {
+        log(`   ⚠️ Téléchargement direct échoué (${szd} o)${dlTry < 2 ? ' — nouvel essai…' : ' — bascule sur base64…'}`)
+        await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
+        if (dlTry < 2) await sleep(1500)
+      }
     }
   }
 
