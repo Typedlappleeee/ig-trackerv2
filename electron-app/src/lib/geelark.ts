@@ -493,7 +493,14 @@ export async function clearInstagramPopups(
     await sleepOrAbort(1400, signal)
   }
 
-  // Ouvre Instagram sur l'accueil pour déclencher l'éventuel interstitiel.
+  // Force l'UI Instagram en ANGLAIS : le RPA de posting cible l'UI anglaise
+  // (galerie « Gallery »…) et ne trouve pas la vidéo si le téléphone est en
+  // français. L'override de langue persiste → le RPA relancera IG en anglais.
+  await shellExec(bearer, phoneId, 'cmd locale set-app-locales com.instagram.android --locales en-US', { maxRetries: 2, signal }).catch(() => {})
+  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android', { maxRetries: 2, signal }).catch(() => {})
+  await sleepOrAbort(1500, signal)
+
+  // Ouvre Instagram (désormais en anglais) pour déclencher l'éventuel interstitiel.
   await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity', { maxRetries: 3, signal }).catch(() => {})
   await sleepOrAbort(4000, signal)
 
@@ -1099,16 +1106,14 @@ async function _postInstagramStoryInner(
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
 
-  // ── Détection de langue ────────────────────────────────────────────────────
-  // L'automatisation story cible des boutons FR/EN. Si le téléphone est dans une
-  // autre langue, les taps tomberaient à côté → story cassée. On saute alors le
-  // compte proprement plutôt que de publier n'importe quoi.
+  // ── Bascule Instagram en anglais ────────────────────────────────────────────
+  // L'automatisation story (galerie « Gallery », sticker « Link »…) est fiable en
+  // anglais. En français, la sélection de l'image/vidéo et du sticker échouait.
+  // On force l'UI IG en anglais ; le force-stop + deep link ci-dessous relancent
+  // Instagram en anglais. L'override persiste par compte.
   const lang = await detectPhoneLang(bearer, phoneId)
-  if (lang === 'other') {
-    log('⏭ Langue du téléphone non supportée (ni FR ni EN) — story ignorée')
-    return { ok: false, error: 'Langue non supportée (ni FR ni EN) — story ignorée' }
-  }
-  log(`🌐 Langue: ${lang === 'unknown' ? 'inconnue (on tente FR+EN)' : lang.toUpperCase()}`)
+  log(`🌐 Langue détectée: ${lang} — bascule Instagram en anglais…`)
+  await shellExec(bearer, phoneId, 'cmd locale set-app-locales com.instagram.android --locales en-US', { maxRetries: 2 }).catch(() => {})
 
   // ── 0. Wipe the gallery ────────────────────────────────────────────────────
   // Stale photos/videos make Instagram's story picker grab the wrong (old) media
