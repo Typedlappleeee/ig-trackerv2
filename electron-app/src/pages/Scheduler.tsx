@@ -39,7 +39,7 @@ import { useOrg } from '@/lib/orgContext'
 import {
   loadScheduledPosts, cancelScheduledPost, claimScheduledPost,
   executeScheduledPost, finishScheduledPost, failStaleRunningPosts,
-  fmtScheduledTime, timeUntil,
+  fmtScheduledTime, timeUntil, createScheduledPost,
   type ScheduledPost, type ScheduleStatus,
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
@@ -399,14 +399,24 @@ function startOfWeek(d: Date): Date {
 const CAL_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const CAL_ROW_H = 46 // px par heure
 
-function CalendarWeek({ posts, onMove, onOpen }: {
+// Date → valeur d'un <input type="datetime-local"> local (YYYY-MM-DDTHH:MM)
+function toSchedInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelete }: {
   posts: ScheduledPost[]
   onMove: (post: ScheduledPost, date: Date) => void
   onOpen: (post: ScheduledPost) => void
+  onSlotClick: (date: Date) => void
+  onDuplicate: (post: ScheduledPost) => void
+  onDelete: (post: ScheduledPost) => void
 }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const dragId = useRef<string | null>(null)
   const [, force] = useState(0)
+  const [menu, setMenu] = useState<{ x: number; y: number; post: ScheduledPost } | null>(null)
 
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d })
   const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -496,11 +506,22 @@ function CalendarWeek({ posts, onMove, onOpen }: {
                 key={dayIdx}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => handleDrop(dayIdx, e)}
-                style={{ position: 'relative', borderLeft: '1px solid rgba(255,255,255,0.05)', height: 24 * CAL_ROW_H }}
+                onClick={e => {
+                  if (e.target !== e.currentTarget) return // clic sur un bloc
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                  let mins = Math.round(((e.clientY - rect.top) / CAL_ROW_H) * 60 / 5) * 5
+                  mins = Math.max(0, Math.min(24 * 60 - 5, mins))
+                  const nd = new Date(weekStart); nd.setDate(nd.getDate() + dayIdx)
+                  nd.setHours(Math.floor(mins / 60), mins % 60, 0, 0)
+                  if (nd.getTime() < Date.now()) return // pas dans le passé
+                  onSlotClick(nd)
+                }}
+                title="Clique un créneau vide pour programmer un post"
+                style={{ position: 'relative', borderLeft: '1px solid rgba(255,255,255,0.05)', height: 24 * CAL_ROW_H, cursor: 'copy' }}
               >
-                {/* Lignes horaires */}
+                {/* Lignes horaires (transparentes aux clics → le créneau reçoit le clic) */}
                 {Array.from({ length: 24 }, (_, h) => (
-                  <div key={h} style={{ height: CAL_ROW_H, borderTop: '1px solid rgba(255,255,255,0.04)' }} />
+                  <div key={h} style={{ height: CAL_ROW_H, borderTop: '1px solid rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
                 ))}
 
                 {/* Ligne "maintenant" */}
@@ -508,7 +529,7 @@ function CalendarWeek({ posts, onMove, onOpen }: {
                   <div style={{
                     position: 'absolute', left: 0, right: 0,
                     top: (now.getHours() + now.getMinutes() / 60) * CAL_ROW_H,
-                    borderTop: '2px solid #f87171', zIndex: 3,
+                    borderTop: '2px solid #f87171', zIndex: 3, pointerEvents: 'none',
                   }} />
                 )}
 
@@ -524,8 +545,9 @@ function CalendarWeek({ posts, onMove, onOpen }: {
                       draggable={canDrag}
                       onDragStart={() => { dragId.current = p.id }}
                       onDragEnd={() => { dragId.current = null }}
-                      onClick={() => onOpen(p)}
-                      title={`${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s)`}
+                      onClick={e => { e.stopPropagation(); onOpen(p) }}
+                      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY, post: p }) }}
+                      title={`${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s) — clic droit pour dupliquer/supprimer`}
                       style={{
                         position: 'absolute', left: 3, right: 3, top: top + 1, minHeight: 34,
                         background: p.status === 'running' ? 'rgba(234,179,8,0.22)' : 'rgba(99,102,241,0.22)',
@@ -548,6 +570,36 @@ function CalendarWeek({ posts, onMove, onOpen }: {
           })}
         </div>
       </div>
+
+      {/* Menu contextuel (clic droit sur un post) */}
+      {menu && (
+        <>
+          <div onClick={() => setMenu(null)} onContextMenu={e => { e.preventDefault(); setMenu(null) }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1500 }} />
+          <div style={{
+            position: 'fixed', top: Math.min(menu.y, window.innerHeight - 140), left: Math.min(menu.x, window.innerWidth - 200),
+            zIndex: 1501, background: '#14141c', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+            padding: 4, minWidth: 190, boxShadow: '0 12px 40px rgba(0,0,0,0.55)',
+          }}>
+            {([
+              { label: 'Dupliquer', fn: () => onDuplicate(menu.post) },
+              { label: 'Reprogrammer (heure précise)', fn: () => onOpen(menu.post) },
+              { label: 'Supprimer', danger: true, fn: () => onDelete(menu.post) },
+            ] as const).map((it, i) => (
+              <button key={i}
+                onClick={() => { it.fn(); setMenu(null) }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', borderRadius: 7,
+                  background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13,
+                  color: (it as { danger?: boolean }).danger ? '#f87171' : 'var(--ivory)',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >{it.label}</button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -567,6 +619,7 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [showCreate, setShowCreate] = useState(false)
   const [showStoryCreate, setShowStoryCreate] = useState(false)
   const [showTypeChoice, setShowTypeChoice] = useState(false)
+  const [presetSchedAt, setPresetSchedAt] = useState<string | undefined>(undefined)
   const [showPlatformChoice, setShowPlatformChoice] = useState(false)
   const [reelPlatform, setReelPlatform] = useState<'instagram' | 'tiktok'>(
     (localStorage.getItem('sf-mp-platform') as 'instagram' | 'tiktok' | null) ?? 'instagram')
@@ -785,6 +838,25 @@ export function Scheduler({ user, onNavigate }: Props) {
     }
   }
 
+  // Duplique un post : recrée la même config dans un nouveau post en attente,
+  // programmé 1h après l'original (ou dans 1h si l'original est passé).
+  async function duplicateSchedPost(post: ScheduledPost) {
+    try {
+      const base = new Date(post.scheduled_at).getTime()
+      const when = new Date(Math.max(Date.now() + 5 * 60_000, base + 60 * 60_000))
+      const created = await createScheduledPost({
+        userId: user.id, orgId: post.org_id, createdByName: post.created_by_name || (user.email ?? 'Moi'),
+        type: post.type, scheduledAt: when, phones: post.phones, videos: post.videos,
+        caption: post.caption, delayMinutes: post.delay_minutes, mode: post.mode,
+        bearerToken: '', reelsTrial: post.reels_trial, platform: post.platform,
+      })
+      setPosts(prev => [created, ...prev])
+      toast.show({ title: 'Post dupliqué ✓', body: `Copie programmée le ${fmtScheduledTime(when.toISOString())}.`, kind: 'ok' })
+    } catch (e) {
+      toast.show({ title: 'Duplication échouée', body: e instanceof Error ? e.message : String(e), kind: 'error' })
+    }
+  }
+
   const pending = posts.filter(p => p.status === 'pending' || p.status === 'running')
   const history = posts.filter(p => p.status === 'done' || p.status === 'failed' || p.status === 'cancelled')
 
@@ -843,7 +915,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               </span>
             )}
             <button
-              onClick={() => setShowTypeChoice(true)}
+              onClick={() => { setPresetSchedAt(undefined); setShowTypeChoice(true) }}
               className="sf-btn sf-btn-primary cursor-pointer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
@@ -957,6 +1029,9 @@ export function Scheduler({ user, onNavigate }: Props) {
             posts={pending}
             onMove={(p, d) => { void doReschedule(p, d) }}
             onOpen={p => { if (p.status === 'pending' && p.user_id === user.id) setReschedule(p) }}
+            onSlotClick={d => { setPresetSchedAt(toSchedInput(d)); setShowTypeChoice(true) }}
+            onDuplicate={p => { void duplicateSchedPost(p) }}
+            onDelete={p => { if (p.status === 'running') cancel(p.id); else setConfirmCancel(p) }}
           />
         ) : shown.length === 0 ? (
           /* ── Empty state ──────────────────────────────────────────────────────── */
@@ -985,7 +1060,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               <button
                 className="sf-btn sf-btn-primary cursor-pointer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
-                onClick={() => setShowTypeChoice(true)}
+                onClick={() => { setPresetSchedAt(undefined); setShowTypeChoice(true) }}
               >
                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                 {posts.length === 0 ? 'Programmer ton premier post' : t('schedulerSchedulePost')}
@@ -1054,8 +1129,9 @@ export function Scheduler({ user, onNavigate }: Props) {
         <CreateScheduleModal
           user={user}
           initialPlatform={reelPlatform}
-          onCreated={() => { setShowCreate(false); reload() }}
-          onClose={() => setShowCreate(false)}
+          initialSchedAt={presetSchedAt}
+          onCreated={() => { setShowCreate(false); setPresetSchedAt(undefined); reload() }}
+          onClose={() => { setShowCreate(false); setPresetSchedAt(undefined) }}
         />
       )}
 
