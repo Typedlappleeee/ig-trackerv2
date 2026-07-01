@@ -641,14 +641,20 @@ export async function ensureInstagramEnglish(
   log?.(`🌐 Langue Instagram détectée à l'écran : ${lang}`)
   if (lang === 'en') return 'en'
 
-  // Bascule + redémarrage + re-vérification.
+  // Bascule + redémarrage + re-vérification. On tente plusieurs variantes car
+  // `set-app-locales` est refusé (status ≠ 0) sur certains téléphones/versions.
   log?.('   ↪︎ Bascule Instagram en anglais…')
-  const r = await shellExec(
-    bearer, phoneId,
+  const attempts = [
+    'cmd locale set-app-locales com.instagram.android --user 0 --locales en-US',
     'cmd locale set-app-locales com.instagram.android --locales en-US',
-    { maxRetries: 2, signal },
-  ).catch((e: unknown) => ({ output: e instanceof Error ? e.message : String(e), status: -1 }))
-  log?.(`   locale set-app-locales → "${(r.output || '').trim().slice(0, 50)}" (status ${r.status})`)
+    'cmd locale set-app-locales com.instagram.android --locales en',
+  ]
+  for (const cmd of attempts) {
+    const r = await shellExec(bearer, phoneId, cmd, { maxRetries: 1, signal })
+      .catch((e: unknown) => ({ output: e instanceof Error ? e.message : String(e), status: -1 }))
+    log?.(`   ${cmd.replace('com.instagram.android', 'IG')} → status ${r.status}${r.output ? ` "${r.output.trim().slice(0, 40)}"` : ''}`)
+    if (r.status === 0) break
+  }
   await shellExec(bearer, phoneId, 'am force-stop com.instagram.android', { maxRetries: 2, signal }).catch(() => {})
   await sleepOrAbort(2000, signal)
 
