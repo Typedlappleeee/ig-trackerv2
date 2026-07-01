@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
 import type { Page } from '@/components/Layout'
+import { LicenseContext } from '@/lib/license'
 
 // ── Publication — hub des types de publication (Reels · Story · Photo) ────────
 
@@ -11,6 +12,8 @@ interface Kind {
   desc: string
   grad: string
   glow: string
+  soon?: boolean
+  admin?: boolean
 }
 
 const KINDS: Kind[] = [
@@ -20,23 +23,24 @@ const KINDS: Kind[] = [
     grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.45)',
   },
   {
-    id: 'storylink', icon: '🔗', title: 'Story', tag: 'Sticker lien',
+    id: 'storylink', icon: '🔗', title: 'Story', tag: 'Sticker lien', admin: true,
     desc: 'Publie une story avec un sticker lien propre à chaque compte — parfait pour ramener du trafic là où tu veux.',
     grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.42)',
   },
   {
-    id: 'photoposting', icon: '🖼️', title: 'Photo', tag: 'Feed',
+    id: 'photoposting', icon: '🖼️', title: 'Photo', tag: 'Feed', soon: true,
     desc: 'Publie une photo dans le feed sur tous tes comptes, avec la même légende — le poste classique, automatisé.',
     grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.4)',
   },
 ]
 
-function KindCard({ kind, onOpen }: { kind: Kind; onOpen: () => void }) {
+function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () => void; disabled?: boolean; badge?: string }) {
   const [hover, setHover] = useState(false)
   const [pos, setPos] = useState({ x: 50, y: 50 })
   return (
     <button
-      onClick={onOpen}
+      onClick={disabled ? undefined : onOpen}
+      disabled={disabled}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onMouseMove={e => {
@@ -48,10 +52,11 @@ function KindCard({ kind, onOpen }: { kind: Kind; onOpen: () => void }) {
         padding: 26, borderRadius: 22, minHeight: 210,
         background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
         border: '1px solid rgba(255,255,255,0.09)',
-        transform: hover ? 'translateY(-6px)' : 'translateY(0)',
-        boxShadow: hover ? `0 24px 60px -20px ${kind.glow}, 0 0 0 1px rgba(255,255,255,0.06)` : '0 8px 30px -18px rgba(0,0,0,0.6)',
+        transform: (hover && !disabled) ? 'translateY(-6px)' : 'translateY(0)',
+        boxShadow: (hover && !disabled) ? `0 24px 60px -20px ${kind.glow}, 0 0 0 1px rgba(255,255,255,0.06)` : '0 8px 30px -18px rgba(0,0,0,0.6)',
         transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s',
         display: 'flex', flexDirection: 'column', gap: 14, isolation: 'isolate',
+        opacity: disabled ? 0.55 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
       }}
     >
       <div aria-hidden style={{
@@ -68,8 +73,9 @@ function KindCard({ kind, onOpen }: { kind: Kind; onOpen: () => void }) {
         }}>{kind.icon}</div>
         <span style={{
           fontSize: 10.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: 'rgba(233,234,240,0.55)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 10px',
-        }}>{kind.tag}</span>
+          color: badge ? '#fbbf24' : 'rgba(233,234,240,0.55)',
+          border: `1px solid ${badge ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '4px 10px',
+        }}>{badge ?? kind.tag}</span>
       </div>
 
       <div style={{ position: 'relative', zIndex: 2 }}>
@@ -82,16 +88,21 @@ function KindCard({ kind, onOpen }: { kind: Kind; onOpen: () => void }) {
         fontSize: 12.5, fontWeight: 700, color: hover ? '#fff' : 'rgba(233,234,240,0.7)',
         transition: 'color 0.2s, gap 0.2s', gap: hover ? 10 : 7,
       }}>
-        Publier
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 12h14M13 6l6 6-6 6"/>
-        </svg>
+        {disabled ? (badge === 'Bientôt' ? 'Bientôt disponible' : 'Indisponible') : 'Publier'}
+        {!disabled && (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+        )}
       </div>
     </button>
   )
 }
 
 export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
+  const isSuperAdmin = useContext(LicenseContext)?.isSuperAdmin === true
+  // Story réservé aux admins pour l'instant → masqué pour les autres.
+  const visibleKinds = KINDS.filter(k => !k.admin || isSuperAdmin)
   return (
     <div style={{ minHeight: '100%', background: 'var(--base)', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
@@ -120,8 +131,14 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
-          {KINDS.map(kind => (
-            <KindCard key={kind.id} kind={kind} onOpen={() => onNavigate(kind.id)} />
+          {visibleKinds.map(kind => (
+            <KindCard
+              key={kind.id}
+              kind={kind}
+              disabled={kind.soon}
+              badge={kind.soon ? 'Bientôt' : kind.admin ? 'Admin' : undefined}
+              onOpen={() => onNavigate(kind.id)}
+            />
           ))}
         </div>
       </div>

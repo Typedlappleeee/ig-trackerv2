@@ -691,7 +691,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   const isVisibleTab = (id: Page): boolean => {
     // Pages internes / superadmin ScaleFlow uniquement (Rapports + Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'tiktokposting' || id === 'reports' || id === 'tasks' || id === 'storylink') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Tous les autres onglets sont visibles pour tout le monde.
@@ -1036,6 +1036,30 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
           {/* Left: page title + breadcrumb */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+            {(() => {
+              const backTo: { hub: Page; label: string } | null =
+                (['posting', 'storylink', 'photoposting'] as Page[]).includes(page) ? { hub: 'publishhub', label: 'Publication' }
+                : (['remix', 'spoof', 'subtitles', 'mixer'] as Page[]).includes(page) ? { hub: 'videostudio', label: 'Studio Vidéo' }
+                : null
+              if (!backTo) return null
+              return (
+                <button
+                  onClick={() => onNavigate(backTo.hub)}
+                  title={`Retour à ${backTo.label}`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 8, padding: '5px 10px', marginRight: 4, cursor: 'pointer',
+                    color: 'rgba(233,234,240,0.8)', fontSize: 12.5, fontWeight: 600,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+                  {backTo.label}
+                </button>
+              )
+            })()}
             <span style={{ color: 'rgba(99,102,241,0.7)', flexShrink: 0, display: 'flex' }}>
               <NavIcon d={ICONS[PAGE_ICON[page] ?? 'grid']} size={15} />
             </span>
