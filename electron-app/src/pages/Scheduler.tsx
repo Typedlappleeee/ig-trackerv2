@@ -58,7 +58,7 @@ const RESCHEDULE_CHUNK_MS = 24 * 60 * 60 * 1000 // re-arm every 24 h for far-fut
 
 interface Props { user: User; onNavigate?: (page: string, tab?: string) => void }
 
-type TabFilter = 'pending' | 'history'
+type TabFilter = 'pending' | 'calendar' | 'history'
 
 // STATUS_LABEL and TYPE_LABEL are now built dynamically inside components using t()
 
@@ -388,6 +388,170 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
   )
 }
 
+// ── Vue calendrier (semaine) avec drag & drop pour reprogrammer ───────────────
+function startOfWeek(d: Date): Date {
+  const x = new Date(d)
+  const day = (x.getDay() + 6) % 7 // Lundi = 0
+  x.setHours(0, 0, 0, 0)
+  x.setDate(x.getDate() - day)
+  return x
+}
+const CAL_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+const CAL_ROW_H = 46 // px par heure
+
+function CalendarWeek({ posts, onMove, onOpen }: {
+  posts: ScheduledPost[]
+  onMove: (post: ScheduledPost, date: Date) => void
+  onOpen: (post: ScheduledPost) => void
+}) {
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
+  const dragId = useRef<string | null>(null)
+  const [, force] = useState(0)
+
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d })
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const now = new Date()
+
+  const byDay: ScheduledPost[][] = Array.from({ length: 7 }, () => [])
+  for (const p of posts) {
+    const dt = new Date(p.scheduled_at)
+    const dayMidnight = new Date(dt); dayMidnight.setHours(0, 0, 0, 0)
+    const idx = Math.round((dayMidnight.getTime() - weekStart.getTime()) / 86400000)
+    if (idx >= 0 && idx < 7) byDay[idx].push(p)
+  }
+
+  const shiftWeek = (n: number) => { const d = new Date(weekStart); d.setDate(d.getDate() + n * 7); setWeekStart(d) }
+
+  const handleDrop = (dayIdx: number, e: React.DragEvent) => {
+    e.preventDefault()
+    const id = dragId.current; dragId.current = null
+    force(x => x + 1)
+    if (!id) return
+    const post = posts.find(p => p.id === id)
+    if (!post) return
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    let mins = Math.round(((e.clientY - rect.top) / CAL_ROW_H) * 60 / 5) * 5
+    mins = Math.max(0, Math.min(24 * 60 - 5, mins))
+    const nd = new Date(weekStart)
+    nd.setDate(nd.getDate() + dayIdx)
+    nd.setHours(Math.floor(mins / 60), mins % 60, 0, 0)
+    if (nd.getTime() < Date.now() + 60_000) { // pas dans le passé → +2 min mini
+      const bump = new Date(Date.now() + 2 * 60_000)
+      nd.setTime(bump.getTime())
+    }
+    onMove(post, nd)
+  }
+
+  const weekLabel = `${days[0].toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      {/* Barre de navigation semaine */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <button onClick={() => shiftWeek(-1)} className="sf-btn sf-btn-ghost sf-btn-sm">‹</button>
+        <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="sf-btn sf-btn-ghost sf-btn-sm">Aujourd'hui</button>
+        <button onClick={() => shiftWeek(1)} className="sf-btn sf-btn-ghost sf-btn-sm">›</button>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ivory)', marginLeft: 4 }}>{weekLabel}</span>
+        <span style={{ fontSize: 11.5, color: 'var(--muted)', marginLeft: 'auto' }}>Glisse un post pour le reprogrammer</span>
+      </div>
+
+      {/* En-têtes des jours */}
+      <div style={{ display: 'grid', gridTemplateColumns: '48px repeat(7, 1fr)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div />
+        {days.map((d, i) => {
+          const isToday = d.getTime() === today.getTime()
+          return (
+            <div key={i} style={{ textAlign: 'center', padding: '6px 0' }}>
+              <div style={{ fontSize: 10.5, color: 'rgba(148,163,184,0.55)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{CAL_DAYS[i]}</div>
+              <div style={{
+                fontSize: 15, fontWeight: 700, marginTop: 2,
+                color: isToday ? '#fff' : 'var(--ivory)',
+                width: 26, height: 26, lineHeight: '26px', borderRadius: '50%', margin: '2px auto 0',
+                background: isToday ? 'var(--accent)' : 'transparent',
+              }}>{d.getDate()}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Grille scrollable */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '48px repeat(7, 1fr)', position: 'relative' }}>
+          {/* Gouttière des heures */}
+          <div style={{ position: 'relative' }}>
+            {Array.from({ length: 24 }, (_, h) => (
+              <div key={h} style={{ height: CAL_ROW_H, position: 'relative' }}>
+                <span style={{ position: 'absolute', top: -6, right: 6, fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>
+                  {h > 0 ? `${String(h).padStart(2, '0')}:00` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Colonnes des jours */}
+          {days.map((day, dayIdx) => {
+            const isToday = day.getTime() === today.getTime()
+            return (
+              <div
+                key={dayIdx}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => handleDrop(dayIdx, e)}
+                style={{ position: 'relative', borderLeft: '1px solid rgba(255,255,255,0.05)', height: 24 * CAL_ROW_H }}
+              >
+                {/* Lignes horaires */}
+                {Array.from({ length: 24 }, (_, h) => (
+                  <div key={h} style={{ height: CAL_ROW_H, borderTop: '1px solid rgba(255,255,255,0.04)' }} />
+                ))}
+
+                {/* Ligne "maintenant" */}
+                {isToday && (
+                  <div style={{
+                    position: 'absolute', left: 0, right: 0,
+                    top: (now.getHours() + now.getMinutes() / 60) * CAL_ROW_H,
+                    borderTop: '2px solid #f87171', zIndex: 3,
+                  }} />
+                )}
+
+                {/* Blocs de posts */}
+                {byDay[dayIdx].map(p => {
+                  const dt = new Date(p.scheduled_at)
+                  const top = (dt.getHours() + dt.getMinutes() / 60) * CAL_ROW_H
+                  const canDrag = p.status === 'pending'
+                  const typeLabel = p.type === 'story' ? 'Story' : p.type === 'mass_posting' ? 'Mass' : 'Reel'
+                  return (
+                    <div
+                      key={p.id}
+                      draggable={canDrag}
+                      onDragStart={() => { dragId.current = p.id }}
+                      onDragEnd={() => { dragId.current = null }}
+                      onClick={() => onOpen(p)}
+                      title={`${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s)`}
+                      style={{
+                        position: 'absolute', left: 3, right: 3, top: top + 1, minHeight: 34,
+                        background: p.status === 'running' ? 'rgba(234,179,8,0.22)' : 'rgba(99,102,241,0.22)',
+                        border: `1px solid ${p.status === 'running' ? 'rgba(234,179,8,0.5)' : 'rgba(99,102,241,0.55)'}`,
+                        borderRadius: 7, padding: '3px 6px', cursor: canDrag ? 'grab' : 'pointer',
+                        overflow: 'hidden', zIndex: 2,
+                      }}
+                    >
+                      <div style={{ fontSize: 10.5, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                        {dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · {typeLabel}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'rgba(226,232,240,0.75)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {p.phones.length} compte{p.phones.length > 1 ? 's' : ''}{p.caption ? ` · ${p.caption.slice(0, 24)}` : ''}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Scheduler({ user, onNavigate }: Props) {
   const t                         = useT()
   const { role }                  = useOrg()
@@ -696,6 +860,7 @@ export function Scheduler({ user, onNavigate }: Props) {
         }}>
           {([
             { id: 'pending' as TabFilter, label: t('schedulerTabPending'), count: pending.length },
+            { id: 'calendar' as TabFilter, label: 'Calendrier', count: 0 },
             { id: 'history' as TabFilter, label: t('schedulerTabHistory'),  count: history.length },
           ]).map(tabItem => (
             <button
@@ -787,6 +952,12 @@ export function Scheduler({ user, onNavigate }: Props) {
               />
             ))}
           </div>
+        ) : tab === 'calendar' ? (
+          <CalendarWeek
+            posts={pending}
+            onMove={(p, d) => { void doReschedule(p, d) }}
+            onOpen={p => { if (p.status === 'pending' && p.user_id === user.id) setReschedule(p) }}
+          />
         ) : shown.length === 0 ? (
           /* ── Empty state ──────────────────────────────────────────────────────── */
           <div className="sf-card" style={{
