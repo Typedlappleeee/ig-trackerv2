@@ -275,26 +275,6 @@ function toAsciiFallback(text: string): string {
     .trim()
 }
 
-// Détection de langue UI (locale système) : 'fr' | 'en' | 'other' | 'unknown'.
-async function detectPhoneLang(bearer: string, phoneId: string): Promise<'fr' | 'en' | 'other' | 'unknown'> {
-  let loc: string | undefined
-  try {
-    const { output } = await shellExec(
-      bearer, phoneId,
-      'getprop persist.sys.locale; getprop ro.product.locale; settings get system system_locales',
-      { maxRetries: 3 },
-    )
-    loc = output.toLowerCase().split(/[\s,;]+/).map(s => s.trim()).filter(Boolean)
-      .find(t => /^[a-z]{2}([-_][a-z0-9]{2,})?$/.test(t))
-  } catch { /* illisible */ }
-  if (loc) {
-    if (loc.startsWith('fr')) return 'fr'
-    if (loc.startsWith('en')) return 'en'
-    return 'other'
-  }
-  return 'unknown'
-}
-
 // Champs EditText du dump (texte + centre). Sert à cibler le champ « texte du sticker »
 // (celui qui ne contient pas l'URL http…).
 interface EditField { text: string; center: [number, number]; y: number }
@@ -312,51 +292,6 @@ function findEditTextFields(xml: string): EditField[] {
     fields.push({ text: tx ? tx[1] : '', center: [cx, cy], y: +tb[2] })
   }
   return fields.sort((a, b) => a.y - b.y)
-}
-
-// Clique le parcours de consentement Meta « Pay or Consent » (RGPD) + popups
-// courants, en FR et EN. Suppose Instagram ouvrable ; le clic est mémorisé par compte.
-async function dismissConsentPopups(bearer: string, phoneId: string, log: (m: string) => void): Promise<void> {
-  const tap = async (pt: [number, number]) => {
-    await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { maxRetries: 2 }).catch(() => {})
-    await sleep(1400)
-  }
-  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity', { maxRetries: 2 }).catch(() => {})
-  await sleep(3000)
-
-  let acted = false
-  for (let i = 0; i < 10; i++) {
-    const xml = await dumpXml(bearer, phoneId)
-    const low = xml.toLowerCase()
-
-    let pt = findByText(xml, 'Confirm', 'Confirmer') ?? findByTextPartial(xml, 'Confirm', 'Confirmer')
-    if (pt && (low.includes('personalized ads') || low.includes('publicités personnalisées') || low.includes('publicites personnalisees'))) {
-      log('   ✔ Consent: Confirm'); await tap(pt); acted = true; continue
-    }
-    pt = findByText(xml, 'Agree', "J'accepte", 'J’accepte', 'Accepter') ?? findByTextPartial(xml, 'Agree', 'accepte')
-    if (pt && (low.includes('processing your data') || low.includes('agree to meta') || low.includes('consent to meta')
-      || low.includes('traiter tes données') || low.includes('traitement de tes données') || low.includes('traiter tes donnees'))) {
-      log('   ✔ Consent: Agree'); await tap(pt); acted = true; continue
-    }
-    if (low.includes('free of charge with ads') || low.includes('free with ads') || low.includes('subscribe to use')
-      || low.includes('gratuitement avec des publicités') || low.includes('gratuitement avec les publicités') || low.includes("s'abonner")) {
-      const optPt = findByTextPartial(xml, 'free of charge with ads', 'free with ads', 'Use free',
-        'gratuitement avec des publicités', 'gratuitement avec les publicités', 'utiliser gratuitement')
-      if (optPt) { log('   ✔ Consent: option gratuite avec pubs'); await tap(optPt) }
-      const contPt = findByText(xml, 'Continue', 'Continuer') ?? findByTextPartial(xml, 'Continue', 'Continuer')
-      if (contPt) { log('   ✔ Consent: Continue'); await tap(contPt); acted = true; continue }
-    }
-    pt = findByText(xml, 'Get started', 'Commencer') ?? findByTextPartial(xml, 'Get started', 'Commencer')
-    if (pt && (low.includes('data for ads') || low.includes('process your')
-      || low.includes('données pour les publicités') || low.includes('données à des fins publicitaires') || low.includes('donnees'))) {
-      log('   ✔ Consent: Get started'); await tap(pt); acted = true; continue
-    }
-    pt = findByText(xml, 'Not now', 'Not Now', 'Plus tard', 'Skip', 'Later', 'Dismiss', 'Pas maintenant', 'Ignorer')
-    if (pt) { log('   ✔ Popup fermé'); await tap(pt); acted = true; continue }
-
-    break
-  }
-  if (acted) log('   ✅ Popups Instagram traités')
 }
 
 // ── Story posting (server port of postInstagramStory) ────────────────────────
@@ -391,16 +326,6 @@ export async function postStoryServer(
   const sh = sm ? parseInt(sm[2]) : 2340
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
-
-  // ── Langue ──────────────────────────────────────────────────────────────────
-  // Story bilingue (boutons matchés FR ET EN) → pas de forçage de langue. On
-  // détecte juste pour info.
-  const lang = await detectPhoneLang(bearer, phoneId)
-  if (lang !== 'en') log(`🌐 Langue du téléphone détectée: ${lang} (story bilingue FR/EN)`)
-
-  // ── Popups de consentement (RGPD) — bloquent le flow story sinon ────────────
-  log('🧹 Vérification des popups Instagram (consentement pubs)…')
-  await dismissConsentPopups(bearer, phoneId, m => log(`   ${m}`))
 
   // ── 0. Wipe the gallery ────────────────────────────────────────────────────
   // Stale media makes IG's story picker grab the wrong file — clear everything
