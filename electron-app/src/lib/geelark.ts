@@ -1640,54 +1640,51 @@ async function _postInstagramStoryInner(
   await sleep(3500) // extra time for tray to fully load
 
   xml = await dumpXml(bearer, phoneId)
-  const linkSticker =
-    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
-    findByTextPartial(xml, 'link', 'lien') ??
-    findByResourceId(xml, 'link_sticker', 'sticker_link')
-  if (linkSticker) {
-    await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
-  } else {
-    // Search the sticker tray for "link"/"lien" via the built-in search bar
+
+  // Recherche large du sticker « Lien » dans le tiroir (texte OU content-desc).
+  const KW_FIND = ['link', 'lien', 'url', 'add a link', 'ajouter un lien', 'sticker lien', 'link sticker']
+  const findLink = (x: string): [number, number] | null =>
+    findByResourceId(x, 'link_sticker', 'sticker_link', 'link_sticker_id') ??
+    findByTextPartial(x, ...KW_FIND)
+
+  let linkSticker = findLink(xml)
+
+  if (!linkSticker) {
+    // Passe TOUJOURS par la recherche : l'ordre du tiroir change souvent et le
+    // sticker « Lien » n'est plus visible d'emblée sur les IG récents.
     const searchPt =
-      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input') ??
-      findByTextPartial(xml, 'search', 'recherch', 'cherch')
-    if (searchPt) {
-      await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
-      await sleep(900)
-      // Try "lien" first (French IG), then "link"
-      await shellExec(bearer, phoneId, `input text "lien"`)
-      await sleep(2000)
-      let xml2 = await dumpXml(bearer, phoneId)
-      let lk2 =
-        findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
-        findByTextPartial(xml2, 'link', 'lien') ??
-        findByResourceId(xml2, 'link_sticker', 'sticker_link')
-      if (!lk2) {
-        // Clear and try English "link"
-        await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long del to clear
-        await sleep(400)
-        await shellExec(bearer, phoneId, `input text "link"`)
-        await sleep(2000)
-        xml2 = await dumpXml(bearer, phoneId)
-        lk2 =
-          findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
-          findByTextPartial(xml2, 'link', 'lien') ??
-          findByResourceId(xml2, 'link_sticker', 'sticker_link')
-      }
-      if (lk2) {
-        await shellExec(bearer, phoneId, `input tap ${lk2[0]} ${lk2[1]}`)
-      } else {
-        log('   ❌ Sticker lien introuvable après recherche')
-        return { ok: false, error: 'Sticker lien introuvable — le sticker "Lien" est peut-être absent de ce compte Instagram' }
-      }
-    } else {
-      // No search bar found — try tapping top-left of the tray then searching
-      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.5)} ${Math.floor(sh * 0.35)}`)
-      await sleep(600)
-      log('   ❌ Barre de recherche de stickers introuvable')
-      return { ok: false, error: 'Sticker lien introuvable — barre de recherche non détectée' }
+      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input', 'search_edit_text') ??
+      findByTextPartial(xml, 'search', 'recherch', 'cherch') ??
+      [cx, Math.floor(sh * 0.14)] as [number, number]  // fallback : barre en haut du tiroir
+    log(`   🔎 Recherche du sticker via la barre (${searchPt[0]},${searchPt[1]})…`)
+    await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
+    await sleep(1000)
+
+    for (const term of ['link', 'lien', 'url']) {
+      // vide le champ puis tape le terme
+      await shellExec(bearer, phoneId, 'input keyevent 123'); await sleep(120)
+      for (let i = 0; i < 3; i++) { await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67'); await sleep(50) }
+      await shellExec(bearer, phoneId, `input text "${term}"`)
+      await sleep(2200)
+      const xs = await dumpXml(bearer, phoneId)
+      linkSticker = findLink(xs)
+      if (linkSticker) { log(`   ✓ Sticker « Lien » trouvé (recherche « ${term} »)`); break }
+    }
+
+    // Dernier recours : taper le PREMIER résultat sous la barre de recherche.
+    if (!linkSticker) {
+      const xs = await dumpXml(bearer, phoneId)
+      // Liste ce que voit l'écran → diagnostic pour ajuster les sélecteurs.
+      const descs = Array.from(xs.matchAll(/content-desc="([^"]+)"/g)).map(m => m[1]).filter(Boolean).slice(0, 40)
+      log(`   🧭 Diagnostic tiroir stickers — content-desc vus : ${descs.join(' | ').slice(0, 400)}`)
+      // Premier résultat = généralement le sticker Lien, juste sous la barre.
+      const firstResult: [number, number] = [Math.floor(sw * 0.2), Math.floor(sh * 0.28)]
+      log(`   ↪︎ Aucun libellé trouvé — tap du 1er résultat (${firstResult[0]},${firstResult[1]})`)
+      linkSticker = firstResult
     }
   }
+
+  await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
   await sleep(2500)
 
   // ── 5. Type the URL (+ optional custom label) ──────────────────────────────
