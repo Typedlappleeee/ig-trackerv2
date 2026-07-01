@@ -562,6 +562,41 @@ export async function clearInstagramPopupsBatch(
   await Promise.all(Array.from({ length: Math.min(concurrency, phoneIds.length) }, worker))
 }
 
+// Détecte la langue de l'UI (téléphone / Instagram) : 'fr' | 'en' | 'other' | 'unknown'.
+// On lit d'abord la locale système (rapide, sans écran). Si elle est explicite mais
+// n'est ni FR ni EN → 'other' (l'automatisation story ne matcherait pas les boutons →
+// à sauter). Si la locale est illisible, on tente un repli sur les textes d'un dump
+// (indices positifs uniquement, jamais 'other' pour ne pas sauter à tort).
+export async function detectPhoneLang(
+  bearer: string,
+  phoneId: string,
+  screenXml?: string,
+): Promise<'fr' | 'en' | 'other' | 'unknown'> {
+  let loc: string | undefined
+  try {
+    const { output } = await shellExec(
+      bearer, phoneId,
+      'getprop persist.sys.locale; getprop ro.product.locale; settings get system system_locales',
+      { maxRetries: 3 },
+    )
+    loc = output.toLowerCase().split(/[\s,;]+/).map(s => s.trim()).filter(Boolean)
+      .find(t => /^[a-z]{2}([-_][a-z0-9]{2,})?$/.test(t))
+  } catch { /* locale illisible → repli écran */ }
+
+  if (loc) {
+    if (loc.startsWith('fr')) return 'fr'
+    if (loc.startsWith('en')) return 'en'
+    return 'other' // locale explicite d'une autre langue
+  }
+
+  if (screenXml) {
+    const s = screenXml.toLowerCase()
+    if (['galerie', 'votre story', 'rechercher', 'ajouter à la story', 'terminé'].some(w => s.includes(w))) return 'fr'
+    if (['gallery', 'your story', 'add to story', 'allow access'].some(w => s.includes(w))) return 'en'
+  }
+  return 'unknown'
+}
+
 // Find every EditText node in the dump, with its current text and center point.
 // Sorted top-to-bottom (by Y). Used to target the sticker-text field precisely:
 // the URL field contains "http…", the sticker-text field is the other one.
@@ -1063,6 +1098,17 @@ async function _postInstagramStoryInner(
   const sh = sm ? parseInt(sm[2]) : 2340
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
+
+  // ── Détection de langue ────────────────────────────────────────────────────
+  // L'automatisation story cible des boutons FR/EN. Si le téléphone est dans une
+  // autre langue, les taps tomberaient à côté → story cassée. On saute alors le
+  // compte proprement plutôt que de publier n'importe quoi.
+  const lang = await detectPhoneLang(bearer, phoneId)
+  if (lang === 'other') {
+    log('⏭ Langue du téléphone non supportée (ni FR ni EN) — story ignorée')
+    return { ok: false, error: 'Langue non supportée (ni FR ni EN) — story ignorée' }
+  }
+  log(`🌐 Langue: ${lang === 'unknown' ? 'inconnue (on tente FR+EN)' : lang.toUpperCase()}`)
 
   // ── 0. Wipe the gallery ────────────────────────────────────────────────────
   // Stale photos/videos make Instagram's story picker grab the wrong (old) media
