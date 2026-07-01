@@ -180,6 +180,63 @@ async function shellExec(
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
+// ── Nouveau système d'upload média : natif GéeLark ─────────────────────────
+// Au lieu de streamer les octets via le shell (curl / base64 + broadcast
+// MEDIA_SCANNER que Android 13+ IGNORE → fichier jamais indexé → galerie vide),
+// on laisse GéeLark faire le transfert : il télécharge le fichier dans son
+// « material center » puis le dépose sur le téléphone au chemin demandé. C'est
+// le chemin OFFICIEL/supporté pour « uploader un média à poster », donc fiable.
+//   1. /material/temp/upload    { fileUrl, fileType, fileName } -> { fileId }
+//   2. /phone/file/upload       { id, fileId, path }            -> { taskId }
+//   3. /phone/file/uploadStatus { taskId } -> { status: pending|uploading|success|failed }
+// `path` = DOSSIER de destination ; on vise DCIM/Camera pour que la galerie voie
+// le fichier tout de suite. Retourne le chemin complet on-phone en cas de succès.
+export async function geelarkUploadMediaToPhone(
+  bearer: string,
+  phoneId: string,
+  fileUrl: string,
+  opts: { fileType: 1 | 2; fileName: string; dir?: string; log?: (m: string) => void; signal?: AbortSignal },
+): Promise<{ ok: boolean; path?: string; error?: string }> {
+  const log = opts.log ?? (() => {})
+  const dir = opts.dir ?? '/sdcard/DCIM/Camera'
+  try {
+    // 1. Upload dans le material center GéeLark (téléchargement côté GéeLark)
+    const up = await geelarkFetch('POST', '/material/temp/upload',
+      { fileUrl, fileType: opts.fileType, fileName: opts.fileName }, bearer)
+    if (up['code'] !== 0)
+      return { ok: false, error: `material/temp/upload: ${up['msg'] ?? up['code']}` }
+    const fileId = ((up['data'] as Record<string, unknown>)?.['fileId']) as string | undefined
+    if (!fileId) return { ok: false, error: 'material/temp/upload: pas de fileId' }
+    log(`   ☁️ Matériel GéeLark prêt (${fileId})`)
+
+    // 2. Dépose le matériel sur le téléphone au dossier voulu
+    const push = await geelarkFetch('POST', '/phone/file/upload',
+      { id: phoneId, fileId, path: dir }, bearer)
+    if (push['code'] !== 0)
+      return { ok: false, error: `phone/file/upload: ${push['msg'] ?? push['code']}` }
+    const taskId = ((push['data'] as Record<string, unknown>)?.['taskId']) as string | undefined
+    if (!taskId) return { ok: false, error: 'phone/file/upload: pas de taskId' }
+    log(`   📥 Dépôt GéeLark vers ${dir}…`)
+
+    // 3. Poll du statut (~70 s max) — pending|uploading|success|failed
+    for (let i = 0; i < 35; i++) {
+      await sleepOrAbort(2000, opts.signal)
+      const st = await geelarkFetch('POST', '/phone/file/uploadStatus', { taskId }, bearer)
+      const data = (st['data'] as Record<string, unknown>) ?? {}
+      const status = String(data['status'] ?? '')
+      if (status === 'success') {
+        const full = `${dir.replace(/\/$/, '')}/${opts.fileName}`
+        log('   ✅ Média déposé par GéeLark')
+        return { ok: true, path: full }
+      }
+      if (status === 'failed') return { ok: false, error: 'Transfert GéeLark: échec' }
+    }
+    return { ok: false, error: 'Transfert GéeLark: timeout' }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 // ⚠️ NE PAS appeler juste avant un RPA instagramPubReels.
 // `cmd locale set-app-locales` redémarre le process Instagram sur les téléphones
 // Android 13+ où la commande prend effet → l'RPA démarre sur une app en plein
@@ -1122,14 +1179,32 @@ async function _postInstagramStoryInner(
   let imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
   let sz = 0
 
-  // ── Primary transfer: let the PHONE download the image itself ───────────────
+  // ── Primary transfer: GéeLark natif (material center → dépôt sur le tel) ────
+  // Le NOUVEAU système d'upload. GéeLark télécharge l'image et la dépose lui-même
+  // dans DCIM/Camera — pas de curl fragile, pas de base64 corrompu, et surtout
+  // GéeLark enregistre le média (le broadcast MEDIA_SCANNER est ignoré sur
+  // Android 13+). C'est le chemin officiel pour « uploader un média à poster ».
+  if (/^https?:\/\//i.test(config.imageUrl)) {
+    const fname = `sf_story_${imgPath.split('/').pop()}`
+    const glUp = await geelarkUploadMediaToPhone(bearer, phoneId, config.imageUrl, {
+      fileType: 1, fileName: fname, dir: '/sdcard/DCIM/Camera', log,
+    })
+    if (glUp.ok && glUp.path) {
+      const ckg = await shellExec(bearer, phoneId, `wc -c < '${glUp.path}' 2>/dev/null || echo 0`)
+      const szg = parseInt(ckg.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+      if (szg >= 2000) { imgPath = glUp.path; outExt = _imgExt; sz = szg; log(`   ✅ Upload GéeLark: ${szg} octets`) }
+      else log(`   ⚠️ Upload GéeLark: fichier introuvable (${szg} o) — bascule…`)
+    } else {
+      log(`   ⚠️ Upload GéeLark indisponible (${glUp.error}) — bascule…`)
+    }
+  }
+
+  // ── Fallback 1: let the PHONE download the image itself ─────────────────────
   // Exactly like the posting flow (the phone pulls the file from a URL), instead
   // of streaming hundreds of base64 chunks through the shell — which is slow and
-  // corruption-prone, the real cause of failed story uploads. The phone has
-  // internet and the Supabase signed URL is reachable, so curl/wget just works.
-  // Trade-off: this fetches the ORIGINAL image (no 9:16 padding); the padded
-  // base64 path below stays as the fallback when the URL isn't phone-reachable.
-  if (/^https?:\/\//i.test(config.imageUrl)) {
+  // corruption-prone. The phone has internet and the Supabase signed URL is
+  // reachable, so curl/wget just works when the GéeLark upload path is unavailable.
+  if (sz < 2000 && /^https?:\/\//i.test(config.imageUrl)) {
     const dlPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
     const urlEsc = config.imageUrl.replace(/'/g, `'\\''`)
     log('   📤 Téléchargement direct par le téléphone…')
@@ -1174,14 +1249,36 @@ async function _postInstagramStoryInner(
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
   }
 
-  // Force media scanner so Instagram's gallery picker sees the new file.
-  // touch -m sets current timestamp → file appears FIRST in "Recents".
-  // Two scan methods for compatibility across Android versions.
+  // Force la galerie à voir le nouveau fichier. Le broadcast MEDIA_SCANNER est
+  // DÉPRÉCIÉ/ignoré sur Android 13+, donc on l'accompagne d'une insertion DIRECTE
+  // dans le MediaStore via `content insert` (méthode moderne fiable sur ces
+  // téléphones GéeLark rootés). touch -m → timestamp courant → 1er dans "Récents".
+  const _mime = outExt === 'png' ? 'image/png' : 'image/jpeg'
+  const _fname = imgPath.split('/').pop() ?? 'sf_story.jpg'
   await shellExec(bearer, phoneId,
-    `touch -m '${imgPath}' && ` +
-    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath} 2>/dev/null; ` +
-    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null`)
-  await sleep(6000)
+    `touch -m '${imgPath}'; ` +
+    `content insert --uri content://media/external/images/media ` +
+    `--bind _data:s:'${imgPath}' --bind mime_type:s:'${_mime}' ` +
+    `--bind _display_name:s:'${_fname}' --bind title:s:'${_fname}' ` +
+    `--bind is_pending:i:0 2>/dev/null; ` +
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null; true`)
+  await sleep(5000)
+  // Auto-vérification : si le MediaStore ne référence toujours pas le fichier,
+  // on relance un scan de tout le dossier (dernier recours avant l'ouverture IG).
+  const _mck = await shellExec(bearer, phoneId,
+    `content query --uri content://media/external/images/media ` +
+    `--projection _id --where "_data='${imgPath}'" 2>/dev/null | head -c 200`)
+  // `content query` imprime "Row: 0 _id=…" dès qu'une ligne existe → indexé.
+  // Sortie vide (ou "No result found") = pas indexé → on relance un scan.
+  if (!/Row:/i.test(_mck.output)) {
+    log('   🔁 Ré-indexation MediaStore…')
+    await shellExec(bearer, phoneId,
+      `am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard/DCIM 2>/dev/null; ` +
+      `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null; true`)
+    await sleep(3000)
+  } else {
+    log('   ✓ Média indexé dans la galerie')
+  }
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
