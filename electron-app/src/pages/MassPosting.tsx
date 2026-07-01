@@ -649,29 +649,37 @@ export function MassPosting({ user }: MassPostingProps) {
       if (stopRef.current) { log('Run interrompu avant le démarrage des téléphones', 'warn'); return }
       const geelarkIds = phoneList.map(p => p.geelark_id)
       activePhonesRef.current = geelarkIds
-      log(`Démarrage de ${phoneList.length} téléphone(s)…`)
-      const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
-      const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
-      log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
-      // Filet de sécurité serveur : si ScaleFlow se ferme, le watchdog éteint ces
-      // téléphones après 5 min (ils ont été démarrés par l'automation, pas à la main).
-      registerStartedPhones(geelarkIds, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
+      // Mode intervalle (IG) : on démarre et poste UN PAR UN dans la boucle plus bas
+      // (sinon les téléphones en attente sont éteints par le watchdog avant leur tour).
+      const intervalSeq = platform !== 'tiktok' && postingOpts.intervalMode !== 'none' && assignments.length > 1
 
-      // Aucun téléphone démarré → inutile de continuer : abort + refund total
-      if (started === 0) {
-        run.abort()
-        const cur = getMassPostingState().taskStatuses
-        for (const p of phoneList) {
-          if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: 'démarrage échoué' })
+      if (!intervalSeq) {
+        log(`Démarrage de ${phoneList.length} téléphone(s)…`)
+        const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
+        const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
+        log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
+        // Filet de sécurité serveur : si ScaleFlow se ferme, le watchdog éteint ces
+        // téléphones après 5 min (ils ont été démarrés par l'automation, pas à la main).
+        registerStartedPhones(geelarkIds, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
+
+        // Aucun téléphone démarré → inutile de continuer : abort + refund total
+        if (started === 0) {
+          run.abort()
+          const cur = getMassPostingState().taskStatuses
+          for (const p of phoneList) {
+            if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: 'démarrage échoué' })
+          }
+          log('Aucun téléphone démarré — run annulé', 'error')
+          return
         }
-        log('Aucun téléphone démarré — run annulé', 'error')
-        return
-      }
 
-      if (stopRef.current) { log('Run interrompu avant le boot', 'warn'); return }
-      log('Attente 30s (boot)…')
-      await new Promise(r => setTimeout(r, 30000))
-      if (stopRef.current) { log('Run interrompu après le boot', 'warn'); return }
+        if (stopRef.current) { log('Run interrompu avant le boot', 'warn'); return }
+        log('Attente 30s (boot)…')
+        await new Promise(r => setTimeout(r, 30000))
+        if (stopRef.current) { log('Run interrompu après le boot', 'warn'); return }
+      } else {
+        log(`Mode intervalle : les ${phoneList.length} téléphones seront démarrés et postés un par un.`, 'info')
+      }
 
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
       log('Creating post tasks…')
@@ -739,6 +747,14 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       } else {
         // ── Instagram : une tâche RPA instagramPubReels par téléphone ──
+        // Mode intervalle → on poste UN PAR UN : on attend le délai, on démarre le
+        // téléphone, on le boot, puis on crée la tâche (scheduleAt = maintenant).
+        const waitInterruptible = async (ms: number) => {
+          const end = Date.now() + ms
+          while (Date.now() < end && !stopRef.current) {
+            await new Promise(r => setTimeout(r, Math.min(2000, Math.max(0, end - Date.now()))))
+          }
+        }
         for (let ai = 0; ai < assignments.length; ai++) {
           if (stopRef.current) { log('Création des tâches interrompue (stop)', 'warn'); break }
           const asgn = assignments[ai]
@@ -748,11 +764,32 @@ export function MassPosting({ user }: MassPostingProps) {
             setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
             continue
           }
+          // Espacement séquentiel entre comptes (mode intervalle).
+          if (intervalSeq && ai > 0) {
+            const gapSec = Math.max(0, scheduleTimes[ai] - scheduleTimes[ai - 1])
+            if (gapSec > 0) {
+              log(`⏳ Intervalle : attente ${Math.round(gapSec / 60)} min avant ${asgn.phone.phone_name}…`, 'info')
+              await waitInterruptible(gapSec * 1000)
+              if (stopRef.current) { log('Intervalle interrompu (stop)', 'warn'); break }
+            }
+          }
+          // Mode intervalle : on démarre CE téléphone maintenant (juste avant son post)
+          // et on attend son boot, pour ne pas le laisser tourner (ni le faire éteindre)
+          // pendant les intervalles précédents.
+          if (intervalSeq) {
+            log(`▶ Démarrage de ${asgn.phone.phone_name}…`, 'info')
+            await geelark(bearer, '/phone/start', { ids: [asgn.phone.geelark_id] }).catch(() => {})
+            registerStartedPhones([asgn.phone.geelark_id], { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
+            log('Attente 30s (boot)…')
+            await waitInterruptible(30000)
+            if (stopRef.current) { log('Interrompu pendant le boot (stop)', 'warn'); break }
+          }
           setPhoneStatus(asgn.phone.id, { status: 'posting' })
           postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
           const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
             id:          asgn.phone.geelark_id,
-            scheduleAt:  scheduleTimes[ai],
+            // En intervalle : maintenant (on est déjà au bon moment). Sinon : batch.
+            scheduleAt:  intervalSeq ? Math.floor(Date.now() / 1000) : scheduleTimes[ai],
             description: caption,
             video:       [token],
             ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
