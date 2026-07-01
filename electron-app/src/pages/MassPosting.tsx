@@ -9,7 +9,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, postVideoStory } from '@/lib/geelark'
+import { takeScreenshot } from '@/lib/geelark'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
@@ -649,37 +649,29 @@ export function MassPosting({ user }: MassPostingProps) {
       if (stopRef.current) { log('Run interrompu avant le démarrage des téléphones', 'warn'); return }
       const geelarkIds = phoneList.map(p => p.geelark_id)
       activePhonesRef.current = geelarkIds
-      // Mode intervalle (IG) : on démarre et poste UN PAR UN dans la boucle plus bas
-      // (sinon les téléphones en attente sont éteints par le watchdog avant leur tour).
-      const intervalSeq = platform !== 'tiktok' && postingOpts.intervalMode !== 'none' && assignments.length > 1
+      log(`Démarrage de ${phoneList.length} téléphone(s)…`)
+      const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
+      const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
+      log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
+      // Filet de sécurité serveur : si ScaleFlow se ferme, le watchdog éteint ces
+      // téléphones après 5 min (ils ont été démarrés par l'automation, pas à la main).
+      registerStartedPhones(geelarkIds, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
 
-      if (!intervalSeq) {
-        log(`Démarrage de ${phoneList.length} téléphone(s)…`)
-        const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
-        const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
-        log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
-        // Filet de sécurité serveur : si ScaleFlow se ferme, le watchdog éteint ces
-        // téléphones après 5 min (ils ont été démarrés par l'automation, pas à la main).
-        registerStartedPhones(geelarkIds, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
-
-        // Aucun téléphone démarré → inutile de continuer : abort + refund total
-        if (started === 0) {
-          run.abort()
-          const cur = getMassPostingState().taskStatuses
-          for (const p of phoneList) {
-            if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: 'démarrage échoué' })
-          }
-          log('Aucun téléphone démarré — run annulé', 'error')
-          return
+      // Aucun téléphone démarré → inutile de continuer : abort + refund total
+      if (started === 0) {
+        run.abort()
+        const cur = getMassPostingState().taskStatuses
+        for (const p of phoneList) {
+          if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: 'démarrage échoué' })
         }
-
-        if (stopRef.current) { log('Run interrompu avant le boot', 'warn'); return }
-        log('Attente 30s (boot)…')
-        await new Promise(r => setTimeout(r, 30000))
-        if (stopRef.current) { log('Run interrompu après le boot', 'warn'); return }
-      } else {
-        log(`Mode intervalle : les ${phoneList.length} téléphones seront démarrés et postés un par un.`, 'info')
+        log('Aucun téléphone démarré — run annulé', 'error')
+        return
       }
+
+      if (stopRef.current) { log('Run interrompu avant le boot', 'warn'); return }
+      log('Attente 30s (boot)…')
+      await new Promise(r => setTimeout(r, 30000))
+      if (stopRef.current) { log('Run interrompu après le boot', 'warn'); return }
 
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
       log('Creating post tasks…')
@@ -738,7 +730,7 @@ export function MassPosting({ user }: MassPostingProps) {
               setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
               setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
               log(`  Tâche TikTok créée pour ${asgn.phone.phone_name}`, 'ok')
-              if (!postingOpts.alsoStory) armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
+              armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
             })
           } else {
             log(`  TikTok /task/add: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
@@ -747,14 +739,6 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       } else {
         // ── Instagram : une tâche RPA instagramPubReels par téléphone ──
-        // Mode intervalle → on poste UN PAR UN : on attend le délai, on démarre le
-        // téléphone, on le boot, puis on crée la tâche (scheduleAt = maintenant).
-        const waitInterruptible = async (ms: number) => {
-          const end = Date.now() + ms
-          while (Date.now() < end && !stopRef.current) {
-            await new Promise(r => setTimeout(r, Math.min(2000, Math.max(0, end - Date.now()))))
-          }
-        }
         for (let ai = 0; ai < assignments.length; ai++) {
           if (stopRef.current) { log('Création des tâches interrompue (stop)', 'warn'); break }
           const asgn = assignments[ai]
@@ -764,32 +748,11 @@ export function MassPosting({ user }: MassPostingProps) {
             setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
             continue
           }
-          // Espacement séquentiel entre comptes (mode intervalle).
-          if (intervalSeq && ai > 0) {
-            const gapSec = Math.max(0, scheduleTimes[ai] - scheduleTimes[ai - 1])
-            if (gapSec > 0) {
-              log(`⏳ Intervalle : attente ${Math.round(gapSec / 60)} min avant ${asgn.phone.phone_name}…`, 'info')
-              await waitInterruptible(gapSec * 1000)
-              if (stopRef.current) { log('Intervalle interrompu (stop)', 'warn'); break }
-            }
-          }
-          // Mode intervalle : on démarre CE téléphone maintenant (juste avant son post)
-          // et on attend son boot, pour ne pas le laisser tourner (ni le faire éteindre)
-          // pendant les intervalles précédents.
-          if (intervalSeq) {
-            log(`▶ Démarrage de ${asgn.phone.phone_name}…`, 'info')
-            await geelark(bearer, '/phone/start', { ids: [asgn.phone.geelark_id] }).catch(() => {})
-            registerStartedPhones([asgn.phone.geelark_id], { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
-            log('Attente 30s (boot)…')
-            await waitInterruptible(30000)
-            if (stopRef.current) { log('Interrompu pendant le boot (stop)', 'warn'); break }
-          }
           setPhoneStatus(asgn.phone.id, { status: 'posting' })
           postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
           const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
             id:          asgn.phone.geelark_id,
-            // En intervalle : maintenant (on est déjà au bon moment). Sinon : batch.
-            scheduleAt:  intervalSeq ? Math.floor(Date.now() / 1000) : scheduleTimes[ai],
+            scheduleAt:  scheduleTimes[ai],
             description: caption,
             video:       [token],
             ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
@@ -801,7 +764,7 @@ export function MassPosting({ user }: MassPostingProps) {
             setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
             setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
             log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
-            if (!postingOpts.alsoStory) armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
+            armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
           } else {
             log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
             setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
@@ -904,23 +867,6 @@ export function MassPosting({ user }: MassPostingProps) {
                   status: status === 3 ? 'done' : 'error',
                   detail: item['failDesc'] as string | undefined,
                 })
-                // « Aussi en story » : le Reel a réussi → on publie la même vidéo
-                // en story sur ce téléphone (encore allumé) avant de l'éteindre.
-                if (status === 3 && postingOpts.alsoStory) {
-                  try {
-                    const asgn = assignments.find(a => a.phone.geelark_id === phone.geelark_id)
-                    const vurl = asgn?.video ? await resolveVideoPath(asgn.video) : null
-                    if (vurl) {
-                      log(`  🎬 Story vidéo sur ${phone.phone_name}…`, 'info')
-                      const sres = await postVideoStory(bearer, phone.geelark_id, { videoUrl: vurl }, m => log(`   ${m}`, 'info'))
-                      log(sres.ok ? `  ✅ Story publiée : ${phone.phone_name}` : `  ⚠ Story échouée (${phone.phone_name}): ${sres.error}`, sres.ok ? 'ok' : 'warn')
-                    } else {
-                      log(`  ⚠ Story ignorée (${phone.phone_name}) : URL vidéo introuvable`, 'warn')
-                    }
-                  } catch (e) {
-                    log(`  ⚠ Story (${phone.phone_name}): ${e instanceof Error ? e.message : String(e)}`, 'warn')
-                  }
-                }
                 // Power off this phone immediately now that its task is finished
                 geelark(bearer, '/phone/stop', { ids: [phone.geelark_id] })
                   .then(() => log(`  ${phone.phone_name} éteint`, 'ok'))
