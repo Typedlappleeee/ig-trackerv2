@@ -515,16 +515,23 @@ export default function StoryLink({ user }: { user: User }) {
       }
     }
 
-    const CONCURRENCY = 3
+    // Concurrence volontairement BASSE : chaque story = des dizaines d'appels ADB
+    // sur ~2 min. Au-delà de 2 téléphones en parallèle, on sature l'API GeeLark
+    // (200 req/min) → échecs. On décale aussi le démarrage de chaque worker pour
+    // que les téléphones ne bootent pas tous au même instant.
+    const CONCURRENCY = 2
     const queue = [...assignments]
     let okCount = 0
-    const worker = async () => {
+    const worker = async (staggerMs: number) => {
+      if (staggerMs > 0) await new Promise(r => setTimeout(r, staggerMs))
       while (queue.length && !abortRef.current) {
         const asgn = queue.shift()!
         okCount += await runOne(asgn)
       }
     }
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, assignments.length) }, worker))
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, assignments.length) }, (_, i) => worker(i * 6000)),
+    )
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
 
