@@ -1518,21 +1518,11 @@ async function _postInstagramStoryInner(
   }
 
   // Force media scanner so Instagram's gallery picker sees the new file.
-  // Sur Android 13/15 le broadcast MEDIA_SCANNER_SCAN_FILE est IGNORÉ (déprécié)
-  // → la galerie « Recents » reste vide. On combine plusieurs méthodes :
-  //   1. touch -m       → timestamp frais (apparaît en 1er dans Recents)
-  //   2. am broadcast   → marche sur Android ≤ 12
-  //   3. content insert → lie le fichier existant au MediaStore (Android récent)
-  //   4. su + scan      → si le téléphone est rooté (cas fréquent GeeLark)
-  const nowSec = Math.floor(Date.now() / 1000)
-  await shellExec(bearer, phoneId, `touch -m '${imgPath}' 2>/dev/null; true`)
+  // touch -m → timestamp frais (apparaît en 1er dans Recents) + broadcast scan.
   await shellExec(bearer, phoneId,
+    `touch -m '${imgPath}' && ` +
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath} 2>/dev/null; ` +
-    `content insert --uri content://media/external/images/media ` +
-    `--bind _data:s:${imgPath} --bind mime_type:s:image/jpeg ` +
-    `--bind _display_name:s:sf_story.${outExt} --bind date_added:i:${nowSec} --bind date_modified:i:${nowSec} 2>/dev/null; ` +
-    `su -c 'am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}' 2>/dev/null; ` +
-    `su -c 'content call --uri content://media --method scan_volume --arg external_primary' 2>/dev/null; true`)
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null`)
   await sleep(6000)
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
