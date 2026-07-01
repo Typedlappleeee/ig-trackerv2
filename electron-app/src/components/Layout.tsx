@@ -58,7 +58,7 @@ export type Page =
   | 'phones'
   | 'stats'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
-  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof'
+  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof' | 'videostudio'
   | 'community' | 'support'
   | 'settings' | 'licences'
   | 'scaleia'
@@ -105,10 +105,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Studio vidéo',
     defaultOpen: true,
     items: [
-      { id: 'remix',       label: 'navRemix',        icon: '🔀' },
-      { id: 'spoof',       label: 'navSpoof',        icon: '🛡️' },
-      { id: 'subtitles',   label: 'navSubtitles',    icon: '💬' },
-      { id: 'mixer',       label: 'navMixer',        icon: '🎞️' },
+      { id: 'videostudio', label: 'Studio vidéo',    icon: '🎬' },
     ],
   },
 ]
@@ -167,6 +164,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   subtitles:       'chat',
   montage:         'scissors',
   remix:           'refresh',
+  videostudio:     'video',
   repurpose:       'zap',
   mixer:           'edit',
   spoof:           'shield',
@@ -685,7 +683,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   // Outils de création de contenu — réservés à partir de Pro (Standard n'y a pas
   // accès). Sur Pro et Organisation, ils sont disponibles (et gratuits en crédits).
-  const CONTENT_CREATION_TABS = new Set<Page>(['remix', 'spoof', 'subtitles', 'mixer', 'montage', 'aitools'])
+  const CONTENT_CREATION_TABS = new Set<Page>(['remix', 'spoof', 'subtitles', 'mixer', 'montage', 'aitools', 'videostudio'])
   const planNow = effectivePlan(license)
   const hasContentCreation = effectiveSuperAdmin || planNow === 'pro' || planNow === 'organisation'
 
@@ -750,6 +748,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     repurpose:   t('navRepurpose'),
     mixer:       t('navMixer'),
     subtitles:   t('navSubtitles'),
+    videostudio: 'Studio vidéo',
     textcopy:    t('pageTextcopy'),
     community:   t('pageCommunity'),
     support:     t('pageSupport'),
@@ -1556,7 +1555,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           display: 'flex', alignItems: 'stretch',
         }}>
           {([
-            { id: 'remix',    iconKey: 'refresh',  label: 'Remix'    },
+            { id: 'videostudio', iconKey: 'video', label: 'Studio' },
             { id: 'bank',     iconKey: 'video',    label: 'Bank'     },
             { id: 'phones',   iconKey: 'phone',    label: 'Phones'   },
             { id: 'scheduler',iconKey: 'calendar', label: 'Planif.'  },

@@ -578,6 +578,7 @@ const Stats          = lazyWithReload(() => import('@/pages/Stats').then(m => ({
 const BankHub        = lazyWithReload(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
 const Montage        = lazyWithReload(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
 const Remix          = lazyWithReload(() => import('@/pages/Remix').then(m => ({ default: m.Remix })))
+const VideoStudio    = lazyWithReload(() => import('@/pages/VideoStudio').then(m => ({ default: m.VideoStudio })))
 const AiTools        = lazyWithReload(() => import('@/pages/AiTools').then(m => ({ default: m.AiTools })))
 const Settings       = lazyWithReload(() => import('@/pages/Settings').then(m => ({ default: m.Settings })))
 
@@ -882,6 +883,7 @@ function AppContent({ user }: { user: User }) {
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
+      case 'videostudio':  return <VideoStudio onNavigate={handleNavigate} />
       case 'repurpose':    return <VideoRepurpose user={user} />
       case 'captionbank':  return <BankHub      user={user} initialTab="captions" />
       case 'mixer':        return <Mixer        user={user} />
