@@ -3,6 +3,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { canManageOrg } from '@/lib/permissions'
+import { createScheduledPost } from '@/lib/schedulerService'
+import { useToast } from '@/components/Toast'
 import { fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import {
@@ -30,6 +32,12 @@ interface DetailView {
   dateIso:   string
   results:   PhoneResult[]
   fallbackNames: string[]
+  kind:      'scheduled' | 'run'
+  status?:   string
+  caption?:  string
+  videosCount?: number
+  accountsCount?: number
+  createdIso?:  string
 }
 
 type HistoryItem =
@@ -81,6 +89,9 @@ const PAGE_SIZE = 30
 
 export function History({ user }: { user: User }) {
   const { currentOrg, role } = useOrg()
+  const toast = useToast()
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; post: ScheduledPost } | null>(null)
+  const [duplicating, setDuplicating] = useState(false)
   const [items,     setItems]   = useState<HistoryItem[]>([])
   const [loading,   setLoading] = useState(true)
   const [hasMore,   setHasMore] = useState(false)
@@ -141,6 +152,35 @@ export function History({ user }: { user: User }) {
     const next = page + 1
     setPage(next)
     load(next, false)
+  }
+
+  // Duplique un post programmé : recrée la même config (téléphones, vidéos,
+  // légende) dans un NOUVEAU post en attente, programmé dans ~1h.
+  async function duplicatePost(post: ScheduledPost) {
+    setDuplicating(true)
+    try {
+      await createScheduledPost({
+        userId:        user.id,
+        orgId:         post.org_id,
+        createdByName: post.created_by_name || (user.email ?? 'Moi'),
+        type:          post.type,
+        scheduledAt:   new Date(Date.now() + 60 * 60 * 1000),
+        phones:        post.phones,
+        videos:        post.videos,
+        caption:       post.caption,
+        delayMinutes:  post.delay_minutes,
+        mode:          post.mode,
+        bearerToken:   '',
+        reelsTrial:    post.reels_trial,
+        platform:      post.platform,
+      })
+      toast.show({ title: 'Post dupliqué ✓', body: 'Nouveau post programmé dans ~1h — ajuste l\'heure dans Programmation (Calendrier).', kind: 'ok' })
+    } catch (e) {
+      toast.show({ title: 'Duplication échouée', body: e instanceof Error ? e.message : String(e), kind: 'error' })
+    } finally {
+      setDuplicating(false)
+      setCtxMenu(null)
+    }
   }
 
   async function clearHistory() {
@@ -286,9 +326,18 @@ export function History({ user }: { user: User }) {
                 dateIso: post.executed_at ?? post.created_at,
                 results: post.result?.phone_results ?? [],
                 fallbackNames: phones.map(p => p.ig_username ?? p.phone_name),
+                kind: 'scheduled',
+                status: post.status,
+                caption: post.caption ?? undefined,
+                videosCount: Array.isArray(post.videos) ? post.videos.length : undefined,
+                accountsCount: phones.length,
+                createdIso: post.created_at,
               })
               return (
-                <div key={`sp-${post.id}`} onClick={openScheduled} style={{
+                <div key={`sp-${post.id}`}
+                  onClick={openScheduled}
+                  onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, post }) }}
+                  style={{
                   padding: '14px 20px',
                   borderBottom: i < items.length - 1 ? `1px solid ${HAIR}` : 'none',
                   display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
@@ -321,6 +370,8 @@ export function History({ user }: { user: User }) {
               const runResults = run.phone_results ?? []
               const openRun = () => setDetail({
                 typeLabel, dateIso: run.created_at, results: runResults, fallbackNames: [],
+                kind: 'run', status: run.err_count === 0 ? 'done' : 'failed',
+                accountsCount: run.total,
               })
               return (
                 <div key={`pr-${run.id}`} onClick={openRun} style={{
@@ -372,7 +423,47 @@ export function History({ user }: { user: User }) {
       </div>
 
       {detail && <PostDetailModal view={detail} onClose={() => setDetail(null)} />}
+
+      {/* Menu contextuel (clic droit) — dupliquer */}
+      {ctxMenu && (
+        <>
+          <div onClick={() => setCtxMenu(null)} onContextMenu={e => { e.preventDefault(); setCtxMenu(null) }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1500 }} />
+          <div style={{
+            position: 'fixed', top: Math.min(ctxMenu.y, window.innerHeight - 60), left: Math.min(ctxMenu.x, window.innerWidth - 190),
+            zIndex: 1501, background: BG2, border: `1px solid ${HAIR}`, borderRadius: 10,
+            padding: 4, minWidth: 180, boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+          }}>
+            <button
+              onClick={() => duplicatePost(ctxMenu.post)}
+              disabled={duplicating}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                padding: '9px 12px', borderRadius: 7, background: 'transparent', border: 'none',
+                color: IVORY, fontSize: 13, fontFamily: SANS, cursor: duplicating ? 'default' : 'pointer',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              {duplicating ? 'Duplication…' : 'Dupliquer ce post'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
+  )
+}
+
+function Chip({ label }: { label: string }) {
+  return (
+    <span style={{
+      fontSize: 11.5, fontWeight: 600, color: MUTED, fontFamily: SANS,
+      background: 'rgba(255,255,255,0.04)', border: `1px solid ${HAIR}`,
+      borderRadius: 20, padding: '3px 10px',
+    }}>{label}</span>
   )
 }
 
@@ -411,10 +502,25 @@ function PostDetailModal({ view, onClose }: { view: DetailView; onClose: () => v
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: IVORY, fontFamily: SANS }}>Détail par compte</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: MUTED, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
-        <p style={{ margin: '0 0 16px', fontSize: 12.5, color: MUTED, fontFamily: SANS }}>
-          {typeLabel} · {fmtScheduledTime(view.dateIso)}
+        <p style={{ margin: '0 0 12px', fontSize: 12.5, color: MUTED, fontFamily: SANS }}>
+          {typeLabel} · {view.kind === 'scheduled' ? 'Programmé' : 'Direct'} · {fmtScheduledTime(view.dateIso)}
           {results.length > 0 && <> · <span style={{ color: OK }}>{okList.length} réussi{okList.length > 1 ? 's' : ''}</span> · <span style={{ color: ERR }}>{koList.length} échoué{koList.length > 1 ? 's' : ''}</span></>}
         </p>
+
+        {/* Infos du post */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          {view.accountsCount != null && <Chip label={`${view.accountsCount} compte${view.accountsCount > 1 ? 's' : ''}`} />}
+          {view.videosCount != null && <Chip label={`${view.videosCount} vidéo${view.videosCount > 1 ? 's' : ''}`} />}
+          {view.status && <Chip label={view.status === 'done' ? 'Publié' : view.status === 'failed' ? 'Échec' : view.status === 'cancelled' ? 'Annulé' : view.status} />}
+        </div>
+        {view.caption && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: FAINT, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Légende</div>
+            <div style={{ fontSize: 12.5, color: IVORY, fontFamily: SANS, lineHeight: 1.5, whiteSpace: 'pre-wrap', background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '8px 10px' }}>
+              {view.caption}
+            </div>
+          </div>
+        )}
 
         {results.length === 0 ? (
           <div style={{ fontSize: 13, color: MUTED, fontFamily: SANS, lineHeight: 1.6 }}>
