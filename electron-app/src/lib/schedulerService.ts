@@ -40,10 +40,30 @@ export interface ScheduledPost {
   reels_trial:     boolean
   recur_hours:     number | null
   platform?:       'instagram' | 'tiktok'
-  result:          { logs: string[] } | null
+  result:          { logs?: string[]; phone_results?: PhoneResult[] } | null
   error_msg:       string | null
   created_at:      string
   executed_at:     string | null
+}
+
+// Résultat par téléphone d'une exécution — permet d'afficher dans l'historique
+// quels comptes ont marché / échoué en cliquant sur une tâche.
+export interface PhoneResult {
+  name:   string
+  ok:     boolean
+  error?: string
+}
+
+// Fusionne les résultats par téléphone dans scheduled_posts.result (garde les logs).
+export async function persistPhoneResults(postId: string, phoneResults: PhoneResult[]): Promise<void> {
+  if (!phoneResults.length) return
+  try {
+    const { data } = await supabase.from('scheduled_posts').select('result').eq('id', postId).maybeSingle()
+    const prev = (data?.result ?? {}) as Record<string, unknown>
+    await supabase.from('scheduled_posts')
+      .update({ result: { ...prev, phone_results: phoneResults } })
+      .eq('id', postId)
+  } catch { /* best-effort */ }
 }
 
 export interface CreateScheduledPostInput {
@@ -215,9 +235,15 @@ export async function claimScheduledPost(id: string): Promise<boolean> {
 export async function finishScheduledPost(
   id: string, success: boolean, logs: string[], errorMsg?: string
 ): Promise<void> {
+  // Préserve les résultats par téléphone déjà écrits (persistPhoneResults).
+  let phoneResults: PhoneResult[] | undefined
+  try {
+    const { data } = await supabase.from('scheduled_posts').select('result').eq('id', id).maybeSingle()
+    phoneResults = (data?.result as { phone_results?: PhoneResult[] } | null)?.phone_results
+  } catch { /* ignore */ }
   await supabase.from('scheduled_posts').update({
     status:    success ? 'done' : 'failed',
-    result:    { logs },
+    result:    { logs, ...(phoneResults ? { phone_results: phoneResults } : {}) },
     error_msg: errorMsg ?? null,
   }).eq('id', id)
 }
@@ -250,11 +276,13 @@ async function executeScheduledStory(
     : post.phones) as ScheduledPhoneRecord[]
 
   let okCount = 0
+  const phoneResults: PhoneResult[] = []
   for (let i = 0; i < phones.length; i++) {
     const phone = phones[i]
     const name = phone.ig_username ?? phone.phone_name
     if (!phone.story_photo || !phone.story_link) {
       onLog(`⚠ ${name} : assignation incomplète (photo ou lien manquant) — ignoré`)
+      phoneResults.push({ name, ok: false, error: 'Assignation incomplète (photo ou lien manquant)' })
       continue
     }
     if (i > 0 && post.delay_minutes > 0) {
@@ -268,14 +296,17 @@ async function executeScheduledStory(
         { imageUrl: phone.story_photo, linkUrl: phone.story_link, linkText: phone.story_text || undefined },
         m => onLog(`   ${m}`),
       )
-      if (res.ok) { okCount++; onLog(`✅ Story publiée : ${name}`) }
-      else onLog(`❌ Échec (${name}) : ${res.error ?? 'inconnu'}`)
+      if (res.ok) { okCount++; onLog(`✅ Story publiée : ${name}`); phoneResults.push({ name, ok: true }) }
+      else { onLog(`❌ Échec (${name}) : ${res.error ?? 'inconnu'}`); phoneResults.push({ name, ok: false, error: res.error ?? 'inconnu' }) }
     } catch (err) {
-      onLog(`❌ Erreur (${name}) : ${err instanceof Error ? err.message : String(err)}`)
+      const msg = err instanceof Error ? err.message : String(err)
+      onLog(`❌ Erreur (${name}) : ${msg}`)
+      phoneResults.push({ name, ok: false, error: msg })
     } finally {
       await stopPhone(bearer, phone.geelark_id).catch(() => {})
     }
   }
+  await persistPhoneResults(post.id, phoneResults)
   onLog(okCount > 0
     ? `✅ Terminé : ${okCount}/${phones.length} story(s) publiée(s)`
     : '❌ Aucune story publiée')
@@ -361,6 +392,10 @@ async function executeScheduledPostInner(
     const taskIds: string[] = []
     let failedCount = 0
     const isTikTok = post.platform === 'tiktok'
+    // Résultats par téléphone (historique cliquable). taskPhoneName : taskId → compte.
+    const phoneResults: PhoneResult[] = []
+    const taskPhoneName = new Map<string, string>()
+    const nameOf = (p: ScheduledPhoneRecord) => p.ig_username ?? p.phone_name
 
     if (isTikTok) {
       // TikTok : un seul /task/add (taskType:1) qui batch tous les comptes.
@@ -373,9 +408,11 @@ async function executeScheduledPostInner(
       const ids: string[] = res?.data?.taskIds ?? []
       if (res.code === 0 && Array.isArray(ids) && ids.length > 0) {
         taskIds.push(...ids)
+        ids.forEach((tid, idx) => { if (phones[idx]) taskPhoneName.set(tid, nameOf(phones[idx])) })
         onLog(`✅ ${ids.length} tâche(s) TikTok créée(s)`)
       } else {
         failedCount = phones.length
+        phones.forEach(p => phoneResults.push({ name: nameOf(p), ok: false, error: `Tâche refusée: ${res.msg ?? res.code}` }))
         onLog(`❌ TikTok /task/add refusé: code=${res.code} msg=${res.msg ?? '?'}`)
       }
     } else {
@@ -395,14 +432,15 @@ async function executeScheduledPostInner(
           video:       [videos[videoIdx].token],
           ...(reels_trial ? { shareType: 2 } : {}),
         }) as any
-        onLog(`📦 Réponse GeelarK (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'} data=${JSON.stringify(res.data ?? null)}`)
+        onLog(`📦 Réponse GeelarK (${nameOf(phone)}): code=${res.code} msg=${res.msg ?? '?'} data=${JSON.stringify(res.data ?? null)}`)
         const taskId = res.data?.id ?? res.data?.taskId ?? res.taskId ?? res.id ?? null
         if (res.code === 0) {
-          if (taskId) taskIds.push(taskId)
-          onLog(`✅ Tâche créée : ${phone.ig_username ?? phone.phone_name}`)
+          if (taskId) { taskIds.push(taskId); taskPhoneName.set(taskId, nameOf(phone)) }
+          onLog(`✅ Tâche créée : ${nameOf(phone)}`)
         } else {
           failedCount++
-          onLog(`❌ Tâche refusée (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'}`)
+          phoneResults.push({ name: nameOf(phone), ok: false, error: `Tâche refusée: ${res.msg ?? res.code}` })
+          onLog(`❌ Tâche refusée (${nameOf(phone)}): code=${res.code} msg=${res.msg ?? '?'}`)
         }
       }
     }
@@ -429,13 +467,19 @@ async function executeScheduledPostInner(
         for (const it of items) {
           const tid = it.id ?? it.taskId
           const st  = Number(it.status)
-          if (st === 3) { pollSuccessCount++; onLog(`✅ Succès : ${tid}`); pending.delete(tid) }
-          else if (st === 4) { pollFailCount++; onLog(`❌ Échec GeelarK : ${it.failDesc ?? tid}`); pending.delete(tid) }
-          else if ([7, 8].includes(st)) { pollFailCount++; onLog(`🚫 Annulé : ${tid}`); pending.delete(tid) }
+          const nm  = taskPhoneName.get(tid) ?? tid
+          if (st === 3) { pollSuccessCount++; onLog(`✅ Succès : ${nm}`); pending.delete(tid); phoneResults.push({ name: nm, ok: true }) }
+          else if (st === 4) { pollFailCount++; onLog(`❌ Échec GeelarK : ${nm} (${it.failDesc ?? '?'})`); pending.delete(tid); phoneResults.push({ name: nm, ok: false, error: it.failDesc ?? 'Échec GeeLark' }) }
+          else if ([7, 8].includes(st)) { pollFailCount++; onLog(`🚫 Annulé : ${nm}`); pending.delete(tid); phoneResults.push({ name: nm, ok: false, error: 'Annulé' }) }
         }
+      }
+      // Tâches non confirmées avant le timeout → marquées incertaines (échec).
+      for (const tid of pending) {
+        phoneResults.push({ name: taskPhoneName.get(tid) ?? tid, ok: false, error: 'Non confirmé (timeout)' })
       }
       if (pending.size > 0) onLog(`⏳ ${pending.size} tâche(s) toujours en attente après timeout`)
     }
+    await persistPhoneResults(post.id, phoneResults)
 
     // 4bis. Marge d'upload — l'RPA passe « done » dès qu'il a appuyé sur Partager,
     // mais Instagram continue d'uploader le reel en arrière-plan. Sans cette pause,
