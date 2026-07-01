@@ -487,7 +487,7 @@ export async function clearInstagramPopups(
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
-): Promise<boolean> {
+): Promise<'en' | 'fr' | 'unknown'> {
   const tap = async (pt: [number, number]) => {
     await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { maxRetries: 2, signal }).catch(() => {})
     await sleepOrAbort(1400, signal)
@@ -503,7 +503,7 @@ export async function clearInstagramPopups(
 
   let acted = false
   for (let i = 0; i < 10; i++) {
-    if (signal?.aborted) return acted
+    if (signal?.aborted) return igLang
     const xml = await dumpXml(bearer, phoneId, log)
     const low = xml.toLowerCase()
 
@@ -542,28 +542,35 @@ export async function clearInstagramPopups(
   // État propre pour que l'RPA relance Instagram à froid.
   await shellExec(bearer, phoneId, 'am force-stop com.instagram.android', { maxRetries: 2, signal }).catch(() => {})
   await sleepOrAbort(1500, signal)
-  return acted
+  return igLang
 }
 
 // Traite les popups sur plusieurs téléphones en parallèle avec une concurrence
 // bornée (respecte le rate-limit GéeLark). Les erreurs par téléphone sont avalées.
+// Retourne un résumé des langues Instagram détectées (visible dans les logs).
 export async function clearInstagramPopupsBatch(
   bearer: string,
   phoneIds: string[],
   log?: (m: string) => void,
   opts?: { concurrency?: number; signal?: AbortSignal },
-): Promise<void> {
+): Promise<{ en: number; fr: number; unknown: number }> {
   const concurrency = opts?.concurrency ?? 4
   const queue = [...phoneIds]
+  const summary = { en: 0, fr: 0, unknown: 0 }
   const worker = async () => {
     while (queue.length) {
       if (opts?.signal?.aborted) return
       const id = queue.shift()!
-      try { await clearInstagramPopups(bearer, id, log, opts?.signal) }
-      catch { /* on continue : ne bloque pas le run */ }
+      try {
+        const lang = await clearInstagramPopups(bearer, id, log, opts?.signal)
+        summary[lang] = (summary[lang] ?? 0) + 1
+      } catch { /* on continue : ne bloque pas le run */ }
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, phoneIds.length) }, worker))
+  log?.(`🌐 Langues Instagram — prêts (anglais): ${summary.en} · ENCORE EN FRANÇAIS: ${summary.fr} · indéterminé: ${summary.unknown}`)
+  if (summary.fr > 0) log?.(`⚠ ${summary.fr} téléphone(s) toujours en français — le posting peut échouer dessus (vérifie qu'ils sont en Android 15).`)
+  return summary
 }
 
 // Détecte la langue de l'UI (téléphone / Instagram) : 'fr' | 'en' | 'other' | 'unknown'.
