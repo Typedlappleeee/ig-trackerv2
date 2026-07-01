@@ -932,14 +932,27 @@ export function MassPosting({ user }: MassPostingProps) {
       // Historique + compteur Hub : on enregistre TOUJOURS le run (même 0 succès)
       // pour que l'Historique soit fiable. (table post_runs, fire-and-forget)
       if (assignments.length > 0) {
-        supabase.from('post_runs').insert({
+        // Détail par compte pour l'historique cliquable (réussis / échoués + raison).
+        const phoneResults = phoneList.map(p => {
+          const st = finalStatuses.get(p.id)
+          const ok = st?.status === 'done'
+          return { name: p.ig_username ?? p.phone_name, ok, ...(ok ? {} : { error: st?.detail || 'Échec' }) }
+        })
+        const base = {
           user_id:   user.id,
           org_id:    currentOrg?.id ?? null,
           type:      platform === 'tiktok' ? 'tiktok' : 'mass_posting',
           ok_count:  okN,
           err_count: errN,
           total:     assignments.length,
-        }) // fire-and-forget, non-blocking
+        }
+        supabase.from('post_runs').insert({ ...base, phone_results: phoneResults })
+          .then(({ error }) => {
+            // Colonne phone_results absente (migration non appliquée) → insert sans.
+            if (error && /phone_results/i.test(error.message)) {
+              supabase.from('post_runs').insert(base).then(() => {}, () => {})
+            }
+          }, () => {})
       }
 
       // Dashboard Rapports : marque chaque compte publié comme "posté aujourd'hui"

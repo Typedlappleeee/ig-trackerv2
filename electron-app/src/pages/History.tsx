@@ -10,6 +10,8 @@ import {
   BG_0 as BG, BG_2 as BG2, ACCENT, ACCENT_L, OK, ERR, SANS,
 } from '@/lib/theme'
 
+interface PhoneResult { name: string; ok: boolean; error?: string }
+
 interface PostRun {
   id: string
   type: string
@@ -19,6 +21,15 @@ interface PostRun {
   created_at: string
   user_id: string
   org_id: string | null
+  phone_results?: PhoneResult[]
+}
+
+// Détail générique affiché dans la fenêtre (programmé ou direct).
+interface DetailView {
+  typeLabel: string
+  dateIso:   string
+  results:   PhoneResult[]
+  fallbackNames: string[]
 }
 
 type HistoryItem =
@@ -77,7 +88,7 @@ export function History({ user }: { user: User }) {
   const [filter,    setFilter]  = useState<'all' | 'scheduled' | 'direct'>('all')
   const [confirming, setConfirming] = useState(false)
   const [clearing,   setClearing]   = useState(false)
-  const [detail,     setDetail]     = useState<ScheduledPost | null>(null)
+  const [detail,     setDetail]     = useState<DetailView | null>(null)
 
   // Solo users own their personal data; in an org only owner/admin can wipe.
   const canClear = role === null || canManageOrg(role)
@@ -270,8 +281,14 @@ export function History({ user }: { user: User }) {
               const ok = post.status === 'done'
               const typeLabel = TYPE_LABELS[post.type ?? ''] ?? 'Post'
               const prCount = post.result?.phone_results?.length ?? 0
+              const openScheduled = () => setDetail({
+                typeLabel,
+                dateIso: post.executed_at ?? post.created_at,
+                results: post.result?.phone_results ?? [],
+                fallbackNames: phones.map(p => p.ig_username ?? p.phone_name),
+              })
               return (
-                <div key={`sp-${post.id}`} onClick={() => setDetail(post)} style={{
+                <div key={`sp-${post.id}`} onClick={openScheduled} style={{
                   padding: '14px 20px',
                   borderBottom: i < items.length - 1 ? `1px solid ${HAIR}` : 'none',
                   display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
@@ -301,12 +318,19 @@ export function History({ user }: { user: User }) {
               const run = item.data
               const ok = run.err_count === 0
               const typeLabel = TYPE_LABELS[run.type] ?? run.type
+              const runResults = run.phone_results ?? []
+              const openRun = () => setDetail({
+                typeLabel, dateIso: run.created_at, results: runResults, fallbackNames: [],
+              })
               return (
-                <div key={`pr-${run.id}`} style={{
+                <div key={`pr-${run.id}`} onClick={openRun} style={{
                   padding: '14px 20px',
                   borderBottom: i < items.length - 1 ? `1px solid ${HAIR}` : 'none',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                }}>
+                  display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
                   <IconBox ok={ok} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
@@ -318,6 +342,7 @@ export function History({ user }: { user: User }) {
                     </p>
                     <p style={{ margin: 0, fontSize: 11.5, color: MUTED, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
                       {typeLabel} · Direct · {fmtScheduledTime(run.created_at)}
+                      {runResults.length > 0 ? ' · détail par compte ›' : ''}
                     </p>
                   </div>
                   <StatusPill status={ok ? 'done' : 'failed'} />
@@ -346,18 +371,18 @@ export function History({ user }: { user: User }) {
       </p>
       </div>
 
-      {detail && <PostDetailModal post={detail} onClose={() => setDetail(null)} />}
+      {detail && <PostDetailModal view={detail} onClose={() => setDetail(null)} />}
     </div>
   )
 }
 
 // ── Détail par compte d'une tâche (téléphones OK / échoués) ────────────────────
-function PostDetailModal({ post, onClose }: { post: ScheduledPost; onClose: () => void }) {
-  const results = post.result?.phone_results ?? []
+function PostDetailModal({ view, onClose }: { view: DetailView; onClose: () => void }) {
+  const results = view.results
   const okList  = results.filter(r => r.ok)
   const koList  = results.filter(r => !r.ok)
-  const phones  = Array.isArray(post.phones) ? post.phones : []
-  const typeLabel = TYPE_LABELS[post.type ?? ''] ?? 'Post'
+  const fallbackNames = view.fallbackNames
+  const typeLabel = view.typeLabel
 
   const Row = ({ name, ok, error }: { name: string; ok: boolean; error?: string }) => (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: `1px solid ${HAIR}` }}>
@@ -387,19 +412,19 @@ function PostDetailModal({ post, onClose }: { post: ScheduledPost; onClose: () =
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: MUTED, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
         <p style={{ margin: '0 0 16px', fontSize: 12.5, color: MUTED, fontFamily: SANS }}>
-          {typeLabel} · {fmtScheduledTime(post.executed_at ?? post.created_at)}
+          {typeLabel} · {fmtScheduledTime(view.dateIso)}
           {results.length > 0 && <> · <span style={{ color: OK }}>{okList.length} réussi{okList.length > 1 ? 's' : ''}</span> · <span style={{ color: ERR }}>{koList.length} échoué{koList.length > 1 ? 's' : ''}</span></>}
         </p>
 
         {results.length === 0 ? (
           <div style={{ fontSize: 13, color: MUTED, fontFamily: SANS, lineHeight: 1.6 }}>
             Pas de détail par compte pour cette tâche (exécutée avant l'ajout de cette fonctionnalité).
-            {phones.length > 0 && (
+            {fallbackNames.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 11, color: FAINT, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Comptes concernés</div>
-                {phones.map((p, i) => (
+                {fallbackNames.map((nm, i) => (
                   <div key={i} style={{ fontSize: 13, color: IVORY, fontFamily: SANS, padding: '4px 0' }}>
-                    {p.ig_username ?? p.phone_name}
+                    {nm}
                   </div>
                 ))}
               </div>
