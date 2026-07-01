@@ -492,21 +492,25 @@ export async function postStoryServer(
   if (/^https?:\/\//i.test(config.imageUrl)) {
     const dlPath = `/sdcard/DCIM/Camera/sf_story.${origExt}`
     const urlEsc = config.imageUrl.replace(/'/g, `'\\''`)
-    log('   📤 Téléchargement direct par le téléphone…')
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera; ` +
-      `curl -L -s -o '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
-      `wget -q -O '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
-      `toybox wget -O '${dlPath}' '${urlEsc}' 2>/dev/null; true`)
-    const ckd = await shellExec(bearer, phoneId, `wc -c < '${dlPath}' 2>/dev/null || echo 0`)
-    const szd = parseInt(ckd.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    if (szd >= 2000) {
-      imgPath = dlPath
-      sz = szd
-      log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
-    } else {
-      log(`   ⚠️ Téléchargement direct échoué (${szd} o) — bascule base64…`)
-      await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
+    // Jusqu'à 3 tentatives (DNS/proxy du téléphone parfois pas prêt après le boot).
+    for (let dlTry = 0; dlTry < 3 && sz < 2000; dlTry++) {
+      log(`   📤 Téléchargement direct par le téléphone${dlTry ? ` (essai ${dlTry + 1}/3)` : ''}…`)
+      await shellExec(bearer, phoneId,
+        `mkdir -p /sdcard/DCIM/Camera; ` +
+        `curl -L -s -o '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+        `wget -q -O '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+        `toybox wget -O '${dlPath}' '${urlEsc}' 2>/dev/null; true`)
+      const ckd = await shellExec(bearer, phoneId, `wc -c < '${dlPath}' 2>/dev/null || echo 0`)
+      const szd = parseInt(ckd.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+      if (szd >= 2000) {
+        imgPath = dlPath
+        sz = szd
+        log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
+      } else {
+        log(`   ⚠️ Téléchargement direct échoué (${szd} o)${dlTry < 2 ? ' — nouvel essai…' : ' — bascule base64…'}`)
+        await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
+        if (dlTry < 2) await sleep(1500)
+      }
     }
   }
 

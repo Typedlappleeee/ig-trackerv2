@@ -77,6 +77,7 @@ export function History({ user }: { user: User }) {
   const [filter,    setFilter]  = useState<'all' | 'scheduled' | 'direct'>('all')
   const [confirming, setConfirming] = useState(false)
   const [clearing,   setClearing]   = useState(false)
+  const [detail,     setDetail]     = useState<ScheduledPost | null>(null)
 
   // Solo users own their personal data; in an org only owner/admin can wipe.
   const canClear = role === null || canManageOrg(role)
@@ -268,12 +269,16 @@ export function History({ user }: { user: User }) {
               const phones = Array.isArray(post.phones) ? post.phones : []
               const ok = post.status === 'done'
               const typeLabel = TYPE_LABELS[post.type ?? ''] ?? 'Post'
+              const prCount = post.result?.phone_results?.length ?? 0
               return (
-                <div key={`sp-${post.id}`} style={{
+                <div key={`sp-${post.id}`} onClick={() => setDetail(post)} style={{
                   padding: '14px 20px',
                   borderBottom: i < items.length - 1 ? `1px solid ${HAIR}` : 'none',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                }}>
+                  display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
                   <IconBox ok={ok} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
@@ -286,6 +291,7 @@ export function History({ user }: { user: User }) {
                     </p>
                     <p style={{ margin: 0, fontSize: 11.5, color: MUTED, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
                       {typeLabel} · Programmé · {fmtScheduledTime(post.executed_at ?? post.created_at)}
+                      {prCount > 0 ? ' · détail par compte ›' : ''}
                     </p>
                   </div>
                   <StatusPill status={post.status} />
@@ -338,6 +344,83 @@ export function History({ user }: { user: User }) {
       <p style={{ marginTop: 16, textAlign: 'center', fontSize: 11, color: FAINT, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
         {items.length} entrée{items.length > 1 ? 's' : ''}
       </p>
+      </div>
+
+      {detail && <PostDetailModal post={detail} onClose={() => setDetail(null)} />}
+    </div>
+  )
+}
+
+// ── Détail par compte d'une tâche (téléphones OK / échoués) ────────────────────
+function PostDetailModal({ post, onClose }: { post: ScheduledPost; onClose: () => void }) {
+  const results = post.result?.phone_results ?? []
+  const okList  = results.filter(r => r.ok)
+  const koList  = results.filter(r => !r.ok)
+  const phones  = Array.isArray(post.phones) ? post.phones : []
+  const typeLabel = TYPE_LABELS[post.type ?? ''] ?? 'Post'
+
+  const Row = ({ name, ok, error }: { name: string; ok: boolean; error?: string }) => (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: `1px solid ${HAIR}` }}>
+      <span style={{ marginTop: 1 }}>
+        {ok
+          ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={OK} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ERR} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: IVORY, fontFamily: SANS }}>{name}</div>
+        {!ok && error && <div style={{ fontSize: 11.5, color: MUTED, fontFamily: SANS, marginTop: 1 }}>{error}</div>}
+      </div>
+    </div>
+  )
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: BG2, border: `1px solid ${HAIR}`, borderRadius: 16,
+        width: 'min(520px, 100%)', maxHeight: '80vh', overflowY: 'auto', padding: 24,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: IVORY, fontFamily: SANS }}>Détail par compte</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: MUTED, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+        <p style={{ margin: '0 0 16px', fontSize: 12.5, color: MUTED, fontFamily: SANS }}>
+          {typeLabel} · {fmtScheduledTime(post.executed_at ?? post.created_at)}
+          {results.length > 0 && <> · <span style={{ color: OK }}>{okList.length} réussi{okList.length > 1 ? 's' : ''}</span> · <span style={{ color: ERR }}>{koList.length} échoué{koList.length > 1 ? 's' : ''}</span></>}
+        </p>
+
+        {results.length === 0 ? (
+          <div style={{ fontSize: 13, color: MUTED, fontFamily: SANS, lineHeight: 1.6 }}>
+            Pas de détail par compte pour cette tâche (exécutée avant l'ajout de cette fonctionnalité).
+            {phones.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 11, color: FAINT, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Comptes concernés</div>
+                {phones.map((p, i) => (
+                  <div key={i} style={{ fontSize: 13, color: IVORY, fontFamily: SANS, padding: '4px 0' }}>
+                    {p.ig_username ?? p.phone_name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {koList.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: ERR, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, fontWeight: 700 }}>❌ Échoués ({koList.length})</div>
+                {koList.map((r, i) => <Row key={i} {...r} />)}
+              </div>
+            )}
+            {okList.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, color: OK, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, fontWeight: 700 }}>✅ Réussis ({okList.length})</div>
+                {okList.map((r, i) => <Row key={i} {...r} />)}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   )
