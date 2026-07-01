@@ -35,6 +35,6 @@
     }
   ],
   "rewrites": [
-    { "source": "/((?!api/|ffmpeg/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|ffmpeg/|assets/).*)", "destination": "/index.html" }
   ]
 }
