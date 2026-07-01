@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense, type ComponentType } from 'react'
+import { isChunkError, reloadForChunk } from '@/components/ChunkErrorBoundary'
 import type { User } from '@supabase/supabase-js'
 import { useAuth }           from '@/hooks/useAuth'
 import { supabase }          from '@/lib/supabase'
@@ -552,32 +553,49 @@ import { initIgStatsPoller } from '@/lib/igStatsPoller'
 // Pages are lazy-loaded so each route ships as its own chunk — the initial
 // bundle only carries the shell + Hub (default landing page after login).
 import Hub                   from '@/pages/Hub'
-const Phones          = lazy(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
 
-const TikTokPosting   = lazy(() => import('@/pages/TikTokPosting'))
-const Publish        = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
-const Stats          = lazy(() => import('@/pages/Stats').then(m => ({ default: m.Stats })))
-const BankHub        = lazy(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
-const Montage        = lazy(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
-const Remix          = lazy(() => import('@/pages/Remix').then(m => ({ default: m.Remix })))
-const AiTools        = lazy(() => import('@/pages/AiTools').then(m => ({ default: m.AiTools })))
-const Settings       = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })))
+// Après un déploiement, un chunk lazy peut avoir disparu (fichier hashé remplacé)
+// → l'import() échoue. Plutôt que de casser la page, on retente une fois (déploiement
+// en cours / réseau), puis on recharge proprement l'app (index.html est en no-cache,
+// donc le reload récupère les nouveaux chunks). Évite le « Failed to fetch module ».
+function lazyWithReload<T extends ComponentType<unknown>>(factory: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    factory().catch(async (err) => {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (!isChunkError(msg)) throw err
+      await new Promise(r => setTimeout(r, 600))
+      try { return await factory() } catch { reloadForChunk() }
+      return { default: (() => null) as unknown as T }   // le temps que le reload prenne effet
+    }),
+  )
+}
 
-const Scheduler      = lazy(() => import('@/pages/Scheduler').then(m => ({ default: m.Scheduler })))
-const Tasks          = lazy(() => import('@/pages/Tasks').then(m => ({ default: m.Tasks })))
-const Warmup         = lazy(() => import('@/pages/Warmup').then(m => ({ default: m.Warmup })))
-const VideoRepurpose = lazy(() => import('@/pages/VideoRepurpose').then(m => ({ default: m.VideoRepurpose })))
-const Mixer          = lazy(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
-const Spoof          = lazy(() => import('@/pages/Spoof').then(m => ({ default: m.Spoof })))
-const Licences       = lazy(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
-const Support        = lazy(() => import('@/pages/Support').then(m => ({ default: m.Support })))
-const History        = lazy(() => import('@/pages/History').then(m => ({ default: m.History })))
-const Reports        = lazy(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
-const Community      = lazy(() => import('@/pages/Community').then(m => ({ default: m.Community })))
-const ScaleIA        = lazy(() => import('@/pages/ScaleIA'))
-const StoryLink      = lazy(() => import('@/pages/StoryLink'))
-const Subtitles      = lazy(() => import('@/pages/Subtitles').then(m => ({ default: m.Subtitles })))
-const Landing        = lazy(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
+const Phones          = lazyWithReload(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
+
+const TikTokPosting   = lazyWithReload(() => import('@/pages/TikTokPosting'))
+const Publish        = lazyWithReload(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
+const Stats          = lazyWithReload(() => import('@/pages/Stats').then(m => ({ default: m.Stats })))
+const BankHub        = lazyWithReload(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
+const Montage        = lazyWithReload(() => import('@/pages/Montage').then(m => ({ default: m.Montage })))
+const Remix          = lazyWithReload(() => import('@/pages/Remix').then(m => ({ default: m.Remix })))
+const AiTools        = lazyWithReload(() => import('@/pages/AiTools').then(m => ({ default: m.AiTools })))
+const Settings       = lazyWithReload(() => import('@/pages/Settings').then(m => ({ default: m.Settings })))
+
+const Scheduler      = lazyWithReload(() => import('@/pages/Scheduler').then(m => ({ default: m.Scheduler })))
+const Tasks          = lazyWithReload(() => import('@/pages/Tasks').then(m => ({ default: m.Tasks })))
+const Warmup         = lazyWithReload(() => import('@/pages/Warmup').then(m => ({ default: m.Warmup })))
+const VideoRepurpose = lazyWithReload(() => import('@/pages/VideoRepurpose').then(m => ({ default: m.VideoRepurpose })))
+const Mixer          = lazyWithReload(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
+const Spoof          = lazyWithReload(() => import('@/pages/Spoof').then(m => ({ default: m.Spoof })))
+const Licences       = lazyWithReload(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
+const Support        = lazyWithReload(() => import('@/pages/Support').then(m => ({ default: m.Support })))
+const History        = lazyWithReload(() => import('@/pages/History').then(m => ({ default: m.History })))
+const Reports        = lazyWithReload(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
+const Community      = lazyWithReload(() => import('@/pages/Community').then(m => ({ default: m.Community })))
+const ScaleIA        = lazyWithReload(() => import('@/pages/ScaleIA'))
+const StoryLink      = lazyWithReload(() => import('@/pages/StoryLink'))
+const Subtitles      = lazyWithReload(() => import('@/pages/Subtitles').then(m => ({ default: m.Subtitles })))
+const Landing        = lazyWithReload(() => import('@/components/Landing').then(m => ({ default: m.Landing })))
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { AppTour }           from '@/components/AppTour'
 import { canSeeTab }         from '@/lib/permissions'
