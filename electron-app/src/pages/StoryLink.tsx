@@ -515,11 +515,11 @@ export default function StoryLink({ user }: { user: User }) {
       }
     }
 
-    // Concurrence volontairement BASSE : chaque story = des dizaines d'appels ADB
-    // sur ~2 min. Au-delà de 2 téléphones en parallèle, on sature l'API GeeLark
-    // (200 req/min) → échecs. On décale aussi le démarrage de chaque worker pour
-    // que les téléphones ne bootent pas tous au même instant.
-    const CONCURRENCY = 2
+    // Concurrence bornée : chaque story = des dizaines d'appels ADB sur ~2 min.
+    // 5 téléphones en parallèle max (au-delà on risque de saturer l'API GeeLark,
+    // 200 req/min). Le démarrage de chaque worker est décalé pour ne pas booter
+    // tous les téléphones au même instant.
+    const CONCURRENCY = 5
     const queue = [...assignments]
     let okCount = 0
     const worker = async (staggerMs: number) => {
