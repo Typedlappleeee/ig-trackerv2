@@ -42,7 +42,7 @@ const _isWeb = typeof window !== 'undefined' && !(window as unknown as { electro
 function igimg(u: string | null | undefined): string | undefined {
   if (!u) return undefined
   if (!_isWeb || !/^https?:\/\//i.test(u)) return u
-  return `/api/img?url=${encodeURIComponent(u)}`
+  return `/api/ig?url=${encodeURIComponent(u)}`
 }
 
 function parisToday(): string { return new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) }

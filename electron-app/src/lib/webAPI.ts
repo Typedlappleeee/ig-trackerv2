@@ -135,17 +135,17 @@ export function buildWebAPI() {
 
     // ── Instagram session check ────────────────────────────────────────────
     async fetchInstagramBySession(opts: { username: string; sessionid: string }) {
-      const r = await fetch('/api/instagram', {
+      const r = await fetch('/api/ig', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(opts),
+        body: JSON.stringify({ fn: 'session', ...opts }),
       })
       try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── Instagram HTML profile (web fallback) ──────────────────────────────
     async fetchInstagramHtml(username: string) {
-      const r = await fetch('/api/proxy', {
+      const r = await fetch('/api/ig', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: `https://www.instagram.com/${username}/`, isText: true }),
@@ -157,7 +157,7 @@ export function buildWebAPI() {
     async fetchIgComments(opts: { mediaId: string; sessionid: string; maxId?: string }) {
       const params = new URLSearchParams({ sessionid: opts.sessionid, media_id: opts.mediaId })
       if (opts.maxId) params.set('max_id', opts.maxId)
-      const r = await fetch('/api/proxy', {
+      const r = await fetch('/api/ig', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -173,7 +173,7 @@ export function buildWebAPI() {
 
     // ── Post IG comment ────────────────────────────────────────────────────
     async postIgComment(opts: { mediaId: string; text: string; sessionid: string }) {
-      const r = await fetch('/api/proxy', {
+      const r = await fetch('/api/ig', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -217,7 +217,7 @@ export function buildWebAPI() {
 
     // ── Fetch image as base64 data URL ──────────────────────────────────────
     async fetchImage(opts: { url: string; headers?: Record<string, string> }) {
-      const r = await fetch('/api/proxy', {
+      const r = await fetch('/api/ig', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: opts.url, headers: opts.headers }),
@@ -227,7 +227,7 @@ export function buildWebAPI() {
 
     // ── Fetch IG video URL ─────────────────────────────────────────────────
     async fetchIgVideo(opts: { url: string }) {
-      const r = await fetch('/api/proxy', {
+      const r = await fetch('/api/ig', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: opts.url }),

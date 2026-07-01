@@ -7,7 +7,7 @@ const _isWeb = typeof window !== 'undefined' && !(window as unknown as { electro
 export function igImg(u?: string | null): string | undefined {
   if (!u) return undefined
   if (!_isWeb || !/^https?:\/\//i.test(u)) return u   // data: / electron → direct
-  return `/api/img?url=${encodeURIComponent(u)}`
+  return `/api/ig?url=${encodeURIComponent(u)}`
 }
 
 // Temps relatif court : "2 h", "3 j", "à l'instant".
