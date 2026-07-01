@@ -632,7 +632,14 @@ export function MassPosting({ user }: MassPostingProps) {
           log(`Vidéo ${vi + 1} sans source — ignorée`, 'warn')
           continue
         }
-        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
+        // Retry sur l'upload : un timeout/throttle transitoire ne doit pas
+        // condamner tous les tels qui utilisent cette vidéo.
+        let up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
+        for (let attempt = 0; (!up.ok || !up.token) && attempt < 2; attempt++) {
+          log(`Upload vidéo ${vi + 1} raté (${up.error}) — nouvel essai…`, 'warn')
+          await new Promise(r => setTimeout(r, 2500 * (attempt + 1)))
+          up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
+        }
         if (!up.ok || !up.token) {
           log(`Upload échoué (${sv.item.title}): ${up.error}`, 'error')
           assignments.forEach(a => {
@@ -739,6 +746,10 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       } else {
         // ── Instagram : une tâche RPA instagramPubReels par téléphone ──
+        // Anti rate-limit GéeLark (200 req/min) : petit espacement entre chaque
+        // création + retry/backoff sur les codes transitoires (throttle/lock).
+        // C'est ce qui fait « ça marche sur certains tels, plus du tout sur
+        // d'autres » quand on lance beaucoup de tels d'un coup.
         for (let ai = 0; ai < assignments.length; ai++) {
           if (stopRef.current) { log('Création des tâches interrompue (stop)', 'warn'); break }
           const asgn = assignments[ai]
@@ -750,14 +761,24 @@ export function MassPosting({ user }: MassPostingProps) {
           }
           setPhoneStatus(asgn.phone.id, { status: 'posting' })
           postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
-          const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-            id:          asgn.phone.geelark_id,
-            scheduleAt:  scheduleTimes[ai],
-            description: caption,
-            video:       [token],
-            ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
-          })
-          if (taskRes['code'] === 0) {
+
+          let taskRes: Record<string, unknown> | null = null
+          for (let attempt = 0; attempt < 3; attempt++) {
+            taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
+              id:          asgn.phone.geelark_id,
+              scheduleAt:  scheduleTimes[ai],
+              description: caption,
+              video:       [token],
+              ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
+            })
+            // Succès → on sort. Sinon backoff avant de réessayer (throttle probable).
+            if (taskRes['code'] === 0) break
+            if (attempt < 2) {
+              log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']} — nouvel essai…`, 'warn')
+              await new Promise(r => setTimeout(r, 3000 * (attempt + 1)))
+            }
+          }
+          if (taskRes && taskRes['code'] === 0) {
             const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
             taskIds[asgn.phone.geelark_id] = tid
             activeTasksRef.current = [...activeTasksRef.current, tid]
@@ -766,9 +787,11 @@ export function MassPosting({ user }: MassPostingProps) {
             log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
             armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
           } else {
-            log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
-            setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
+            log(`  ${asgn.phone.phone_name}: ${taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec'}`, 'error')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec') })
           }
+          // Espacement entre tels pour ne pas saturer l'API (sauf le dernier).
+          if (ai < assignments.length - 1) await new Promise(r => setTimeout(r, 500))
         }
       }
 
@@ -905,6 +928,7 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
         await geelark(bearer, '/phone/stop', { ids: remaining })
         unregisterPhones(remaining).catch(() => {})
+        activePhonesRef.current = []  // déjà coupés → évite un double-stop dans le finally
       }
 
       // Mark only phones without a final status yet as done (preserve 'error' states)
@@ -986,18 +1010,23 @@ export function MassPosting({ user }: MassPostingProps) {
 
     } catch (e: unknown) {
       log(`Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
-      // Always stop phones on unexpected crash — so they don't stay on indefinitely
-      const stuck = activePhonesRef.current
+    } finally {
+      // Filet de sécurité DUR : quoi qu'il arrive (crash, throttle, tâche jamais
+      // confirmée par GéeLark, sortie anticipée), on éteint TOUS les tels encore
+      // marqués actifs. C'est ce qui règle « les tels restent allumés ».
+      const stuck = [...new Set(activePhonesRef.current.filter(Boolean))]
       if (stuck.length > 0) {
-        log(`Arrêt d'urgence de ${stuck.length} téléphone(s)…`, 'warn')
-        geelark(bearer, '/phone/stop', { ids: stuck }).catch(() => {})
+        log(`Extinction de sécurité de ${stuck.length} téléphone(s)…`, 'warn')
+        try { await geelark(bearer, '/phone/stop', { ids: stuck }) } catch { /* best-effort */ }
         unregisterPhones(stuck).catch(() => {})
       }
+      // Purge les timers d'auto-stop encore en attente (les tels sont déjà coupés).
+      autoStopTimersRef.current.forEach(id => window.clearTimeout(id))
+      autoStopTimersRef.current = []
+      activePhonesRef.current = []
+      activeTasksRef.current = []
+      setPosting(false)
     }
-
-    activePhonesRef.current = []
-    activeTasksRef.current = []
-    setPosting(false)
   }
 
   const visiblePhones = phones.filter(p => {
