@@ -1349,7 +1349,7 @@ async function _postInstagramStoryInner(
   // mis-classify it → Instagram's gallery can't open it → "image n'upload pas".
   let outExt = 'png'
 
-  // Download the image server-side (via /api/proxy) to avoid CORS, then compress
+  // Download the image server-side (via /api/ig) to avoid CORS, then compress
   // client-side and push as base64 chunks via shell. Target: < 200 KB JPEG so the
   // push takes ~5 seconds instead of hanging with 2600+ chunks.
   const bufToB64 = (buf: ArrayBuffer | Uint8Array): string => {
@@ -1363,9 +1363,9 @@ async function _postInstagramStoryInner(
 
   let imgBase64: string | null = null
 
-  // Download: try /api/proxy (server-side, no CORS) then direct fetch
+  // Download: try /api/ig (server-side, no CORS) then direct fetch
   try {
-    const pr = await fetch('/api/proxy', {
+    const pr = await fetch('/api/ig', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: config.imageUrl }),
