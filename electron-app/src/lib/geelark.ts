@@ -191,6 +191,38 @@ async function shellExec(
 //   3. /phone/file/uploadStatus { taskId } -> { status: pending|uploading|success|failed }
 // `path` = DOSSIER de destination ; on vise DCIM/Camera pour que la galerie voie
 // le fichier tout de suite. Retourne le chemin complet on-phone en cas de succès.
+//
+// ⚠️ Dédup material center : en Mass Story, N téléphones partagent la MÊME image.
+// Ré-uploader le fichier dans le material center pour CHAQUE tél = N uploads
+// identiques + rafale de requêtes → GéeLark throttle et lâche certains tels
+// (« ça upload sur certains, plus du tout sur d'autres »). On met donc en cache
+// le fileId par URL : le fichier n'est uploadé qu'UNE fois, réutilisé partout.
+const _materialCache = new Map<string, Promise<string | null>>()
+
+async function geelarkGetMaterialId(
+  bearer: string, fileUrl: string, fileType: 1 | 2, fileName: string,
+): Promise<string | null> {
+  const cached = _materialCache.get(fileUrl)
+  if (cached) return cached
+  const p = (async () => {
+    // Petit retry : material/temp/upload peut renvoyer un throttle transitoire.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const up = await geelarkFetch('POST', '/material/temp/upload',
+          { fileUrl, fileType, fileName }, bearer)
+        const fid = ((up['data'] as Record<string, unknown>)?.['fileId']) as string | undefined
+        if (up['code'] === 0 && fid) return fid
+      } catch { /* retry */ }
+      await sleep(1500 + attempt * 1500)
+    }
+    return null
+  })()
+  _materialCache.set(fileUrl, p)
+  // Si l'upload échoue, ne pas garder un échec en cache pour toujours.
+  p.then(v => { if (!v) _materialCache.delete(fileUrl) }).catch(() => _materialCache.delete(fileUrl))
+  return p
+}
+
 export async function geelarkUploadMediaToPhone(
   bearer: string,
   phoneId: string,
@@ -200,30 +232,34 @@ export async function geelarkUploadMediaToPhone(
   const log = opts.log ?? (() => {})
   const dir = opts.dir ?? '/sdcard/DCIM/Camera'
   try {
-    // 1. Upload dans le material center GéeLark (téléchargement côté GéeLark)
-    const up = await geelarkFetch('POST', '/material/temp/upload',
-      { fileUrl, fileType: opts.fileType, fileName: opts.fileName }, bearer)
-    if (up['code'] !== 0)
-      return { ok: false, error: `material/temp/upload: ${up['msg'] ?? up['code']}` }
-    const fileId = ((up['data'] as Record<string, unknown>)?.['fileId']) as string | undefined
+    // 1. fileId du material center (mis en cache → 1 seul upload par image)
+    const fileId = await geelarkGetMaterialId(bearer, fileUrl, opts.fileType, opts.fileName)
     if (!fileId) return { ok: false, error: 'material/temp/upload: pas de fileId' }
     log(`   ☁️ Matériel GéeLark prêt (${fileId})`)
 
-    // 2. Dépose le matériel sur le téléphone au dossier voulu
-    const push = await geelarkFetch('POST', '/phone/file/upload',
-      { id: phoneId, fileId, path: dir }, bearer)
-    if (push['code'] !== 0)
-      return { ok: false, error: `phone/file/upload: ${push['msg'] ?? push['code']}` }
-    const taskId = ((push['data'] as Record<string, unknown>)?.['taskId']) as string | undefined
-    if (!taskId) return { ok: false, error: 'phone/file/upload: pas de taskId' }
+    // 2. Dépose le matériel sur le téléphone au dossier voulu (retry si tél pas prêt)
+    let taskId: string | undefined
+    for (let attempt = 0; attempt < 3 && !taskId; attempt++) {
+      const push = await geelarkFetch('POST', '/phone/file/upload',
+        { id: phoneId, fileId, path: dir }, bearer)
+      taskId = ((push['data'] as Record<string, unknown>)?.['taskId']) as string | undefined
+      if (!taskId) {
+        if (attempt === 2) return { ok: false, error: `phone/file/upload: ${push['msg'] ?? push['code']}` }
+        await sleepOrAbort(3000, opts.signal)
+      }
+    }
     log(`   📥 Dépôt GéeLark vers ${dir}…`)
 
-    // 3. Poll du statut (~70 s max) — pending|uploading|success|failed
-    for (let i = 0; i < 35; i++) {
+    // 3. Poll du statut (~90 s max) — pending|uploading|success|failed.
+    //    Tolérant : une erreur transitoire de polling ne fait PAS échouer, on
+    //    continue jusqu'au statut 'failed' explicite ou au timeout.
+    for (let i = 0; i < 45; i++) {
       await sleepOrAbort(2000, opts.signal)
-      const st = await geelarkFetch('POST', '/phone/file/uploadStatus', { taskId }, bearer)
-      const data = (st['data'] as Record<string, unknown>) ?? {}
-      const status = String(data['status'] ?? '')
+      let status = ''
+      try {
+        const st = await geelarkFetch('POST', '/phone/file/uploadStatus', { taskId }, bearer)
+        status = String((st['data'] as Record<string, unknown>)?.['status'] ?? '')
+      } catch { continue }
       if (status === 'success') {
         const full = `${dir.replace(/\/$/, '')}/${opts.fileName}`
         log('   ✅ Média déposé par GéeLark')
