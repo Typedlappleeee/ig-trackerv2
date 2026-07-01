@@ -19,17 +19,17 @@ interface Kind {
 const KINDS: Kind[] = [
   {
     id: 'posting', icon: '🎬', title: 'Reels', tag: 'Vidéo',
-    desc: 'Publie tes Reels en masse sur tous tes comptes en un clic — intervalles, Reels Trial, et « aussi en story ».',
+    desc: 'Publie un Reels.',
     grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.45)',
   },
   {
     id: 'storylink', icon: '🔗', title: 'Story', tag: 'Sticker lien', admin: true,
-    desc: 'Publie une story avec un sticker lien propre à chaque compte — parfait pour ramener du trafic là où tu veux.',
+    desc: 'Publie une story avec un lien.',
     grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.42)',
   },
   {
     id: 'photoposting', icon: '🖼️', title: 'Photo', tag: 'Feed', soon: true,
-    desc: 'Publie une photo dans le feed sur tous tes comptes, avec la même légende — le poste classique, automatisé.',
+    desc: 'Publie une photo.',
     grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.4)',
   },
 ]
