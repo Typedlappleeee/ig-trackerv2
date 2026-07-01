@@ -437,6 +437,15 @@ async function executeScheduledPostInner(
       if (pending.size > 0) onLog(`⏳ ${pending.size} tâche(s) toujours en attente après timeout`)
     }
 
+    // 4bis. Marge d'upload — l'RPA passe « done » dès qu'il a appuyé sur Partager,
+    // mais Instagram continue d'uploader le reel en arrière-plan. Sans cette pause,
+    // on éteignait le téléphone au bout d'~1 min → l'upload était coupé et le reel
+    // ne partait pas. On patiente 2 min pour laisser l'envoi se terminer.
+    if (pollSuccessCount > 0) {
+      onLog("⏳ Marge d'upload (2 min) avant l'arrêt des téléphones…")
+      await sleep(120_000)
+    }
+
     // 5. Stop phones
     onLog('⏹ Arrêt des téléphones…')
     await gPost(bearer, '/phone/stop', { ids: geelarkIds })
