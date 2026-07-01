@@ -9,7 +9,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, clearInstagramPopupsBatch } from '@/lib/geelark'
+import { takeScreenshot } from '@/lib/geelark'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
@@ -672,21 +672,6 @@ export function MassPosting({ user }: MassPostingProps) {
       log('Attente 30s (boot)…')
       await new Promise(r => setTimeout(r, 30000))
       if (stopRef.current) { log('Run interrompu après le boot', 'warn'); return }
-
-      // ── Step 2bis: purge des popups Meta « Pay or Consent » (RGPD) ─────────
-      // Ces interstitiels bloquent l'app UE → l'RPA reste coincé dessus. On les
-      // clique avant de lancer le posting. Instagram uniquement (pas TikTok).
-      if (platform !== 'tiktok') {
-        log('Vérification des popups Instagram (consentement pubs)…')
-        const popupAbort = new AbortController()
-        const popupWatch = window.setInterval(() => { if (stopRef.current) popupAbort.abort() }, 1000)
-        try {
-          await clearInstagramPopupsBatch(bearer, geelarkIds, (m) => log(m, 'info'), {
-            concurrency: 4, signal: popupAbort.signal,
-          })
-        } finally { window.clearInterval(popupWatch) }
-        if (stopRef.current) { log('Run interrompu (popups)', 'warn'); return }
-      }
 
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
       log('Creating post tasks…')
