@@ -31,7 +31,7 @@
  * -- )$$);
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useT, useLang } from '@/lib/i18n'
@@ -613,6 +613,70 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
   )
 }
 
+// ── Modal détails d'un post programmé ─────────────────────────────────────────
+function SchedDetailModal({ post, onClose, onReschedule, onDuplicate }: {
+  post: ScheduledPost
+  onClose: () => void
+  onReschedule?: () => void
+  onDuplicate: () => void
+}) {
+  const phones = Array.isArray(post.phones) ? post.phones : []
+  const results = post.result?.phone_results ?? []
+  const okList = results.filter(r => r.ok)
+  const koList = results.filter(r => !r.ok)
+  const typeLabel = post.type === 'story' ? 'Story' : post.type === 'mass_posting' ? 'Mass Posting' : 'Reel'
+  const statusLabel = post.status === 'pending' ? 'À venir' : post.status === 'running' ? 'En cours'
+    : post.status === 'done' ? 'Publié' : post.status === 'failed' ? 'Échec' : 'Annulé'
+  const Chip = ({ children }: { children: ReactNode }) => (
+    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'rgba(233,234,240,0.6)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 20, padding: '3px 10px' }}>{children}</span>
+  )
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#12131a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: 'min(540px,100%)', maxHeight: '82vh', overflowY: 'auto', padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#E9EAF0' }}>Détail du post</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'rgba(233,234,240,0.5)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+        <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'rgba(233,234,240,0.5)' }}>
+          {typeLabel} · {fmtScheduledTime(post.executed_at ?? post.scheduled_at)}
+          {results.length > 0 && <> · <span style={{ color: '#34D399' }}>{okList.length} réussi{okList.length > 1 ? 's' : ''}</span> · <span style={{ color: '#f87171' }}>{koList.length} échoué{koList.length > 1 ? 's' : ''}</span></>}
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <Chip>{statusLabel}</Chip>
+          <Chip>{phones.length} compte{phones.length > 1 ? 's' : ''}</Chip>
+          {Array.isArray(post.videos) && <Chip>{post.videos.length} vidéo{post.videos.length > 1 ? 's' : ''}</Chip>}
+        </div>
+        {post.caption && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.32)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Légende</div>
+            <div style={{ fontSize: 12.5, color: '#E9EAF0', lineHeight: 1.5, whiteSpace: 'pre-wrap', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px' }}>{post.caption}</div>
+          </div>
+        )}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.32)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Comptes</div>
+          {results.length > 0 ? (
+            [...koList, ...okList].map((r, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ color: r.ok ? '#34D399' : '#f87171', fontWeight: 800, fontSize: 13 }}>{r.ok ? '✓' : '✕'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, color: '#E9EAF0' }}>{r.name}</div>
+                  {!r.ok && r.error && <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)' }}>{r.error}</div>}
+                </div>
+              </div>
+            ))
+          ) : (
+            phones.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: '#E9EAF0', padding: '4px 0' }}>{p.ig_username ?? p.phone_name}</div>)
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onDuplicate} className="sf-btn sf-btn-primary" style={{ flex: 1 }}>Dupliquer</button>
+          {onReschedule && <button onClick={onReschedule} className="sf-btn sf-btn-ghost" style={{ flex: 1 }}>Reprogrammer</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Scheduler({ user, onNavigate }: Props) {
   const t                         = useT()
   const { role }                  = useOrg()
@@ -629,6 +693,7 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [showStoryCreate, setShowStoryCreate] = useState(false)
   const [showTypeChoice, setShowTypeChoice] = useState(false)
   const [presetSchedAt, setPresetSchedAt] = useState<string | undefined>(undefined)
+  const [detailPost, setDetailPost] = useState<ScheduledPost | null>(null)
   const [showPlatformChoice, setShowPlatformChoice] = useState(false)
   const [reelPlatform, setReelPlatform] = useState<'instagram' | 'tiktok'>(
     (localStorage.getItem('sf-mp-platform') as 'instagram' | 'tiktok' | null) ?? 'instagram')
@@ -1036,7 +1101,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           <CalendarWeek
             posts={posts}
             onMove={(p, d) => { void doReschedule(p, d) }}
-            onOpen={p => { if (p.status === 'pending' && p.user_id === user.id) setReschedule(p) }}
+            onOpen={p => setDetailPost(p)}
             onSlotClick={d => { setPresetSchedAt(toSchedInput(d)); setShowTypeChoice(true) }}
             onDuplicate={p => { void duplicateSchedPost(p) }}
             onDelete={p => { if (p.status === 'running') cancel(p.id); else setConfirmCancel(p) }}
@@ -1129,6 +1194,15 @@ export function Scheduler({ user, onNavigate }: Props) {
           videosCount={reschedule.videos.length}
           onConfirm={date => { void doReschedule(reschedule, date) }}
           onClose={() => setReschedule(null)}
+        />
+      )}
+
+      {detailPost && (
+        <SchedDetailModal
+          post={detailPost}
+          onClose={() => setDetailPost(null)}
+          onReschedule={detailPost.status === 'pending' && detailPost.user_id === user.id ? () => { setReschedule(detailPost); setDetailPost(null) } : undefined}
+          onDuplicate={() => { void duplicateSchedPost(detailPost); setDetailPost(null) }}
         />
       )}
 
