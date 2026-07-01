@@ -461,11 +461,21 @@ export async function postStoryServer(
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
   }
 
-  // Force media scanner so Instagram's gallery picker sees the new file.
-  // touch -m ensures the file has the current timestamp → appears FIRST in "Recents".
-  await shellExec(bearer, phoneId,
-    `touch -m '${imgPath}' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
-  await sleep(4000)
+  // Force media scanner (Android 13/15 ignore le broadcast → on combine plusieurs
+  // méthodes : broadcast, content insert dans le MediaStore, et su si rooté).
+  {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const outExt2 = imgPath.split('.').pop() || 'jpg'
+    await shellExec(bearer, phoneId, `touch -m '${imgPath}' 2>/dev/null; true`)
+    await shellExec(bearer, phoneId,
+      `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath} 2>/dev/null; ` +
+      `content insert --uri content://media/external/images/media ` +
+      `--bind _data:s:${imgPath} --bind mime_type:s:image/jpeg ` +
+      `--bind _display_name:s:sf_story.${outExt2} --bind date_added:i:${nowSec} --bind date_modified:i:${nowSec} 2>/dev/null; ` +
+      `su -c 'am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}' 2>/dev/null; ` +
+      `su -c 'content call --uri content://media --method scan_volume --arg external_primary' 2>/dev/null; true`)
+  }
+  await sleep(5000)
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
