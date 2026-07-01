@@ -474,6 +474,94 @@ async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => voi
   return last
 }
 
+// ── Popups Meta « Pay or Consent » (RGPD) + interstitiels bloquants ──────────
+// Instagram affiche aux comptes détectés en UE un parcours de consentement pubs
+// qui BLOQUE toute l'app tant qu'un choix n'est pas fait → l'RPA de posting reste
+// coincé dessus et échoue. Ce helper ouvre Instagram, clique automatiquement le
+// parcours (Get started → « Use free of charge with ads » → Continue → Agree →
+// Confirm) ainsi que quelques popups non bloquants, puis rend la main. Le choix
+// est mémorisé PAR COMPTE : une fois fait, le RPA ne le revoit plus.
+// À appeler après le boot du téléphone, AVANT de créer la tâche instagramPubReels.
+export async function clearInstagramPopups(
+  bearer: string,
+  phoneId: string,
+  log?: (m: string) => void,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const tap = async (pt: [number, number]) => {
+    await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { maxRetries: 2, signal }).catch(() => {})
+    await sleepOrAbort(1400, signal)
+  }
+
+  // Ouvre Instagram sur l'accueil pour déclencher l'éventuel interstitiel.
+  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity', { maxRetries: 3, signal }).catch(() => {})
+  await sleepOrAbort(4000, signal)
+
+  let acted = false
+  for (let i = 0; i < 10; i++) {
+    if (signal?.aborted) return acted
+    const xml = await dumpXml(bearer, phoneId, log)
+    const low = xml.toLowerCase()
+
+    // 1) Dernier écran « Here's what to expect with personalized ads » → Confirm
+    let pt = findByText(xml, 'Confirm') ?? findByTextPartial(xml, 'Confirm')
+    if (pt && low.includes('personalized ads')) { log?.('   ✔ Consent: Confirm'); await tap(pt); acted = true; continue }
+
+    // 2) « agree to Meta processing your data » → Agree
+    pt = findByText(xml, 'Agree') ?? findByTextPartial(xml, 'Agree')
+    if (pt && (low.includes('processing your data') || low.includes('agree to meta') || low.includes('consent to meta'))) {
+      log?.('   ✔ Consent: Agree'); await tap(pt); acted = true; continue
+    }
+
+    // 3) « Subscribe or continue … free of charge with ads? » → choisir gratuit puis Continue
+    if (low.includes('free of charge with ads') || low.includes('free with ads') || low.includes('subscribe to use')) {
+      const optPt = findByTextPartial(xml, 'free of charge with ads', 'free with ads', 'Use free')
+      if (optPt) { log?.('   ✔ Consent: option gratuite avec pubs'); await tap(optPt) }
+      const contPt = findByText(xml, 'Continue') ?? findByTextPartial(xml, 'Continue')
+      if (contPt) { log?.('   ✔ Consent: Continue'); await tap(contPt); acted = true; continue }
+    }
+
+    // 4) Premier écran « Choose if we process your data for ads » → Get started
+    pt = findByText(xml, 'Get started') ?? findByTextPartial(xml, 'Get started', 'Commencer')
+    if (pt && (low.includes('data for ads') || low.includes('process your'))) {
+      log?.('   ✔ Consent: Get started'); await tap(pt); acted = true; continue
+    }
+
+    // 5) Popups non bloquants courants (notifs, « save login info », etc.) → fermer
+    pt = findByText(xml, 'Not now', 'Not Now', 'Plus tard', 'Skip', 'Later', 'Dismiss', 'Pas maintenant')
+    if (pt) { log?.('   ✔ Popup fermé'); await tap(pt); acted = true; continue }
+
+    break // plus rien à traiter
+  }
+
+  if (acted) log?.('   ✅ Popups Instagram traités')
+  // État propre pour que l'RPA relance Instagram à froid.
+  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android', { maxRetries: 2, signal }).catch(() => {})
+  await sleepOrAbort(1500, signal)
+  return acted
+}
+
+// Traite les popups sur plusieurs téléphones en parallèle avec une concurrence
+// bornée (respecte le rate-limit GéeLark). Les erreurs par téléphone sont avalées.
+export async function clearInstagramPopupsBatch(
+  bearer: string,
+  phoneIds: string[],
+  log?: (m: string) => void,
+  opts?: { concurrency?: number; signal?: AbortSignal },
+): Promise<void> {
+  const concurrency = opts?.concurrency ?? 4
+  const queue = [...phoneIds]
+  const worker = async () => {
+    while (queue.length) {
+      if (opts?.signal?.aborted) return
+      const id = queue.shift()!
+      try { await clearInstagramPopups(bearer, id, log, opts?.signal) }
+      catch { /* on continue : ne bloque pas le run */ }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, phoneIds.length) }, worker))
+}
+
 // Find every EditText node in the dump, with its current text and center point.
 // Sorted top-to-bottom (by Y). Used to target the sticker-text field precisely:
 // the URL field contains "http…", the sticker-text field is the other one.
