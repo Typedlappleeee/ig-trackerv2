@@ -493,16 +493,13 @@ export async function clearInstagramPopups(
     await sleepOrAbort(1400, signal)
   }
 
-  // Force l'UI Instagram en ANGLAIS : le RPA de posting cible l'UI anglaise
-  // (galerie « Gallery »…) et ne trouve pas la vidéo si le téléphone est en
-  // français. L'override de langue persiste → le RPA relancera IG en anglais.
-  await shellExec(bearer, phoneId, 'cmd locale set-app-locales com.instagram.android --locales en-US', { maxRetries: 2, signal }).catch(() => {})
-  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android', { maxRetries: 2, signal }).catch(() => {})
-  await sleepOrAbort(1500, signal)
-
-  // Ouvre Instagram (désormais en anglais) pour déclencher l'éventuel interstitiel.
-  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity', { maxRetries: 3, signal }).catch(() => {})
-  await sleepOrAbort(4000, signal)
+  // Verrouille l'UI Instagram en anglais (le RPA de posting cible l'UI EN et ne
+  // trouve pas la vidéo en français) — avec VÉRIFICATION réelle à l'écran. Laisse
+  // Instagram ouvert pour la purge des popups qui suit.
+  const igLang = await ensureInstagramEnglish(bearer, phoneId, log, signal)
+  if (igLang === 'fr') {
+    log?.('   ⚠ Instagram TOUJOURS en français après bascule — le RPA risque d\'échouer. Vérifie que le téléphone est en Android 15.')
+  }
 
   let acted = false
   for (let i = 0; i < 10; i++) {
@@ -602,6 +599,55 @@ export async function detectPhoneLang(
     if (['gallery', 'your story', 'add to story', 'allow access'].some(w => s.includes(w))) return 'en'
   }
   return 'unknown'
+}
+
+// Détecte la VRAIE langue de l'UI Instagram depuis un dump d'écran (ce qui compte
+// pour l'automatisation, contrairement à la locale système qui peut différer).
+// Compte les marqueurs FR vs EN présents à l'écran.
+function detectIgLangFromXml(xml: string): 'fr' | 'en' | 'unknown' {
+  const s = xml.toLowerCase()
+  const FR = ['galerie', 'votre story', 'rechercher', 'terminé', 'réglages', 'paramètres', 'abonnés', 'partager', 'suivant', 'autoriser', 'ajouter', 'enregistrer', 'accueil', 'publier', 'nouvelle publication']
+  const EN = ['gallery', 'your story', 'search', 'done', 'settings', 'followers', 'share', 'next', 'allow', 'add to', 'save', 'home', 'new post', 'add a link']
+  const fr = FR.filter(w => s.includes(w)).length
+  const en = EN.filter(w => s.includes(w)).length
+  if (fr > en && fr > 0) return 'fr'
+  if (en > fr && en > 0) return 'en'
+  return 'unknown'
+}
+
+// Verrouille l'UI Instagram en anglais, AVEC vérification à l'écran. Ouvre IG, lit
+// la langue réelle ; si ce n'est pas déjà l'anglais, pose l'override en-US, redémarre
+// IG et re-vérifie. Laisse Instagram ouvert. Retourne la langue finale détectée.
+export async function ensureInstagramEnglish(
+  bearer: string,
+  phoneId: string,
+  log?: (m: string) => void,
+  signal?: AbortSignal,
+): Promise<'en' | 'fr' | 'unknown'> {
+  const openAndDetect = async (): Promise<'en' | 'fr' | 'unknown'> => {
+    await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity', { maxRetries: 3, signal }).catch(() => {})
+    await sleepOrAbort(4000, signal)
+    return detectIgLangFromXml(await dumpXml(bearer, phoneId, log))
+  }
+
+  let lang = await openAndDetect()
+  log?.(`🌐 Langue Instagram détectée à l'écran : ${lang}`)
+  if (lang === 'en') return 'en'
+
+  // Bascule + redémarrage + re-vérification.
+  log?.('   ↪︎ Bascule Instagram en anglais…')
+  const r = await shellExec(
+    bearer, phoneId,
+    'cmd locale set-app-locales com.instagram.android --locales en-US',
+    { maxRetries: 2, signal },
+  ).catch((e: unknown) => ({ output: e instanceof Error ? e.message : String(e), status: -1 }))
+  log?.(`   locale set-app-locales → "${(r.output || '').trim().slice(0, 50)}" (status ${r.status})`)
+  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android', { maxRetries: 2, signal }).catch(() => {})
+  await sleepOrAbort(2000, signal)
+
+  lang = await openAndDetect()
+  log?.(`🌐 Après bascule : ${lang}`)
+  return lang
 }
 
 // Find every EditText node in the dump, with its current text and center point.
@@ -1106,14 +1152,12 @@ async function _postInstagramStoryInner(
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
 
-  // ── Bascule Instagram en anglais ────────────────────────────────────────────
-  // L'automatisation story (galerie « Gallery », sticker « Link »…) est fiable en
-  // anglais. En français, la sélection de l'image/vidéo et du sticker échouait.
-  // On force l'UI IG en anglais ; le force-stop + deep link ci-dessous relancent
-  // Instagram en anglais. L'override persiste par compte.
+  // ── Langue ──────────────────────────────────────────────────────────────────
+  // L'automatisation story matche les boutons en FR ET EN → pas besoin de forcer
+  // l'anglais (ça pouvait laisser l'app dans un état mixte). On détecte juste la
+  // langue pour info dans les logs.
   const lang = await detectPhoneLang(bearer, phoneId)
-  log(`🌐 Langue détectée: ${lang} — bascule Instagram en anglais…`)
-  await shellExec(bearer, phoneId, 'cmd locale set-app-locales com.instagram.android --locales en-US', { maxRetries: 2 }).catch(() => {})
+  log(`🌐 Langue du téléphone détectée: ${lang} (story bilingue FR/EN)`)
 
   // ── 0. Wipe the gallery ────────────────────────────────────────────────────
   // Stale photos/videos make Instagram's story picker grab the wrong (old) media

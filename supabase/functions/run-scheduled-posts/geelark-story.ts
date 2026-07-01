@@ -347,13 +347,11 @@ export async function postStoryServer(
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
 
-  // ── Bascule Instagram en anglais ────────────────────────────────────────────
-  // La sélection galerie/sticker est fiable en anglais ; en français elle échouait
-  // (image/vidéo non prise). On force l'UI IG en anglais ; le force-stop + deep
-  // link ci-dessous relancent Instagram en anglais. L'override persiste par compte.
+  // ── Langue ──────────────────────────────────────────────────────────────────
+  // Story bilingue (boutons matchés FR ET EN) → pas de forçage de langue. On
+  // détecte juste pour info.
   const lang = await detectPhoneLang(bearer, phoneId)
-  log(`🌐 Langue détectée: ${lang} — bascule Instagram en anglais…`)
-  await shellExec(bearer, phoneId, 'cmd locale set-app-locales com.instagram.android --locales en-US', { maxRetries: 2 }).catch(() => {})
+  log(`🌐 Langue du téléphone détectée: ${lang} (story bilingue FR/EN)`)
 
   // ── 0. Wipe the gallery ────────────────────────────────────────────────────
   // Stale media makes IG's story picker grab the wrong file — clear everything
