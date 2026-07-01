@@ -14,6 +14,21 @@ if (!window.electronAPI) {
   window.__IS_WEB = true
 }
 
+// ── Rechargement propre après un déploiement (chunk manquant) ─────────────────
+// Vite émet `vite:preloadError` quand un module lazy n'a pas pu être préchargé
+// (fichier hashé disparu après un deploy). On recharge pour récupérer la nouvelle
+// version, au lieu de laisser une erreur casser la fenêtre en cours d'ouverture.
+// Couvre aussi les import() dans des handlers (non attrapés par l'ErrorBoundary).
+import { isChunkError, reloadForChunk } from './components/ChunkErrorBoundary'
+window.addEventListener('vite:preloadError', (e) => {
+  e.preventDefault()
+  reloadForChunk()
+})
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e?.reason instanceof Error ? e.reason.message : String(e?.reason ?? '')
+  if (isChunkError(msg)) { e.preventDefault(); reloadForChunk() }
+})
+
 // ── Global Error Boundary ─────────────────────────────────────────────────────
 interface EBState { error: Error | null }
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {

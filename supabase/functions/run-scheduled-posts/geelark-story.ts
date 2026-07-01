@@ -267,6 +267,53 @@ function escapeForInputText(text: string): string {
     .replace(/ /g, '%s')
 }
 
+// Enlève accents/emojis pour la saisie via `input text` (qui ne tape pas l'Unicode).
+function toAsciiFallback(text: string): string {
+  return text
+    .normalize('NFD').replace(/\p{Mn}/gu, '')  // accents (diacritiques combinants)
+    .replace(/[^\x00-\x7F]/g, '')              // reste non-ASCII (emojis…)
+    .trim()
+}
+
+// Détection de langue UI (locale système) : 'fr' | 'en' | 'other' | 'unknown'.
+async function detectPhoneLang(bearer: string, phoneId: string): Promise<'fr' | 'en' | 'other' | 'unknown'> {
+  let loc: string | undefined
+  try {
+    const { output } = await shellExec(
+      bearer, phoneId,
+      'getprop persist.sys.locale; getprop ro.product.locale; settings get system system_locales',
+      { maxRetries: 3 },
+    )
+    loc = output.toLowerCase().split(/[\s,;]+/).map(s => s.trim()).filter(Boolean)
+      .find(t => /^[a-z]{2}([-_][a-z0-9]{2,})?$/.test(t))
+  } catch { /* illisible */ }
+  if (loc) {
+    if (loc.startsWith('fr')) return 'fr'
+    if (loc.startsWith('en')) return 'en'
+    return 'other'
+  }
+  return 'unknown'
+}
+
+// Champs EditText du dump (texte + centre). Sert à cibler le champ « texte du sticker »
+// (celui qui ne contient pas l'URL http…).
+interface EditField { text: string; center: [number, number]; y: number }
+function findEditTextFields(xml: string): EditField[] {
+  const fields: EditField[] = []
+  const re = /<node\b[^>]*class="[^"]*EditText[^"]*"[^>]*>/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(xml)) !== null) {
+    const el = m[0]
+    const tb = el.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
+    if (!tb) continue
+    const cx = Math.floor((+tb[1] + +tb[3]) / 2)
+    const cy = Math.floor((+tb[2] + +tb[4]) / 2)
+    const tx = el.match(/text="([^"]*)"/)
+    fields.push({ text: tx ? tx[1] : '', center: [cx, cy], y: +tb[2] })
+  }
+  return fields.sort((a, b) => a.y - b.y)
+}
+
 // ── Story posting (server port of postInstagramStory) ────────────────────────
 
 export interface StoryServerConfig {
@@ -299,6 +346,16 @@ export async function postStoryServer(
   const sh = sm ? parseInt(sm[2]) : 2340
   const cx = Math.floor(sw / 2)
   log(`📐 Écran: ${sw}x${sh}`)
+
+  // ── Détection de langue ────────────────────────────────────────────────────
+  // Les boutons ciblés sont FR/EN. Autre langue → on saute le compte plutôt que
+  // de taper à côté et publier une story cassée.
+  const lang = await detectPhoneLang(bearer, phoneId)
+  if (lang === 'other') {
+    log('⏭ Langue du téléphone non supportée (ni FR ni EN) — story ignorée')
+    return { ok: false, error: 'Langue non supportée (ni FR ni EN) — story ignorée' }
+  }
+  log(`🌐 Langue: ${lang === 'unknown' ? 'inconnue (on tente FR+EN)' : lang.toUpperCase()}`)
 
   // ── 0. Wipe the gallery ────────────────────────────────────────────────────
   // Stale media makes IG's story picker grab the wrong file — clear everything
@@ -613,27 +670,91 @@ export async function postStoryServer(
   await sleep(1200)
 
   // Optional custom sticker text — replaces the default "LINK"/"LIEN" label.
+  // Writer robuste (porté du client) : localise le champ « texte du sticker »,
+  // le focus/vide, puis tente PLUSIEURS méthodes de saisie EN SÉQUENCE en relisant
+  // le champ après chaque tentative pour voir laquelle a réellement écrit. Gère le
+  // focus ET l'Unicode (accents/emojis) que `input text` ne sait pas taper.
   if (config.linkText?.trim()) {
-    log('   ✏️  Texte du sticker…')
+    const wanted = config.linkText.trim()
+    const ascii  = toAsciiFallback(wanted)
+    const needle = ascii.toLowerCase()
+    log(`   ✏️  Texte du sticker: "${wanted}"${ascii !== wanted ? ` (ascii: "${ascii}")` : ''}`)
     await sleep(600)
-    xml = await dumpXml(bearer, phoneId)
-    const customPt =
-      findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
-      findByText(xml, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
-      findByTextPartial(xml, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
-    if (customPt) {
-      log(`   ✓ Champ texte trouvé: ${customPt[0]},${customPt[1]}`)
-      await shellExec(bearer, phoneId, `input tap ${customPt[0]} ${customPt[1]}`)
-      await sleep(900)
-    } else {
-      log('   ↩︎ Champ « personnaliser le texte » non détecté — tap sous l\'URL')
-      await shellExec(bearer, phoneId, `input tap ${urlField[0]} ${urlField[1] + Math.floor(sh * 0.07)}`)
-      await sleep(900)
+
+    const readTextField = async (): Promise<EditField | null> => {
+      const fields = findEditTextFields(await dumpXml(bearer, phoneId))
+      return fields.find(f => !/https?:\/\/|www\./i.test(f.text)) ?? (fields.length >= 2 ? fields[1] : null)
     }
-    await shellExec(bearer, phoneId, 'input keyevent --longpress KEYCODE_DEL')
-    await sleep(300)
-    await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
-    await sleep(1000)
+    const present = (fields: EditField[]) =>
+      needle.length > 0 && fields.some(f => !/https?:\/\//i.test(f.text) && toAsciiFallback(f.text).toLowerCase().includes(needle))
+    const focusAndClear = async (pt: [number, number]) => {
+      await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`); await sleep(400)
+      await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`); await sleep(400)
+      await shellExec(bearer, phoneId, 'input keyevent 123'); await sleep(120) // MOVE_END
+      for (let i = 0; i < 3; i++) { await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67'); await sleep(60) }
+      await sleep(120)
+    }
+    const verify = async (): Promise<boolean> => present(findEditTextFields(await dumpXml(bearer, phoneId)))
+
+    let done = false
+    let field = await readTextField()
+    if (!field) {
+      const dump = await dumpXml(bearer, phoneId)
+      const revealPt =
+        findByResourceId(dump, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit', 'caption_text_view', 'sticker_text') ??
+        findByText(dump, 'Customize sticker text', 'Personnaliser le texte du sticker', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
+        findByTextPartial(dump, 'customize sticker', 'personnalis', 'sticker text', 'texte du sticker')
+      if (revealPt) {
+        log('   ↪︎ Ouverture du champ « texte du sticker »…')
+        await shellExec(bearer, phoneId, `input tap ${revealPt[0]} ${revealPt[1]}`); await sleep(800)
+        field = await readTextField()
+      }
+    }
+
+    if (field) {
+      const pt = field.center
+      log(`   🎯 Champ ciblé: ${pt[0]},${pt[1]}`)
+
+      // Méthode 1 : input text (ASCII) — le chemin éprouvé (comme l'URL).
+      if (!done && ascii.length > 0) {
+        await focusAndClear(pt)
+        await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
+        await sleep(700)
+        if (await verify()) { log('   ✓ Saisi via input text (ASCII)'); done = true }
+        else log('   … input text ASCII n\'a rien écrit')
+      }
+      // Méthode 2 : presse-papier + CTRL+V (Unicode, garde accents/emojis).
+      if (!done) {
+        await focusAndClear(pt)
+        const shellSafe = wanted.replace(/'/g, `'\\''`)
+        await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`).catch(() => ({ output: '', status: -1 }))
+        await sleep(300)
+        await shellExec(bearer, phoneId, 'input keycombination 113 50') // CTRL+V
+        await sleep(700)
+        if (await verify()) { log('   ✓ Saisi via presse-papier (CTRL+V)'); done = true }
+        else log('   … CTRL+V n\'a rien collé')
+      }
+      // Méthode 3 : presse-papier + long-press → menu Coller/Paste.
+      if (!done) {
+        await focusAndClear(pt)
+        await shellExec(bearer, phoneId, `input swipe ${pt[0]} ${pt[1]} ${pt[0]} ${pt[1]} 700`) // long-press
+        await sleep(700)
+        const menu = await dumpXml(bearer, phoneId)
+        const pastePt = findByText(menu, 'Paste', 'Coller', 'PASTE', 'COLLER') ?? findByTextPartial(menu, 'paste', 'coller')
+        if (pastePt) {
+          await shellExec(bearer, phoneId, `input tap ${pastePt[0]} ${pastePt[1]}`)
+          await sleep(700)
+          if (await verify()) { log('   ✓ Saisi via menu Coller'); done = true }
+          else log('   … menu Coller n\'a rien collé')
+        } else {
+          log('   … menu Coller introuvable')
+        }
+      }
+    } else {
+      log('   ⚠ Champ texte du sticker introuvable')
+    }
+
+    if (!done) log('   ⚠ Texte du sticker non écrit — publication avec le libellé par défaut')
   }
 
   // Confirm the link (Done / Terminé / checkmark in top-right)
