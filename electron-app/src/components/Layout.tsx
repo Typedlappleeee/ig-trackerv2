@@ -58,6 +58,7 @@ export type Page =
   | 'phones'
   | 'stats'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
+  | 'publishhub' | 'photoposting'
   | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof' | 'videostudio'
   | 'community' | 'support'
   | 'settings' | 'licences'
@@ -94,8 +95,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Publier',
     defaultOpen: true,
     items: [
-      { id: 'posting',     label: 'navPosting',      icon: '🚀' },
-      { id: 'storylink',   label: 'navStoryLink',    icon: '🔗' },
+      { id: 'publishhub',  label: 'Publication',     icon: '🚀' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
@@ -165,6 +165,8 @@ const PAGE_ICON: Record<string, IconKey> = {
   montage:         'scissors',
   remix:           'refresh',
   videostudio:     'video',
+  publishhub:      'send',
+  photoposting:    'send',
   repurpose:       'zap',
   mixer:           'edit',
   spoof:           'shield',
@@ -749,6 +751,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     mixer:       t('navMixer'),
     subtitles:   t('navSubtitles'),
     videostudio: 'Studio vidéo',
+    publishhub:  'Publication',
+    photoposting: 'Publication photo',
     textcopy:    t('pageTextcopy'),
     community:   t('pageCommunity'),
     support:     t('pageSupport'),
