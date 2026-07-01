@@ -506,8 +506,9 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                 key={dayIdx}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => handleDrop(dayIdx, e)}
-                onClick={e => {
-                  if (e.target !== e.currentTarget) return // clic sur un bloc
+                onContextMenu={e => {
+                  if (e.target !== e.currentTarget) return // clic droit sur un bloc → son propre menu
+                  e.preventDefault()
                   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                   let mins = Math.round(((e.clientY - rect.top) / CAL_ROW_H) * 60 / 5) * 5
                   mins = Math.max(0, Math.min(24 * 60 - 5, mins))
@@ -516,8 +517,8 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                   if (nd.getTime() < Date.now()) return // pas dans le passé
                   onSlotClick(nd)
                 }}
-                title="Clique un créneau vide pour programmer un post"
-                style={{ position: 'relative', borderLeft: '1px solid rgba(255,255,255,0.05)', height: 24 * CAL_ROW_H, cursor: 'copy' }}
+                title="Clic droit sur un créneau vide pour programmer un post"
+                style={{ position: 'relative', borderLeft: '1px solid rgba(255,255,255,0.05)', height: 24 * CAL_ROW_H }}
               >
                 {/* Lignes horaires (transparentes aux clics → le créneau reçoit le clic) */}
                 {Array.from({ length: 24 }, (_, h) => (
@@ -1099,7 +1100,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           </div>
         ) : tab === 'calendar' ? (
           <CalendarWeek
-            posts={posts}
+            posts={posts.filter(p => p.status !== 'cancelled')}
             onMove={(p, d) => { void doReschedule(p, d) }}
             onOpen={p => setDetailPost(p)}
             onSlotClick={d => { setPresetSchedAt(toSchedInput(d)); setShowTypeChoice(true) }}
