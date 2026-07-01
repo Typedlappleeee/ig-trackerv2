@@ -486,6 +486,10 @@ export default function StoryLink({ user }: { user: User }) {
     setJobs(assignments.map(a => ({ phoneId: a.phoneId, status: 'idle', logs: [] })))
 
     function addLog(id: string, msg: string) {
+      // Aussi en console (F12) pour diagnostiquer facilement les échecs.
+      const isErr = /échou|echou|erreur|error|❌|⚠️|introuvable|non transf/i.test(msg)
+      if (isErr) console.error(`[STORY ${id.slice(-5)}] ${msg}`)
+      else console.log(`[STORY ${id.slice(-5)}] ${msg}`)
       setJobs(prev => prev.map(j => j.phoneId === id ? { ...j, logs: [...j.logs, msg] } : j))
     }
     function setStatus(id: string, status: JobStatus) {
