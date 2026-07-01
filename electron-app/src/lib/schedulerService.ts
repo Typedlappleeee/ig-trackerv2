@@ -344,6 +344,18 @@ async function executeScheduledPostInner(
     onLog('⏳ Boot téléphones (30s)…')
     await sleep(30_000)
 
+    // 2bis. Purge des popups Meta « Pay or Consent » (RGPD) qui bloquent l'RPA UE.
+    // Instagram uniquement (le RPA reste coincé sur l'interstitiel sinon).
+    if (post.platform !== 'tiktok') {
+      onLog('🧹 Vérification des popups Instagram (consentement pubs)…')
+      try {
+        const { clearInstagramPopupsBatch } = await import('./geelark')
+        await clearInstagramPopupsBatch(bearer, geelarkIds, onLog, { concurrency: 4 })
+      } catch (e) {
+        onLog(`⚠ Purge popups ignorée: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+
     // 3. Create RPA tasks
     onLog('📤 Envoi des tâches de posting…')
     const taskIds: string[] = []
