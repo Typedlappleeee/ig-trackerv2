@@ -539,6 +539,13 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                   const top = (dt.getHours() + dt.getMinutes() / 60) * CAL_ROW_H
                   const canDrag = p.status === 'pending'
                   const typeLabel = p.type === 'story' ? 'Story' : p.type === 'mass_posting' ? 'Mass' : 'Reel'
+                  // Couleur par statut : à venir (violet), en cours (ambre),
+                  // publié (vert), échec (rouge), annulé (gris).
+                  const col = p.status === 'pending'   ? { bg: 'rgba(99,102,241,0.22)',  bd: 'rgba(99,102,241,0.55)' }
+                            : p.status === 'running'   ? { bg: 'rgba(234,179,8,0.22)',   bd: 'rgba(234,179,8,0.5)' }
+                            : p.status === 'done'      ? { bg: 'rgba(16,185,129,0.18)',  bd: 'rgba(16,185,129,0.45)' }
+                            : p.status === 'failed'    ? { bg: 'rgba(248,113,113,0.18)', bd: 'rgba(248,113,113,0.45)' }
+                            : { bg: 'rgba(148,163,184,0.14)', bd: 'rgba(148,163,184,0.35)' }
                   return (
                     <div
                       key={p.id}
@@ -547,11 +554,11 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                       onDragEnd={() => { dragId.current = null }}
                       onClick={e => { e.stopPropagation(); onOpen(p) }}
                       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY, post: p }) }}
-                      title={`${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s) — clic droit pour dupliquer/supprimer`}
+                      title={`${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s) — clic droit pour dupliquer`}
                       style={{
                         position: 'absolute', left: 3, right: 3, top: top + 1, minHeight: 34,
-                        background: p.status === 'running' ? 'rgba(234,179,8,0.22)' : 'rgba(99,102,241,0.22)',
-                        border: `1px solid ${p.status === 'running' ? 'rgba(234,179,8,0.5)' : 'rgba(99,102,241,0.55)'}`,
+                        background: col.bg, border: `1px solid ${col.bd}`,
+                        opacity: (p.status === 'done' || p.status === 'failed' || p.status === 'cancelled') ? 0.82 : 1,
                         borderRadius: 7, padding: '3px 6px', cursor: canDrag ? 'grab' : 'pointer',
                         overflow: 'hidden', zIndex: 2,
                       }}
@@ -583,9 +590,11 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
           }}>
             {([
               { label: 'Dupliquer', fn: () => onDuplicate(menu.post) },
-              { label: 'Reprogrammer (heure précise)', fn: () => onOpen(menu.post) },
-              { label: 'Supprimer', danger: true, fn: () => onDelete(menu.post) },
-            ] as const).map((it, i) => (
+              ...(menu.post.status === 'pending' || menu.post.status === 'running' ? [
+                { label: 'Reprogrammer (heure précise)', fn: () => onOpen(menu.post) },
+                { label: 'Supprimer', danger: true, fn: () => onDelete(menu.post) },
+              ] : []),
+            ] as { label: string; danger?: boolean; fn: () => void }[]).map((it, i) => (
               <button key={i}
                 onClick={() => { it.fn(); setMenu(null) }}
                 style={{
@@ -933,7 +942,6 @@ export function Scheduler({ user, onNavigate }: Props) {
           {([
             { id: 'pending' as TabFilter, label: t('schedulerTabPending'), count: pending.length },
             { id: 'calendar' as TabFilter, label: 'Calendrier', count: 0 },
-            { id: 'history' as TabFilter, label: t('schedulerTabHistory'),  count: history.length },
           ]).map(tabItem => (
             <button
               key={tabItem.id}
@@ -1026,7 +1034,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           </div>
         ) : tab === 'calendar' ? (
           <CalendarWeek
-            posts={pending}
+            posts={posts}
             onMove={(p, d) => { void doReschedule(p, d) }}
             onOpen={p => { if (p.status === 'pending' && p.user_id === user.id) setReschedule(p) }}
             onSlotClick={d => { setPresetSchedAt(toSchedInput(d)); setShowTypeChoice(true) }}
