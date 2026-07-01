@@ -108,6 +108,9 @@ alter table public.phones add column if not exists account_state text;
 -- Nombre de posts faits aujourd'hui (par compte/jour).
 alter table public.account_daily add column if not exists posts_today integer default 0;
 
+-- Détail par compte des runs directs (Mass Posting) → historique cliquable.
+alter table public.post_runs add column if not exists phone_results jsonb default '[]'::jsonb;
+
 -- ════════════════ 7. SUPPRESSION HISTORIQUE (vider l'historique) ════
 -- Permet à un utilisateur de supprimer son propre historique, et à un admin/
 -- propriétaire d'org de vider l'historique de l'org.
