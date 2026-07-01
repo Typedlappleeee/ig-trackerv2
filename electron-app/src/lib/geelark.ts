@@ -43,37 +43,23 @@ async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown
   const url = `${BASE}${path}`
   const headers = bearer ? authHeaders(bearer) : undefined
 
-  // Retente les coupures TRANSITOIRES (blip réseau, proxy Vercel 5xx/429/timeout).
-  // Une story enchaîne des dizaines d'appels shell : sans ça, un seul hoquet réseau
-  // fait échouer toute la story (« GéeLark inaccessible »). On ne retente PAS les
-  // vraies erreurs API (code métier renvoyé par GéeLark), gérées plus haut.
-  const TRANSIENT = /network error|failed to fetch|proxy http (5\d\d|429|408)|timeout|econnre|socket hang/i
-  let lastErr: unknown
-  for (let attempt = 0; attempt < 4; attempt++) {
-    try {
-      if (window.electronAPI?.geelarkRequest) {
-        const result = await window.electronAPI.geelarkRequest({ method, url, headers, body })
-        if (!result.ok) throw new Error(result.error ?? 'Network error')
-        return result.data as Record<string, unknown>
-      }
-      // Web fallback: route through Vercel proxy (bypasses CORS)
-      const res = await fetch('/api/geelark', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method, url, headers: headers ?? {}, body }),
-      })
-      if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
-      const result = await res.json()
-      if (!result.ok) throw new Error(result.error ?? 'Network error')
-      return result.data as Record<string, unknown>
-    } catch (e) {
-      lastErr = e
-      const msg = e instanceof Error ? e.message : String(e)
-      if (!TRANSIENT.test(msg) || attempt === 3) throw e
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
-    }
+  // UN SEUL appel — pas de retry ici : shellExec/les callers retentent déjà par
+  // dessus. Un retry ici multipliait les requêtes (×4) → saturation de l'API GeeLark.
+  if (window.electronAPI?.geelarkRequest) {
+    const result = await window.electronAPI.geelarkRequest({ method, url, headers, body })
+    if (!result.ok) throw new Error(result.error ?? 'Network error')
+    return result.data as Record<string, unknown>
   }
-  throw lastErr
+  // Web fallback: route through Vercel proxy (bypasses CORS)
+  const res = await fetch('/api/geelark', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, url, headers: headers ?? {}, body }),
+  })
+  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
+  const result = await res.json()
+  if (!result.ok) throw new Error(result.error ?? 'Network error')
+  return result.data as Record<string, unknown>
 }
 
 // Fetch all phones (paginates automatically).
@@ -190,8 +176,10 @@ async function shellExec(
       await sleepOrAbort(4000 + attempt * 2000, signal)
       continue
     }
+    console.error(`[shellExec] ÉCHEC ${phoneId.slice(-5)}: code=${code} msg="${msg}" cmd="${cmd.slice(0, 80)}"`)
     throw new Error(`GéeLark shell: ${msg} (code ${code}, cmd="${cmd.slice(0, 60)}")`)
   }
+  console.error(`[shellExec] téléphone non prêt ${phoneId.slice(-5)} après ${maxRetries} tentatives — cmd="${cmd.slice(0, 80)}"`)
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
