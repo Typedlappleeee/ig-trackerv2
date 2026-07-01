@@ -3,9 +3,15 @@ import { Component, type ReactNode } from 'react'
 interface Props { children: ReactNode }
 interface State { hasError: boolean; chunk: boolean; error?: string }
 
-// Messages d'échec de chargement d'un chunk dynamique, tous navigateurs confondus.
-// Survient surtout après un déploiement : l'app ouverte référence d'anciens fichiers
-// hashés qui n'existent plus → l'import() d'une page/fenêtre lazy échoue.
+// Messages d'échec de chargement d'un CHUNK dynamique (page/fenêtre lazy), tous
+// navigateurs confondus. Survient après un déploiement : l'app ouverte référence
+// d'anciens fichiers hashés qui n'existent plus → l'import() échoue.
+//
+// ⚠️ IMPORTANT : ces motifs doivent être SPÉCIFIQUES aux imports de modules. Ne
+// JAMAIS y mettre 'Failed to fetch' / 'Load failed' seuls : ce sont les erreurs
+// génériques de N'IMPORTE QUEL fetch (Supabase, API, images). Quand on revient sur
+// l'onglet après une coupure réseau, un fetch de fond échoué déclenchait alors un
+// reload intempestif. On exige donc « module » / « chunk » / « preload ».
 const CHUNK_PATTERNS = [
   'Failed to fetch dynamically imported module',
   'error loading dynamically imported module',
@@ -14,12 +20,12 @@ const CHUNK_PATTERNS = [
   'ChunkLoadError',
   'Loading chunk',
   'Loading CSS chunk',
-  'Failed to fetch',
-  'Load failed',
   'Unable to preload',
+  'error loading dynamically',
 ]
 
 export function isChunkError(msg: string): boolean {
+  if (!msg) return false
   return CHUNK_PATTERNS.some(p => msg.includes(p))
 }
 
