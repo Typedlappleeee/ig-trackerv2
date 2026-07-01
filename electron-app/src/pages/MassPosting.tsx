@@ -926,9 +926,17 @@ export function MassPosting({ user }: MassPostingProps) {
       const remaining = activePhonesRef.current
       if (remaining.length > 0) {
         log(`Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
-        await geelark(bearer, '/phone/stop', { ids: remaining })
-        unregisterPhones(remaining).catch(() => {})
-        activePhonesRef.current = []  // déjà coupés → évite un double-stop dans le finally
+        let stopOk = false
+        try {
+          const r = await geelark(bearer, '/phone/stop', { ids: remaining })
+          stopOk = r?.['code'] === 0
+        } catch { /* le finally / watchdog serveur prendra le relais */ }
+        if (stopOk) {
+          unregisterPhones(remaining).catch(() => {})
+          activePhonesRef.current = []  // déjà coupés → évite un double-stop dans le finally
+        }
+        // Si l'arrêt a échoué : on GARDE activePhonesRef → le finally retente,
+        // et on GARDE la ligne watchdog → le cron serveur rattrape.
       }
 
       // Mark only phones without a final status yet as done (preserve 'error' states)
@@ -1017,8 +1025,16 @@ export function MassPosting({ user }: MassPostingProps) {
       const stuck = [...new Set(activePhonesRef.current.filter(Boolean))]
       if (stuck.length > 0) {
         log(`Extinction de sécurité de ${stuck.length} téléphone(s)…`, 'warn')
-        try { await geelark(bearer, '/phone/stop', { ids: stuck }) } catch { /* best-effort */ }
-        unregisterPhones(stuck).catch(() => {})
+        let stopOk = false
+        try {
+          const r = await geelark(bearer, '/phone/stop', { ids: stuck })
+          stopOk = r?.['code'] === 0
+        } catch { /* réseau — on garde le watchdog serveur */ }
+        // On ne retire du watchdog serveur QUE si l'extinction a réussi. Sinon on
+        // LAISSE la ligne phone_power_watch : le cron serveur rattrapera le tel
+        // (double sécurité — c'est la garantie « les tels ne restent pas allumés »).
+        if (stopOk) unregisterPhones(stuck).catch(() => {})
+        else log('  Extinction non confirmée — le garde-fou serveur prendra le relais (≤ 5 min)', 'warn')
       }
       // Purge les timers d'auto-stop encore en attente (les tels sont déjà coupés).
       autoStopTimersRef.current.forEach(id => window.clearTimeout(id))
