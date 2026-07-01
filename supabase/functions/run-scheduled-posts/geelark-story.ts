@@ -396,7 +396,7 @@ export async function postStoryServer(
   // Story bilingue (boutons matchés FR ET EN) → pas de forçage de langue. On
   // détecte juste pour info.
   const lang = await detectPhoneLang(bearer, phoneId)
-  log(`🌐 Langue du téléphone détectée: ${lang} (story bilingue FR/EN)`)
+  if (lang !== 'en') log(`🌐 Langue du téléphone détectée: ${lang} (story bilingue FR/EN)`)
 
   // ── Popups de consentement (RGPD) — bloquent le flow story sinon ────────────
   log('🧹 Vérification des popups Instagram (consentement pubs)…')
