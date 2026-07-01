@@ -605,7 +605,11 @@ export async function clearInstagramPopupsBatch(
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, phoneIds.length) }, worker))
-  log?.(`🌐 Langues Instagram — prêts (anglais): ${summary.en} · ENCORE EN FRANÇAIS: ${summary.fr} · indéterminé: ${summary.unknown}`)
+  // On ne loggue le résumé que s'il y a un souci (français/indéterminé) — inutile
+  // de polluer le journal quand tout est déjà en anglais.
+  if (summary.fr > 0 || summary.unknown > 0) {
+    log?.(`🌐 Langues Instagram — prêts (anglais): ${summary.en} · ENCORE EN FRANÇAIS: ${summary.fr} · indéterminé: ${summary.unknown}`)
+  }
   if (summary.fr > 0) log?.(`⚠ ${summary.fr} téléphone(s) toujours en français — le posting peut échouer dessus (vérifie qu'ils sont en Android 15).`)
   return summary
 }
@@ -675,8 +679,8 @@ export async function ensureInstagramEnglish(
   }
 
   let lang = await openAndDetect()
+  if (lang === 'en') return 'en' // déjà en anglais → rien à signaler dans le journal
   log?.(`🌐 Langue Instagram détectée à l'écran : ${lang}`)
-  if (lang === 'en') return 'en'
 
   // Bascule + redémarrage + re-vérification. On tente plusieurs variantes car
   // `set-app-locales` est refusé (status ≠ 0) sur certains téléphones/versions.
@@ -1207,7 +1211,7 @@ async function _postInstagramStoryInner(
   // l'anglais (ça pouvait laisser l'app dans un état mixte). On détecte juste la
   // langue pour info dans les logs.
   const lang = await detectPhoneLang(bearer, phoneId)
-  log(`🌐 Langue du téléphone détectée: ${lang} (story bilingue FR/EN)`)
+  if (lang !== 'en') log(`🌐 Langue du téléphone détectée: ${lang} (story bilingue FR/EN)`)
 
   // ── Popups de consentement (RGPD) ───────────────────────────────────────────
   // Le parcours « Pay or Consent » de Meta bloque l'app et casse le flow story.
