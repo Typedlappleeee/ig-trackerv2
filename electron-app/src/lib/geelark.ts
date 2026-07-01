@@ -957,6 +957,144 @@ async function withPhoneAutoStop<T>(
   }
 }
 
+// ── Post a VIDEO to the Instagram story (no link) ────────────────────────────
+// « Aussi en story » : publie la même vidéo (le Reel) en story. Télécharge la
+// vidéo dans la galerie, ouvre la caméra story, sélectionne la vidéo, passe
+// l'écran de découpe éventuel, puis publie sur « Your story ». ADB, sans sticker.
+export interface VideoStoryConfig { videoUrl: string; dryRun?: boolean }
+
+export async function postVideoStory(
+  bearer: string,
+  phoneId: string,
+  config: VideoStoryConfig,
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+    () => _postVideoStoryInner(bearer, phoneId, config, log))
+}
+
+async function _postVideoStoryInner(
+  bearer: string,
+  phoneId: string,
+  config: VideoStoryConfig,
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  const ready = await ensurePhoneRunning(bearer, phoneId, log)
+  if (!ready) throw new Error('Téléphone non démarré')
+
+  log('📱 Réveil écran…')
+  await shellExec(bearer, phoneId, 'input keyevent 224'); await sleep(800)
+  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400'); await sleep(1200)
+
+  const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
+  const sm = sizeOut.match(/(\d+)x(\d+)/)
+  const sw = sm ? parseInt(sm[1]) : 1080
+  const sh = sm ? parseInt(sm[2]) : 2340
+  log(`📐 Écran: ${sw}x${sh}`)
+
+  // Nettoyage galerie (comme la story image) pour être sûr de sélectionner LA vidéo.
+  log('🧹 Nettoyage de la galerie…')
+  await shellExec(bearer, phoneId,
+    `find /sdcard/DCIM /sdcard/Pictures /sdcard/Download /sdcard/Movies -type f ` +
+    `\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' ` +
+    `-o -iname '*.gif' -o -iname '*.heic' -o -iname '*.mp4' -o -iname '*.mov' \\) ` +
+    `-delete 2>/dev/null; rm -rf /sdcard/DCIM/Camera/* 2>/dev/null; true`)
+  await shellExec(bearer, phoneId,
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; true`)
+
+  // Téléchargement de la vidéo (le téléphone la récupère depuis l'URL signée).
+  const vidPath = '/sdcard/DCIM/Camera/sf_vstory.mp4'
+  const urlEsc = config.videoUrl.replace(/'/g, `'\\''`)
+  let sz = 0
+  for (let t = 0; t < 3 && sz < 10000; t++) {
+    log(`   📤 Téléchargement de la vidéo${t ? ` (essai ${t + 1}/3)` : ''}…`)
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera; ` +
+      `curl -L -s -o '${vidPath}' '${urlEsc}' 2>/dev/null || ` +
+      `wget -q -O '${vidPath}' '${urlEsc}' 2>/dev/null || ` +
+      `toybox wget -O '${vidPath}' '${urlEsc}' 2>/dev/null; true`)
+    const ck = await shellExec(bearer, phoneId, `wc -c < '${vidPath}' 2>/dev/null || echo 0`)
+    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    if (sz < 10000 && t < 2) await sleep(1500)
+  }
+  if (sz < 10000) return { ok: false, error: `Vidéo non transférée sur le téléphone (${sz} octets)` }
+  log(`   📎 Vidéo: ${sz} octets`)
+  await shellExec(bearer, phoneId,
+    `touch -m '${vidPath}'; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${vidPath} 2>/dev/null; true`)
+  await sleep(1500)
+
+  const dismissPerm = async () => {
+    const px = await dumpXml(bearer, phoneId)
+    const allow =
+      findByText(px, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser', 'While using the app', 'Continue', 'Continuer') ??
+      findByResourceId(px, 'permission_allow_button', 'permission_allow_all_button', 'permission_allow_foreground_only_button')
+    if (allow) { await shellExec(bearer, phoneId, `input tap ${allow[0]} ${allow[1]}`); await sleep(1500); return true }
+    return false
+  }
+
+  // Caméra story
+  log('🎬 Ouverture de la caméra story…')
+  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android'); await sleep(1200)
+  await shellExec(bearer, phoneId,
+    'am start -a android.intent.action.VIEW -d "instagram://story-camera" com.instagram.android')
+  await sleep(7000)
+  await dismissPerm()
+
+  // Galerie
+  log('🖼 Sélection de la vidéo dans la galerie…')
+  let xml = await dumpXml(bearer, phoneId)
+  const galleryBtn =
+    findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'media_thumbnail_tray') ??
+    findByText(xml, 'Gallery', 'Galerie')
+  if (galleryBtn) await shellExec(bearer, phoneId, `input tap ${galleryBtn[0]} ${galleryBtn[1]}`)
+  else await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.13)} ${Math.floor(sh * 0.88)}`)
+  await sleep(2500)
+  await dismissPerm()
+
+  // Première vignette (la vidéo qu'on vient de pousser)
+  xml = await dumpXml(bearer, phoneId)
+  const firstThumb = (() => {
+    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+    let best: [number, number] | null = null, bestScore = Infinity
+    let m: RegExpExecArray | null
+    while ((m = re.exec(xml)) !== null) {
+      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
+      const score = y1 * 10000 + x1
+      if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
+    }
+    return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)] as [number, number]
+  })()
+  await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
+  await sleep(3500)
+
+  // Écran de découpe vidéo éventuel → Suivant/Next
+  xml = await dumpXml(bearer, phoneId)
+  const nextPt = findByText(xml, 'Next', 'Suivant') ?? findByResourceId(xml, 'next_button', 'action_next')
+  if (nextPt) { log('   ➡️ Écran de découpe — Suivant'); await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`); await sleep(3000) }
+
+  if (config.dryRun) {
+    log('🧪 Mode test — arrêt avant publication.')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android').catch(() => {})
+    return { ok: true }
+  }
+
+  // Publication
+  log('🚀 Publication de la story vidéo…')
+  xml = await dumpXml(bearer, phoneId)
+  const sharePt =
+    findByText(xml, 'Your story', 'Votre story', 'Share', 'Partager', 'Add to story', 'Ajouter à la story') ??
+    findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button')
+  if (sharePt) await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
+  else await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
+  await sleep(6000)
+
+  const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
+  const stillEditing = /gallery_grid_item|media_picker_grid_item|sticker_button/.test(finalXml)
+  if (stillEditing) return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }
+  log('✅ Story vidéo publiée !')
+  return { ok: true }
+}
+
 export async function postInstagramStory(
   bearer: string,
   phoneId: string,
