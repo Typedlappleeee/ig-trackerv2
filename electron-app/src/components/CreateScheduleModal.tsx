@@ -22,11 +22,12 @@ const SERIF = "'Inter', system-ui, sans-serif"
 
 interface SelVideo { url: string; title: string }
 
-export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform }: {
+export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform, initialSchedAt }: {
   user:      User
   onCreated: () => void
   onClose:   () => void
   initialPlatform?: 'instagram' | 'tiktok'
+  initialSchedAt?: string
 }) {
   const { currentOrg, role, perms } = useOrg()
   const conns = useConnections(user)
@@ -43,7 +44,7 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform 
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [caption, setCaption]           = useState('')
   const [mode, setMode]                 = useState<'seq' | 'random'>('seq')
-  const [schedAt, setSchedAt]           = useState(defaultSchedValue(60))
+  const [schedAt, setSchedAt]           = useState(initialSchedAt || defaultSchedValue(60))
   const delayMin = 0   // délai entre comptes retiré de l'UI (toujours 0)
   const [reelsTrial, setReelsTrial]     = useState(false)
   const [platform, setPlatform]         = useState<'instagram' | 'tiktok'>(initialPlatform ?? 'instagram')
