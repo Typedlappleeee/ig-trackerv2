@@ -23,7 +23,7 @@ const KINDS: Kind[] = [
     grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.45)',
   },
   {
-    id: 'storylink', icon: '🔗', title: 'Story', tag: 'Sticker lien', admin: true,
+    id: 'storylink', icon: '🔗', title: 'Story', tag: 'Sticker lien',
     desc: 'Publie une story avec un lien.',
     grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.42)',
   },

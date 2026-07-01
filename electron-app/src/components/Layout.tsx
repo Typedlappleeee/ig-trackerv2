@@ -691,7 +691,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   const isVisibleTab = (id: Page): boolean => {
     // Pages internes / superadmin ScaleFlow uniquement (Rapports + Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'reports' || id === 'tasks' || id === 'storylink') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'tiktokposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Tous les autres onglets sont visibles pour tout le monde.
