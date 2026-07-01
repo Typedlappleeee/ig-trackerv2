@@ -9,7 +9,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot } from '@/lib/geelark'
+import { takeScreenshot, postVideoStory } from '@/lib/geelark'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
@@ -738,7 +738,7 @@ export function MassPosting({ user }: MassPostingProps) {
               setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
               setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
               log(`  Tâche TikTok créée pour ${asgn.phone.phone_name}`, 'ok')
-              armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
+              if (!postingOpts.alsoStory) armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
             })
           } else {
             log(`  TikTok /task/add: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
@@ -801,7 +801,7 @@ export function MassPosting({ user }: MassPostingProps) {
             setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
             setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
             log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
-            armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
+            if (!postingOpts.alsoStory) armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
           } else {
             log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
             setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
@@ -904,6 +904,23 @@ export function MassPosting({ user }: MassPostingProps) {
                   status: status === 3 ? 'done' : 'error',
                   detail: item['failDesc'] as string | undefined,
                 })
+                // « Aussi en story » : le Reel a réussi → on publie la même vidéo
+                // en story sur ce téléphone (encore allumé) avant de l'éteindre.
+                if (status === 3 && postingOpts.alsoStory) {
+                  try {
+                    const asgn = assignments.find(a => a.phone.geelark_id === phone.geelark_id)
+                    const vurl = asgn?.video ? await resolveVideoPath(asgn.video) : null
+                    if (vurl) {
+                      log(`  🎬 Story vidéo sur ${phone.phone_name}…`, 'info')
+                      const sres = await postVideoStory(bearer, phone.geelark_id, { videoUrl: vurl }, m => log(`   ${m}`, 'info'))
+                      log(sres.ok ? `  ✅ Story publiée : ${phone.phone_name}` : `  ⚠ Story échouée (${phone.phone_name}): ${sres.error}`, sres.ok ? 'ok' : 'warn')
+                    } else {
+                      log(`  ⚠ Story ignorée (${phone.phone_name}) : URL vidéo introuvable`, 'warn')
+                    }
+                  } catch (e) {
+                    log(`  ⚠ Story (${phone.phone_name}): ${e instanceof Error ? e.message : String(e)}`, 'warn')
+                  }
+                }
                 // Power off this phone immediately now that its task is finished
                 geelark(bearer, '/phone/stop', { ids: [phone.geelark_id] })
                   .then(() => log(`  ${phone.phone_name} éteint`, 'ok'))

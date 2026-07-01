@@ -106,6 +106,22 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         </button>
       </div>
 
+      {/* Aussi en story */}
+      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex', fontSize: 14 }}>🎬</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Aussi en story</span>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Publie la même vidéo en story sur chaque compte</p>
+        </div>
+        <button
+          onClick={() => set({ alsoStory: !opts.alsoStory })}
+          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+          style={{ background: opts.alsoStory ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.alsoStory ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
+      </div>
+
       {/* Expanded interval controls */}
       {on && (
         <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
