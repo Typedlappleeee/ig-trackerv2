@@ -488,11 +488,6 @@ export async function clearInstagramPopups(
   log?: (m: string) => void,
   signal?: AbortSignal,
 ): Promise<'en' | 'fr' | 'unknown'> {
-  const tap = async (pt: [number, number]) => {
-    await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { maxRetries: 2, signal }).catch(() => {})
-    await sleepOrAbort(1400, signal)
-  }
-
   // Verrouille l'UI Instagram en anglais (le RPA de posting cible l'UI EN et ne
   // trouve pas la vidéo en français) — avec VÉRIFICATION réelle à l'écran. Laisse
   // Instagram ouvert pour la purge des popups qui suit.
@@ -501,48 +496,75 @@ export async function clearInstagramPopups(
     log?.('   ⚠ Instagram TOUJOURS en français après bascule — le RPA risque d\'échouer. Vérifie que le téléphone est en Android 15.')
   }
 
-  let acted = false
-  for (let i = 0; i < 10; i++) {
-    if (signal?.aborted) return igLang
-    const xml = await dumpXml(bearer, phoneId, log)
-    const low = xml.toLowerCase()
+  // Purge les popups de consentement (FR + EN).
+  await dismissConsentPopups(bearer, phoneId, log, signal)
 
-    // 1) Dernier écran « Here's what to expect with personalized ads » → Confirm
-    let pt = findByText(xml, 'Confirm') ?? findByTextPartial(xml, 'Confirm')
-    if (pt && low.includes('personalized ads')) { log?.('   ✔ Consent: Confirm'); await tap(pt); acted = true; continue }
-
-    // 2) « agree to Meta processing your data » → Agree
-    pt = findByText(xml, 'Agree') ?? findByTextPartial(xml, 'Agree')
-    if (pt && (low.includes('processing your data') || low.includes('agree to meta') || low.includes('consent to meta'))) {
-      log?.('   ✔ Consent: Agree'); await tap(pt); acted = true; continue
-    }
-
-    // 3) « Subscribe or continue … free of charge with ads? » → choisir gratuit puis Continue
-    if (low.includes('free of charge with ads') || low.includes('free with ads') || low.includes('subscribe to use')) {
-      const optPt = findByTextPartial(xml, 'free of charge with ads', 'free with ads', 'Use free')
-      if (optPt) { log?.('   ✔ Consent: option gratuite avec pubs'); await tap(optPt) }
-      const contPt = findByText(xml, 'Continue') ?? findByTextPartial(xml, 'Continue')
-      if (contPt) { log?.('   ✔ Consent: Continue'); await tap(contPt); acted = true; continue }
-    }
-
-    // 4) Premier écran « Choose if we process your data for ads » → Get started
-    pt = findByText(xml, 'Get started') ?? findByTextPartial(xml, 'Get started', 'Commencer')
-    if (pt && (low.includes('data for ads') || low.includes('process your'))) {
-      log?.('   ✔ Consent: Get started'); await tap(pt); acted = true; continue
-    }
-
-    // 5) Popups non bloquants courants (notifs, « save login info », etc.) → fermer
-    pt = findByText(xml, 'Not now', 'Not Now', 'Plus tard', 'Skip', 'Later', 'Dismiss', 'Pas maintenant')
-    if (pt) { log?.('   ✔ Popup fermé'); await tap(pt); acted = true; continue }
-
-    break // plus rien à traiter
-  }
-
-  if (acted) log?.('   ✅ Popups Instagram traités')
   // État propre pour que l'RPA relance Instagram à froid.
   await shellExec(bearer, phoneId, 'am force-stop com.instagram.android', { maxRetries: 2, signal }).catch(() => {})
   await sleepOrAbort(1500, signal)
   return igLang
+}
+
+// Clique tout le parcours de consentement Meta « Pay or Consent » (RGPD) + popups
+// courants, en FR et EN. Suppose Instagram déjà ouvert (l'ouvre sinon). Ne force
+// pas la langue ni le force-stop → réutilisable par le posting ET les stories.
+export async function dismissConsentPopups(
+  bearer: string,
+  phoneId: string,
+  log?: (m: string) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const tap = async (pt: [number, number]) => {
+    await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { maxRetries: 2, signal }).catch(() => {})
+    await sleepOrAbort(1400, signal)
+  }
+  // S'assure qu'Instagram est au premier plan (no-op s'il l'est déjà).
+  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity', { maxRetries: 2, signal }).catch(() => {})
+  await sleepOrAbort(3000, signal)
+
+  let acted = false
+  for (let i = 0; i < 10; i++) {
+    if (signal?.aborted) return
+    const xml = await dumpXml(bearer, phoneId, log)
+    const low = xml.toLowerCase()
+
+    // 1) « Here's what to expect with personalized ads » → Confirm / Confirmer
+    let pt = findByText(xml, 'Confirm', 'Confirmer') ?? findByTextPartial(xml, 'Confirm', 'Confirmer')
+    if (pt && (low.includes('personalized ads') || low.includes('publicités personnalisées') || low.includes('publicites personnalisees'))) {
+      log?.('   ✔ Consent: Confirm'); await tap(pt); acted = true; continue
+    }
+
+    // 2) « agree to Meta processing your data » → Agree / J'accepte / Accepter
+    pt = findByText(xml, 'Agree', "J'accepte", 'J’accepte', 'Accepter') ?? findByTextPartial(xml, 'Agree', 'accepte')
+    if (pt && (low.includes('processing your data') || low.includes('agree to meta') || low.includes('consent to meta')
+      || low.includes('traiter tes données') || low.includes('traitement de tes données') || low.includes('traiter tes donnees'))) {
+      log?.('   ✔ Consent: Agree'); await tap(pt); acted = true; continue
+    }
+
+    // 3) « … free of charge with ads? » → choisir gratuit puis Continue / Continuer
+    if (low.includes('free of charge with ads') || low.includes('free with ads') || low.includes('subscribe to use')
+      || low.includes('gratuitement avec des publicités') || low.includes('gratuitement avec les publicités') || low.includes("s'abonner")) {
+      const optPt = findByTextPartial(xml, 'free of charge with ads', 'free with ads', 'Use free',
+        'gratuitement avec des publicités', 'gratuitement avec les publicités', 'utiliser gratuitement')
+      if (optPt) { log?.('   ✔ Consent: option gratuite avec pubs'); await tap(optPt) }
+      const contPt = findByText(xml, 'Continue', 'Continuer') ?? findByTextPartial(xml, 'Continue', 'Continuer')
+      if (contPt) { log?.('   ✔ Consent: Continue'); await tap(contPt); acted = true; continue }
+    }
+
+    // 4) « Choose if we process your data for ads » → Get started / Commencer
+    pt = findByText(xml, 'Get started', 'Commencer') ?? findByTextPartial(xml, 'Get started', 'Commencer')
+    if (pt && (low.includes('data for ads') || low.includes('process your')
+      || low.includes('données pour les publicités') || low.includes('données à des fins publicitaires') || low.includes('donnees'))) {
+      log?.('   ✔ Consent: Get started'); await tap(pt); acted = true; continue
+    }
+
+    // 5) Popups non bloquants (notifs, « save login info »…) → fermer
+    pt = findByText(xml, 'Not now', 'Not Now', 'Plus tard', 'Skip', 'Later', 'Dismiss', 'Pas maintenant', 'Ignorer')
+    if (pt) { log?.('   ✔ Popup fermé'); await tap(pt); acted = true; continue }
+
+    break // plus rien à traiter
+  }
+  if (acted) log?.('   ✅ Popups Instagram traités')
 }
 
 // Traite les popups sur plusieurs téléphones en parallèle avec une concurrence
@@ -1171,6 +1193,12 @@ async function _postInstagramStoryInner(
   // langue pour info dans les logs.
   const lang = await detectPhoneLang(bearer, phoneId)
   log(`🌐 Langue du téléphone détectée: ${lang} (story bilingue FR/EN)`)
+
+  // ── Popups de consentement (RGPD) ───────────────────────────────────────────
+  // Le parcours « Pay or Consent » de Meta bloque l'app et casse le flow story.
+  // On le clique (FR + EN) avant de continuer. Le choix est mémorisé par compte.
+  log('🧹 Vérification des popups Instagram (consentement pubs)…')
+  await dismissConsentPopups(bearer, phoneId, m => log(`   ${m}`))
 
   // ── 0. Wipe the gallery ────────────────────────────────────────────────────
   // Stale photos/videos make Instagram's story picker grab the wrong (old) media
