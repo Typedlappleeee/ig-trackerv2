@@ -43,13 +43,12 @@ async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown
   const url = `${BASE}${path}`
   const headers = bearer ? authHeaders(bearer) : undefined
 
-  // UN SEUL appel — pas de retry ici : shellExec/les callers retentent déjà par
-  // dessus. Un retry ici multipliait les requêtes (×4) → saturation de l'API GeeLark.
   if (window.electronAPI?.geelarkRequest) {
     const result = await window.electronAPI.geelarkRequest({ method, url, headers, body })
     if (!result.ok) throw new Error(result.error ?? 'Network error')
     return result.data as Record<string, unknown>
   }
+
   // Web fallback: route through Vercel proxy (bypasses CORS)
   const res = await fetch('/api/geelark', {
     method: 'POST',
@@ -176,10 +175,8 @@ async function shellExec(
       await sleepOrAbort(4000 + attempt * 2000, signal)
       continue
     }
-    console.error(`[shellExec] ÉCHEC ${phoneId.slice(-5)}: code=${code} msg="${msg}" cmd="${cmd.slice(0, 80)}"`)
     throw new Error(`GéeLark shell: ${msg} (code ${code}, cmd="${cmd.slice(0, 60)}")`)
   }
-  console.error(`[shellExec] téléphone non prêt ${phoneId.slice(-5)} après ${maxRetries} tentatives — cmd="${cmd.slice(0, 80)}"`)
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
@@ -454,26 +451,10 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
   return null
 }
 
-// Dump uiautomator robuste : `uiautomator dump` échoue par intermittence
-// (« ERROR: null root node… », pendant une animation) — et le `&&` d'origine
-// sautait alors le `cat` → écran vide → taps à côté. Ici on cat TOUJOURS et on
-// réessaie. On N'UTILISE PAS `--compressed` : le dump compressé retire des nœuds
-// (dont le sticker « Lien »), ce qui cassait la détection.
-async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => void): Promise<string> {
+async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
-  let last = ''
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { output } = await shellExec(
-      bearer, phoneId,
-      `uiautomator dump ${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
-    )
-    last = output
-    const nodes = (output.match(/<node\b/g) || []).length
-    if (output.includes('<hierarchy') && nodes > 1) return output
-    log?.(`   ⏳ Lecture d'écran incomplète (essai ${attempt + 1}/4) — nouvel essai…`)
-    await sleep(1300)
-  }
-  return last
+  const { output } = await shellExec(bearer, phoneId, `uiautomator dump ${f} && cat ${f}`)
+  return output
 }
 
 // Find every EditText node in the dump, with its current text and center point.
@@ -944,312 +925,6 @@ async function withPhoneAutoStop<T>(
   }
 }
 
-// ── Post a VIDEO to the Instagram story (no link) ────────────────────────────
-// « Aussi en story » : publie la même vidéo (le Reel) en story. Télécharge la
-// vidéo dans la galerie, ouvre la caméra story, sélectionne la vidéo, passe
-// l'écran de découpe éventuel, puis publie sur « Your story ». ADB, sans sticker.
-export interface VideoStoryConfig { videoUrl: string; dryRun?: boolean }
-
-export async function postVideoStory(
-  bearer: string,
-  phoneId: string,
-  config: VideoStoryConfig,
-  log: (m: string) => void,
-): Promise<{ ok: boolean; error?: string }> {
-  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
-    () => _postVideoStoryInner(bearer, phoneId, config, log))
-}
-
-async function _postVideoStoryInner(
-  bearer: string,
-  phoneId: string,
-  config: VideoStoryConfig,
-  log: (m: string) => void,
-): Promise<{ ok: boolean; error?: string }> {
-  const ready = await ensurePhoneRunning(bearer, phoneId, log)
-  if (!ready) throw new Error('Téléphone non démarré')
-
-  log('📱 Réveil écran…')
-  await shellExec(bearer, phoneId, 'input keyevent 224'); await sleep(800)
-  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400'); await sleep(1200)
-
-  const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
-  const sm = sizeOut.match(/(\d+)x(\d+)/)
-  const sw = sm ? parseInt(sm[1]) : 1080
-  const sh = sm ? parseInt(sm[2]) : 2340
-  log(`📐 Écran: ${sw}x${sh}`)
-
-  // Nettoyage galerie (comme la story image) pour être sûr de sélectionner LA vidéo.
-  log('🧹 Nettoyage de la galerie…')
-  await shellExec(bearer, phoneId,
-    `find /sdcard/DCIM /sdcard/Pictures /sdcard/Download /sdcard/Movies -type f ` +
-    `\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' ` +
-    `-o -iname '*.gif' -o -iname '*.heic' -o -iname '*.mp4' -o -iname '*.mov' \\) ` +
-    `-delete 2>/dev/null; rm -rf /sdcard/DCIM/Camera/* 2>/dev/null; true`)
-  await shellExec(bearer, phoneId,
-    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; true`)
-
-  // Téléchargement de la vidéo (le téléphone la récupère depuis l'URL signée).
-  const vidPath = '/sdcard/DCIM/Camera/sf_vstory.mp4'
-  const urlEsc = config.videoUrl.replace(/'/g, `'\\''`)
-  let sz = 0
-  for (let t = 0; t < 3 && sz < 10000; t++) {
-    log(`   📤 Téléchargement de la vidéo${t ? ` (essai ${t + 1}/3)` : ''}…`)
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera; ` +
-      `curl -L -s -o '${vidPath}' '${urlEsc}' 2>/dev/null || ` +
-      `wget -q -O '${vidPath}' '${urlEsc}' 2>/dev/null || ` +
-      `toybox wget -O '${vidPath}' '${urlEsc}' 2>/dev/null; true`)
-    const ck = await shellExec(bearer, phoneId, `wc -c < '${vidPath}' 2>/dev/null || echo 0`)
-    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    if (sz < 10000 && t < 2) await sleep(1500)
-  }
-  if (sz < 10000) return { ok: false, error: `Vidéo non transférée sur le téléphone (${sz} octets)` }
-  log(`   📎 Vidéo: ${sz} octets`)
-  await shellExec(bearer, phoneId,
-    `touch -m '${vidPath}'; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${vidPath} 2>/dev/null; true`)
-  await sleep(1500)
-
-  const dismissPerm = async () => {
-    const px = await dumpXml(bearer, phoneId)
-    const allow =
-      findByText(px, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser', 'While using the app', 'Continue', 'Continuer') ??
-      findByResourceId(px, 'permission_allow_button', 'permission_allow_all_button', 'permission_allow_foreground_only_button')
-    if (allow) { await shellExec(bearer, phoneId, `input tap ${allow[0]} ${allow[1]}`); await sleep(1500); return true }
-    return false
-  }
-
-  // Caméra story
-  log('🎬 Ouverture de la caméra story…')
-  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android'); await sleep(1200)
-  await shellExec(bearer, phoneId,
-    'am start -a android.intent.action.VIEW -d "instagram://story-camera" com.instagram.android')
-  await sleep(7000)
-  await dismissPerm()
-
-  // Galerie
-  log('🖼 Sélection de la vidéo dans la galerie…')
-  let xml = await dumpXml(bearer, phoneId)
-  const galleryBtn =
-    findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'media_thumbnail_tray') ??
-    findByText(xml, 'Gallery', 'Galerie')
-  if (galleryBtn) await shellExec(bearer, phoneId, `input tap ${galleryBtn[0]} ${galleryBtn[1]}`)
-  else await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.13)} ${Math.floor(sh * 0.88)}`)
-  await sleep(2500)
-  await dismissPerm()
-
-  // Première vignette (la vidéo qu'on vient de pousser)
-  xml = await dumpXml(bearer, phoneId)
-  const firstThumb = (() => {
-    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
-    let best: [number, number] | null = null, bestScore = Infinity
-    let m: RegExpExecArray | null
-    while ((m = re.exec(xml)) !== null) {
-      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
-      const score = y1 * 10000 + x1
-      if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
-    }
-    return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)] as [number, number]
-  })()
-  await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
-  await sleep(3500)
-
-  // Écran de découpe vidéo éventuel → Suivant/Next
-  xml = await dumpXml(bearer, phoneId)
-  const nextPt = findByText(xml, 'Next', 'Suivant') ?? findByResourceId(xml, 'next_button', 'action_next')
-  if (nextPt) { log('   ➡️ Écran de découpe — Suivant'); await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`); await sleep(3000) }
-
-  if (config.dryRun) {
-    log('🧪 Mode test — arrêt avant publication.')
-    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android').catch(() => {})
-    return { ok: true }
-  }
-
-  // Publication
-  log('🚀 Publication de la story vidéo…')
-  xml = await dumpXml(bearer, phoneId)
-  const sharePt =
-    findByText(xml, 'Your story', 'Votre story', 'Share', 'Partager', 'Add to story', 'Ajouter à la story') ??
-    findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button')
-  if (sharePt) await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
-  else await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
-  await sleep(6000)
-
-  const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
-  const stillEditing = /gallery_grid_item|media_picker_grid_item|sticker_button/.test(finalXml)
-  if (stillEditing) return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }
-  log('✅ Story vidéo publiée !')
-  return { ok: true }
-}
-
-// ── Post a PHOTO to the Instagram feed (ADB) ─────────────────────────────────
-// Ouvre le flux « nouvelle publication », choisit la photo, enchaîne les écrans
-// (recadrage → filtres) puis saisit la légende et publie. Fragile (UI IG) —
-// chaque étape a un lookup id/texte + fallback coordonnées, avec logs.
-export interface PhotoPostConfig { imageUrl: string; caption?: string; dryRun?: boolean }
-
-export async function postInstagramPhoto(
-  bearer: string,
-  phoneId: string,
-  config: PhotoPostConfig,
-  log: (m: string) => void,
-): Promise<{ ok: boolean; error?: string }> {
-  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
-    () => _postInstagramPhotoInner(bearer, phoneId, config, log))
-}
-
-async function _postInstagramPhotoInner(
-  bearer: string,
-  phoneId: string,
-  config: PhotoPostConfig,
-  log: (m: string) => void,
-): Promise<{ ok: boolean; error?: string }> {
-  const ready = await ensurePhoneRunning(bearer, phoneId, log)
-  if (!ready) throw new Error('Téléphone non démarré')
-
-  log('📱 Réveil écran…')
-  await shellExec(bearer, phoneId, 'input keyevent 224'); await sleep(800)
-  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400'); await sleep(1200)
-
-  const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
-  const sm = sizeOut.match(/(\d+)x(\d+)/)
-  const sw = sm ? parseInt(sm[1]) : 1080
-  const sh = sm ? parseInt(sm[2]) : 2340
-  log(`📐 Écran: ${sw}x${sh}`)
-
-  // Nettoyage galerie + téléchargement de la photo
-  log('🧹 Nettoyage de la galerie…')
-  await shellExec(bearer, phoneId,
-    `find /sdcard/DCIM /sdcard/Pictures /sdcard/Download /sdcard/Movies -type f ` +
-    `\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' ` +
-    `-o -iname '*.heic' -o -iname '*.mp4' -o -iname '*.mov' \\) -delete 2>/dev/null; ` +
-    `rm -rf /sdcard/DCIM/Camera/* 2>/dev/null; true`)
-  await shellExec(bearer, phoneId,
-    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; true`)
-
-  const imgPath = '/sdcard/DCIM/Camera/sf_photo.jpg'
-  const urlEsc = config.imageUrl.replace(/'/g, `'\\''`)
-  let sz = 0
-  for (let t = 0; t < 3 && sz < 2000; t++) {
-    log(`   📤 Téléchargement de la photo${t ? ` (essai ${t + 1}/3)` : ''}…`)
-    await shellExec(bearer, phoneId,
-      `mkdir -p /sdcard/DCIM/Camera; ` +
-      `curl -L -s -o '${imgPath}' '${urlEsc}' 2>/dev/null || ` +
-      `wget -q -O '${imgPath}' '${urlEsc}' 2>/dev/null || ` +
-      `toybox wget -O '${imgPath}' '${urlEsc}' 2>/dev/null; true`)
-    const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
-    sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-    if (sz < 2000 && t < 2) await sleep(1500)
-  }
-  if (sz < 2000) return { ok: false, error: `Photo non transférée sur le téléphone (${sz} octets)` }
-  log(`   📎 Photo: ${sz} octets`)
-  await shellExec(bearer, phoneId,
-    `touch -m '${imgPath}'; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath} 2>/dev/null; true`)
-  await sleep(1500)
-
-  const dismissPerm = async () => {
-    const px = await dumpXml(bearer, phoneId)
-    const allow =
-      findByText(px, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser', 'While using the app', 'Continue', 'Continuer') ??
-      findByResourceId(px, 'permission_allow_button', 'permission_allow_all_button', 'permission_allow_foreground_only_button')
-    if (allow) { await shellExec(bearer, phoneId, `input tap ${allow[0]} ${allow[1]}`); await sleep(1500); return true }
-    return false
-  }
-
-  // Ouvre le flux « nouvelle publication »
-  log('➕ Ouverture d\'une nouvelle publication…')
-  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android'); await sleep(1200)
-  await shellExec(bearer, phoneId,
-    'am start -a android.intent.action.VIEW -d "instagram://library?media_type=PHOTO" com.instagram.android')
-  await sleep(6000)
-  await dismissPerm()
-
-  // Si le deep link n'a pas ouvert le picker → tap sur l'onglet « + »
-  let xml = await dumpXml(bearer, phoneId)
-  const onPicker =
-    findByResourceId(xml, 'gallery_grid_item', 'media_picker_grid_item', 'gallery_recycler_view') ??
-    findByText(xml, 'Recents', 'Récents', 'New post', 'Nouvelle publication')
-  if (!onPicker) {
-    log('   ↩︎ Picker non détecté — tap sur « + »…')
-    await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity'); await sleep(4000)
-    const homeXml = await dumpXml(bearer, phoneId)
-    const plus = findByResourceId(homeXml, 'tab_bar_camera_button', 'creation_tab', 'tab_avatar') ??
-      findByText(homeXml, 'Create', 'Créer', 'New post', 'Nouvelle publication')
-    if (plus) { await shellExec(bearer, phoneId, `input tap ${plus[0]} ${plus[1]}`) }
-    else await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.5)} ${Math.floor(sh * 0.965)}`)
-    await sleep(4000)
-    await dismissPerm()
-  }
-
-  // Sélectionne la première photo
-  log('🖼 Sélection de la photo…')
-  xml = await dumpXml(bearer, phoneId)
-  const firstThumb = (() => {
-    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
-    let best: [number, number] | null = null, bestScore = Infinity
-    let m: RegExpExecArray | null
-    while ((m = re.exec(xml)) !== null) {
-      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
-      const score = y1 * 10000 + x1
-      if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
-    }
-    return best ?? [Math.floor(sw * 0.17), Math.floor(sh * 0.42)] as [number, number]
-  })()
-  await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
-  await sleep(2500)
-
-  // Écran recadrage → Next/Suivant
-  const tapNext = async (label: string) => {
-    const nx = await dumpXml(bearer, phoneId)
-    const pt = findByText(nx, 'Next', 'Suivant') ?? findByResourceId(nx, 'next_button', 'action_next', 'creation_next_button')
-    if (pt) { log(`   ➡️ ${label}`); await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`) }
-    else { log(`   ➡️ ${label} (fallback coin haut-droit)`); await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.92)} ${Math.floor(sh * 0.06)}`) }
-    await sleep(3000)
-  }
-  await tapNext('Recadrage → Suivant')
-  await tapNext('Filtres → Suivant')
-
-  // Légende
-  if (config.caption?.trim()) {
-    log('✏️  Saisie de la légende…')
-    xml = await dumpXml(bearer, phoneId)
-    const capField =
-      findByResourceId(xml, 'caption_input_text_view', 'caption_text_view', 'caption_edit_text') ??
-      findByText(xml, 'Write a caption', 'Ajouter une légende', 'Écrivez une légende', 'Add a caption') ??
-      [Math.floor(sw * 0.5), Math.floor(sh * 0.18)] as [number, number]
-    await shellExec(bearer, phoneId, `input tap ${capField[0]} ${capField[1]}`); await sleep(900)
-    await shellExec(bearer, phoneId, `input text "${escapeForInputText(toAsciiFallback(config.caption.trim()))}"`); await sleep(800)
-    // Ferme le clavier / valide la légende (OK / Terminé souvent en haut-droit)
-    const okXml = await dumpXml(bearer, phoneId)
-    const okPt = findByText(okXml, 'OK', 'Done', 'Terminé', 'Valider')
-    if (okPt) { await shellExec(bearer, phoneId, `input tap ${okPt[0]} ${okPt[1]}`) }
-    else await shellExec(bearer, phoneId, 'input keyevent 4') // back → close keyboard
-    await sleep(1500)
-  }
-
-  if (config.dryRun) {
-    log('🧪 Mode test — arrêt avant publication.')
-    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android').catch(() => {})
-    return { ok: true }
-  }
-
-  // Partage
-  log('🚀 Publication…')
-  xml = await dumpXml(bearer, phoneId)
-  const sharePt =
-    findByText(xml, 'Share', 'Partager', 'OK') ??
-    findByResourceId(xml, 'share_footer_button', 'next_button', 'action_share', 'creation_next_button')
-  if (sharePt) await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
-  else await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.92)} ${Math.floor(sh * 0.06)}`)
-  await sleep(6000)
-
-  const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
-  const stillEditing = /caption_input|gallery_grid_item|media_picker_grid_item|share_footer/.test(finalXml)
-  if (stillEditing) return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }
-  log('✅ Photo publiée !')
-  return { ok: true }
-}
-
 export async function postInstagramStory(
   bearer: string,
   phoneId: string,
@@ -1337,7 +1012,7 @@ async function _postInstagramStoryInner(
   // mis-classify it → Instagram's gallery can't open it → "image n'upload pas".
   let outExt = 'png'
 
-  // Download the image server-side (via /api/ig) to avoid CORS, then compress
+  // Download the image server-side (via /api/proxy) to avoid CORS, then compress
   // client-side and push as base64 chunks via shell. Target: < 200 KB JPEG so the
   // push takes ~5 seconds instead of hanging with 2600+ chunks.
   const bufToB64 = (buf: ArrayBuffer | Uint8Array): string => {
@@ -1351,9 +1026,9 @@ async function _postInstagramStoryInner(
 
   let imgBase64: string | null = null
 
-  // Download: try /api/ig (server-side, no CORS) then direct fetch
+  // Download: try /api/proxy (server-side, no CORS) then direct fetch
   try {
-    const pr = await fetch('/api/ig', {
+    const pr = await fetch('/api/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: config.imageUrl }),
@@ -1457,28 +1132,22 @@ async function _postInstagramStoryInner(
   if (/^https?:\/\//i.test(config.imageUrl)) {
     const dlPath = `/sdcard/DCIM/Camera/sf_story.${_imgExt}`
     const urlEsc = config.imageUrl.replace(/'/g, `'\\''`)
-    // Jusqu'à 3 tentatives : le téléchargement direct rate parfois (DNS/proxy du
-    // téléphone pas encore prêt juste après le boot) → une seule tentative faisait
-    // échouer la story. On réessaie avant de basculer sur le base64.
-    for (let dlTry = 0; dlTry < 3 && sz < 2000; dlTry++) {
-      log(`   📤 Téléchargement direct par le téléphone${dlTry ? ` (essai ${dlTry + 1}/3)` : ''}…`)
-      await shellExec(bearer, phoneId,
-        `mkdir -p /sdcard/DCIM/Camera; ` +
-        `curl -L -s -o '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
-        `wget -q -O '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
-        `toybox wget -O '${dlPath}' '${urlEsc}' 2>/dev/null; true`)
-      const ckd = await shellExec(bearer, phoneId, `wc -c < '${dlPath}' 2>/dev/null || echo 0`)
-      const szd = parseInt(ckd.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-      if (szd >= 2000) {
-        imgPath = dlPath
-        outExt = _imgExt
-        sz = szd
-        log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
-      } else {
-        log(`   ⚠️ Téléchargement direct échoué (${szd} o)${dlTry < 2 ? ' — nouvel essai…' : ' — bascule sur base64…'}`)
-        await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
-        if (dlTry < 2) await sleep(1500)
-      }
+    log('   📤 Téléchargement direct par le téléphone…')
+    await shellExec(bearer, phoneId,
+      `mkdir -p /sdcard/DCIM/Camera; ` +
+      `curl -L -s -o '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+      `wget -q -O '${dlPath}' '${urlEsc}' 2>/dev/null || ` +
+      `toybox wget -O '${dlPath}' '${urlEsc}' 2>/dev/null; true`)
+    const ckd = await shellExec(bearer, phoneId, `wc -c < '${dlPath}' 2>/dev/null || echo 0`)
+    const szd = parseInt(ckd.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+    if (szd >= 2000) {
+      imgPath = dlPath
+      outExt = _imgExt
+      sz = szd
+      log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
+    } else {
+      log(`   ⚠️ Téléchargement direct échoué (${szd} o) — bascule sur base64…`)
+      await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
     }
   }
 
@@ -1506,7 +1175,8 @@ async function _postInstagramStoryInner(
   }
 
   // Force media scanner so Instagram's gallery picker sees the new file.
-  // touch -m → timestamp frais (apparaît en 1er dans Recents) + broadcast scan.
+  // touch -m sets current timestamp → file appears FIRST in "Recents".
+  // Two scan methods for compatibility across Android versions.
   await shellExec(bearer, phoneId,
     `touch -m '${imgPath}' && ` +
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath} 2>/dev/null; ` +
@@ -1626,51 +1296,54 @@ async function _postInstagramStoryInner(
   await sleep(3500) // extra time for tray to fully load
 
   xml = await dumpXml(bearer, phoneId)
-
-  // Recherche large du sticker « Lien » dans le tiroir (texte OU content-desc).
-  const KW_FIND = ['link', 'lien', 'url', 'add a link', 'ajouter un lien', 'sticker lien', 'link sticker']
-  const findLink = (x: string): [number, number] | null =>
-    findByResourceId(x, 'link_sticker', 'sticker_link', 'link_sticker_id') ??
-    findByTextPartial(x, ...KW_FIND)
-
-  let linkSticker = findLink(xml)
-
-  if (!linkSticker) {
-    // Passe TOUJOURS par la recherche : l'ordre du tiroir change souvent et le
-    // sticker « Lien » n'est plus visible d'emblée sur les IG récents.
+  const linkSticker =
+    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
+    findByTextPartial(xml, 'link', 'lien') ??
+    findByResourceId(xml, 'link_sticker', 'sticker_link')
+  if (linkSticker) {
+    await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
+  } else {
+    // Search the sticker tray for "link"/"lien" via the built-in search bar
     const searchPt =
-      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input', 'search_edit_text') ??
-      findByTextPartial(xml, 'search', 'recherch', 'cherch') ??
-      [cx, Math.floor(sh * 0.14)] as [number, number]  // fallback : barre en haut du tiroir
-    log(`   🔎 Recherche du sticker via la barre (${searchPt[0]},${searchPt[1]})…`)
-    await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
-    await sleep(1000)
-
-    for (const term of ['link', 'lien', 'url']) {
-      // vide le champ puis tape le terme
-      await shellExec(bearer, phoneId, 'input keyevent 123'); await sleep(120)
-      for (let i = 0; i < 3; i++) { await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67'); await sleep(50) }
-      await shellExec(bearer, phoneId, `input text "${term}"`)
-      await sleep(2200)
-      const xs = await dumpXml(bearer, phoneId)
-      linkSticker = findLink(xs)
-      if (linkSticker) { log(`   ✓ Sticker « Lien » trouvé (recherche « ${term} »)`); break }
-    }
-
-    // Dernier recours : taper le PREMIER résultat sous la barre de recherche.
-    if (!linkSticker) {
-      const xs = await dumpXml(bearer, phoneId)
-      // Liste ce que voit l'écran → diagnostic pour ajuster les sélecteurs.
-      const descs = Array.from(xs.matchAll(/content-desc="([^"]+)"/g)).map(m => m[1]).filter(Boolean).slice(0, 40)
-      log(`   🧭 Diagnostic tiroir stickers — content-desc vus : ${descs.join(' | ').slice(0, 400)}`)
-      // Premier résultat = généralement le sticker Lien, juste sous la barre.
-      const firstResult: [number, number] = [Math.floor(sw * 0.2), Math.floor(sh * 0.28)]
-      log(`   ↪︎ Aucun libellé trouvé — tap du 1er résultat (${firstResult[0]},${firstResult[1]})`)
-      linkSticker = firstResult
+      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box', 'search_input') ??
+      findByTextPartial(xml, 'search', 'recherch', 'cherch')
+    if (searchPt) {
+      await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
+      await sleep(900)
+      // Try "lien" first (French IG), then "link"
+      await shellExec(bearer, phoneId, `input text "lien"`)
+      await sleep(2000)
+      let xml2 = await dumpXml(bearer, phoneId)
+      let lk2 =
+        findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
+        findByTextPartial(xml2, 'link', 'lien') ??
+        findByResourceId(xml2, 'link_sticker', 'sticker_link')
+      if (!lk2) {
+        // Clear and try English "link"
+        await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long del to clear
+        await sleep(400)
+        await shellExec(bearer, phoneId, `input text "link"`)
+        await sleep(2000)
+        xml2 = await dumpXml(bearer, phoneId)
+        lk2 =
+          findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
+          findByTextPartial(xml2, 'link', 'lien') ??
+          findByResourceId(xml2, 'link_sticker', 'sticker_link')
+      }
+      if (lk2) {
+        await shellExec(bearer, phoneId, `input tap ${lk2[0]} ${lk2[1]}`)
+      } else {
+        log('   ❌ Sticker lien introuvable après recherche')
+        return { ok: false, error: 'Sticker lien introuvable — le sticker "Lien" est peut-être absent de ce compte Instagram' }
+      }
+    } else {
+      // No search bar found — try tapping top-left of the tray then searching
+      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.5)} ${Math.floor(sh * 0.35)}`)
+      await sleep(600)
+      log('   ❌ Barre de recherche de stickers introuvable')
+      return { ok: false, error: 'Sticker lien introuvable — barre de recherche non détectée' }
     }
   }
-
-  await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
   await sleep(2500)
 
   // ── 5. Type the URL (+ optional custom label) ──────────────────────────────
