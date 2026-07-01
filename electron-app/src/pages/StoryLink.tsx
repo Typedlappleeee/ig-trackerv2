@@ -492,7 +492,10 @@ export default function StoryLink({ user }: { user: User }) {
       setJobs(prev => prev.map(j => j.phoneId === id ? { ...j, status } : j))
     }
 
-    const counts = await Promise.all(assignments.map(async asgn => {
+    // Une story = des dizaines d'appels ADB (shell/execute) sur ~2 min. Lancer TOUS
+    // les téléphones en parallèle sature la limite GeeLark (200 req/min) → la moitié
+    // des appels échouent → stories ratées. On borne la concurrence à 3 téléphones.
+    const runOne = async (asgn: typeof assignments[number]): Promise<number> => {
       if (abortRef.current) return 0
       setStatus(asgn.phoneId, 'running')
       try {
@@ -510,14 +513,24 @@ export default function StoryLink({ user }: { user: User }) {
       } finally {
         try { await stopPhone(bearer, asgn.phoneId) } catch (_) { /* ignore */ }
       }
-    }))
-    const okCount = counts.reduce<number>((s, n) => s + n, 0)
+    }
+
+    const CONCURRENCY = 3
+    const queue = [...assignments]
+    let okCount = 0
+    const worker = async () => {
+      while (queue.length && !abortRef.current) {
+        const asgn = queue.shift()!
+        okCount += await runOne(asgn)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, assignments.length) }, worker))
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
 
     // Historique : on enregistre TOUJOURS le run (réussi ou non) pour que la
     // page Historique soit fiable. (table post_runs, fire-and-forget)
-    const totalRun = jobs.length || counts.length
+    const totalRun = jobs.length || assignments.length
     supabase.from('post_runs').insert({
       user_id:   user.id,
       org_id:    currentOrg?.id ?? null,
