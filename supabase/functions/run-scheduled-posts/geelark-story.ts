@@ -26,6 +26,51 @@ async function gFetch(bearer: string, path: string, body: unknown): Promise<Reco
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
+// ── Nouveau système d'upload média : natif GéeLark ─────────────────────────
+// GéeLark télécharge le fichier dans son material center puis le dépose sur le
+// téléphone au chemin voulu (DCIM/Camera). Plus fiable que curl/base64 + le
+// broadcast MEDIA_SCANNER que Android 13+ ignore. Retourne le chemin on-phone.
+//   1. /material/temp/upload    { fileUrl, fileType, fileName } -> { fileId }
+//   2. /phone/file/upload       { id, fileId, path }            -> { taskId }
+//   3. /phone/file/uploadStatus { taskId } -> { status: pending|uploading|success|failed }
+async function geelarkUploadMediaToPhone(
+  bearer: string,
+  phoneId: string,
+  fileUrl: string,
+  opts: { fileType: 1 | 2; fileName: string; dir?: string; log?: (m: string) => void },
+): Promise<{ ok: boolean; path?: string; error?: string }> {
+  const log = opts.log ?? (() => {})
+  const dir = opts.dir ?? '/sdcard/DCIM/Camera'
+  try {
+    const up = await gFetch(bearer, '/material/temp/upload',
+      { fileUrl, fileType: opts.fileType, fileName: opts.fileName })
+    if (up['code'] !== 0) return { ok: false, error: `material/temp/upload: ${up['msg'] ?? up['code']}` }
+    const fileId = up['data']?.fileId as string | undefined
+    if (!fileId) return { ok: false, error: 'material/temp/upload: pas de fileId' }
+    log(`   ☁️ Matériel GéeLark prêt (${fileId})`)
+
+    const push = await gFetch(bearer, '/phone/file/upload', { id: phoneId, fileId, path: dir })
+    if (push['code'] !== 0) return { ok: false, error: `phone/file/upload: ${push['msg'] ?? push['code']}` }
+    const taskId = push['data']?.taskId as string | undefined
+    if (!taskId) return { ok: false, error: 'phone/file/upload: pas de taskId' }
+    log(`   📥 Dépôt GéeLark vers ${dir}…`)
+
+    for (let i = 0; i < 35; i++) {
+      await sleep(2000)
+      const st = await gFetch(bearer, '/phone/file/uploadStatus', { taskId })
+      const status = String(st['data']?.status ?? '')
+      if (status === 'success') {
+        log('   ✅ Média déposé par GéeLark')
+        return { ok: true, path: `${dir.replace(/\/$/, '')}/${opts.fileName}` }
+      }
+      if (status === 'failed') return { ok: false, error: 'Transfert GéeLark: échec' }
+    }
+    return { ok: false, error: 'Transfert GéeLark: timeout' }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 // ── Phone listing ────────────────────────────────────────────────────────────
 async function fetchAllPhones(
   bearer: string,
@@ -409,11 +454,27 @@ export async function postStoryServer(
   let imgPath = `/sdcard/DCIM/Camera/sf_story.${outExt}`
   let sz = 0
 
-  // ── Primary transfer: let the PHONE download the image itself (like posting) ─
-  // Far more reliable than streaming hundreds of base64 chunks through the shell
-  // (the real cause of failed story uploads). Phone has internet + the signed URL
-  // is reachable, so curl/wget just works. Fetches the original (no padding).
+  // ── Primary transfer: GéeLark natif (material center → dépôt sur le tel) ────
+  // GéeLark télécharge et dépose l'image lui-même dans DCIM/Camera + enregistre
+  // le média — bien plus fiable que curl/base64 côté serveur.
   if (/^https?:\/\//i.test(config.imageUrl)) {
+    const fname = `sf_story_${imgPath.split('/').pop()}`
+    const glUp = await geelarkUploadMediaToPhone(bearer, phoneId, config.imageUrl, {
+      fileType: 1, fileName: fname, dir: '/sdcard/DCIM/Camera', log,
+    })
+    if (glUp.ok && glUp.path) {
+      const ckg = await shellExec(bearer, phoneId, `wc -c < '${glUp.path}' 2>/dev/null || echo 0`)
+      const szg = parseInt(ckg.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+      if (szg >= 2000) { imgPath = glUp.path; outExt = origExt; sz = szg; log(`   ✅ Upload GéeLark: ${szg} octets`) }
+      else log(`   ⚠️ Upload GéeLark: fichier introuvable (${szg} o) — bascule…`)
+    } else {
+      log(`   ⚠️ Upload GéeLark indisponible (${glUp.error}) — bascule…`)
+    }
+  }
+
+  // ── Fallback 1: let the PHONE download the image itself (like posting) ───────
+  // Phone has internet + the signed URL is reachable, so curl/wget just works.
+  if (sz < 2000 && /^https?:\/\//i.test(config.imageUrl)) {
     const dlPath = `/sdcard/DCIM/Camera/sf_story.${origExt}`
     const urlEsc = config.imageUrl.replace(/'/g, `'\\''`)
     // Jusqu'à 3 tentatives (DNS/proxy du téléphone parfois pas prêt après le boot).
@@ -461,9 +522,17 @@ export async function postStoryServer(
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
   }
 
-  // Force media scanner so Instagram's gallery picker sees the new file.
+  // Force la galerie à voir le fichier. Le broadcast MEDIA_SCANNER est ignoré sur
+  // Android 13+, donc on l'accompagne d'une insertion directe dans le MediaStore.
+  const _mime = outExt === 'png' ? 'image/png' : 'image/jpeg'
+  const _fname = imgPath.split('/').pop() ?? 'sf_story.jpg'
   await shellExec(bearer, phoneId,
-    `touch -m '${imgPath}' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
+    `touch -m '${imgPath}'; ` +
+    `content insert --uri content://media/external/images/media ` +
+    `--bind _data:s:'${imgPath}' --bind mime_type:s:'${_mime}' ` +
+    `--bind _display_name:s:'${_fname}' --bind title:s:'${_fname}' ` +
+    `--bind is_pending:i:0 2>/dev/null; ` +
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null; true`)
   await sleep(4000)
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
