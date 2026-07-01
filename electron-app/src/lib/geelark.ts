@@ -467,18 +467,17 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
 }
 
 // Dump uiautomator robuste : `uiautomator dump` échoue par intermittence
-// (« ERROR: null root node… », pendant une animation, sur certaines images
-// Android) — et le `&&` d'origine sautait alors le `cat` → écran vide → taps à
-// côté. Ici on cat TOUJOURS, et on réessaie (puis --compressed) tant que l'arbre
-// de nœuds est vide. Corrige la majorité des échecs intermittents de story.
+// (« ERROR: null root node… », pendant une animation) — et le `&&` d'origine
+// sautait alors le `cat` → écran vide → taps à côté. Ici on cat TOUJOURS et on
+// réessaie. On N'UTILISE PAS `--compressed` : le dump compressé retire des nœuds
+// (dont le sticker « Lien »), ce qui cassait la détection.
 async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => void): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
   let last = ''
   for (let attempt = 0; attempt < 4; attempt++) {
-    const flag = attempt >= 2 ? '--compressed ' : ''
     const { output } = await shellExec(
       bearer, phoneId,
-      `uiautomator dump ${flag}${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
+      `uiautomator dump ${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
     )
     last = output
     const nodes = (output.match(/<node\b/g) || []).length

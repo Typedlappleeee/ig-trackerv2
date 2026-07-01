@@ -232,10 +232,9 @@ async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => voi
   const f = '/sdcard/sf_dump.xml'
   let last = ''
   for (let attempt = 0; attempt < 4; attempt++) {
-    const flag = attempt >= 2 ? '--compressed ' : ''
     const { output } = await shellExec(
       bearer, phoneId,
-      `uiautomator dump ${flag}${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
+      `uiautomator dump ${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`,
     )
     last = output
     const nodes = (output.match(/<node\b/g) || []).length
