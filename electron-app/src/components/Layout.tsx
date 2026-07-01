@@ -95,7 +95,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Publier',
     defaultOpen: true,
     items: [
-      { id: 'publishhub',  label: 'Publication',     icon: '🚀' },
+      { id: 'publishhub',  label: 'navPublishVideo', icon: '🚀' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
@@ -105,7 +105,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Studio vidéo',
     defaultOpen: true,
     items: [
-      { id: 'videostudio', label: 'Studio vidéo',    icon: '🎬' },
+      { id: 'videostudio', label: 'navVideoStudio',  icon: '🎬' },
     ],
   },
 ]
