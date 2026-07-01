@@ -30,18 +30,34 @@ window.addEventListener('unhandledrejection', (e) => {
 })
 
 // ── Global Error Boundary ─────────────────────────────────────────────────────
-interface EBState { error: Error | null }
+interface EBState { error: Error | null; chunk: boolean }
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, EBState> {
   constructor(props: { children: React.ReactNode }) {
     super(props)
-    this.state = { error: null }
+    this.state = { error: null, chunk: false }
   }
-  static getDerivedStateFromError(error: Error): EBState { return { error } }
+  static getDerivedStateFromError(error: Error): EBState {
+    // Chunk périmé après un déploiement → recharge en silence (pas d'écran d'erreur).
+    const chunk = isChunkError(error?.message ?? String(error))
+    if (chunk) reloadForChunk()
+    return { error, chunk }
+  }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ScaleFlow] Uncaught render error:', error, info.componentStack)
   }
   render() {
     if (!this.state.error) return this.props.children
+    // Pendant le rechargement d'un chunk : écran neutre, aucun « code d'erreur ».
+    if (this.state.chunk) {
+      return (
+        <div style={{
+          minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#0A0B0E', color: '#E9EAF0', fontFamily: 'system-ui, sans-serif', fontSize: 15,
+        }}>
+          Mise à jour de l'application…
+        </div>
+      )
+    }
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
