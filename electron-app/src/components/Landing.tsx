@@ -1591,6 +1591,9 @@ export function Landing() {
         </div>
       </section>
 
+      {/* ── Publication — démo mass posting en direct ────────────────────────── */}
+      <AutoPostShowcase />
+
       {/* ── Features ─────────────────────────────────────────────────────────── */}
       <section id="features" style={{ position: 'relative', zIndex: 1, padding: '40px 24px 140px' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto' }}>
