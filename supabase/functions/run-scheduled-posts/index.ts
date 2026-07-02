@@ -31,7 +31,29 @@ const FN_BUDGET_MS = 230_000
 //   le temps que GeeLark exécute les tâches.
 
 interface PhoneRec { geelark_id: string; phone_name: string; ig_username: string | null; reels_trial_unsupported?: boolean }
-interface VideoRec { token: string; title: string }
+interface VideoRec {
+  token: string; title: string
+  // Usage unique : réf banque à supprimer après publication réussie.
+  remove?: boolean; bank_id?: string; storage_path?: string | null; thumbnail_path?: string | null
+}
+
+// Usage unique : supprime de la banque les vidéos marquées `remove` (Bank only).
+// deno-lint-ignore no-explicit-any
+async function removeUsedBankVideos(db: any, orgId: string | null, userId: string, videos: VideoRec[]): Promise<number> {
+  const toRemove = (videos ?? []).filter(v => v && v.remove && v.storage_path)
+  if (!toRemove.length) return 0
+  try {
+    const ids = toRemove.map(v => v.bank_id).filter(Boolean) as string[]
+    if (ids.length) {
+      let q = db.from('content_bank').delete().in('id', ids)
+      q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)
+      await q
+    }
+    const paths = toRemove.flatMap(v => [v.storage_path, v.thumbnail_path]).filter(Boolean) as string[]
+    if (paths.length) await db.storage.from('content').remove(paths)
+  } catch { /* best-effort */ }
+  return toRemove.length
+}
 
 type StepType = 'publication' | 'story' | 'warmup'
 interface TaskStep {
@@ -383,7 +405,7 @@ Deno.serve(async (req) => {
   const storyCutoff = new Date(Date.now() - 6 * 60 * 60_000).toISOString()
   try {
     let staleQuery = db.from('scheduled_posts')
-      .select('id, user_id, org_id, executed_at, created_at, result, bearer_token')
+      .select('id, user_id, org_id, executed_at, created_at, result, bearer_token, videos')
       .eq('status', 'running')
       .neq('type', 'story')
       .or(`executed_at.lt.${cutoff},and(executed_at.is.null,created_at.lt.${cutoff})`)
@@ -468,7 +490,10 @@ Deno.serve(async (req) => {
         await db.from('scheduled_posts')
           .update({ status: 'done', error_msg: null })
           .eq('id', sp.id)
-        summary[`heal:${sp.id}`] = `recovered → done (${success} ok)`
+        // Usage unique : supprime de la banque les vidéos marquées (PC éteint).
+        const spVideos: VideoRec[] = Array.isArray(sp.videos) ? sp.videos : (typeof sp.videos === 'string' ? JSON.parse(sp.videos) : [])
+        const removed = await removeUsedBankVideos(db, sp.org_id, sp.user_id, spVideos)
+        summary[`heal:${sp.id}`] = `recovered → done (${success} ok)${removed ? ` · ${removed} vidéo(s) retirée(s)` : ''}`
       } else if (failed > 0 && pending === 0) {
         if (geelarkIds.length > 0) await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
         await healFail(sp, `Échec GeeLark (${failed}/${seen} tâche(s) échouée(s))`,
@@ -927,6 +952,9 @@ Deno.serve(async (req) => {
             status: 'done', result: { logs }, error_msg: null,
           }).eq('id', post.id)
         }
+        // Usage unique : supprime de la banque les vidéos marquées (PC éteint).
+        const removed = await removeUsedBankVideos(db, post.org_id, post.user_id, videos)
+        if (removed) log(`🗑️ ${removed} vidéo(s) retirée(s) de la banque (usage unique).`)
       }
 
       // Auto-remove used videos from task pool (if enabled on parent task)
