@@ -80,6 +80,35 @@ export const tokens = {
 }
 ```
 
+### Chiffres réels (comptés dans le code)
+
+**3 systèmes de tokens contradictoires** pour les mêmes rôles :
+
+| Rôle | `tailwind.config.js` | `theme.ts` | `index.css :root` |
+|---|---|---|---|
+| Fond app | `#07070B` | `#0A0B0E` | `#0C0C15` |
+| **Accent** | `#8B5CF6` **(violet)** | `#6366F1` **(indigo)** | `#6366F1` |
+
+→ **la marque change de couleur entre la landing (violet) et l'app produit (indigo)**.
+
+| Métrique | Compté | Cible |
+|---|---|---|
+| Couleurs hex distinctes | **195** | ~24 |
+| `rgba()` distincts | **503** (2 671 occ.) | tokens |
+| Gris/neutres distincts | **51** | ~6 |
+| Tailles de police distinctes | **~60** (30 px + 30 clamp) | 7 |
+| Valeurs de padding inline distinctes | **224** | ~7 |
+| Rayons distincts | **~24** | 4 |
+| `boxShadow` inline distincts | **87** | 4 |
+| Systèmes de bouton | **3** (689 `<button>` bruts + 734 `sf-btn` + 38 `<Button>`) | 1 |
+| SVG inline (path dupliqués) | 427 → **209 duplications** | lib d'icônes |
+| Emojis comme icônes dans le JSX | **703** (110 distincts) | 0 fonctionnels |
+| `@keyframes` | **89** (dont ~25 décoratifs + doublons fade/scale/slide) | dédupliqués |
+
+**Doublons sémantiques** : vert = `#34d399` + `#22c55e` + `#059669` ; rouge = `#f87171` + `#ef4444` + `#dc2626` ; jaune = `#f59e0b` + `#fbbf24` + `#eab308` (chaque couleur d'état existe en 3 variantes).
+
+**⚠️ Accessibilité — texte secondaire sous WCAG AA** : `theme.ts` `TEXT_2` (rgba 0.42) = contraste **3.62** (échoue AA 4.5), `TEXT_3` (0.22) = **1.84** (illisible), titres de sidebar `sb-section #3A3356` = **1.64**. À corriger dans les tokens (remonter les opacités).
+
 ### Migration visuelle sans tout casser
 1. Définir les tokens + les exposer aussi en **variables CSS** (`:root { --accent: … }`) pour les classes `sf-*`.
 2. **Codemod** : remplacer les `#6366F1` littéraux par `var(--accent)` / `tokens.color.accent` (script sur les 173 occurrences).
@@ -168,6 +197,24 @@ Segmented control `sf-tabs` (déjà utilisé dans BankHub) en tête d'espace ; f
 **Studio unifié** : un rail d'opérations à gauche (les 8 outils en 2 familles *Rendre unique* / *Éditer & habiller*) → zone de travail centrale identique (Source via **un seul `BankPicker`** + Réglages + Aperçu `contain` avant/après) → **file de jobs partagée persistante à droite** (une seule `<JobCard>` : vignette 9:16, **barre de progression réelle**, statut normalisé et traduit `En file → Préparation moteur 31 Mo → Rendu serveur|local 62% → Terminé`, actions Télécharger + Enregistrer). Jamais la file dans un modal. Masquer les réglages Montage non exportés tant que le pipeline ne les applique pas.
 
 ---
+
+## 4bis. Pages de gestion & données (Phones · Bank · Analytics · Layout)
+
+**Le modèle à généraliser = Phones** : header clair, skeleton au chargement, 2 empty states distincts (vide / pas de résultat), recherche + filtres + tri, sélection multiple + barre bulk flottante, actions destructives protégées par `ConfirmDialog`. C'est la page la plus aboutie.
+
+**Incohérences transverses à standardiser** (par gravité) :
+1. **Confirmations destructives non uniformes** : `ConfirmDialog` (Phones, Bank), confirm inline (History), **AUCUNE dans CaptionBank** (`CaptionBank.tsx:571,437` — suppression directe, risque de perte de données).
+2. **6 empty states différents** : `sf-empty` (Phones, Bank), divs custom (CaptionBank, History), emoji+texte (Reports), **texte brut sans icône ni CTA** (Stats).
+3. **3 styles de loading** : skeleton (Phones, Reports), spinner (Bank, CaptionBank), texte « Chargement… » (History, Stats).
+4. **4 mécaniques de « tableau »** : vraie `<table>` (Phones), grille de `<div>` avec `gridTemplateColumns` codé (Bank, Stats leaderboard, History).
+5. **Barres de recherche réinventées** à chaque page ; absente sur Reports/History.
+6. **Badge `account_state` en 3 représentations** (Phones pastille ✕/!, Reports badges texte inline, modale encore différente).
+7. **Feedback** : toasts (Phones/Bank/Stats) vs inline (CaptionBank/Reports) vs **`alert()` natif** (Reports « Tester l'API » — rupture totale en dark premium).
+8. **Scalabilité** : seul Bank a une pagination UI (« Voir plus »), History un « charger plus ». **Phones, Stats, CaptionBank rendent tout** — aucune virtualisation (mur à 500+ items).
+9. **BankHub** : double en-tête empilé (BankHub + Bank) + **texte 100 % anglais** (« Content Bank / Manage your videos… ») dans une app FR.
+10. **Layout** : `RecoBadge` = pastille **rouge alarme permanente** pour une aide passive (fausse alerte) ; topbar droite sans `flexWrap` (déborde < 1280px) ; **aucun indicateur de statut de connexion GeeLark/réseau** ; double déclencheur de menu user (sidebar + topbar).
+
+→ **Composants à extraire** : `<EmptyState>`, `<Loading>` (skeleton), `<DataTable>`, `<SearchInput>`, `<StatusBadge>`/`<AccountStateBadge>`, `<ConfirmDialog>` imposé partout. Bannir `alert()`.
 
 ## 5. Entrée dans l'app — supprimer le tunnel
 
