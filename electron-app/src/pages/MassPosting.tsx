@@ -1265,13 +1265,12 @@ export function MassPosting({ user }: MassPostingProps) {
           {/* Left: icon + title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.28)',
-              color: 'var(--accent-l)',
+              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+              boxShadow: '0 10px 24px -8px rgba(99,102,241,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
             }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 22-7z"/>
               </svg>
             </div>
@@ -1990,9 +1989,11 @@ export function MassPosting({ user }: MassPostingProps) {
                   : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
                   : selectedVideos.length === 0 ? 'Sélectionne des vidéos dans la banque'
                   : 'Publication en cours…'}
-                className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+                className="sf-btn sf-btn-lg cursor-pointer"
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff',
+                  background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                  boxShadow: canLaunch && !posting ? '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 0 rgba(255,255,255,0.3)' : 'none',
                   opacity: !canLaunch ? 0.4 : posting ? 0.7 : 1,
                 }}>
                 {posting ? (

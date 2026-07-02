@@ -971,13 +971,12 @@ export function Scheduler({ user, onNavigate }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             {/* Icon */}
             <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.28)',
-              color: 'var(--accent)',
+              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+              boxShadow: '0 10px 24px -8px rgba(99,102,241,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
             }}>
-              <IconCalendarSm size={22} color="var(--accent)" />
+              <IconCalendarSm size={22} color="#fff" />
             </div>
 
             {/* Text */}
@@ -1007,8 +1006,12 @@ export function Scheduler({ user, onNavigate }: Props) {
             )}
             <button
               onClick={() => { setPresetSchedAt(undefined); setShowTypeChoice(true) }}
-              className="sf-btn sf-btn-primary cursor-pointer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              className="sf-btn sf-btn-lg cursor-pointer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff',
+                background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                boxShadow: '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 0 rgba(255,255,255,0.3)',
+              }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
               Programmer
