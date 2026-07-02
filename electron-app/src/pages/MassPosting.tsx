@@ -657,7 +657,6 @@ export function MassPosting({ user }: MassPostingProps) {
       // On limite le nombre de téléphones allumés/postant EN MÊME TEMPS ; chaque
       // lot est démarré → posté → éteint avant le suivant, avec délai optionnel.
       const _concurrency  = effectiveConcurrency(postingOpts, assignments.length)
-      const _batchDelayMs = Math.max(0, postingOpts.batchDelaySec) * 1000
       if (platform === 'instagram' && _concurrency < assignments.length) {
         const batches: (typeof assignments)[] = []
         for (let i = 0; i < assignments.length; i += _concurrency) batches.push(assignments.slice(i, i + _concurrency))
@@ -758,11 +757,6 @@ export function MassPosting({ user }: MassPostingProps) {
             try { await geelark(bearer, '/phone/stop', { ids: strag }) } catch { /* watchdog serveur */ }
             unregisterPhones(strag).catch(() => {})
             activePhonesRef.current = activePhonesRef.current.filter(id => !strag.includes(id))
-          }
-
-          if (bi < batches.length - 1 && _batchDelayMs && !stopRef.current) {
-            log(`Délai de ${postingOpts.batchDelaySec}s avant le prochain lot…`, 'info')
-            await new Promise(r => setTimeout(r, _batchDelayMs))
           }
         }
       } else {

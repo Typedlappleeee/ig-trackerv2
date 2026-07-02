@@ -133,28 +133,17 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         </button>
       </div>
 
-      {/* Concurrence + délai (masqués si proxy rotatif = 1 forcé) */}
-      <div className="flex items-center gap-2 flex-wrap pl-[26px]">
-        {!opts.rotatingProxy && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Simultanés</span>
-            <input type="number" min={0} max={200} value={opts.maxConcurrent || ''}
-              placeholder="Tous"
-              onChange={e => set({ maxConcurrent: Math.max(0, parseInt(e.target.value) || 0) })}
-              className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
-          </div>
-        )}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Délai entre lots</span>
-          <input type="number" min={0} max={3600} value={opts.batchDelaySec || ''}
-            placeholder="0"
-            onChange={e => set({ batchDelaySec: Math.max(0, parseInt(e.target.value) || 0) })}
+      {/* Concurrence (masquée si proxy rotatif = 1 forcé) */}
+      {!opts.rotatingProxy && (
+        <div className="flex items-center gap-2 pl-[26px]">
+          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Téléphones simultanés</span>
+          <input type="number" min={0} max={200} value={opts.maxConcurrent || ''}
+            placeholder="Tous"
+            onChange={e => set({ maxConcurrent: Math.max(0, parseInt(e.target.value) || 0) })}
             className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
-          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>s</span>
         </div>
-      </div>
+      )}
 
       {/* Expanded interval controls */}
       {on && (

@@ -15,7 +15,6 @@ export interface PostingOpts {
   // TEMPS, avec un délai optionnel entre chaque lot.
   rotatingProxy: boolean  // raccourci : force 1 téléphone à la fois
   maxConcurrent: number   // nb de téléphones simultanés (0 = tous d'un coup)
-  batchDelaySec: number   // délai entre chaque lot, en secondes (0 = aucun)
 }
 
 const KEY = 'sf_posting_opts'
@@ -28,7 +27,6 @@ const DEFAULTS: PostingOpts = {
   alsoStory:    false,
   rotatingProxy: false,
   maxConcurrent: 0,
-  batchDelaySec: 0,
 }
 
 export function loadPostingOpts(): PostingOpts {
@@ -42,7 +40,6 @@ export function loadPostingOpts(): PostingOpts {
       alsoStory:     saved.alsoStory     ?? DEFAULTS.alsoStory,
       rotatingProxy: saved.rotatingProxy ?? DEFAULTS.rotatingProxy,
       maxConcurrent: saved.maxConcurrent ?? DEFAULTS.maxConcurrent,
-      batchDelaySec: saved.batchDelaySec ?? DEFAULTS.batchDelaySec,
       intervalMode:  'none',
     }
   } catch { return { ...DEFAULTS } }

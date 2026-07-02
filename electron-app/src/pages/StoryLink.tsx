@@ -334,10 +334,8 @@ export default function StoryLink({ user }: { user: User }) {
   // Concurrence (proxys rotatifs) — persistée
   const [rotProxy, setRotProxy]   = useState(() => localStorage.getItem('sf-story-rotproxy') === '1')
   const [maxConc,  setMaxConc]    = useState(() => parseInt(localStorage.getItem('sf-story-maxconc') ?? '0', 10) || 0)
-  const [delaySec, setDelaySec]   = useState(() => parseInt(localStorage.getItem('sf-story-delaysec') ?? '0', 10) || 0)
   useEffect(() => { localStorage.setItem('sf-story-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
   useEffect(() => { localStorage.setItem('sf-story-maxconc', String(maxConc)) }, [maxConc])
-  useEffect(() => { localStorage.setItem('sf-story-delaysec', String(delaySec)) }, [delaySec])
   const [showSchedule, setShowSchedule]     = useState(false)
   const [schedAt, setSchedAt]               = useState(() => defaultSchedValue(60))
   const [schedDelay, setSchedDelay]         = useState(2)
@@ -533,7 +531,6 @@ export default function StoryLink({ user }: { user: User }) {
     // Concurrence : proxy rotatif → 1 téléphone à la fois ; sinon le nombre choisi
     // (0 = défaut 5). Délai optionnel entre chaque story pour ménager le proxy.
     const CONCURRENCY = rotProxy ? 1 : (maxConc > 0 ? maxConc : 5)
-    const delayMs = Math.max(0, delaySec) * 1000
     const queue = [...assignments]
     let okCount = 0
     const worker = async (staggerMs: number) => {
@@ -541,7 +538,6 @@ export default function StoryLink({ user }: { user: User }) {
       while (queue.length && !abortRef.current) {
         const asgn = queue.shift()!
         okCount += await runOne(asgn)
-        if (delayMs && queue.length && !abortRef.current) await new Promise(r => setTimeout(r, delayMs))
       }
     }
     await Promise.all(
@@ -1160,16 +1156,11 @@ export default function StoryLink({ user }: { user: User }) {
               </button>
             </div>
             {!rotProxy && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Simultanés</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Téléphones simultanés</span>
                 <input type="number" min={0} max={200} value={maxConc || ''} placeholder="5"
                   onChange={e => setMaxConc(Math.max(0, parseInt(e.target.value) || 0))}
                   className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
-                <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 6 }}>Délai</span>
-                <input type="number" min={0} max={3600} value={delaySec || ''} placeholder="0"
-                  onChange={e => setDelaySec(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
-                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>s</span>
               </div>
             )}
           </div>
