@@ -18,8 +18,9 @@ export default {
         border:  'rgba(255,255,255,0.08)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        sans:    ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['"Space Grotesk"', 'Inter', 'system-ui', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       backgroundImage: {
         'brand-gradient': 'linear-gradient(135deg, #22D3EE 0%, #818CF8 50%, #A855F7 100%)',
@@ -44,6 +45,9 @@ export default {
         'border-spin':  'borderSpin 4s linear infinite',
         'count-up':     'countUp 1s ease both',
         'glow-pulse':   'glowPulse 3s ease-in-out infinite',
+        'marquee':      'marquee 38s linear infinite',
+        'aurora':       'aurora 18s ease-in-out infinite',
+        'shine':        'shine 6s ease-in-out infinite',
       },
       keyframes: {
         floatSlow: {
@@ -82,6 +86,19 @@ export default {
         glowPulse: {
           '0%,100%': { opacity: '0.6' },
           '50%':     { opacity: '1' },
+        },
+        marquee: {
+          '0%':   { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+        aurora: {
+          '0%,100%': { transform: 'translate(0,0) scale(1)',        opacity: '0.55' },
+          '33%':     { transform: 'translate(4%,-3%) scale(1.08)',  opacity: '0.75' },
+          '66%':     { transform: 'translate(-3%,4%) scale(0.96)',  opacity: '0.6' },
+        },
+        shine: {
+          '0%,100%': { backgroundPosition: '0% 50%' },
+          '50%':     { backgroundPosition: '100% 50%' },
         },
       },
     },
