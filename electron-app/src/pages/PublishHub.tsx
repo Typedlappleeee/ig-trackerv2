@@ -123,8 +123,8 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
         transform: active ? 'translateY(-6px)' : 'translateY(0)',
         boxShadow: active ? `0 34px 70px -26px ${kind.glow}, inset 0 1px 0 0 rgba(255,255,255,0.1)` : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 8px 30px -18px rgba(0,0,0,0.6)',
         transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s',
-        display: 'flex', flexDirection: 'column', gap: 15, isolation: 'isolate', minHeight: 268,
-        opacity: disabled ? 0.66 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex', flexDirection: 'column', gap: 15, isolation: 'isolate', minHeight: 328,
+        opacity: disabled ? 0.7 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
       }}
     >
       <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', background: `radial-gradient(480px circle at ${pos.x}% ${pos.y}%, ${kind.glow}, transparent 60%)`, opacity: active ? 0.42 : 0, transition: 'opacity 0.3s' }} />
@@ -137,16 +137,35 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
             <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: badge ? '#fbbf24' : kind.accent }}>{badge ?? kind.tag}</span>
           </div>
         </div>
-        {!disabled && (
-          <span style={{ display: 'inline-flex', width: 30, height: 30, borderRadius: '50%', border: `1px solid ${active ? kind.accent : 'rgba(255,255,255,0.12)'}`, color: active ? kind.accent : 'rgba(233,234,240,0.5)', alignItems: 'center', justifyContent: 'center', transform: active ? 'translateX(2px)' : 'none', transition: 'all 0.25s' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </span>
-        )}
       </div>
 
-      <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(233,234,240,0.55)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 39 }}>{kind.desc}</p>
+      <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(233,234,240,0.6)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 39 }}>{kind.desc}</p>
 
-      <div style={{ position: 'relative', zIndex: 2, marginTop: 'auto' }}><Preview kind={kind.preview} accent={kind.accent} /></div>
+      <div style={{ position: 'relative', zIndex: 2 }}><Preview kind={kind.preview} accent={kind.accent} /></div>
+
+      {/* CTA claire */}
+      <div style={{
+        position: 'relative', zIndex: 2, marginTop: 'auto',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        height: 40, borderRadius: 11, fontSize: 13, fontWeight: 800, letterSpacing: '0.01em',
+        color: disabled ? 'rgba(233,234,240,0.5)' : '#fff',
+        background: disabled ? 'rgba(255,255,255,0.05)' : kind.grad,
+        border: disabled ? '1px solid rgba(255,255,255,0.08)' : 'none',
+        boxShadow: disabled ? 'none' : (active ? `0 12px 26px -10px ${kind.glow}, inset 0 1px 0 0 rgba(255,255,255,0.3)` : 'inset 0 1px 0 0 rgba(255,255,255,0.2)'),
+        transition: 'box-shadow 0.3s',
+      }}>
+        {disabled ? (
+          <>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            Bientôt disponible
+          </>
+        ) : (
+          <>
+            Ouvrir {kind.title}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: active ? 'translateX(3px)' : 'none', transition: 'transform 0.25s' }}><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </>
+        )}
+      </div>
     </button>
   )
 }
@@ -171,14 +190,27 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
           <h1 style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#6ee7b7 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
             Publie partout, en un clic
           </h1>
-          <p style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.55)', maxWidth: 600, lineHeight: 1.65 }}>
-            Choisis ton format et diffuse sur des dizaines de comptes Instagram & TikTok en parallèle.
+          <p style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.6)', maxWidth: 600, lineHeight: 1.65 }}>
+            Choisis un format ci-dessous, sélectionne tes comptes et ton contenu, puis publie sur des dizaines de comptes Instagram & TikTok en parallèle.
           </p>
-          <div style={{ display: 'flex', gap: 26, marginTop: 22, flexWrap: 'wrap' }}>
-            {[['100+', 'comptes'], ['Parallèle', 'en un clic'], ['IG + TikTok', 'multi-plateforme'], ['Auto', 'extinction']].map(([v, l], i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-                <span style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{v}</span>
-                <span style={{ fontSize: 11.5, color: 'rgba(233,234,240,0.42)' }}>{l}</span>
+          {/* Comment ça marche — 3 étapes */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
+            {[
+              { n: '1', t: 'Choisis un format', s: 'Reels, Story ou Photo', c: '#818CF8' },
+              { n: '2', t: 'Comptes & contenu', s: 'Sélectionne tes téléphones', c: '#FBBF24' },
+              { n: '3', t: 'Publie en 1 clic', s: 'Tout part en parallèle', c: '#34D399' },
+            ].map((step, i, arr) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px 8px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#0A0B0E', background: step.c }}>{step.n}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff' }}>{step.t}</span>
+                    <span style={{ fontSize: 10.5, color: 'rgba(233,234,240,0.42)' }}>{step.s}</span>
+                  </div>
+                </div>
+                {i < arr.length - 1 && (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(233,234,240,0.28)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                )}
               </div>
             ))}
           </div>

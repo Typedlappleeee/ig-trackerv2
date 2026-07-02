@@ -186,6 +186,21 @@ const PAGE_ICON: Record<string, IconKey> = {
   tiktokposting:   'zap',
 }
 
+// Couleur d'accent par onglet — petite touche de couleur dans le menu (icônes
+// des onglets inactifs). L'onglet actif garde la pastille violette.
+const PAGE_COLOR: Record<string, string> = {
+  phones:       '#818CF8', // indigo
+  bank:         '#F472B6', // rose
+  library:      '#22D3EE', // cyan
+  history:      '#94A3B8', // slate
+  reports:      '#34D399', // vert
+  publishhub:   '#A78BFA', // violet
+  scheduler:    '#FBBF24', // ambre
+  tasks:        '#FB7185', // rose vif
+  warmup:       '#FB923C', // orange
+  videostudio:  '#F472B6', // rose
+}
+
 // Sidebar divider — hairline
 function SidebarDivider() {
   return (
@@ -283,6 +298,7 @@ interface SidebarNavItemProps {
   id: Page
   label: string
   iconKey: IconKey
+  color?: string
   beta?: boolean
   isNew?: boolean
   dev?: boolean
@@ -291,7 +307,7 @@ interface SidebarNavItemProps {
   onNavigate: (page: Page) => void
 }
 
-function SidebarNavItem({ id, label, iconKey, beta, isNew, dev, active, collapsed, onNavigate }: SidebarNavItemProps) {
+function SidebarNavItem({ id, label, iconKey, color, beta, isNew, dev, active, collapsed, onNavigate }: SidebarNavItemProps) {
   const [hovered, setHovered] = useState(false)
   const [tooltipY, setTooltipY] = useState(0)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -314,7 +330,7 @@ function SidebarNavItem({ id, label, iconKey, beta, isNew, dev, active, collapse
         onMouseLeave={() => setHovered(false)}
         style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
       >
-        <span className="sf-sidebar-icon">
+        <span className="sf-sidebar-icon" style={!active && color ? { color } : undefined}>
           <NavIcon d={ICONS[iconKey]} size={17} />
         </span>
         {!collapsed && (
@@ -892,6 +908,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                         id={item.id}
                         label={t(item.label as any)}
                         iconKey={PAGE_ICON[item.id] ?? defaultIcon}
+                        color={PAGE_COLOR[item.id]}
                         beta={item.beta}
                         isNew={item.isNew}
                         dev={item.dev}
