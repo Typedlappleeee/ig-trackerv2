@@ -7,6 +7,7 @@ import { createScheduledPost } from '@/lib/schedulerService'
 import { useToast } from '@/components/Toast'
 import { fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
+import type { Page } from '@/components/Layout'
 import {
   TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR,
   BG_0 as BG, BG_2 as BG2, ACCENT, ACCENT_L, OK, ERR, SANS,
@@ -49,6 +50,25 @@ function itemDate(it: HistoryItem): string {
   return it.data.created_at
 }
 
+// Statut « réussi » unifié (programmé = done ; direct = aucun échec).
+function itemOk(it: HistoryItem): boolean {
+  if (it.kind === 'scheduled') return it.data.status === 'done'
+  return it.data.err_count === 0
+}
+
+// Texte cherchable : type + légende + noms de comptes.
+function itemSearchText(it: HistoryItem): string {
+  if (it.kind === 'scheduled') {
+    const phones = Array.isArray(it.data.phones) ? it.data.phones : []
+    return [
+      TYPE_LABELS[it.data.type ?? ''] ?? 'Post',
+      it.data.caption ?? '',
+      ...phones.map(p => `${p.ig_username ?? ''} ${p.phone_name ?? ''}`),
+    ].join(' ').toLowerCase()
+  }
+  return [TYPE_LABELS[it.data.type ?? ''] ?? 'Post', 'direct'].join(' ').toLowerCase()
+}
+
 const TYPE_LABELS: Record<string, string> = {
   mass_posting: 'Mass Posting',
   posting:      'Posting',
@@ -61,7 +81,11 @@ const TYPE_LABELS: Record<string, string> = {
 function StatusPill({ status }: { status: string }) {
   const ok  = status === 'done'
   const err = status === 'failed'
+  const partial = status === 'partial'
   const pending = status === 'pending' || status === 'running'
+  if (partial) {
+    return <span className="sf-badge" style={{ whiteSpace: 'nowrap', background: 'rgba(251,191,36,0.14)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.3)' }}>PARTIEL</span>
+  }
   const variant = ok ? 'ok' : err ? 'danger' : pending ? 'accent' : 'muted'
   const label = ok ? 'PUBLIÉ' : err ? 'ÉCHEC' : pending ? 'EN COURS' : status.toUpperCase()
   return (
@@ -87,7 +111,7 @@ function IconBox({ ok }: { ok: boolean }) {
 
 const PAGE_SIZE = 30
 
-export function History({ user }: { user: User }) {
+export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Page) => void }) {
   const { currentOrg, role } = useOrg()
   const toast = useToast()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; post: ScheduledPost } | null>(null)
@@ -97,6 +121,8 @@ export function History({ user }: { user: User }) {
   const [hasMore,   setHasMore] = useState(false)
   const [page,      setPage]    = useState(0)
   const [filter,    setFilter]  = useState<'all' | 'scheduled' | 'direct'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ok' | 'failed'>('all')
+  const [search,    setSearch]  = useState('')
   const [confirming, setConfirming] = useState(false)
   const [clearing,   setClearing]   = useState(false)
   const [detail,     setDetail]     = useState<DetailView | null>(null)
@@ -222,6 +248,31 @@ export function History({ user }: { user: User }) {
     >{label}</button>
   )
 
+  const statusBtn = (f: typeof statusFilter, label: string, dot?: string) => (
+    <button
+      onClick={() => setStatusFilter(f)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
+        cursor: 'pointer', transition: 'all 0.15s',
+        background: statusFilter === f ? 'rgba(255,255,255,0.06)' : 'transparent',
+        color: statusFilter === f ? IVORY : MUTED,
+        border: statusFilter === f ? '1px solid rgba(255,255,255,0.16)' : `1px solid ${HAIR}`,
+      }}
+    >{dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />}{label}</button>
+  )
+
+  // Filtres client sur les entrées chargées (recherche + statut).
+  const q = search.trim().toLowerCase()
+  const visible = items.filter(it => {
+    if (statusFilter === 'ok' && !itemOk(it)) return false
+    if (statusFilter === 'failed' && itemOk(it)) return false
+    if (q && !itemSearchText(it).includes(q)) return false
+    return true
+  })
+  const okCount = items.filter(itemOk).length
+  const successRate = items.length ? Math.round((okCount / items.length) * 100) : 0
+
   return (
     <div style={{ minHeight: '100%', background: BG, padding: '24px 28px 80px', boxSizing: 'border-box', overflowY: 'auto' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -286,18 +337,46 @@ export function History({ user }: { user: User }) {
         )}
       </div>
 
-      {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      {/* Filters: source tabs + status + search */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         {filterBtn('all', 'Tout')}
         {filterBtn('scheduled', 'Programmé')}
         {filterBtn('direct', 'Direct')}
+        <div style={{ width: 1, height: 22, background: HAIR, margin: '0 2px' }} />
+        {statusBtn('all', 'Tous statuts')}
+        {statusBtn('ok', 'Publiés', OK)}
+        {statusBtn('failed', 'Échecs', ERR)}
+        <div style={{ position: 'relative', marginLeft: 'auto', minWidth: 220 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Rechercher (compte, légende, type)…"
+            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px 8px 32px', borderRadius: 8, fontSize: 12.5, fontFamily: SANS, color: IVORY, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, outline: 'none' }}
+          />
+        </div>
       </div>
+
+      {/* Résumé santé — sur les entrées chargées */}
+      {items.length > 0 && (
+        <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ color: IVORY, fontWeight: 700 }}>{items.length}</span> entrée{items.length > 1 ? 's' : ''} chargée{items.length > 1 ? 's' : ''}
+          {' · '}<span style={{ color: successRate >= 90 ? OK : successRate >= 60 ? '#FBBF24' : ERR, fontWeight: 700 }}>{successRate}%</span> de réussite
+          {(items.length - okCount) > 0 && <> · <span style={{ color: ERR, fontWeight: 600 }}>{items.length - okCount} échec{(items.length - okCount) > 1 ? 's' : ''}</span></>}
+        </p>
+      )}
 
       {/* List */}
       <div className="sf-card sf-anim-slide-up" style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 14, overflow: 'hidden', padding: 0 }}>
         {loading && items.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: MUTED, fontSize: 13, fontFamily: SANS }}>
             Chargement…
+          </div>
+        ) : items.length > 0 && visible.length === 0 ? (
+          <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: IVORY, fontFamily: SANS }}>Aucun résultat</p>
+            <p style={{ margin: 0, fontSize: 12.5, color: FAINT, fontFamily: SANS }}>Aucune entrée ne correspond à ces filtres.</p>
+            <button className="sf-btn sf-btn-ghost sf-btn-sm" style={{ marginTop: 4 }} onClick={() => { setSearch(''); setStatusFilter('all') }}>Réinitialiser les filtres</button>
           </div>
         ) : items.length === 0 ? (
           <div style={{ padding: '56px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -312,9 +391,15 @@ export function History({ user }: { user: User }) {
             </div>
             <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: IVORY, fontFamily: SANS }}>Aucun historique pour l'instant</p>
             <p style={{ margin: 0, fontSize: 12.5, color: FAINT, fontFamily: SANS }}>Vos posts programmés et directs apparaîtront ici.</p>
+            {onNavigate && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button className="sf-btn sf-btn-primary sf-btn-sm" onClick={() => onNavigate('publishhub')}>Publier maintenant</button>
+                <button className="sf-btn sf-btn-secondary sf-btn-sm" onClick={() => onNavigate('scheduler')}>Programmer un post</button>
+              </div>
+            )}
           </div>
         ) : (
-          items.map((item, i) => {
+          visible.map((item, i) => {
             if (item.kind === 'scheduled') {
               const post = item.data
               const phones = Array.isArray(post.phones) ? post.phones : []
@@ -339,7 +424,7 @@ export function History({ user }: { user: User }) {
                   onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, post }) }}
                   style={{
                   padding: '14px 20px',
-                  borderBottom: i < items.length - 1 ? `1px solid ${HAIR}` : 'none',
+                  borderBottom: i < visible.length - 1 ? `1px solid ${HAIR}` : 'none',
                   display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
                 }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
@@ -376,7 +461,7 @@ export function History({ user }: { user: User }) {
               return (
                 <div key={`pr-${run.id}`} onClick={openRun} style={{
                   padding: '14px 20px',
-                  borderBottom: i < items.length - 1 ? `1px solid ${HAIR}` : 'none',
+                  borderBottom: i < visible.length - 1 ? `1px solid ${HAIR}` : 'none',
                   display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
                 }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
@@ -396,7 +481,7 @@ export function History({ user }: { user: User }) {
                       {runResults.length > 0 ? ' · détail par compte ›' : ''}
                     </p>
                   </div>
-                  <StatusPill status={ok ? 'done' : 'failed'} />
+                  <StatusPill status={ok ? 'done' : run.ok_count > 0 ? 'partial' : 'failed'} />
                 </div>
               )
             }
@@ -418,7 +503,9 @@ export function History({ user }: { user: User }) {
       </div>
 
       <p style={{ marginTop: 16, textAlign: 'center', fontSize: 11, color: FAINT, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
-        {items.length} entrée{items.length > 1 ? 's' : ''}
+        {(q || statusFilter !== 'all')
+          ? `${visible.length} sur ${items.length} entrée${items.length > 1 ? 's' : ''}`
+          : `${items.length} entrée${items.length > 1 ? 's' : ''}`}
       </p>
       </div>
 

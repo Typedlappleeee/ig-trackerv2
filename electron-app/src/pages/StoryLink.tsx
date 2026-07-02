@@ -11,6 +11,7 @@ import { BankPicker } from '@/pages/Bank'
 import type { CaptionItem } from '@/pages/CaptionBank'
 import { supabase } from '@/lib/supabase'
 import { playSuccess, playError } from '@/lib/sounds'
+import { useToast } from '@/components/Toast'
 import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -305,8 +306,16 @@ export default function StoryLink({ user }: { user: User }) {
   const bearer = conns.bearer
   const { role, perms, currentOrg } = useOrg()
   const credits = useCredits()
+  const toast = useToast()
 
-  const [storyPlatformChosen, setStoryPlatformChosen] = useState(false)
+  // Choix mémorisé : Story = Instagram seulement → on ne redemande pas à chaque visite.
+  const [storyPlatformChosen, setStoryPlatformChosen] = useState(() => {
+    try { return localStorage.getItem('sf-story-platform') === 'instagram' } catch { return false }
+  })
+  const chooseStoryPlatform = () => {
+    try { localStorage.setItem('sf-story-platform', 'instagram') } catch { /* ignore */ }
+    setStoryPlatformChosen(true)
+  }
 
   // ── Phones ────────────────────────────────────────────────────────────────
   const [phones, setPhones]           = useState<GeelarkPhone[]>([])
@@ -469,6 +478,14 @@ export default function StoryLink({ user }: { user: User }) {
   const missingLinkIds = selectedIds.filter(id => !getLink(id).trim())
   const canRun = !!bearer && selectedIds.length > 0 && photoPool.length > 0 && missingLinkIds.length === 0 && !running
 
+  // Raison précise du blocage — pour expliquer un bouton grisé (tooltip).
+  const blockReason = !bearer ? 'Connecte GéeLark dans les Paramètres'
+    : selectedIds.length === 0 ? 'Sélectionne au moins un compte'
+    : photoPool.length === 0 ? 'Ajoute au moins une photo'
+    : missingLinkIds.length > 0 ? `${missingLinkIds.length} compte${missingLinkIds.length > 1 ? 's' : ''} sans lien — renseigne le lien de chaque compte`
+    : ''
+  const storyCost = selectedIds.length * CREDIT_COSTS.story
+
   // ── Run ───────────────────────────────────────────────────────────────────
   async function run() {
     if (!canRun || !bearer) return
@@ -569,6 +586,7 @@ export default function StoryLink({ user }: { user: User }) {
         saveTextPool([])
         setSelected(new Set())
         setJobs([])
+        toast.show({ title: 'Configuration réinitialisée', body: 'Photos, textes et comptes ont été vidés après la publication.', kind: 'info' })
       }, 3000)
     }
   }
@@ -664,7 +682,7 @@ export default function StoryLink({ user }: { user: User }) {
             <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 22 }}>Les stories sont disponibles sur Instagram.</p>
             <div style={{ display: 'flex', gap: 14 }}>
               <button
-                onClick={() => setStoryPlatformChosen(true)}
+                onClick={chooseStoryPlatform}
                 className="cursor-pointer"
                 style={{ flex: 1, padding: '22px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1.5px solid rgba(99,102,241,0.4)' }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.06)' }}
@@ -744,13 +762,14 @@ export default function StoryLink({ user }: { user: User }) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
             </svg>
-            Mode test{dryRun ? ' ON' : ''}
+            {dryRun ? 'Mode test ON (ne publie pas)' : 'Mode test'}
           </button>
 
           {/* Schedule button */}
           <button
             onClick={() => { setSchedAt(defaultSchedValue(60)); setSchedErr(''); setShowSchedule(true) }}
             disabled={!canSchedule}
+            title={canSchedule ? 'Programmer la story pour plus tard' : blockReason || undefined}
             className="sf-btn sf-btn-lg sf-btn-secondary"
             style={{ cursor: canSchedule ? 'pointer' : 'not-allowed', opacity: canSchedule ? 1 : 0.45, gap: 8 }}
           >
@@ -774,11 +793,14 @@ export default function StoryLink({ user }: { user: User }) {
             <button
               onClick={run}
               disabled={!canRun}
+              title={canRun ? (dryRun ? 'Test — ne publie pas réellement' : `Publier la story sur ${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} · ${storyCost} crédits`) : blockReason || undefined}
               className={`sf-btn sf-btn-lg sf-btn-primary cursor-pointer`}
               style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9, opacity: canRun ? 1 : 0.5 }}
             >
               <IconSend />
-              {`Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`}
+              {dryRun
+                ? `Tester${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`
+                : `Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}${storyCost > 0 ? ` · ${storyCost} cr.` : ''}`}
             </button>
           )}
         </div>
@@ -845,7 +867,10 @@ export default function StoryLink({ user }: { user: User }) {
                 <p style={{ fontSize: 12, color: 'var(--text-3)' }}>Chargement…</p>
               </div>
             ) : visiblePhones.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--text-3)', padding: '24px 0', textAlign: 'center' }}>Aucun compte</p>
+              <div style={{ padding: '28px 16px', textAlign: 'center' }}>
+                <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 4px' }}>Aucun compte</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>Vérifie le filtre de groupe, ou ajoute des téléphones dans l'onglet Téléphones.</p>
+              </div>
             ) : visiblePhones.map(p => {
               const sel = selected.has(p.id)
               const grp = p.group?.name ?? p.groupName
