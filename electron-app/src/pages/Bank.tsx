@@ -2198,7 +2198,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
 export interface BankPickerProps {
   user: User
   mode: 'single' | 'multi'
-  onSelect: (paths: string[], titles?: string[], descriptions?: string[]) => void
+  onSelect: (paths: string[], titles?: string[], descriptions?: string[], items?: ContentItem[]) => void
   onClose: () => void
   // 'signed-url': just create a signed URL (fast, no download) — for MassPosting
   // 'full': download to local path/blob URL — for Remix/FFmpeg (default)
@@ -2240,8 +2240,11 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     return item.title.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
   })
 
-  async function resolvePaths(its: ContentItem[]): Promise<string[]> {
-    const out: string[] = []
+  // Retourne les chemins résolus ALIGNÉS avec les items d'origine (mêmes indices),
+  // pour que l'appelant puisse relier chaque vidéo à son item de banque.
+  async function resolvePaths(its: ContentItem[]): Promise<{ paths: string[]; resolved: ContentItem[] }> {
+    const paths: string[] = []
+    const resolved: ContentItem[] = []
     for (let i = 0; i < its.length; i++) {
       const it = its[i]
       setResolving(`${i + 1}/${its.length} — ${it.title}`)
@@ -2250,25 +2253,25 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
           // Fast path: just create a signed URL — no full download needed
           const { getSignedUrl } = await import('@/lib/storage')
           const url = await getSignedUrl(it.storage_path ?? it.file_url)
-          if (url) out.push(url)
-          else if (it.file_url) out.push(it.file_url)
+          if (url) { paths.push(url); resolved.push(it) }
+          else if (it.file_url) { paths.push(it.file_url); resolved.push(it) }
         } else {
           const { resolveContentToLocalPath } = await import('@/lib/storage')
-          out.push(await resolveContentToLocalPath(it))
+          paths.push(await resolveContentToLocalPath(it)); resolved.push(it)
         }
       } catch (e) {
         console.error('[BankPicker] resolve failed', it.id, e)
       }
     }
-    return out
+    return { paths, resolved }
   }
 
   async function toggle(item: ContentItem) {
     if (!item.file_url && !item.storage_path) return
     if (mode === 'single') {
-      const paths = await resolvePaths([item])
+      const { paths, resolved } = await resolvePaths([item])
       setResolving(null)
-      if (paths.length > 0) onSelect(paths, [item.title], [getItemDesc(item)])
+      if (paths.length > 0) onSelect(paths, resolved.map(i => i.title), resolved.map(i => getItemDesc(i)), resolved)
       return
     }
     setSelected(prev => {
@@ -2281,9 +2284,9 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
 
   async function confirm() {
     const its = items.filter(i => selected.has(i.id))
-    const paths = await resolvePaths(its)
+    const { paths, resolved } = await resolvePaths(its)
     setResolving(null)
-    onSelect(paths, its.map(i => i.title), its.map(i => getItemDesc(i)))
+    onSelect(paths, resolved.map(i => i.title), resolved.map(i => getItemDesc(i)), resolved)
   }
 
   return (
