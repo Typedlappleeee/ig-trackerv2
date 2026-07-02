@@ -18,6 +18,11 @@ export interface ScheduledPhoneRecord {
 export interface ScheduledVideoRecord {
   token: string
   title: string
+  // Usage unique : référence banque à supprimer après publication réussie.
+  bank_id?:        string
+  storage_path?:   string | null
+  thumbnail_path?: string | null
+  remove?:         boolean
 }
 
 export type ScheduleStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
@@ -534,6 +539,26 @@ async function executeScheduledPostInner(
     // Clear the safety stop — phones are stopped, sweep no longer needed.
     supabase.from('scheduled_posts').update({ stop_phones_at: null, stop_phone_ids: null })
       .eq('id', post.id).then(() => {}, () => {})
+
+    // Usage unique : supprime de la banque les vidéos marquées `remove` si au moins
+    // un post a réussi (Bank uniquement — storage_path présent).
+    if (pollSuccessCount > 0) {
+      const toRemove = videos.filter(v => v.remove && v.storage_path)
+      if (toRemove.length) {
+        try {
+          const ids = toRemove.map(v => v.bank_id).filter(Boolean) as string[]
+          if (ids.length) {
+            const base = supabase.from('content_bank').delete().in('id', ids)
+            await (post.org_id ? (base as any).eq('org_id', post.org_id) : (base as any).eq('user_id', post.user_id).is('org_id', null))
+          }
+          const { deleteStorageObjects } = await import('./storage')
+          await deleteStorageObjects(toRemove.flatMap(v => [v.storage_path, v.thumbnail_path]))
+          onLog(`🗑️ ${toRemove.length} vidéo(s) retirée(s) de la banque (usage unique)`)
+        } catch (e) {
+          onLog(`⚠ Suppression banque échouée : ${e instanceof Error ? e.message : String(e)}`)
+        }
+      }
+    }
 
     const totalFailed = failedCount + pollFailCount
     const totalOk = phones.length - failedCount + pollSuccessCount - (taskIds.length - pollSuccessCount - pollFailCount)

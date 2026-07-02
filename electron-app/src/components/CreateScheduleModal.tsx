@@ -10,7 +10,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
-import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
+import { createScheduledPost, defaultSchedValue, type ScheduledVideoRecord } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 const GOLD  = '#6366F1'
@@ -20,7 +20,7 @@ const FAINT = 'rgba(233,234,240,0.22)'
 const HAIR  = 'rgba(233,234,240,0.08)'
 const SERIF = "'Inter', system-ui, sans-serif"
 
-interface SelVideo { url: string; title: string }
+interface SelVideo { url: string; title: string; bank_id?: string; storage_path?: string | null; thumbnail_path?: string | null }
 
 export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform, initialSchedAt }: {
   user:      User
@@ -47,6 +47,7 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
   const [schedAt, setSchedAt]           = useState(initialSchedAt || defaultSchedValue(60))
   const delayMin = 0   // délai entre comptes retiré de l'UI (toujours 0)
   const [reelsTrial, setReelsTrial]     = useState(false)
+  const [deleteAfterPost, setDeleteAfterPost] = useState(false)
   const [platform, setPlatform]         = useState<'instagram' | 'tiktok'>(initialPlatform ?? 'instagram')
   const [submitting, setSubmitting]     = useState(false)
   const [progress, setProgress]         = useState('')
@@ -109,12 +110,19 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
     try {
       // In sequential mode only the first min(phones, videos) videos are used
       const toUpload = mode === 'random' ? videos : videos.slice(0, Math.min(phoneList.length, videos.length))
-      const tokens: { token: string; title: string }[] = []
+      const tokens: ScheduledVideoRecord[] = []
       for (let i = 0; i < toUpload.length; i++) {
         setProgress(`Upload vidéo ${i + 1}/${toUpload.length}…`)
-        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: toUpload[i].url })
-        if (!up.ok || !up.token) throw new Error(`Upload « ${toUpload[i].title} » échoué : ${up.error ?? '?'}`)
-        tokens.push({ token: up.token, title: toUpload[i].title })
+        const v = toUpload[i]
+        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: v.url })
+        if (!up.ok || !up.token) throw new Error(`Upload « ${v.title} » échoué : ${up.error ?? '?'}`)
+        tokens.push({
+          token: up.token, title: v.title,
+          // Usage unique : on garde la réf banque pour supprimer après publication.
+          ...(deleteAfterPost && v.storage_path
+            ? { remove: true, bank_id: v.bank_id, storage_path: v.storage_path, thumbnail_path: v.thumbnail_path }
+            : {}),
+        })
       }
       setProgress('Création de la programmation…')
       await createScheduledPost({
@@ -348,6 +356,18 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
                 {reelsTrial ? 'Activé' : 'Désactivé'}
               </button>
             </div>
+            <div>
+              <span style={labelStyle}>Usage unique</span>
+              <button onClick={() => setDeleteAfterPost(v => !v)} className="cursor-pointer"
+                title="Supprime la vidéo de la banque une fois publiée"
+                style={{
+                  height: 34, padding: '0 16px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                  background: deleteAfterPost ? GOLD : 'transparent', color: deleteAfterPost ? '#0A0B0E' : MUTED,
+                  border: deleteAfterPost ? 'none' : `1px solid ${HAIR}`, transition: 'all 0.18s',
+                }}>
+                {deleteAfterPost ? 'Activé' : 'Désactivé'}
+              </button>
+            </div>
           </section>
 
           <p style={{ fontSize: 11, color: MUTED, margin: 0, lineHeight: 1.6 }}>
@@ -404,10 +424,16 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
           user={user}
           mode="multi"
           resolveMode="signed-url"
-          onSelect={(paths) => {
+          onSelect={(paths, _titles, _descs, items) => {
             const newOnes = paths
-              .filter(p => !videos.some(v => v.url === p))
-              .map(p => ({ url: p, title: p.replace(/\\/g, '/').split('/').pop()?.split('?')[0] ?? p }))
+              .map((p, i) => ({
+                url: p,
+                title: items?.[i]?.title ?? (p.replace(/\\/g, '/').split('/').pop()?.split('?')[0] ?? p),
+                bank_id: items?.[i]?.id,
+                storage_path: items?.[i]?.storage_path ?? null,
+                thumbnail_path: items?.[i]?.thumbnail_path ?? null,
+              }))
+              .filter(v => !videos.some(x => x.url === v.url))
             setVideos(prev => [...prev, ...newOnes])
             setShowBankPicker(false)
           }}
