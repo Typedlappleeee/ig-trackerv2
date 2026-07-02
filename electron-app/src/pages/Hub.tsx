@@ -11,7 +11,7 @@ import { timeUntil, fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import type { Page } from '@/components/Layout'
 import {
-  ACCENT as GOLD, ACCENT_L as GOLD_L, ACCENT_D as GOLD_D,
+  ACCENT as GOLD,
   TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR,
   BG_0 as BG, BG_1 as BG2, OK, ERR, SANS,
 } from '@/lib/theme'
@@ -55,6 +55,10 @@ const HUB_CSS = `
     0%, 100% { opacity: 0.5; }
     50%       { opacity: 0.9; }
   }
+  @keyframes hub-shimmer { 0%{background-position:-160% 0} 100%{background-position:260% 0} }
+  @keyframes hub-float-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(34px,24px)} }
+  @keyframes hub-float-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-28px,30px)} }
+  @keyframes hub-line-grow { from{transform:scaleX(0)} to{transform:scaleX(1)} }
 `
 function useHubCSS() {
   useEffect(() => {
@@ -68,42 +72,53 @@ function useHubCSS() {
 }
 
 // ── KPI card ───────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, icon, loading, accent, delay = 0 }: {
+function KpiCard({ label, value, icon, loading, delay = 0, grad, glow, accentColor }: {
   label: string; value: string | number; icon: string
-  loading?: boolean; accent?: boolean; delay?: number
+  loading?: boolean; delay?: number; grad: string; glow: string; accentColor: string
 }) {
+  const [hover, setHover] = useState(false)
   return (
     <div
-      className="sf-card sf-card-lift"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
-        flex: 1, minWidth: 0,
-        padding: 20,
-        border: `1px solid ${accent ? 'rgba(99,102,241,0.22)' : HAIR}`,
-        borderRadius: 12,
+        flex: 1, minWidth: 190,
+        padding: 20, borderRadius: 16,
+        background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
+        border: '1px solid rgba(255,255,255,0.08)',
         animation: `hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) ${delay}s both`,
-        transition: 'border-color 200ms ease, box-shadow 240ms ease, transform 240ms cubic-bezier(0.22,1,0.36,1)',
-        position: 'relative',
-        overflow: 'hidden',
+        transform: hover ? 'translateY(-4px)' : 'none',
+        boxShadow: hover
+          ? `0 26px 54px -26px ${glow}, inset 0 1px 0 0 rgba(255,255,255,0.1)`
+          : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 8px 26px -18px rgba(0,0,0,0.6)',
+        transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s',
+        position: 'relative', overflow: 'hidden', isolation: 'isolate',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div aria-hidden style={{ position: 'absolute', top: -40, right: -30, width: 140, height: 140, borderRadius: '50%', background: `radial-gradient(circle, ${glow}, transparent 68%)`, opacity: hover ? 0.55 : 0.28, transition: 'opacity 0.3s', pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <span style={{
-          fontSize: 11, fontWeight: 600, letterSpacing: '0.04em',
+          fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
           textTransform: 'uppercase', color: MUTED, fontFamily: SANS,
         }}>{label}</span>
-        <span style={{ color: accent ? GOLD : 'rgba(233,234,240,0.18)' }}>
-          <SvgIcon d={ICONS[icon]} size={15} color="currentColor" />
+        <span style={{
+          width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', background: grad, boxShadow: `0 8px 20px -8px ${glow}, inset 0 1px 0 0 rgba(255,255,255,0.35)`,
+          transform: hover ? 'scale(1.08) rotate(-4deg)' : 'none', transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)',
+        }}>
+          <SvgIcon d={ICONS[icon]} size={16} color="currentColor" strokeWidth={2} />
         </span>
       </div>
       {loading ? (
         <div style={{
-          height: 26, width: 56, borderRadius: 5, background: HAIR,
+          height: 30, width: 60, borderRadius: 6, background: HAIR,
           animation: 'hub-pulse-bg 1.4s ease-in-out infinite',
         }} />
       ) : (
         <p style={{
-          fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em',
-          color: accent ? GOLD_L : IVORY, margin: 0, lineHeight: 1,
+          position: 'relative', zIndex: 1,
+          fontSize: 32, fontWeight: 900, letterSpacing: '-0.035em',
+          color: accentColor, margin: 0, lineHeight: 1,
           fontFamily: SANS, fontVariantNumeric: 'tabular-nums',
         }}>{value}</p>
       )}
@@ -313,12 +328,19 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   return (
     <div style={{ minHeight: '100%', background: BG, padding: '28px 28px 80px', boxSizing: 'border-box' }}>
 
-      {/* subtle ambient glow */}
-      <div style={{
-        position: 'fixed', top: 0, left: '30%', width: 760, height: 320,
-        background: 'radial-gradient(ellipse, rgba(124,58,237,0.07), transparent 65%)',
-        filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0,
-      }} />
+      {/* ambient animated glows */}
+      <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+        <div style={{
+          position: 'absolute', top: -120, left: '18%', width: 560, height: 420,
+          background: 'radial-gradient(ellipse, rgba(99,102,241,0.13), transparent 66%)',
+          filter: 'blur(70px)', animation: 'hub-float-a 20s ease-in-out infinite',
+        }} />
+        <div style={{
+          position: 'absolute', top: 40, right: '6%', width: 460, height: 380,
+          background: 'radial-gradient(ellipse, rgba(16,185,129,0.09), transparent 68%)',
+          filter: 'blur(72px)', animation: 'hub-float-b 24s ease-in-out infinite',
+        }} />
+      </div>
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto' }}>
 
@@ -335,11 +357,15 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
               margin: '0 0 6px', fontFamily: SANS,
             }}>{dateLabel}</p>
             <h1 style={{
-              margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.04em',
-              color: IVORY, fontFamily: SANS, lineHeight: 1.05,
+              margin: 0, fontSize: 34, fontWeight: 900, letterSpacing: '-0.045em',
+              color: IVORY, fontFamily: SANS, lineHeight: 1.02,
             }}>
               {greeting},&nbsp;
-              <span style={{ color: GOLD_L }}>{firstName}</span>
+              <span style={{
+                background: 'linear-gradient(100deg,#818CF8 10%,#c4b5fd 50%,#6ee7b7 90%)',
+                backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text', animation: 'hub-shimmer 6s linear infinite',
+              }}>{firstName}</span>
             </h1>
           </div>
           <button
@@ -354,11 +380,14 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
         {/* ── KPI row ──────────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-          <KpiCard label={t('hubKpiPhones')}    value={loading ? '…' : phoneCount} icon="phone"    delay={0.05} />
-          <KpiCard label={t('hubKpiVideos')}    value={loading ? '…' : videoCount} icon="video"    delay={0.10} />
-          <KpiCard label={t('hubKpiWeekPosts')} value={loading ? '…' : weekPosts} icon="send"    delay={0.15} />
-          <KpiCard label={t('hubKpiCredits')}   value={credLoading ? '…' : balance.toLocaleString(locale)}
-                   icon="sparkles" accent delay={0.20} />
+          <KpiCard label={t('hubKpiPhones')}    value={loading ? '…' : phoneCount} icon="phone" delay={0.05}
+                   grad="linear-gradient(135deg,#6366F1,#8B5CF6)" glow="rgba(99,102,241,0.5)"  accentColor="#fff" />
+          <KpiCard label={t('hubKpiVideos')}    value={loading ? '…' : videoCount} icon="video" delay={0.10}
+                   grad="linear-gradient(135deg,#EC4899,#8B5CF6)" glow="rgba(236,72,153,0.5)"  accentColor="#fff" />
+          <KpiCard label={t('hubKpiWeekPosts')} value={loading ? '…' : weekPosts} icon="send" delay={0.15}
+                   grad="linear-gradient(135deg,#10B981,#059669)" glow="rgba(16,185,129,0.5)"  accentColor="#fff" />
+          <KpiCard label={t('hubKpiCredits')}   value={credLoading ? '…' : balance.toLocaleString(locale)} icon="sparkles" delay={0.20}
+                   grad="linear-gradient(135deg,#F59E0B,#EF4444)" glow="rgba(245,158,11,0.5)"  accentColor="#FBBF24" />
         </div>
 
         {/* ── Quick actions ──────────────────────────────────────────────── */}

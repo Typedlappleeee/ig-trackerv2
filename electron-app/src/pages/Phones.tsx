@@ -1180,11 +1180,12 @@ export function Phones({ user }: PhonesProps) {
           {/* Left: icon + title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             <div className="sf-anim-scale-spring" style={{
-              width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)', color: ACCENT,
+              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+              boxShadow: '0 10px 24px -8px rgba(99,102,241,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
             }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="6" y="2" width="12" height="20" rx="3"/>
                 <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>
               </svg>
@@ -1290,44 +1291,50 @@ export function Phones({ user }: PhonesProps) {
           {/* ── Stats chips ──────────────────────────────────────────────── */}
           {!loading && phones.length > 0 && (() => {
             const onlinePct  = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
-            const statChips = [
+            const statCards = [
               {
-                label: t('phoneSummaryTotal'), value: phones.length,
+                label: t('phoneSummaryTotal'), value: phones.length, sub: undefined as string | undefined,
                 icon: (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <rect x="3.5" y="0.5" width="7" height="13" rx="2" stroke="currentColor" strokeWidth="1.3"/>
-                    <circle cx="7" cy="11" r="0.7" fill="currentColor"/>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>
                   </svg>
                 ),
-                color: ACCENT, sub: undefined as string | undefined,
+                grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', valColor: '#fff',
               },
               {
                 label: t('phoneSummaryOnline'), value: onlineCount, sub: `${onlinePct}%`,
-                icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)', display: 'inline-block' }} />,
-                color: 'var(--ok)',
+                icon: <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#fff', display: 'inline-block', boxShadow: '0 0 0 3px rgba(255,255,255,0.25)' }} />,
+                grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.5)', valColor: '#34D399',
               },
               {
-                label: t('phoneSummaryOffline'), value: offlineCount,
-                icon: <span style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid rgba(233,234,240,0.4)', display: 'inline-block' }} />,
-                color: 'rgba(233,234,240,0.5)', sub: undefined as string | undefined,
+                label: t('phoneSummaryOffline'), value: offlineCount, sub: undefined as string | undefined,
+                icon: <span style={{ width: 9, height: 9, borderRadius: '50%', border: '2px solid #fff', display: 'inline-block' }} />,
+                grad: 'linear-gradient(135deg,#475569,#334155)', glow: 'rgba(100,116,139,0.4)', valColor: '#E9EAF0',
               },
             ]
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-                <div className="anim-stagger" style={{ display: 'contents' }}>
-                  {statChips.map(chip => (
-                    <div key={chip.label} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 7,
-                      padding: '6px 12px', borderRadius: 8,
-                      background: 'rgba(233,234,240,0.04)', border: '1px solid rgba(233,234,240,0.08)',
-                    }}>
-                      <span style={{ color: chip.color, display: 'flex', alignItems: 'center' }}>{chip.icon}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: TEXT_1, fontVariantNumeric: 'tabular-nums' }}>{chip.value}</span>
-                      <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.55)', fontWeight: 500 }}>{chip.label}</span>
-                      {chip.sub && <span style={{ fontSize: 10, color: chip.color, fontWeight: 600 }}>{chip.sub}</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
+                {statCards.map(card => (
+                  <div key={card.label} className="sf-anim-slide-up" style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 12,
+                    padding: '12px 18px 12px 12px', borderRadius: 14,
+                    background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 8px 26px -18px rgba(0,0,0,0.6)',
+                  }}>
+                    <span style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', background: card.grad, boxShadow: `0 8px 20px -8px ${card.glow}, inset 0 1px 0 0 rgba(255,255,255,0.35)`,
+                    }}>{card.icon}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <span style={{ fontSize: 22, fontWeight: 900, color: card.valColor, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{card.value}</span>
+                        {card.sub && <span style={{ fontSize: 11, color: card.valColor, fontWeight: 800, opacity: 0.85 }}>{card.sub}</span>}
+                      </div>
+                      <span style={{ fontSize: 10.5, color: 'rgba(233,234,240,0.5)', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{card.label}</span>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
                 {lastUpdated && (
                   <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.35)', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
