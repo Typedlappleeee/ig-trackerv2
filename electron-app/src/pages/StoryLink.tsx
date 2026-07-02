@@ -527,13 +527,12 @@ export default function StoryLink({ user }: { user: User }) {
       }
     }
 
-    // Concurrence bornée : chaque story = des dizaines d'appels ADB sur ~2 min.
-    // 5 téléphones en parallèle max (au-delà on risque de saturer l'API GeeLark,
-    // 200 req/min). Le démarrage de chaque worker est décalé pour ne pas booter
-    // tous les téléphones au même instant.
-    // Concurrence : proxy rotatif → 1 téléphone à la fois ; sinon le nombre choisi
-    // (0 = défaut 5). Délai optionnel entre chaque story pour ménager le proxy.
-    const CONCURRENCY = rotProxy ? 1 : (maxConc > 0 ? maxConc : 5)
+    // Par défaut : TOUS les téléphones en même temps (comme le Mass Posting).
+    // Proxy rotatif → 1 à la fois ; sinon le nombre choisi (0 = tous).
+    const CONCURRENCY = rotProxy ? 1 : (maxConc > 0 ? maxConc : assignments.length)
+    // Petit décalage de démarrage plafonné (~6s) pour ne pas booter tout au même
+    // instant. En rotatif un seul worker → aucun décalage.
+    const staggerBase = rotProxy ? 0 : 1000
     const queue = [...assignments]
     let okCount = 0
     const worker = async (staggerMs: number) => {
@@ -544,7 +543,7 @@ export default function StoryLink({ user }: { user: User }) {
       }
     }
     await Promise.all(
-      Array.from({ length: Math.min(CONCURRENCY, assignments.length) }, (_, i) => worker(i * 6000)),
+      Array.from({ length: Math.min(CONCURRENCY, assignments.length) }, (_, i) => worker(Math.min(i, 6) * staggerBase)),
     )
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
@@ -1161,7 +1160,7 @@ export default function StoryLink({ user }: { user: User }) {
             {!rotProxy && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Téléphones simultanés</span>
-                <input type="number" min={0} max={200} value={maxConc || ''} placeholder="5"
+                <input type="number" min={0} max={200} value={maxConc || ''} placeholder="Tous"
                   onChange={e => setMaxConc(Math.max(0, parseInt(e.target.value) || 0))}
                   className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
               </div>
