@@ -201,6 +201,18 @@ const PAGE_COLOR: Record<string, string> = {
   videostudio:  '#F472B6', // rose
 }
 
+// Couleur exacte de chaque sous-outil, reprise des cartes des hubs Publication
+// et Studio. Sert à teinter l'en-tête (retour au hub + icône) de la page ouverte.
+const SUBTOOL_COLOR: Record<string, string> = {
+  posting:      '#818CF8', // Reels (Publication)
+  storylink:    '#FBBF24', // Story (Publication)
+  photoposting: '#34D399', // Photo (Publication)
+  remix:        '#818CF8', // Remix (Studio)
+  spoof:        '#34D399', // Spoof (Studio)
+  subtitles:    '#FBBF24', // Sous-titres (Studio)
+  mixer:        '#F472B6', // Mixer (Studio)
+}
+
 // Sidebar divider — hairline
 function SidebarDivider() {
   return (
@@ -863,20 +875,6 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             </button>
           </div>
 
-          {/* Community — pinned */}
-          {isVisibleTab('community') && (
-            <div style={{ marginBottom: 2 }}>
-              <button
-                className={`sf-sidebar-item${page === 'community' ? ' is-active' : ''}`}
-                onClick={() => { playNav(); onNavigate('community') }}
-                style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
-              >
-                <span className="sf-sidebar-icon"><NavIcon d={ICONS.chat} size={17} /></span>
-                {!collapsed && <span style={{ flex: 1 }}>{t('navCommunity')}</span>}
-              </button>
-            </div>
-          )}
-
           <SidebarDivider />
 
           {/* Sections — collapsible (itère NAV_SECTIONS directement, robuste à
@@ -1064,31 +1062,32 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                 : (['remix', 'spoof', 'subtitles', 'mixer'] as Page[]).includes(page) ? { hub: 'videostudio', label: 'Studio Vidéo' }
                 : null
               if (!backTo) return null
+              const c = SUBTOOL_COLOR[page]
               return (
                 <button
                   onClick={() => onNavigate(backTo.hub)}
                   title={`Retour à ${backTo.label}`}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
-                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                    background: c ? `${c}1a` : 'rgba(255,255,255,0.05)', border: `1px solid ${c ? `${c}59` : 'rgba(255,255,255,0.1)'}`,
                     borderRadius: 8, padding: '5px 10px', marginRight: 4, cursor: 'pointer',
-                    color: 'rgba(233,234,240,0.8)', fontSize: 12.5, fontWeight: 600,
+                    color: c ?? 'rgba(233,234,240,0.8)', fontSize: 12.5, fontWeight: 600,
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = c ? `${c}2e` : 'rgba(255,255,255,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = c ? `${c}1a` : 'rgba(255,255,255,0.05)')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
                   {backTo.label}
                 </button>
               )
             })()}
-            <span style={{ color: 'rgba(99,102,241,0.7)', flexShrink: 0, display: 'flex' }}>
+            <span style={{ color: SUBTOOL_COLOR[page] ?? 'rgba(99,102,241,0.7)', flexShrink: 0, display: 'flex' }}>
               <NavIcon d={ICONS[PAGE_ICON[page] ?? 'grid']} size={15} />
             </span>
             <span style={{
               width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginRight: 3,
-              background: 'linear-gradient(135deg, #6366F1, #E9EAF0)',
-              boxShadow: '0 0 8px rgba(99,102,241,0.6)',
+              background: SUBTOOL_COLOR[page] ? `linear-gradient(135deg, ${SUBTOOL_COLOR[page]}, #E9EAF0)` : 'linear-gradient(135deg, #6366F1, #E9EAF0)',
+              boxShadow: `0 0 8px ${SUBTOOL_COLOR[page] ? `${SUBTOOL_COLOR[page]}99` : 'rgba(99,102,241,0.6)'}`,
             }} />
             <span style={{ fontSize: 14.5, fontWeight: 600, color: '#F1F0F7', whiteSpace: 'nowrap' }}>
               {pageLabels[page] ?? page}
