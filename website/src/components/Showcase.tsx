@@ -34,7 +34,7 @@ const ICheckSmall = () => (
 // ── Mini-UI previews ─────────────────────────────────────────────────────────
 function PreviewToken() {
   return (
-    <div className="rounded-xl border border-border bg-[#080812] p-3.5">
+    <div className="rounded-xl border border-white/[0.06] bg-[#07070F] p-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-text2">Connexion GeeLark</span>
         <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold text-emerald" style={{ background: 'rgba(52,211,153,0.12)' }}>
@@ -67,7 +67,7 @@ function PreviewBank() {
     { name: 'final-v3.mp4', dur: '0:19', accent: '#FB923C' },
   ]
   return (
-    <div className="rounded-xl border border-border bg-[#080812] p-3.5">
+    <div className="rounded-xl border border-white/[0.06] bg-[#07070F] p-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-text2">Banque vidéos</span>
         <span className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo">
@@ -77,7 +77,7 @@ function PreviewBank() {
       </div>
       <div className="grid grid-cols-3 gap-1.5">
         {files.map((f) => (
-          <div key={f.name} className="overflow-hidden rounded-lg border border-border bg-white/[0.03]">
+          <div key={f.name} className="overflow-hidden rounded-lg border border-white/[0.06] bg-white/[0.03]">
             <div className="flex aspect-video items-center justify-center" style={{ background: `${f.accent}14` }}>
               <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: `${f.accent}33`, color: f.accent }}>
                 <IPlay />
@@ -104,7 +104,7 @@ function PreviewMassPost() {
     { name: 'iPhone-06', state: 'queue' },
   ] as const
   return (
-    <div className="rounded-xl border border-border bg-[#080812] p-3.5">
+    <div className="rounded-xl border border-white/[0.06] bg-[#07070F] p-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-text2">Mass Posting</span>
         <span className="font-mono text-[9px] font-bold text-emerald">42/47 publiés</span>
@@ -137,7 +137,11 @@ function PreviewMassPost() {
           </div>
         ))}
       </div>
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+      <div className="mt-2.5 flex items-center justify-between text-[9px]">
+        <span className="text-text2">Instagram &amp; TikTok</span>
+        <span className="font-mono font-bold text-emerald">89 %</span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
         <div className="h-full rounded-full" style={{ width: '89%', background: 'linear-gradient(90deg, #22D3EE, #34D399)' }} />
       </div>
     </div>
@@ -167,7 +171,7 @@ const STEPS = [
     icon: IRocket,
     accent: '#A855F7',
     title: 'Lance le Mass Post',
-    text: "Sélectionne tes comptes, choisis la cadence, clique. ScaleFlow publie en parallèle et libère chaque phone dès que c'est terminé.",
+    text: "Sélectionne tes comptes, choisis la cadence, clique. ScaleFlow publie en parallèle sur Instagram et TikTok, et libère chaque phone dès que c'est terminé.",
     preview: <PreviewMassPost />,
   },
 ]
@@ -191,36 +195,53 @@ export function Showcase() {
   const ref = useReveal()
 
   return (
-    <section id="how" className="relative px-5 py-28" ref={ref}>
-      <div className="pointer-events-none absolute inset-0 -z-10">
+    <section id="how" className="relative overflow-hidden px-5 py-28" ref={ref}>
+      {/* Halos de fond discrets */}
+      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
         <div
-          className="absolute left-1/4 top-1/3 h-[500px] w-[500px] rounded-full opacity-[0.05]"
-          style={{ background: 'radial-gradient(circle, #22D3EE, transparent)', filter: 'blur(90px)' }}
+          className="absolute left-1/4 top-1/4 h-[520px] w-[520px] rounded-full opacity-[0.06] animate-aurora"
+          style={{ background: 'radial-gradient(circle, #22D3EE, transparent 70%)', filter: 'blur(100px)' }}
+        />
+        <div
+          className="absolute right-[8%] top-1/2 h-[460px] w-[460px] rounded-full opacity-[0.06] animate-aurora"
+          style={{ background: 'radial-gradient(circle, #A855F7, transparent 70%)', filter: 'blur(100px)', animationDelay: '-8s' }}
         />
       </div>
 
       <div className="mx-auto max-w-6xl">
+        {/* En-tête centré */}
         <div className="mx-auto max-w-2xl text-center reveal">
           <span className="section-label">Comment ça marche</span>
-          <h2 className="text-3xl font-black text-text sm:text-5xl">
+          <h2 className="font-display h-section">
             Opérationnel en <span className="gradient-text">3 étapes.</span>
           </h2>
           <p className="mt-4 text-text2">
-            Pas de setup interminable, pas de scripts à bidouiller. Du token au premier mass post en moins de cinq minutes.
+            Pas de setup interminable, pas de scripts à bidouiller. Du token GeeLark au premier mass post
+            sur <strong className="font-semibold text-text">Instagram &amp; TikTok</strong> en moins de cinq minutes.
           </p>
         </div>
 
         <div className="relative mt-16">
-          {/* Gradient connecting line (desktop) */}
+          {/* Ligne de connexion — desktop (horizontale) */}
           <div
-            className="pointer-events-none absolute left-[16.67%] right-[16.67%] top-7 hidden h-px lg:block"
-            style={{ background: 'linear-gradient(90deg, #22D3EE 0%, #818CF8 50%, #A855F7 100%)', opacity: 0.45 }}
+            className="pointer-events-none absolute left-[16.67%] right-[16.67%] top-8 hidden h-px lg:block"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, #22D3EE 12%, #818CF8 50%, #A855F7 88%, transparent 100%)',
+              opacity: 0.55,
+              maskImage: 'linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)',
+              WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)',
+            }}
             aria-hidden="true"
           />
-          {/* Vertical connecting line (mobile) */}
+          {/* Ligne de connexion — mobile (verticale) */}
           <div
-            className="pointer-events-none absolute bottom-12 left-7 top-10 w-px lg:hidden"
-            style={{ background: 'linear-gradient(180deg, #22D3EE 0%, #818CF8 50%, #A855F7 100%)', opacity: 0.35 }}
+            className="pointer-events-none absolute bottom-16 left-8 top-12 w-px lg:hidden"
+            style={{
+              background: 'linear-gradient(180deg, #22D3EE 0%, #818CF8 50%, #A855F7 100%)',
+              opacity: 0.4,
+              maskImage: 'linear-gradient(180deg, transparent, #000 6%, #000 94%, transparent)',
+              WebkitMaskImage: 'linear-gradient(180deg, transparent, #000 6%, #000 94%, transparent)',
+            }}
             aria-hidden="true"
           />
 
@@ -231,30 +252,41 @@ export function Showcase() {
                 className="reveal relative flex gap-5 lg:flex-col lg:gap-0"
                 style={{ transitionDelay: `${i * 0.15}s` }}
               >
-                {/* Number badge */}
-                <div className="relative z-10 shrink-0 lg:mx-auto lg:mb-6">
+                {/* Badge numéro raffiné avec glow */}
+                <div className="relative z-10 shrink-0 lg:mx-auto lg:mb-7">
                   <span
-                    className="flex h-14 w-14 items-center justify-center rounded-2xl bg-bg font-mono text-base font-extrabold"
+                    className="absolute inset-0 -z-10 rounded-2xl blur-md"
+                    style={{ background: `radial-gradient(circle, ${step.accent}66, transparent 72%)` }}
+                    aria-hidden="true"
+                  />
+                  <span
+                    className="flex h-14 w-14 items-center justify-center rounded-2xl font-display text-lg font-bold"
                     style={{
-                      border: `1.5px solid ${step.accent}55`,
+                      background: `linear-gradient(160deg, ${step.accent}22 0%, rgba(8,8,20,0.9) 60%)`,
+                      border: `1.5px solid ${step.accent}66`,
                       color: step.accent,
-                      boxShadow: `0 0 30px -6px ${step.accent}66, inset 0 0 24px -10px ${step.accent}55`,
+                      boxShadow: `0 0 34px -6px ${step.accent}77, inset 0 1px 0 0 rgba(255,255,255,0.14), inset 0 0 22px -12px ${step.accent}88`,
                     }}
                   >
                     {step.num}
                   </span>
                 </div>
 
-                {/* Card */}
+                {/* Carte premium */}
                 <div className="glass-card min-w-0 flex-1 rounded-2xl p-6">
                   <div className="mb-3 flex items-center gap-2.5">
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                      style={{ background: `${step.accent}1A`, border: `1px solid ${step.accent}33`, color: step.accent }}
+                      style={{
+                        background: `${step.accent}1A`,
+                        border: `1px solid ${step.accent}33`,
+                        color: step.accent,
+                        boxShadow: `inset 0 0 16px -8px ${step.accent}99`,
+                      }}
                     >
                       <step.icon />
                     </span>
-                    <h3 className="text-base font-bold text-text">{step.title}</h3>
+                    <h3 className="font-display text-base font-bold text-text">{step.title}</h3>
                   </div>
                   <p className="text-sm leading-relaxed text-text2">{step.text}</p>
                   <div className="mt-5">{step.preview}</div>

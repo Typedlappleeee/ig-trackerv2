@@ -88,23 +88,19 @@ export function Nav() {
           {/* Desktop CTAs */}
           <div className="flex items-center gap-2">
             <a
+              href={DOWNLOAD_URL}
+              className="hidden sm:inline-flex btn-ghost !px-4 !py-2 !text-xs !rounded-full"
+            >
+              Télécharger
+            </a>
+            <a
               href={APP_URL}
               target="_blank"
               rel="noreferrer"
-              className="hidden sm:inline-flex btn-ghost !px-4 !py-2 !text-xs !rounded-xl"
+              className="btn-primary !px-4 !py-2 !text-xs !rounded-full"
             >
-              Ouvrir l'app
-            </a>
-            <a
-              href={DOWNLOAD_URL}
-              className="btn-primary !px-4 !py-2 !text-xs !rounded-xl"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              Télécharger
+              Commencer
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </a>
 
             {/* Mobile hamburger */}
@@ -150,16 +146,16 @@ export function Nav() {
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setOpen(false)}
-                className="btn-secondary w-full !justify-center !py-2.5 !text-sm"
+                className="btn-primary w-full !justify-center !py-2.5 !text-sm"
               >
-                Ouvrir l'app dans le navigateur
+                Commencer gratuitement
               </a>
               <a
                 href={DOWNLOAD_URL}
                 onClick={() => setOpen(false)}
-                className="btn-primary w-full !justify-center !py-2.5 !text-sm"
+                className="btn-secondary w-full !justify-center !py-2.5 !text-sm"
               >
-                Télécharger gratuitement
+                Télécharger l'app
               </a>
             </div>
           </div>

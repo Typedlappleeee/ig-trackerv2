@@ -7,6 +7,10 @@ const QA = [
     a: "Une app pour gérer en masse tes comptes Instagram : poster automatiquement sur des dizaines de téléphones en parallèle, organiser ta banque de vidéos, voir les stats en temps réel, et automatiser les tâches répétitives.",
   },
   {
+    q: 'Ça marche aussi pour TikTok ?',
+    a: "Oui. Le mass posting, la programmation des posts et le warmup gèrent Instagram ET TikTok depuis le même dashboard. Tu pilotes tes deux réseaux côte à côte, sans changer d'outil ni dupliquer ton flux de travail.",
+  },
+  {
     q: "J'ai besoin de quoi pour l'utiliser ?",
     a: "Un abonnement GeeLark (cloud phones) avec ton bearer token. ScaleFlow se connecte à ton compte GeeLark pour piloter tes téléphones virtuels. Niveau machine, n'importe quel Mac/PC moderne suffit.",
   },
@@ -66,10 +70,11 @@ function FaqItem({
   const btnId = `faq-button-${index}`
   return (
     <div
-      className="glass overflow-hidden rounded-2xl transition-all duration-300"
+      className="glass-card overflow-hidden rounded-2xl"
       style={{
-        borderLeft: isOpen ? '3px solid #818CF8' : '3px solid transparent',
-        background: isOpen ? 'rgba(139,92,246,0.06)' : undefined,
+        borderLeft: isOpen ? '2.5px solid transparent' : undefined,
+        borderImage: isOpen ? 'linear-gradient(180deg, #5EEAD4, #818CF8, #C084FC) 1' : undefined,
+        background: isOpen ? 'linear-gradient(160deg, rgba(129,140,248,0.10) 0%, rgba(255,255,255,0.02) 100%)' : undefined,
       }}
     >
       <h3>
@@ -81,15 +86,16 @@ function FaqItem({
           aria-controls={panelId}
           className="flex w-full cursor-pointer items-center justify-between gap-3 px-5 py-4 text-left transition-colors duration-200 hover:bg-white/[0.03]"
         >
-          <span className={`text-[15px] font-semibold transition-colors duration-200 ${isOpen ? 'gradient-text' : 'text-text'}`}>
+          <span className={`text-[15px] font-semibold transition-colors duration-300 ${isOpen ? 'gradient-text' : 'text-text'}`}>
             {item.q}
           </span>
           <span
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all duration-300"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all duration-300 ease-out"
             style={{
-              background: isOpen ? 'rgba(129,140,248,0.16)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${isOpen ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.1)'}`,
-              transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
+              background: isOpen ? 'rgba(129,140,248,0.18)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${isOpen ? 'rgba(129,140,248,0.45)' : 'rgba(255,255,255,0.1)'}`,
+              transform: isOpen ? 'rotate(135deg)' : 'rotate(0deg)',
+              boxShadow: isOpen ? '0 0 16px -4px rgba(129,140,248,0.6)' : 'none',
             }}
           >
             <IconPlus width={15} height={15} className={isOpen ? 'text-indigo' : 'text-text2'} />
@@ -117,20 +123,23 @@ export function Faq() {
 
   return (
     <section id="faq" className="relative px-5 py-28" ref={ref}>
-      <div className="pointer-events-none absolute inset-0 -z-10">
+      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
         <div
-          className="absolute right-1/4 top-1/4 h-[440px] w-[440px] rounded-full opacity-[0.05]"
+          className="absolute right-1/4 top-1/4 h-[440px] w-[440px] rounded-full opacity-[0.06]"
           style={{ background: 'radial-gradient(circle, #A855F7, transparent)', filter: 'blur(90px)' }}
         />
+        <div className="absolute inset-0 bg-grid opacity-[0.018]" />
       </div>
 
       <div className="mx-auto max-w-3xl">
         <div className="mb-12 text-center reveal">
           <span className="section-label">FAQ</span>
-          <h2 className="text-3xl font-black text-text sm:text-5xl">
+          <h2 className="font-display h-section">
             On répond à <span className="gradient-text">tout.</span>
           </h2>
-          <p className="mt-4 text-text2">Les questions qu'on nous pose le plus souvent avant de passer au mass posting.</p>
+          <p className="mx-auto mt-4 max-w-md text-text2">
+            Les questions qu'on nous pose le plus souvent avant de passer au mass posting.
+          </p>
         </div>
 
         <div className="space-y-3">
@@ -142,24 +151,24 @@ export function Faq() {
         </div>
 
         {/* CTA card */}
-        <div className="reveal relative mt-14 overflow-hidden rounded-3xl glass-strong p-8 text-center sm:p-10">
+        <div className="reveal relative mt-14 overflow-hidden rounded-3xl gradient-ring p-8 text-center sm:p-10">
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px"
-            style={{ background: 'linear-gradient(90deg, transparent, #818CF8, transparent)' }}
+            className="pointer-events-none absolute left-1/2 top-0 h-40 w-72 -translate-x-1/2 rounded-full opacity-25"
+            style={{ background: 'radial-gradient(ellipse, #818CF8, transparent)', filter: 'blur(44px)' }}
             aria-hidden="true"
           />
-          <div
-            className="pointer-events-none absolute left-1/2 top-0 h-40 w-72 -translate-x-1/2 rounded-full opacity-20"
-            style={{ background: 'radial-gradient(ellipse, #818CF8, transparent)', filter: 'blur(40px)' }}
-            aria-hidden="true"
-          />
-          <h3 className="text-2xl font-extrabold text-text">
+          <h3 className="font-display text-2xl font-bold text-text">
             Encore une <span className="gradient-text">question ?</span>
           </h3>
           <p className="mx-auto mb-7 mt-2 max-w-sm text-sm text-text2">
             Écris-nous directement sur Telegram. Réponse en moins d'une heure, en moyenne.
           </p>
-          <a href="https://t.me/justquentin" target="_blank" rel="noreferrer" className="btn-primary cursor-pointer">
+          <a
+            href="https://t.me/justquentin"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary !px-7 !py-3.5"
+          >
             <IconTelegram />
             Contacter sur Telegram
           </a>

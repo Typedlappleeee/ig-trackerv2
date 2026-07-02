@@ -5,7 +5,7 @@
 @layer base {
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: 5rem;
+    scroll-padding-top: 5.5rem;
   }
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -15,26 +15,38 @@
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'ss01', 'cv01', 'cv11';
   }
-  h1, h2, h3 { letter-spacing: -0.035em; }
-  ::selection { background: rgba(139,92,246,0.35); color: #F2F0FF; }
-  :focus-visible { outline: 2px solid rgba(34,211,238,0.85); outline-offset: 2px; border-radius: 4px; }
+  /* Display font on headings — plus de caractère, hiérarchie premium */
+  h1, h2, h3 { font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.03em; }
+  ::selection { background: rgba(129,140,248,0.32); color: #F2F0FF; }
+  :focus-visible { outline: 2px solid rgba(34,211,238,0.85); outline-offset: 2px; border-radius: 6px; }
 }
 
 @layer components {
 
   /* ── Gradients ─────────────────────────────────────────────────────────── */
   .gradient-text {
-    background: linear-gradient(135deg, #22D3EE 0%, #818CF8 45%, #A855F7 100%);
+    background: linear-gradient(105deg, #5EEAD4 0%, #818CF8 42%, #C084FC 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .gradient-text-warm {
-    background: linear-gradient(135deg, #F472B6 0%, #A855F7 50%, #818CF8 100%);
+    background: linear-gradient(120deg, #F472B6 0%, #C084FC 55%, #818CF8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+  /* Titre géant avec léger balayage lumineux */
+  .shine-text {
+    background: linear-gradient(100deg, #C7C4FF 0%, #FFFFFF 30%, #A5B4FC 50%, #FFFFFF 70%, #C7C4FF 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shine 6s ease-in-out infinite;
   }
 
   /* ── Glass surfaces ─────────────────────────────────────────────────────── */
@@ -50,96 +62,119 @@
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
+  /* Carte premium : dégradé subtil + liseré haut lumineux (inset) */
   .glass-card {
-    background: linear-gradient(135deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.025) 100%);
-    border: 1px solid rgba(255,255,255,0.09);
+    position: relative;
+    background: linear-gradient(160deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.018) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    transition: all 0.25s ease;
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.06);
+    transition: transform 0.3s cubic-bezier(0.22,1,0.36,1), border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
   }
   .glass-card:hover {
-    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
-    border-color: rgba(139,92,246,0.3);
-    box-shadow: 0 12px 40px -8px rgba(124,58,237,0.25);
-    transform: translateY(-2px);
+    background: linear-gradient(160deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+    border-color: rgba(129,140,248,0.32);
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.09), 0 20px 50px -18px rgba(99,102,241,0.4);
+    transform: translateY(-4px);
   }
 
-  /* ── Gradient border (popular plan, featured cards) ────────────────────── */
+  /* ── Gradient border (plans, cartes vedettes) ──────────────────────────── */
   .gradient-ring {
     position: relative;
     background:
-      linear-gradient(#09091A, #09091A) padding-box,
-      linear-gradient(135deg, #22D3EE 0%, #818CF8 45%, #A855F7 100%) border-box;
+      linear-gradient(#0A0A18, #0A0A18) padding-box,
+      linear-gradient(135deg, #5EEAD4 0%, #818CF8 45%, #C084FC 100%) border-box;
     border: 1.5px solid transparent;
   }
 
-  /* ── Buttons ────────────────────────────────────────────────────────────── */
+  /* ── Boutons ────────────────────────────────────────────────────────────── */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold cursor-pointer transition-all duration-200 select-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold cursor-pointer select-none;
+    transition: transform 0.18s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease, filter 0.2s ease, background 0.25s ease, border-color 0.25s ease;
   }
   .btn-primary {
-    @apply btn px-6 py-3 text-white;
-    background: linear-gradient(135deg, #22D3EE 0%, #818CF8 50%, #A855F7 100%);
-    box-shadow: 0 8px 30px -8px rgba(124,58,237,0.6);
+    @apply btn px-6 py-3 text-[#08060F];
+    background: linear-gradient(120deg, #67E8F9 0%, #A5B4FC 48%, #D8B4FE 100%);
+    box-shadow: 0 10px 34px -10px rgba(129,140,248,0.75), inset 0 1px 0 0 rgba(255,255,255,0.6);
   }
   .btn-primary:hover {
-    box-shadow: 0 14px 44px -8px rgba(124,58,237,0.8);
-    filter: brightness(1.08);
-    transform: translateY(-1px);
+    box-shadow: 0 16px 48px -10px rgba(129,140,248,0.9), inset 0 1px 0 0 rgba(255,255,255,0.7);
+    filter: brightness(1.06);
+    transform: translateY(-2px);
   }
   .btn-primary:active { transform: translateY(0); }
 
   .btn-secondary {
     @apply btn px-6 py-3 text-text;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05);
   }
   .btn-secondary:hover {
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(34,211,238,0.4);
-    transform: translateY(-1px);
+    background: rgba(255,255,255,0.09);
+    border-color: rgba(94,234,212,0.45);
+    transform: translateY(-2px);
   }
 
   .btn-ghost {
     @apply btn px-5 py-2.5 text-text2 text-sm;
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.09);
   }
   .btn-ghost:hover { background: rgba(255,255,255,0.05); color: #F2F0FF; }
 
-  /* ── Labels / eyebrows ──────────────────────────────────────────────────── */
+  /* ── Eyebrows / chips / labels ─────────────────────────────────────────── */
   .eyebrow {
     @apply inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium text-text2;
-    background: rgba(139,92,246,0.08);
-    border: 1px solid rgba(139,92,246,0.22);
+    background: rgba(129,140,248,0.08);
+    border: 1px solid rgba(129,140,248,0.24);
+    backdrop-filter: blur(8px);
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: rgba(226,232,240,0.85);
   }
   .section-label {
-    @apply inline-block text-xs font-bold uppercase tracking-[0.22em] gradient-text mb-3;
+    @apply inline-block text-[11px] font-bold uppercase tracking-[0.28em] gradient-text mb-3.5;
+  }
+  /* Titre de section standard */
+  .h-section { @apply text-[2rem] font-bold leading-[1.05] text-text sm:text-[2.9rem]; }
+
+  /* ── Hairlines ─────────────────────────────────────────────────────────── */
+  .hairline {
+    background: linear-gradient(90deg, transparent, rgba(129,140,248,0.35), transparent);
+    height: 1px;
   }
 
-  /* ── Shimmer loading effect ─────────────────────────────────────────────── */
+  /* ── Marquee ───────────────────────────────────────────────────────────── */
+  .marquee-mask {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+
+  /* ── Shimmer ───────────────────────────────────────────────────────────── */
   .shimmer {
     background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
     background-size: 200% 100%;
     animation: shimmer 2.5s linear infinite;
   }
 
-  /* ── Scroll-triggered reveal ────────────────────────────────────────────── */
+  /* ── Reveal au scroll ──────────────────────────────────────────────────── */
   .reveal {
     opacity: 0;
-    transform: translateY(28px);
-    transition: opacity 0.65s ease, transform 0.65s ease;
+    transform: translateY(26px);
+    transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1);
   }
-  .reveal.visible {
-    opacity: 1;
-    transform: none;
-  }
-  .reveal-delay-1 { transition-delay: 0.1s; }
-  .reveal-delay-2 { transition-delay: 0.2s; }
-  .reveal-delay-3 { transition-delay: 0.3s; }
-  .reveal-delay-4 { transition-delay: 0.4s; }
-  .reveal-delay-5 { transition-delay: 0.5s; }
+  .reveal.visible { opacity: 1; transform: none; }
+  .reveal-delay-1 { transition-delay: 0.08s; }
+  .reveal-delay-2 { transition-delay: 0.16s; }
+  .reveal-delay-3 { transition-delay: 0.24s; }
+  .reveal-delay-4 { transition-delay: 0.32s; }
+  .reveal-delay-5 { transition-delay: 0.4s; }
 
-  /* ── Noise texture overlay ──────────────────────────────────────────────── */
+  /* ── Texture bruit ─────────────────────────────────────────────────────── */
   .noise::after {
     content: '';
     position: absolute;
@@ -149,18 +184,15 @@
     opacity: 0.4;
   }
 
-  /* ── Tag / badge ────────────────────────────────────────────────────────── */
-  .tag {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide;
-    border: 1px solid currentColor;
-    opacity: 0.85;
-  }
+  .stat-value { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+}
 
-  /* ── Stat counter ───────────────────────────────────────────────────────── */
-  .stat-value {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: 'tnum';
-  }
+/* Fine grid utility for backgrounds */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px);
+  background-size: 64px 64px;
 }
 
 /* ── Respect reduced motion ───────────────────────────────────────────────── */
