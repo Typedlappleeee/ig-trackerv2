@@ -29,6 +29,15 @@ function IconFlask({ size = 14, color = 'currentColor' }: { size?: number; color
   )
 }
 
+function IconTrash({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  )
+}
+
 function IconNetwork({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -112,6 +121,24 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           style={{ background: opts.reelsTrial ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
         >
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.reelsTrial ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
+      </div>
+
+      {/* ── Usage unique : supprime la vidéo de la banque après publication ──── */}
+      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
+          <IconTrash size={14} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Usage unique</span>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Supprime la vidéo de la banque une fois publiée</p>
+        </div>
+        <button
+          onClick={() => set({ deleteAfterPost: !opts.deleteAfterPost })}
+          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+          style={{ background: opts.deleteAfterPost ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.deleteAfterPost ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
       </div>
 

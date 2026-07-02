@@ -15,6 +15,7 @@ export interface PostingOpts {
   // TEMPS, avec un délai optionnel entre chaque lot.
   rotatingProxy: boolean  // raccourci : force 1 téléphone à la fois
   maxConcurrent: number   // nb de téléphones simultanés (0 = tous d'un coup)
+  deleteAfterPost: boolean // usage unique : supprime la vidéo de la banque après publication
 }
 
 const KEY = 'sf_posting_opts'
@@ -27,6 +28,7 @@ const DEFAULTS: PostingOpts = {
   alsoStory:    false,
   rotatingProxy: false,
   maxConcurrent: 0,
+  deleteAfterPost: false,
 }
 
 export function loadPostingOpts(): PostingOpts {
@@ -38,8 +40,9 @@ export function loadPostingOpts(): PostingOpts {
       intervalMin:   saved.intervalMin   ?? DEFAULTS.intervalMin,
       intervalMax:   saved.intervalMax   ?? DEFAULTS.intervalMax,
       alsoStory:     saved.alsoStory     ?? DEFAULTS.alsoStory,
-      rotatingProxy: saved.rotatingProxy ?? DEFAULTS.rotatingProxy,
-      maxConcurrent: saved.maxConcurrent ?? DEFAULTS.maxConcurrent,
+      rotatingProxy:   saved.rotatingProxy   ?? DEFAULTS.rotatingProxy,
+      maxConcurrent:   saved.maxConcurrent   ?? DEFAULTS.maxConcurrent,
+      deleteAfterPost: saved.deleteAfterPost ?? DEFAULTS.deleteAfterPost,
       intervalMode:  'none',
     }
   } catch { return { ...DEFAULTS } }
