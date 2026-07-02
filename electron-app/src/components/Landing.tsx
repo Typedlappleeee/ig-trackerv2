@@ -12,14 +12,15 @@ const REEL_PHOTOS = [
 ]
 
 // ── Design tokens — "ScaleFlow Noir" ─────────────────────────────────────────
-const SERIF = "'Inter', 'Times New Roman', Georgia, serif"
+const SERIF = "'Instrument Serif', 'Times New Roman', Georgia, serif"
 const SANS  = "'Inter', system-ui, sans-serif"
 const BG    = '#0A0B0E'
 const IVORY = '#E9EAF0'
-const MUTED = 'rgba(233,234,240,0.42)'
-const FAINT = 'rgba(233,234,240,0.22)'
-const HAIR  = 'rgba(233,234,240,0.09)'
-const GOLD  = '#6366F1'
+// Contraste relevé : les anciens 0.42 / 0.22 échouaient WCAG AA (illisibles).
+const MUTED = 'rgba(233,234,240,0.60)'
+const FAINT = 'rgba(233,234,240,0.40)'
+const HAIR  = 'rgba(233,234,240,0.10)'
+const GOLD  = '#818CF8'
 const VIOLET = '#6366F1'
 
 // ── Lucide-style inline icon set ──────────────────────────────────────────────
@@ -517,7 +518,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
       {/* Brand */}
       <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none' }}>
         <div style={{ animation: 'sf-blur-in 1.1s cubic-bezier(0.16,1,0.3,1) 0.2s both' }}>
-          <MicroLabel style={{ marginBottom: 30 }}>Instagram Automation Studio</MicroLabel>
+          <MicroLabel style={{ marginBottom: 30 }}>Instagram &amp; TikTok Automation Studio</MicroLabel>
         </div>
 
         <h1 style={{
@@ -538,11 +539,11 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
         </h1>
 
         <p style={{
-          fontFamily: SERIF, fontStyle: 'normal', fontSize: 'clamp(15px, 1.6vw, 19px)',
-          color: MUTED, margin: '14px 0 52px', letterSpacing: '0.01em',
+          fontFamily: SERIF, fontStyle: 'italic', fontSize: 'clamp(17px, 1.8vw, 22px)',
+          color: MUTED, margin: '16px 0 52px', letterSpacing: '0.01em',
           animation: 'sf-fade-in 1.4s ease 1s both',
         }}>
-          L’usine de contenu des marques qui dominent Instagram.
+          L’usine de contenu des marques qui dominent Instagram &amp; TikTok.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', animation: 'sf-fade-up 0.9s cubic-bezier(0.16,1,0.3,1) 1.25s both' }}>
@@ -769,12 +770,15 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
         </FadeIn>
 
         <FadeIn delay={0.08}>
-          <h1 style={{ margin: 0, lineHeight: 1.02, letterSpacing: '-0.04em', maxWidth: 980 }}>
-            <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(42px, 7vw, 96px)', color: IVORY }}>
+          <h1 style={{ margin: 0, lineHeight: 1.0, letterSpacing: '-0.04em', maxWidth: 1040 }}>
+            <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(40px, 6.6vw, 92px)', color: IVORY }}>
               L’automatisation
             </span>
-            <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(42px, 7vw, 96px)', color: IVORY }}>
-              Instagram, <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, color: GOLD, letterSpacing: '-0.01em' }}>élevée au rang d’art.</span>
+            <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(40px, 6.6vw, 92px)', color: IVORY }}>
+              Instagram &amp; TikTok,
+            </span>
+            <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(44px, 7vw, 100px)', color: GOLD, letterSpacing: '-0.005em', marginTop: '0.06em' }}>
+              élevée au rang d’art.
             </span>
           </h1>
         </FadeIn>
