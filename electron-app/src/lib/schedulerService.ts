@@ -18,6 +18,9 @@ export interface ScheduledPhoneRecord {
 export interface ScheduledVideoRecord {
   token: string
   title: string
+  // Légende propre à la vidéo (description de banque) — prioritaire sur la
+  // légende globale du post. Absente → repli sur post.caption.
+  desc?:           string
   // Usage unique : référence banque à supprimer après publication réussie.
   bank_id?:        string
   storage_path?:   string | null
@@ -456,7 +459,7 @@ async function executeScheduledPostInner(
       const now = Math.floor(Date.now() / 1000)
       const list = phones.map((phone, i) => {
         const videoIdx = mode === 'random' ? Math.floor(Math.random() * videos.length) : i % videos.length
-        return { scheduleAt: now + i * delay_minutes * 60, envId: phone.geelark_id, video: videos[videoIdx].token, videoDesc: caption }
+        return { scheduleAt: now + i * delay_minutes * 60, envId: phone.geelark_id, video: videos[videoIdx].token, videoDesc: (videos[videoIdx].desc?.trim() || caption) }
       })
       const res = await gPost(bearer, '/task/add', { taskType: 1, list }) as any
       const ids: string[] = res?.data?.taskIds ?? []
@@ -482,7 +485,7 @@ async function executeScheduledPostInner(
         const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
           scheduleAt:  Math.floor(Date.now() / 1000),
-          description: caption,
+          description: (videos[videoIdx].desc?.trim() || caption),
           video:       [videos[videoIdx].token],
           ...(reels_trial ? { shareType: 2 } : {}),
         }) as any

@@ -33,6 +33,8 @@ const FN_BUDGET_MS = 230_000
 interface PhoneRec { geelark_id: string; phone_name: string; ig_username: string | null; reels_trial_unsupported?: boolean }
 interface VideoRec {
   token: string; title: string
+  // Légende propre à la vidéo (description de banque) — prioritaire sur post.caption.
+  desc?: string
   // Usage unique : réf banque à supprimer après publication réussie.
   remove?: boolean; bank_id?: string; storage_path?: string | null; thumbnail_path?: string | null
 }
@@ -836,7 +838,7 @@ Deno.serve(async (req) => {
         const list = phones.map((phone, i) => {
           const vIdx = post.mode === 'random' ? Math.floor(Math.random() * videos.length) : i % videos.length
           usedVideoIndices.add(vIdx)
-          return { scheduleAt: baseTs + i * delayMin * 60, envId: phone.geelark_id, video: resolvedTokens[vIdx], videoDesc: post.caption }
+          return { scheduleAt: baseTs + i * delayMin * 60, envId: phone.geelark_id, video: resolvedTokens[vIdx], videoDesc: (videos[vIdx]?.desc?.trim() || post.caption) }
         })
         const res = await gPost(bearer, '/task/add', { taskType: 1, list })
         const ids: string[] = res.data?.taskIds ?? []
@@ -863,7 +865,7 @@ Deno.serve(async (req) => {
         const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
           scheduleAt:  baseTs + i * delayMin * 60,
-          description: post.caption,
+          description: (videos[videoIdx]?.desc?.trim() || post.caption),
           video:       [resolvedTokens[videoIdx]],
           ...(useTrialReels ? { shareType: 2 } : {}),
         })
