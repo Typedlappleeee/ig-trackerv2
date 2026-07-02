@@ -1065,6 +1065,35 @@ export function MassPosting({ user }: MassPostingProps) {
       const okN = [...finalStatuses.values()].filter(s => s.status === 'done').length
       const errN = [...finalStatuses.values()].filter(s => s.status === 'error').length
       setLastRun({ ok: okN, err: errN, total: assignments.length })
+
+      // Usage unique : retire de la banque les vidéos réellement publiées (au moins
+      // un téléphone en succès), pour ne jamais reposter la même. Bank uniquement
+      // (pas les fichiers locaux), et seulement si un post a réussi.
+      if (postingOpts.deleteAfterPost) {
+        const postedIdx = new Set<number>()
+        for (const a of assignments) {
+          if (a.videoIndex >= 0 && finalStatuses.get(a.phone.id)?.status === 'done') postedIdx.add(a.videoIndex)
+        }
+        const toDelete = [...postedIdx]
+          .map(i => selectedVideos[i])
+          .filter(sv => sv && sv.item.storage_path && !String(sv.item.id).startsWith('local-'))
+        if (toDelete.length) {
+          try {
+            const ids = toDelete.map(sv => sv.item.id)
+            const base = supabase.from('content_bank').delete().in('id', ids)
+            await (currentOrg ? (base as any).eq('org_id', currentOrg.id) : (base as any).eq('user_id', user.id).is('org_id', null))
+            const { deleteStorageObjects } = await import('@/lib/storage')
+            deleteStorageObjects(toDelete.flatMap(sv => [sv.item.storage_path, sv.item.thumbnail_path])).catch(() => {})
+            // Retire aussi de la sélection courante pour ne pas les re-proposer.
+            const deletedIds = new Set(ids)
+            setSelVideos(prev => prev.filter(sv => !deletedIds.has(sv.item.id)))
+            log(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, 'ok')
+          } catch (e) {
+            log(`Suppression banque échouée : ${e instanceof Error ? e.message : String(e)}`, 'warn')
+          }
+        }
+      }
+
       toast.show({ title: errN === 0 ? 'Mass posting terminé ✓' : 'Mass posting terminé avec erreurs', body: `${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`, kind: errN === 0 ? 'ok' : 'error' })
       import('@/lib/notify').then(({ sendNotification }) => sendNotification({
         userId: user.id, orgId: currentOrg?.id ?? null,
