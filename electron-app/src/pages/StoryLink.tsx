@@ -508,6 +508,9 @@ export default function StoryLink({ user }: { user: User }) {
       if (abortRef.current) return 0
       setStatus(asgn.phoneId, 'running')
       try {
+        // La vérification de connexion (proxy rotatif) est faite AU DÉBUT de
+        // postInstagramStory. Pas de retry sur échec : re-poster risquerait un
+        // double post si GéeLark rapporte un faux échec.
         const res = await postInstagramStory(
           bearer, asgn.phoneId,
           { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun },

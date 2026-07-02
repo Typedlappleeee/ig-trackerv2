@@ -9,7 +9,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot } from '@/lib/geelark'
+import { takeScreenshot, waitForPhoneConnectivity } from '@/lib/geelark'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
@@ -724,6 +724,9 @@ export function MassPosting({ user }: MassPostingProps) {
             if (stopRef.current) break
             const token = tokenMap.get(asgn.videoIndex)
             if (!token) { log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn'); setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' }); continue }
+            // Proxy rotatif : attendre que le tel ait vraiment Internet avant de poster
+            // (PRÉ-check seulement — jamais de retry, pour ne pas risquer un double post).
+            await waitForPhoneConnectivity(bearer, asgn.phone.geelark_id, m => log(`  ${asgn.phone.phone_name}: ${m.trim()}`))
             setPhoneStatus(asgn.phone.id, { status: 'posting' })
             postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
             let taskRes: Record<string, unknown> | null = null
