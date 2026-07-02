@@ -999,10 +999,16 @@ export function Scheduler({ user, onNavigate }: Props) {
               </span>
             )}
             {history.length > 0 && (
-              <span className="sf-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums' }}>
+              <button
+                onClick={() => onNavigate?.('history')}
+                title="Voir l'historique complet"
+                className="sf-badge cursor-pointer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums', background: 'transparent', cursor: onNavigate ? 'pointer' : 'default' }}
+              >
                 <IconCheck size={11} color="rgba(148,163,184,0.52)" />
                 {history.length} {t('schedulerTabHistory')}
-              </span>
+                {onNavigate && <span style={{ opacity: 0.6 }}>›</span>}
+              </button>
             )}
             <button
               onClick={() => { setPresetSchedAt(undefined); setShowTypeChoice(true) }}
@@ -1081,7 +1087,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             className="sf-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher un post…"
+            placeholder="Rechercher (légende, compte)…"
             style={{ paddingLeft: 32, height: 32, fontSize: 12.5 }}
           />
         </div>
@@ -1118,14 +1124,20 @@ export function Scheduler({ user, onNavigate }: Props) {
             ))}
           </div>
         ) : tab === 'calendar' ? (
-          <CalendarWeek
-            posts={posts.filter(p => p.status !== 'cancelled')}
-            onMove={(p, d) => { void doReschedule(p, d) }}
-            onOpen={p => setDetailPost(p)}
-            onSlotClick={d => { setPresetSchedAt(toSchedInput(d)); setShowTypeChoice(true) }}
-            onDuplicate={p => { void duplicateSchedPost(p) }}
-            onDelete={p => { if (p.status === 'running') cancel(p.id); else setConfirmCancel(p) }}
-          />
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '9px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.16)', fontSize: 12, color: 'var(--muted)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-l)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              <span>Clique un créneau vide pour programmer un post · glisse un post en attente pour le déplacer.</span>
+            </div>
+            <CalendarWeek
+              posts={posts.filter(p => p.status !== 'cancelled')}
+              onMove={(p, d) => { void doReschedule(p, d) }}
+              onOpen={p => setDetailPost(p)}
+              onSlotClick={d => { setPresetSchedAt(toSchedInput(d)); setShowTypeChoice(true) }}
+              onDuplicate={p => { void duplicateSchedPost(p) }}
+              onDelete={p => { if (p.status === 'running') cancel(p.id); else setConfirmCancel(p) }}
+            />
+          </div>
         ) : shown.length === 0 ? (
           /* ── Empty state ──────────────────────────────────────────────────────── */
           <div className="sf-card" style={{
@@ -1525,6 +1537,25 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
 
       {/* ── Row 3: stat chips (phones + videos + delay + mode) ────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+        {(post.status === 'done' || post.status === 'failed') && (post.result?.phone_results?.length ?? 0) > 0 && (() => {
+          const prs = post.result!.phone_results!
+          const okN = prs.filter(r => r.ok).length
+          const allOk = okN === prs.length
+          return (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 99,
+              fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+              background: allOk ? 'rgba(52,211,153,0.12)' : 'rgba(251,191,36,0.12)',
+              color: allOk ? '#34D399' : '#FBBF24',
+              border: `1px solid ${allOk ? 'rgba(52,211,153,0.28)' : 'rgba(251,191,36,0.28)'}`,
+            }}>
+              {allOk
+                ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                : <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 8v5"/><path d="M12 16h.01"/></svg>}
+              {okN}/{prs.length} réussi{okN > 1 ? 's' : ''}
+            </span>
+          )
+        })()}
         <StatChip
           icon={<IconPhone size={11} color="rgba(233,234,240,0.72)" />}
           label={`${post.phones.length} ${post.phones.length !== 1 ? t('schedulerPhonePlural') : t('schedulerPhone')}`}

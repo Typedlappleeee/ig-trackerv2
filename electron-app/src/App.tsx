@@ -900,7 +900,7 @@ function AppContent({ user }: { user: User }) {
       case 'scaleia':      return <ScaleIA />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
-      case 'history':      return <History     user={user} />
+      case 'history':      return <History     user={user} onNavigate={handleNavigate} />
       case 'reports':      return <Reports     user={user} />
       case 'library':      return <Library     user={user} />
 
