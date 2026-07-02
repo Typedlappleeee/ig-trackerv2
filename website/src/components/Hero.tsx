@@ -60,10 +60,10 @@ function StatCounter({ target, suffix = '', label }: { target: number; suffix?: 
 
   return (
     <div ref={ref} className="text-center">
-      <div className="stat-value text-3xl font-black text-text sm:text-4xl">
+      <div className="stat-value text-lg font-black text-text leading-tight break-words sm:text-4xl">
         {count.toLocaleString('fr-FR')}{suffix}
       </div>
-      <div className="mt-1.5 text-xs text-text2 leading-snug">{label}</div>
+      <div className="mt-1.5 text-[11px] text-text2 leading-snug sm:text-xs">{label}</div>
     </div>
   )
 }
@@ -176,7 +176,7 @@ export function Hero() {
 
         {/* Stats */}
         <div
-          className="mx-auto mt-12 grid max-w-2xl grid-cols-3 gap-4 sm:gap-6 animate-fade-up"
+          className="mx-auto mt-12 grid max-w-2xl grid-cols-3 gap-2.5 sm:gap-6 animate-fade-up"
           style={{ animationDelay: '0.4s' }}
         >
           {[
@@ -186,7 +186,7 @@ export function Hero() {
           ].map(s => (
             <div
               key={s.label}
-              className="glass-card rounded-2xl px-3 py-5 text-center"
+              className="glass-card overflow-hidden rounded-2xl px-2 py-4 text-center sm:px-3 sm:py-5"
             >
               <StatCounter target={s.target} suffix={s.suffix} label={s.label} />
             </div>
