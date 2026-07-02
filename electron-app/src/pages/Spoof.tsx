@@ -269,11 +269,10 @@ export function Spoof({ user }: { user: User }) {
           <div style={{
             width: 44, height: 44, borderRadius: 13, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(99,102,241,0.06))',
-            border: '1px solid rgba(99,102,241,0.28)',
-            boxShadow: '0 0 24px -6px rgba(99,102,241,0.4)',
+            background: 'linear-gradient(135deg,#10B981,#059669)',
+            boxShadow: '0 10px 24px -8px rgba(16,185,129,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
           }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
           </div>
