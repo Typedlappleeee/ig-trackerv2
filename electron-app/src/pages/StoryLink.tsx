@@ -331,6 +331,11 @@ export default function StoryLink({ user }: { user: User }) {
   const [jobs, setJobs]                     = useState<Job[]>([])
   const [openLog, setOpenLog]               = useState<string | null>(null)
   const [dryRun, setDryRun]                 = useState(false)
+  // Concurrence (proxys rotatifs) — persistée
+  const [rotProxy, setRotProxy]   = useState(() => localStorage.getItem('sf-story-rotproxy') === '1')
+  const [maxConc,  setMaxConc]    = useState(() => parseInt(localStorage.getItem('sf-story-maxconc') ?? '0', 10) || 0)
+  useEffect(() => { localStorage.setItem('sf-story-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
+  useEffect(() => { localStorage.setItem('sf-story-maxconc', String(maxConc)) }, [maxConc])
   const [showSchedule, setShowSchedule]     = useState(false)
   const [schedAt, setSchedAt]               = useState(() => defaultSchedValue(60))
   const [schedDelay, setSchedDelay]         = useState(2)
@@ -503,6 +508,9 @@ export default function StoryLink({ user }: { user: User }) {
       if (abortRef.current) return 0
       setStatus(asgn.phoneId, 'running')
       try {
+        // La vérification de connexion (proxy rotatif) est faite AU DÉBUT de
+        // postInstagramStory. Pas de retry sur échec : re-poster risquerait un
+        // double post si GéeLark rapporte un faux échec.
         const res = await postInstagramStory(
           bearer, asgn.phoneId,
           { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun },
@@ -523,7 +531,9 @@ export default function StoryLink({ user }: { user: User }) {
     // 5 téléphones en parallèle max (au-delà on risque de saturer l'API GeeLark,
     // 200 req/min). Le démarrage de chaque worker est décalé pour ne pas booter
     // tous les téléphones au même instant.
-    const CONCURRENCY = 5
+    // Concurrence : proxy rotatif → 1 téléphone à la fois ; sinon le nombre choisi
+    // (0 = défaut 5). Délai optionnel entre chaque story pour ménager le proxy.
+    const CONCURRENCY = rotProxy ? 1 : (maxConc > 0 ? maxConc : 5)
     const queue = [...assignments]
     let okCount = 0
     const worker = async (staggerMs: number) => {
@@ -1131,6 +1141,31 @@ export default function StoryLink({ user }: { user: User }) {
                 )
               })}
             </div>
+          </div>
+
+          {/* ── Proxy rotatif / concurrence ─────────────────────────────────── */}
+          <div className="sf-card" style={{ padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: rotProxy ? 0 : 12 }}>
+              <div style={{ flex: 1 }}>
+                <span className="sf-section-label" style={{ margin: 0 }}>Proxy rotatif</span>
+                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Poste 1 téléphone à la fois (évite les coupures de co)</p>
+              </div>
+              <button
+                onClick={() => setRotProxy(v => !v)}
+                className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+                style={{ background: rotProxy ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${rotProxy ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+            </div>
+            {!rotProxy && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Téléphones simultanés</span>
+                <input type="number" min={0} max={200} value={maxConc || ''} placeholder="5"
+                  onChange={e => setMaxConc(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
+              </div>
+            )}
           </div>
         </div>
 

@@ -46,10 +46,20 @@ export function Nav() {
       />
 
       <header className="fixed inset-x-0 top-3 z-50 px-4">
+        {/* Voile plein largeur : masque le contenu qui défile sous la barre
+            (la barre est une pastille centrée, le texte passait sur les côtés). */}
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 top-0 h-24 -z-10 transition-opacity duration-300"
+          style={{
+            opacity: scrolled ? 1 : 0,
+            background: 'linear-gradient(180deg, rgba(6,6,14,0.92) 0%, rgba(6,6,14,0.75) 45%, rgba(6,6,14,0) 100%)',
+          }}
+        />
         <nav
           className="mx-auto flex max-w-6xl items-center justify-between gap-4 rounded-2xl px-4 py-2.5 sm:px-5"
           style={{
-            background: scrolled ? 'rgba(6,6,14,0.85)' : 'rgba(255,255,255,0.035)',
+            background: scrolled ? 'rgba(6,6,14,0.92)' : 'rgba(255,255,255,0.035)',
             border: '1px solid rgba(255,255,255,0.09)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',

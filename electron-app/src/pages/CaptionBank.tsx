@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useT } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import { Spinner } from '@/components/ui/Spinner'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 interface CaptionBankProps { user: User }
 
@@ -192,6 +193,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
   const [editItem,     setEditItem]     = useState<CaptionItem | undefined>()
   const [selected,     setSelected]     = useState<Set<string>>(new Set())
   const [deleting,     setDeleting]     = useState(false)
+  const [confirmIds,   setConfirmIds]   = useState<string[] | null>(null)
   const [error,        setError]        = useState('')
   const [hoveredCard,  setHoveredCard]  = useState<string | null>(null)
   const [hoveredFolder, setHoveredFolder] = useState<string | null>(null)
@@ -279,6 +281,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
     if (err) setError(err.message)
     else { setSelected(new Set()); load() }
     setDeleting(false)
+    setConfirmIds(null)
   }
 
   const toggleSelect = (id: string) => {
@@ -435,7 +438,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
 
           {selected.size > 0 && (
             <button
-              onClick={() => handleDelete([...selected])}
+              onClick={() => setConfirmIds([...selected])}
               disabled={deleting}
               className="sf-btn sf-btn-danger cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 text-[12px] sf-anim-scale-in"
             >
@@ -569,7 +572,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
                           className="sf-btn sf-btn-ghost text-[10px] px-2 py-1 cursor-pointer"
                         >Modifier</button>
                         <button
-                          onClick={e => { e.stopPropagation(); handleDelete([item.id]) }}
+                          onClick={e => { e.stopPropagation(); setConfirmIds([item.id]) }}
                           className="sf-btn sf-btn-danger text-[10px] px-2 py-1 cursor-pointer"
                         >Suppr.</button>
                       </div>
@@ -590,6 +593,17 @@ export function CaptionBank({ user }: CaptionBankProps) {
           onClose={() => { setShowModal(false); setEditItem(undefined) }}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmIds !== null}
+        danger
+        busy={deleting}
+        title={confirmIds && confirmIds.length > 1 ? `Supprimer ${confirmIds.length} captions ?` : 'Supprimer cette caption ?'}
+        message="Cette action est définitive."
+        confirmLabel="Supprimer"
+        onConfirm={() => confirmIds && handleDelete(confirmIds)}
+        onCancel={() => setConfirmIds(null)}
+      />
     </div>
   )
 }

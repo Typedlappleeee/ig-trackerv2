@@ -180,6 +180,43 @@ async function shellExec(
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
+// ── Détection de rotation d'IP (proxys rotatifs) ───────────────────────────
+// Sur proxy rotatif, l'IP change périodiquement ; pendant la bascule le téléphone
+// n'a plus de connexion (quelques secondes à ~1 min). Poster à ce moment échoue.
+// On teste la vraie connectivité DU TÉLÉPHONE (donc via son proxy) et on attend
+// que la co revienne avant de lancer l'automation.
+// Retourne true si en ligne, false si toujours hors-ligne après toutes les tentatives.
+export async function waitForPhoneConnectivity(
+  bearer: string,
+  phoneId: string,
+  log?: (m: string) => void,
+  opts?: { tries?: number; delayMs?: number; signal?: AbortSignal },
+): Promise<boolean> {
+  const tries   = opts?.tries   ?? 12
+  const delayMs = opts?.delayMs ?? 5000
+  for (let i = 0; i < tries; i++) {
+    if (opts?.signal?.aborted) return false
+    try {
+      // 204 = endpoint "generate_204" (Google/Android) → co OK. Sinon ping en repli.
+      const { output } = await shellExec(bearer, phoneId,
+        `curl -s -m 6 -o /dev/null -w '%{http_code}' https://www.google.com/generate_204 2>/dev/null || ` +
+        `(ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 && echo 204 || echo 000)`,
+        { maxRetries: 1, signal: opts?.signal })
+      const code = output.trim()
+      if (/^(204|2\d\d|3\d\d)$/.test(code)) {
+        if (i > 0) log?.('   ✅ Connexion rétablie')
+        return true
+      }
+    } catch { /* shell pas prêt — on retente */ }
+    if (i < tries - 1) {
+      log?.(`   ⏳ Pas de connexion (proxy en rotation ?) — attente… (${i + 1}/${tries})`)
+      await sleepOrAbort(delayMs, opts?.signal)
+    }
+  }
+  log?.('   ⚠️ Toujours hors-ligne après attente — on tente quand même')
+  return false
+}
+
 // ── Nouveau système d'upload média : natif GéeLark ─────────────────────────
 // Au lieu de streamer les octets via le shell (curl / base64 + broadcast
 // MEDIA_SCANNER que Android 13+ IGNORE → fichier jamais indexé → galerie vide),
@@ -1036,6 +1073,12 @@ async function _postInstagramStoryInner(
 ): Promise<{ ok: boolean; error?: string }> {
   const ready = await ensurePhoneRunning(bearer, phoneId, log)
   if (!ready) throw new Error('Téléphone non démarré')
+
+  // ── Attente de connectivité (proxys rotatifs) ──────────────────────────────
+  // On ne lance l'automation que quand le téléphone a réellement Internet via son
+  // proxy — sinon une rotation d'IP en cours ferait échouer la story.
+  log('🌐 Vérification de la connexion…')
+  await waitForPhoneConnectivity(bearer, phoneId, log)
 
   // ── Wake + unlock ──────────────────────────────────────────────────────────
   log('📱 Réveil écran…')
