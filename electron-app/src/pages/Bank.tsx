@@ -2215,17 +2215,37 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
   // Selection is tracked by item.id so cloud-stored items work even though their file_url is null.
   const [selected, setSelected]     = useState<Set<string>>(new Set())
   const [resolving, setResolving]   = useState<string | null>(null)
+  // Rendu plafonné : afficher des milliers de miniatures d'un coup fait ramer/
+  // planter l'onglet. On rend par tranches (« Voir plus »).
+  const [shownCount, setShownCount] = useState(60)
 
   useEffect(() => {
-    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    q.then(({ data }) => {
-      let rows = (data ?? []) as ContentItem[]
-      rows = rows.filter(i => !(i.notes === '__sf_folder__' && !i.storage_path && !i.file_url))
+    // Pagination : Supabase plafonne à 1000 lignes par requête. Sans ça, au-delà
+    // de 1000 vidéos, des fichiers ENTIERS (et des dossiers) disparaissent du
+    // sélecteur. On boucle par pages de 1000 pour tout charger.
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      const PAGE = 1000
+      let from = 0
+      const all: ContentItem[] = []
+      while (true) {
+        let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, from + PAGE - 1)
+        q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+        const { data, error } = await q
+        if (error) break
+        const rows = (data ?? []) as ContentItem[]
+        all.push(...rows)
+        if (rows.length < PAGE) break
+        from += PAGE
+      }
+      if (cancelled) return
+      let rows = all.filter(i => !(i.notes === '__sf_folder__' && !i.storage_path && !i.file_url))
       if (role) rows = rows.filter(i => canAccessBankFolder(role, perms, i.folder ?? null))
       setItems(rows)
       setLoading(false)
-    })
+    })()
+    return () => { cancelled = true }
   }, [currentOrg?.id])
 
   const folders = [...new Set(
@@ -2239,6 +2259,9 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     const q = search.toLowerCase()
     return item.title.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
   })
+  // Reset la tranche affichée quand le filtre change.
+  useEffect(() => { setShownCount(60) }, [selectedFolder, search])
+  const shownVisible = visible.slice(0, shownCount)
 
   // Retourne les chemins résolus ALIGNÉS avec les items d'origine (mêmes indices),
   // pour que l'appelant puisse relier chaque vidéo à son item de banque.
@@ -2391,7 +2414,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
               </div>
             ) : (
               <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
-                {visible.map(item => {
+                {shownVisible.map(item => {
                   const isItemSelected = selected.has(item.id)
                   return (
                     <button
@@ -2423,6 +2446,13 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                     </button>
                   )
                 })}
+              </div>
+            )}
+            {visible.length > shownCount && (
+              <div className="flex justify-center py-4">
+                <button onClick={() => setShownCount(c => c + 120)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">
+                  Voir plus ({visible.length - shownCount})
+                </button>
               </div>
             )}
           </div>
