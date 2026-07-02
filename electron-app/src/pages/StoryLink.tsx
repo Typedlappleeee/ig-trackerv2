@@ -724,9 +724,10 @@ export default function StoryLink({ user }: { user: User }) {
       <header className="sf-page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
-            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)', color: 'var(--accent)',
+            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            background: 'linear-gradient(135deg,#F59E0B,#EF4444)',
+            boxShadow: '0 10px 24px -8px rgba(245,158,11,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
           }}>
             <IconLink />
           </div>

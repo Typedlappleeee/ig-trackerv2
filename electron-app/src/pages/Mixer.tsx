@@ -419,12 +419,11 @@ export function Mixer({ user }: MixerProps) {
           <div style={{
             width: 44, height: 44, borderRadius: 13, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(99,102,241,0.12))',
-            border: '1px solid rgba(99,102,241,0.3)',
-            boxShadow: '0 0 24px -6px rgba(99,102,241,0.5)',
+            background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
+            boxShadow: '0 10px 24px -8px rgba(236,72,153,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
           }}>
             {/* Edit + merge icon */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
