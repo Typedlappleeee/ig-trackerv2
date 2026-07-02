@@ -682,6 +682,11 @@ html.no-animations *::after {
   }
 }
 
+/* Dézoom global par défaut (~10%) — vue plus large sur tout ScaleFlow.
+   Même mécanisme que les tailles de police ci-dessous (zoom sur body). Les choix
+   explicites petite/grande restent prioritaires (spécificité plus élevée). */
+body { zoom: 0.9; }
+
 /* Font size: zoom on body (Electron/Chromium supporte zoom) */
 html[data-fontsize="petite"] body  { zoom: 0.88; }
 html[data-fontsize="grande"]  body { zoom: 1.13; }
