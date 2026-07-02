@@ -40,7 +40,6 @@ import {
   loadScheduledPosts, cancelScheduledPost, claimScheduledPost,
   executeScheduledPost, finishScheduledPost, failStaleRunningPosts,
   fmtScheduledTime, timeUntil, createScheduledPost,
-  loadManualRuns, isManualRun,
   type ScheduledPost, type ScheduleStatus,
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
@@ -555,14 +554,8 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                       onDragStart={() => { dragId.current = p.id }}
                       onDragEnd={() => { dragId.current = null }}
                       onClick={e => { e.stopPropagation(); onOpen(p) }}
-                      onContextMenu={e => {
-                        e.preventDefault(); e.stopPropagation()
-                        if (isManualRun(p)) return  // run manuel = lecture seule
-                        setMenu({ x: e.clientX, y: e.clientY, post: p })
-                      }}
-                      title={isManualRun(p)
-                        ? `${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · Mass Posting manuel · ${p.phones.length} compte(s)`
-                        : `${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s) — clic droit pour dupliquer`}
+                      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY, post: p }) }}
+                      title={`${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s) — clic droit pour dupliquer`}
                       style={{
                         position: 'absolute', left: 3, right: 3, top: top + 1, minHeight: 34,
                         background: col.bg, border: `1px solid ${col.bd}`,
@@ -676,12 +669,10 @@ function SchedDetailModal({ post, onClose, onReschedule, onDuplicate }: {
             phones.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: '#E9EAF0', padding: '4px 0' }}>{p.ig_username ?? p.phone_name}</div>)
           )}
         </div>
-        {!isManualRun(post) && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={onDuplicate} className="sf-btn sf-btn-primary" style={{ flex: 1 }}>Dupliquer</button>
-            {onReschedule && <button onClick={onReschedule} className="sf-btn sf-btn-ghost" style={{ flex: 1 }}>Reprogrammer</button>}
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onDuplicate} className="sf-btn sf-btn-primary" style={{ flex: 1 }}>Dupliquer</button>
+          {onReschedule && <button onClick={onReschedule} className="sf-btn sf-btn-ghost" style={{ flex: 1 }}>Reprogrammer</button>}
+        </div>
       </div>
     </div>
   )
@@ -729,12 +720,8 @@ export function Scheduler({ user, onNavigate }: Props) {
     setLoading(true)
     // Self-heal: posts stuck in 'running' (app closed mid-execution) → failed
     await failStaleRunningPosts().catch(() => {})
-    // Posts programmés + Mass Posting lancés à la main (post_runs) dans le même agenda.
-    const [all, manual] = await Promise.all([
-      loadScheduledPosts(),
-      loadManualRuns().catch(() => [] as ScheduledPost[]),
-    ])
-    setPosts([...all, ...manual])
+    const all = await loadScheduledPosts()
+    setPosts(all)
     setLoading(false)
   }, [])
 
@@ -864,7 +851,6 @@ export function Scheduler({ user, onNavigate }: Props) {
   }, [])
 
   async function cancel(id: string) {
-    if (id.startsWith('run-')) return  // run manuel : rien à annuler
     setCancelling(id)
     const timer = timersRef.current.get(id)
     if (timer) { clearTimeout(timer); timersRef.current.delete(id) }
@@ -900,7 +886,6 @@ export function Scheduler({ user, onNavigate }: Props) {
   // Reschedule a pending post: clear its timer, update scheduled_at in DB,
   // then let the auto-schedule effect re-arm a fresh timer.
   async function doReschedule(post: ScheduledPost, date: Date) {
-    if (isManualRun(post)) return  // run manuel : rien à reprogrammer
     const timer = timersRef.current.get(post.id)
     if (timer) { clearTimeout(timer); timersRef.current.delete(post.id) }
     try {
@@ -931,7 +916,6 @@ export function Scheduler({ user, onNavigate }: Props) {
   // Duplique un post : recrée la même config dans un nouveau post en attente,
   // programmé 1h après l'original (ou dans 1h si l'original est passé).
   async function duplicateSchedPost(post: ScheduledPost) {
-    if (isManualRun(post)) return  // run manuel : pas de config à dupliquer
     try {
       const base = new Date(post.scheduled_at).getTime()
       const when = new Date(Math.max(Date.now() + 5 * 60_000, base + 60 * 60_000))
