@@ -852,7 +852,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
 
 // ── Features — liste éditoriale numérotée ────────────────────────────────────
 const FEATURES: { num: string; title: string; serif: string; text: string; icon: IconName }[] = [
-  { num: '01', title: 'Mass',      serif: 'Posting',   icon: 'send',            text: "Des dizaines de comptes publient en parallèle. Sélectionne, lance — chaque téléphone s’éteint après sa publication. Sans surveillance." },
+  { num: '01', title: 'Mass',      serif: 'Posting',   icon: 'send',            text: "Des dizaines de comptes Instagram & TikTok publient en parallèle. Sélectionne, lance — chaque téléphone s’éteint après sa publication. Sans surveillance." },
   { num: '02', title: 'Banque de', serif: 'contenu',   icon: 'folder-archive',  text: 'Ta vidéothèque cloud, organisée par dossiers et partagée avec ton organisation. Import drag & drop, miniatures automatiques.' },
   { num: '03', title: 'Remix &',   serif: 'Spoof',     icon: 'shuffle',         text: 'Des copies uniques générées par FFmpeg : luminosité, grain, zoom, recadrage, teinte. Le duplicate content ne te concerne plus.' },
   { num: '04', title: 'Outils',    serif: 'IA',        icon: 'bot',             text: 'Scripts, hooks, captions virales, analyse de miniatures. Llama et Claude Vision intégrés directement dans ton flux de travail.' },
@@ -898,7 +898,7 @@ function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number })
         <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 19, color: hover ? GOLD : FAINT, transition: 'color 0.3s' }}>{f.num}</span>
 
         <div>
-          <h3 style={{ margin: '0 0 8px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+          <h3 style={{ margin: '0 0 8px', lineHeight: 1 }}>
             <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 'clamp(22px, 2.6vw, 34px)', letterSpacing: '-0.03em', color: IVORY }}>{f.title}</span>
             <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(24px, 2.8vw, 37px)', color: hover ? GOLD : 'rgba(99,102,241,0.75)', marginLeft: '0.18em', transition: 'color 0.3s' }}>{f.serif}</span>
           </h3>
@@ -1268,6 +1268,19 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
     } finally { setLoading(false) }
   }
 
+  async function handleForgot() {
+    setError(null); setSuccess(null)
+    if (!email.trim()) { setError('Entre ton email d’abord, puis clique sur « Mot de passe oublié ».'); return }
+    setLoading(true)
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin })
+      if (err) throw err
+      setSuccess('Email de réinitialisation envoyé. Vérifie ta boîte mail.')
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally { setLoading(false) }
+  }
+
   const fieldLabel: React.CSSProperties = {
     display: 'block', fontFamily: SANS, fontSize: 9.5, fontWeight: 700,
     letterSpacing: '0.3em', textTransform: 'uppercase', color: FAINT, marginBottom: 10,
@@ -1406,6 +1419,15 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                   <Icon name={showPw ? 'eye-off' : 'eye'} size={17} label={showPw ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} />
                 </button>
               </div>
+              {tab === 'login' && (
+                <button type="button" onClick={handleForgot} disabled={loading}
+                  style={{ marginTop: 10, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                    fontFamily: SANS, fontSize: 11.5, color: MUTED, transition: 'color 0.2s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = IVORY)}
+                  onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
+                  Mot de passe oublié ?
+                </button>
+              )}
             </div>
 
             {tab === 'register' && (
