@@ -304,13 +304,22 @@ export function MassPosting({ user }: MassPostingProps) {
 
   async function openFolderPick() {
     setFolderLoading(true)
-    let q = supabase.from('content_bank').select('folder')
-    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
-    const { data } = await q
+    // Pagination : sans ça, au-delà de 1000 vidéos, des dossiers manquent.
     const counts = new Map<string, number>()
-    for (const row of data ?? []) {
-      const f = (row as { folder?: string | null }).folder
-      if (f) counts.set(f, (counts.get(f) ?? 0) + 1)
+    const PAGE = 1000
+    let from = 0
+    while (true) {
+      let q = supabase.from('content_bank').select('folder').range(from, from + PAGE - 1)
+      q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+      const { data, error } = await q
+      if (error) break
+      const rows = data ?? []
+      for (const row of rows) {
+        const f = (row as { folder?: string | null }).folder
+        if (f) counts.set(f, (counts.get(f) ?? 0) + 1)
+      }
+      if (rows.length < PAGE) break
+      from += PAGE
     }
     setBankFolders([...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count })))
     setFolderLoading(false)
@@ -321,12 +330,22 @@ export function MassPosting({ user }: MassPostingProps) {
     setShowFolderPick(false)
     setAddingFolder(folderName)
     try {
-      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-      q = currentOrg
-        ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
-        : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
-      const { data } = await q
-      const items = (data ?? []) as ContentItem[]
+      // Pagination : un dossier peut contenir > 1000 vidéos.
+      const PAGE = 1000
+      let from = 0
+      const items: ContentItem[] = []
+      while (true) {
+        let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, from + PAGE - 1)
+        q = currentOrg
+          ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
+          : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
+        const { data, error } = await q
+        if (error) break
+        const rows = (data ?? []) as ContentItem[]
+        items.push(...rows)
+        if (rows.length < PAGE) break
+        from += PAGE
+      }
       if (!items.length) return
       const { getSignedUrl } = await import('@/lib/storage')
       const newVideos: SelectedVideo[] = []

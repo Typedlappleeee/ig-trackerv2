@@ -112,7 +112,10 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
     platform:         input.platform ?? 'instagram',
   }).select().single()
   if (error) throw new Error(error.message)
-  return data as ScheduledPost
+  const d = data as any
+  // Normalise les jsonb en tableaux (évite un crash si renvoyés en string).
+  const arr = (v: unknown): any[] => Array.isArray(v) ? v : (typeof v === 'string' ? (() => { try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] } })() : [])
+  return { ...d, phones: arr(d.phones), videos: arr(d.videos) } as ScheduledPost
 }
 
 // Resolves the GeeLark bearer at execution time. Falls back to the token
@@ -224,7 +227,15 @@ export async function loadScheduledPosts(): Promise<ScheduledPost[]> {
     .select('*')
     .order('scheduled_at', { ascending: false })
     .limit(200)
-  return (data ?? []) as ScheduledPost[]
+  // Défensif : normalise les colonnes jsonb en tableaux. Si une ligne arrive avec
+  // phones/videos en STRING (réplication realtime, données legacy), un `.map`/
+  // `.some` plus loin ferait planter tout l'onglet Programmation.
+  const asArray = (v: unknown): any[] => {
+    if (Array.isArray(v)) return v
+    if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] } }
+    return []
+  }
+  return (data ?? []).map((r: any) => ({ ...r, phones: asArray(r.phones), videos: asArray(r.videos) })) as ScheduledPost[]
 }
 
 // Charge les Mass Posting lancés À LA MAIN (table post_runs) et les convertit en
