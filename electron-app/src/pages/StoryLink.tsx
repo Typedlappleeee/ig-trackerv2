@@ -308,14 +308,7 @@ export default function StoryLink({ user }: { user: User }) {
   const credits = useCredits()
   const toast = useToast()
 
-  // Choix mémorisé : Story = Instagram seulement → on ne redemande pas à chaque visite.
-  const [storyPlatformChosen, setStoryPlatformChosen] = useState(() => {
-    try { return localStorage.getItem('sf-story-platform') === 'instagram' } catch { return false }
-  })
-  const chooseStoryPlatform = () => {
-    try { localStorage.setItem('sf-story-platform', 'instagram') } catch { /* ignore */ }
-    setStoryPlatformChosen(true)
-  }
+  const [storyPlatformChosen, setStoryPlatformChosen] = useState(false)
 
   // ── Phones ────────────────────────────────────────────────────────────────
   const [phones, setPhones]           = useState<GeelarkPhone[]>([])
@@ -682,7 +675,7 @@ export default function StoryLink({ user }: { user: User }) {
             <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 22 }}>Les stories sont disponibles sur Instagram.</p>
             <div style={{ display: 'flex', gap: 14 }}>
               <button
-                onClick={chooseStoryPlatform}
+                onClick={() => setStoryPlatformChosen(true)}
                 className="cursor-pointer"
                 style={{ flex: 1, padding: '22px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1.5px solid rgba(99,102,241,0.4)' }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.06)' }}
