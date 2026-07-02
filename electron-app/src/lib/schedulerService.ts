@@ -222,56 +222,6 @@ export async function loadScheduledPosts(): Promise<ScheduledPost[]> {
   return (data ?? []) as ScheduledPost[]
 }
 
-// Charge les Mass Posting lancés À LA MAIN (table post_runs) et les convertit en
-// « posts » terminés pour qu'ils apparaissent aussi dans le calendrier, à leur
-// heure de lancement. Read-only : id préfixé « run- » → aucune action possible.
-export async function loadManualRuns(): Promise<ScheduledPost[]> {
-  const { data, error } = await supabase.from('post_runs')
-    .select('id, user_id, org_id, type, ok_count, err_count, total, phone_results, created_at')
-    .in('type', ['mass_posting', 'tiktok'])
-    .order('created_at', { ascending: false })
-    .limit(400)
-  if (error || !data) return []
-  return data.map((r: Record<string, unknown>) => {
-    const results = (r['phone_results'] as PhoneResult[] | null) ?? []
-    const total   = Number(r['total'] ?? results.length ?? 0)
-    const phones: ScheduledPhoneRecord[] = results.length
-      ? results.map((pr, i) => ({ id: `run-${r['id']}-${i}`, geelark_id: '', phone_name: pr.name, ig_username: pr.name }))
-      : Array.from({ length: total }, (_, i) => ({ id: `run-${r['id']}-${i}`, geelark_id: '', phone_name: '', ig_username: null }))
-    const okCount  = Number(r['ok_count'] ?? 0)
-    const errCount = Number(r['err_count'] ?? 0)
-    const status: ScheduleStatus = okCount === 0 && errCount > 0 ? 'failed' : 'done'
-    const createdAt = String(r['created_at'])
-    return {
-      id:              `run-${r['id']}`,
-      user_id:         String(r['user_id'] ?? ''),
-      org_id:          (r['org_id'] as string | null) ?? null,
-      created_by_name: 'Manuel',
-      type:            'mass_posting',
-      status,
-      scheduled_at:    createdAt,
-      phones,
-      videos:          [],
-      caption:         '',
-      delay_minutes:   0,
-      mode:            'seq',
-      bearer_token:    '',
-      reels_trial:     false,
-      recur_hours:     null,
-      platform:        r['type'] === 'tiktok' ? 'tiktok' : 'instagram',
-      result:          results.length ? { phone_results: results } : null,
-      error_msg:       null,
-      created_at:      createdAt,
-      executed_at:     createdAt,
-    } as ScheduledPost
-  })
-}
-
-// True si le post vient d'un run manuel (post_runs) → lecture seule dans l'agenda.
-export function isManualRun(post: { id: string }): boolean {
-  return post.id.startsWith('run-')
-}
-
 // Atomic claim: returns true if this process successfully claimed the post.
 // Prevents double-execution if both the app and the edge function try to run it.
 export async function claimScheduledPost(id: string): Promise<boolean> {
