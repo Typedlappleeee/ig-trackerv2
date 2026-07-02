@@ -61,6 +61,7 @@ export type Page =
   | 'publishhub' | 'photoposting'
   | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof' | 'videostudio'
   | 'community' | 'support'
+  | 'library'
   | 'settings' | 'licences'
   | 'scaleia'
   | 'history'
@@ -87,6 +88,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'phones',      label: 'navPhones',       icon: '📱' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'library',     label: 'navLibrary',      icon: '📚', isNew: true },
       { id: 'history',     label: 'navHistory',      icon: '🕑' },
       { id: 'reports',     label: 'navReports',      icon: '📊', beta: true },
     ],
@@ -142,6 +144,7 @@ const ICONS = {
   chevronRight: 'M9 18l6-6-6-6',
   menu:         'M4 6h16M4 12h16M4 18h7',
   grid:         'M4 5a1 1 0 0 1 1-1h5v6H4V5zm10-1h5a1 1 0 0 1 1 1v5h-6V4zM4 14h6v6H5a1 1 0 0 1-1-1v-5zm10 0h6v5a1 1 0 0 1-1 1h-5v-6z',
+  book:         'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z',
 } as const
 
 type IconKey = keyof typeof ICONS
@@ -179,6 +182,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   support:         'chat',
   history:         'refresh',
   reports:         'chart',
+  library:         'book',
   tiktokposting:   'zap',
 }
 
@@ -759,6 +763,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     settings:    t('pageSettings'),
     licences:    t('pageLicences'),
     reports:     t('navReports'),
+    library:     t('navLibrary'),
   }
 
   return (
