@@ -9,6 +9,13 @@ export interface PostingOpts {
   intervalMax:  number   // minutes (random upper bound)
   reelsTrial:   boolean  // post as Instagram Reels Trial (non-followers only)
   alsoStory:    boolean  // publie AUSSI la même vidéo en story sur chaque compte
+  // ── Concurrence (proxys rotatifs) ──────────────────────────────────────────
+  // Sur proxy rotatif, allumer tous les téléphones d'un coup fait tomber les
+  // connexions. On limite alors le nombre de téléphones allumés/postant EN MÊME
+  // TEMPS, avec un délai optionnel entre chaque lot.
+  rotatingProxy: boolean  // raccourci : force 1 téléphone à la fois
+  maxConcurrent: number   // nb de téléphones simultanés (0 = tous d'un coup)
+  batchDelaySec: number   // délai entre chaque lot, en secondes (0 = aucun)
 }
 
 const KEY = 'sf_posting_opts'
@@ -19,6 +26,9 @@ const DEFAULTS: PostingOpts = {
   intervalMax:  5,
   reelsTrial:   false,
   alsoStory:    false,
+  rotatingProxy: false,
+  maxConcurrent: 0,
+  batchDelaySec: 0,
 }
 
 export function loadPostingOpts(): PostingOpts {
@@ -27,12 +37,24 @@ export function loadPostingOpts(): PostingOpts {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}')
     return {
       ...DEFAULTS,
-      intervalMin:  saved.intervalMin  ?? DEFAULTS.intervalMin,
-      intervalMax:  saved.intervalMax  ?? DEFAULTS.intervalMax,
-      alsoStory:    saved.alsoStory    ?? DEFAULTS.alsoStory,
-      intervalMode: 'none',
+      intervalMin:   saved.intervalMin   ?? DEFAULTS.intervalMin,
+      intervalMax:   saved.intervalMax   ?? DEFAULTS.intervalMax,
+      alsoStory:     saved.alsoStory     ?? DEFAULTS.alsoStory,
+      rotatingProxy: saved.rotatingProxy ?? DEFAULTS.rotatingProxy,
+      maxConcurrent: saved.maxConcurrent ?? DEFAULTS.maxConcurrent,
+      batchDelaySec: saved.batchDelaySec ?? DEFAULTS.batchDelaySec,
+      intervalMode:  'none',
     }
   } catch { return { ...DEFAULTS } }
+}
+
+// Nombre de téléphones qui postent réellement en même temps.
+// rotatingProxy → 1 ; maxConcurrent 0/≥total → tous d'un coup (comportement legacy).
+export function effectiveConcurrency(opts: PostingOpts, total: number): number {
+  if (total <= 1) return 1
+  if (opts.rotatingProxy) return 1
+  if (!opts.maxConcurrent || opts.maxConcurrent <= 0) return total
+  return Math.min(opts.maxConcurrent, total)
 }
 
 export function savePostingOpts(opts: PostingOpts) {

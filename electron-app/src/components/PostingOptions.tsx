@@ -29,6 +29,15 @@ function IconFlask({ size = 14, color = 'currentColor' }: { size?: number; color
   )
 }
 
+function IconNetwork({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="2" />
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5L19 19M19 5l-2.5 2.5M7.5 16.5L5 19" />
+    </svg>
+  )
+}
+
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
 export function PostingOptions({ opts, onChange, phonesCount }: Props) {
@@ -104,6 +113,47 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         >
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.reelsTrial ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
+      </div>
+
+      {/* ── Proxy rotatif / concurrence ─────────────────────────────────────── */}
+      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
+          <IconNetwork size={14} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Proxy rotatif</span>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Poste 1 téléphone à la fois (évite les coupures de co)</p>
+        </div>
+        <button
+          onClick={() => set({ rotatingProxy: !opts.rotatingProxy })}
+          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+          style={{ background: opts.rotatingProxy ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.rotatingProxy ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
+      </div>
+
+      {/* Concurrence + délai (masqués si proxy rotatif = 1 forcé) */}
+      <div className="flex items-center gap-2 flex-wrap pl-[26px]">
+        {!opts.rotatingProxy && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Simultanés</span>
+            <input type="number" min={0} max={200} value={opts.maxConcurrent || ''}
+              placeholder="Tous"
+              onChange={e => set({ maxConcurrent: Math.max(0, parseInt(e.target.value) || 0) })}
+              className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Délai entre lots</span>
+          <input type="number" min={0} max={3600} value={opts.batchDelaySec || ''}
+            placeholder="0"
+            onChange={e => set({ batchDelaySec: Math.max(0, parseInt(e.target.value) || 0) })}
+            className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
+          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>s</span>
+        </div>
       </div>
 
       {/* Expanded interval controls */}

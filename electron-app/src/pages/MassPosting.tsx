@@ -24,7 +24,7 @@ import { ACCENT, ACCENT_L, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HA
 import { useToast } from '@/components/Toast'
 import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
-import { loadPostingOpts, savePostingOpts, buildScheduleTimes, type PostingOpts } from '@/lib/postingOpts'
+import { loadPostingOpts, savePostingOpts, buildScheduleTimes, effectiveConcurrency, type PostingOpts } from '@/lib/postingOpts'
 import { PostingOptions } from '@/components/PostingOptions'
 
 interface MassPostingProps { user: User }
@@ -652,6 +652,120 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
       }
 
+      // ── Concurrence limitée (proxys rotatifs) : postage par lots ──────────
+      // Allumer tous les téléphones d'un coup fait tomber la co sur proxy rotatif.
+      // On limite le nombre de téléphones allumés/postant EN MÊME TEMPS ; chaque
+      // lot est démarré → posté → éteint avant le suivant, avec délai optionnel.
+      const _concurrency  = effectiveConcurrency(postingOpts, assignments.length)
+      const _batchDelayMs = Math.max(0, postingOpts.batchDelaySec) * 1000
+      if (platform === 'instagram' && _concurrency < assignments.length) {
+        const batches: (typeof assignments)[] = []
+        for (let i = 0; i < assignments.length; i += _concurrency) batches.push(assignments.slice(i, i + _concurrency))
+        log(`Concurrence : ${_concurrency} téléphone(s) à la fois — ${batches.length} lot(s)${postingOpts.rotatingProxy ? ' · proxy rotatif' : ''}`, 'info')
+
+        const STATUS_B: Record<number, string> = { 1: 'Pending', 2: 'In progress', 3: 'Done', 4: 'Failed', 7: 'Cancelled' }
+        const pollBatch = async (ids: Record<string, string>) => {
+          const list = Object.values(ids)
+          if (!list.length) return
+          const pending = new Set(list)
+          const deadline = Date.now() + 6 * 60 * 1000
+          while (pending.size > 0 && Date.now() < deadline) {
+            if (stopRef.current) break
+            await new Promise(r => setTimeout(r, 10000))
+            if (stopRef.current) break
+            let qRes: Record<string, unknown>
+            try { qRes = await geelark(bearer, '/task/query', { ids: [...pending] }) } catch { continue }
+            const d = (qRes['data'] as Record<string, unknown>) ?? qRes
+            let items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
+            if (!Array.isArray(items)) items = []
+            for (const item of items) {
+              const tid = (item['id'] ?? item['taskId']) as string
+              const status = Number(item['status'])
+              if (![3, 4, 7].includes(status)) continue
+              pending.delete(tid)
+              const phone = phoneList.find(p => ids[p.geelark_id] === tid)
+              postingStartRef.current.delete(phone?.geelark_id ?? '')
+              const fail = item['failDesc'] ? ` — ${item['failDesc']}` : ''
+              log(`${STATUS_B[status] ?? status} ${phone?.phone_name ?? tid}${fail}`, status === 3 ? 'ok' : 'error')
+              if (phone) {
+                setPhoneStatus(phone.id, { status: status === 3 ? 'done' : 'error', detail: item['failDesc'] as string | undefined })
+                activeTasksRef.current = activeTasksRef.current.filter(id => id !== tid)
+              }
+            }
+          }
+          if (pending.size > 0 && !stopRef.current) {
+            for (const tid of pending) {
+              const phone = phoneList.find(p => ids[p.geelark_id] === tid)
+              if (phone) setPhoneStatus(phone.id, { status: 'done', detail: 'non confirmé' })
+            }
+          }
+        }
+
+        for (let bi = 0; bi < batches.length; bi++) {
+          if (stopRef.current) { log('Run interrompu (stop)', 'warn'); break }
+          const batch = batches[bi]
+          const ids = batch.map(a => a.phone.geelark_id)
+          log(`Lot ${bi + 1}/${batches.length} — démarrage de ${batch.length} téléphone(s)…`)
+          activePhonesRef.current = [...new Set([...activePhonesRef.current, ...ids])]
+          const startRes = await geelark(bearer, '/phone/start', { ids })
+          registerStartedPhones(ids, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
+          const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
+          if (started === 0) {
+            batch.forEach(a => setPhoneStatus(a.phone.id, { status: 'error', detail: 'démarrage échoué' }))
+            activePhonesRef.current = activePhonesRef.current.filter(id => !ids.includes(id))
+            continue
+          }
+          if (stopRef.current) break
+          log('Attente 30s (boot)…')
+          await new Promise(r => setTimeout(r, 30000))
+          if (stopRef.current) break
+
+          const batchTaskIds: Record<string, string> = {}
+          for (const asgn of batch) {
+            if (stopRef.current) break
+            const token = tokenMap.get(asgn.videoIndex)
+            if (!token) { log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn'); setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' }); continue }
+            setPhoneStatus(asgn.phone.id, { status: 'posting' })
+            postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
+            let taskRes: Record<string, unknown> | null = null
+            for (let attempt = 0; attempt < 3; attempt++) {
+              taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
+                id: asgn.phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
+                description: caption, video: [token], ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
+              })
+              if (taskRes['code'] === 0) break
+              if (attempt < 2) { log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']} — nouvel essai…`, 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
+            }
+            if (taskRes && taskRes['code'] === 0) {
+              const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
+              batchTaskIds[asgn.phone.geelark_id] = tid
+              activeTasksRef.current = [...activeTasksRef.current, tid]
+              setPhoneTaskId(asgn.phone.geelark_id, tid)
+              setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
+              log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
+            } else {
+              log(`  ${asgn.phone.phone_name}: ${taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec'}`, 'error')
+              setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec') })
+            }
+            await new Promise(r => setTimeout(r, 500))
+          }
+
+          await pollBatch(batchTaskIds)
+
+          // Éteint les téléphones de ce lot (libère le proxy avant le suivant).
+          const strag = ids.filter(id => activePhonesRef.current.includes(id))
+          if (strag.length) {
+            try { await geelark(bearer, '/phone/stop', { ids: strag }) } catch { /* watchdog serveur */ }
+            unregisterPhones(strag).catch(() => {})
+            activePhonesRef.current = activePhonesRef.current.filter(id => !strag.includes(id))
+          }
+
+          if (bi < batches.length - 1 && _batchDelayMs && !stopRef.current) {
+            log(`Délai de ${postingOpts.batchDelaySec}s avant le prochain lot…`, 'info')
+            await new Promise(r => setTimeout(r, _batchDelayMs))
+          }
+        }
+      } else {
       // ── Step 2: start phones ──────────────────────────────────────────────
       if (stopRef.current) { log('Run interrompu avant le démarrage des téléphones', 'warn'); return }
       const geelarkIds = phoneList.map(p => p.geelark_id)
@@ -938,6 +1052,7 @@ export function MassPosting({ user }: MassPostingProps) {
         // Si l'arrêt a échoué : on GARDE activePhonesRef → le finally retente,
         // et on GARDE la ligne watchdog → le cron serveur rattrape.
       }
+      } // fin du mode standard (else de la concurrence limitée)
 
       // Mark only phones without a final status yet as done (preserve 'error' states)
       const currentStatuses = getMassPostingState().taskStatuses
