@@ -584,7 +584,7 @@ export function MassPosting({ user }: MassPostingProps) {
           createdByName: user.email?.split('@')[0] ?? 'Moi',
           type: 'mass_posting', scheduledAt,
           phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
-          videos: videosToSchedule.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
+          videos: videosToSchedule.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title, desc: (v.caption?.trim() || undefined) })),
           caption, delayMinutes: 0, mode, bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
           platform,
         })
@@ -604,6 +604,11 @@ export function MassPosting({ user }: MassPostingProps) {
     if (!bearer)                  { log('Missing GéeLark token — Settings', 'error'); return }
     if (phoneList.length === 0)   { log('Select at least one phone', 'warn'); return }
     if (selectedVideos.length === 0) { log('Select at least one video', 'warn'); return }
+
+    // Légende à poster pour une vidéo donnée : sa description de banque si elle
+    // en a une, sinon la légende globale saisie. Corrige le cas où chaque vidéo
+    // a sa propre description mais toutes recevaient la même légende globale.
+    const capFor = (v: SelectedVideo | null) => (v?.caption && v.caption.trim()) || caption
 
     // Débit upfront via le cycle de vie unifié — chaque téléphone en échec
     // sera remboursé au settle() en fin de run.
@@ -752,7 +757,7 @@ export function MassPosting({ user }: MassPostingProps) {
             for (let attempt = 0; attempt < 3; attempt++) {
               taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
                 id: asgn.phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
-                description: caption, video: [token], ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
+                description: capFor(asgn.video), video: [token], ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
               })
               if (taskRes['code'] === 0) break
               if (attempt < 2) { log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']} — nouvel essai…`, 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
@@ -848,7 +853,7 @@ export function MassPosting({ user }: MassPostingProps) {
           }
           setPhoneStatus(asgn.phone.id, { status: 'posting' })
           postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
-          list.push({ scheduleAt: scheduleTimes[ai], envId: asgn.phone.geelark_id, video: token, videoDesc: caption, ai })
+          list.push({ scheduleAt: scheduleTimes[ai], envId: asgn.phone.geelark_id, video: token, videoDesc: capFor(asgn.video), ai })
         }
         if (list.length > 0) {
           const taskRes = await geelark(bearer, '/task/add', {
@@ -897,7 +902,7 @@ export function MassPosting({ user }: MassPostingProps) {
             taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
               id:          asgn.phone.geelark_id,
               scheduleAt:  scheduleTimes[ai],
-              description: caption,
+              description: capFor(asgn.video),
               video:       [token],
               ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
             })
@@ -2064,9 +2069,12 @@ export function MassPosting({ user }: MassPostingProps) {
             // vide, on pré-remplit la légende avec (anti-écrasement du texte saisi).
             const firstDesc = descriptions?.find(d => d && d.trim())
             if (firstDesc && !caption.trim()) setCaption(firstDesc.trim())
+            // On zippe chaque chemin avec SA description de banque (index aligné)
+            // AVANT le filtrage anti-doublon, pour conserver la légende par vidéo.
             const newVideos: SelectedVideo[] = paths
-              .filter(p => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))
-              .map(p => ({
+              .map((p, i) => ({ p, desc: (descriptions?.[i] ?? '').trim() }))
+              .filter(({ p }) => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))
+              .map(({ p, desc }) => ({
                 item: {
                   id:             `bank-${p}`,
                   user_id:        user.id,
@@ -2079,12 +2087,14 @@ export function MassPosting({ user }: MassPostingProps) {
                   thumbnail_url:  null,
                   duration:       null,
                   tags:           [],
-                  notes:          '',
+                  notes:          desc,
+                  description:    desc || undefined,
                   used_count:     0,
                   created_at:     new Date().toISOString(),
                   updated_at:     new Date().toISOString(),
                 },
                 localPath: null,
+                caption:   desc || null,
               }))
             setSelVideos(prev => [...prev, ...newVideos])
             setShowBankPicker(false)

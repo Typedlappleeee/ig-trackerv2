@@ -18,6 +18,9 @@ export interface TaskStatus {
 export interface SelectedVideo {
   item:      ContentItem
   localPath: string | null
+  // Légende propre à la vidéo (description saisie dans la banque). Prioritaire
+  // sur la légende globale au moment de poster ; null → repli sur la globale.
+  caption?:  string | null
 }
 
 interface MassPostingState {
