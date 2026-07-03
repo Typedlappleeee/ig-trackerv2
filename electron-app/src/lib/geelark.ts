@@ -67,29 +67,38 @@ async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown
 // throw JAMAIS. Après l'appel, l'appelant doit attendre le retour de la
 // connexion (waitForPhoneConnectivity) avant de poster — d'où le petit délai
 // interne pour laisser l'IP se couper avant de vérifier.
-export async function rotateProxyIp(url: string, log?: (m: string) => void): Promise<boolean> {
+export interface RotationResult { ok: boolean; detail: string }
+
+export async function rotateProxyIp(url: string, log?: (m: string) => void): Promise<RotationResult> {
   const clean = (url ?? '').trim()
-  if (!clean || !/^https?:\/\//i.test(clean)) return false
+  if (!clean || !/^https?:\/\//i.test(clean)) return { ok: false, detail: 'URL invalide (doit commencer par http(s)://)' }
+  const short = (s: string) => (s ?? '').slice(0, 120).replace(/\s+/g, ' ').trim()
   try {
-    let ok = false
-    let bodyPreview = ''
     if (window.electronAPI?.geelarkRequest) {
-      // Electron : net.fetch direct sur n'importe quelle URL.
-      const r = await window.electronAPI.geelarkRequest({ method: 'GET', url: clean, isText: true })
-      ok = !!r.ok
-      bodyPreview = typeof r.data === 'string' ? r.data : ''
-    } else {
-      // Web : passe par un petit proxy serverless (contourne le CORS).
-      const res = await fetch(`/api/rotate?url=${encodeURIComponent(clean)}`)
-      const j = await res.json().catch(() => null) as { ok?: boolean; body?: string } | null
-      ok = res.ok && (j?.ok ?? false)
-      bodyPreview = j?.body ?? ''
+      // Electron : net.fetch direct sur n'importe quelle URL (pas de CORS/CSP).
+      const r = await window.electronAPI.geelarkRequest({ method: 'GET', url: clean, isText: true }) as { ok?: boolean; status?: number; data?: unknown; error?: string }
+      const body = typeof r.data === 'string' ? r.data : ''
+      const httpOk = r.ok && (r.status === undefined || (r.status >= 200 && r.status < 400))
+      const detail = r.ok ? (body ? short(body) : `HTTP ${r.status ?? '?'}`) : (r.error ?? 'échec réseau')
+      log?.(`🔄 Rotation IP : ${detail}`)
+      return { ok: !!httpOk, detail }
     }
-    log?.(ok ? `🔄 Rotation IP déclenchée${bodyPreview ? ` — ${bodyPreview.slice(0, 80).replace(/\s+/g, ' ').trim()}` : ''}` : '⚠ Rotation IP : réponse non-OK')
-    return ok
+    // Web : proxy serverless (contourne CORS ET la CSP connect-src du navigateur).
+    const res = await fetch(`/api/rotate?url=${encodeURIComponent(clean)}`)
+    if (res.status === 404) {
+      const detail = 'proxy serveur /api/rotate introuvable — déploiement en cours ? (attends 1-2 min + recharge)'
+      log?.(`⚠ Rotation IP : ${detail}`)
+      return { ok: false, detail }
+    }
+    const j = await res.json().catch(() => null) as { ok?: boolean; body?: string; error?: string; status?: number } | null
+    const ok = res.ok && (j?.ok ?? false)
+    const detail = j?.body ? short(j.body) : (j?.error ? short(j.error) : `HTTP ${j?.status ?? res.status}`)
+    log?.(`🔄 Rotation IP : ${detail}`)
+    return { ok, detail }
   } catch (e) {
-    log?.(`⚠ Rotation IP échouée : ${e instanceof Error ? e.message : String(e)} — on continue`)
-    return false
+    const detail = e instanceof Error ? e.message : String(e)
+    log?.(`⚠ Rotation IP échouée : ${detail} — on continue`)
+    return { ok: false, detail }
   }
 }
 

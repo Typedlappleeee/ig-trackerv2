@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/geelark.js": { "maxDuration": 30 },
-    "api/gx.js":      { "maxDuration": 30 }
+    "api/gx.js":      { "maxDuration": 30 },
+    "api/rotate.js":  { "maxDuration": 15 }
   },
   "buildCommand": "npm run build:web",
   "outputDirectory": "dist",
