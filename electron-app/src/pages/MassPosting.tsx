@@ -682,11 +682,10 @@ export function MassPosting({ user }: MassPostingProps) {
       // Allumer tous les téléphones d'un coup fait tomber la co sur proxy rotatif.
       // On limite le nombre de téléphones allumés/postant EN MÊME TEMPS ; chaque
       // lot est démarré → posté → éteint avant le suivant, avec délai optionnel.
-      // Rotation d'IP active → on FORCE le mode série (1 tel à la fois) pour que
-      // chaque post reçoive sa propre IP fraîche (le hook de rotation est dans le
-      // chemin par lots ci-dessous).
-      const rotationUrls  = activeRotationUrls()
-      const _concurrency  = rotationUrls.length > 0 ? 1 : effectiveConcurrency(postingOpts, assignments.length)
+      // Rotation d'IP : UNIQUEMENT si "Proxy rotatif" est coché ET des URLs sont
+      // configurées. Sinon rien ne change (pas de série forcée).
+      const rotationUrls  = postingOpts.rotatingProxy ? activeRotationUrls() : []
+      const _concurrency  = effectiveConcurrency(postingOpts, assignments.length)
       if (platform === 'instagram' && _concurrency < assignments.length) {
         const batches: (typeof assignments)[] = []
         for (let i = 0; i < assignments.length; i += _concurrency) batches.push(assignments.slice(i, i + _concurrency))

@@ -37,6 +37,7 @@ interface AiTextOverlay {
 interface ElectronAPI {
   platform: string
   geelarkRequest:    (opts: GeelarkRequestOptions) => Promise<GeelarkRequestResult>
+  rotateProxy?:      (url: string) => Promise<{ ok: boolean; status?: number; body?: string; error?: string }>
   pickVideoFile:     () => Promise<string | null>
   pickOutputFile:    (opts: { defaultName: string }) => Promise<string | null>
   pickAnyFile:       (opts?: { filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>

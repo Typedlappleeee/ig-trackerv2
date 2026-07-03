@@ -525,7 +525,7 @@ export default function StoryLink({ user }: { user: User }) {
         // double post si GéeLark rapporte un faux échec.
         const res = await postInstagramStory(
           bearer, asgn.phoneId,
-          { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun, rotationUrls: activeRotationUrls() },
+          { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun, rotationUrls },
           m => addLog(asgn.phoneId, m),
         )
         if (res.ok) { setStatus(asgn.phoneId, 'ok'); return 1 }
@@ -540,9 +540,9 @@ export default function StoryLink({ user }: { user: User }) {
     }
 
     // Par défaut : TOUS les téléphones en même temps (comme le Mass Posting).
-    // Proxy rotatif OU rotation d'IP configurée → 1 à la fois (IP fraîche/story).
-    const rotationOn = activeRotationUrls().length > 0
-    const serial = rotProxy || rotationOn
+    // Rotation d'IP UNIQUEMENT si "Proxy rotatif" est coché ET URLs configurées.
+    const rotationUrls = rotProxy ? activeRotationUrls() : []
+    const serial = rotProxy  // série seulement si la case est cochée
     const CONCURRENCY = serial ? 1 : (maxConc > 0 ? maxConc : assignments.length)
     // Petit décalage de démarrage plafonné (~6s) pour ne pas booter tout au même
     // instant. En rotatif un seul worker → aucun décalage.

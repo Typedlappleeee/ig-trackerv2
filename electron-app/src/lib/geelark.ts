@@ -74,14 +74,13 @@ export async function rotateProxyIp(url: string, log?: (m: string) => void): Pro
   if (!clean || !/^https?:\/\//i.test(clean)) return { ok: false, detail: 'URL invalide (doit commencer par http(s)://)' }
   const short = (s: string) => (s ?? '').slice(0, 120).replace(/\s+/g, ' ').trim()
   try {
-    if (window.electronAPI?.geelarkRequest) {
-      // Electron : net.fetch direct sur n'importe quelle URL (pas de CORS/CSP).
-      const r = await window.electronAPI.geelarkRequest({ method: 'GET', url: clean, isText: true }) as { ok?: boolean; status?: number; data?: unknown; error?: string }
-      const body = typeof r.data === 'string' ? r.data : ''
-      const httpOk = r.ok && (r.status === undefined || (r.status >= 200 && r.status < 400))
-      const detail = r.ok ? (body ? short(body) : `HTTP ${r.status ?? '?'}`) : (r.error ?? 'échec réseau')
+    // Electron : GET direct via le module Node https (contourne le "Forbidden URL"
+    // de net.fetch). Nécessite la dernière version de l'app desktop.
+    if (window.electronAPI?.rotateProxy) {
+      const r = await window.electronAPI.rotateProxy(clean)
+      const detail = r.ok ? (r.body ? short(r.body) : `HTTP ${r.status ?? '?'}`) : (r.error ?? 'échec réseau')
       log?.(`🔄 Rotation IP : ${detail}`)
-      return { ok: !!httpOk, detail }
+      return { ok: !!r.ok, detail }
     }
     // Web : proxy serverless (contourne CORS ET la CSP connect-src du navigateur).
     const res = await fetch(`/api/rotate?url=${encodeURIComponent(clean)}`)
