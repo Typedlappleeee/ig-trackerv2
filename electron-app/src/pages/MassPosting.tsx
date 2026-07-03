@@ -9,7 +9,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies } from '@/lib/geelark'
+import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp } from '@/lib/geelark'
 import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
@@ -763,6 +763,10 @@ export function MassPosting({ user }: MassPostingProps) {
             // booté sur l'IP fraîche). On vérifie juste que la connexion est là.
             // (PRÉ-check seulement — jamais de retry, pour ne pas risquer un double post).
             await waitForPhoneConnectivity(bearer, asgn.phone.geelark_id, m => log(`  ${asgn.phone.phone_name}: ${m.trim()}`))
+            if (rotationUrls.length > 0) {
+              const ip = await getPhonePublicIp(bearer, asgn.phone.geelark_id)
+              if (ip) log(`  ${asgn.phone.phone_name}: 🌍 IP ${ip}`, 'ok')
+            }
             setPhoneStatus(asgn.phone.id, { status: 'posting' })
             postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
             let taskRes: Record<string, unknown> | null = null

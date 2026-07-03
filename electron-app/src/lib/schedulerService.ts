@@ -508,7 +508,7 @@ async function executeScheduledPostInner(
         // Mode rotation : 🔄 rote l'IP → 📱 allume CE tél (il boote sur l'IP fraîche)
         // → boot 30s → vérif connexion. Le tél ne touche jamais l'ancienne IP.
         if (serialRotate) {
-          const { rotateAllProxies, waitForPhoneConnectivity } = await import('./geelark')
+          const { rotateAllProxies, waitForPhoneConnectivity, getPhonePublicIp } = await import('./geelark')
           onLog(`🔄 Rotation IP avant démarrage (${nameOf(phone)})…`)
           await rotateAllProxies(reelsRotationUrls, m => onLog(`   ${m}`))
           onLog(`▶ Démarrage ${nameOf(phone)}…`)
@@ -520,6 +520,8 @@ async function executeScheduledPostInner(
           onLog('⏳ Boot (30s)…')
           await sleep(30_000)
           await waitForPhoneConnectivity(bearer, phone.geelark_id, m => onLog(`   ${m}`))
+          const ip = await getPhonePublicIp(bearer, phone.geelark_id)
+          if (ip) onLog(`🌍 IP actuelle (${nameOf(phone)}) : ${ip}`)
         }
         const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
