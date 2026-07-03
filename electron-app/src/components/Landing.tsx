@@ -384,41 +384,6 @@ function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: strin
   )
 }
 
-function AutoPostShowcase() {
-  const grads = [
-    'linear-gradient(160deg,#3b2f6b,#1a1733)', 'linear-gradient(160deg,#5b2350,#231024)',
-    'linear-gradient(160deg,#22405e,#0e1c2b)', 'linear-gradient(160deg,#4a2d63,#1d1230)',
-    'linear-gradient(160deg,#5e3a22,#2b1a0e)', 'linear-gradient(160deg,#264e3a,#0e1f17)',
-    'linear-gradient(160deg,#3a2d63,#15122e)', 'linear-gradient(160deg,#5e2240,#280f1d)',
-  ]
-  const handles = ['@luna.fit', '@kayavibes', '@mia.daily', '@nora.x', '@ava.glow', '@zoe.life', '@lea.studio', '@emma.co']
-  const phones = Array.from({ length: 8 }, (_, i) => ({ i, grad: grads[i % grads.length], handle: handles[i % handles.length] }))
-  return (
-    <section style={{ position: 'relative', padding: '110px 0 120px', overflow: 'hidden', background: BG }}>
-      {/* glow */}
-      <div aria-hidden style={{ position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%,-50%)', width: 900, height: 500, background: 'radial-gradient(ellipse closest-side, rgba(99,102,241,0.10), transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
-      <FadeIn>
-        <div style={{ textAlign: 'center', maxWidth: 720, margin: '0 auto 56px', padding: '0 24px', position: 'relative' }}>
-          <MicroLabel color="rgba(99,102,241,0.6)" style={{ marginBottom: 22 }}>Automatisation en direct</MicroLabel>
-          <h2 style={{ margin: '0 0 14px', lineHeight: 1.04 }}>
-            <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px,4.4vw,54px)', letterSpacing: '-0.03em', color: IVORY }}>Des dizaines de comptes.<br /></span>
-            <span className="sf-serif-shimmer" style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px,4.6vw,58px)', color: GOLD }}>Ça poste tout seul.</span>
-          </h2>
-          <p style={{ fontFamily: SANS, fontSize: 'clamp(14px,1.4vw,17px)', color: FAINT, lineHeight: 1.6, maxWidth: 540, margin: '0 auto' }}>
-            Tu choisis tes vidéos, tu lances. ScaleFlow pilote tous tes cloud phones et publie sur Instagram — en parallèle, sans surveillance.
-          </p>
-        </div>
-      </FadeIn>
-      {/* Bande défilante de téléphones */}
-      <div style={{ position: 'relative', maskImage: 'linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)', WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)' }}>
-        <div style={{ display: 'flex', gap: 26, width: 'max-content', padding: '0 26px', animation: 'sf-conveyor 38s linear infinite' }}>
-          {[...phones, ...phones].map((p, idx) => <AutoPhone key={idx} i={idx} grad={p.grad} handle={p.handle} />)}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 // ── Fond aurora animé (dégradés qui dérivent) ─────────────────────────────────
 function Aurora() {
   return (
@@ -1592,9 +1557,6 @@ export function Landing() {
           </FadeIn>
         </div>
       </section>
-
-      {/* ── Publication — démo mass posting en direct ────────────────────────── */}
-      <AutoPostShowcase />
 
       {/* ── Features ─────────────────────────────────────────────────────────── */}
       <section id="features" style={{ position: 'relative', zIndex: 1, padding: '40px 24px 140px' }}>
