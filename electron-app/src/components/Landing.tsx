@@ -321,13 +321,10 @@ function SmokeBackground({ tint = false, subtle = false }: { tint?: boolean; sub
   )
 }
 
-// Vidéos affichées dans les téléphones de la démo. Dépose tes fichiers dans
-// electron-app/public/showcase/ (1.mp4 … 8.mp4) et ils s'affichent ici.
-// Si un fichier manque, on retombe proprement sur le dégradé.
-const SHOWCASE_VIDEOS: string[] = [
-  '/showcase/1.mp4', '/showcase/2.mp4', '/showcase/3.mp4', '/showcase/4.mp4',
-  '/showcase/5.mp4', '/showcase/6.mp4', '/showcase/7.mp4', '/showcase/8.mp4',
-]
+// Vidéos affichées dans les téléphones de la démo. Pour les activer, dépose tes
+// fichiers dans electron-app/public/showcase/ (1.mp4 … 8.mp4) PUIS ajoute leurs
+// chemins ci-dessous. Laissé vide par défaut → jolis dégradés animés, sans 404.
+const SHOWCASE_VIDEOS: string[] = []
 
 // ── Mini-téléphone qui poste tout seul ───────────────────────────────────────
 function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: string }) {
@@ -335,7 +332,7 @@ function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: strin
   const delay = -(i * 0.85)             // décalage → effet de vague
   const a = (name: string) => `${name} ${cycle}s linear ${delay}s infinite`
   const [videoOk, setVideoOk] = useState(true)
-  const src = SHOWCASE_VIDEOS[i % SHOWCASE_VIDEOS.length]
+  const src = SHOWCASE_VIDEOS.length ? SHOWCASE_VIDEOS[i % SHOWCASE_VIDEOS.length] : undefined
   return (
     <div style={{ animation: `sf-float-soft ${7 + (i % 4)}s ease-in-out ${i * 0.3}s infinite`, flexShrink: 0 }}>
       <div style={{
