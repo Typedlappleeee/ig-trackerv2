@@ -801,6 +801,20 @@ export function MassPosting({ user }: MassPostingProps) {
             unregisterPhones(strag).catch(() => {})
             activePhonesRef.current = activePhonesRef.current.filter(id => !strag.includes(id))
           }
+
+          // Réconciliation : le lot est éteint → un tél encore "en cours" (le poll
+          // n'a pas confirmé à temps, ex. GeeLark a fermé le tél à 5 min) est
+          // marqué "publié (non confirmé)" au lieu de rester bloqué. Sauf si stop.
+          if (!stopRef.current) {
+            const cur = getMassPostingState().taskStatuses
+            for (const asgn of batch) {
+              const st = cur.get(asgn.phone.id)?.status
+              if (st === 'posting' || st === 'pending' || st === 'uploading') {
+                setPhoneStatus(asgn.phone.id, { status: 'done', detail: 'non confirmé' })
+                activeTasksRef.current = activeTasksRef.current.filter(id => id !== batchTaskIds[asgn.phone.geelark_id])
+              }
+            }
+          }
         }
       } else {
       // ── Step 2: start phones ──────────────────────────────────────────────
