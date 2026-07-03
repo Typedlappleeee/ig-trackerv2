@@ -15,7 +15,7 @@ import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/p
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
-  resetMassPosting,
+  resetMassPosting, loadPersistedRun, clearPersistedRun,
 } from '@/lib/massPostingStore'
 import { playSuccess } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
@@ -218,6 +218,7 @@ export function MassPosting({ user }: MassPostingProps) {
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [randomSeed, setRandomSeed]               = useState(0)
   const stopRef                           = useRef(false)
+  const runActiveRef                      = useRef(false)  // ce session pilote un run
   const activePhonesRef                   = useRef<string[]>([])
   const activeTasksRef                    = useRef<string[]>([])
   const logEndRef                         = useRef<HTMLDivElement>(null)
@@ -305,6 +306,70 @@ export function MassPosting({ user }: MassPostingProps) {
   function setPhoneStatus(phoneId: string, status: TaskStatus) {
     setTaskStatuses(prev => new Map(prev).set(phoneId, status))
   }
+
+  // ── Reprise du suivi après un refresh ────────────────────────────────────────
+  // Les Reels partis chez GeeLark continuent de se publier côté serveur même si
+  // on refresh. Au retour sur l'app, on reprend le SUIVI : on relit l'état, on
+  // repoll les tâches (LECTURE SEULE — jamais de re-post) et on éteint les tél
+  // une fois fini. Se déclenche une seule fois, si un run était en cours.
+  const resumedRef = useRef(false)
+  useEffect(() => {
+    // On ne reprend QUE si le module est "frais" (posting=false en mémoire = après
+    // un refresh). En navigation interne, la boucle d'origine tourne encore
+    // (store.posting=true) → surtout pas de 2ᵉ poll.
+    if (resumedRef.current || runActiveRef.current || !bearer) return
+    if (getMassPostingState().posting) return
+    const persisted = loadPersistedRun()
+    if (!persisted) return
+    const age = Date.now() - (persisted.startedAt || 0)
+    if (age > 25 * 60_000) { clearPersistedRun(); return }  // trop vieux → on oublie
+    resumedRef.current = true
+
+    // Rehydrate l'état visible.
+    const statuses = new Map<string, TaskStatus>(persisted.taskStatuses)
+    setMassPostingState({ posting: true, logs: persisted.logs, taskStatuses: statuses, runPhones: persisted.runPhones, startedAt: persisted.startedAt })
+    stopRef.current = false
+    log('🔄 Reprise du suivi du posting en cours (relancé avant refresh)…', 'info')
+
+    ;(async () => {
+      const byTask = new Map<string, { phoneId: string; geelarkId: string; phoneName: string }>()
+      for (const rp of persisted.runPhones) {
+        const st = statuses.get(rp.phoneId)
+        if (st?.taskId && (st.status === 'posting' || st.status === 'pending' || st.status === 'uploading')) {
+          byTask.set(st.taskId, rp)
+        }
+      }
+      const deadline = (persisted.startedAt || Date.now()) + 12 * 60_000
+      const STATUS_B: Record<number, string> = { 3: 'Publié', 4: 'Échec', 7: 'Annulé' }
+      while (byTask.size > 0 && Date.now() < deadline && !stopRef.current) {
+        await new Promise(r => setTimeout(r, 12000))
+        if (stopRef.current) break
+        let qRes: Record<string, unknown>
+        try { qRes = await geelark(bearer, '/task/query', { ids: [...byTask.keys()] }) } catch { continue }
+        const d = (qRes['data'] as Record<string, unknown>) ?? qRes
+        let items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
+        if (!Array.isArray(items)) items = []
+        for (const item of items) {
+          const tid = (item['id'] ?? item['taskId']) as string
+          const status = Number(item['status'])
+          if (![3, 4, 7].includes(status)) continue
+          const rp = byTask.get(tid)
+          if (!rp) continue
+          byTask.delete(tid)
+          const fail = item['failDesc'] ? ` — ${item['failDesc']}` : ''
+          log(`${STATUS_B[status] ?? status} ${rp.phoneName}${fail}`, status === 3 ? 'ok' : 'error')
+          setPhoneStatus(rp.phoneId, { status: status === 3 ? 'done' : 'error', detail: item['failDesc'] as string | undefined })
+        }
+      }
+      // Ce qui reste non confirmé → publié (non confirmé), et on éteint les tél du run.
+      for (const rp of byTask.values()) setPhoneStatus(rp.phoneId, { status: 'done', detail: 'non confirmé' })
+      const gids = persisted.runPhones.map(p => p.geelarkId)
+      if (gids.length) { try { await geelark(bearer, '/phone/stop', { ids: gids }) } catch { /* watchdog serveur */ } unregisterPhones(gids).catch(() => {}) }
+      setPosting(false)
+      clearPersistedRun()
+      log('✅ Suivi terminé (reprise après refresh)', 'ok')
+    })()
+  }, [bearer])
 
   // Stable pour React.memo(PhoneRow) — ne dépend que de setters fonctionnels
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -637,7 +702,10 @@ export function MassPosting({ user }: MassPostingProps) {
     if (typeof run.balance === 'number') credits.setBalance(run.balance)
 
     playSuccess()
+    runActiveRef.current = true  // ce session pilote le run (pas une reprise)
     setPosting(true)
+    // Mémorise le run pour reprendre le suivi après un éventuel refresh.
+    setMassPostingState({ startedAt: Date.now(), runPhones: phoneList.map(p => ({ phoneId: p.id, geelarkId: p.geelark_id, phoneName: p.phone_name })) })
     setLogs([])
     setLastRun(null)
     stopRef.current = false

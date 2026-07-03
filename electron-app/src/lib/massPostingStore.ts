@@ -23,6 +23,10 @@ export interface SelectedVideo {
   caption?:  string | null
 }
 
+// Téléphones impliqués dans le run en cours (pour reprendre le suivi après un
+// refresh : on garde de quoi poller les tâches GeeLark et éteindre les tél).
+export interface RunPhone { phoneId: string; geelarkId: string; phoneName: string }
+
 interface MassPostingState {
   posting:        boolean
   logs:           TaskLog[]
@@ -30,6 +34,8 @@ interface MassPostingState {
   selectedPhones: Set<string>
   selectedVideos: SelectedVideo[]
   caption:        string
+  startedAt:      number        // timestamp du lancement (0 si aucun run)
+  runPhones:      RunPhone[]     // téléphones du run courant
 }
 
 const state: MassPostingState = {
@@ -39,10 +45,48 @@ const state: MassPostingState = {
   selectedPhones: new Set(),
   selectedVideos: [],
   caption:        '',
+  startedAt:      0,
+  runPhones:      [],
 }
 
 const subs = new Set<() => void>()
 function notify() { subs.forEach(cb => cb()) }
+
+// ── Persistance du run (survit à un refresh) ─────────────────────────────────
+const RUN_KEY = 'sf-mass-run'
+export interface PersistedRun {
+  startedAt:    number
+  logs:         TaskLog[]
+  taskStatuses: [string, TaskStatus][]
+  runPhones:    RunPhone[]
+}
+function persistRun() {
+  try {
+    if (state.posting && state.runPhones.length) {
+      const payload: PersistedRun = {
+        startedAt: state.startedAt || Date.now(),
+        logs: state.logs.slice(-200),
+        taskStatuses: [...state.taskStatuses.entries()],
+        runPhones: state.runPhones,
+      }
+      localStorage.setItem(RUN_KEY, JSON.stringify(payload))
+    } else {
+      localStorage.removeItem(RUN_KEY)
+    }
+  } catch { /* quota / privacy mode — best-effort */ }
+}
+export function loadPersistedRun(): PersistedRun | null {
+  try {
+    const raw = localStorage.getItem(RUN_KEY)
+    if (!raw) return null
+    const p = JSON.parse(raw) as PersistedRun
+    if (!p || !Array.isArray(p.runPhones) || !p.runPhones.length) return null
+    return p
+  } catch { return null }
+}
+export function clearPersistedRun() {
+  try { localStorage.removeItem(RUN_KEY) } catch { /* ignore */ }
+}
 
 export function getMassPostingState(): MassPostingState {
   return {
@@ -50,6 +94,7 @@ export function getMassPostingState(): MassPostingState {
     taskStatuses:   new Map(state.taskStatuses),
     selectedPhones: new Set(state.selectedPhones),
     selectedVideos: [...state.selectedVideos],
+    runPhones:      [...state.runPhones],
   }
 }
 
@@ -57,11 +102,13 @@ export function setMassPostingState(patch: Partial<MassPostingState>) {
   if (patch.taskStatuses)   state.taskStatuses   = new Map(patch.taskStatuses)
   if (patch.selectedPhones) state.selectedPhones = new Set(patch.selectedPhones)
   if (patch.selectedVideos) state.selectedVideos = [...patch.selectedVideos]
+  if (patch.runPhones)      state.runPhones      = [...patch.runPhones]
   const rest = { ...patch }
-  delete rest.taskStatuses; delete rest.selectedPhones; delete rest.selectedVideos
+  delete rest.taskStatuses; delete rest.selectedPhones; delete rest.selectedVideos; delete rest.runPhones
   const postingChanged = 'posting' in rest && rest.posting !== state.posting
   Object.assign(state, rest)
   notify()
+  persistRun()
   if (postingChanged) {
     window.electronAPI?.setMassPostingRunning?.(!!state.posting)
   }
@@ -71,6 +118,9 @@ export function resetMassPosting() {
   state.posting      = false
   state.logs         = []
   state.taskStatuses = new Map()
+  state.startedAt    = 0
+  state.runPhones    = []
+  clearPersistedRun()
   notify()
 }
 
