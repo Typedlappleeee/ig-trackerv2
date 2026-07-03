@@ -267,6 +267,19 @@ export async function waitForPhoneConnectivity(
   return false
 }
 
+// Récupère l'IP publique VUE PAR LE TÉLÉPHONE (donc l'IP de sortie de son proxy).
+// Sert à afficher la nouvelle IP après une rotation. Best-effort — null si échec.
+export async function getPhonePublicIp(bearer: string, phoneId: string): Promise<string | null> {
+  try {
+    const { output } = await shellExec(bearer, phoneId,
+      `curl -s -m 8 https://api.ipify.org 2>/dev/null || ` +
+      `curl -s -m 8 https://ipv4.icanhazip.com 2>/dev/null || ` +
+      `curl -s -m 8 https://ifconfig.me/ip 2>/dev/null`,
+      { maxRetries: 1 })
+    return (output ?? '').match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/)?.[0] ?? null
+  } catch { return null }
+}
+
 // ── Nouveau système d'upload média : natif GéeLark ─────────────────────────
 // Au lieu de streamer les octets via le shell (curl / base64 + broadcast
 // MEDIA_SCANNER que Android 13+ IGNORE → fichier jamais indexé → galerie vide),
@@ -1139,6 +1152,12 @@ async function _postInstagramStoryInner(
   // proxy — sinon une rotation d'IP en cours ferait échouer la story.
   log('🌐 Vérification de la connexion…')
   await waitForPhoneConnectivity(bearer, phoneId, log)
+
+  // Affiche l'IP publique (utile pour vérifier que la rotation a bien changé l'IP).
+  if (config.rotationUrls && config.rotationUrls.length > 0) {
+    const ip = await getPhonePublicIp(bearer, phoneId)
+    if (ip) log(`🌍 IP actuelle : ${ip}`)
+  }
 
   // ── Wake + unlock ──────────────────────────────────────────────────────────
   log('📱 Réveil écran…')
