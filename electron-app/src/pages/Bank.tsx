@@ -2305,7 +2305,11 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
   }
 
   async function confirm() {
-    const its = items.filter(i => selected.has(i.id))
+    // On respecte l'ORDRE DE SÉLECTION (clics) — `selected` est un Set qui
+    // conserve l'ordre d'insertion — et non l'ordre d'affichage de la grille,
+    // pour que le mode séquentiel (téléphone 1 = vidéo 1) suive les clics.
+    const byId = new Map(items.map(i => [i.id, i]))
+    const its = [...selected].map(id => byId.get(id)).filter((i): i is ContentItem => !!i)
     const { paths, resolved } = await resolvePaths(its)
     setResolving(null)
     onSelect(paths, resolved.map(i => i.title), resolved.map(i => getItemDesc(i)), resolved)

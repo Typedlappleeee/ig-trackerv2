@@ -2176,37 +2176,32 @@ export function MassPosting({ user }: MassPostingProps) {
           user={user}
           mode="multi"
           resolveMode="signed-url"
-          onSelect={(paths, _titles, descriptions) => {
+          onSelect={(paths, _titles, descriptions, items) => {
             // Si la 1ʳᵉ vidéo choisie a une description et que la légende est
             // vide, on pré-remplit la légende avec (anti-écrasement du texte saisi).
             const firstDesc = descriptions?.find(d => d && d.trim())
             if (firstDesc && !caption.trim()) setCaption(firstDesc.trim())
-            // On zippe chaque chemin avec SA description de banque (index aligné)
-            // AVANT le filtrage anti-doublon, pour conserver la légende par vidéo.
+            // On zippe chaque chemin avec SON item de banque RÉEL (id + storage_path)
+            // et sa description — index aligné — pour que l'usage unique puisse
+            // supprimer la vraie ligne de banque, et garder la légende par vidéo.
             const newVideos: SelectedVideo[] = paths
-              .map((p, i) => ({ p, desc: (descriptions?.[i] ?? '').trim() }))
+              .map((p, i) => ({ p, desc: (descriptions?.[i] ?? '').trim(), real: items?.[i] }))
               .filter(({ p }) => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))
-              .map(({ p, desc }) => ({
-                item: {
-                  id:             `bank-${p}`,
-                  user_id:        user.id,
-                  org_id:         null,
-                  folder:         null,
-                  title:          p.replace(/\\/g, '/').split('/').pop() ?? p,
-                  file_url:       p,
-                  storage_path:   null,
-                  thumbnail_path: null,
-                  thumbnail_url:  null,
-                  duration:       null,
-                  tags:           [],
-                  notes:          desc,
-                  description:    desc || undefined,
-                  used_count:     0,
-                  created_at:     new Date().toISOString(),
-                  updated_at:     new Date().toISOString(),
-                },
+              .map(({ p, desc, real }) => ({
+                item: real
+                  // Vrai item de banque : on garde son id + storage_path (pour la
+                  // suppression usage unique) et on force file_url = URL signée.
+                  ? { ...real, file_url: p, description: (real.description ?? desc) || undefined, notes: real.notes || desc }
+                  // Fallback (BankPicker ancien sans items) : item synthétique.
+                  : {
+                    id: `bank-${p}`, user_id: user.id, org_id: null, folder: null,
+                    title: p.replace(/\\/g, '/').split('/').pop() ?? p,
+                    file_url: p, storage_path: null, thumbnail_path: null, thumbnail_url: null,
+                    duration: null, tags: [], notes: desc, description: desc || undefined,
+                    used_count: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+                  },
                 localPath: null,
-                caption:   desc || null,
+                caption:   (desc || real?.description || '').trim() || null,
               }))
             setSelVideos(prev => [...prev, ...newVideos])
             setShowBankPicker(false)
