@@ -1123,16 +1123,17 @@ async function _postInstagramStoryInner(
   config: StoryConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
-  const ready = await ensurePhoneRunning(bearer, phoneId, log)
-  if (!ready) throw new Error('Téléphone non démarré')
-
-  // ── Rotation d'IP avant le post (optionnel) ────────────────────────────────
-  // Nouvelle IP fraîche pour chaque story. Best-effort : si ça rate, on continue
-  // (le check de connectivité ci-dessous rattrape). Pas de re-post → 0 double.
+  // ── Rotation d'IP AVANT d'allumer le téléphone (optionnel) ─────────────────
+  // Nouvelle IP fraîche : le tél boote directement dessus (il ne touche jamais
+  // l'ancienne). Best-effort : si ça rate, on continue (le check de connectivité
+  // rattrape). Pas de re-post → 0 double.
   if (config.rotationUrls && config.rotationUrls.length > 0) {
-    log('🔄 Rotation de l\'IP proxy…')
+    log('🔄 Rotation de l\'IP proxy (avant démarrage)…')
     await rotateAllProxies(config.rotationUrls, log)
   }
+
+  const ready = await ensurePhoneRunning(bearer, phoneId, log)
+  if (!ready) throw new Error('Téléphone non démarré')
 
   // ── Attente de connectivité (proxys rotatifs) ──────────────────────────────
   // On ne lance l'automation que quand le téléphone a réellement Internet via son

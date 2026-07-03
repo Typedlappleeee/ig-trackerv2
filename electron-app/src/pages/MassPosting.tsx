@@ -734,6 +734,12 @@ export function MassPosting({ user }: MassPostingProps) {
           if (stopRef.current) { log('Run interrompu (stop)', 'warn'); break }
           const batch = batches[bi]
           const ids = batch.map(a => a.phone.geelark_id)
+          // Rotation d'IP AVANT d'allumer le(s) téléphone(s) du lot → ils démarrent
+          // directement sur la nouvelle IP (ils ne touchent jamais l'ancienne).
+          if (rotationUrls.length > 0) {
+            log(`Lot ${bi + 1}/${batches.length} — rotation IP avant démarrage…`)
+            await rotateAllProxies(rotationUrls, m => log(`  ${m.trim()}`))
+          }
           log(`Lot ${bi + 1}/${batches.length} — démarrage de ${batch.length} téléphone(s)…`)
           activePhonesRef.current = [...new Set([...activePhonesRef.current, ...ids])]
           const startRes = await geelark(bearer, '/phone/start', { ids })
@@ -754,13 +760,8 @@ export function MassPosting({ user }: MassPostingProps) {
             if (stopRef.current) break
             const token = tokenMap.get(asgn.videoIndex)
             if (!token) { log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn'); setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' }); continue }
-            // Rotation d'IP avant CE post (si configurée) → IP fraîche par post.
-            // Best-effort, jamais de re-post → aucun risque de double.
-            if (rotationUrls.length > 0) {
-              log(`  ${asgn.phone.phone_name}: rotation IP…`)
-              await rotateAllProxies(rotationUrls, m => log(`  ${asgn.phone.phone_name}: ${m.trim()}`))
-            }
-            // Proxy rotatif : attendre que le tel ait vraiment Internet avant de poster
+            // La rotation d'IP a déjà eu lieu AVANT le démarrage du lot (le tél a
+            // booté sur l'IP fraîche). On vérifie juste que la connexion est là.
             // (PRÉ-check seulement — jamais de retry, pour ne pas risquer un double post).
             await waitForPhoneConnectivity(bearer, asgn.phone.geelark_id, m => log(`  ${asgn.phone.phone_name}: ${m.trim()}`))
             setPhoneStatus(asgn.phone.id, { status: 'posting' })
