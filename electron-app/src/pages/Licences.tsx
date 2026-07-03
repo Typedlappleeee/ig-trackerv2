@@ -93,6 +93,10 @@ export function Licences({ user: _user }: Props) {
   const [copied, setCopied]   = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<LicenseKey | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // Extension de durée (ajout de jours) sur une clé existante.
+  const [extendTarget, setExtendTarget] = useState<string | null>(null)  // id de la clé dont le panneau est ouvert
+  const [extendingId, setExtendingId]   = useState<string | null>(null)  // id en cours de mise à jour
+  const [customDays, setCustomDays]     = useState<string>('')
 
   // Credit codes
   const [creditCodes, setCreditCodes]   = useState<CreditCode[]>([])
@@ -198,6 +202,39 @@ export function Licences({ user: _user }: Props) {
       toast.show({ title: lang === 'en' ? 'Revoke failed' : 'Révocation échouée', body: error.message, kind: 'error' })
       return
     }
+    load()
+  }
+
+  // Ajoute (ou retire, si négatif) des jours à une clé existante. On repart de
+  // l'expiration actuelle si elle est dans le futur, sinon de maintenant, pour
+  // qu'ajouter des jours à une clé expirée la réactive à partir d'aujourd'hui.
+  async function extendKey(k: LicenseKey, days: number) {
+    if (!days) return
+    if (!k.expires_at) {
+      toast.show({ title: lang === 'en' ? 'Lifetime key' : 'Clé à vie', body: lang === 'en' ? 'This key never expires — nothing to add.' : 'Cette clé est déjà à vie — rien à ajouter.', kind: 'info' })
+      return
+    }
+    setExtendingId(k.id)
+    const now = Date.now()
+    const base = Math.max(now, new Date(k.expires_at).getTime())
+    const next = base + days * 86_400_000
+    // On ne descend jamais sous « maintenant » (une clé ne peut pas expirer dans le passé par ce biais).
+    const newExpiresAt = new Date(Math.max(now, next)).toISOString()
+    const { error } = await supabase.from('license_keys')
+      .update({ expires_at: newExpiresAt, is_active: true })
+      .eq('id', k.id)
+    setExtendingId(null)
+    if (error) {
+      toast.show({ title: lang === 'en' ? 'Update failed' : 'Mise à jour échouée', body: error.message, kind: 'error' })
+      return
+    }
+    setExtendTarget(null)
+    setCustomDays('')
+    toast.show({
+      title: lang === 'en' ? 'Key updated' : 'Clé mise à jour',
+      body: (days > 0 ? '+' : '') + `${days} ${lang === 'en' ? 'day(s)' : 'jour(s)'} — ${daysLeft(newExpiresAt, lang)}`,
+      kind: 'ok',
+    })
     load()
   }
 
@@ -405,8 +442,9 @@ export function Licences({ user: _user }: Props) {
           ) : (
             <div className="space-y-2">
               {filtered.map(k => (
-                <div key={k.id}
-                  className={`sf-card px-5 py-3.5 flex flex-wrap items-center gap-3 transition-opacity ${!k.is_active ? 'opacity-50' : ''}`}>
+                <div key={k.id} className="sf-card overflow-hidden">
+                <div
+                  className={`px-5 py-3.5 flex flex-wrap items-center gap-3 transition-opacity ${!k.is_active ? 'opacity-50' : ''}`}>
                   {/* Key */}
                   <button
                     onClick={() => copyKey(k.key)}
@@ -452,6 +490,15 @@ export function Licences({ user: _user }: Props) {
 
                   {/* Actions */}
                   <div className="flex gap-1">
+                    {k.expires_at && (
+                      <button
+                        onClick={() => { setExtendTarget(extendTarget === k.id ? null : k.id); setCustomDays('') }}
+                        className={`sf-btn sf-btn-ghost text-[12px] px-3 py-1.5 cursor-pointer ${extendTarget === k.id ? 'text-accent' : 'text-text2 hover:text-accent'}`}
+                        title={lang === 'en' ? 'Add days' : 'Ajouter des jours'}
+                      >
+                        {lang === 'en' ? '+ Days' : '+ Jours'}
+                      </button>
+                    )}
                     {k.is_active && (
                       <button
                         onClick={() => revokeKey(k.id)}
@@ -467,6 +514,49 @@ export function Licences({ user: _user }: Props) {
                       {t('delete')}
                     </button>
                   </div>
+                </div>
+
+                {/* Panneau d'extension de durée */}
+                {extendTarget === k.id && (
+                  <div className="px-5 py-3.5 flex flex-wrap items-center gap-2 border-t border-border"
+                    style={{ background: 'rgba(99,102,241,0.05)' }}>
+                    <span className="text-[12px] font-semibold text-text2 mr-1">
+                      {lang === 'en' ? 'Add:' : 'Ajouter :'}
+                    </span>
+                    {[1, 2, 7, 30, 90, 365].map(d => (
+                      <button
+                        key={d}
+                        disabled={extendingId === k.id}
+                        onClick={() => extendKey(k, d)}
+                        className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-text2 hover:text-white transition-all cursor-pointer disabled:opacity-40"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(99,102,241,0.25)' }}
+                      >
+                        +{d}{lang === 'en' ? 'd' : 'j'}
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-1.5 ml-1">
+                      <input
+                        type="number"
+                        value={customDays}
+                        onChange={e => setCustomDays(e.target.value)}
+                        placeholder={lang === 'en' ? 'custom' : 'perso'}
+                        className="sf-input w-[90px] text-[13px] py-1.5"
+                        style={{ fontVariantNumeric: 'tabular-nums' }}
+                        onKeyDown={e => { if (e.key === 'Enter' && Number(customDays)) extendKey(k, Math.trunc(Number(customDays))) }}
+                      />
+                      <button
+                        disabled={extendingId === k.id || !Number.isFinite(Number(customDays)) || Math.trunc(Number(customDays)) === 0}
+                        onClick={() => extendKey(k, Math.trunc(Number(customDays)))}
+                        className="sf-btn sf-btn-primary text-[12px] px-3 py-1.5 cursor-pointer disabled:opacity-40"
+                      >
+                        {extendingId === k.id ? '…' : (lang === 'en' ? 'Apply' : 'Appliquer')}
+                      </button>
+                    </div>
+                    <span className="text-[11px] text-text3 ml-auto">
+                      {lang === 'en' ? 'Negative value removes days' : 'Valeur négative pour retirer des jours'}
+                    </span>
+                  </div>
+                )}
                 </div>
               ))}
             </div>
