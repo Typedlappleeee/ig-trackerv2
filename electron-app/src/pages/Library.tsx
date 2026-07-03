@@ -166,14 +166,15 @@ function CapabilityCard({ cap, accent }: { cap: Capability; accent: string }) {
 }
 
 // ── Écran « Bientôt » pour les utilisateurs non-admin ────────────────────────
-// Aperçu coloré de tout ce que la bibliothèque permettra d'automatiser.
+// Teasers volontairement mystérieux : des NOUVEAUTÉS à venir, pas une redite
+// des onglets existants de l'app.
 const TEASERS = [
-  { emoji: '🚀', title: 'Recettes de publication', desc: 'Poste Reels, Stories et photos en masse, prêt à lancer.', grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', accent: '#818CF8' },
-  { emoji: '🔥', title: 'Séquences de warmup', desc: 'Chauffe tes comptes automatiquement, sans y penser.', grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
-  { emoji: '🧩', title: 'Modèles de tâches', desc: 'Des scénarios multi-étapes prêts à importer en un clic.', grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6' },
-  { emoji: '🎨', title: 'Presets de contenu', desc: 'Légendes, hooks et styles réutilisables à volonté.', grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
-  { emoji: '🎬', title: 'Chaînes vidéo', desc: 'Remix, spoof et sous-titres enchaînés automatiquement.', grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.45)', accent: '#22D3EE' },
-  { emoji: '🎓', title: 'Guides & tutoriels', desc: 'Pas à pas pour tout maîtriser, du débutant au pro.', grad: 'linear-gradient(135deg,#A78BFA,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
+  { emoji: '🤖', title: 'Automations intelligentes', desc: 'Des scénarios complets qui tournent seuls, du contenu au posting.', grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', accent: '#818CF8' },
+  { emoji: '📈', title: 'Stratégies de croissance', desc: 'Des plans d\'action éprouvés, prêts à activer en un clic.', grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
+  { emoji: '⚡', title: 'Packs prêts à l\'emploi', desc: 'Importe une config complète et lance-toi immédiatement.', grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
+  { emoji: '🧠', title: 'Recettes exclusives', desc: 'Les méthodes qui performent, partagées et actualisées en continu.', grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6' },
+  { emoji: '🔗', title: 'Intégrations', desc: 'Connecte ScaleFlow à tes autres outils préférés.', grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.45)', accent: '#22D3EE' },
+  { emoji: '💎', title: 'Et plus encore…', desc: 'Des surprises en préparation. Reste connecté.', grad: 'linear-gradient(135deg,#A78BFA,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
 ]
 
 function ComingSoon() {

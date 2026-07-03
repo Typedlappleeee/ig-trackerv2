@@ -1281,19 +1281,29 @@ export function Scheduler({ user, onNavigate }: Props) {
           onClick={e => { if (e.target === e.currentTarget) setShowPlatformChoice(false) }}
         >
           <div className="anim-scale-in" style={{
-            width: '100%', maxWidth: 460,
-            background: '#13141A', border: '1px solid rgba(233,234,240,0.08)',
-            borderRadius: 12, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+            width: '100%', maxWidth: 500, position: 'relative',
+            background: 'linear-gradient(170deg, #16171F, #0F1014)', border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: 20, overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(233,234,240,0.08)' }}>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ivory)' }}>
+            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(236,72,153,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', padding: '22px 24px 4px', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)' }}>Reel programmé</p>
+              <p style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
                 Où veux-tu publier ?
               </p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 20 }}>
+            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
               {([
-                { k: 'instagram' as const, emoji: '📸', label: 'Instagram', desc: 'Reels — publication native' },
-                { k: 'tiktok'    as const, emoji: '🎵', label: 'TikTok',    desc: 'Vidéos — publication native' },
+                {
+                  k: 'instagram' as const, label: 'Instagram', desc: 'Reels — publication native',
+                  grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6',
+                  icon: <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>,
+                },
+                {
+                  k: 'tiktok' as const, label: 'TikTok', desc: 'Vidéos — publication native',
+                  grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.5)', accent: '#22D3EE',
+                  icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.4 2 4.1 4.5 4.4v3c-1.7.1-3.2-.4-4.6-1.3v6.2c0 3.6-2.7 5.9-6 5.9-3.2 0-5.6-2.5-5.6-5.5 0-3.4 2.9-5.9 6.4-5.3v3.1c-.4-.1-.9-.2-1.3-.2-1.4 0-2.4 1-2.4 2.4 0 1.4 1 2.4 2.5 2.4 1.6 0 2.6-1.1 2.6-2.9V3h3.9z"/></svg>,
+                },
               ]).map(p => (
                 <button
                   key={p.k}
@@ -1305,17 +1315,20 @@ export function Scheduler({ user, onNavigate }: Props) {
                   }}
                   className="cursor-pointer"
                   style={{
-                    padding: '22px 14px', borderRadius: 10, textAlign: 'center',
-                    background: reelPlatform === p.k ? 'rgba(99,102,241,0.1)' : 'rgba(233,234,240,0.025)',
-                    border: `1px solid ${reelPlatform === p.k ? 'rgba(99,102,241,0.4)' : 'rgba(233,234,240,0.1)'}`,
-                    transition: 'all 0.15s',
+                    padding: 18, borderRadius: 16, textAlign: 'center',
+                    background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
+                    border: `1px solid ${reelPlatform === p.k ? `${p.accent}59` : 'rgba(255,255,255,0.09)'}`,
+                    transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s, border-color 0.25s',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.13)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.45)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = reelPlatform === p.k ? 'rgba(99,102,241,0.1)' : 'rgba(233,234,240,0.025)'; e.currentTarget.style.borderColor = reelPlatform === p.k ? 'rgba(99,102,241,0.4)' : 'rgba(233,234,240,0.1)' }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = `0 22px 46px -20px ${p.glow}`; e.currentTarget.style.borderColor = `${p.accent}66` }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = reelPlatform === p.k ? `${p.accent}59` : 'rgba(255,255,255,0.09)' }}
                 >
-                  <div style={{ fontSize: 36, lineHeight: 1, marginBottom: 10 }}>{p.emoji}</div>
-                  <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--ivory)' }}>{p.label}</p>
-                  <p style={{ margin: 0, fontSize: 11, lineHeight: 1.4, color: 'var(--muted)' }}>{p.desc}</p>
+                  <div style={{ width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: p.grad, boxShadow: `0 10px 22px -8px ${p.glow}, inset 0 1px 0 rgba(255,255,255,0.3)` }}>{p.icon}</div>
+                  <div>
+                    <p style={{ margin: '0 0 3px', fontSize: 14.5, fontWeight: 800, color: '#fff' }}>{p.label}</p>
+                    <p style={{ margin: 0, fontSize: 11, lineHeight: 1.4, color: 'rgba(233,234,240,0.5)' }}>{p.desc}</p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -1362,61 +1375,63 @@ export function Scheduler({ user, onNavigate }: Props) {
           onClick={e => { if (e.target === e.currentTarget) setShowTypeChoice(false) }}
         >
           <div className="anim-scale-in" style={{
-            width: '100%', maxWidth: 460,
-            background: '#13141A', border: '1px solid rgba(233,234,240,0.08)',
-            borderRadius: 12, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+            width: '100%', maxWidth: 520, position: 'relative',
+            background: 'linear-gradient(170deg, #16171F, #0F1014)', border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: 20, overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(233,234,240,0.08)' }}>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ivory)' }}>
+            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(99,102,241,0.18), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', padding: '22px 24px 4px', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)' }}>Nouvelle programmation</p>
+              <p style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
                 Que veux-tu programmer ?
               </p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 20 }}>
-              {/* Reel */}
-              <button
-                onClick={() => { setShowTypeChoice(false); setShowPlatformChoice(true) }}
-                className="cursor-pointer"
-                style={{
-                  padding: '20px 16px', borderRadius: 10, textAlign: 'left',
-                  background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.25)',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.13)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.45)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.07)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)' }}
-              >
-                <div style={{ marginBottom: 10, color: 'var(--accent-l)' }}>
-                  <IconVideo size={22} color="currentColor" />
-                </div>
-                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--ivory)' }}>Reel</p>
-                <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'var(--muted)' }}>
-                  Vidéos de la banque, légende, mode séquentiel ou aléatoire. Part même app fermée.
-                </p>
-              </button>
-              {/* Story */}
-              <button
-                onClick={() => { setShowTypeChoice(false); setShowStoryCreate(true) }}
-                className="cursor-pointer"
-                style={{
-                  padding: '20px 16px', borderRadius: 10, textAlign: 'left',
-                  background: 'rgba(233,234,240,0.025)', border: '1px solid rgba(233,234,240,0.1)',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.07)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(233,234,240,0.025)'; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.1)' }}
-              >
-                <div style={{ marginBottom: 10, color: 'var(--accent-l)' }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                  </svg>
-                </div>
-                <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: 'var(--ivory)' }}>Story avec lien</p>
-                <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'var(--muted)' }}>
-                  Photos + sticker lien par compte. Configure et programme directement ici.
-                </p>
-              </button>
+            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
+              {([
+                {
+                  onClick: () => { setShowTypeChoice(false); setShowPlatformChoice(true) },
+                  title: 'Reel', tag: 'Vidéo', accent: '#818CF8',
+                  grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)',
+                  desc: 'Vidéos de la banque, légende, mode séquentiel ou aléatoire. Part même app fermée.',
+                  icon: <IconVideo size={21} color="#fff" />,
+                },
+                {
+                  onClick: () => { setShowTypeChoice(false); setShowStoryCreate(true) },
+                  title: 'Story avec lien', tag: 'Sticker lien', accent: '#FBBF24',
+                  grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)',
+                  desc: 'Photos + sticker lien par compte. Configure et programme directement ici.',
+                  icon: (
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                  ),
+                },
+              ]).map((opt, i) => (
+                <button
+                  key={i}
+                  onClick={opt.onClick}
+                  className="cursor-pointer"
+                  style={{
+                    padding: 18, borderRadius: 16, textAlign: 'left',
+                    background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
+                    border: '1px solid rgba(255,255,255,0.09)',
+                    transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s, border-color 0.25s',
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = `0 22px 46px -20px ${opt.glow}`; e.currentTarget.style.borderColor = `${opt.accent}66` }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)' }}
+                >
+                  <div style={{ width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: opt.grad, boxShadow: `0 10px 22px -8px ${opt.glow}, inset 0 1px 0 rgba(255,255,255,0.3)` }}>{opt.icon}</div>
+                  <div>
+                    <p style={{ margin: '0 0 1px', fontSize: 15, fontWeight: 800, color: '#fff' }}>{opt.title}</p>
+                    <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: opt.accent }}>{opt.tag}</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.55, color: 'rgba(233,234,240,0.55)' }}>{opt.desc}</p>
+                </button>
+              ))}
             </div>
-            <div style={{ padding: '0 20px 16px' }}>
+            <div style={{ position: 'relative', padding: '0 22px 18px' }}>
               <button
                 onClick={() => setShowTypeChoice(false)}
                 className="sf-btn sf-btn-ghost cursor-pointer"
