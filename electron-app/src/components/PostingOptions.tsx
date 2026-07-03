@@ -1,4 +1,5 @@
 import { type PostingOpts, type IntervalMode, savePostingOpts } from '@/lib/postingOpts'
+import { getProxyRotation } from '@/lib/proxyRotation'
 
 interface Props {
   opts: PostingOpts
@@ -159,6 +160,37 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.rotatingProxy ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
       </div>
+
+      {/* Statut rotation d'IP — visible dès que "Proxy rotatif" est coché */}
+      {opts.rotatingProxy && (() => {
+        const rot = getProxyRotation()
+        const active = rot.enabled && rot.urls.some(u => /^https?:\/\//i.test(u.trim()))
+        return active ? (
+          <div className="flex items-start gap-2.5 pl-[26px]" style={{
+            padding: '9px 12px', borderRadius: 10, marginLeft: 26,
+            background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.28)',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            <div>
+              <p className="text-[12px] font-semibold" style={{ color: '#34D399', margin: 0 }}>Rotation d'IP active</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.65)', margin: '2px 0 0' }}>Une IP fraîche est déclenchée avant chaque post ✓</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2.5" style={{
+            padding: '10px 12px', borderRadius: 10, marginLeft: 26,
+            background: 'rgba(248,113,113,0.09)', border: '1px solid rgba(248,113,113,0.35)',
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            <div>
+              <p className="text-[12px] font-bold" style={{ color: '#F87171', margin: 0 }}>Rotation d'IP non configurée — risque de ban ⚠</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(226,232,240,0.7)', margin: '3px 0 0', lineHeight: 1.5 }}>
+                Poster plusieurs comptes sur la même IP fait bannir. Active la rotation dans <strong style={{ color: '#fff' }}>Paramètres → Connexions → Rotation d'IP proxy</strong> et colle ton lien de changement d'IP.
+              </p>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Concurrence (masquée si proxy rotatif = 1 forcé) */}
       {!opts.rotatingProxy && (
