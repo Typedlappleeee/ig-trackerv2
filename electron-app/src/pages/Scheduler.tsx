@@ -960,56 +960,50 @@ export function Scheduler({ user, onNavigate }: Props) {
       )
     : baseShown
 
+  const doneCount = history.filter(p => p.status === 'done').length
+  const headStats: Array<[string, number, string]> = [
+    ['En attente', pending.length, '#818CF8'],
+    ['Publiés', doneCount, '#34D399'],
+    ['Total', posts.length, '#94A3B8'],
+  ]
+
   return (
-    <div className="sf-page anim-page">
+    <div className="sf-page anim-page" style={{ position: 'relative' }}>
+      <style>{`@keyframes sch-shimmer{0%{background-position:-160% 0}100%{background-position:260% 0}}@keyframes sch-float{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,22px)}}`}</style>
+      {/* Ambient glow */}
+      <div aria-hidden style={{ position: 'absolute', top: -110, left: '14%', width: 520, height: 340, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(99,102,241,0.12), transparent 68%)', filter: 'blur(60px)', pointerEvents: 'none', animation: 'sch-float 22s ease-in-out infinite', zIndex: 0 }} />
 
       {/* ── Page header ─────────────────────────────────────────────────────────── */}
-      <div className="sf-page-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '24px 28px 0', borderBottom: 'none' }}>
+      <div className="sf-page-header" style={{ position: 'relative', zIndex: 1, flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '24px 28px 0', borderBottom: 'none' }}>
 
         {/* Title row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 15, minWidth: 0 }}>
             {/* Icon */}
             <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+              width: 52, height: 52, borderRadius: 15, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
               background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-              boxShadow: '0 10px 24px -8px rgba(99,102,241,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
+              boxShadow: '0 12px 28px -8px rgba(99,102,241,0.6), inset 0 1px 0 0 rgba(255,255,255,0.35)',
             }}>
-              <IconCalendarSm size={22} color="#fff" />
+              <IconCalendarSm size={25} color="#fff" />
             </div>
 
             {/* Text */}
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)', marginBottom: 3 }}>Programmation</div>
+              <h1 style={{
+                margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0,
+                background: 'linear-gradient(100deg,#fff 20%,#a5b4fc 55%,#6ee7b7 90%)', backgroundSize: '200% auto',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'sch-shimmer 7s linear infinite',
+              }}>
                 {t('schedulerTitle')}
               </h1>
-              <p className="sf-page-sub" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {posts.length} {posts.length !== 1 ? t('schedulerTaskCountPlural') : t('schedulerTaskCount')}
-              </p>
             </div>
           </div>
 
-          {/* Right: stat chips + schedule button */}
+          {/* Right: schedule button */}
           <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            {pending.length > 0 && (
-              <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums' }}>
-                <IconClock size={11} color="var(--accent-l)" />
-                {pending.length} {t('schedulerPendingCount')}
-              </span>
-            )}
-            {history.length > 0 && (
-              <button
-                onClick={() => onNavigate?.('history')}
-                title="Voir l'historique complet"
-                className="sf-badge cursor-pointer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums', background: 'transparent', cursor: onNavigate ? 'pointer' : 'default' }}
-              >
-                <IconCheck size={11} color="rgba(148,163,184,0.52)" />
-                {history.length} {t('schedulerTabHistory')}
-                {onNavigate && <span style={{ opacity: 0.6 }}>›</span>}
-              </button>
-            )}
             <button
               onClick={() => { setPresetSchedAt(undefined); setShowTypeChoice(true) }}
               className="sf-btn sf-btn-lg cursor-pointer"
@@ -1023,6 +1017,30 @@ export function Scheduler({ user, onNavigate }: Props) {
               Programmer
             </button>
           </div>
+        </div>
+
+        {/* Stats strip */}
+        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+          {headStats.map(([label, val, color], i) => {
+            const clickable = i === 1 && onNavigate && doneCount > 0
+            return (
+              <button
+                key={label}
+                onClick={clickable ? () => onNavigate?.('history') : undefined}
+                title={clickable ? "Voir l'historique complet" : undefined}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 9, padding: '9px 15px 9px 11px', borderRadius: 12,
+                  background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
+                  border: '1px solid rgba(255,255,255,0.08)', cursor: clickable ? 'pointer' : 'default',
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 8px ${color}` }} />
+                <span style={{ fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{val}</span>
+                <span style={{ fontSize: 12, color: 'rgba(233,234,240,0.5)', fontWeight: 600 }}>{label}</span>
+                {clickable && <span style={{ opacity: 0.5, marginLeft: 2 }}>›</span>}
+              </button>
+            )
+          })}
         </div>
 
         {/* Tabs — underline style */}
