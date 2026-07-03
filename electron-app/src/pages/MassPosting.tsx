@@ -260,6 +260,19 @@ export function MassPosting({ user }: MassPostingProps) {
     return unsub
   }, [])
 
+  // ⚠️ Le posting tourne dans le navigateur : un refresh/fermeture l'interrompt.
+  // Tant qu'un run est en cours, on demande confirmation avant de quitter.
+  useEffect(() => {
+    if (!posting) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = 'Un posting est en cours. Si tu quittes ou rafraîchis, il sera interrompu.'
+      return e.returnValue
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [posting])
+
   // Pull the active connection (org_config when an org is active, app_config otherwise)
   const conns = useConnections(user)
   useProxyRotation(user)  // charge la config de rotation d'IP dans le cache
