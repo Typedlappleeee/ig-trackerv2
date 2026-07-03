@@ -1200,7 +1200,16 @@ export default function StoryLink({ user }: { user: User }) {
           <div className="sf-card" style={{ padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: rotProxy ? 0 : 12 }}>
               <div style={{ flex: 1 }}>
-                <span className="sf-section-label" style={{ margin: 0 }}>Proxy rotatif</span>
+                <span className="sf-section-label" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  Proxy rotatif
+                  {(() => {
+                    const rot = getProxyRotation()
+                    const configured = rot.enabled && rot.urls.some(u => /^https?:\/\//i.test(u.trim()))
+                    return configured ? null : (
+                      <span title="Rotation d'IP non configurée — risque de ban. Active-la dans Paramètres → Rotation d'IP proxy." style={{ width: 7, height: 7, borderRadius: '50%', background: '#F87171', boxShadow: '0 0 6px rgba(248,113,113,0.9)', flexShrink: 0, animation: 'pulse 1.6s ease-in-out infinite' }} />
+                    )
+                  })()}
+                </span>
                 <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Poste 1 téléphone à la fois (évite les coupures de co)</p>
               </div>
               <button
