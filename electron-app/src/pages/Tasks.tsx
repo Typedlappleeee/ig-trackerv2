@@ -2606,17 +2606,21 @@ const WF_STEP_META: Record<string, { grad: string; glow: string; accent: string;
   warmup:      { grad: 'linear-gradient(135deg,#EA580C,#FB923C)', glow: 'rgba(251,146,60,0.35)', accent: '#FB923C', label: 'Warmup' },
 }
 
-// Connecteur du rail : ligne dégradée + point lumineux qui voyage (si actif).
+// Connecteur du rail : ligne dégradée + comète lumineuse qui voyage (si actif).
 function FlowConnector({ active, from, to, flowDelay }: { active: boolean; from: string; to: string; flowDelay: number }) {
   return (
     <div style={{ position: 'relative', width: 44, height: 2, flexShrink: 0, margin: '0 3px', alignSelf: 'flex-start', marginTop: 25 }}>
       <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: `linear-gradient(90deg, ${from}66, ${to}66)` }} />
       {active && (
         <div style={{
-          position: 'absolute', top: -2, left: 0, width: 6, height: 6, borderRadius: 99,
-          background: '#C7D2FE', boxShadow: '0 0 8px 2px rgba(165,180,252,0.7)',
+          position: 'absolute', top: -2, left: 0, width: 16, height: 6,
           animation: 'wf-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${flowDelay}s`,
-        }} />
+        }}>
+          {/* traînée de la comète */}
+          <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
+          {/* tête lumineuse */}
+          <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+        </div>
       )}
     </div>
   )
@@ -2937,11 +2941,10 @@ function EmptyState({ onNew }: { onNew: () => void }) {
             {i > 0 && (
               <div style={{ position: 'relative', width: 42, height: 2, margin: '0 3px' }}>
                 <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: 'linear-gradient(90deg, rgba(139,92,246,0.35), rgba(129,140,248,0.35))' }} />
-                <div style={{
-                  position: 'absolute', top: -2, left: 0, width: 6, height: 6, borderRadius: 99,
-                  background: '#C7D2FE', boxShadow: '0 0 8px 2px rgba(165,180,252,0.7)',
-                  animation: 'wf-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${i * 0.4}s`,
-                }} />
+                <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'wf-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${i * 0.4}s` }}>
+                  <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
+                  <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+                </div>
               </div>
             )}
             <div style={{
@@ -3384,7 +3387,7 @@ export function Tasks({ user }: { user: User }) {
     <div className="sf-page anim-page" style={{ position: 'relative' }}>
       <style>{`
         @keyframes wf-shimmer { 0%{background-position:-160% 0} 100%{background-position:260% 0} }
-        @keyframes wf-flow { 0%{left:0;opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:calc(100% - 6px);opacity:0} }
+        @keyframes wf-flow { 0%{left:0;opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:calc(100% - 16px);opacity:0} }
         @keyframes wf-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.55;transform:scale(.85)} }
         @keyframes wf-rotate { to{transform:rotate(360deg)} }
         @keyframes wf-float { 0%,100%{transform:translate(0,0)} 50%{transform:translate(30px,22px)} }

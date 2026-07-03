@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useT, useLang } from '@/lib/i18n'
 import { playNav, playTick } from '@/lib/sounds'
@@ -56,6 +56,7 @@ const HUB_CSS = `
     50%       { opacity: 0.9; }
   }
   @keyframes hub-shimmer { 0%{background-position:-160% 0} 100%{background-position:260% 0} }
+  @keyframes hub-kpi-flow { 0%{left:0;opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:calc(100% - 16px);opacity:0} }
   @keyframes hub-float-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(34px,24px)} }
   @keyframes hub-float-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-28px,30px)} }
   @keyframes hub-line-grow { from{transform:scaleX(0)} to{transform:scaleX(1)} }
@@ -377,16 +378,28 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           </button>
         </div>
 
-        {/* ── KPI row ──────────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-          <KpiCard label={t('hubKpiPhones')}    value={loading ? '…' : phoneCount} icon="phone" delay={0.05}
-                   grad="linear-gradient(135deg,#6366F1,#8B5CF6)" glow="rgba(99,102,241,0.5)"  accentColor="#fff" />
-          <KpiCard label={t('hubKpiVideos')}    value={loading ? '…' : videoCount} icon="video" delay={0.10}
-                   grad="linear-gradient(135deg,#EC4899,#8B5CF6)" glow="rgba(236,72,153,0.5)"  accentColor="#fff" />
-          <KpiCard label={t('hubKpiWeekPosts')} value={loading ? '…' : weekPosts} icon="send" delay={0.15}
-                   grad="linear-gradient(135deg,#10B981,#059669)" glow="rgba(16,185,129,0.5)"  accentColor="#fff" />
-          <KpiCard label={t('hubKpiCredits')}   value={credLoading ? '…' : balance.toLocaleString(locale)} icon="sparkles" delay={0.20}
-                   grad="linear-gradient(135deg,#F59E0B,#EF4444)" glow="rgba(245,158,11,0.5)"  accentColor="#FBBF24" />
+        {/* ── KPI row — reliée par un flux lumineux ───────────────────────── */}
+        <div style={{ display: 'flex', gap: 0, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+          {([
+            { label: t('hubKpiPhones'),    value: loading ? '…' : phoneCount, icon: 'phone',    delay: 0.05, grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', accentColor: '#fff', c: '#818CF8' },
+            { label: t('hubKpiVideos'),    value: loading ? '…' : videoCount, icon: 'video',    delay: 0.10, grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accentColor: '#fff', c: '#F472B6' },
+            { label: t('hubKpiWeekPosts'), value: loading ? '…' : weekPosts,  icon: 'send',     delay: 0.15, grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.5)', accentColor: '#fff', c: '#34D399' },
+            { label: t('hubKpiCredits'),   value: credLoading ? '…' : balance.toLocaleString(locale), icon: 'sparkles', delay: 0.20, grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.5)', accentColor: '#FBBF24', c: '#FBBF24' },
+          ]).map((k, i, arr) => (
+            <Fragment key={k.label}>
+              {i > 0 && (
+                <div style={{ position: 'relative', width: 22, height: 2, flexShrink: 0, margin: '0 -1px', zIndex: 1 }}>
+                  <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(90deg, ${arr[i - 1].c}4d, ${k.c}4d)` }} />
+                  <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'hub-kpi-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${(i - 1) * 0.5}s` }}>
+                    <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
+                    <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+                  </div>
+                </div>
+              )}
+              <KpiCard label={k.label} value={k.value} icon={k.icon} delay={k.delay}
+                       grad={k.grad} glow={k.glow} accentColor={k.accentColor} />
+            </Fragment>
+          ))}
         </div>
 
         {/* ── Quick actions ──────────────────────────────────────────────── */}

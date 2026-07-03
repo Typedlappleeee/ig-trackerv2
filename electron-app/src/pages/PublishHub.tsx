@@ -20,6 +20,7 @@ const CSS = `
 @keyframes hub-bar { 0%{width:14%} 60%,100%{width:89%} }
 @keyframes hub-pulse { 0%,100%{opacity:.45} 50%{opacity:1} }
 @keyframes hub-tilt { 0%,100%{transform:rotate(-3deg) translateY(0)} 50%{transform:rotate(-3deg) translateY(-4px)} }
+@keyframes hub-flow { 0%{left:0;opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:calc(100% - 16px);opacity:0} }
 .hubcard { position: relative; }
 .hubcard::before {
   content:''; position:absolute; inset:-1px; border-radius:23px; padding:1.4px;
@@ -209,7 +210,13 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   </div>
                 </div>
                 {i < arr.length - 1 && (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(233,234,240,0.28)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  <div style={{ position: 'relative', width: 38, height: 2, flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: `linear-gradient(90deg, ${step.c}59, ${arr[i + 1].c}59)` }} />
+                    <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'hub-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${i * 0.5}s` }}>
+                      <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
+                      <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+                    </div>
+                  </div>
                 )}
               </div>
             ))}

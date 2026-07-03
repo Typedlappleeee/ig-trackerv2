@@ -1312,10 +1312,13 @@ export function Phones({ user }: PhonesProps) {
                 grad: 'linear-gradient(135deg,#475569,#334155)', glow: 'rgba(100,116,139,0.4)', valColor: '#E9EAF0',
               },
             ]
+            const flowColors = ['#818CF8', '#34D399', '#94A3B8']
             return (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
-                {statCards.map(card => (
-                  <div key={card.label} className="sf-anim-slide-up" style={{
+                <style>{`@keyframes ph-flow{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:calc(100% - 16px);opacity:0}}`}</style>
+                {statCards.map((card, ci) => (
+                  <div key={card.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="sf-anim-slide-up" style={{
                     display: 'inline-flex', alignItems: 'center', gap: 12,
                     padding: '12px 18px 12px 12px', borderRadius: 14,
                     background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
@@ -1333,6 +1336,16 @@ export function Phones({ user }: PhonesProps) {
                       </div>
                       <span style={{ fontSize: 10.5, color: 'rgba(233,234,240,0.5)', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{card.label}</span>
                     </div>
+                  </div>
+                  {ci < statCards.length - 1 && (
+                    <div style={{ position: 'relative', width: 30, height: 2, flexShrink: 0 }}>
+                      <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: `linear-gradient(90deg, ${flowColors[ci]}59, ${flowColors[ci + 1]}59)` }} />
+                      <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'ph-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${ci * 0.5}s` }}>
+                        <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
+                        <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+                      </div>
+                    </div>
+                  )}
                   </div>
                 ))}
                 {lastUpdated && (
