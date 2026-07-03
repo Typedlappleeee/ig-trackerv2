@@ -427,19 +427,30 @@ async function executeScheduledPostInner(
     : post.videos) as ScheduledVideoRecord[]
 
   const geelarkIds = phones.map(p => p.geelark_id)
+  const isTikTok = post.platform === 'tiktok'
+  // Rotation d'IP active (reels IG) → on démarre les tél 1 par 1, en rotant l'IP
+  // AVANT d'allumer chacun (il boote sur l'IP fraîche). Sinon comportement normal.
+  const serialRotate = !isTikTok && reelsRotationUrls.length > 0
 
   try {
-    // 1. Start phones
-    onLog(`▶ Démarrage de ${phones.length} téléphone(s)…`)
-    const startRes = await gPost(bearer, '/phone/start', { ids: geelarkIds }) as any
-    if (startRes.code !== 0) onLog(`⚠ Démarrage: ${startRes.msg ?? startRes.code}`)
+    // 1. Start phones (en mode rotation, le démarrage se fait 1 par 1 dans la boucle)
+    if (!serialRotate) {
+      onLog(`▶ Démarrage de ${phones.length} téléphone(s)…`)
+      const startRes = await gPost(bearer, '/phone/start', { ids: geelarkIds }) as any
+      if (startRes.code !== 0) onLog(`⚠ Démarrage: ${startRes.msg ?? startRes.code}`)
+    } else {
+      onLog(`▶ Mode rotation d'IP : démarrage séquentiel (1 tél à la fois, IP fraîche par tél)`)
+    }
 
     // Safety net: immediately store phone IDs + a scheduled stop time in the DB.
     // If this client session dies before reaching the stop step (app closed, crash,
     // tab refreshed…), the server-side sweep (1ter) will call /phone/stop at
     // safetyStopAt — preventing phones from running indefinitely and billing forever.
     // safetyStopAt = last-phone delay + 5 min buffer.
+    // En mode rotation série, chaque tél ajoute ~2 min (rotation + boot + post),
+    // donc on étend le filet pour ne pas couper le run en plein milieu.
     const safetyOffsetMs = (phones.length - 1) * delay_minutes * 60_000 + 5 * 60_000
+      + (serialRotate ? phones.length * 120_000 : 0)
     supabase.from('scheduled_posts').update({
       result:         { geelark_ids: geelarkIds, geelark_task_ids: [] },
       stop_phones_at: new Date(Date.now() + safetyOffsetMs).toISOString(),
@@ -451,15 +462,16 @@ async function executeScheduledPostInner(
       stopAt: new Date(Date.now() + safetyOffsetMs), reason: 'scheduler',
     })
 
-    // 2. Wait for boot
-    onLog('⏳ Boot téléphones (30s)…')
-    await sleep(30_000)
+    // 2. Wait for boot (en mode rotation, le boot se fait 1 par 1 dans la boucle)
+    if (!serialRotate) {
+      onLog('⏳ Boot téléphones (30s)…')
+      await sleep(30_000)
+    }
 
     // 3. Create RPA tasks
     onLog('📤 Envoi des tâches de posting…')
     const taskIds: string[] = []
     let failedCount = 0
-    const isTikTok = post.platform === 'tiktok'
     // Résultats par téléphone (historique cliquable). taskPhoneName : taskId → compte.
     const phoneResults: PhoneResult[] = []
     const taskPhoneName = new Map<string, string>()
@@ -493,11 +505,20 @@ async function executeScheduledPostInner(
         const videoIdx = mode === 'random'
           ? Math.floor(Math.random() * videos.length)
           : i % videos.length
-        // Rotation d'IP avant CE post (si configurée) → IP fraîche par post.
-        if (reelsRotationUrls.length > 0) {
+        // Mode rotation : 🔄 rote l'IP → 📱 allume CE tél (il boote sur l'IP fraîche)
+        // → boot 30s → vérif connexion. Le tél ne touche jamais l'ancienne IP.
+        if (serialRotate) {
           const { rotateAllProxies, waitForPhoneConnectivity } = await import('./geelark')
-          onLog(`🔄 Rotation IP (${nameOf(phone)})…`)
+          onLog(`🔄 Rotation IP avant démarrage (${nameOf(phone)})…`)
           await rotateAllProxies(reelsRotationUrls, m => onLog(`   ${m}`))
+          onLog(`▶ Démarrage ${nameOf(phone)}…`)
+          const sr = await gPost(bearer, '/phone/start', { ids: [phone.geelark_id] }) as any
+          if (sr.code !== 0) onLog(`⚠ Démarrage ${nameOf(phone)}: ${sr.msg ?? sr.code}`)
+          registerStartedPhones([phone.geelark_id], { orgId: post.org_id ?? null, userId: post.user_id }, {
+            stopAt: new Date(Date.now() + 8 * 60_000), reason: 'scheduler',
+          })
+          onLog('⏳ Boot (30s)…')
+          await sleep(30_000)
           await waitForPhoneConnectivity(bearer, phone.geelark_id, m => onLog(`   ${m}`))
         }
         const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
