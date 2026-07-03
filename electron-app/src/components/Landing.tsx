@@ -128,6 +128,9 @@ const GLOBAL_CSS = `
   .sf-shine:hover::after { animation: sf-beam 0.85s cubic-bezier(0.16,1,0.3,1); }
   .sf-flow-text { background: linear-gradient(90deg,#818CF8,#a855f7,#ec4899,#818CF8); background-size: 220% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; animation: sf-flow-move 7s linear infinite; }
   @keyframes sf-flow-move { to { background-position: 220% center; } }
+  /* Shimmer serif élégant pour les accents dorés (cohérent avec l'app) */
+  .sf-serif-shimmer { background: linear-gradient(100deg,#a5b4fc 8%,#c4b5fd 42%,#818CF8 66%,#6ee7b7 100%); background-size: 220% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; animation: sf-serif-shim 7s linear infinite; }
+  @keyframes sf-serif-shim { to { background-position: 220% center; } }
   @keyframes sf-tile-in {
     from { opacity: 0; transform: translateY(18px) scale(0.96); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -399,7 +402,7 @@ function AutoPostShowcase() {
           <MicroLabel color="rgba(99,102,241,0.6)" style={{ marginBottom: 22 }}>Automatisation en direct</MicroLabel>
           <h2 style={{ margin: '0 0 14px', lineHeight: 1.04 }}>
             <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px,4.4vw,54px)', letterSpacing: '-0.03em', color: IVORY }}>Des dizaines de comptes.<br /></span>
-            <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px,4.6vw,58px)', color: GOLD }}>Ça poste tout seul.</span>
+            <span className="sf-serif-shimmer" style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px,4.6vw,58px)', color: GOLD }}>Ça poste tout seul.</span>
           </h2>
           <p style={{ fontFamily: SANS, fontSize: 'clamp(14px,1.4vw,17px)', color: FAINT, lineHeight: 1.6, maxWidth: 540, margin: '0 auto' }}>
             Tu choisis tes vidéos, tu lances. ScaleFlow pilote tous tes cloud phones et publie sur Instagram — en parallèle, sans surveillance.
@@ -518,14 +521,16 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           <MicroLabel style={{ marginBottom: 30 }}>Instagram &amp; TikTok Automation Studio</MicroLabel>
         </div>
 
+        {/* Halo qui respire derrière le wordmark */}
+        <div aria-hidden style={{ position: 'absolute', top: '50%', left: '50%', width: 'min(720px, 90vw)', height: 360, transform: 'translate(-50%,-50%)', background: 'radial-gradient(ellipse at center, rgba(129,140,248,0.16), transparent 68%)', filter: 'blur(50px)', pointerEvents: 'none', animation: 'sf-float 9s ease-in-out infinite' }} />
         <h1 style={{
-          margin: '0 0 8px',
+          margin: '0 0 8px', position: 'relative',
           lineHeight: 0.92,
           animation: 'sf-blur-in 1.2s cubic-bezier(0.16,1,0.3,1) 0.45s both',
-          position: 'relative', overflow: 'hidden', padding: '0 0.1em',
+          overflow: 'hidden', padding: '0 0.1em',
         }}>
           <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(64px, 11vw, 150px)', letterSpacing: '-0.05em', color: IVORY }}>SCALE</span>
-          <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(66px, 11.5vw, 158px)', letterSpacing: '-0.02em', color: GOLD, marginLeft: '0.02em' }}>Flow</span>
+          <span className="sf-serif-shimmer" style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(66px, 11.5vw, 158px)', letterSpacing: '-0.02em', color: GOLD, marginLeft: '0.02em' }}>Flow</span>
           {/* light sweep */}
           <span aria-hidden style={{
             position: 'absolute', top: 0, bottom: 0, left: 0, width: '34%',
@@ -774,7 +779,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
             <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(40px, 6.6vw, 92px)', color: IVORY }}>
               Instagram &amp; TikTok,
             </span>
-            <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(44px, 7vw, 100px)', color: GOLD, letterSpacing: '-0.005em', marginTop: '0.06em' }}>
+            <span className="sf-serif-shimmer" style={{ display: 'block', fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(44px, 7vw, 100px)', color: GOLD, letterSpacing: '-0.005em', marginTop: '0.06em' }}>
               élevée au rang d’art.
             </span>
           </h1>
@@ -1008,7 +1013,7 @@ function PricingSection() {
             <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>Investissement</MicroLabel>
             <h2 style={{ margin: '0 0 34px', lineHeight: 1, letterSpacing: '-0.04em' }}>
               <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 5vw, 62px)', color: IVORY }}>Trois plans. </span>
-              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 5.3vw, 66px)', color: GOLD }}>Zéro limite.</span>
+              <span className="sf-serif-shimmer" style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 5.3vw, 66px)', color: GOLD }}>Zéro limite.</span>
             </h2>
             {/* Billing toggle */}
             <div style={{ display: 'inline-flex', border: `1px solid ${HAIR}`, padding: 3, gap: 0 }}>
