@@ -728,6 +728,32 @@ ipcMain.handle('adspower-request', (_event, opts: {
   return tryHost(0)
 })
 
+// ── IPC: rotation d'IP proxy ─────────────────────────────────────────────────
+// GET direct sur le "Change IP URL" du fournisseur (Prox'Easy…) via le module
+// Node https/http — net.fetch rejette ces hôtes ("Forbidden URL"). Best-effort.
+ipcMain.handle('rotate-proxy', (_event, url: string) => {
+  return new Promise<{ ok: boolean; status?: number; body?: string; error?: string }>((resolve) => {
+    try {
+      const u = new URL(url)
+      const mod = u.protocol === 'http:' ? http : https
+      const req = mod.request(url, { method: 'GET', timeout: 12000 }, (res) => {
+        let raw = ''
+        res.setEncoding('utf8')
+        res.on('data', (c) => { raw += c })
+        res.on('end', () => {
+          const code = res.statusCode ?? 0
+          resolve({ ok: code >= 200 && code < 400, status: code, body: raw.slice(0, 300) })
+        })
+      })
+      req.on('error', (e) => resolve({ ok: false, error: e.message }))
+      req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }) })
+      req.end()
+    } catch (e) {
+      resolve({ ok: false, error: e instanceof Error ? e.message : String(e) })
+    }
+  })
+})
+
 // ── CORS proxy for AdsPower (allows web app to reach local.adspower.net) ────
 // The browser blocks HTTPS→HTTP requests (Private Network Access / CORS).
 // This proxy runs on localhost:50327, forwards to AdsPower on :50325, and

@@ -146,6 +146,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   adspowerRequest: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) =>
     ipcRenderer.invoke('adspower-request', opts),
 
+  // Rotation d'IP proxy — GET direct via Node https (contourne "Forbidden URL")
+  rotateProxy: (url: string) => ipcRenderer.invoke('rotate-proxy', url),
+
   // Notify main process that a mass posting run started/ended so it can keep the
   // app alive in the system tray instead of quitting when the window is closed.
   setMassPostingRunning: (running: boolean) =>
