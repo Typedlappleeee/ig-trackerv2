@@ -2598,6 +2598,75 @@ function StepEditor({
 
 // ── Task Card ──────────────────────────────────────────────────────────────────
 
+// ── Workflow pipeline — building blocks ─────────────────────────────────────
+// Style visuel par type d'étape (repris des accents des hubs).
+const WF_STEP_META: Record<string, { grad: string; glow: string; accent: string; label: string }> = {
+  publication: { grad: 'linear-gradient(135deg,#6366F1,#818CF8)', glow: 'rgba(129,140,248,0.4)', accent: '#818CF8', label: 'Reels' },
+  story:       { grad: 'linear-gradient(135deg,#F59E0B,#FBBF24)', glow: 'rgba(251,191,36,0.35)', accent: '#FBBF24', label: 'Story' },
+  warmup:      { grad: 'linear-gradient(135deg,#EA580C,#FB923C)', glow: 'rgba(251,146,60,0.35)', accent: '#FB923C', label: 'Warmup' },
+}
+
+// Connecteur du rail : ligne dégradée + point lumineux qui voyage (si actif).
+function FlowConnector({ active, from, to, flowDelay }: { active: boolean; from: string; to: string; flowDelay: number }) {
+  return (
+    <div style={{ position: 'relative', width: 44, height: 2, flexShrink: 0, margin: '0 3px', alignSelf: 'flex-start', marginTop: 25 }}>
+      <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: `linear-gradient(90deg, ${from}66, ${to}66)` }} />
+      {active && (
+        <div style={{
+          position: 'absolute', top: -2, left: 0, width: 6, height: 6, borderRadius: 99,
+          background: '#C7D2FE', boxShadow: '0 0 8px 2px rgba(165,180,252,0.7)',
+          animation: 'wf-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${flowDelay}s`,
+        }} />
+      )}
+    </div>
+  )
+}
+
+// Nœud du rail : tuile 52px + label + sous-texte.
+function FlowNode({ grad, glow, accent, label, sub, index, icon, onAdd, addTitle }: {
+  grad: string; glow: string; accent: string; label: string; sub: React.ReactNode
+  index?: number; icon: React.ReactNode; onAdd?: () => void; addTitle?: string
+}) {
+  const [h, setH] = useState(false)
+  return (
+    <div
+      onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0, transition: 'transform 0.2s cubic-bezier(0.16,1,0.3,1)', transform: h ? 'translateY(-3px)' : 'none', minWidth: 68 }}
+    >
+      <div style={{
+        position: 'relative', width: 52, height: 52, borderRadius: 16,
+        background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+        boxShadow: `0 0 ${h ? 26 : 16}px ${glow}, inset 0 1px 0 rgba(255,255,255,0.28)`, transition: 'box-shadow 0.25s',
+      }}>
+        {icon}
+        {typeof index === 'number' && (
+          <span style={{
+            position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: 99,
+            fontSize: 9, fontWeight: 800, color: '#0A0B0E', background: '#F3F4F6',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #0A0B0E',
+          }}>{index}</span>
+        )}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: accent, letterSpacing: '0.02em' }}>{label}</div>
+      <div style={{ fontSize: 10, color: 'rgba(233,234,240,0.45)', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+        {sub}
+        {onAdd && (
+          <button
+            onClick={e => { e.stopPropagation(); onAdd() }}
+            title={addTitle ?? 'Ajouter des médias'}
+            className="cursor-pointer"
+            style={{
+              width: 15, height: 15, borderRadius: 4, border: 'none',
+              background: 'rgba(99,102,241,0.16)', color: '#818CF8',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
+          ><IconPlus size={7} /></button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function TaskCard({
   task,
   onToggle,
@@ -2618,67 +2687,76 @@ function TaskCard({
   const [hovered, setHovered] = useState(false)
   const isActive = task.status === 'active'
   const hasSegments = !!task.segments && task.segments.length > 0
-  const statusColor = isActive ? '#34d399' : '#F59E0B'
-
-  const metaParts: string[] = []
-  metaParts.push(`↻ ${formatInterval(task.recur_hours)}`)
-  metaParts.push(`${task.phones.length} tél.`)
-  if (!hasSegments) {
-    metaParts.push(task.task_type === 'story' ? 'Story' : 'Publication')
-    metaParts.push(`${task.videos.length} ${task.task_type === 'story' ? 'image' : 'vidéo'}${task.videos.length > 1 ? 's' : ''}`)
-  } else {
-    metaParts.push(`${(task.segments ?? []).length} étape${(task.segments ?? []).length > 1 ? 's' : ''}`)
-  }
+  const segs = task.segments ?? []
+  const creditsPerRun = task.phones.length * 2
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: 'rgba(14,14,26,0.9)',
-        border: `1px solid ${hovered ? 'rgba(99,102,241,0.28)' : 'rgba(233,234,240,0.07)'}`,
-        borderRadius: 14,
-        padding: '18px 20px',
-        transition: 'border-color 0.18s ease, box-shadow 0.18s ease',
-        boxShadow: hovered ? '0 6px 28px -6px rgba(99,102,241,0.2)' : '0 2px 10px rgba(0,0,0,0.2)',
-        position: 'relative',
+        position: 'relative', borderRadius: 20, padding: '18px 20px 14px',
+        background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
+        border: `1px solid ${hovered ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.08)'}`,
+        transition: 'border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.16,1,0.3,1)',
+        transform: hovered ? 'translateY(-2px)' : 'none',
+        boxShadow: hovered
+          ? '0 12px 40px rgba(0,0,0,0.45), 0 0 60px -20px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.07)'
+          : 'inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 26px -18px rgba(0,0,0,0.6)',
         overflow: 'hidden',
       }}
     >
-      {/* Status accent left border */}
+      {/* Barre d'accent statut */}
       <div style={{
-        position: 'absolute', top: 0, left: 0, bottom: 0, width: 3,
-        background: statusColor, opacity: isActive ? 0.7 : 0.35,
-        borderRadius: '14px 0 0 14px',
+        position: 'absolute', left: 0, top: 14, bottom: 14, width: 3, borderRadius: '0 3px 3px 0',
+        background: isActive ? 'linear-gradient(180deg,#34D399,#10B981)' : 'rgba(255,255,255,0.12)',
+        boxShadow: isActive ? '0 0 12px rgba(52,211,153,0.5)' : 'none', transition: 'background 0.3s, box-shadow 0.3s',
       }} />
 
       <div style={{ paddingLeft: 8 }}>
-        {/* Row 1: name + action buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          {/* Status dot */}
-          <span style={{
-            width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0,
-            boxShadow: isActive ? `0 0 7px ${statusColor}` : 'none',
-            animation: isActive ? 'pulse 1.6s ease-in-out infinite' : 'none',
-          }} />
-
+        {/* ── Row 1 : nom + badge + countdown + actions ──────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
           <p style={{
-            margin: 0, flex: 1, minWidth: 0,
-            fontSize: 14, fontWeight: 700, color: 'var(--ivory)',
-            letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            margin: 0, minWidth: 0, maxWidth: '38%',
+            fontSize: 15.5, fontWeight: 800, color: '#F3F4F6',
+            letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {task.name || 'Tâche sans nom'}
+            {task.name || 'Workflow sans nom'}
           </p>
 
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+          {/* Badge statut */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, height: 21, padding: '0 9px', borderRadius: 999,
+            fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase',
+            color: isActive ? '#34D399' : 'rgba(233,234,240,0.45)',
+            background: isActive ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${isActive ? 'rgba(52,211,153,0.28)' : 'rgba(255,255,255,0.1)'}`,
+          }}>
+            {isActive && <span style={{ width: 6, height: 6, borderRadius: 99, background: '#34D399', boxShadow: '0 0 6px rgba(52,211,153,0.8)', animation: 'wf-pulse 2s ease-in-out infinite' }} />}
+            {isActive ? 'Actif' : 'En pause'}
+          </span>
+
+          {/* Chip prochain run (niveau tâche, mode plat) */}
+          {!hasSegments && isActive && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, height: 21, padding: '0 10px', borderRadius: 999,
+              fontSize: 10.5, fontWeight: 700, color: '#A5B4FC', background: 'rgba(99,102,241,0.1)',
+              border: '1px solid rgba(99,102,241,0.25)', fontVariantNumeric: 'tabular-nums',
+            }}>
+              <IconClock size={10} color="#A5B4FC" />
+              {formatCountdown(task.next_run_at)}
+            </span>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 'auto' }}>
             <button
               onClick={onToggle}
               disabled={toggling}
               title={isActive ? 'Mettre en pause' : 'Reprendre'}
               className="cursor-pointer"
               style={{
-                width: 30, height: 30, borderRadius: 8, border: 'none',
+                width: 32, height: 32, borderRadius: 10, border: 'none',
                 background: isActive ? 'rgba(245,158,11,0.1)' : 'rgba(52,211,153,0.1)',
                 color: isActive ? '#F59E0B' : '#34d399',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2694,7 +2772,7 @@ function TaskCard({
               title="Modifier"
               className="cursor-pointer"
               style={{
-                width: 30, height: 30, borderRadius: 8, border: 'none',
+                width: 32, height: 32, borderRadius: 10, border: 'none',
                 background: 'rgba(99,102,241,0.08)', color: '#818CF8',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'background 0.15s', cursor: 'pointer',
@@ -2710,7 +2788,7 @@ function TaskCard({
               title="Supprimer"
               className="cursor-pointer"
               style={{
-                width: 30, height: 30, borderRadius: 8, border: 'none',
+                width: 32, height: 32, borderRadius: 10, border: 'none',
                 background: 'rgba(248,113,113,0.06)', color: 'rgba(248,113,113,0.65)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.15s', opacity: deleting ? 0.5 : 1, cursor: 'pointer',
@@ -2723,109 +2801,99 @@ function TaskCard({
           </div>
         </div>
 
-        {/* Row 2: compact meta */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 14 }}>
-          <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0 }}>
-            {metaParts.map((part, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <span style={{ margin: '0 6px', opacity: 0.35 }}>·</span>}
-                <span>{part}</span>
-              </React.Fragment>
-            ))}
-            {!hasSegments && (
-              <button
-                onClick={e => { e.stopPropagation(); onOpenAddVideos() }}
-                title="Ajouter des vidéos"
-                className="cursor-pointer"
-                style={{
-                  marginLeft: 5, width: 16, height: 16, borderRadius: 4, border: 'none',
-                  background: 'rgba(99,102,241,0.14)', color: '#818CF8',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.15s', flexShrink: 0,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.28)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.14)' }}
-              >
-                <IconPlus size={7} />
-              </button>
-            )}
-          </p>
+        {/* ── Row 2 : LE PIPELINE ────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 0, marginTop: 14, marginBottom: 12,
+          overflowX: 'auto', paddingBottom: 4,
+          filter: isActive ? 'none' : 'saturate(0.3) brightness(0.75)',
+          opacity: isActive ? 1 : 0.7,
+          transition: 'filter 0.4s ease, opacity 0.4s ease',
+        }}>
+          {/* Nœud trigger */}
+          <FlowNode
+            grad="linear-gradient(135deg,#6366F1,#8B5CF6)" glow="rgba(139,92,246,0.4)" accent="#A5B4FC"
+            label="Déclencheur"
+            sub={<span style={{ fontVariantNumeric: 'tabular-nums' }}>↻ {formatInterval(task.recur_hours)}</span>}
+            icon={<IconClock size={22} color="#fff" />}
+          />
+
+          {hasSegments ? (
+            segs.map((seg, i) => {
+              const meta = WF_STEP_META[seg.type] ?? WF_STEP_META.publication
+              const prev = i === 0 ? '#8B5CF6' : (WF_STEP_META[segs[i - 1].type] ?? WF_STEP_META.publication).accent
+              const story = seg.type === 'story'
+              return (
+                <React.Fragment key={seg.id}>
+                  <FlowConnector active={isActive} from={prev} to={meta.accent} flowDelay={i * 0.4} />
+                  <FlowNode
+                    grad={meta.grad} glow={meta.glow} accent={meta.accent} label={meta.label} index={i + 1}
+                    sub={<>
+                      <span>{seg.videos.length} {story ? 'image' : 'vidéo'}{seg.videos.length > 1 ? 's' : ''}</span>
+                      {isActive && <span style={{ color: '#A5B4FC', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>· {formatCountdown(seg.next_run_at)}</span>}
+                    </>}
+                    icon={story ? <IconLinkType size={20} color="#fff" /> : <IconVideo size={20} color="#fff" />}
+                    onAdd={() => onOpenAddVideos(seg.id)}
+                    addTitle="Ajouter des médias à cette étape"
+                  />
+                </React.Fragment>
+              )
+            })
+          ) : (
+            (() => {
+              const meta = WF_STEP_META[task.task_type] ?? WF_STEP_META.publication
+              const story = task.task_type === 'story'
+              return (
+                <>
+                  <FlowConnector active={isActive} from="#8B5CF6" to={meta.accent} flowDelay={0} />
+                  <FlowNode
+                    grad={meta.grad} glow={meta.glow} accent={meta.accent} label={meta.label}
+                    sub={<span>{task.videos.length} {story ? 'image' : 'vidéo'}{task.videos.length > 1 ? 's' : ''}</span>}
+                    icon={story ? <IconLinkType size={20} color="#fff" /> : <IconVideo size={20} color="#fff" />}
+                    onAdd={() => onOpenAddVideos()}
+                  />
+                </>
+              )
+            })()
+          )}
+
+          {/* Indicateur de répétition */}
+          <FlowConnector active={isActive} from={hasSegments ? (WF_STEP_META[segs[segs.length - 1]?.type] ?? WF_STEP_META.publication).accent : (WF_STEP_META[task.task_type] ?? WF_STEP_META.publication).accent} to="rgba(233,234,240,0.35)" flowDelay={(hasSegments ? segs.length : 1) * 0.4} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 99, marginTop: 8,
+              border: '1.5px dashed rgba(255,255,255,0.22)', color: 'rgba(233,234,240,0.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: isActive ? 'wf-rotate 9s linear infinite' : 'none',
+            }}>
+              <IconRepeat size={15} color="currentColor" />
+            </div>
+            <span style={{ fontSize: 9.5, color: 'rgba(233,234,240,0.35)', fontWeight: 700 }}>en boucle</span>
+          </div>
         </div>
 
-        {/* Separator */}
-        <div style={{ height: 1, background: 'rgba(233,234,240,0.05)', marginBottom: 12 }} />
-
-      {hasSegments ? (
-        /* Segment list — one mini-row per segment with its own timer */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {(task.segments ?? []).map(seg => {
-            const story = seg.type === 'story'
-            return (
-              <div key={seg.id} style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 10px', borderRadius: 8,
-                background: isActive ? 'rgba(99,102,241,0.04)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${isActive ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.05)'}`,
-              }}>
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  background: story ? 'rgba(236,72,153,0.12)' : 'rgba(99,102,241,0.12)',
-                  color: story ? '#F472B6' : '#818CF8',
-                  border: `1px solid ${story ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
-                  borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 700, flexShrink: 0,
-                }}>
-                  {story ? <IconLinkType size={10} /> : <IconVideo size={10} />}
-                  {story ? 'Story' : 'Pub'}
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
-                  {story ? <IconLinkType size={10} color="rgba(233,234,240,0.5)" /> : <IconVideo size={10} color="rgba(233,234,240,0.5)" />}
-                  {seg.videos.length}
-                  <button
-                    onClick={e => { e.stopPropagation(); onOpenAddVideos(seg.id) }}
-                    title="Ajouter des médias à ce segment"
-                    className="cursor-pointer"
-                    style={{
-                      width: 16, height: 16, borderRadius: 4, border: 'none',
-                      background: 'rgba(99,102,241,0.15)', color: '#818CF8',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}
-                  >
-                    <IconPlus size={7} />
-                  </button>
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#818CF8', flexShrink: 0 }}>
-                  <IconRepeat size={10} color="#818CF8" /> {formatInterval(seg.recur_hours)}
-                </span>
-                <span style={{
-                  marginLeft: 'auto', fontSize: 11, fontWeight: 700,
-                  color: isActive ? 'var(--accent-l)' : 'var(--muted)',
-                  fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-                }}>
-                  {isActive ? formatCountdown(seg.next_run_at) : 'En pause'}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        /* Next run inline */
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <IconClock size={11} color={isActive ? 'var(--accent-l)' : 'var(--muted)'} />
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Prochain post</span>
-          <span style={{
-            fontSize: 12, fontWeight: 700,
-            color: isActive ? 'var(--accent-l)' : 'var(--muted)',
-            fontVariantNumeric: 'tabular-nums',
-          }}>
-            {isActive ? formatCountdown(task.next_run_at) : '—'}
+        {/* ── Row 3 : footer méta ────────────────────────────────────────── */}
+        <div style={{
+          borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10,
+          display: 'flex', alignItems: 'center', gap: 16, fontSize: 11.5, color: 'rgba(233,234,240,0.45)', flexWrap: 'wrap',
+        }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <IconPhone size={12} color="rgba(233,234,240,0.4)" />
+            {task.phones.length} téléphone{task.phones.length > 1 ? 's' : ''}
           </span>
-          {isActive && (
-            <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)' }}>
-              · {formatAbsolute(task.next_run_at)}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <IconBolt size={12} color="rgba(233,234,240,0.4)" />
+            <span style={{ color: '#FBBF24', fontWeight: 700 }}>~{creditsPerRun} crédits</span>/run
+          </span>
+          {(task.run_count ?? 0) > 0 && (
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{task.run_count} run{(task.run_count ?? 0) > 1 ? 's' : ''}</span>
+          )}
+          {task.last_run_at && (
+            <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums' }}>
+              Dernier run : {formatRelativePast(task.last_run_at)}
+              <span style={{ color: '#34D399', display: 'inline-flex' }}><IconCheck size={9} /></span>
             </span>
           )}
         </div>
-      )}
       </div>
     </div>
   )
@@ -2850,47 +2918,71 @@ function TaskSkeleton() {
 // ── Empty state ────────────────────────────────────────────────────────────────
 
 function EmptyState({ onNew }: { onNew: () => void }) {
+  // Pipeline fantôme animé : vend la promesse du workflow avant même d'en créer un.
+  const ghostTiles = [
+    { grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', icon: <IconClock size={19} color="#fff" /> },
+    { grad: 'linear-gradient(135deg,#EA580C,#FB923C)', icon: <IconBolt size={19} color="#fff" /> },
+    { grad: 'linear-gradient(135deg,#6366F1,#818CF8)', icon: <IconVideo size={18} color="#fff" /> },
+    { grad: 'linear-gradient(135deg,#F59E0B,#FBBF24)', icon: <IconLinkType size={18} color="#fff" /> },
+  ]
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       padding: '72px 32px', textAlign: 'center',
     }}>
-      <div style={{
-        position: 'relative', marginBottom: 24,
-        width: 96, height: 96,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{
-          width: 96, height: 96, borderRadius: 24,
-          background: 'rgba(99,102,241,0.07)',
-          border: '1px solid rgba(99,102,241,0.18)',
-          boxShadow: '0 0 60px -12px rgba(99,102,241,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <IconBolt size={40} color="rgba(99,102,241,0.55)" />
+      {/* Ghost pipeline */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 30 }}>
+        {ghostTiles.map((tile, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && (
+              <div style={{ position: 'relative', width: 42, height: 2, margin: '0 3px' }}>
+                <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: 'linear-gradient(90deg, rgba(139,92,246,0.35), rgba(129,140,248,0.35))' }} />
+                <div style={{
+                  position: 'absolute', top: -2, left: 0, width: 6, height: 6, borderRadius: 99,
+                  background: '#C7D2FE', boxShadow: '0 0 8px 2px rgba(165,180,252,0.7)',
+                  animation: 'wf-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${i * 0.4}s`,
+                }} />
+              </div>
+            )}
+            <div style={{
+              width: 46, height: 46, borderRadius: 14, opacity: 0.75,
+              background: tile.grad, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 20px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.25)',
+            }}>{tile.icon}</div>
+          </React.Fragment>
+        ))}
+        <div style={{ position: 'relative', width: 34, height: 2, margin: '0 3px' }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: 'linear-gradient(90deg, rgba(251,191,36,0.35), rgba(233,234,240,0.2))' }} />
         </div>
         <div style={{
-          position: 'absolute', top: 6, right: 8, width: 10, height: 10,
-          borderRadius: '50%', background: '#34d399',
-          boxShadow: '0 0 8px #34d399',
-          animation: 'pulse 1.6s ease-in-out infinite',
-        }} />
+          width: 34, height: 34, borderRadius: 99,
+          border: '1.5px dashed rgba(255,255,255,0.22)', color: 'rgba(233,234,240,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'wf-rotate 9s linear infinite',
+        }}>
+          <IconRepeat size={14} color="currentColor" />
+        </div>
       </div>
 
-      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--ivory)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-        Aucune tâche automatique
+      <p style={{ fontSize: 19, fontWeight: 800, color: '#F3F4F6', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+        Crée ton premier workflow
       </p>
-      <p style={{ fontSize: 12.5, lineHeight: 1.7, color: 'var(--text-3)', margin: '0 0 24px', maxWidth: 360 }}>
-        Les tâches automatiques postent sur tes comptes à intervalles réguliers, sans action de ta part.
+      <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'rgba(233,234,240,0.5)', margin: '0 0 26px', maxWidth: 420 }}>
+        Enchaîne warmup, Reels et Stories sur tous tes téléphones, en boucle, sans lever le petit doigt.
       </p>
 
       <button
         onClick={onNew}
-        className="sf-btn sf-btn-primary cursor-pointer"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700 }}
+        className="sf-btn sf-btn-lg cursor-pointer"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 800,
+          border: 'none', color: '#fff',
+          background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+          boxShadow: '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 rgba(255,255,255,0.3)',
+        }}
       >
         <IconPlus size={11} />
-        Créer ma première tâche
+        Créer mon premier workflow
       </button>
     </div>
   )
@@ -3289,28 +3381,45 @@ export function Tasks({ user }: { user: User }) {
   ]
 
   return (
-    <div className="sf-page anim-page">
+    <div className="sf-page anim-page" style={{ position: 'relative' }}>
+      <style>{`
+        @keyframes wf-shimmer { 0%{background-position:-160% 0} 100%{background-position:260% 0} }
+        @keyframes wf-flow { 0%{left:0;opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:calc(100% - 6px);opacity:0} }
+        @keyframes wf-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.55;transform:scale(.85)} }
+        @keyframes wf-rotate { to{transform:rotate(360deg)} }
+        @keyframes wf-float { 0%,100%{transform:translate(0,0)} 50%{transform:translate(30px,22px)} }
+        @keyframes wf-card-in { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+      `}</style>
+      {/* Ambient glow */}
+      <div aria-hidden style={{ position: 'absolute', top: -110, left: '16%', width: 540, height: 340, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(99,102,241,0.12), transparent 68%)', filter: 'blur(60px)', pointerEvents: 'none', animation: 'wf-float 24s ease-in-out infinite', zIndex: 0 }} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="sf-page-header" style={{
+        position: 'relative', zIndex: 1,
         flexDirection: 'column', alignItems: 'stretch', gap: 0,
         padding: '24px 28px 0', borderBottom: 'none',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
             <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              width: 52, height: 52, borderRadius: 15, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)',
+              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+              boxShadow: '0 12px 28px -8px rgba(99,102,241,0.6), inset 0 1px 0 0 rgba(255,255,255,0.35)',
             }}>
-              <IconBolt size={22} color="var(--accent)" />
+              <IconBolt size={25} color="#fff" />
             </div>
             <div className="sf-anim-slide-up sf-d50">
-              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
-                Tâches automatiques
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)', marginBottom: 3 }}>Automatisation</div>
+              <h1 style={{
+                margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0,
+                background: 'linear-gradient(100deg,#fff 18%,#a5b4fc 52%,#c4b5fd 86%)', backgroundSize: '200% auto',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'wf-shimmer 7s linear infinite',
+              }}>
+                Workflows d'automatisation
               </h1>
-              <p className="sf-page-sub">
-                Tableau de bord de tes publications récurrentes
+              <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(233,234,240,0.5)' }}>
+                Tes chaînes de publication tournent toutes seules, en boucle.
               </p>
             </div>
           </div>
@@ -3318,11 +3427,15 @@ export function Tasks({ user }: { user: User }) {
           <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               onClick={() => { setEditTask(null); setShowWizard(true) }}
-              className="sf-btn sf-btn-primary cursor-pointer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              className="sf-btn sf-btn-lg cursor-pointer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff',
+                background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                boxShadow: '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 0 rgba(255,255,255,0.3)',
+              }}
             >
               <IconPlus />
-              Nouvelle tâche
+              Nouveau workflow
             </button>
             <button
               onClick={() => { setEditTask(null); setShowCreate(true) }}
@@ -3334,45 +3447,41 @@ export function Tasks({ user }: { user: User }) {
           </div>
         </div>
 
-        {/* ── Stats inline bar ────────────────────────────────────────────── */}
-        <div className="sf-anim-slide-up sf-d150" style={{
-          display: 'flex', alignItems: 'center', gap: 0,
-          padding: '10px 16px', marginBottom: 20,
-          background: 'rgba(255,255,255,0.025)',
-          border: '1px solid rgba(233,234,240,0.06)',
-          borderRadius: 10, flexWrap: 'wrap',
-        }}>
+        {/* ── Stats strip — pills premium ─────────────────────────────────── */}
+        <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
           {[
-            { label: 'actives', value: activeTasks.length, color: '#34d399', pulse: activeTasks.length > 0 },
-            { label: 'en pause', value: pausedTasks.length, color: '#F59E0B', pulse: false },
+            { label: 'workflows actifs', value: activeTasks.length, color: '#34D399', pulse: activeTasks.length > 0 },
+            { label: 'en pause', value: pausedTasks.length, color: '#94A3B8', pulse: false },
             { label: 'publications', value: totalRuns, color: '#818CF8', pulse: false },
-          ].map((stat, i) => (
-            <React.Fragment key={stat.label}>
-              {i > 0 && <span style={{ width: 1, height: 18, background: 'rgba(233,234,240,0.08)', margin: '0 16px' }} />}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <span style={{
-                  width: 6, height: 6, borderRadius: '50%', background: stat.color, flexShrink: 0,
-                  animation: stat.pulse ? 'pulse 1.6s ease-in-out infinite' : 'none',
-                  boxShadow: stat.pulse ? `0 0 6px ${stat.color}` : 'none',
-                }} />
-                <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ivory)', fontVariantNumeric: 'tabular-nums' }}>
-                  {stat.value}
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{stat.label}</span>
-              </div>
-            </React.Fragment>
+          ].map(stat => (
+            <div key={stat.label} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 9, height: 36, padding: '0 15px 0 12px',
+              borderRadius: 999,
+              background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: '50%', background: stat.color, flexShrink: 0,
+                animation: stat.pulse ? 'wf-pulse 2s ease-in-out infinite' : 'none',
+                boxShadow: `0 0 8px ${stat.color}`,
+              }} />
+              <span style={{ fontSize: 16, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                {stat.value}
+              </span>
+              <span style={{ fontSize: 12, color: 'rgba(233,234,240,0.5)', fontWeight: 600 }}>{stat.label}</span>
+            </div>
           ))}
           {nextRun && (
-            <>
-              <span style={{ width: 1, height: 18, background: 'rgba(233,234,240,0.08)', margin: '0 16px' }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <IconClock size={12} color="#6366F1" />
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>Prochaine</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-l)', fontVariantNumeric: 'tabular-nums' }}>
-                  {formatCountdown(nextRun).replace('dans ', '')}
-                </span>
-              </div>
-            </>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7, height: 36, padding: '0 15px',
+              borderRadius: 999, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
+            }}>
+              <IconClock size={12} color="#A5B4FC" />
+              <span style={{ fontSize: 12, color: 'rgba(165,180,252,0.8)', fontWeight: 600 }}>Prochain run</span>
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: '#A5B4FC', fontVariantNumeric: 'tabular-nums' }}>
+                {formatCountdown(nextRun).replace('dans ', '')}
+              </span>
+            </div>
           )}
         </div>
 
@@ -3440,18 +3549,19 @@ export function Tasks({ user }: { user: User }) {
               onNew={() => { setEditTask(null); setShowWizard(true) }}
             />
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
-              {tasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  toggling={toggling === task.id}
-                  deleting={deleting === task.id}
-                  onToggle={() => void toggleTask(task)}
-                  onEdit={() => { setEditTask(task); setShowCreate(true) }}
-                  onDelete={() => setDeleteTask(task)}
-                  onOpenAddVideos={(segmentId?: string) => setAddVideosTaskId({ taskId: task.id, segmentId })}
-                />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 1120 }}>
+              {tasks.map((task, ti) => (
+                <div key={task.id} style={{ animation: 'wf-card-in .45s cubic-bezier(.2,.8,.2,1) both', animationDelay: `${ti * 70}ms` }}>
+                  <TaskCard
+                    task={task}
+                    toggling={toggling === task.id}
+                    deleting={deleting === task.id}
+                    onToggle={() => void toggleTask(task)}
+                    onEdit={() => { setEditTask(task); setShowCreate(true) }}
+                    onDelete={() => setDeleteTask(task)}
+                    onOpenAddVideos={(segmentId?: string) => setAddVideosTaskId({ taskId: task.id, segmentId })}
+                  />
+                </div>
               ))}
             </div>
           )
