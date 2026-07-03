@@ -1337,8 +1337,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       const url = (cfg.urls[i] ?? '').trim()
                       if (!url) return
                       setRotTest(p => ({ ...p, [i]: { busy: true } }))
-                      const ok = await rotateProxyIp(url)
-                      setRotTest(p => ({ ...p, [i]: { ok, msg: ok ? 'IP changée ✓' : 'Échec — vérifie l’URL' } }))
+                      const r = await rotateProxyIp(url)
+                      setRotTest(p => ({ ...p, [i]: { ok: r.ok, msg: r.ok ? `IP changée ✓ — ${r.detail}` : `Échec : ${r.detail}` } }))
                     }
                     const saveRot = async () => {
                       setRotSaving(true)
