@@ -5,7 +5,7 @@ import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, postInstagramStory, stopPhone, type GeelarkPhone } from '@/lib/geelark'
-import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
+import { activeRotationUrls, useProxyRotation, getProxyRotation } from '@/lib/proxyRotation'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
@@ -1212,13 +1212,34 @@ export default function StoryLink({ user }: { user: User }) {
               </button>
             </div>
             {!rotProxy && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Téléphones simultanés</span>
                 <input type="number" min={0} max={200} value={maxConc || ''} placeholder="Tous"
                   onChange={e => setMaxConc(Math.max(0, parseInt(e.target.value) || 0))}
                   className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
               </div>
             )}
+            {rotProxy && (() => {
+              const rot = getProxyRotation()
+              const active = rot.enabled && rot.urls.some(u => /^https?:\/\//i.test(u.trim()))
+              return active ? (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 12, padding: '9px 12px', borderRadius: 10, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.28)' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                  <div>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#34D399', margin: 0 }}>Rotation d'IP active</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>IP fraîche avant chaque story ✓</p>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(248,113,113,0.09)', border: '1px solid rgba(248,113,113,0.35)' }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                  <div>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#F87171', margin: 0 }}>Rotation d'IP non configurée — risque de ban ⚠</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-2)', margin: '3px 0 0', lineHeight: 1.5 }}>Poster plusieurs comptes sur la même IP fait bannir. Active-la dans <strong style={{ color: '#fff' }}>Paramètres → Rotation d'IP proxy</strong>.</p>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </div>
 
