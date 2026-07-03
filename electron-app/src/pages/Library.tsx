@@ -166,42 +166,46 @@ function CapabilityCard({ cap, accent }: { cap: Capability; accent: string }) {
 }
 
 // ── Écran « Bientôt » pour les utilisateurs non-admin ────────────────────────
+// Aperçu coloré de tout ce que la bibliothèque permettra d'automatiser.
 const TEASERS = [
-  { emoji: '🎓', title: 'Guides & tutoriels', desc: 'Pas à pas pour maîtriser chaque outil.' },
-  { emoji: '🧩', title: 'Templates de tâches', desc: 'Séquences prêtes à l\'emploi à importer.' },
-  { emoji: '🎨', title: 'Presets de contenu', desc: 'Légendes, hooks et styles réutilisables.' },
-  { emoji: '⚙️', title: 'Recettes d\'automatisation', desc: 'Des workflows complets, clés en main.' },
+  { emoji: '🚀', title: 'Recettes de publication', desc: 'Poste Reels, Stories et photos en masse, prêt à lancer.', grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', accent: '#818CF8' },
+  { emoji: '🔥', title: 'Séquences de warmup', desc: 'Chauffe tes comptes automatiquement, sans y penser.', grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
+  { emoji: '🧩', title: 'Modèles de tâches', desc: 'Des scénarios multi-étapes prêts à importer en un clic.', grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6' },
+  { emoji: '🎨', title: 'Presets de contenu', desc: 'Légendes, hooks et styles réutilisables à volonté.', grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
+  { emoji: '🎬', title: 'Chaînes vidéo', desc: 'Remix, spoof et sous-titres enchaînés automatiquement.', grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.45)', accent: '#22D3EE' },
+  { emoji: '🎓', title: 'Guides & tutoriels', desc: 'Pas à pas pour tout maîtriser, du débutant au pro.', grad: 'linear-gradient(135deg,#A78BFA,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
 ]
 
 function ComingSoon() {
   return (
-    <div style={{ position: 'relative', zIndex: 1, maxWidth: 900, margin: '0 auto', paddingTop: 24 }}>
+    <div style={{ position: 'relative', zIndex: 1, maxWidth: 980, margin: '0 auto', paddingTop: 24 }}>
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 18, fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: '#818CF8' }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#818CF8', animation: 'lib-pulse 2s ease-in-out infinite' }} />
-          Bientôt disponible
+          Bibliothèque · Bientôt
         </div>
-        <h1 style={{ margin: '0 0 14px', fontSize: 'clamp(34px, 5.6vw, 58px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#c4b5fd 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'lib-shimmer 7s linear infinite' }}>
-          La Bibliothèque arrive
+        <h1 style={{ margin: '0 0 14px', fontSize: 'clamp(34px, 5.6vw, 58px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#6ee7b7 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'lib-shimmer 7s linear infinite' }}>
+          Tout ce que ScaleFlow peut faire
         </h1>
-        <p style={{ margin: '0 auto', maxWidth: 520, fontSize: 15.5, color: 'rgba(233,234,240,0.58)', lineHeight: 1.65 }}>
-          Guides, templates, presets et recettes d'automatisation — tout ce qu'il te faut pour aller plus vite, réuni au même endroit.
+        <p style={{ margin: '0 auto', maxWidth: 560, fontSize: 15.5, color: 'rgba(233,234,240,0.6)', lineHeight: 1.65 }}>
+          Une bibliothèque pour automatiser un grand nombre d'actions — recettes, modèles et séquences prêts à l'emploi, réunis au même endroit.
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
         {TEASERS.map((tsr, i) => (
           <div key={i} style={{
-            position: 'relative', overflow: 'hidden', padding: 22, borderRadius: 18, minHeight: 150,
-            background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
-            border: '1px solid rgba(255,255,255,0.08)', animation: `lib-rise .5s ease both ${i * 0.08}s`,
-            display: 'flex', flexDirection: 'column', gap: 9,
+            position: 'relative', overflow: 'hidden', padding: 22, borderRadius: 18, minHeight: 176,
+            background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
+            border: `1px solid ${tsr.accent}26`, animation: `lib-rise .5s ease both ${i * 0.07}s`,
+            display: 'flex', flexDirection: 'column', gap: 11, isolation: 'isolate',
           }}>
-            <div style={{ fontSize: 30, filter: 'grayscale(0.15)' }}>{tsr.emoji}</div>
-            <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff' }}>{tsr.title}</h4>
-            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: 'rgba(233,234,240,0.5)' }}>{tsr.desc}</p>
-            <span style={{ position: 'absolute', top: 14, right: 14, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.4)' }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            <div aria-hidden style={{ position: 'absolute', top: -30, right: -20, width: 120, height: 120, borderRadius: '50%', background: `radial-gradient(circle, ${tsr.glow}, transparent 68%)`, opacity: 0.35, pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', zIndex: 1, width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, background: tsr.grad, boxShadow: `0 10px 24px -8px ${tsr.glow}, inset 0 1px 0 0 rgba(255,255,255,0.3)` }}>{tsr.emoji}</div>
+            <h4 style={{ position: 'relative', zIndex: 1, margin: 0, fontSize: 15, fontWeight: 800, color: '#fff' }}>{tsr.title}</h4>
+            <p style={{ position: 'relative', zIndex: 1, margin: 0, fontSize: 12.5, lineHeight: 1.5, color: 'rgba(233,234,240,0.55)' }}>{tsr.desc}</p>
+            <span style={{ position: 'absolute', top: 14, right: 14, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: tsr.accent, background: `${tsr.accent}1f`, border: `1px solid ${tsr.accent}3d`, borderRadius: 99, padding: '3px 8px' }}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
               Bientôt
             </span>
           </div>
