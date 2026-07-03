@@ -15,6 +15,7 @@ const CSS = `
 @keyframes hub-spin { to { --hub-a: 360deg } }
 @keyframes vs-float-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(40px,30px)} }
 @keyframes vs-float-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-30px,40px)} }
+@keyframes vs-flow { 0%{left:0;opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:calc(100% - 16px);opacity:0} }
 @keyframes hub-shimmer { 0%{background-position:-160% 0} 100%{background-position:260% 0} }
 @keyframes hub-rise { 0%{opacity:0;transform:translateY(8px) scale(.94)} 14%,78%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-8px) scale(.94)} }
 @keyframes hub-word { 0%,16%{opacity:0;transform:translateY(6px)} 28%,72%{opacity:1;transform:translateY(0)} 88%,100%{opacity:0} }
@@ -181,11 +182,23 @@ export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
           <p style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.55)', maxWidth: 600, lineHeight: 1.65 }}>
             Quatre outils pour transformer une vidéo en dizaines de posts uniques — puis les balancer dans le posting.
           </p>
-          <div style={{ display: 'flex', gap: 26, marginTop: 22, flexWrap: 'wrap' }}>
-            {[['4', 'outils'], ['∞', 'variantes'], ['Serveur', 'rendu rapide'], ['1 clic', 'export']].map(([v, l], i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-                <span style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{v}</span>
-                <span style={{ fontSize: 11.5, color: 'rgba(233,234,240,0.42)' }}>{l}</span>
+          {/* Mini-flux : 1 vidéo → 4 outils → ∞ variantes → export */}
+          <div style={{ display: 'flex', gap: 12, marginTop: 22, flexWrap: 'wrap', alignItems: 'center' }}>
+            {([['1', 'vidéo source', '#818CF8'], ['4', 'outils', '#F472B6'], ['∞', 'variantes uniques', '#34D399'], ['1 clic', 'export', '#FBBF24']] as const).map(([v, l, c], i, arr) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '7px 13px', borderRadius: 99, background: 'rgba(255,255,255,0.035)', border: `1px solid ${c}33` }}>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: c, letterSpacing: '-0.02em' }}>{v}</span>
+                  <span style={{ fontSize: 11.5, color: 'rgba(233,234,240,0.5)' }}>{l}</span>
+                </div>
+                {i < arr.length - 1 && (
+                  <div style={{ position: 'relative', width: 34, height: 2, flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: `linear-gradient(90deg, ${c}59, ${arr[i + 1][2]}59)` }} />
+                    <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'vs-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${i * 0.5}s` }}>
+                      <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
+                      <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

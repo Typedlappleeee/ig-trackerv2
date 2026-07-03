@@ -969,7 +969,7 @@ export function Scheduler({ user, onNavigate }: Props) {
 
   return (
     <div className="sf-page anim-page" style={{ position: 'relative' }}>
-      <style>{`@keyframes sch-shimmer{0%{background-position:-160% 0}100%{background-position:260% 0}}@keyframes sch-float{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,22px)}}`}</style>
+      <style>{`@keyframes sch-shimmer{0%{background-position:-160% 0}100%{background-position:260% 0}}@keyframes sch-float{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,22px)}}@keyframes sch-flow{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:calc(100% - 16px);opacity:0}}`}</style>
       {/* Ambient glow */}
       <div aria-hidden style={{ position: 'absolute', top: -110, left: '14%', width: 520, height: 340, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(99,102,241,0.12), transparent 68%)', filter: 'blur(60px)', pointerEvents: 'none', animation: 'sch-float 22s ease-in-out infinite', zIndex: 0 }} />
 
@@ -1019,26 +1019,36 @@ export function Scheduler({ user, onNavigate }: Props) {
           </div>
         </div>
 
-        {/* Stats strip */}
-        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        {/* Stats strip — reliées par un flux lumineux */}
+        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
           {headStats.map(([label, val, color], i) => {
             const clickable = i === 1 && onNavigate && doneCount > 0
             return (
-              <button
-                key={label}
-                onClick={clickable ? () => onNavigate?.('history') : undefined}
-                title={clickable ? "Voir l'historique complet" : undefined}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 9, padding: '9px 15px 9px 11px', borderRadius: 12,
-                  background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
-                  border: '1px solid rgba(255,255,255,0.08)', cursor: clickable ? 'pointer' : 'default',
-                }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 8px ${color}` }} />
-                <span style={{ fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{val}</span>
-                <span style={{ fontSize: 12, color: 'rgba(233,234,240,0.5)', fontWeight: 600 }}>{label}</span>
-                {clickable && <span style={{ opacity: 0.5, marginLeft: 2 }}>›</span>}
-              </button>
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={clickable ? () => onNavigate?.('history') : undefined}
+                  title={clickable ? "Voir l'historique complet" : undefined}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 9, padding: '9px 15px 9px 11px', borderRadius: 12,
+                    background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
+                    border: '1px solid rgba(255,255,255,0.08)', cursor: clickable ? 'pointer' : 'default',
+                  }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 8px ${color}` }} />
+                  <span style={{ fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{val}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(233,234,240,0.5)', fontWeight: 600 }}>{label}</span>
+                  {clickable && <span style={{ opacity: 0.5, marginLeft: 2 }}>›</span>}
+                </button>
+                {i < headStats.length - 1 && (
+                  <div style={{ position: 'relative', width: 30, height: 2, flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: `linear-gradient(90deg, ${color}59, ${headStats[i + 1][2]}59)` }} />
+                    <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'sch-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${i * 0.5}s` }}>
+                      <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
+                      <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+                    </div>
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
