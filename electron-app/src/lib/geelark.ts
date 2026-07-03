@@ -61,6 +61,48 @@ async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown
   return result.data as Record<string, unknown>
 }
 
+// ── Rotation d'IP proxy (Prox'Easy & co) ─────────────────────────────────────
+// Déclenche un changement d'IP en appelant le "Change IP URL" du fournisseur
+// (ex. https://dongle.proxeasy.tech/android/changeip?u=…). Best-effort : ne
+// throw JAMAIS. Après l'appel, l'appelant doit attendre le retour de la
+// connexion (waitForPhoneConnectivity) avant de poster — d'où le petit délai
+// interne pour laisser l'IP se couper avant de vérifier.
+export async function rotateProxyIp(url: string, log?: (m: string) => void): Promise<boolean> {
+  const clean = (url ?? '').trim()
+  if (!clean || !/^https?:\/\//i.test(clean)) return false
+  try {
+    let ok = false
+    let bodyPreview = ''
+    if (window.electronAPI?.geelarkRequest) {
+      // Electron : net.fetch direct sur n'importe quelle URL.
+      const r = await window.electronAPI.geelarkRequest({ method: 'GET', url: clean, isText: true })
+      ok = !!r.ok
+      bodyPreview = typeof r.data === 'string' ? r.data : ''
+    } else {
+      // Web : passe par un petit proxy serverless (contourne le CORS).
+      const res = await fetch(`/api/rotate?url=${encodeURIComponent(clean)}`)
+      const j = await res.json().catch(() => null) as { ok?: boolean; body?: string } | null
+      ok = res.ok && (j?.ok ?? false)
+      bodyPreview = j?.body ?? ''
+    }
+    log?.(ok ? `🔄 Rotation IP déclenchée${bodyPreview ? ` — ${bodyPreview.slice(0, 80).replace(/\s+/g, ' ').trim()}` : ''}` : '⚠ Rotation IP : réponse non-OK')
+    return ok
+  } catch (e) {
+    log?.(`⚠ Rotation IP échouée : ${e instanceof Error ? e.message : String(e)} — on continue`)
+    return false
+  }
+}
+
+// Rote plusieurs proxies d'un coup (en parallèle) puis laisse le temps aux IP de
+// se réattribuer avant le check de connectivité. Best-effort — ne throw jamais.
+export async function rotateAllProxies(urls: string[], log?: (m: string) => void): Promise<void> {
+  const list = (urls ?? []).map(u => (u ?? '').trim()).filter(u => /^https?:\/\//i.test(u))
+  if (list.length === 0) return
+  await Promise.all(list.map(u => rotateProxyIp(u, log)))
+  // Laisse le(s) dongle(s) couper l'ancienne IP avant que le check de connectivité tourne.
+  await sleep(6000)
+}
+
 // Fetch all phones (paginates automatically).
 // Throws a descriptive error if the API rejects the token.
 export async function fetchAllPhones(bearer: string): Promise<GeelarkPhone[]> {
@@ -1032,6 +1074,7 @@ export interface StoryConfig {
   linkUrl:  string            // destination URL for the link sticker
   linkText?: string           // optional custom label shown on the sticker
   dryRun?:  boolean           // run every step but stop right before publishing
+  rotationUrls?: string[]     // si non vide : rote ces proxies avant de poster
 }
 
 // Wrap any phone operation with an auto-stop safety timer.
@@ -1073,6 +1116,14 @@ async function _postInstagramStoryInner(
 ): Promise<{ ok: boolean; error?: string }> {
   const ready = await ensurePhoneRunning(bearer, phoneId, log)
   if (!ready) throw new Error('Téléphone non démarré')
+
+  // ── Rotation d'IP avant le post (optionnel) ────────────────────────────────
+  // Nouvelle IP fraîche pour chaque story. Best-effort : si ça rate, on continue
+  // (le check de connectivité ci-dessous rattrape). Pas de re-post → 0 double.
+  if (config.rotationUrls && config.rotationUrls.length > 0) {
+    log('🔄 Rotation de l\'IP proxy…')
+    await rotateAllProxies(config.rotationUrls, log)
+  }
 
   // ── Attente de connectivité (proxys rotatifs) ──────────────────────────────
   // On ne lance l'automation que quand le téléphone a réellement Internet via son

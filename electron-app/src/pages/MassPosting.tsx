@@ -9,7 +9,8 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, waitForPhoneConnectivity } from '@/lib/geelark'
+import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies } from '@/lib/geelark'
+import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
@@ -261,6 +262,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
   // Pull the active connection (org_config when an org is active, app_config otherwise)
   const conns = useConnections(user)
+  useProxyRotation(user)  // charge la config de rotation d'IP dans le cache
   useEffect(() => { if (conns.bearer) setBearer(conns.bearer) }, [conns.bearer])
   useEffect(() => { if (conns.groq)   setGroqKey(conns.groq) },  [conns.groq])
 
@@ -680,7 +682,11 @@ export function MassPosting({ user }: MassPostingProps) {
       // Allumer tous les téléphones d'un coup fait tomber la co sur proxy rotatif.
       // On limite le nombre de téléphones allumés/postant EN MÊME TEMPS ; chaque
       // lot est démarré → posté → éteint avant le suivant, avec délai optionnel.
-      const _concurrency  = effectiveConcurrency(postingOpts, assignments.length)
+      // Rotation d'IP active → on FORCE le mode série (1 tel à la fois) pour que
+      // chaque post reçoive sa propre IP fraîche (le hook de rotation est dans le
+      // chemin par lots ci-dessous).
+      const rotationUrls  = activeRotationUrls()
+      const _concurrency  = rotationUrls.length > 0 ? 1 : effectiveConcurrency(postingOpts, assignments.length)
       if (platform === 'instagram' && _concurrency < assignments.length) {
         const batches: (typeof assignments)[] = []
         for (let i = 0; i < assignments.length; i += _concurrency) batches.push(assignments.slice(i, i + _concurrency))
@@ -748,6 +754,12 @@ export function MassPosting({ user }: MassPostingProps) {
             if (stopRef.current) break
             const token = tokenMap.get(asgn.videoIndex)
             if (!token) { log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn'); setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' }); continue }
+            // Rotation d'IP avant CE post (si configurée) → IP fraîche par post.
+            // Best-effort, jamais de re-post → aucun risque de double.
+            if (rotationUrls.length > 0) {
+              log(`  ${asgn.phone.phone_name}: rotation IP…`)
+              await rotateAllProxies(rotationUrls, m => log(`  ${asgn.phone.phone_name}: ${m.trim()}`))
+            }
             // Proxy rotatif : attendre que le tel ait vraiment Internet avant de poster
             // (PRÉ-check seulement — jamais de retry, pour ne pas risquer un double post).
             await waitForPhoneConnectivity(bearer, asgn.phone.geelark_id, m => log(`  ${asgn.phone.phone_name}: ${m.trim()}`))

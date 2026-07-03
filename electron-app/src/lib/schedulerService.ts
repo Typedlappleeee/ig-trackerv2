@@ -340,6 +340,11 @@ async function executeScheduledStory(
   onLog: (msg: string) => void,
 ): Promise<boolean> {
   const { postInstagramStory, stopPhone } = await import('./geelark')
+  const { loadProxyRotation } = await import('./proxyRotation')
+  // Charge la config de rotation d'IP de l'org du post (persistée dans le config).
+  const rotationUrls = (await loadProxyRotation(post.org_id ?? null, post.user_id)
+    .then(c => c.enabled ? c.urls.filter(u => /^https?:\/\//i.test(u.trim())) : [])
+    .catch(() => []))
   const phones = (typeof post.phones === 'string'
     ? JSON.parse(post.phones as unknown as string)
     : post.phones) as ScheduledPhoneRecord[]
@@ -362,7 +367,7 @@ async function executeScheduledStory(
     try {
       const res = await postInstagramStory(
         bearer, phone.geelark_id,
-        { imageUrl: phone.story_photo, linkUrl: phone.story_link, linkText: phone.story_text || undefined },
+        { imageUrl: phone.story_photo, linkUrl: phone.story_link, linkText: phone.story_text || undefined, rotationUrls },
         m => onLog(`   ${m}`),
       )
       if (res.ok) { okCount++; onLog(`✅ Story publiée : ${name}`); phoneResults.push({ name, ok: true }) }
@@ -406,6 +411,12 @@ async function executeScheduledPostInner(
   }
 
   if (post.type === 'story') return executeScheduledStory(post, bearer, onLog)
+
+  // Rotation d'IP (reels programmés) : config de l'org du post.
+  const reelsRotationUrls = await (await import('./proxyRotation'))
+    .loadProxyRotation(post.org_id ?? null, post.user_id)
+    .then(c => c.enabled ? c.urls.filter(u => /^https?:\/\//i.test(u.trim())) : [])
+    .catch(() => [])
 
   // Supabase Realtime can deliver jsonb columns as strings — parse defensively
   const phones = (typeof post.phones === 'string'
@@ -482,6 +493,13 @@ async function executeScheduledPostInner(
         const videoIdx = mode === 'random'
           ? Math.floor(Math.random() * videos.length)
           : i % videos.length
+        // Rotation d'IP avant CE post (si configurée) → IP fraîche par post.
+        if (reelsRotationUrls.length > 0) {
+          const { rotateAllProxies, waitForPhoneConnectivity } = await import('./geelark')
+          onLog(`🔄 Rotation IP (${nameOf(phone)})…`)
+          await rotateAllProxies(reelsRotationUrls, m => onLog(`   ${m}`))
+          await waitForPhoneConnectivity(bearer, phone.geelark_id, m => onLog(`   ${m}`))
+        }
         const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
           scheduleAt:  Math.floor(Date.now() / 1000),

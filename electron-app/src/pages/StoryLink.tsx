@@ -5,6 +5,7 @@ import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, postInstagramStory, stopPhone, type GeelarkPhone } from '@/lib/geelark'
+import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
@@ -304,6 +305,7 @@ function CaptionBankPicker({
 export default function StoryLink({ user }: { user: User }) {
   const conns  = useConnections(user)
   const bearer = conns.bearer
+  useProxyRotation(user)  // charge la config de rotation d'IP dans le cache
   const { role, perms, currentOrg } = useOrg()
   const credits = useCredits()
   const toast = useToast()
@@ -523,7 +525,7 @@ export default function StoryLink({ user }: { user: User }) {
         // double post si GéeLark rapporte un faux échec.
         const res = await postInstagramStory(
           bearer, asgn.phoneId,
-          { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun },
+          { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun, rotationUrls: activeRotationUrls() },
           m => addLog(asgn.phoneId, m),
         )
         if (res.ok) { setStatus(asgn.phoneId, 'ok'); return 1 }
@@ -538,11 +540,13 @@ export default function StoryLink({ user }: { user: User }) {
     }
 
     // Par défaut : TOUS les téléphones en même temps (comme le Mass Posting).
-    // Proxy rotatif → 1 à la fois ; sinon le nombre choisi (0 = tous).
-    const CONCURRENCY = rotProxy ? 1 : (maxConc > 0 ? maxConc : assignments.length)
+    // Proxy rotatif OU rotation d'IP configurée → 1 à la fois (IP fraîche/story).
+    const rotationOn = activeRotationUrls().length > 0
+    const serial = rotProxy || rotationOn
+    const CONCURRENCY = serial ? 1 : (maxConc > 0 ? maxConc : assignments.length)
     // Petit décalage de démarrage plafonné (~6s) pour ne pas booter tout au même
     // instant. En rotatif un seul worker → aucun décalage.
-    const staggerBase = rotProxy ? 0 : 1000
+    const staggerBase = serial ? 0 : 1000
     const queue = [...assignments]
     let okCount = 0
     const worker = async (staggerMs: number) => {

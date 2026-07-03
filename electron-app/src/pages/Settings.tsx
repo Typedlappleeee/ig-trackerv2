@@ -13,6 +13,8 @@ import { canSeeTab } from '@/lib/permissions'
 import { notifyConnectionsChanged, DEFAULT_GROQ_KEY } from '@/lib/connections'
 import { useLicense } from '@/lib/license'
 import { useCredits } from '@/lib/credits'
+import { useProxyRotation } from '@/lib/proxyRotation'
+import { rotateProxyIp } from '@/lib/geelark'
 import {
   isMusicEnabled, setMusicEnabled,
   getVolume, setVolume,
@@ -274,6 +276,12 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   const license = useLicense()
   const canSeeConnexions     = role ? canSeeTab(role, perms, 'settings') : true
   const canEditOrgConnexions = role === 'owner' || role === 'admin'
+
+  // Rotation d'IP proxy (config par org, persistée une fois)
+  const proxyRot = useProxyRotation(user)
+  const [rotSaving, setRotSaving] = useState(false)
+  const [rotSaved, setRotSaved]   = useState(false)
+  const [rotTest, setRotTest]     = useState<Record<number, { busy?: boolean; ok?: boolean; msg?: string }>>({})
 
   const [panel, setPanel]   = useState<Panel>(() => {
     const p = initialPanel ?? 'general'
@@ -1319,6 +1327,91 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       ))}
                     </div>
                   </div>
+
+                  {/* Rotation d'IP proxy */}
+                  {!currentOrg || canEditOrgConnexions ? (() => {
+                    const cfg = proxyRot.cfg
+                    const canEdit = !currentOrg || canEditOrgConnexions
+                    const setUrls = (urls: string[]) => proxyRot.setCfg({ ...cfg, urls })
+                    const testUrl = async (i: number) => {
+                      const url = (cfg.urls[i] ?? '').trim()
+                      if (!url) return
+                      setRotTest(p => ({ ...p, [i]: { busy: true } }))
+                      const ok = await rotateProxyIp(url)
+                      setRotTest(p => ({ ...p, [i]: { ok, msg: ok ? 'IP changée ✓' : 'Échec — vérifie l’URL' } }))
+                    }
+                    const saveRot = async () => {
+                      setRotSaving(true)
+                      try { await proxyRot.save({ enabled: cfg.enabled, urls: cfg.urls.map(u => u.trim()).filter(Boolean) }); setRotSaved(true); setTimeout(() => setRotSaved(false), 2500) }
+                      finally { setRotSaving(false) }
+                    }
+                    return (
+                    <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <h3 className="text-[11px] font-semibold uppercase" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid #FB923C', paddingLeft: 8, margin: 0 }}>Rotation d'IP proxy</h3>
+                        {/* Toggle */}
+                        <button
+                          onClick={() => canEdit && proxyRot.setCfg({ ...cfg, enabled: !cfg.enabled })}
+                          disabled={!canEdit}
+                          aria-label="Activer la rotation d'IP"
+                          style={{ position: 'relative', width: 42, height: 24, borderRadius: 99, border: 'none', cursor: canEdit ? 'pointer' : 'default', flexShrink: 0, background: cfg.enabled ? 'linear-gradient(135deg,#EA580C,#FB923C)' : 'rgba(255,255,255,0.14)', transition: 'background 0.2s' }}
+                        >
+                          <span style={{ position: 'absolute', top: 3, left: cfg.enabled ? 21 : 3, width: 18, height: 18, borderRadius: 99, background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.4)', transition: 'left 0.2s' }} />
+                        </button>
+                      </div>
+
+                      <p style={{ fontSize: 12.5, color: S.text3, lineHeight: 1.6, margin: 0 }}>
+                        Quand c'est activé, ScaleFlow <strong style={{ color: S.text }}>change l'IP de ton proxy avant chaque post</strong> (mass posting, story, reels Instagram & TikTok, et programmation) → une IP fraîche à chaque publication, comme si chaque post venait d'un appareil différent.
+                        <br /><br />
+                        Colle ici le <strong style={{ color: S.text }}>« Change IP URL »</strong> de ton fournisseur (ex. Prox'Easy → onglet <em>IP Management</em>). Tu peux en ajouter plusieurs si tu as plusieurs proxies. <strong style={{ color: S.text }}>Configuré une seule fois</strong> — c'est mémorisé pour toute l'organisation.
+                      </p>
+
+                      {cfg.enabled && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${S.border}`, paddingTop: 14 }}>
+                          {(cfg.urls.length ? cfg.urls : ['']).map((url, i) => (
+                            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <input
+                                  className="sf-input" placeholder="https://…/changeip?u=…" value={url}
+                                  disabled={!canEdit}
+                                  onChange={e => { const next = [...(cfg.urls.length ? cfg.urls : [''])]; next[i] = e.target.value; setUrls(next); setRotTest(p => ({ ...p, [i]: {} })) }}
+                                  style={{ flex: 1, fontFamily: 'ui-monospace, monospace', fontSize: 12 }}
+                                />
+                                <button onClick={() => testUrl(i)} disabled={!canEdit || !url.trim() || rotTest[i]?.busy} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flexShrink: 0, opacity: (!url.trim() || rotTest[i]?.busy) ? 0.5 : 1 }}>
+                                  {rotTest[i]?.busy ? 'Test…' : 'Tester'}
+                                </button>
+                                {canEdit && (cfg.urls.length > 1) && (
+                                  <button onClick={() => setUrls(cfg.urls.filter((_, j) => j !== i))} title="Retirer" className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" style={{ flexShrink: 0, color: '#F87171' }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                  </button>
+                                )}
+                              </div>
+                              {rotTest[i]?.msg && (
+                                <span style={{ fontSize: 11.5, fontWeight: 600, color: rotTest[i]?.ok ? '#34D399' : '#F87171' }}>{rotTest[i]?.msg}</span>
+                              )}
+                            </div>
+                          ))}
+                          {canEdit && (
+                            <button onClick={() => setUrls([...(cfg.urls.length ? cfg.urls : ['']), ''])} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                              Ajouter un proxy
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {canEdit && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${S.border}`, paddingTop: 14 }}>
+                          <button onClick={saveRot} disabled={rotSaving} className="sf-btn sf-btn-primary sf-btn-sm" style={{ opacity: rotSaving ? 0.6 : 1 }}>
+                            {rotSaving ? 'Enregistrement…' : 'Enregistrer la rotation'}
+                          </button>
+                          {rotSaved && <span style={{ fontSize: 12, fontWeight: 600, color: '#34D399' }}>Enregistré ✓</span>}
+                          <span style={{ fontSize: 11.5, color: S.text3, marginLeft: 'auto' }}>⚡ Poste 1 tél. à la fois quand activé</span>
+                        </div>
+                      )}
+                    </div>
+                    )
+                  })() : null}
 
                   {/* Webhooks GéeLark */}
                   {!currentOrg || canEditOrgConnexions ? (
