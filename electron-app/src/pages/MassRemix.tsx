@@ -1521,11 +1521,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <div
                 className="sf-anim-scale-spring"
                 style={{
-                  width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(99,102,241,0.08)',
-                  border: '1px solid rgba(99,102,241,0.28)',
-                  color: '#6366F1',
+                  width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                  background: 'linear-gradient(135deg,#6366F1,#818CF8)',
+                  boxShadow: '0 10px 24px -8px rgba(129,140,248,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
                 }}>
                 <IconZap size={22} />
               </div>

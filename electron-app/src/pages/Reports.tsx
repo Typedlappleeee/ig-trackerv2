@@ -261,11 +261,23 @@ export function Reports({ user }: { user: User }) {
   return (
     <div className="sf-page">
       <div className="sf-toolbar" style={{ justifyContent: 'space-between' }}>
-        <div>
-          <h1 className="sf-page-title">Rapports</h1>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
-            Activité quotidienne par compte · maj 1×/jour {lastSync && `· dernière maj ${fmtTime(lastSync)}`}
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            background: 'linear-gradient(135deg,#10B981,#059669)',
+            boxShadow: '0 10px 24px -8px rgba(16,185,129,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
+          }}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="sf-page-title">Rapports</h1>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
+              Activité quotidienne par compte · maj 1×/jour {lastSync && `· dernière maj ${fmtTime(lastSync)}`}
+            </p>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type="date" value={day} max={parisToday()} onChange={e => setDay(e.target.value)} className="sf-input" style={{ width: 150, height: 32 }} />

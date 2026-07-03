@@ -365,11 +365,23 @@ export function Subtitles({ user }: SubtitlesProps) {
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap" style={{ gap: 10 }}>
-        <div>
-          <h1 style={{ fontSize: 21, fontWeight: 800, color: TEXT_1, letterSpacing: '-0.01em' }}>Sous-titres Auto</h1>
-          <p style={{ fontSize: 13, color: TEXT_2, marginTop: 2 }}>
-            Groq Whisper transcrit · FFmpeg incruste
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            background: 'linear-gradient(135deg,#F59E0B,#FBBF24)',
+            boxShadow: '0 10px 24px -8px rgba(251,191,36,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="3"/><path d="M6 14h4"/><path d="M13 14h5"/><path d="M6 17h2"/><path d="M11 17h7"/>
+            </svg>
+          </div>
+          <div>
+            <h1 style={{ fontSize: 21, fontWeight: 800, color: TEXT_1, letterSpacing: '-0.01em' }}>Sous-titres Auto</h1>
+            <p style={{ fontSize: 13, color: TEXT_2, marginTop: 2 }}>
+              Groq Whisper transcrit · FFmpeg incruste
+            </p>
+          </div>
         </div>
         <span className="sf-badge sf-badge-accent">Powered by Groq Whisper</span>
       </div>

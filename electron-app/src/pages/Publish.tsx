@@ -8,15 +8,26 @@
 import { useState, Suspense, lazy } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Spinner } from '@/components/ui/Spinner'
-import { ACCENT, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR, BG_2 as BG2 } from '@/lib/theme'
+import { TEXT_2 as MUTED, HAIR } from '@/lib/theme'
 
 const MassPosting = lazy(() => import('@/pages/MassPosting').then(m => ({ default: m.MassPosting })))
 
 type Platform = 'instagram' | 'tiktok'
 
-const PLATFORMS: { k: Platform; label: string; emoji: string; desc: string; accent: string }[] = [
-  { k: 'instagram', label: 'Instagram', emoji: '📸', desc: 'Reels — publication native via RPA', accent: '#E1306C' },
-  { k: 'tiktok',    label: 'TikTok',    emoji: '🎵', desc: 'Vidéos — publication native GeeLark', accent: '#25F4EE' },
+const PLATFORMS: {
+  k: Platform; label: string; desc: string
+  grad: string; glow: string; accent: string; icon: JSX.Element
+}[] = [
+  {
+    k: 'instagram', label: 'Instagram', desc: 'Reels — publication native via RPA',
+    grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6',
+    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>,
+  },
+  {
+    k: 'tiktok', label: 'TikTok', desc: 'Vidéos — publication native GeeLark',
+    grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.5)', accent: '#22D3EE',
+    icon: <svg width="21" height="21" viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.4 2 4.1 4.5 4.4v3c-1.7.1-3.2-.4-4.6-1.3v6.2c0 3.6-2.7 5.9-6 5.9-3.2 0-5.6-2.5-5.6-5.5 0-3.4 2.9-5.9 6.4-5.3v3.1c-.4-.1-.9-.2-1.3-.2-1.4 0-2.4 1-2.4 2.4 0 1.4 1 2.4 2.5 2.4 1.6 0 2.6-1.1 2.6-2.9V3h3.9z"/></svg>,
+  },
 ]
 
 export function Publish({ user }: { user: User }) {
@@ -33,34 +44,42 @@ export function Publish({ user }: { user: User }) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div className="sf-anim-scale-in" style={{
-          width: '100%', maxWidth: 460, background: BG2, border: `1px solid ${HAIR}`,
-          borderRadius: 18, padding: '30px 30px 26px', textAlign: 'center',
-          boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)',
+          width: '100%', maxWidth: 520, position: 'relative',
+          background: 'linear-gradient(170deg, #16171F, #0F1014)', border: '1px solid rgba(255,255,255,0.09)',
+          borderRadius: 20, overflow: 'hidden',
+          boxShadow: '0 40px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
         }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: IVORY }}>Où veux-tu publier ?</h2>
-          <p style={{ fontSize: 13, color: MUTED, marginTop: 6, marginBottom: 22 }}>
-            Choisis la plateforme pour cette session de publication.
-          </p>
-          <div style={{ display: 'flex', gap: 14 }}>
+          <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(236,72,153,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', padding: '24px 24px 4px', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)' }}>Publication</p>
+            <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>Où veux-tu publier ?</h2>
+            <p style={{ fontSize: 12.5, color: MUTED, marginTop: 6, marginBottom: 0 }}>
+              Choisis la plateforme pour cette session de publication.
+            </p>
+          </div>
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
             {PLATFORMS.map(p => (
               <button
                 key={p.k}
                 onClick={() => choose(p.k)}
                 className="cursor-pointer"
                 style={{
-                  flex: 1, padding: '22px 14px', borderRadius: 14, textAlign: 'center',
-                  background: 'rgba(255,255,255,0.02)',
-                  border: `1.5px solid ${last === p.k ? 'rgba(99,102,241,0.45)' : HAIR}`,
-                  transition: 'all 0.15s',
+                  padding: 18, borderRadius: 16, textAlign: 'center',
+                  background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
+                  border: `1px solid ${last === p.k ? `${p.accent}59` : 'rgba(255,255,255,0.09)'}`,
+                  transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s, border-color 0.25s',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.background = 'rgba(99,102,241,0.06)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = last === p.k ? 'rgba(99,102,241,0.45)' : HAIR; e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = `0 22px 46px -20px ${p.glow}`; e.currentTarget.style.borderColor = `${p.accent}66` }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = last === p.k ? `${p.accent}59` : 'rgba(255,255,255,0.09)' }}
               >
-                <div style={{ fontSize: 38, lineHeight: 1, marginBottom: 12 }}>{p.emoji}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: IVORY }}>{p.label}</div>
-                <div style={{ fontSize: 11, color: FAINT, marginTop: 5, lineHeight: 1.4 }}>{p.desc}</div>
+                <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: p.grad, boxShadow: `0 10px 22px -8px ${p.glow}, inset 0 1px 0 rgba(255,255,255,0.3)` }}>{p.icon}</div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{p.label}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.5)', marginTop: 4, lineHeight: 1.45 }}>{p.desc}</div>
+                </div>
                 {last === p.k && (
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: ACCENT, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dernier choix</div>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: p.accent, textTransform: 'uppercase', letterSpacing: '0.1em', background: `${p.accent}1f`, border: `1px solid ${p.accent}3d`, borderRadius: 99, padding: '3px 9px' }}>Dernier choix</div>
                 )}
               </button>
             ))}
@@ -70,6 +89,7 @@ export function Publish({ user }: { user: User }) {
     )
   }
 
+  const cur = PLATFORMS.find(p => p.k === platform) ?? PLATFORMS[0]
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Bandeau plateforme + bouton changer */}
@@ -78,8 +98,14 @@ export function Publish({ user }: { user: User }) {
         padding: '8px 28px', borderBottom: `1px solid ${HAIR}`,
       }}>
         <span style={{ fontSize: 12, color: MUTED }}>Plateforme :</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: IVORY }}>
-          {platform === 'tiktok' ? '🎵 TikTok' : '📸 Instagram'}
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 7,
+          fontSize: 12.5, fontWeight: 800, color: cur.accent,
+          background: `${cur.accent}14`, border: `1px solid ${cur.accent}3d`,
+          borderRadius: 99, padding: '4px 12px',
+        }}>
+          <span style={{ display: 'inline-flex', transform: 'scale(0.7)', marginLeft: -3 }}>{cur.icon}</span>
+          {cur.label}
         </span>
         <button
           onClick={() => setPlatform(null)}
