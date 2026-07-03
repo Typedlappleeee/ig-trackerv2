@@ -350,6 +350,18 @@ export default function StoryLink({ user }: { user: User }) {
 
   useEffect(() => () => { abortRef.current = true }, [])
 
+  // ⚠️ La publication de stories tourne dans le navigateur : un refresh l'arrête.
+  useEffect(() => {
+    if (!running) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = 'Une publication est en cours. Si tu quittes ou rafraîchis, elle sera interrompue.'
+      return e.returnValue
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [running])
+
   // ── Persist whenever pools change ─────────────────────────────────────────
   useEffect(() => savePhotoPool(photoPool), [photoPool])
   useEffect(() => saveTextPool(textPool),   [textPool])
