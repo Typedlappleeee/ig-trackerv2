@@ -279,12 +279,12 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
       {/* Header */}
       <div className="sf-anim-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
         <div style={{
-          width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-          background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(99,102,241,0.06))',
-          border: '1px solid rgba(99,102,241,0.28)',
+          width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+          background: 'linear-gradient(135deg,#64748B,#475569)',
+          boxShadow: '0 10px 24px -8px rgba(100,116,139,0.5), inset 0 1px 0 0 rgba(255,255,255,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
           </svg>
         </div>

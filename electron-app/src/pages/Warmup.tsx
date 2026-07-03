@@ -444,14 +444,31 @@ export function Warmup({ user }: WarmupProps) {
 
       {/* Popup de choix de plateforme — niveau page (Login / Mass Edit / Warmup) */}
       {!warmupPlatformChosen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,14,0.8)', backdropFilter: 'blur(6px)' }}>
-          <div className="sf-card sf-anim-scale-in" style={{ width: '100%', maxWidth: 440, padding: '30px 30px 26px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)' }}>Quelle plateforme ?</h2>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 22 }}>Choisis la plateforme pour cette session.</p>
-            <div style={{ display: 'flex', gap: 14 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,11,14,0.8)', backdropFilter: 'blur(8px)', padding: 24 }}>
+          <div className="sf-anim-scale-in" style={{
+            width: '100%', maxWidth: 500, position: 'relative',
+            background: 'linear-gradient(170deg, #16171F, #0F1014)', border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: 20, overflow: 'hidden',
+            boxShadow: '0 40px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
+          }}>
+            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(251,146,60,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', padding: '24px 24px 4px', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(251,146,60,0.8)' }}>Warmup</p>
+              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>Quelle plateforme ?</h2>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>Choisis la plateforme pour cette session.</p>
+            </div>
+            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
               {([
-                { k: 'instagram', label: 'Instagram', emoji: '📸', desc: 'Login + Mass Edit + Warmup' },
-                { k: 'tiktok',    label: 'TikTok',    emoji: '🎵', desc: 'Mass Edit + Warmup (login bientôt)' },
+                {
+                  k: 'instagram', label: 'Instagram', desc: 'Login + Mass Edit + Warmup',
+                  grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6',
+                  icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>,
+                },
+                {
+                  k: 'tiktok', label: 'TikTok', desc: 'Mass Edit + Warmup (login bientôt)',
+                  grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.5)', accent: '#22D3EE',
+                  icon: <svg width="21" height="21" viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.4 2 4.1 4.5 4.4v3c-1.7.1-3.2-.4-4.6-1.3v6.2c0 3.6-2.7 5.9-6 5.9-3.2 0-5.6-2.5-5.6-5.5 0-3.4 2.9-5.9 6.4-5.3v3.1c-.4-.1-.9-.2-1.3-.2-1.4 0-2.4 1-2.4 2.4 0 1.4 1 2.4 2.5 2.4 1.6 0 2.6-1.1 2.6-2.9V3h3.9z"/></svg>,
+                },
               ] as const).map(p => (
                 <button key={p.k}
                   onClick={() => {
@@ -460,12 +477,20 @@ export function Warmup({ user }: WarmupProps) {
                     if (p.k === 'tiktok' && activeTab === 'login') setActiveTab('warmup')
                   }}
                   className="cursor-pointer"
-                  style={{ flex: 1, padding: '22px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1.5px solid var(--border)' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.background = 'rgba(99,102,241,0.06)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}>
-                  <div style={{ fontSize: 38, lineHeight: 1, marginBottom: 12 }}>{p.emoji}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{p.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 5, lineHeight: 1.4 }}>{p.desc}</div>
+                  style={{
+                    padding: 18, borderRadius: 16, textAlign: 'center',
+                    background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
+                    border: '1px solid rgba(255,255,255,0.09)',
+                    transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s, border-color 0.25s',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = `0 22px 46px -20px ${p.glow}`; e.currentTarget.style.borderColor = `${p.accent}66` }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)' }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: p.grad, boxShadow: `0 10px 22px -8px ${p.glow}, inset 0 1px 0 rgba(255,255,255,0.3)` }}>{p.icon}</div>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{p.label}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.5)', marginTop: 4, lineHeight: 1.45 }}>{p.desc}</div>
+                  </div>
                 </button>
               ))}
             </div>
@@ -492,17 +517,18 @@ export function Warmup({ user }: WarmupProps) {
       <div className="sf-page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
           <div style={{
-            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)',
-            color: 'var(--accent)', position: 'relative', overflow: 'hidden',
+            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            background: 'linear-gradient(135deg,#EA580C,#FB923C)',
+            boxShadow: '0 10px 24px -8px rgba(251,146,60,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
+            position: 'relative', overflow: 'hidden',
           }}>
             <IconBolt size={22} />
             {running && (
               <div style={{
-                position: 'absolute', inset: 0, borderRadius: 12,
-                background: 'linear-gradient(135deg,var(--accent),var(--accent-l))',
-                opacity: 0.2, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
+                position: 'absolute', inset: 0, borderRadius: 13,
+                background: 'linear-gradient(135deg,#fff,#FDBA74)',
+                opacity: 0.25, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
               }} />
             )}
           </div>
