@@ -176,11 +176,11 @@ export function Warmup({ user }: WarmupProps) {
   const [editPicFile,  setEditPicFile]  = useState<string | null>(null)
 
   // ── WARMUP state ──────────────────────────────────────────────────────────
-  const [browseMinutes,   setBrowseMinutes]   = useState(15)
-  const [likePosts,       setLikePosts]       = useState(true)
-  const [watchReels,      setWatchReels]      = useState(true)
-  const [followSuggested, setFollowSuggested] = useState(false)
-  const [warmupKeyword,   setWarmupKeyword]   = useState('')
+  const [browseMinutes,   setBrowseMinutes]   = useState(() => Number(localStorage.getItem('sf-wu-browse') ?? '15'))
+  const [likePosts,       setLikePosts]       = useState(() => localStorage.getItem('sf-wu-like') !== '0')
+  const [watchReels,      setWatchReels]      = useState(() => localStorage.getItem('sf-wu-watch') !== '0')
+  const [followSuggested, setFollowSuggested] = useState(() => localStorage.getItem('sf-wu-follow') === '1')
+  const [warmupKeyword,   setWarmupKeyword]   = useState(() => localStorage.getItem('sf-wu-keyword') ?? '')
   const [warmupPlatform,  setWarmupPlatform]  = useState<'instagram' | 'tiktok'>('instagram')
   const [warmupPlatformChosen, setWarmupPlatformChosen] = useState(false)
   // Engagement TikTok
@@ -196,6 +196,13 @@ export function Warmup({ user }: WarmupProps) {
   // rotation d'IP avant d'allumer chaque téléphone (édition de profil ET warmup).
   const [rotProxy, setRotProxy] = useState(() => localStorage.getItem('sf-warmup-rotproxy') === '1')
   useEffect(() => { localStorage.setItem('sf-warmup-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
+
+  // Persistance de la config de warmup (perdue avant en changeant d'onglet).
+  useEffect(() => { localStorage.setItem('sf-wu-browse', String(browseMinutes)) }, [browseMinutes])
+  useEffect(() => { localStorage.setItem('sf-wu-like', likePosts ? '1' : '0') }, [likePosts])
+  useEffect(() => { localStorage.setItem('sf-wu-watch', watchReels ? '1' : '0') }, [watchReels])
+  useEffect(() => { localStorage.setItem('sf-wu-follow', followSuggested ? '1' : '0') }, [followSuggested])
+  useEffect(() => { localStorage.setItem('sf-wu-keyword', warmupKeyword) }, [warmupKeyword])
   const abortRef = useRef<{ abort: boolean }>({ abort: false })
 
   useEffect(() => { return () => { abortRef.current.abort = true } }, [])

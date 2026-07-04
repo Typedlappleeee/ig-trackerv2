@@ -841,6 +841,18 @@ function AppContent({ user }: { user: User }) {
     setSettingsPanel(tab)
   }
 
+  // Bus de navigation global : n'importe quel écran peut demander à naviguer
+  // (ex. un état vide « Connecter GéeLark → Réglages ») via un CustomEvent, sans
+  // devoir recevoir onNavigate en prop.
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const d = (e as CustomEvent<{ page: string; tab?: string }>).detail
+      if (d?.page) handleNavigate(d.page as Page, d.tab)
+    }
+    window.addEventListener('sf:navigate', onNav as EventListener)
+    return () => window.removeEventListener('sf:navigate', onNav as EventListener)
+  }, [])
+
   function handleRefresh() {
     setLastRefresh(new Date())
     setRefreshTick(t => t + 1)

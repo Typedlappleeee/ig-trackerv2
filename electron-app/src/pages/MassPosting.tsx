@@ -27,6 +27,7 @@ import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
 import { loadPostingOpts, savePostingOpts, buildScheduleTimes, effectiveConcurrency, type PostingOpts } from '@/lib/postingOpts'
 import { PostingOptions } from '@/components/PostingOptions'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface MassPostingProps { user: User }
 
@@ -1698,6 +1699,25 @@ export function MassPosting({ user }: MassPostingProps) {
                 </button>
               )
             })}
+
+            {/* État vide de la colonne téléphones : distingue « pas de token » de « aucun téléphone ». */}
+            {phonePickMode === 'phones' && visiblePhones.length === 0 && (
+              !bearer ? (
+                <EmptyState
+                  compact
+                  title="GéeLark non connecté"
+                  description="Ajoute ton token GéeLark pour importer tes téléphones."
+                  action={{ label: 'Configurer dans les Réglages', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'settings', tab: 'connexions' } })) }}
+                />
+              ) : (
+                <EmptyState
+                  compact
+                  title="Aucun téléphone"
+                  description="Synchronise tes cloud phones GéeLark depuis l'onglet Téléphones."
+                  action={{ label: 'Aller aux Téléphones', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'phones' } })) }}
+                />
+              )
+            )}
 
             {phonePickMode === 'groups' && (() => {
               const realGroups = groups.filter(g => g !== 'Tous')
