@@ -2127,6 +2127,13 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
               </>
             )}
+            {phoneList.length > 0 && (
+              <span style={{ fontSize: 11, color: MUTED }}
+                title="Coût : 2 crédits × nb téléphones à chaque exécution, plus 50 crédits/jour tant que la tâche est active.">
+                ≈ <span style={{ color: GOLD, fontWeight: 700 }}>{phoneList.length * 2}</span> cr/exéc
+                {' · '}<span style={{ color: GOLD, fontWeight: 700 }}>50</span> cr/jour
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
