@@ -1471,13 +1471,59 @@ async function _postInstagramStoryInner(
     log('   ✓ Média indexé dans la galerie')
   }
 
-  // ── 2. Open Instagram + the story camera ───────────────────────────────────
+  // ── 2. Open Instagram + load the image into the story composer ─────────────
   log('📲 Lancement Instagram…')
   await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
   await sleep(1200)
 
-  // Most reliable path: Instagram's dedicated story-camera deep link. This jumps
-  // straight to the capture screen and skips the fragile home-feed avatar tap.
+  // Accepte les popups de permission ("Autoriser l'accès aux photos"). Définie ici
+  // pour être utilisable par les DEUX chemins (intent direct + navigation galerie).
+  async function dismissPermissionDialog() {
+    const permXml = await dumpXml(bearer, phoneId)
+    const allowPt =
+      findByText(permXml, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser',
+        'While using the app', 'Lorsque l\'application est utilisée', 'Continue', 'Continuer') ??
+      findByResourceId(permXml, 'permission_allow_button', 'permission_allow_all_button',
+        'permission_allow_foreground_only_button')
+    if (allowPt) {
+      log('   ✓ Popup de permission acceptée')
+      await shellExec(bearer, phoneId, `input tap ${allowPt[0]} ${allowPt[1]}`)
+      await sleep(2000)
+      return true
+    }
+    return false
+  }
+
+  let xml = ''
+
+  // Chemin ROBUSTE (toutes versions Android/IG) : charge l'image DIRECTEMENT dans
+  // le composeur de story via le share-handler d'Instagram → saute l'écran caméra
+  // + la sélection galerie (l'étape qui casse sur les Android récents). On tente
+  // plusieurs noms d'activity selon les versions.
+  log('🎬 Ouverture du composeur de story…')
+  const shareActivities = [
+    'com.instagram.share.handleractivity.StoryShareHandlerActivity',
+    'com.instagram.share.handleractivity.ShareHandlerActivity',
+  ]
+  let loadedViaIntent = false
+  for (const act of shareActivities) {
+    await shellExec(bearer, phoneId,
+      `am start -n com.instagram.android/${act} ` +
+      `-a android.intent.action.SEND -t "image/*" ` +
+      `--grant-read-uri-permission --grant-persistable-uri-permission ` +
+      `--eu android.intent.extra.STREAM "file://${imgPath}" 2>/dev/null`)
+    await sleep(6000)
+    await dismissPermissionDialog()
+    xml = await dumpXml(bearer, phoneId)
+    const inComposer =
+      findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'text_tool', 'draw_tool', 'toolbar_sticker_button') ??
+      findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story', 'Send to', 'Envoyer à', 'Recipients')
+    if (inComposer) { loadedViaIntent = true; log('   ✓ Image chargée directement dans la story'); break }
+  }
+
+  if (!loadedViaIntent) {
+  log('   ↩︎ Repli : caméra + galerie…')
+  // Ancien chemin : deep link caméra story puis sélection dans la galerie.
   log('🎬 Ouverture de la caméra story…')
   await shellExec(bearer, phoneId,
     'am start -a android.intent.action.VIEW -d "instagram://story-camera" com.instagram.android')
@@ -1485,7 +1531,7 @@ async function _postInstagramStoryInner(
 
   // Verify we actually reached the camera. If we're still on the home feed
   // (the deep link was ignored on this IG build), tap the "Your story" avatar.
-  let xml = await dumpXml(bearer, phoneId)
+  xml = await dumpXml(bearer, phoneId)
   const onCamera =
     findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'capture_button', 'camera_shutter_button') ??
     findByText(xml, 'Gallery', 'Galerie', 'Story', 'Boomerang', 'Layout')
@@ -1511,24 +1557,6 @@ async function _postInstagramStoryInner(
       await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.12)} ${Math.floor(sh * 0.13)}`)
     }
     await sleep(5000)
-  }
-
-  // Android/IG permission prompts ("Allow access to photos") silently block the
-  // flow if not dismissed — accept them whenever they appear.
-  async function dismissPermissionDialog() {
-    const permXml = await dumpXml(bearer, phoneId)
-    const allowPt =
-      findByText(permXml, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser',
-        'While using the app', 'Lorsque l\'application est utilisée', 'Continue', 'Continuer') ??
-      findByResourceId(permXml, 'permission_allow_button', 'permission_allow_all_button',
-        'permission_allow_foreground_only_button')
-    if (allowPt) {
-      log('   ✓ Popup de permission détectée — acceptation…')
-      await shellExec(bearer, phoneId, `input tap ${allowPt[0]} ${allowPt[1]}`)
-      await sleep(2000)
-      return true
-    }
-    return false
   }
 
   await dismissPermissionDialog()
@@ -1586,6 +1614,7 @@ async function _postInstagramStoryInner(
   log('   🖼 Sélection de la photo…')
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
+  } // fin du repli caméra + galerie (si l'intent direct a échoué)
 
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')
