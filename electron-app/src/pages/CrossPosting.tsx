@@ -36,7 +36,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
   const [showPicker, setShowPicker] = useState(false)
   const [captionsText, setCaptionsText] = useState('')
   const [mode, setMode]           = useState<'seq' | 'random'>('seq')
-  const [loadingCaps, setLoadingCaps] = useState(false)
+  const [showCapPicker, setShowCapPicker] = useState(false)
 
   const [rotProxy, setRotProxy]   = useState(() => localStorage.getItem('sf-cross-rotproxy') === '1')
   useEffect(() => { localStorage.setItem('sf-cross-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
@@ -68,15 +68,10 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
     setJobs(prev => prev.map(j => j.key === key ? { ...j, ...patch } : j))
   }
 
-  // Importe les captions de la banque de captions dans la pool (une par ligne).
-  async function importCaptions() {
-    setLoadingCaps(true)
-    let q = supabase.from('caption_bank').select('content').order('created_at', { ascending: false })
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await q
-    const texts = (data ?? []).map(r => String((r as { content?: string }).content ?? '').trim()).filter(Boolean)
-    if (texts.length) setCaptionsText(prev => (prev.trim() ? prev.trim() + '\n' : '') + texts.join('\n'))
-    setLoadingCaps(false)
+  // Ajoute les captions choisies dans la banque à la pool (une par ligne).
+  function addCaptions(texts: string[]) {
+    const clean = texts.map(t => t.trim()).filter(Boolean)
+    if (clean.length) setCaptionsText(prev => (prev.trim() ? prev.trim() + '\n' : '') + clean.join('\n'))
   }
 
   async function launch() {
@@ -232,18 +227,21 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
             <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Captions</p>
-                <span style={{ fontSize: 10.5, color: 'var(--text-4)' }}>une par ligne · distribuées comme les vidéos</span>
-                <button onClick={importCaptions} disabled={loadingCaps} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>
-                  {loadingCaps ? '…' : '＋ Banque de captions'}
+                {captions.length > 0 && <span className="sf-badge sf-badge-accent" style={{ fontSize: 10 }}>{captions.length}</span>}
+                <button onClick={() => setShowCapPicker(true)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>
+                  ＋ Choisir dans la banque
                 </button>
               </div>
               <textarea
                 value={captionsText}
                 onChange={e => setCaptionsText(e.target.value)}
-                placeholder="Une caption par ligne… (optionnel)"
+                placeholder="Une caption par ligne — chaque caption = la description d'un compte…"
                 className="sf-input"
                 style={{ minHeight: 90, resize: 'vertical', padding: 10, fontSize: 12.5 }}
               />
+              <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0 }}>
+                1 caption = 1 compte ({mode === 'seq' ? 'séquentiel : compte 1 → caption 1…' : 'aléatoire'}). Une ligne par caption.
+              </p>
               <div className="sf-card" style={{ padding: '10px 12px', background: 'var(--surface-2)' }}>
                 <Toggle on={rotProxy} onChange={setRotProxy} label="Proxy rotatif"
                   warn={!rotConfigured} warnTitle="Rotation non configurée — Réglages → Connexions"
@@ -338,6 +336,89 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
           onClose={() => setShowPicker(false)}
         />
       )}
+
+      {showCapPicker && (
+        <CaptionPicker
+          user={user}
+          currentOrg={currentOrg}
+          onSelect={texts => { addCaptions(texts); setShowCapPicker(false) }}
+          onClose={() => setShowCapPicker(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Sélecteur de captions depuis la banque (choix multiple) ──────────────────
+function CaptionPicker({ user, currentOrg, onSelect, onClose }: {
+  user: User
+  currentOrg: { id: string } | null
+  onSelect: (texts: string[]) => void
+  onClose: () => void
+}) {
+  const [items, setItems]   = useState<{ id: string; title: string; content: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sel, setSel]       = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    (async () => {
+      let q = supabase.from('caption_bank').select('id, title, content').order('created_at', { ascending: false })
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      const { data } = await q
+      setItems((data ?? []) as { id: string; title: string; content: string }[])
+      setLoading(false)
+    })()
+  }, [currentOrg, user.id])
+
+  const visible = items.filter(i => {
+    if (!search) return true
+    const s = search.toLowerCase()
+    return (i.title ?? '').toLowerCase().includes(s) || (i.content ?? '').toLowerCase().includes(s)
+  })
+  const toggle = (id: string) => setSel(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div className="sf-card" style={{ width: '100%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: 18 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Choisir des captions</p>
+          <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{sel.size} sélectionnée(s)</span>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto' }}>✕</button>
+        </div>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…" className="sf-input" style={{ height: 32, fontSize: 12.5, marginBottom: 10 }} />
+        <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {loading ? (
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', textAlign: 'center', padding: 20 }}>Chargement…</p>
+          ) : visible.length === 0 ? (
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', textAlign: 'center', padding: 20 }}>Aucune caption dans la banque.</p>
+          ) : visible.map(i => {
+            const on = sel.has(i.id)
+            return (
+              <button key={i.id} onClick={() => toggle(i.id)} className="cursor-pointer"
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 11px', borderRadius: 'var(--r-sm)', textAlign: 'left', border: '1px solid ' + (on ? 'var(--border-accent)' : 'var(--border)'), background: on ? 'var(--accent-dim)' : 'var(--surface-2)' }}>
+                <span style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0, marginTop: 1, border: on ? 'none' : '1px solid var(--border-strong)', background: on ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {on && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1.5 4L3 5.5L6.5 2" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.4, whiteSpace: 'pre-wrap', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                  {i.content || i.title}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={() => setSel(new Set(visible.map(i => i.id)))} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">Tout</button>
+          <button
+            onClick={() => onSelect(items.filter(i => sel.has(i.id)).map(i => i.content || i.title))}
+            disabled={sel.size === 0}
+            className="sf-btn sf-btn-primary cursor-pointer"
+            style={{ marginLeft: 'auto', opacity: sel.size === 0 ? 0.5 : 1 }}
+          >
+            Ajouter {sel.size > 0 ? `(${sel.size})` : ''}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
