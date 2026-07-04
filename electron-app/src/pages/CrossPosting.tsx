@@ -4,7 +4,7 @@ import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { supabase } from '@/lib/supabase'
 import {
-  publishVideoCrossPlatform, CROSS_PLATFORMS,
+  publishVideoCrossPlatform, geelarkUploadForRpa, CROSS_PLATFORMS,
   type CrossPlatform,
 } from '@/lib/geelark'
 import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
@@ -90,21 +90,39 @@ export function CrossPosting({ user }: CrossPostingProps) {
     setJobs(initial)
 
     // Distribution vidéo/caption par téléphone : séquentiel (tél i → élément i) ou
-    // aléatoire. Les templates RPA téléchargent la vidéo depuis l'URL signée.
+    // aléatoire.
     const pick = <T,>(arr: T[], i: number): T =>
       mode === 'seq' ? arr[i % arr.length] : arr[Math.floor(Math.random() * arr.length)]
+
+    // Les templates RPA exigent une URL HÉBERGÉE chez GeeLark. On héberge chaque
+    // média UNE fois (cache par URL signée) puis on réutilise l'URL GeeLark.
+    const hostCache = new Map<string, { resourceUrl: string; isImage: boolean } | null>()
+    const ensureHosted = async (url: string) => {
+      if (hostCache.has(url)) return hostCache.get(url)!
+      const up = await geelarkUploadForRpa(bearer!, url)
+      hostCache.set(url, up)
+      return up
+    }
 
     let ok = 0, err = 0
     for (let i = 0; i < toRun.length; i++) {
       const phone = toRun[i]
       const vid = pick(videos, i)
       const cap = caps.length ? pick(caps, i) : ''
+      const phoneKeys = plats.map(pl => `${phone.id}:${pl.key}`)
+      phoneKeys.forEach(k => setJob(k, { status: 'uploading', detail: 'Envoi du média à GeeLark…' }))
+      const hosted = await ensureHosted(vid.url)
+      if (!hosted) {
+        err += plats.length
+        phoneKeys.forEach(k => setJob(k, { status: 'error', detail: 'Média non hébergé (upload échoué)' }))
+        continue
+      }
       for (const pl of plats) {
         const key = `${phone.id}:${pl.key}`
         setJob(key, { status: 'running' })
         try {
           const r = await publishVideoCrossPlatform(bearer!, phone.geelark_id, pl.key,
-            { videoUrl: vid.url, caption: cap || undefined, rotationUrls },
+            { mediaUrl: hosted.resourceUrl, isImage: hosted.isImage, caption: cap || undefined, rotationUrls },
             m => setJob(key, { detail: m }))
           if (r.ok) { ok++; setJob(key, { status: 'done', detail: 'Publié ✓' }) }
           else { err++; setJob(key, { status: 'error', detail: r.error ?? 'Échec' }) }

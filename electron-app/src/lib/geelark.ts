@@ -2628,23 +2628,52 @@ export const CROSS_PLATFORMS: { key: CrossPlatform; label: string; endpoint: str
   { key: 'pinterest', label: 'Pinterest',      endpoint: '/rpa/task/pinterestVideo',  emoji: '📌' },
 ]
 
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heif', 'heic']
+
+// Héberge un média chez GeeLark et renvoie son URL (material.geelark.com) : les
+// templates RPA de publication n'acceptent PAS une URL externe, seulement une URL
+// hébergée par GeeLark. Flow : /upload/getUrl → PUT des octets → resourceUrl.
+export async function geelarkUploadForRpa(
+  bearer: string, fileUrl: string, log?: (m: string) => void,
+): Promise<{ resourceUrl: string; isImage: boolean } | null> {
+  try {
+    const ext = (fileUrl.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+    const isImage = IMAGE_EXTS.includes(ext)
+    const res = await geelarkFetch('POST', '/upload/getUrl', { fileType: ext }, bearer)
+    if (res['code'] !== 0) { log?.(`   ⚠ upload/getUrl: ${res['msg'] ?? res['code']}`); return null }
+    const d = res['data'] as { uploadUrl?: string; resourceUrl?: string } | undefined
+    if (!d?.uploadUrl || !d?.resourceUrl) { log?.('   ⚠ pas d\'URL d\'upload renvoyée'); return null }
+    const bytes = await (await fetch(fileUrl)).arrayBuffer()
+    const put = await fetch(d.uploadUrl, { method: 'PUT', body: bytes })
+    if (!put.ok) { log?.(`   ⚠ envoi du média : HTTP ${put.status}`); return null }
+    return { resourceUrl: d.resourceUrl, isImage }
+  } catch (e) {
+    log?.(`   ⚠ upload média échoué : ${e instanceof Error ? e.message : String(e)}`)
+    return null
+  }
+}
+
 export async function publishVideoCrossPlatform(
   bearer: string,
   phoneId: string,
   platform: CrossPlatform,
-  opts: { videoUrl: string; caption?: string; rotationUrls?: string[] },
+  opts: { mediaUrl: string; isImage?: boolean; caption?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   const cfg = CROSS_PLATFORMS.find(p => p.key === platform)!
   return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
     const ready = await rotateThenEnsureRunning(bearer, phoneId, opts.rotationUrls, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    // Threads a 2 templates (image vs vidéo). Les autres → endpoint vidéo.
+    let endpoint = cfg.endpoint
+    let mediaField: 'video' | 'images' = 'video'
+    if (platform === 'threads' && opts.isImage) { endpoint = '/rpa/task/threadsImage'; mediaField = 'images' }
     log(`📤 Publication ${cfg.label}…`)
-    const res = await geelarkFetch('POST', cfg.endpoint, {
+    const res = await geelarkFetch('POST', endpoint, {
       id: phoneId,
       scheduleAt: Math.floor(Date.now() / 1000) + 5,
       title: (opts.caption ?? '').slice(0, 500),
-      video: [opts.videoUrl],
+      [mediaField]: [opts.mediaUrl],
       name: `ScaleFlow ${cfg.label}`.slice(0, 128),
     }, bearer)
     if (res['code'] !== 0) return { ok: false, error: `GéeLark (${cfg.label}) : ${res['msg'] ?? res['code']}` }
