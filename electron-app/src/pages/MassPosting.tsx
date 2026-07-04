@@ -769,7 +769,8 @@ export function MassPosting({ user }: MassPostingProps) {
       // Rotation d'IP : UNIQUEMENT si "Proxy rotatif" est coché ET des URLs sont
       // configurées. Sinon rien ne change (pas de série forcée).
       const rotationUrls  = postingOpts.rotatingProxy ? activeRotationUrls() : []
-      const _concurrency  = effectiveConcurrency(postingOpts, assignments.length)
+      // En proxy rotatif : autant de téléphones en parallèle qu'il y a de proxies.
+      const _concurrency  = effectiveConcurrency(postingOpts, assignments.length, rotationUrls.length)
       if (platform === 'instagram' && _concurrency < assignments.length) {
         const batches: (typeof assignments)[] = []
         for (let i = 0; i < assignments.length; i += _concurrency) batches.push(assignments.slice(i, i + _concurrency))
