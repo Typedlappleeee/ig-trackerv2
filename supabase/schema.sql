@@ -516,7 +516,11 @@ CREATE POLICY "profiles_select" ON public.profiles FOR SELECT USING (
   auth.uid() = id OR public.shares_org_with(id)
 );
 CREATE POLICY "profiles_insert" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "profiles_update" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+-- WITH CHECK + trigger trg_protect_profile_privileges (section 7) empêchent
+-- l'auto-promotion en super admin via un simple UPDATE.
+CREATE POLICY "profiles_update" ON public.profiles FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 -- ── user_items ─────────────────────────────────────────────────
 DROP POLICY IF EXISTS "items_all" ON public.user_items;
@@ -655,11 +659,9 @@ CREATE POLICY "lk_org_owner_select" ON public.license_keys FOR SELECT
       WHERE om.user_id = auth.uid() AND o.owner_id = license_keys.user_id
     )
   );
-CREATE POLICY "lk_unactivated_select" ON public.license_keys FOR SELECT
-  USING (user_id IS NULL AND is_active = true);
-CREATE POLICY "lk_activate" ON public.license_keys FOR UPDATE
-  USING (user_id IS NULL AND is_active = true)
-  WITH CHECK (user_id = auth.uid());
+-- ⚠ Les policies "lk_unactivated_select" et "lk_activate" ont été SUPPRIMÉES
+-- (faille : exposaient toutes les clés non réclamées). L'activation passe
+-- exclusivement par la RPC activate_license_key (SECURITY DEFINER, section 7).
 
 -- ── user_credits ───────────────────────────────────────────────
 DROP POLICY IF EXISTS "users_read_own_credits" ON public.user_credits;
@@ -679,11 +681,9 @@ CREATE POLICY "superadmin_manage_credit_codes" ON public.credit_codes
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_super_admin = true)
   );
-CREATE POLICY "anyone_read_active_codes" ON public.credit_codes
-  FOR SELECT USING (is_active = true AND used_by IS NULL);
-CREATE POLICY "users_claim_codes" ON public.credit_codes
-  FOR UPDATE USING (is_active = true AND used_by IS NULL)
-  WITH CHECK (used_by = auth.uid());
+-- ⚠ Les policies "anyone_read_active_codes" et "users_claim_codes" ont été
+-- SUPPRIMÉES (faille : exposaient le `code` de tous les codes actifs). La
+-- redemption passe exclusivement par redeem_credit_code (SECURITY DEFINER).
 
 -- ── support_tickets ────────────────────────────────────────────
 DROP POLICY IF EXISTS "tickets_user_select" ON public.support_tickets;
@@ -976,6 +976,98 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'amount', v_amount, 'balance', v_new_balance);
 END;
 $$;
+
+-- ── Trigger : protège profiles.is_super_admin ─────────────────
+-- Empêche un utilisateur authentifié de s'auto-promouvoir super admin via un
+-- simple UPDATE (auth.uid() NULL = service-role/migration/seed → autorisé).
+CREATE OR REPLACE FUNCTION public.protect_profile_privileges()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NEW.is_super_admin IS DISTINCT FROM OLD.is_super_admin
+     AND auth.uid() IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM public.profiles
+       WHERE id = auth.uid() AND is_super_admin = true
+     ) THEN
+    RAISE EXCEPTION 'Modification non autorisée du statut super admin';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_protect_profile_privileges ON public.profiles;
+CREATE TRIGGER trg_protect_profile_privileges
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.protect_profile_privileges();
+
+-- ── RPC : activation d'une clé de licence (cumul de durée, côté serveur) ──
+-- Remplace l'ancien flow client (qui exigeait de SELECT les clés non réclamées,
+-- d'où la faille). Ne révèle jamais les clés non attribuées.
+CREATE OR REPLACE FUNCTION public.activate_license_key(p_key text, p_user_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_key       record;
+  v_add_days  integer;
+  v_is_life   boolean := false;
+  v_base      timestamptz := now();
+  v_best_rank integer := 0;
+  v_new_exp   timestamptz;
+  v_plan      text;
+  r           record;
+  rank_of     jsonb := '{"standard":0,"pro":1,"organisation":2}'::jsonb;
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_user_id THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Non autorisé');
+  END IF;
+
+  SELECT id, plan, duration_days, expires_at, created_at INTO v_key
+  FROM public.license_keys
+  WHERE key = UPPER(REPLACE(p_key, ' ', '')) AND user_id IS NULL AND is_active = true
+  LIMIT 1;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Clé invalide ou déjà utilisée.');
+  END IF;
+
+  IF v_key.duration_days IS NOT NULL THEN
+    v_add_days := v_key.duration_days;
+  ELSIF v_key.expires_at IS NOT NULL THEN
+    v_add_days := GREATEST(0, CEIL(EXTRACT(EPOCH FROM (v_key.expires_at - COALESCE(v_key.created_at, now()))) / 86400.0)::int);
+  ELSE
+    v_add_days := NULL;
+  END IF;
+  v_best_rank := COALESCE((rank_of ->> v_key.plan)::int, 0);
+
+  FOR r IN SELECT id, plan, expires_at FROM public.license_keys
+           WHERE user_id = p_user_id AND is_active = true LOOP
+    v_best_rank := GREATEST(v_best_rank, COALESCE((rank_of ->> r.plan)::int, 0));
+    IF r.expires_at IS NULL THEN
+      v_is_life := true;
+    ELSIF r.expires_at > now() AND r.expires_at > v_base THEN
+      v_base := r.expires_at;
+    END IF;
+  END LOOP;
+
+  IF v_add_days IS NULL OR v_is_life THEN
+    v_new_exp := NULL;
+  ELSE
+    v_new_exp := v_base + (v_add_days || ' days')::interval;
+  END IF;
+
+  v_plan := CASE v_best_rank WHEN 2 THEN 'organisation' WHEN 1 THEN 'pro' ELSE 'standard' END;
+
+  UPDATE public.license_keys
+  SET user_id = p_user_id, activated_at = now(), expires_at = v_new_exp, plan = v_plan
+  WHERE id = v_key.id AND user_id IS NULL;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Clé déjà utilisée.');
+  END IF;
+
+  UPDATE public.license_keys SET is_active = false
+  WHERE user_id = p_user_id AND is_active = true AND id <> v_key.id;
+
+  RETURN jsonb_build_object('ok', true, 'plan', v_plan, 'expires_at', v_new_exp);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.activate_license_key(text, uuid) TO authenticated;
 
 -- ── RPC : crédits mensuels (idempotent) ───────────────────────
 CREATE OR REPLACE FUNCTION public.maybe_grant_monthly_credits(p_user_id uuid, p_plan_credits integer)

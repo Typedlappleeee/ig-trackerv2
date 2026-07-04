@@ -145,81 +145,22 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
 }
 
 export async function activateKey(key: string, userId: string): Promise<{ success: boolean; error?: string }> {
-  const normalized = key.toUpperCase().replace(/\s/g, '')
+  // Toute la logique (vérif clé non réclamée, cumul de durée, meilleur plan,
+  // claim atomique, désactivation des anciennes clés) est faite côté serveur par
+  // la RPC SECURITY DEFINER — le client ne voit JAMAIS les clés non attribuées.
+  const { data, error } = await supabase.rpc('activate_license_key', {
+    p_key: key,
+    p_user_id: userId,
+  })
+  if (error) return { success: false, error: error.message }
 
-  // Step 1: verify key exists and is unclaimed (needs lk_unactivated_select policy)
-  const { data: existing, error: selectErr } = await supabase
-    .from('license_keys')
-    .select('id, plan, duration_days, expires_at, created_at')
-    .eq('key', normalized)
-    .is('user_id', null)
-    .eq('is_active', true)
-    .maybeSingle()
+  const res = data as { ok: boolean; error?: string; plan?: string } | null
+  if (!res?.ok) return { success: false, error: res?.error ?? 'Activation impossible.' }
 
-  if (selectErr) return { success: false, error: selectErr.message }
-  if (!existing) return { success: false, error: 'Clé invalide ou déjà utilisée.' }
-
-  // Durée (jours) apportée par la clé. Priorité à duration_days ; pour les clés
-  // legacy (sans cette colonne), on la déduit de created_at → expires_at.
-  // null = clé à vie (sans expiration).
-  let addDays: number | null
-  if (existing.duration_days != null) {
-    addDays = existing.duration_days
-  } else if (existing.expires_at) {
-    const base = existing.created_at ? new Date(existing.created_at).getTime() : Date.now()
-    addDays = Math.max(0, Math.ceil((new Date(existing.expires_at).getTime() - base) / 86_400_000))
-  } else {
-    addDays = null
-  }
-
-  // Step 2 : temps restant actuel de l'utilisateur (clés actives non expirées).
-  // On part de la date d'expiration la plus lointaine → la nouvelle durée s' AJOUTE
-  // par-dessus (cumul). Ex. 26 j restants + clé 30 j = 56 j.
-  const now = Date.now()
-  const { data: activeKeys } = await supabase
-    .from('license_keys')
-    .select('id, plan, expires_at')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-
-  let baseExpiry = now
-  let hasLifetime = false
-  let bestRank = PLAN_RANK[(existing.plan as Plan) ?? 'standard'] ?? 0
-  for (const k of activeKeys ?? []) {
-    const rank = PLAN_RANK[(k.plan as Plan) ?? 'standard'] ?? 0
-    if (rank > bestRank) bestRank = rank // on garde le meilleur plan (jamais de downgrade)
-    if (!k.expires_at) { hasLifetime = true; continue }
-    const t = new Date(k.expires_at).getTime()
-    if (t > now && t > baseExpiry) baseExpiry = t
-  }
-
-  // Nouvelle expiration cumulée (à vie si la clé ou un abo existant est à vie).
-  const newExpiresAt = (addDays == null || hasLifetime)
-    ? null
-    : new Date(baseExpiry + addDays * 86_400_000).toISOString()
-
-  // Plan résultant = le meilleur rang entre la clé et les abos en cours.
-  const resultPlan = (Object.keys(PLAN_RANK) as Plan[]).find(p => PLAN_RANK[p] === bestRank)
-    ?? ((existing.plan as Plan) ?? 'standard')
-
-  // Step 3 : on réclame la clé en y inscrivant l'expiration cumulée + le plan retenu.
-  const { error: updateErr } = await supabase
-    .from('license_keys')
-    .update({ user_id: userId, activated_at: new Date().toISOString(), expires_at: newExpiresAt, plan: resultPlan })
-    .eq('id', existing.id)
-
-  if (updateErr) return { success: false, error: updateErr.message }
-
-  // Step 4 : les anciennes clés actives sont désactivées — leur temps restant est
-  // déjà replié dans la nouvelle clé (qui porte l'expiration cumulée).
-  for (const old of activeKeys ?? []) {
-    await supabase.from('license_keys').update({ is_active: false }).eq('id', old.id)
-  }
-
-  // Step 5 : crédits mensuels du plan (best-effort ; une fois par mois calendaire).
+  // Crédits mensuels du plan (best-effort ; une fois par mois calendaire).
   try {
     const { maybeGrantMonthlyCredits } = await import('./credits')
-    await maybeGrantMonthlyCredits(userId, resultPlan)
+    await maybeGrantMonthlyCredits(userId, (res.plan as Plan) ?? 'standard')
   } catch { /* ignore */ }
 
   return { success: true }
