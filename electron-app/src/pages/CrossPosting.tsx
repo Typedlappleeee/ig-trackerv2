@@ -28,10 +28,12 @@ export function CrossPosting({ user }: CrossPostingProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [search, setSearch]     = useState('')
 
-  const [platforms, setPlatforms] = useState<Set<CrossPlatform>>(new Set(['facebook', 'youtube']))
-  const [video, setVideo]         = useState<{ url: string; title: string } | null>(null)
+  const [platforms, setPlatforms] = useState<Set<CrossPlatform>>(new Set(['threads']))
+  const [videos, setVideos]       = useState<{ url: string; title: string }[]>([])
   const [showPicker, setShowPicker] = useState(false)
-  const [caption, setCaption]     = useState('')
+  const [captionsText, setCaptionsText] = useState('')
+  const [mode, setMode]           = useState<'seq' | 'random'>('seq')
+  const [loadingCaps, setLoadingCaps] = useState(false)
 
   const [rotProxy, setRotProxy]   = useState(() => localStorage.getItem('sf-cross-rotproxy') === '1')
   useEffect(() => { localStorage.setItem('sf-cross-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
@@ -55,18 +57,31 @@ export function CrossPosting({ user }: CrossPostingProps) {
   const togglePhone = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   const togglePlatform = (k: CrossPlatform) => setPlatforms(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n })
 
+  const captions = captionsText.split('\n').map(s => s.trim()).filter(Boolean)
   const rotConfigured = getProxyRotation().enabled && getProxyRotation().urls.length > 0
-  const canLaunch = !running && !!bearer && !!video && selected.size > 0 && platforms.size > 0
+  const canLaunch = !running && !!bearer && videos.length > 0 && selected.size > 0 && platforms.size > 0
 
   function setJob(key: string, patch: Partial<Job>) {
     setJobs(prev => prev.map(j => j.key === key ? { ...j, ...patch } : j))
   }
 
+  // Importe les captions de la banque de captions dans la pool (une par ligne).
+  async function importCaptions() {
+    setLoadingCaps(true)
+    let q = supabase.from('caption_bank').select('content').order('created_at', { ascending: false })
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    const { data } = await q
+    const texts = (data ?? []).map(r => String((r as { content?: string }).content ?? '').trim()).filter(Boolean)
+    if (texts.length) setCaptionsText(prev => (prev.trim() ? prev.trim() + '\n' : '') + texts.join('\n'))
+    setLoadingCaps(false)
+  }
+
   async function launch() {
-    if (!canLaunch || !video) return
+    if (!canLaunch) return
     const toRun = phones.filter(p => selected.has(p.id))
     const plats = CROSS_PLATFORMS.filter(p => platforms.has(p.key))
     const rotationUrls = rotProxy ? activeRotationUrls() : []
+    const caps = captions
     setRunning(true)
 
     const initial: Job[] = toRun.flatMap(phone => plats.map(pl => ({
@@ -74,19 +89,22 @@ export function CrossPosting({ user }: CrossPostingProps) {
     })))
     setJobs(initial)
 
-    // Les templates RPA téléchargent la vidéo depuis une URL directe (URL signée
-    // de la banque) — pas besoin de pré-upload vers un fileId.
-    const videoUrl = video.url
+    // Distribution vidéo/caption par téléphone : séquentiel (tél i → élément i) ou
+    // aléatoire. Les templates RPA téléchargent la vidéo depuis l'URL signée.
+    const pick = <T,>(arr: T[], i: number): T =>
+      mode === 'seq' ? arr[i % arr.length] : arr[Math.floor(Math.random() * arr.length)]
 
     let ok = 0, err = 0
-    // Série par téléphone (rotation d'IP éventuelle), plateformes enchaînées par téléphone.
-    for (const phone of toRun) {
+    for (let i = 0; i < toRun.length; i++) {
+      const phone = toRun[i]
+      const vid = pick(videos, i)
+      const cap = caps.length ? pick(caps, i) : ''
       for (const pl of plats) {
         const key = `${phone.id}:${pl.key}`
         setJob(key, { status: 'running' })
         try {
           const r = await publishVideoCrossPlatform(bearer!, phone.geelark_id, pl.key,
-            { videoUrl, caption: caption.trim() || undefined, rotationUrls },
+            { videoUrl: vid.url, caption: cap || undefined, rotationUrls },
             m => setJob(key, { detail: m }))
           if (r.ok) { ok++; setJob(key, { status: 'done', detail: 'Publié ✓' }) }
           else { err++; setJob(key, { status: 'error', detail: r.error ?? 'Échec' }) }
@@ -112,7 +130,7 @@ export function CrossPosting({ user }: CrossPostingProps) {
       <div className="sf-page-header">
         <div>
           <h1 className="sf-page-title" style={{ fontSize: 22 }}>Cross-posting</h1>
-          <p className="sf-page-sub">Publie une vidéo sur plusieurs plateformes d’un coup — la même infra que ton posting Insta/TikTok.</p>
+          <p className="sf-page-sub">Mass posting Threads &amp; co : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire sur tes comptes.</p>
         </div>
       </div>
 
@@ -155,18 +173,47 @@ export function CrossPosting({ user }: CrossPostingProps) {
               </p>
             </div>
 
-            {/* Video + caption */}
+            {/* Vidéos */}
             <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)' }}>Vidéo</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Vidéos</p>
+                {videos.length > 0 && <span className="sf-badge sf-badge-accent" style={{ fontSize: 10 }}>{videos.length}</span>}
+                {videos.length > 0 && <button onClick={() => setVideos([])} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>Vider</button>}
+              </div>
               <button onClick={() => setShowPicker(true)} className="sf-btn sf-btn-secondary cursor-pointer" style={{ justifyContent: 'flex-start' }}>
-                {video ? `🎬 ${video.title}` : '＋ Choisir dans la banque'}
+                {videos.length ? `🎬 ${videos.length} vidéo(s) — ajouter d'autres` : '＋ Choisir dans la banque'}
               </button>
+
+              {/* Distribution seq/random */}
+              <div style={{ display: 'flex', gap: 6 }}>
+                {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
+                  <button key={m.k} onClick={() => setMode(m.k)} className="cursor-pointer"
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 'var(--r-sm)', fontSize: 11.5, fontWeight: 600, border: '1px solid ' + (mode === m.k ? 'var(--border-accent)' : 'var(--border)'),
+                      background: mode === m.k ? 'var(--accent-dim)' : 'var(--surface-2)', color: mode === m.k ? 'var(--accent-lt)' : 'var(--text-3)' }}>
+                    {m.l}
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0 }}>
+                {mode === 'seq' ? 'Téléphone 1 → vidéo 1, téléphone 2 → vidéo 2…' : 'Chaque téléphone reçoit une vidéo au hasard.'}
+              </p>
+            </div>
+
+            {/* Captions (description Threads = champ title) */}
+            <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Captions</p>
+                <span style={{ fontSize: 10.5, color: 'var(--text-4)' }}>une par ligne · distribuées comme les vidéos</span>
+                <button onClick={importCaptions} disabled={loadingCaps} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>
+                  {loadingCaps ? '…' : '＋ Banque de captions'}
+                </button>
+              </div>
               <textarea
-                value={caption}
-                onChange={e => setCaption(e.target.value)}
-                placeholder="Légende / titre (optionnel)…"
+                value={captionsText}
+                onChange={e => setCaptionsText(e.target.value)}
+                placeholder="Une caption par ligne… (optionnel)"
                 className="sf-input"
-                style={{ minHeight: 70, resize: 'vertical', padding: 10, fontSize: 12.5 }}
+                style={{ minHeight: 90, resize: 'vertical', padding: 10, fontSize: 12.5 }}
               />
               <div className="sf-card" style={{ padding: '10px 12px', background: 'var(--surface-2)' }}>
                 <Toggle on={rotProxy} onChange={setRotProxy} label="Proxy rotatif"
@@ -181,7 +228,7 @@ export function CrossPosting({ user }: CrossPostingProps) {
               className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
               style={{ opacity: canLaunch ? 1 : 0.5 }}
             >
-              {running ? 'Publication en cours…' : `🚀 Publier sur ${platforms.size} plateforme(s) × ${selected.size} téléphone(s)`}
+              {running ? 'Publication en cours…' : `🚀 Publier — ${selected.size} téléphone(s) × ${platforms.size} plateforme(s)`}
             </button>
           </div>
 
@@ -249,9 +296,16 @@ export function CrossPosting({ user }: CrossPostingProps) {
       {showPicker && (
         <BankPicker
           user={user}
-          mode="single"
+          mode="multi"
           resolveMode="signed-url"
-          onSelect={(paths, titles) => { if (paths[0]) setVideo({ url: paths[0], title: titles?.[0] ?? 'video' }); setShowPicker(false) }}
+          onSelect={(paths, titles) => {
+            const added = paths.map((p, i) => ({ url: p, title: titles?.[i] ?? 'video' }))
+            setVideos(prev => {
+              const seen = new Set(prev.map(v => v.url))
+              return [...prev, ...added.filter(a => !seen.has(a.url))]
+            })
+            setShowPicker(false)
+          }}
           onClose={() => setShowPicker(false)}
         />
       )}
