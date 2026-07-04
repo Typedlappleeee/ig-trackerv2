@@ -821,14 +821,16 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS)
   try {
-    // Step 1: get presigned upload URL
+    // Step 1: get presigned upload URL. Le type de fichier est déduit de
+    // l'extension (mp4 par défaut) → gère aussi les images (jpg/png/…).
+    const ext = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
     const urlRes = await net.fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${opts.bearer}`,
       },
-      body: JSON.stringify({ fileType: 'mp4' }),
+      body: JSON.stringify({ fileType: ext }),
       signal: abort.signal,
     })
     const urlData = await urlRes.json() as Record<string, unknown>

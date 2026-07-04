@@ -93,13 +93,23 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
       mode === 'seq' ? arr[i % arr.length] : arr[Math.floor(Math.random() * arr.length)]
 
     // Les templates RPA exigent une URL HÉBERGÉE chez GeeLark. On héberge chaque
-    // média UNE fois (cache par URL signée) puis on réutilise l'URL GeeLark.
+    // média UNE fois (cache par URL) — via le MÊME mécanisme que le posting Insta
+    // (uploadVideoGeelark : upload côté Electron, pas de blocage CORS). Repli web.
+    const isImg = (u: string) => /\.(jpg|jpeg|png|gif|bmp|webp|heif|heic)(\?|$)/i.test(u)
     const hostCache = new Map<string, { resourceUrl: string; isImage: boolean } | null>()
-    const ensureHosted = async (url: string) => {
+    const ensureHosted = async (url: string): Promise<{ resourceUrl: string; isImage: boolean } | null | { err: string }> => {
       if (hostCache.has(url)) return hostCache.get(url)!
-      const up = await geelarkUploadForRpa(bearer!, url)
-      hostCache.set(url, up)
-      return up
+      let out: { resourceUrl: string; isImage: boolean } | null = null
+      let errMsg = ''
+      if (window.electronAPI?.uploadVideoGeelark) {
+        const up = await window.electronAPI.uploadVideoGeelark({ bearer: bearer!, filePath: url })
+        if (up?.ok && up.token) out = { resourceUrl: up.token, isImage: isImg(url) }
+        else errMsg = up?.error ?? 'upload échoué'
+      } else {
+        out = await geelarkUploadForRpa(bearer!, url, m => { errMsg = m })
+      }
+      hostCache.set(url, out)
+      return out ?? { err: errMsg }
     }
 
     let ok = 0, err = 0
@@ -108,11 +118,13 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
       const vid = pick(videos, i)
       const cap = caps.length ? pick(caps, i) : ''
       const phoneKeys = plats.map(pl => `${phone.id}:${pl.key}`)
-      phoneKeys.forEach(k => setJob(k, { status: 'uploading', detail: 'Envoi du média à GeeLark…' }))
-      const hosted = await ensureHosted(vid.url)
+      phoneKeys.forEach(k => setJob(k, { status: 'uploading', detail: 'Envoi de la vidéo au téléphone…' }))
+      const res = await ensureHosted(vid.url)
+      const hosted = res && 'resourceUrl' in res ? res : null
       if (!hosted) {
         err += plats.length
-        phoneKeys.forEach(k => setJob(k, { status: 'error', detail: 'Média non hébergé (upload échoué)' }))
+        const reason = res && 'err' in res && res.err ? res.err : 'upload échoué'
+        phoneKeys.forEach(k => setJob(k, { status: 'error', detail: `Média non envoyé : ${reason}` }))
         continue
       }
       for (const pl of plats) {
