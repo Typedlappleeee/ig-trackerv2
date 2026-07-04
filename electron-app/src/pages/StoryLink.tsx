@@ -4,7 +4,8 @@ import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
-import { fetchAllPhones, postInstagramStory, stopPhone, type GeelarkPhone } from '@/lib/geelark'
+import { fetchAllPhones, postInstagramStory, stopPhone, fetchPhoneProxies, type GeelarkPhone } from '@/lib/geelark'
+import { startRun, updateRun, endRun, proxyConflicts } from '@/lib/activeRuns'
 import { activeRotationUrls, useProxyRotation, getProxyRotation } from '@/lib/proxyRotation'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
@@ -570,18 +571,34 @@ export default function StoryLink({ user }: { user: User }) {
     // Petit décalage de démarrage plafonné (~6s) pour ne pas booter tout au même
     // instant. En rotatif un seul worker → aucun décalage.
     const staggerBase = rotProxy ? 0 : 1000
+    // Suivi global + alerte même-proxy.
+    const runId = `story-${Date.now()}`
+    ;(async () => {
+      let proxyKeys: string[] = []
+      try {
+        const pm = await fetchPhoneProxies(bearer)
+        proxyKeys = [...new Set(assignments.map(a => { const px = pm.get(a.phoneId); return px?.server ? `${px.server}:${px.port ?? ''}` : '' }).filter(Boolean))]
+      } catch { /* best-effort */ }
+      if (proxyConflicts(proxyKeys, runId).length) {
+        toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — risque de ban.', kind: 'warn' })
+      }
+      startRun({ id: runId, type: 'story', label: `Story · ${assignments.length} compte${assignments.length > 1 ? 's' : ''}`, proxyKeys, done: 0, total: assignments.length, page: 'storylink' })
+    })()
+
     const queue = [...assignments]
-    let okCount = 0
+    let okCount = 0, doneCount = 0
     const worker = async (staggerMs: number) => {
       if (staggerMs > 0) await new Promise(r => setTimeout(r, staggerMs))
       while (queue.length && !abortRef.current) {
         const asgn = queue.shift()!
         okCount += await runOne(asgn)
+        updateRun(runId, { done: ++doneCount })
       }
     }
     await Promise.all(
       Array.from({ length: Math.min(CONCURRENCY, assignments.length) }, (_, i) => worker(Math.min(i, 6) * staggerBase)),
     )
+    endRun(runId, okCount === 0 && assignments.length > 0 ? 'error' : 'done')
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
 
