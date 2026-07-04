@@ -9,6 +9,7 @@ const S = (size = 24) => ({ width: size, height: size, viewBox: '0 0 24 24', fil
 const IconReels: IconFn = ({ size }) => (<svg {...S(size)}><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 8h18"/><path d="M8 3l2.5 5"/><path d="M14 3l2.5 5"/><path d="M11 12.5v4l3.5-2z" fill="currentColor" stroke="none"/></svg>)
 const IconStory: IconFn = ({ size }) => (<svg {...S(size)}><circle cx="12" cy="12" r="9" strokeDasharray="3.6 3.2"/><path d="M9.5 12a2 2 0 0 1 2-2h1"/><path d="M14.5 12a2 2 0 0 1-2 2h-1"/><path d="M10.5 12h3"/></svg>)
 const IconPhoto: IconFn = ({ size }) => (<svg {...S(size)}><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9" r="1.6"/><path d="M4 17l4.5-4.5a2 2 0 0 1 2.8 0L20 21"/></svg>)
+const IconGlobe: IconFn = ({ size }) => (<svg {...S(size)}><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>)
 
 const CSS = `
 @property --hub-a { syntax:'<angle>'; inherits:false; initial-value:0deg }
@@ -45,6 +46,9 @@ const KINDS: Kind[] = [
   { id: 'photoposting', Icon: IconPhoto, title: 'Photo', tag: 'Feed', preview: 'photo', soon: true,
     desc: 'Publie une photo dans le feed sur tous tes comptes.',
     grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.4)', accent: '#34D399' },
+  { id: 'crossposting', Icon: IconGlobe, title: 'Cross-posting', tag: 'Multi-plateforme', preview: 'reels', admin: true,
+    desc: 'Publie une vidéo sur Facebook, YouTube Shorts, X, Threads, Reddit & Pinterest en une fois.',
+    grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(6,182,212,0.4)', accent: '#38BDF8' },
 ]
 
 function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {

@@ -3,6 +3,19 @@
 
 export const config = { api: { bodyParser: { sizeLimit: '25mb' } } }
 
+// Garde-fou SSRF : n'autorise qu'une URL http(s) publique (bloque localhost,
+// IP privées et link-local, dont les métadonnées cloud 169.254.169.254).
+function isSafePublicUrl(url) {
+  try {
+    const u = new URL(url)
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false
+    const host = u.hostname
+    if (/^(localhost|0\.0\.0\.0|127\.|10\.|169\.254\.|192\.168\.|::1|\[::1\])/i.test(host)) return false
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false  // 172.16.0.0/12
+    return true
+  } catch { return false }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
@@ -18,6 +31,7 @@ export default async function handler(req, res) {
     try {
       let buffer
       if (videoUrl) {
+        if (!isSafePublicUrl(videoUrl)) return res.status(400).json({ ok: false, error: 'URL vidéo non autorisée' })
         const r = await fetch(videoUrl)
         if (!r.ok) return res.json({ ok: false, error: `Fetch vidéo ${r.status}` })
         buffer = Buffer.from(await r.arrayBuffer())

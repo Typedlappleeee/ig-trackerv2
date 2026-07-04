@@ -206,7 +206,7 @@ export function Subtitles({ user }: SubtitlesProps) {
         // Bank URL (web or Electron): let the proxy/IPC download it server-side.
         // Avoids sending large video bytes over the network from the client.
         console.log('[Subtitles] → chemin videoUrl (bank URL, aucun octet envoyé côté client)')
-        setStatus('Transcription via URL banque…')
+        setStatus('Transcription de l\'audio…')
         transcriptRes = await (window.electronAPI as any).groqTranscription({
           apiKey:   groqKey,
           videoUrl: videoSrc,
@@ -223,7 +223,7 @@ export function Subtitles({ user }: SubtitlesProps) {
         if (fileRef.current) blob = fileRef.current
         else if (videoSrc) {
           const r = await fetch(videoSrc)
-          if (!r.ok) throw new Error(`Téléchargement échoué (${r.status})`)
+          if (!r.ok) throw new Error('Téléchargement de la vidéo échoué')
           blob = await r.blob()
         } else throw new Error('Aucune source vidéo')
 
@@ -233,8 +233,8 @@ export function Subtitles({ user }: SubtitlesProps) {
         const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, filename, scope)
         tempPaths.push(storagePath, thumbnailPath)
         const signed = await getSignedUrl(storagePath)
-        if (!signed) throw new Error('URL signée indisponible')
-        setStatus('Transcription via URL…')
+        if (!signed) throw new Error('Préparation de la vidéo impossible')
+        setStatus('Transcription de l\'audio…')
         transcriptRes = await (window.electronAPI as any).groqTranscription({
           apiKey:   groqKey,
           videoUrl: signed,
@@ -257,7 +257,7 @@ export function Subtitles({ user }: SubtitlesProps) {
             audioBytes = r.bytes as ArrayBuffer
           } else {
             const r = await fetch(videoSrc)
-            if (!r.ok) throw new Error(`Téléchargement échoué (${r.status})`)
+            if (!r.ok) throw new Error('Téléchargement de la vidéo échoué')
             audioBytes = await r.arrayBuffer()
           }
           setStatus('Transcription de l\'audio…')
@@ -287,7 +287,7 @@ export function Subtitles({ user }: SubtitlesProps) {
         segments:   segs,
         fontSize, fontColor, position, style, preset,
       })
-      if (!ffRes.ok || !ffRes.outputPath) throw new Error(ffRes.error ?? 'FFmpeg échoué')
+      if (!ffRes.ok || !ffRes.outputPath) throw new Error(ffRes.error ?? 'L\'incrustation des sous-titres a échoué')
 
       // Load result for preview
       if (!isWeb && window.electronAPI?.readLocalVideo) {
@@ -332,7 +332,7 @@ export function Subtitles({ user }: SubtitlesProps) {
     setSaving(true)
     try {
       const resp = await fetch(src)
-      if (!resp.ok) throw new Error(`Lecture du résultat échouée (${resp.status})`)
+      if (!resp.ok) throw new Error('Lecture de la vidéo générée impossible')
       const blob = await resp.blob()
       const title = videoName.replace(/\.[^.]+$/, '') + '_sous-titres'
       const scope = currentOrg?.id

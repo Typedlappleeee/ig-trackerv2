@@ -412,6 +412,8 @@ export function Bank({ user }: BankProps) {
   const [typeFilter, setTypeFilter] = useState<'all' | 'video' | 'photo' | 'gif' | 'audio'>('all')
   // Sort order
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'name' | 'duration'>('date-desc')
+  // Masquer les vidéos déjà utilisées (used_count > 0) — évite de reposter la même
+  const [hideUsed, setHideUsed] = useState(false)
   // Delete confirmations (single item / bulk selection)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<ContentItem | null>(null)
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
@@ -435,7 +437,17 @@ export function Bank({ user }: BankProps) {
   const [showBulkMove, setShowBulkMove] = useState(false)
   const selectionMode = selectedIds.size > 0
 
-  function toggleSelection(id: string) {
+  const lastClickedIdx = useRef<number>(-1)
+  function toggleSelection(id: string, index?: number, shiftKey?: boolean) {
+    // Shift-clic : sélectionne toute la plage depuis le dernier élément cliqué.
+    if (shiftKey && typeof index === 'number' && lastClickedIdx.current >= 0) {
+      const [a, b] = [lastClickedIdx.current, index].sort((x, y) => x - y)
+      const rangeIds = visiblePage.slice(a, b + 1).map(it => it.id)
+      setSelectedIds(prev => { const n = new Set(prev); rangeIds.forEach(r => n.add(r)); return n })
+      lastClickedIdx.current = index
+      return
+    }
+    if (typeof index === 'number') lastClickedIdx.current = index
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
   function exitSelection() { setSelectedIds(new Set()) }
@@ -833,20 +845,35 @@ export function Bank({ user }: BankProps) {
     return 'video'
   }
 
-  const visible = useMemo(() => items.filter(item => {
-    const folder = (item as unknown as {folder?: string | null}).folder
-    const folderMatch = selectedFolder === null ? true : folder === selectedFolder
-    if (!folderMatch) return false
-    if (typeFilter !== 'all' && inferType(item.storage_path ?? item.file_url) !== typeFilter) return false
-    if (!search) return true
-    const q = search.toLowerCase()
-    return item.title.toLowerCase().includes(q) || item.notes.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
-  }), [items, selectedFolder, typeFilter, search])
+  const visible = useMemo(() => {
+    const filtered = items.filter(item => {
+      const folder = (item as unknown as {folder?: string | null}).folder
+      const folderMatch = selectedFolder === null ? true : folder === selectedFolder
+      if (!folderMatch) return false
+      if (typeFilter !== 'all' && inferType(item.storage_path ?? item.file_url) !== typeFilter) return false
+      if (hideUsed && (item.used_count ?? 0) > 0) return false
+      if (!search) return true
+      const q = search.toLowerCase()
+      return item.title.toLowerCase().includes(q) || item.notes.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
+    })
+    // Tri (le sortBy était déclaré mais jamais appliqué)
+    const sorted = [...filtered]
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-asc':  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        case 'name':      return (a.title ?? '').localeCompare(b.title ?? '')
+        case 'duration':  return (b.duration ?? 0) - (a.duration ?? 0)
+        case 'date-desc':
+        default:          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      }
+    })
+    return sorted
+  }, [items, selectedFolder, typeFilter, search, sortBy, hideUsed])
 
   // Pagination — reset when filters/folder change
   const PAGE_SIZE = 60
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [selectedFolder, typeFilter, search])
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [selectedFolder, typeFilter, search, sortBy, hideUsed])
   const visiblePage = useMemo(() => visible.slice(0, visibleCount), [visible, visibleCount])
 
   const openCtx = useCallback((e: React.MouseEvent, item: ContentItem) => {
@@ -1045,6 +1072,28 @@ export function Bank({ user }: BankProps) {
             >{tf.l}</button>
           ))}
         </div>
+
+        {/* Tri + masquer les vidéos déjà utilisées */}
+        <select
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          className="sf-input cursor-pointer"
+          style={{ height: 28, fontSize: 11, padding: '0 8px', width: 'auto' }}
+          title="Trier"
+        >
+          <option value="date-desc">Récent → ancien</option>
+          <option value="date-asc">Ancien → récent</option>
+          <option value="name">Nom (A→Z)</option>
+          <option value="duration">Durée</option>
+        </select>
+        <button
+          onClick={() => setHideUsed(v => !v)}
+          className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer px-3 py-1 rounded-lg text-[11px] font-semibold"
+          style={hideUsed ? { background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.35)', color: 'var(--accent-lt)' } : {}}
+          title="Masquer les vidéos déjà utilisées (usage unique)"
+        >
+          {hideUsed ? '✓ ' : ''}Masquer utilisées
+        </button>
 
         <div className="flex-1" />
 
@@ -1348,7 +1397,7 @@ export function Bank({ user }: BankProps) {
               /* ── Grid view ── */
               <div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 anim-stagger">
-                  {visiblePage.map(item => (
+                  {visiblePage.map((item, idx) => (
                     <VideoCard
                       key={item.id}
                       item={item}
@@ -1356,7 +1405,7 @@ export function Bank({ user }: BankProps) {
                       onPlay={setPlayingItem}
                       selectionMode={selectionMode}
                       isSelected={selectedIds.has(item.id)}
-                      onToggleSelect={() => toggleSelection(item.id)}
+                      onToggleSelect={(e?: React.MouseEvent) => toggleSelection(item.id, idx, e?.shiftKey)}
                     />
                   ))}
                 </div>
@@ -2061,7 +2110,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
   onPlay: (item: ContentItem) => void
   selectionMode?: boolean
   isSelected?: boolean
-  onToggleSelect?: () => void
+  onToggleSelect?: (e?: React.MouseEvent) => void
 }) {
   const t = useT()
   return (
@@ -2080,7 +2129,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
       <div
         className="relative overflow-hidden cursor-pointer"
         style={{ aspectRatio: '9/16' }}
-        onClick={() => selectionMode ? onToggleSelect?.() : (item.file_url || item.storage_path) && onPlay(item)}
+        onClick={e => selectionMode ? onToggleSelect?.(e) : (item.file_url || item.storage_path) && onPlay(item)}
       >
         <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
 
@@ -2101,7 +2150,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
             ? { background: 'var(--accent)', border: '1px solid var(--accent)', opacity: 1 }
             : { background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.3)', opacity: 0 }
           }
-          onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
+          onClick={e => { e.stopPropagation(); onToggleSelect?.(e) }}
           title={isSelected ? t('bankCardDeselect') : t('bankCardSelect')}
         >
           {isSelected && <IconCheck size={9} className="text-white" strokeWidth={2.5} />}
@@ -2112,7 +2161,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
           <button
             className="absolute top-2 left-2 z-10 w-5 h-5 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
             style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.35)' }}
-            onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
+            onClick={e => { e.stopPropagation(); onToggleSelect?.(e) }}
           />
         )}
 
@@ -2305,7 +2354,11 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
   }
 
   async function confirm() {
-    const its = items.filter(i => selected.has(i.id))
+    // On respecte l'ORDRE DE SÉLECTION (clics) — `selected` est un Set qui
+    // conserve l'ordre d'insertion — et non l'ordre d'affichage de la grille,
+    // pour que le mode séquentiel (téléphone 1 = vidéo 1) suive les clics.
+    const byId = new Map(items.map(i => [i.id, i]))
+    const its = [...selected].map(id => byId.get(id)).filter((i): i is ContentItem => !!i)
     const { paths, resolved } = await resolvePaths(its)
     setResolving(null)
     onSelect(paths, resolved.map(i => i.title), resolved.map(i => getItemDesc(i)), resolved)

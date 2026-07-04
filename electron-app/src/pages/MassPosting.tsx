@@ -27,6 +27,7 @@ import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
 import { loadPostingOpts, savePostingOpts, buildScheduleTimes, effectiveConcurrency, type PostingOpts } from '@/lib/postingOpts'
 import { PostingOptions } from '@/components/PostingOptions'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface MassPostingProps { user: User }
 
@@ -207,6 +208,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]     = useState('')
+  const [hideBanned, setHideBanned]       = useState(() => localStorage.getItem('sf-hide-banned') !== '0')
+  useEffect(() => { localStorage.setItem('sf-hide-banned', hideBanned ? '1' : '0') }, [hideBanned])
   const [phonePickMode, setPhonePickMode] = useState<'phones' | 'groups'>('phones')
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
   const [showBankPicker, setShowBankPicker] = useState(false)
@@ -536,7 +539,7 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`  ${tasks.length} tâche(s) annulée(s)`, 'warn')
       }
     } catch (e) {
-      log(`  annulation tâches: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+      log(`  Impossible d'annuler certaines tâches`, 'warn')
     }
     try {
       if (phones.length > 0) {
@@ -545,7 +548,7 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`  ${phones.length} téléphone(s) éteint(s)`, 'warn')
       }
     } catch (e) {
-      log(`  extinction téléphones: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+      log(`  Impossible d'éteindre certains téléphones`, 'warn')
     }
     activeTasksRef.current = []
     activePhonesRef.current = []
@@ -561,7 +564,7 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function generateCaption() {
-    if (!groqKey) { log('Missing Groq key — Settings', 'error'); return }
+    if (!groqKey) { log('Clé Groq manquante — ajoute-la dans les Paramètres', 'error'); return }
     if (!window.electronAPI?.groqRequest) return
     setGenerating(true)
     try {
@@ -584,10 +587,10 @@ export function MassPosting({ user }: MassPostingProps) {
         const choice = (r.data as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content
         if (choice) setCaption(choice.trim())
       } else {
-        log(`Génération échouée: ${r.error}`, 'error')
+        log('La génération de la description a échoué. Réessaie.', 'error')
       }
     } catch (e) {
-      log(`${e instanceof Error ? e.message : String(e)}`, 'error')
+      log('La génération de la description a échoué.', 'error')
     }
     setGenerating(false)
   }
@@ -605,9 +608,9 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function scheduleMassPost(scheduledAt: Date) {
-    if (!bearer)                    { log('Missing GéeLark token — Settings', 'error'); return }
-    if (phoneList.length === 0)     { log('Select at least one phone', 'warn'); return }
-    if (selectedVideos.length === 0){ log('Select at least one video', 'warn'); return }
+    if (!bearer)                    { log('Connexion GéeLark manquante — ajoute ton token dans les Paramètres', 'error'); return }
+    if (phoneList.length === 0)     { log('Sélectionne au moins un téléphone', 'warn'); return }
+    if (selectedVideos.length === 0){ log('Sélectionne au moins une vidéo', 'warn'); return }
     // GéeLark expire les fichiers uploadés après 30 jours — bloque au-delà de 25
     if (scheduledAt.getTime() > Date.now() + 25 * 24 * 60 * 60 * 1000) {
       log('Programmation limitée à 25 jours (les vidéos uploadées chez GéeLark expirent après 30 jours)', 'error')
@@ -652,9 +655,9 @@ export function MassPosting({ user }: MassPostingProps) {
       for (let i = 0; i < videosToSchedule.length; i++) {
         const sv = videosToSchedule[i]
         const filePath = await resolveVideoPath(sv)
-        if (!filePath) { await refundOnFailure(`Chemin manquant pour ${sv.item.title}`); return }
+        if (!filePath) { await refundOnFailure(`Fichier introuvable pour « ${sv.item.title} »`); return }
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
-        if (!up.ok || !up.token) { await refundOnFailure(`Upload échoué pour ${sv.item.title}: ${up.error}`); return }
+        if (!up.ok || !up.token) { await refundOnFailure(`Échec de l'envoi de « ${sv.item.title} » vers GéeLark`); return }
         tokenMap.set(i, up.token)
         log(`Vidéo ${i + 1}/${videosToSchedule.length} prête`, 'ok')
       }
@@ -669,21 +672,21 @@ export function MassPosting({ user }: MassPostingProps) {
           platform,
         })
       } catch (err: any) {
-        await refundOnFailure(`Programmation échouée : ${err.message}`)
+        await refundOnFailure('La programmation a échoué.')
         return
       }
       log(`Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
     } catch (err: any) {
-      log(`Erreur: ${err.message}`, 'error')
+      log('Une erreur est survenue pendant la programmation.', 'error')
     } finally {
       setPosting(false)
     }
   }
 
   async function post() {
-    if (!bearer)                  { log('Missing GéeLark token — Settings', 'error'); return }
-    if (phoneList.length === 0)   { log('Select at least one phone', 'warn'); return }
-    if (selectedVideos.length === 0) { log('Select at least one video', 'warn'); return }
+    if (!bearer)                  { log('Connexion GéeLark manquante — ajoute ton token dans les Paramètres', 'error'); return }
+    if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
+    if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
 
     // Légende à poster pour une vidéo donnée : sa description de banque si elle
     // en a une, sinon la légende globale saisie. Corrige le cas où chaque vidéo
@@ -743,12 +746,12 @@ export function MassPosting({ user }: MassPostingProps) {
         // condamner tous les tels qui utilisent cette vidéo.
         let up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
         for (let attempt = 0; (!up.ok || !up.token) && attempt < 2; attempt++) {
-          log(`Upload vidéo ${vi + 1} raté (${up.error}) — nouvel essai…`, 'warn')
+          log(`Envoi de la vidéo ${vi + 1} raté — nouvel essai…`, 'warn')
           await new Promise(r => setTimeout(r, 2500 * (attempt + 1)))
           up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
         }
         if (!up.ok || !up.token) {
-          log(`Upload échoué (${sv.item.title}): ${up.error}`, 'error')
+          log(`Échec de l'envoi de « ${sv.item.title} » vers GéeLark`, 'error')
           assignments.forEach(a => {
             if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'error', detail: up.error })
           })
@@ -772,7 +775,7 @@ export function MassPosting({ user }: MassPostingProps) {
         for (let i = 0; i < assignments.length; i += _concurrency) batches.push(assignments.slice(i, i + _concurrency))
         log(`Concurrence : ${_concurrency} téléphone(s) à la fois — ${batches.length} lot(s)${postingOpts.rotatingProxy ? ' · proxy rotatif' : ''}`, 'info')
 
-        const STATUS_B: Record<number, string> = { 1: 'Pending', 2: 'In progress', 3: 'Done', 4: 'Failed', 7: 'Cancelled' }
+        const STATUS_B: Record<number, string> = { 1: 'En attente', 2: 'En cours', 3: 'Publié', 4: 'Échec', 7: 'Annulé' }
         const pollBatch = async (ids: Record<string, string>) => {
           const list = Object.values(ids)
           if (!list.length) return
@@ -839,7 +842,7 @@ export function MassPosting({ user }: MassPostingProps) {
           for (const asgn of batch) {
             if (stopRef.current) break
             const token = tokenMap.get(asgn.videoIndex)
-            if (!token) { log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn'); setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' }); continue }
+            if (!token) { log(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, 'warn'); setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'vidéo non préparée' }); continue }
             // La rotation d'IP a déjà eu lieu AVANT le démarrage du lot (le tél a
             // booté sur l'IP fraîche). On vérifie juste que la connexion est là.
             // (PRÉ-check seulement — jamais de retry, pour ne pas risquer un double post).
@@ -857,7 +860,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 description: capFor(asgn.video), video: [token], ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
               })
               if (taskRes['code'] === 0) break
-              if (attempt < 2) { log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']} — nouvel essai…`, 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
+              if (attempt < 2) { log(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
             }
             if (taskRes && taskRes['code'] === 0) {
               const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
@@ -867,7 +870,7 @@ export function MassPosting({ user }: MassPostingProps) {
               setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
               log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
             } else {
-              log(`  ${asgn.phone.phone_name}: ${taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec'}`, 'error')
+              log(`  ${asgn.phone.phone_name} : ${taskRes?.['msg'] ?? 'la publication a échoué'}`, 'error')
               setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec') })
             }
             await new Promise(r => setTimeout(r, 500))
@@ -927,7 +930,7 @@ export function MassPosting({ user }: MassPostingProps) {
       if (stopRef.current) { log('Run interrompu après le boot', 'warn'); return }
 
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
-      log('Creating post tasks…')
+      log('Préparation des publications…')
       const taskIds: Record<string, string> = {}
       const scheduleTimes = buildScheduleTimes(assignments.length, postingOpts)
       if (postingOpts.intervalMode !== 'none' && assignments.length > 1) {
@@ -958,8 +961,8 @@ export function MassPosting({ user }: MassPostingProps) {
           const asgn = assignments[ai]
           const token = tokenMap.get(asgn.videoIndex)
           if (!token) {
-            log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
-            setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
+            log(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, 'warn')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'vidéo non préparée' })
             continue
           }
           setPhoneStatus(asgn.phone.id, { status: 'posting' })
@@ -986,7 +989,7 @@ export function MassPosting({ user }: MassPostingProps) {
               armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
             })
           } else {
-            log(`  TikTok /task/add: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
+            log(`  TikTok a refusé la publication${typeof taskRes['msg'] === 'string' ? ` — ${taskRes['msg']}` : ''}`, 'error')
             list.forEach(item => setPhoneStatus(assignments[item.ai].phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) }))
           }
         }
@@ -1001,8 +1004,8 @@ export function MassPosting({ user }: MassPostingProps) {
           const asgn = assignments[ai]
           const token = tokenMap.get(asgn.videoIndex)
           if (!token) {
-            log(`  ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
-            setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
+            log(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, 'warn')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'vidéo non préparée' })
             continue
           }
           setPhoneStatus(asgn.phone.id, { status: 'posting' })
@@ -1020,7 +1023,7 @@ export function MassPosting({ user }: MassPostingProps) {
             // Succès → on sort. Sinon backoff avant de réessayer (throttle probable).
             if (taskRes['code'] === 0) break
             if (attempt < 2) {
-              log(`  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']} — nouvel essai…`, 'warn')
+              log(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, 'warn')
               await new Promise(r => setTimeout(r, 3000 * (attempt + 1)))
             }
           }
@@ -1046,7 +1049,7 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
         const pending = new Set(Object.values(taskIds))
         const deadline = Date.now() + 6 * 60 * 1000
-        const STATUS: Record<number, string> = { 1: 'Pending', 2: 'In progress', 3: 'Done', 4: 'Failed', 7: 'Cancelled' }
+        const STATUS: Record<number, string> = { 1: 'En attente', 2: 'En cours', 3: 'Publié', 4: 'Échec', 7: 'Annulé' }
 
         // Phrases spécifiques d'un popup login/vérification — des mots isolés
         // ('confirm', 'login') matchaient l'UI normale d'Instagram (faux positifs).
@@ -1104,7 +1107,7 @@ export function MassPosting({ user }: MassPostingProps) {
           try {
             qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
           } catch (pollErr) {
-            log(`Poll /task/query raté: ${pollErr instanceof Error ? pollErr.message : String(pollErr)} — on réessaie…`, 'warn')
+            log('Vérification du statut échouée — nouvelle tentative…', 'warn')
             continue
           }
           pollCount++
@@ -1117,7 +1120,6 @@ export function MassPosting({ user }: MassPostingProps) {
           // First poll diagnostic: log raw shape so we can fix it if items is empty
           if (pollCount === 1 && items.length === 0) {
             console.log('[mass-posting] /task/query raw response:', JSON.stringify(qRes).slice(0, 800))
-            log(`Réponse /task/query (debug): clés=${Object.keys(d).join(',') || '(vide)'}`, 'warn')
           }
 
           for (const item of items) {
@@ -1139,7 +1141,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 // Power off this phone immediately now that its task is finished
                 geelark(bearer, '/phone/stop', { ids: [phone.geelark_id] })
                   .then(() => log(`  ${phone.phone_name} éteint`, 'ok'))
-                  .catch(e => log(`  extinction ${phone.phone_name}: ${e instanceof Error ? e.message : String(e)}`, 'warn'))
+                  .catch(() => log(`  Extinction de ${phone.phone_name} échouée`, 'warn'))
                 unregisterPhones([phone.geelark_id])
                 activePhonesRef.current = activePhonesRef.current.filter(id => id !== phone.geelark_id)
                 activeTasksRef.current  = activeTasksRef.current.filter(id => id !== tid)
@@ -1200,6 +1202,8 @@ export function MassPosting({ user }: MassPostingProps) {
       const okN = [...finalStatuses.values()].filter(s => s.status === 'done').length
       const errN = [...finalStatuses.values()].filter(s => s.status === 'error').length
       setLastRun({ ok: okN, err: errN, total: assignments.length })
+      // Mémorise les téléphones en échec pour permettre un « Relancer les échecs ».
+      setFailedPhoneIds(phoneList.filter(p => finalStatuses.get(p.id)?.status !== 'done').map(p => p.id))
 
       // Usage unique : retire de la banque les vidéos réellement publiées (au moins
       // un téléphone en succès), pour ne jamais reposter la même. Bank uniquement
@@ -1224,7 +1228,7 @@ export function MassPosting({ user }: MassPostingProps) {
             setSelVideos(prev => prev.filter(sv => !deletedIds.has(sv.item.id)))
             log(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, 'ok')
           } catch (e) {
-            log(`Suppression banque échouée : ${e instanceof Error ? e.message : String(e)}`, 'warn')
+            log('Impossible de retirer certaines vidéos de la banque', 'warn')
           }
         }
       }
@@ -1286,15 +1290,30 @@ export function MassPosting({ user }: MassPostingProps) {
           }
         } catch (e) { console.error('[MassPosting] account_daily write failed', e) }
       })()
-      log('Done! Resetting in 5s…', 'ok')
+      log('Terminé ! Réinitialisation dans 5s…', 'ok')
       await new Promise(r => setTimeout(r, 5000))
       resetMassPosting()
       setSelPhones(new Set())
       setSelVideos([])
 
     } catch (e: unknown) {
-      log(`Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
+      log('Une erreur est survenue pendant le posting.', 'error')
     } finally {
+      // Remboursement des crédits : quoi qu'il arrive (crash, sortie anticipée,
+      // aucun téléphone démarré, Stop utilisateur), chaque téléphone qui n'a PAS
+      // publié est remboursé. settle() est idempotent → sûr même appelé une fois.
+      try {
+        const fin = getMassPostingState().taskStatuses
+        const okCount = phoneList.filter(p => fin.get(p.id)?.status === 'done').length
+        const failedCount = phoneList.length - okCount
+        if (failedCount > 0) run.markFailed(failedCount)
+        const { refunded } = await run.settle()
+        if (refunded > 0) {
+          log(`${refunded} crédit(s) remboursé(s) — ${failedCount} téléphone(s) non publié(s)`, 'info')
+          credits.refresh()
+        }
+      } catch { /* best-effort — jamais bloquer l'extinction des téléphones */ }
+
       // Filet de sécurité DUR : quoi qu'il arrive (crash, throttle, tâche jamais
       // confirmée par GéeLark, sortie anticipée), on éteint TOUS les tels encore
       // marqués actifs. C'est ce qui règle « les tels restent allumés ».
@@ -1324,12 +1343,15 @@ export function MassPosting({ user }: MassPostingProps) {
   const visiblePhones = phones.filter(p => {
     if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (groupFilter !== 'Tous' && p.group_name !== groupFilter) return false
+    // Exclut les comptes détectés comme bloqués (évite de payer 2 cr pour un compte mort).
+    if (hideBanned && p.account_state === 'banned') return false
     if (phoneSearch) {
       const q = phoneSearch.toLowerCase()
       return p.phone_name?.toLowerCase().includes(q) || p.ig_username?.toLowerCase().includes(q)
     }
     return true
   })
+  const bannedCount = phones.filter(p => p.account_state === 'banned').length
 
 
   // Live progress stats
@@ -1341,6 +1363,24 @@ export function MassPosting({ user }: MassPostingProps) {
   const progressPct    = totalTasks > 0 ? Math.round(((doneTasks + errorTasks + cancelledTasks) / totalTasks) * 100) : 0
   const toast = useToast()
   const [lastRun, setLastRun] = useState<{ ok: number; err: number; total: number } | null>(null)
+  const [failedPhoneIds, setFailedPhoneIds] = useState<string[]>([])
+  const [pendingRetry, setPendingRetry]     = useState(false)
+
+  // Relance un run en ne (re)sélectionnant que les téléphones en échec.
+  function retryFailed() {
+    if (failedPhoneIds.length === 0 || posting) return
+    setSelPhones(new Set(failedPhoneIds))
+    setLastRun(null)
+    setFailedPhoneIds([])
+    setPendingRetry(true)  // post() est déclenché par l'effet une fois la sélection à jour
+  }
+  useEffect(() => {
+    if (pendingRetry && !posting) {
+      setPendingRetry(false)
+      post()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRetry, phoneList])
   const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0
   const launchCost = phoneList.length * CREDIT_COSTS.mass_posting
 
@@ -1465,7 +1505,12 @@ export function MassPosting({ user }: MassPostingProps) {
             <span style={{ fontSize: 12.5, fontWeight: 700, color: lastRun.err === 0 ? 'var(--ok)' : 'var(--warn)' }}>
               {lastRun.err === 0 ? '✓' : '!'} Dernier run : {lastRun.ok}/{lastRun.total} réussi{lastRun.ok > 1 ? 's' : ''}{lastRun.err > 0 ? ` · ${lastRun.err} échec${lastRun.err > 1 ? 's' : ''}` : ''}
             </span>
-            <button onClick={() => setLastRun(null)} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ marginLeft: 'auto' }}>
+            {failedPhoneIds.length > 0 && (
+              <button onClick={retryFailed} className="sf-btn sf-btn-primary sf-btn-sm" style={{ marginLeft: 'auto' }}>
+                ↻ Relancer les {failedPhoneIds.length} échec{failedPhoneIds.length > 1 ? 's' : ''}
+              </button>
+            )}
+            <button onClick={() => setLastRun(null)} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ marginLeft: failedPhoneIds.length > 0 ? 0 : 'auto' }}>
               Masquer
             </button>
           </div>
@@ -1563,7 +1608,15 @@ export function MassPosting({ user }: MassPostingProps) {
                     style={{ fontSize: 10, letterSpacing: '0.04em', textTransform: 'uppercase', padding: '2px 6px', color: FAINT }}>
                     {t('massPostingNoneGroup')}
                   </button>
-                  <span style={{ marginLeft: 'auto', fontSize: 10.5, color: FAINT, fontVariantNumeric: 'tabular-nums' }}>{visiblePhones.length}</span>
+                  {bannedCount > 0 && (
+                    <button onClick={() => setHideBanned(v => !v)}
+                      className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+                      title="Masquer les comptes détectés comme bloqués"
+                      style={{ fontSize: 10, letterSpacing: '0.04em', textTransform: 'uppercase', padding: '2px 6px', color: hideBanned ? 'var(--danger)' : FAINT }}>
+                      {hideBanned ? '✓ ' : ''}Bannis masqués ({bannedCount})
+                    </button>
+                  )}
+                  <span style={{ marginLeft: bannedCount > 0 ? 0 : 'auto', fontSize: 10.5, color: FAINT, fontVariantNumeric: 'tabular-nums' }}>{visiblePhones.length}</span>
                 </div>
               </div>
             )}
@@ -1659,6 +1712,25 @@ export function MassPosting({ user }: MassPostingProps) {
                 </button>
               )
             })}
+
+            {/* État vide de la colonne téléphones : distingue « pas de token » de « aucun téléphone ». */}
+            {phonePickMode === 'phones' && visiblePhones.length === 0 && (
+              !bearer ? (
+                <EmptyState
+                  compact
+                  title="GéeLark non connecté"
+                  description="Ajoute ton token GéeLark pour importer tes téléphones."
+                  action={{ label: 'Configurer dans les Réglages', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'settings', tab: 'connexions' } })) }}
+                />
+              ) : (
+                <EmptyState
+                  compact
+                  title="Aucun téléphone"
+                  description="Synchronise tes cloud phones GéeLark depuis l'onglet Téléphones."
+                  action={{ label: 'Aller aux Téléphones', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'phones' } })) }}
+                />
+              )
+            )}
 
             {phonePickMode === 'groups' && (() => {
               const realGroups = groups.filter(g => g !== 'Tous')
@@ -2176,37 +2248,32 @@ export function MassPosting({ user }: MassPostingProps) {
           user={user}
           mode="multi"
           resolveMode="signed-url"
-          onSelect={(paths, _titles, descriptions) => {
+          onSelect={(paths, _titles, descriptions, items) => {
             // Si la 1ʳᵉ vidéo choisie a une description et que la légende est
             // vide, on pré-remplit la légende avec (anti-écrasement du texte saisi).
             const firstDesc = descriptions?.find(d => d && d.trim())
             if (firstDesc && !caption.trim()) setCaption(firstDesc.trim())
-            // On zippe chaque chemin avec SA description de banque (index aligné)
-            // AVANT le filtrage anti-doublon, pour conserver la légende par vidéo.
+            // On zippe chaque chemin avec SON item de banque RÉEL (id + storage_path)
+            // et sa description — index aligné — pour que l'usage unique puisse
+            // supprimer la vraie ligne de banque, et garder la légende par vidéo.
             const newVideos: SelectedVideo[] = paths
-              .map((p, i) => ({ p, desc: (descriptions?.[i] ?? '').trim() }))
+              .map((p, i) => ({ p, desc: (descriptions?.[i] ?? '').trim(), real: items?.[i] }))
               .filter(({ p }) => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))
-              .map(({ p, desc }) => ({
-                item: {
-                  id:             `bank-${p}`,
-                  user_id:        user.id,
-                  org_id:         null,
-                  folder:         null,
-                  title:          p.replace(/\\/g, '/').split('/').pop() ?? p,
-                  file_url:       p,
-                  storage_path:   null,
-                  thumbnail_path: null,
-                  thumbnail_url:  null,
-                  duration:       null,
-                  tags:           [],
-                  notes:          desc,
-                  description:    desc || undefined,
-                  used_count:     0,
-                  created_at:     new Date().toISOString(),
-                  updated_at:     new Date().toISOString(),
-                },
+              .map(({ p, desc, real }) => ({
+                item: real
+                  // Vrai item de banque : on garde son id + storage_path (pour la
+                  // suppression usage unique) et on force file_url = URL signée.
+                  ? { ...real, file_url: p, description: (real.description ?? desc) || undefined, notes: real.notes || desc }
+                  // Fallback (BankPicker ancien sans items) : item synthétique.
+                  : {
+                    id: `bank-${p}`, user_id: user.id, org_id: null, folder: null,
+                    title: p.replace(/\\/g, '/').split('/').pop() ?? p,
+                    file_url: p, storage_path: null, thumbnail_path: null, thumbnail_url: null,
+                    duration: null, tags: [], notes: desc, description: desc || undefined,
+                    used_count: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+                  },
                 localPath: null,
-                caption:   desc || null,
+                caption:   (desc || real?.description || '').trim() || null,
               }))
             setSelVideos(prev => [...prev, ...newVideos])
             setShowBankPicker(false)

@@ -12,6 +12,8 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { logActivity } from '@/lib/activityLog'
 import { useT, useLang } from '@/lib/i18n'
+import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
+import { Toggle } from '@/components/ui/Toggle'
 
 interface WarmupProps { user: User }
 
@@ -118,6 +120,27 @@ function IconCircle({ size = 14 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>
 }
 
+// Bandeau « Proxy rotatif » : quand activé, l'édition/warmup se fait EN SÉRIE
+// (1 téléphone à la fois) avec rotation d'IP avant chaque démarrage.
+function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) {
+  const cfg = getProxyRotation()
+  const configured = cfg.enabled && cfg.urls.length > 0
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border-md)' }}>
+      <Toggle
+        on={on}
+        onChange={setOn}
+        warn={!configured}
+        warnTitle="Rotation non configurée — Réglages → Connexions → Rotation d'IP proxy"
+        label="Proxy rotatif"
+        hint={on
+          ? (configured ? 'Traitement 1 par 1 · nouvelle IP avant chaque téléphone' : '⚠ Aucune URL de rotation — configure-la dans les Réglages')
+          : 'Traitement en parallèle · sans rotation d’IP'}
+      />
+    </div>
+  )
+}
+
 export function Warmup({ user }: WarmupProps) {
   const t = useT()
   const { lang } = useLang()
@@ -153,11 +176,11 @@ export function Warmup({ user }: WarmupProps) {
   const [editPicFile,  setEditPicFile]  = useState<string | null>(null)
 
   // ── WARMUP state ──────────────────────────────────────────────────────────
-  const [browseMinutes,   setBrowseMinutes]   = useState(15)
-  const [likePosts,       setLikePosts]       = useState(true)
-  const [watchReels,      setWatchReels]      = useState(true)
-  const [followSuggested, setFollowSuggested] = useState(false)
-  const [warmupKeyword,   setWarmupKeyword]   = useState('')
+  const [browseMinutes,   setBrowseMinutes]   = useState(() => Number(localStorage.getItem('sf-wu-browse') ?? '15'))
+  const [likePosts,       setLikePosts]       = useState(() => localStorage.getItem('sf-wu-like') !== '0')
+  const [watchReels,      setWatchReels]      = useState(() => localStorage.getItem('sf-wu-watch') !== '0')
+  const [followSuggested, setFollowSuggested] = useState(() => localStorage.getItem('sf-wu-follow') === '1')
+  const [warmupKeyword,   setWarmupKeyword]   = useState(() => localStorage.getItem('sf-wu-keyword') ?? '')
   const [warmupPlatform,  setWarmupPlatform]  = useState<'instagram' | 'tiktok'>('instagram')
   const [warmupPlatformChosen, setWarmupPlatformChosen] = useState(false)
   // Engagement TikTok
@@ -168,6 +191,18 @@ export function Warmup({ user }: WarmupProps) {
   // ── Job / execution state ─────────────────────────────────────────────────
   const [jobs,    setJobs]    = useState<PhoneJob[]>([])
   const [running, setRunning] = useState(false)
+
+  // Proxy rotatif : quand coché → traitement EN SÉRIE (1 téléphone à la fois) avec
+  // rotation d'IP avant d'allumer chaque téléphone (édition de profil ET warmup).
+  const [rotProxy, setRotProxy] = useState(() => localStorage.getItem('sf-warmup-rotproxy') === '1')
+  useEffect(() => { localStorage.setItem('sf-warmup-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
+
+  // Persistance de la config de warmup (perdue avant en changeant d'onglet).
+  useEffect(() => { localStorage.setItem('sf-wu-browse', String(browseMinutes)) }, [browseMinutes])
+  useEffect(() => { localStorage.setItem('sf-wu-like', likePosts ? '1' : '0') }, [likePosts])
+  useEffect(() => { localStorage.setItem('sf-wu-watch', watchReels ? '1' : '0') }, [watchReels])
+  useEffect(() => { localStorage.setItem('sf-wu-follow', followSuggested ? '1' : '0') }, [followSuggested])
+  useEffect(() => { localStorage.setItem('sf-wu-keyword', warmupKeyword) }, [warmupKeyword])
   const abortRef = useRef<{ abort: boolean }>({ abort: false })
 
   useEffect(() => { return () => { abortRef.current.abort = true } }, [])
@@ -303,7 +338,11 @@ export function Warmup({ user }: WarmupProps) {
       profilePicUrl: editPicUrl.trim() || undefined,
     }
 
-    await pLimit(targets, MAX_CONCURRENCY, async phone => {
+    // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
+    const rotationUrls = rotProxy ? activeRotationUrls() : []
+    const concurrency  = rotProxy ? 1 : MAX_CONCURRENCY
+
+    await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
         updateJob(phone.id, { status: 'error', error: 'Annulé' })
         return
@@ -315,13 +354,25 @@ export function Warmup({ user }: WarmupProps) {
               nickName:  config.profileName,
               bio:       config.bio,
               avatarUrl: config.profilePicUrl,
+              rotationUrls,
             }, msg => addLog(phone.id, msg))
-          : await editInstagramProfileNative(bearer, phone.id, {
-              nickname:  config.profileName,
-              username:  config.username,
-              biography: config.bio,
-              avatarUrl: config.profilePicUrl,
-            }, msg => addLog(phone.id, msg))
+          // Changement de pseudo Instagram : on passe par le chemin ADB, qui EFFACE
+          // le champ (select-all + suppr) avant de taper — le RPA natif, lui,
+          // n'efface pas l'ancien username. Sinon (nom/bio/photo seuls) → natif.
+          : config.username
+            ? await updateInstagramProfile(bearer, phone.id, {
+                profileName:   config.profileName,
+                username:      config.username,
+                bio:           config.bio,
+                profilePicUrl: config.profilePicUrl,
+                rotationUrls,
+              }, msg => addLog(phone.id, msg)).then(() => ({ ok: true as const }))
+            : await editInstagramProfileNative(bearer, phone.id, {
+                nickname:  config.profileName,
+                biography: config.bio,
+                avatarUrl: config.profilePicUrl,
+                rotationUrls,
+              }, msg => addLog(phone.id, msg))
         updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
@@ -344,9 +395,12 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets)
 
-    const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested, keyword: warmupKeyword.trim() || undefined }
+    // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
+    const rotationUrls = rotProxy ? activeRotationUrls() : []
+    const concurrency  = rotProxy ? 1 : MAX_CONCURRENCY
+    const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested, keyword: warmupKeyword.trim() || undefined, rotationUrls }
 
-    await pLimit(targets, MAX_CONCURRENCY, async phone => {
+    await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
         updateJob(phone.id, { status: 'error', error: 'Annulé' })
         return
@@ -354,11 +408,11 @@ export function Warmup({ user }: WarmupProps) {
       updateJob(phone.id, { status: 'running' })
       const result = warmupPlatform === 'tiktok'
         // TikTok : warmup natif (recherche/parcours) + engagement (like/follow/commentaire IA)
-        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment }, msg => addLog(phone.id, msg))
+        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment, rotationUrls }, msg => addLog(phone.id, msg))
         // Instagram : mot-clé → recherche ADB ; sinon → warmup IA natif général
         : warmupKeyword.trim()
           ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
-          : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)) }, msg => addLog(phone.id, msg))
+          : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)), rotationUrls }, msg => addLog(phone.id, msg))
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
@@ -1147,6 +1201,8 @@ export function Warmup({ user }: WarmupProps) {
                   </div>
                 </div>
 
+                <ProxyRotToggle on={rotProxy} setOn={setRotProxy} />
+
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"
                   style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
@@ -1316,6 +1372,8 @@ export function Warmup({ user }: WarmupProps) {
                     ))}
                   </div>
                 </div>
+
+                <ProxyRotToggle on={rotProxy} setOn={setRotProxy} />
 
                 {/* Launch button — full width, accent, lg */}
                 <button

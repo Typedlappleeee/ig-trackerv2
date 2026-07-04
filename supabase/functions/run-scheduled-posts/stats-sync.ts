@@ -10,6 +10,7 @@
 // Best-effort : ne jette jamais, no-op si pas de clé.
 
 import { igPost, parseProfile, parseReels } from './ig-rapidapi.ts'
+import { notifyOwner } from './notify.ts'
 
 const STALE_HOURS = 22
 const MAX_PER_INVOCATION = 40
@@ -26,7 +27,7 @@ export async function runStatsSync(db: any, nowIso: string, deadlineMs: number):
 
     // Comptes à suivre.
     const { data: phones } = await db.from('phones')
-      .select('id, user_id, org_id, ig_username, total_views')
+      .select('id, user_id, org_id, ig_username, total_views, account_state')
       .not('ig_username', 'is', null)
       .limit(4000)
     if (!phones || !phones.length) return 0
@@ -71,6 +72,18 @@ export async function runStatsSync(db: any, nowIso: string, deadlineMs: number):
       let { error: uErr } = await db.from('phones').update(fullUpd).eq('id', p.id)
       if (uErr && /pp_url|last_post_at|account_state/.test(uErr.message || '')) {
         if (Object.keys(baseUpd).length) await db.from('phones').update(baseUpd).eq('id', p.id)
+      }
+
+      // Alerte : le compte VIENT de passer en shadowban/banni (transition depuis
+      // un état sain). On ne notifie qu'à la bascule, pas à chaque sync.
+      if ((account_state === 'shadow' || account_state === 'banned')
+          && p.account_state !== 'shadow' && p.account_state !== 'banned') {
+        await notifyOwner(db, { userId: p.user_id, orgId: p.org_id },
+          'account_flagged',
+          account_state === 'shadow' ? '🚫 Compte en shadowban' : '⛔ Compte bloqué',
+          account_state === 'shadow'
+            ? `Le compte @${username} semble en shadowban (vues effondrées). Vérifie-le et lève le pied sur les posts.`
+            : `Le compte @${username} ne répond plus (probable blocage). Vérifie-le avant de continuer à poster dessus.`)
       }
 
       if (prof) {

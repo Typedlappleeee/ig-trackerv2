@@ -11,6 +11,8 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { useConnections } from '@/lib/connections'
+import { syncGeelarkAnalytics } from '@/lib/geelarkAnalytics'
 
 interface TrackingConfig {
   enabled: boolean
@@ -57,6 +59,9 @@ function fmtTime(iso: string | null): string {
 
 export function Reports({ user }: { user: User }) {
   const { currentOrg } = useOrg()
+  const { bearer } = useConnections(user)
+  const [glSyncing, setGlSyncing] = useState(false)
+  const [glMsg, setGlMsg]         = useState('')
   const table  = currentOrg ? 'org_config' : 'app_config'
   const keyCol = currentOrg ? 'org_id' : 'user_id'
   const keyVal = currentOrg ? currentOrg.id : user.id
@@ -155,6 +160,20 @@ export function Reports({ user }: { user: User }) {
     } catch (e) { setLaunchMsg('❌ ' + String(e)); console.error('[Reports] sync exception', e) }
     await load()   // recharge les données fraîchement synchronisées (+ courbe)
     setLaunching(false); setLaunched(true); setTimeout(() => setLaunched(false), 10000)
+  }
+
+  // Synchro via l'analytics GeeLark (inclus au plan Pro — gratuit, sans RapidAPI).
+  async function syncViaGeelark() {
+    setGlSyncing(true); setGlMsg('')
+    try {
+      const r = await syncGeelarkAnalytics(bearer, currentOrg?.id ?? null, user.id)
+      if (r.needsPro) setGlMsg('❌ Analytics indisponible — plan Pro GéeLark requis')
+      else if (!r.ok) setGlMsg('❌ ' + (r.error ?? 'Échec'))
+      else setGlMsg(`✓ ${r.updated} compte(s) mis à jour via GéeLark`)
+    } catch (e) { setGlMsg('❌ ' + String(e)) }
+    await load()
+    setGlSyncing(false)
+    setTimeout(() => setGlMsg(''), 10000)
   }
 
   // Test RapidAPI : appelle l'edge function en mode diagnostic et affiche le détail.
@@ -329,9 +348,11 @@ export function Reports({ user }: { user: User }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: saving ? 0.6 : 1 }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
               <button onClick={launchNow} disabled={launching} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: launching ? 0.6 : 1 }}>{launching ? '⏳ Synchro en cours…' : '⚡ Lancer maintenant'}</button>
+              <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère les stats via l'analytics GeeLark (inclus au plan Pro, sans RapidAPI)">{glSyncing ? '⏳ Synchro GéeLark…' : '🟢 Sync via GéeLark (gratuit)'}</button>
               <button onClick={testApi} disabled={testing} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: testing ? 0.6 : 1 }}>{testing ? 'Test…' : '🔍 Tester l\'API'}</button>
               {saved && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Enregistré</span>}
               {launched && <span style={{ fontSize: 12, color: launchMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{launchMsg || '✓ Synchronisé'}</span>}
+              {glMsg && <span style={{ fontSize: 12, color: glMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{glMsg}</span>}
             </div>
           </div>
         )}

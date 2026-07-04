@@ -6,14 +6,18 @@
 
 module.exports.config = { maxDuration: 30 }
 
+// Domaines autorisés. Les hôtes scontent (miniatures IG) finissent tous par
+// cdninstagram.com ou fbcdn.net → couverts par le suffixe, pas besoin de fragment.
 const ALLOWED = [
-  'instagram.com', 'www.instagram.com', 'i.instagram.com', 'graph.instagram.com', 'api.instagram.com',
-  'cdninstagram.com', 'scontent', 'fbcdn.net', 'supabase.co',
+  'instagram.com', 'cdninstagram.com', 'fbcdn.net', 'supabase.co',
 ]
 function isAllowed(url) {
   try {
-    const { hostname } = new URL(url)
-    return ALLOWED.some(h => hostname === h || hostname.endsWith('.' + h) || hostname.includes(h))
+    const { protocol, hostname } = new URL(url)
+    if (protocol !== 'https:' && protocol !== 'http:') return false
+    // Égalité stricte OU sous-domaine (.domaine). PAS de .includes() : sinon
+    // "supabase.co.attacker.com" ou "scontent.attacker.com" passeraient (SSRF).
+    return ALLOWED.some(h => hostname === h || hostname.endsWith('.' + h))
   } catch { return false }
 }
 

@@ -376,6 +376,14 @@ export default function StoryLink({ user }: { user: User }) {
       .then(() => {}, () => {})
   }
 
+  // Applique un même lien à TOUS les comptes sélectionnés (évite 200 saisies).
+  const [bulkLink, setBulkLink] = useState('')
+  function applyLinkToAll() {
+    const link = bulkLink.trim()
+    if (!link) return
+    selectedIds.forEach(id => setLink(id, link))
+  }
+
   // ── Load phones ───────────────────────────────────────────────────────────
   async function loadPhones() {
     if (!bearer) return
@@ -502,7 +510,7 @@ export default function StoryLink({ user }: { user: User }) {
       const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
         playError()
-        setJobs(selectedIds.map(id => ({ phoneId: id, status: 'error', logs: [`[err] ${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost})`] })))
+        setJobs(selectedIds.map(id => ({ phoneId: id, status: 'error', logs: [`❌ ${creditRes.error ?? 'Crédits insuffisants'} (${creditCost} crédits nécessaires)`] })))
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
@@ -541,10 +549,10 @@ export default function StoryLink({ user }: { user: User }) {
           m => addLog(asgn.phoneId, m),
         )
         if (res.ok) { setStatus(asgn.phoneId, 'ok'); return 1 }
-        else { setStatus(asgn.phoneId, 'error'); addLog(asgn.phoneId, `[err] ${res.error ?? 'Échec'}`); return 0 }
+        else { setStatus(asgn.phoneId, 'error'); addLog(asgn.phoneId, `❌ ${res.error ?? 'La publication de la story a échoué'}`); return 0 }
       } catch (e) {
         setStatus(asgn.phoneId, 'error')
-        addLog(asgn.phoneId, `[err] ${e instanceof Error ? e.message : String(e)}`)
+        addLog(asgn.phoneId, `❌ La publication de la story a échoué (erreur inattendue)`)
         return 0
       } finally {
         try { await stopPhone(bearer, asgn.phoneId) } catch (_) { /* ignore */ }
@@ -573,6 +581,16 @@ export default function StoryLink({ user }: { user: User }) {
     )
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
+
+    // Remboursement des stories non publiées (échec, annulation, Stop). Symétrique
+    // au chemin programmation. Uniquement si on a réellement débité (pas en dryRun).
+    if (!dryRun) {
+      const failed = Math.max(0, selectedIds.length - okCount)
+      if (failed > 0) {
+        const refunded = await refundCredits(credits.ownerId, failed * CREDIT_COSTS.story)
+        if (refunded) credits.refresh()
+      }
+    }
 
     // Historique : on enregistre TOUJOURS le run (réussi ou non) pour que la
     // page Historique soit fiable. (table post_runs, fire-and-forget)
@@ -1280,6 +1298,30 @@ export default function StoryLink({ user }: { user: User }) {
               </p>
             )}
           </div>
+
+          {/* Barre : appliquer un lien à tous les comptes sélectionnés */}
+          {previewAssignments.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, padding: '8px 10px 0' }}>
+              <input
+                value={bulkLink}
+                onChange={e => setBulkLink(e.target.value)}
+                disabled={running}
+                placeholder="Appliquer un lien à tous les comptes…"
+                className="sf-input"
+                style={{ flex: 1, height: 30, fontSize: 11.5, borderRadius: 8 }}
+                onKeyDown={e => { if (e.key === 'Enter') applyLinkToAll() }}
+              />
+              <button
+                onClick={applyLinkToAll}
+                disabled={running || !bulkLink.trim()}
+                className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+                style={{ flexShrink: 0, opacity: (running || !bulkLink.trim()) ? 0.5 : 1 }}
+                title="Renseigne ce lien pour tous les comptes sélectionnés"
+              >
+                Appliquer à tous
+              </button>
+            </div>
+          )}
 
           {/* Assignment list — anim-stagger */}
           <div className="sf-scroll anim-stagger" style={{ flex: 1, padding: '8px 10px' }}>

@@ -1589,19 +1589,31 @@ export function Phones({ user }: PhonesProps) {
                     </svg>
                   </div>
                   <p className="sf-empty-title">{t('phonesNoConfigured')}</p>
-                  <p className="sf-empty-desc">{t('phonesNoConfiguredDesc')}</p>
-                  <button
-                    onClick={syncFromGeelark}
-                    disabled={!bearer || syncing}
-                    className="sf-btn sf-btn-primary sf-btn-lg"
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer', opacity: (!bearer || syncing) ? 0.5 : 1 }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                      <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    {t('phonesSyncGeelark')}
-                  </button>
+                  <p className="sf-empty-desc">
+                    {bearer ? t('phonesNoConfiguredDesc') : 'Connecte d’abord ton compte GéeLark (token) dans les Réglages, puis synchronise tes téléphones.'}
+                  </p>
+                  {bearer ? (
+                    <button
+                      onClick={syncFromGeelark}
+                      disabled={syncing}
+                      className="sf-btn sf-btn-primary sf-btn-lg"
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.5 : 1 }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                        <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {t('phonesSyncGeelark')}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'settings', tab: 'connexions' } }))}
+                      className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+                      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      Connecter GéeLark dans les Réglages
+                    </button>
+                  )}
                 </div>
 
               ) : visible.length === 0 ? (

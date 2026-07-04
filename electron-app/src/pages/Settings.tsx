@@ -1338,7 +1338,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       if (!url) return
                       setRotTest(p => ({ ...p, [i]: { busy: true } }))
                       const r = await rotateProxyIp(url)
-                      setRotTest(p => ({ ...p, [i]: { ok: r.ok, msg: r.ok ? `IP changée ✓ — ${r.detail}` : `Échec : ${r.detail}` } }))
+                      setRotTest(p => ({ ...p, [i]: { ok: r.ok, msg: r.ok ? 'Connexion au proxy réussie, l’IP peut être changée ✓' : `Le proxy n’a pas répondu correctement : ${r.detail}` } }))
                     }
                     const saveRot = async () => {
                       setRotSaving(true)

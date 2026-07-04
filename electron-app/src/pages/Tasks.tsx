@@ -232,7 +232,20 @@ interface RunUnit {
   recur_hours: number
 }
 
+// Déclenche l'exécution des tâches dues CÔTÉ SERVEUR — la MÊME edge function que
+// le cron (chaque minute). On ne poste plus directement depuis le client : ce
+// chemin ne débitait AUCUN crédit (posting récurrent gratuit tant que l'app était
+// ouverte) et pouvait double-exécuter une tâche (aucun verrou). L'edge function,
+// elle, débite les crédits, réserve la tâche de façon atomique (anti-double) et
+// crée le scheduled_post. Filtrée sur l'utilisateur courant via son JWT.
+async function triggerDueTasksOnServer(): Promise<void> {
+  try { await supabase.functions.invoke('run-scheduled-posts', { body: {} }) }
+  catch { /* le cron serveur prendra le relais à la minute suivante */ }
+}
+
 // Entry point — routes to the segmented or legacy single-task flow.
+// ⚠ Déprécié pour le déclenchement automatique (contournait la facturation) —
+// conservé pour référence ; l'exécution passe par triggerDueTasksOnServer().
 async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   if (task.segments && task.segments.length > 0) {
     const now = Date.now()
@@ -338,7 +351,7 @@ async function executeUnit(
   }
 
   if (!bearer) {
-    log('❌ Aucun token GéeLark configuré (bearer vide)')
+    log('❌ Configuration GéeLark manquante')
     await saveResult('failed', 'bearer vide')
     return
   }
@@ -368,7 +381,7 @@ async function executeUnit(
         try {
           imageUrls.push(await resolveTaskMediaUrl(unit.videos[i]))
         } catch (err) {
-          log(`❌ Image échouée (${unit.videos[i].title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
+          log(`❌ Image indisponible (${unit.videos[i].title || '?'})`)
           imageUrls.push(null)
         }
       }
@@ -396,7 +409,7 @@ async function executeUnit(
         const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
         log(`  ${started} démarré(s)`)
         registerStartedPhones(storyIds, { orgId: task.org_id ?? null, userId: task.user_id }, { reason: 'task_story' })
-        log('⏳ Attente 30s (boot)…')
+        log('⏳ Attente 30s (démarrage)…')
         await new Promise(r => setTimeout(r, 30_000))
       }
 
@@ -417,7 +430,7 @@ async function executeUnit(
           if (res.ok) { log(`✅ ${name} — story publiée`); return true }
           else { log(`❌ ${name} : ${res.error ?? 'échec'}`); return false }
         } catch (err) {
-          log(`❌ ${name} : ${err instanceof Error ? err.message : String(err)}`)
+          log(`❌ ${name} : échec de la story`)
           return false
         } finally {
           try { await stopPhone(bearer, phone.geelark_id) } catch { /* ignore */ }
@@ -429,7 +442,7 @@ async function executeUnit(
       await saveResult(okN > 0 ? 'done' : 'failed', okN > 0 ? undefined : 'Aucune story publiée')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      log(`❌ Erreur inattendue: ${msg}`)
+      log('❌ Erreur inattendue')
       await saveResult('failed', msg)
     }
     return
@@ -448,7 +461,7 @@ async function executeUnit(
     // ── Step 1 : upload des vidéos vers GéeLark (séquentiel, AVANT le démarrage) ──
     // Exactement comme MassPosting : on upload d'abord, on démarre les téléphones
     // après. Sinon le téléphone reste inactif pendant l'upload et GéeLark l'éteint.
-    log(`▶ Upload de ${unit.videos.length} vidéo(s) vers GéeLark (parallèle)…`)
+    log(`📤 Envoi de ${unit.videos.length} vidéo(s)…`)
     const tokenByIndex: (string | null)[] = await Promise.all(
       unit.videos.map(async (v, i) => {
         try {
@@ -456,14 +469,14 @@ async function executeUnit(
           log(`✅ Vidéo ${i + 1}/${unit.videos.length} prête`)
           return tok
         } catch (err) {
-          log(`❌ Vidéo ${i + 1} échouée (${v.title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
+          log(`❌ Vidéo ${i + 1} indisponible (${v.title || '?'})`)
           return null
         }
       })
     )
     const validTokens = tokenByIndex.filter((t): t is string => Boolean(t))
     if (!validTokens.length) {
-      const errMsg = 'Upload de toutes les vidéos a échoué'
+      const errMsg = 'Envoi de toutes les vidéos a échoué'
       log(`❌ ${errMsg}`)
       await saveResult('failed', errMsg)
       return
@@ -483,7 +496,7 @@ async function executeUnit(
     }
 
     // ── Step 3 : attente boot 20s ─────────────────────────────────────────────
-    log('⏳ Attente 20s (boot)…')
+    log('⏳ Attente 20s (démarrage)…')
     await new Promise(r => setTimeout(r, 20_000))
 
     // ── Step 4 : création des tâches RPA (séquentiel) ─────────────────────────
@@ -526,10 +539,10 @@ async function executeUnit(
         console.log('[Task] instagramPubReels response data:', JSON.stringify(d))
         if (tid) { rpaIds.push(tid); taskIdByGid[phone.geelark_id] = tid }
         if (useTrialReels) trialReelsActive.add(phone.geelark_id)
-        log(`✅ Tâche créée : ${name}${tid ? '' : ' (ID non récupéré)'}`)
+        log(`✅ Publication lancée : ${name}`)
       } else {
         fails++
-        log(`❌ ${name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
+        log(`❌ ${name} : ${res['msg'] ?? 'Instagram a refusé la publication'}`)
         // Task refused while trial reels was active → mark phone
         if (useTrialReels) {
           await supabase.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', phone.geelark_id)
@@ -540,7 +553,7 @@ async function executeUnit(
     }
 
     if (rpaCreated === 0) {
-      log('❌ Aucune tâche RPA créée')
+      log('❌ Aucune publication lancée')
       log(`⏰ Prochain post dans ${recurHours}h`)
       await saveResult('failed', 'Aucune tâche RPA créée')
       await new Promise(r => setTimeout(r, 5_000))
@@ -550,7 +563,7 @@ async function executeUnit(
 
     // Si tâches créées mais IDs non extraits → même logique qu'MassPosting : auto-stop 5 min
     if (rpaIds.length === 0) {
-      log(`⏳ ${rpaCreated} tâche(s) RPA lancée(s) — arrêt auto dans 5 min (IDs non trackables)…`)
+      log(`⏳ ${rpaCreated} publication(s) lancée(s) — arrêt automatique dans 5 min…`)
       await new Promise(r => setTimeout(r, 5 * 60 * 1000))
       log(`⏰ Prochain post dans ${recurHours}h`)
       await saveResult('done')
@@ -559,7 +572,7 @@ async function executeUnit(
     }
 
     // ── Step 5 : poll jusqu'à complétion (max 8 min) — éteint chaque tél fini ──
-    log(`⏳ Suivi de ${rpaIds.length} tâche(s)…`)
+    log(`⏳ Suivi de ${rpaIds.length} publication(s)…`)
     let pollDone = 0
     let pollFail = 0
     const pending  = new Set(rpaIds)
@@ -567,7 +580,7 @@ async function executeUnit(
     const deadline = Date.now() + 8 * 60 * 1000
     const gidByTid = new Map<string, string>()
     for (const [gid, tid] of Object.entries(taskIdByGid)) gidByTid.set(tid, gid)
-    const STATUS: Record<number, string> = { 1: 'Pending', 2: 'En cours', 3: '✅ Done', 4: '❌ Failed', 7: 'Annulé' }
+    const STATUS: Record<number, string> = { 1: 'En attente', 2: 'En cours', 3: '✅ Terminé', 4: '❌ Échec', 7: 'Annulé' }
     while (pending.size > 0 && Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 10_000))
       let qRes: Record<string, unknown>
@@ -921,7 +934,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
             </p>
           </div>
           <button onClick={onClose} className="cursor-pointer"
-            style={{ background: 'none', border: 'none', color: 'rgba(233,234,240,0.42)', display: 'flex', padding: 6, borderRadius: 6 }}>
+            style={{ background: 'none', border: 'none', color: 'rgba(233,234,240,0.42)', display: 'flex', padding: 6, borderRadius: 8 }}>
             <IconX size={12} />
           </button>
         </div>
@@ -956,7 +969,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
                   <button key={it.id} onClick={() => toggle(it.id)} className="cursor-pointer"
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
-                      padding: '9px 11px', borderRadius: 9, border: 'none',
+                      padding: '9px 11px', borderRadius: 8, border: 'none',
                       background: on ? 'rgba(244,114,182,0.08)' : 'rgba(233,234,240,0.02)',
                       outline: on ? '1px solid rgba(244,114,182,0.3)' : '1px solid transparent',
                       transition: 'all 0.12s',
@@ -990,7 +1003,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
           display: 'flex', gap: 10, justifyContent: 'flex-end',
         }}>
           <button onClick={onClose} className="cursor-pointer"
-            style={{ padding: '9px 16px', fontSize: 11, fontWeight: 700, background: 'transparent', color: 'rgba(233,234,240,0.42)', border: '1px solid rgba(233,234,240,0.08)', borderRadius: 7 }}>
+            style={{ padding: '9px 16px', fontSize: 11, fontWeight: 700, background: 'transparent', color: 'rgba(233,234,240,0.42)', border: '1px solid rgba(233,234,240,0.08)', borderRadius: 8 }}>
             Annuler
           </button>
           <button
@@ -1001,7 +1014,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
               padding: '9px 20px', fontSize: 11, fontWeight: 800,
               background: selected.size > 0 ? '#F472B6' : 'rgba(233,234,240,0.08)',
               color: selected.size > 0 ? '#fff' : 'rgba(233,234,240,0.3)',
-              border: 'none', borderRadius: 7,
+              border: 'none', borderRadius: 8,
             }}
           >
             Ajouter {selected.size > 0 ? `(${selected.size})` : ''}
@@ -1393,7 +1406,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 32, height: 32, borderRadius: 9,
+              width: 32, height: 32, borderRadius: 8,
               background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
@@ -1406,7 +1419,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           <button
             onClick={() => !submitting && onClose()}
             className="cursor-pointer"
-            style={{ background: 'none', border: 'none', color: MUTED, display: 'flex', padding: 6, borderRadius: 6 }}
+            style={{ background: 'none', border: 'none', color: MUTED, display: 'flex', padding: 6, borderRadius: 8 }}
           >
             <IconX size={12} />
           </button>
@@ -1529,7 +1542,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                     >
                       {/* Avatar */}
                       <div style={{
-                        width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                        width: 30, height: 30, borderRadius: 8, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: checked ? GOLD : 'rgba(255,255,255,0.05)',
                         color: checked ? '#fff' : 'rgba(233,234,240,0.55)',
@@ -1585,7 +1598,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 }}
               >
                 <div style={{
-                  width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                  width: 34, height: 34, borderRadius: 8, flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: sequenceMode ? GOLD : 'rgba(255,255,255,0.05)',
                   color: sequenceMode ? '#fff' : 'rgba(233,234,240,0.55)',
@@ -1660,7 +1673,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                     padding: '10px 16px', fontSize: 10.5, fontWeight: 700,
                     letterSpacing: '0.04em', textTransform: 'uppercase',
                     background: 'transparent', color: GOLD,
-                    border: `1px dashed rgba(99,102,241,0.4)`, borderRadius: 9,
+                    border: `1px dashed rgba(99,102,241,0.4)`, borderRadius: 8,
                     transition: 'all 0.15s',
                   }}
                 >
@@ -1687,7 +1700,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                   return (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                       <div style={{
-                        width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                        width: 26, height: 26, borderRadius: 8, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'rgba(255,255,255,0.05)', color: 'rgba(233,234,240,0.6)',
                         fontSize: 12, fontWeight: 700,
@@ -1706,7 +1719,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                           flex: 1, height: 32, padding: '0 10px', fontSize: 12,
                           background: 'rgba(233,234,240,0.02)', color: IVORY,
                           border: `1px solid ${filled ? 'rgba(52,211,153,0.4)' : 'rgba(245,158,11,0.4)'}`,
-                          borderRadius: 7, outline: 'none',
+                          borderRadius: 8, outline: 'none',
                         }}
                       />
                     </div>
@@ -1776,7 +1789,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                           background: isStory ? 'rgba(236,72,153,0.1)' : 'rgba(99,102,241,0.1)',
                           color: accent,
                           border: `1px solid ${isStory ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
-                          borderRadius: 6, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
+                          borderRadius: 8, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
                         }}>
                           {isStory ? <IconLinkType size={11} /> : <IconVideo size={11} />}
                           {isStory ? 'Story' : 'Publication'}
@@ -1806,7 +1819,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                             width: 36, height: 36, flexShrink: 0,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             background: 'none', border: 'none', marginRight: 6,
-                            color: 'rgba(248,113,113,0.55)', borderRadius: 7,
+                            color: 'rgba(248,113,113,0.55)', borderRadius: 8,
                           }}
                         >
                           <IconTrash size={12} />
@@ -1834,14 +1847,14 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                   className="cursor-pointer"
                                   style={{
                                     display: 'flex', alignItems: 'center', gap: 11,
-                                    padding: '11px 14px', borderRadius: 9,
+                                    padding: '11px 14px', borderRadius: 8,
                                     border: `1px solid ${active ? (opt.k === 'story' ? 'rgba(244,114,182,0.45)' : 'rgba(99,102,241,0.45)') : HAIR}`,
                                     background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.08)' : 'rgba(99,102,241,0.08)') : 'rgba(255,255,255,0.02)',
                                     color: active ? optAccent : 'rgba(233,234,240,0.55)',
                                     transition: 'all 0.15s',
                                   }}>
                                   <span style={{
-                                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                                    width: 32, height: 32, borderRadius: 8, flexShrink: 0,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.12)' : 'rgba(99,102,241,0.12)') : 'rgba(255,255,255,0.04)',
                                   }}>
@@ -1868,7 +1881,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               {seg.videos.map((v, i) => (
                                 <span key={i} style={{
                                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                                  padding: '4px 8px 4px 6px', borderRadius: 6,
+                                  padding: '4px 8px 4px 6px', borderRadius: 8,
                                   border: `1px solid ${HAIR}`,
                                   fontSize: 11.5, color: 'rgba(233,234,240,0.7)',
                                   background: 'rgba(233,234,240,0.03)',
@@ -1893,7 +1906,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               display: 'inline-flex', alignItems: 'center', gap: 7,
                               padding: '7px 14px', fontSize: 11, fontWeight: 700,
                               background: accentAlpha + '0.1)', color: accent,
-                              border: `1px solid ${accentAlpha + '0.28)'}`, borderRadius: 7,
+                              border: `1px solid ${accentAlpha + '0.28)'}`, borderRadius: 8,
                             }}
                           >
                             <IconPlus size={10} /> Depuis la banque de médias
@@ -1930,7 +1943,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 {seg.story_texts.map((txt, i) => (
                                   <div key={i} style={{
                                     display: 'flex', alignItems: 'center', gap: 8,
-                                    padding: '7px 10px', borderRadius: 7,
+                                    padding: '7px 10px', borderRadius: 8,
                                     border: `1px solid ${HAIR}`,
                                     background: 'rgba(233,234,240,0.02)',
                                   }}>
@@ -1984,7 +1997,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 display: 'inline-flex', alignItems: 'center', gap: 7,
                                 padding: '7px 13px', fontSize: 11, fontWeight: 700,
                                 background: 'rgba(244,114,182,0.07)', color: storyAccent,
-                                border: '1px solid rgba(244,114,182,0.25)', borderRadius: 7,
+                                border: '1px solid rgba(244,114,182,0.25)', borderRadius: 8,
                               }}
                             >
                               <IconPlus size={10} /> Depuis la banque de captions
@@ -2002,11 +2015,11 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <input type="number" min={1} max={9999} value={seg.recurValue}
                                   onChange={e => patchSegment(idx, { recurValue: Math.max(1, Number(e.target.value) || 24) })}
-                                  style={{ width: 62, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                  style={{ width: 62, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none' }} />
                                 <select value={seg.recurUnit}
                                   onChange={e => patchSegment(idx, { recurUnit: e.target.value as 'minutes' | 'heures' | 'jours' })}
                                   className="cursor-pointer"
-                                  style={{ height: 34, padding: '0 6px', fontSize: 12, background: '#0F1014', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }}>
+                                  style={{ height: 34, padding: '0 6px', fontSize: 12, background: '#0F1014', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none' }}>
                                   <option value="minutes">min</option>
                                   <option value="heures">h</option>
                                   <option value="jours">j</option>
@@ -2018,12 +2031,12 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Premier post</p>
                               <input type="datetime-local" value={seg.next_run_at}
                                 onChange={e => patchSegment(idx, { next_run_at: e.target.value })}
-                                style={{ height: 34, padding: '0 10px', fontSize: 12, colorScheme: 'dark', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+                                style={{ height: 34, padding: '0 10px', fontSize: 12, colorScheme: 'dark', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
                             </div>
                             {/* Mode */}
                             <div>
                               <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Ordre médias</p>
-                              <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 7, overflow: 'hidden', height: 34 }}>
+                              <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 8, overflow: 'hidden', height: 34 }}>
                                 {([{ k: 'seq', l: 'Seq.' }, { k: 'random', l: 'Aléa.' }] as const).map(m => (
                                   <button key={m.k} onClick={() => patchSegment(idx, { mode: m.k })} className="cursor-pointer"
                                     style={{
@@ -2043,7 +2056,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <input type="number" min={0} max={120} value={seg.delay_minutes}
                                     onChange={e => patchSegment(idx, { delay_minutes: Math.max(0, Math.min(120, Number(e.target.value) || 0)) })}
-                                    style={{ width: 54, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                    style={{ width: 54, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none' }} />
                                   <span style={{ fontSize: 11, color: MUTED }}>min</span>
                                 </div>
                               </div>
@@ -2053,7 +2066,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               <div>
                                 <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Reels Trial</p>
                                 <button onClick={() => patchSegment(idx, { reels_trial: !seg.reels_trial })} className="cursor-pointer"
-                                  style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.reels_trial ? GOLD : 'transparent', color: seg.reels_trial ? '#0A0B0E' : MUTED, border: seg.reels_trial ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
+                                  style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.reels_trial ? GOLD : 'transparent', color: seg.reels_trial ? '#0A0B0E' : MUTED, border: seg.reels_trial ? 'none' : `1px solid ${HAIR}`, borderRadius: 8 }}>
                                   {seg.reels_trial ? 'Activé' : 'Désactivé'}
                                 </button>
                               </div>
@@ -2063,7 +2076,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Usage unique</p>
                               <button onClick={() => patchSegment(idx, { auto_remove_videos: !seg.auto_remove_videos })}
                                 title="Retire chaque média du pool après utilisation" className="cursor-pointer"
-                                style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.auto_remove_videos ? '#F59E0B' : 'transparent', color: seg.auto_remove_videos ? '#0A0B0E' : MUTED, border: seg.auto_remove_videos ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
+                                style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.auto_remove_videos ? '#F59E0B' : 'transparent', color: seg.auto_remove_videos ? '#0A0B0E' : MUTED, border: seg.auto_remove_videos ? 'none' : `1px solid ${HAIR}`, borderRadius: 8 }}>
                                 {seg.auto_remove_videos ? 'Activé' : 'Désactivé'}
                               </button>
                             </div>
@@ -2114,6 +2127,13 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
               </>
             )}
+            {phoneList.length > 0 && (
+              <span style={{ fontSize: 11, color: MUTED }}
+                title="Coût : 2 crédits × nb téléphones à chaque exécution, plus 50 crédits/jour tant que la tâche est active.">
+                ≈ <span style={{ color: GOLD, fontWeight: 700 }}>{phoneList.length * 2}</span> cr/exéc
+                {' · '}<span style={{ color: GOLD, fontWeight: 700 }}>50</span> cr/jour
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -2123,7 +2143,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               padding: '10px 18px', fontSize: 10.5, fontWeight: 700,
               letterSpacing: '0.05em', textTransform: 'uppercase',
               background: 'transparent', color: MUTED,
-              border: `1px solid ${HAIR}`, borderRadius: 7,
+              border: `1px solid ${HAIR}`, borderRadius: 8,
               opacity: submitting ? 0.4 : 1,
             }}
           >
@@ -2139,7 +2159,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               letterSpacing: '0.05em', textTransform: 'uppercase',
               background: canSubmit ? GOLD : 'rgba(233,234,240,0.08)',
               color: canSubmit ? '#fff' : MUTED,
-              border: 'none', borderRadius: 7, transition: 'all 0.18s',
+              border: 'none', borderRadius: 8, transition: 'all 0.18s',
             }}
             onMouseEnter={e => { if (canSubmit) e.currentTarget.style.background = '#818CF8' }}
             onMouseLeave={e => { if (canSubmit) e.currentTarget.style.background = canSubmit ? GOLD : 'rgba(233,234,240,0.08)' }}
@@ -2293,7 +2313,7 @@ function StepEditor({
       {/* Step header: number badge + type chips + move/delete buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{
-          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+          width: 22, height: 22, borderRadius: 8, flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(233,234,240,0.08)', fontSize: 11, fontWeight: 800, color: MUTED,
         }}>
@@ -2309,7 +2329,7 @@ function StepEditor({
               style={{
                 padding: '4px 10px', fontSize: 10, fontWeight: 700,
                 letterSpacing: '0.04em', textTransform: 'uppercase',
-                borderRadius: 6, border: '1px solid',
+                borderRadius: 8, border: '1px solid',
                 borderColor: step.type === t
                   ? (t === 'publication' ? 'rgba(99,102,241,0.55)' : t === 'story' ? 'rgba(236,72,153,0.55)' : 'rgba(245,158,11,0.55)')
                   : 'rgba(233,234,240,0.1)',
@@ -2328,15 +2348,15 @@ function StepEditor({
         {/* Move / delete */}
         <div style={{ display: 'flex', gap: 4 }}>
           <button onClick={onMoveUp} disabled={index === 0} className="cursor-pointer"
-            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === 0 ? 0.3 : 1 }}>
+            style={{ width: 24, height: 24, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === 0 ? 0.3 : 1 }}>
             ↑
           </button>
           <button onClick={onMoveDown} disabled={index === total - 1} className="cursor-pointer"
-            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === total - 1 ? 0.3 : 1 }}>
+            style={{ width: 24, height: 24, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === total - 1 ? 0.3 : 1 }}>
             ↓
           </button>
           <button onClick={onDelete} className="cursor-pointer"
-            style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.06)', color: '#F87171', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ width: 24, height: 24, borderRadius: 8, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.06)', color: '#F87171', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <IconX size={8} />
           </button>
         </div>
@@ -2356,7 +2376,7 @@ function StepEditor({
               style={{
                 width: 64, height: 30, padding: '0 10px', fontSize: 12,
                 textAlign: 'center', background: 'rgba(233,234,240,0.03)', color: IVORY,
-                border: `1px solid ${HAIR}`, borderRadius: 6, outline: 'none',
+                border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
               }}
             />
             <span style={{ fontSize: 11, color: MUTED }}>min</span>
@@ -2377,7 +2397,7 @@ function StepEditor({
             {mediaList.map((v, i) => (
               <span key={i} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '3px 7px', borderRadius: 6,
+                padding: '3px 7px', borderRadius: 8,
                 border: `1px solid ${HAIR}`, fontSize: 11,
                 color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
               }}>
@@ -2423,7 +2443,7 @@ function StepEditor({
                   className="cursor-pointer"
                   style={{
                     padding: '4px 10px', fontSize: 10, fontWeight: 700,
-                    borderRadius: 6, border: `1px solid ${active ? 'rgba(99,102,241,0.5)' : HAIR}`,
+                    borderRadius: 8, border: `1px solid ${active ? 'rgba(99,102,241,0.5)' : HAIR}`,
                     background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
                     color: active ? '#818CF8' : MUTED,
                   }}
@@ -2439,7 +2459,7 @@ function StepEditor({
               style={{
                 marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '4px 10px', fontSize: 10, fontWeight: 700,
-                borderRadius: 6, border: `1px solid ${step.auto_remove_videos ? 'rgba(245,158,11,0.45)' : HAIR}`,
+                borderRadius: 8, border: `1px solid ${step.auto_remove_videos ? 'rgba(245,158,11,0.45)' : HAIR}`,
                 background: step.auto_remove_videos ? 'rgba(245,158,11,0.12)' : 'transparent',
                 color: step.auto_remove_videos ? '#F59E0B' : MUTED,
               }}
@@ -2472,7 +2492,7 @@ function StepEditor({
               fontSize: 12, lineHeight: 1.5,
               background: 'rgba(233,234,240,0.02)', color: IVORY,
               resize: 'vertical', border: `1px solid ${HAIR}`,
-              borderRadius: 7, outline: 'none', fontFamily: 'inherit',
+              borderRadius: 8, outline: 'none', fontFamily: 'inherit',
               boxSizing: 'border-box',
             }}
           />
@@ -2505,7 +2525,7 @@ function StepEditor({
                       flex: 1, height: 28, padding: '0 8px', fontSize: 11,
                       background: 'rgba(233,234,240,0.02)', color: IVORY,
                       border: `1px solid ${filled ? 'rgba(52,211,153,0.4)' : 'rgba(245,158,11,0.4)'}`,
-                      borderRadius: 6, outline: 'none',
+                      borderRadius: 8, outline: 'none',
                     }}
                   />
                 </div>
@@ -2531,7 +2551,7 @@ function StepEditor({
               style={{
                 flex: 1, height: 30, padding: '0 10px', fontSize: 12,
                 background: 'rgba(233,234,240,0.02)', color: IVORY,
-                border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none',
+                border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
               }}
             />
             <button
@@ -2543,7 +2563,7 @@ function StepEditor({
                 letterSpacing: '0.04em', textTransform: 'uppercase',
                 background: storyTextDraft.trim() ? GOLD : 'rgba(233,234,240,0.08)',
                 color: storyTextDraft.trim() ? '#fff' : MUTED,
-                border: 'none', borderRadius: 6,
+                border: 'none', borderRadius: 8,
               }}
             >
               +
@@ -2554,7 +2574,7 @@ function StepEditor({
               {(step.story_texts ?? []).map((txt, i) => (
                 <span key={i} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '3px 7px', borderRadius: 6,
+                  padding: '3px 7px', borderRadius: 8,
                   border: `1px solid ${HAIR}`, fontSize: 11,
                   color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
                 }}>
@@ -2586,7 +2606,7 @@ function StepEditor({
             style={{
               width: 56, height: 28, padding: '0 8px', fontSize: 12,
               textAlign: 'center', background: 'rgba(233,234,240,0.03)', color: IVORY,
-              border: `1px solid ${HAIR}`, borderRadius: 6, outline: 'none',
+              border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
             }}
           />
           <span style={{ fontSize: 11, color: MUTED }}>min avant l'étape suivante</span>
@@ -2619,7 +2639,7 @@ function FlowConnector({ active, from, to, flowDelay }: { active: boolean; from:
           {/* traînée de la comète */}
           <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
           {/* tête lumineuse */}
-          <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+          <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 999, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
         </div>
       )}
     </div>
@@ -2645,7 +2665,7 @@ function FlowNode({ grad, glow, accent, label, sub, index, icon, onAdd, addTitle
         {icon}
         {typeof index === 'number' && (
           <span style={{
-            position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: 99,
+            position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: 999,
             fontSize: 9, fontWeight: 800, color: '#0A0B0E', background: '#F3F4F6',
             display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #0A0B0E',
           }}>{index}</span>
@@ -2676,6 +2696,8 @@ function TaskCard({
   onToggle,
   onEdit,
   onDelete,
+  onRunNow,
+  onDuplicate,
   onOpenAddVideos,
   toggling,
   deleting,
@@ -2684,6 +2706,8 @@ function TaskCard({
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
+  onRunNow: () => void
+  onDuplicate: () => void
   onOpenAddVideos: (segmentId?: string) => void
   toggling: boolean
   deleting: boolean
@@ -2736,7 +2760,7 @@ function TaskCard({
             background: isActive ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)',
             border: `1px solid ${isActive ? 'rgba(52,211,153,0.28)' : 'rgba(255,255,255,0.1)'}`,
           }}>
-            {isActive && <span style={{ width: 6, height: 6, borderRadius: 99, background: '#34D399', boxShadow: '0 0 6px rgba(52,211,153,0.8)', animation: 'wf-pulse 2s ease-in-out infinite' }} />}
+            {isActive && <span style={{ width: 6, height: 6, borderRadius: 999, background: '#34D399', boxShadow: '0 0 6px rgba(52,211,153,0.8)', animation: 'wf-pulse 2s ease-in-out infinite' }} />}
             {isActive ? 'Actif' : 'En pause'}
           </span>
 
@@ -2754,6 +2778,37 @@ function TaskCard({
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 'auto' }}>
+            <button
+              onClick={onRunNow}
+              disabled={toggling}
+              title="Lancer maintenant"
+              className="cursor-pointer"
+              style={{
+                width: 32, height: 32, borderRadius: 10, border: 'none',
+                background: 'rgba(56,189,248,0.1)', color: '#38BDF8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s', opacity: toggling ? 0.5 : 1, cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(56,189,248,0.22)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(56,189,248,0.1)' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+            </button>
+            <button
+              onClick={onDuplicate}
+              title="Dupliquer"
+              className="cursor-pointer"
+              style={{
+                width: 32, height: 32, borderRadius: 10, border: 'none',
+                background: 'rgba(99,102,241,0.08)', color: '#818CF8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s', cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.18)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
             <button
               onClick={onToggle}
               disabled={toggling}
@@ -2864,7 +2919,7 @@ function TaskCard({
           <FlowConnector active={isActive} from={hasSegments ? (WF_STEP_META[segs[segs.length - 1]?.type] ?? WF_STEP_META.publication).accent : (WF_STEP_META[task.task_type] ?? WF_STEP_META.publication).accent} to="rgba(233,234,240,0.35)" flowDelay={(hasSegments ? segs.length : 1) * 0.4} />
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 99, marginTop: 8,
+              width: 36, height: 36, borderRadius: 999, marginTop: 8,
               border: '1.5px dashed rgba(255,255,255,0.22)', color: 'rgba(233,234,240,0.45)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               animation: isActive ? 'wf-rotate 9s linear infinite' : 'none',
@@ -2943,7 +2998,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
                 <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: 'linear-gradient(90deg, rgba(139,92,246,0.35), rgba(129,140,248,0.35))' }} />
                 <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'wf-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${i * 0.4}s` }}>
                   <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
-                  <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+                  <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 999, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
                 </div>
               </div>
             )}
@@ -2958,7 +3013,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
           <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: 'linear-gradient(90deg, rgba(251,191,36,0.35), rgba(233,234,240,0.2))' }} />
         </div>
         <div style={{
-          width: 34, height: 34, borderRadius: 99,
+          width: 34, height: 34, borderRadius: 999,
           border: '1.5px dashed rgba(255,255,255,0.22)', color: 'rgba(233,234,240,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           animation: 'wf-rotate 9s linear infinite',
@@ -3268,7 +3323,7 @@ export function Tasks({ user }: { user: User }) {
       )
       if (!overdue.length) return
       triggeringRef.current = true
-      Promise.all(overdue.map(t => runTaskNow(t, bearerRef.current).catch(() => {})))
+      triggerDueTasksOnServer()
         .then(() => load())
         .finally(() => { triggeringRef.current = false })
     })
@@ -3287,10 +3342,7 @@ export function Tasks({ user }: { user: User }) {
       if (!hasOverdue) return
       triggeringRef.current = true
       try {
-        const overdue = tasksRef.current.filter(
-          t => t.status === 'active' && isTaskDue(t),
-        )
-        await Promise.all(overdue.map(t => runTaskNow(t, bearerRef.current).catch(() => {})))
+        await triggerDueTasksOnServer()
         await load()
       } catch { /* silent */ }
       finally { triggeringRef.current = false }
@@ -3333,6 +3385,66 @@ export function Tasks({ user }: { user: User }) {
     } finally {
       setDeleting(null)
     }
+  }
+
+  // Dupliquer une tâche — copie toute la config, remise à zéro des timers/compteurs.
+  // Créée EN PAUSE pour éviter une exécution (et une facturation) surprise.
+  async function duplicateTask(task: RecurringTask) {
+    setToggling(task.id)
+    try {
+      const recur = Number(task.recur_hours) || 24
+      const now = Date.now()
+      const segs = (task.segments && task.segments.length > 0)
+        ? task.segments.map(s => ({ ...s, next_run_at: new Date(now + (Number(s.recur_hours) || 24) * 3_600_000).toISOString() }))
+        : []
+      const copy: Record<string, unknown> = {
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        name: `${task.name ?? 'Tâche'} (copie)`, status: 'paused',
+        task_type: task.task_type, phones: task.phones, videos: task.videos,
+        caption: task.caption, story_texts: task.story_texts, mode: task.mode,
+        delay_minutes: task.delay_minutes, recur_hours: recur,
+        next_run_at: new Date(now + recur * 3_600_000).toISOString(),
+        reels_trial: task.reels_trial, auto_remove_videos: (task as { auto_remove_videos?: boolean }).auto_remove_videos ?? false,
+        steps: task.steps ?? [], segments: segs,
+      }
+      const { data, error } = await supabase.from('recurring_tasks').insert(copy).select().single()
+      if (!error && data) setTasks(prev => [data as RecurringTask, ...prev])
+    } finally { setToggling(null) }
+  }
+
+  // Lancer une tâche maintenant : on avance next_run_at à maintenant et on déclenche
+  // l'edge function (qui débite + réserve atomiquement). Permet de tester une config
+  // sans attendre l'échéance.
+  async function runTaskNowManually(task: RecurringTask) {
+    setToggling(task.id)
+    try {
+      const nowIso = new Date().toISOString()
+      const updates: Partial<RecurringTask> = { next_run_at: nowIso, status: 'active' }
+      if (task.segments && task.segments.length > 0) {
+        updates.segments = task.segments.map(s => ({ ...s, next_run_at: nowIso }))
+      }
+      await supabase.from('recurring_tasks').update(updates).eq('id', task.id)
+      await triggerDueTasksOnServer()
+      await load()
+    } finally { setToggling(null) }
+  }
+
+  // Pause / reprise EN MASSE de toutes les tâches.
+  async function pauseAllTasks() {
+    const ids = tasks.filter(t => t.status === 'active').map(t => t.id)
+    if (!ids.length) return
+    await supabase.from('recurring_tasks').update({ status: 'paused' }).in('id', ids)
+    setTasks(prev => prev.map(t => t.status === 'active' ? { ...t, status: 'paused' } : t))
+  }
+  async function resumeAllTasks() {
+    const paused = tasks.filter(t => t.status === 'paused')
+    if (!paused.length) return
+    const now = Date.now()
+    await Promise.all(paused.map(t =>
+      supabase.from('recurring_tasks')
+        .update({ status: 'active', next_run_at: new Date(now + (Number(t.recur_hours) || 24) * 3_600_000).toISOString() })
+        .eq('id', t.id)))
+    await load()
   }
 
   async function addVideosToTask(taskId: string, newVids: SelVideo[], segmentId?: string) {
@@ -3553,6 +3665,23 @@ export function Tasks({ user }: { user: User }) {
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 1120 }}>
+              {(activeTasks.length > 0 || pausedTasks.length > 0) && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', marginRight: 'auto' }}>
+                    {activeTasks.length} active{activeTasks.length > 1 ? 's' : ''} · {pausedTasks.length} en pause
+                  </span>
+                  {activeTasks.length > 0 && (
+                    <button onClick={() => void pauseAllTasks()} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">
+                      ⏸ Tout mettre en pause
+                    </button>
+                  )}
+                  {pausedTasks.length > 0 && (
+                    <button onClick={() => void resumeAllTasks()} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">
+                      ▶ Tout reprendre
+                    </button>
+                  )}
+                </div>
+              )}
               {tasks.map((task, ti) => (
                 <div key={task.id} style={{ animation: 'wf-card-in .45s cubic-bezier(.2,.8,.2,1) both', animationDelay: `${ti * 70}ms` }}>
                   <TaskCard
@@ -3562,6 +3691,8 @@ export function Tasks({ user }: { user: User }) {
                     onToggle={() => void toggleTask(task)}
                     onEdit={() => { setEditTask(task); setShowCreate(true) }}
                     onDelete={() => setDeleteTask(task)}
+                    onRunNow={() => void runTaskNowManually(task)}
+                    onDuplicate={() => void duplicateTask(task)}
                     onOpenAddVideos={(segmentId?: string) => setAddVideosTaskId({ taskId: task.id, segmentId })}
                   />
                 </div>

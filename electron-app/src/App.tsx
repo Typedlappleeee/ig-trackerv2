@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense, type ComponentType } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react'
 import { isChunkError, reloadForChunk } from '@/components/ChunkErrorBoundary'
 import type { User } from '@supabase/supabase-js'
 import { useAuth }           from '@/hooks/useAuth'
@@ -371,6 +371,49 @@ function BugScreen() {
   )
 }
 
+// Annonce ponctuelle : compatibilité universelle de l'automatisation.
+function AndroidCompatPopup({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
+      <div className="bg-[#080610] border border-[#22c55e]/25 rounded-2xl p-8 w-full max-w-md shadow-2xl text-center space-y-5 anim-scale-in">
+        <div className="flex flex-col items-center gap-3">
+          <div style={{ width: 60, height: 60, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)' }}>🤖</div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#22c55e' }}>Nouveauté</div>
+            <h2 className="text-2xl font-black text-white tracking-tight mt-1">Compatible avec tous les Android</h2>
+          </div>
+        </div>
+
+        <p className="text-sm text-text2 leading-relaxed">
+          L'automatisation fonctionne <b>désormais sur tous les Android</b> et est <b>compatible avec toutes les versions d'Instagram</b>. Plus besoin d'une version ou d'une configuration spécifique — tu postes directement.
+        </p>
+
+        <div className="text-left space-y-2">
+          {[
+            { icon: '✅', text: 'Fonctionne sur tous les cloud phones Android' },
+            { icon: '📲', text: 'Compatible avec toutes les versions d\'Instagram' },
+            { icon: '🚀', text: 'Aucune configuration spéciale requise pour poster' },
+          ].map(({ icon, text }) => (
+            <div key={text} className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+              style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)' }}>
+              <span className="text-base flex-shrink-0">{icon}</span>
+              <span className="text-sm text-text2">{text}</span>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{ background: 'linear-gradient(130deg,#16a34a,#22c55e)', border: 'none' }}
+          className="w-full text-white font-bold py-3 rounded-xl text-sm hover:opacity-90 active:scale-[0.98] transition-all"
+        >
+          C'est parti →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function BetaPopup({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
@@ -558,21 +601,28 @@ import Hub                   from '@/pages/Hub'
 // → l'import() échoue. Plutôt que de casser la page, on retente une fois (déploiement
 // en cours / réseau), puis on recharge proprement l'app (index.html est en no-cache,
 // donc le reload récupère les nouveaux chunks). Évite le « Failed to fetch module ».
-function lazyWithReload<T extends ComponentType<unknown>>(factory: () => Promise<{ default: T }>) {
-  return lazy(() =>
+// Le générique porte les VRAIES props de la page (ComponentType<P>) au lieu de
+// ComponentType<unknown> — sinon chaque page perd le type de ses props et le
+// typecheck casse (c'était la cause des 54 erreurs TS, toutes dans ce fichier).
+// T extends ComponentType<any> (et non <unknown>) : un composant à props
+// spécifiques (ex. ComponentType<PhonesProps>) reste assignable — c'est ce qui
+// évite les 54 erreurs TS que provoquait la contrainte <unknown>.
+function lazyWithReload<T extends ComponentType<any>>(factory: () => Promise<{ default: T }>): LazyExoticComponent<T> {
+  const load = (): Promise<{ default: T }> =>
     factory().catch(async (err) => {
       const msg = err instanceof Error ? err.message : String(err)
       if (!isChunkError(msg)) throw err
       await new Promise(r => setTimeout(r, 600))
       try { return await factory() } catch { reloadForChunk() }
       return { default: (() => null) as unknown as T }   // le temps que le reload prenne effet
-    }),
-  )
+    })
+  return lazy(load)
 }
 
 const Phones          = lazyWithReload(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
 
 const TikTokPosting   = lazyWithReload(() => import('@/pages/TikTokPosting'))
+const CrossPosting    = lazyWithReload(() => import('@/pages/CrossPosting').then(m => ({ default: m.CrossPosting })))
 const Publish        = lazyWithReload(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
 const Stats          = lazyWithReload(() => import('@/pages/Stats').then(m => ({ default: m.Stats })))
 const BankHub        = lazyWithReload(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
@@ -606,6 +656,7 @@ import type { PageKey }      from '@/lib/supabase'
 
 const BETA_KEY  = 'scaleflow-v1-seen'
 const TOUR_KEY  = 'scaleflow-show-tour'
+const ANDROID_COMPAT_KEY = 'sf-announce-android-compat'
 
 function AppContent({ user }: { user: User }) {
   const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError, role, perms } = useOrg()
@@ -630,6 +681,7 @@ function AppContent({ user }: { user: User }) {
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showTour, setShowTour]             = useState(() => !!localStorage.getItem(TOUR_KEY))
   const [showBeta, setShowBeta]             = useState(false)
+  const [showAndroidCompat, setShowAndroidCompat] = useState(() => !localStorage.getItem(ANDROID_COMPAT_KEY))
   const [phoneCount, setPhoneCount]         = useState(0)
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
   const [refreshTick, setRefreshTick]       = useState(0)
@@ -835,6 +887,18 @@ function AppContent({ user }: { user: User }) {
     setSettingsPanel(tab)
   }
 
+  // Bus de navigation global : n'importe quel écran peut demander à naviguer
+  // (ex. un état vide « Connecter GéeLark → Réglages ») via un CustomEvent, sans
+  // devoir recevoir onNavigate en prop.
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const d = (e as CustomEvent<{ page: string; tab?: string }>).detail
+      if (d?.page) handleNavigate(d.page as Page, d.tab)
+    }
+    window.addEventListener('sf:navigate', onNav as EventListener)
+    return () => window.removeEventListener('sf:navigate', onNav as EventListener)
+  }, [])
+
   function handleRefresh() {
     setLastRefresh(new Date())
     setRefreshTick(t => t + 1)
@@ -876,6 +940,7 @@ function AppContent({ user }: { user: User }) {
       case 'phones':          return <Phones          user={user} key={refreshTick} />
 
       case 'tiktokposting':   return <TikTokPosting   user={user} />
+      case 'crossposting':    return <CrossPosting    user={user} />
       case 'posting':      return <Publish     user={user} />
       case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
@@ -911,6 +976,9 @@ function AppContent({ user }: { user: User }) {
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
+      {!showBeta && showAndroidCompat && (
+        <AndroidCompatPopup onClose={() => { localStorage.setItem(ANDROID_COMPAT_KEY, '1'); setShowAndroidCompat(false) }} />
+      )}
       {showTour && <AppTour
         onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }}
         onNavigate={p => { setPage(p as Page) }}
