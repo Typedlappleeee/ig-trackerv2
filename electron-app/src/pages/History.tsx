@@ -8,6 +8,7 @@ import { useToast } from '@/components/Toast'
 import { fmtScheduledTime } from '@/lib/schedulerService'
 import type { ScheduledPost } from '@/lib/schedulerService'
 import type { Page } from '@/components/Layout'
+import { getActiveRuns, subscribeActiveRuns, type ActiveRun } from '@/lib/activeRuns'
 import {
   TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR,
   BG_0 as BG, BG_2 as BG2, ACCENT, ACCENT_L, OK, ERR, SANS,
@@ -337,6 +338,9 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
         )}
       </div>
 
+      {/* Postings en cours (live) */}
+      <ActiveRunsSection onNavigate={onNavigate} />
+
       {/* Filters: source tabs + status + search */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         {filterBtn('all', 'Tout')}
@@ -639,6 +643,62 @@ function PostDetailModal({ view, onClose }: { view: DetailView; onClose: () => v
             )}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Section « postings en cours » (live, alimentée par le registre activeRuns) ──
+const RUN_META: Record<ActiveRun['type'], { emoji: string; page: string }> = {
+  mass:    { emoji: '🚀', page: 'posting' },
+  story:   { emoji: '📸', page: 'storylink' },
+  warmup:  { emoji: '🔥', page: 'warmup' },
+  threads: { emoji: '🧵', page: 'posting' },
+}
+
+function ActiveRunsSection({ onNavigate }: { onNavigate?: (p: Page) => void }) {
+  const [runs, setRuns] = useState<ActiveRun[]>(getActiveRuns())
+  useEffect(() => subscribeActiveRuns(() => setRuns(getActiveRuns())), [])
+
+  if (runs.length === 0) return null
+
+  // Conflit : un proxy utilisé par ≥ 2 runs actifs en même temps.
+  const cnt = new Map<string, number>()
+  for (const r of runs) if (r.status === 'running') for (const k of new Set(r.proxyKeys)) cnt.set(k, (cnt.get(k) ?? 0) + 1)
+  const clash = new Set([...cnt.entries()].filter(([, n]) => n >= 2).map(([k]) => k))
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
+        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)' }}>En cours</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{runs.filter(r => r.status === 'running').length} posting(s)</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {runs.map(r => {
+          const m = RUN_META[r.type]
+          const pct = r.total > 0 ? Math.round((r.done / r.total) * 100) : 0
+          const conflicted = r.status === 'running' && r.proxyKeys.some(k => clash.has(k))
+          const color = r.status === 'error' ? 'var(--danger)' : r.status === 'done' ? 'var(--ok)' : 'var(--accent)'
+          return (
+            <div key={r.id}
+              onClick={() => r.page && onNavigate?.(r.page as Page)}
+              className={r.page ? 'cursor-pointer' : ''}
+              style={{ padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: `1px solid ${conflicted ? 'rgba(239,68,68,0.5)' : 'var(--border-md)'}`, display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <span style={{ fontSize: 16 }}>{m.emoji}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{r.label}</span>
+                {conflicted && <span title="Même proxy qu'un autre posting — risque de ban" style={{ fontSize: 12 }}>⚠️ même proxy</span>}
+                <span style={{ marginLeft: 'auto', fontSize: 12.5, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>
+                  {r.status === 'running' ? `${r.done}/${r.total} · ${pct}%` : r.status === 'done' ? '✓ terminé' : '✕ échec'}
+                </span>
+              </div>
+              <div style={{ height: 5, borderRadius: 5, background: 'var(--surface-3)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${r.status === 'done' ? 100 : pct}%`, background: color, transition: 'width .3s' }} />
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
