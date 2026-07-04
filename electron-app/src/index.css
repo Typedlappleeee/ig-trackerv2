@@ -738,14 +738,41 @@ html[data-glass="off"] * {
   -webkit-backdrop-filter: none !important;
 }
 
-/* Dark/Light mode — invert trick (works great in Electron/Chromium) */
-html[data-theme="light"] body {
-  filter: invert(1) hue-rotate(180deg);
-  background: #fff;
+/* ── Light theme — vrai thème via redéfinition des tokens ────────────────────
+   (remplace l'ancien hack filter:invert qui dénaturait le violet de marque et
+   double-inversait les médias). Tout ce qui utilise var(--…) s'adapte ; le
+   violet d'accent et les images/vidéos restent intacts. */
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --void:       #FFFFFF;
+  --base:       #F6F7FB;
+  --surface:    #FFFFFF;
+  --surface-2:  #F2F3F8;
+  --surface-3:  #E9EAF2;
+  --overlay:    rgba(255,255,255,0.96);
+
+  --border:        rgba(20,20,45,0.08);
+  --border-md:     rgba(20,20,45,0.12);
+  --border-strong: rgba(20,20,45,0.18);
+  --border-accent: rgba(99,102,241,0.30);
+
+  --accent-dim:  rgba(99,102,241,0.10);
+  --accent-dim2: rgba(99,102,241,0.05);
+
+  --text-1: #14142B;
+  --text-2: rgba(67,56,142,0.82);
+  --text-3: rgba(71,85,105,0.72);
+  --text-4: rgba(100,116,139,0.55);
+
+  --shadow-sm:  0 1px 3px rgba(20,20,50,0.08), 0 1px 2px rgba(20,20,50,0.05);
+  --shadow-md:  0 4px 16px rgba(20,20,50,0.10), 0 1px 4px rgba(20,20,50,0.06);
+  --shadow-lg:  0 8px 40px rgba(20,20,50,0.14), 0 2px 8px rgba(20,20,50,0.08);
+  --shadow-card:0 1px 3px rgba(20,20,50,0.06), 0 4px 16px rgba(20,20,50,0.06);
 }
-html[data-theme="light"] img,
-html[data-theme="light"] video,
-html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
+/* Voile clair : convertit les sur-couches blanches en dark (rgba(255,255,255,x))
+   codées en dur — sinon invisibles sur fond clair. Cible large mais sûre. */
+html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
 
 /* ══════════════════════════════════════════════════════════════════════════════ */
 

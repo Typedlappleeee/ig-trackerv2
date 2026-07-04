@@ -934,7 +934,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
             </p>
           </div>
           <button onClick={onClose} className="cursor-pointer"
-            style={{ background: 'none', border: 'none', color: 'rgba(233,234,240,0.42)', display: 'flex', padding: 6, borderRadius: 6 }}>
+            style={{ background: 'none', border: 'none', color: 'rgba(233,234,240,0.42)', display: 'flex', padding: 6, borderRadius: 8 }}>
             <IconX size={12} />
           </button>
         </div>
@@ -969,7 +969,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
                   <button key={it.id} onClick={() => toggle(it.id)} className="cursor-pointer"
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
-                      padding: '9px 11px', borderRadius: 9, border: 'none',
+                      padding: '9px 11px', borderRadius: 8, border: 'none',
                       background: on ? 'rgba(244,114,182,0.08)' : 'rgba(233,234,240,0.02)',
                       outline: on ? '1px solid rgba(244,114,182,0.3)' : '1px solid transparent',
                       transition: 'all 0.12s',
@@ -1003,7 +1003,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
           display: 'flex', gap: 10, justifyContent: 'flex-end',
         }}>
           <button onClick={onClose} className="cursor-pointer"
-            style={{ padding: '9px 16px', fontSize: 11, fontWeight: 700, background: 'transparent', color: 'rgba(233,234,240,0.42)', border: '1px solid rgba(233,234,240,0.08)', borderRadius: 7 }}>
+            style={{ padding: '9px 16px', fontSize: 11, fontWeight: 700, background: 'transparent', color: 'rgba(233,234,240,0.42)', border: '1px solid rgba(233,234,240,0.08)', borderRadius: 8 }}>
             Annuler
           </button>
           <button
@@ -1014,7 +1014,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
               padding: '9px 20px', fontSize: 11, fontWeight: 800,
               background: selected.size > 0 ? '#F472B6' : 'rgba(233,234,240,0.08)',
               color: selected.size > 0 ? '#fff' : 'rgba(233,234,240,0.3)',
-              border: 'none', borderRadius: 7,
+              border: 'none', borderRadius: 8,
             }}
           >
             Ajouter {selected.size > 0 ? `(${selected.size})` : ''}
@@ -1406,7 +1406,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 32, height: 32, borderRadius: 9,
+              width: 32, height: 32, borderRadius: 8,
               background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
@@ -1419,7 +1419,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           <button
             onClick={() => !submitting && onClose()}
             className="cursor-pointer"
-            style={{ background: 'none', border: 'none', color: MUTED, display: 'flex', padding: 6, borderRadius: 6 }}
+            style={{ background: 'none', border: 'none', color: MUTED, display: 'flex', padding: 6, borderRadius: 8 }}
           >
             <IconX size={12} />
           </button>
@@ -1542,7 +1542,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                     >
                       {/* Avatar */}
                       <div style={{
-                        width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                        width: 30, height: 30, borderRadius: 8, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: checked ? GOLD : 'rgba(255,255,255,0.05)',
                         color: checked ? '#fff' : 'rgba(233,234,240,0.55)',
@@ -1598,7 +1598,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 }}
               >
                 <div style={{
-                  width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                  width: 34, height: 34, borderRadius: 8, flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: sequenceMode ? GOLD : 'rgba(255,255,255,0.05)',
                   color: sequenceMode ? '#fff' : 'rgba(233,234,240,0.55)',
@@ -1673,7 +1673,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                     padding: '10px 16px', fontSize: 10.5, fontWeight: 700,
                     letterSpacing: '0.04em', textTransform: 'uppercase',
                     background: 'transparent', color: GOLD,
-                    border: `1px dashed rgba(99,102,241,0.4)`, borderRadius: 9,
+                    border: `1px dashed rgba(99,102,241,0.4)`, borderRadius: 8,
                     transition: 'all 0.15s',
                   }}
                 >
@@ -1700,7 +1700,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                   return (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                       <div style={{
-                        width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                        width: 26, height: 26, borderRadius: 8, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'rgba(255,255,255,0.05)', color: 'rgba(233,234,240,0.6)',
                         fontSize: 12, fontWeight: 700,
@@ -1719,7 +1719,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                           flex: 1, height: 32, padding: '0 10px', fontSize: 12,
                           background: 'rgba(233,234,240,0.02)', color: IVORY,
                           border: `1px solid ${filled ? 'rgba(52,211,153,0.4)' : 'rgba(245,158,11,0.4)'}`,
-                          borderRadius: 7, outline: 'none',
+                          borderRadius: 8, outline: 'none',
                         }}
                       />
                     </div>
@@ -1789,7 +1789,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                           background: isStory ? 'rgba(236,72,153,0.1)' : 'rgba(99,102,241,0.1)',
                           color: accent,
                           border: `1px solid ${isStory ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
-                          borderRadius: 6, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
+                          borderRadius: 8, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
                         }}>
                           {isStory ? <IconLinkType size={11} /> : <IconVideo size={11} />}
                           {isStory ? 'Story' : 'Publication'}
@@ -1819,7 +1819,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                             width: 36, height: 36, flexShrink: 0,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             background: 'none', border: 'none', marginRight: 6,
-                            color: 'rgba(248,113,113,0.55)', borderRadius: 7,
+                            color: 'rgba(248,113,113,0.55)', borderRadius: 8,
                           }}
                         >
                           <IconTrash size={12} />
@@ -1847,14 +1847,14 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                   className="cursor-pointer"
                                   style={{
                                     display: 'flex', alignItems: 'center', gap: 11,
-                                    padding: '11px 14px', borderRadius: 9,
+                                    padding: '11px 14px', borderRadius: 8,
                                     border: `1px solid ${active ? (opt.k === 'story' ? 'rgba(244,114,182,0.45)' : 'rgba(99,102,241,0.45)') : HAIR}`,
                                     background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.08)' : 'rgba(99,102,241,0.08)') : 'rgba(255,255,255,0.02)',
                                     color: active ? optAccent : 'rgba(233,234,240,0.55)',
                                     transition: 'all 0.15s',
                                   }}>
                                   <span style={{
-                                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                                    width: 32, height: 32, borderRadius: 8, flexShrink: 0,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.12)' : 'rgba(99,102,241,0.12)') : 'rgba(255,255,255,0.04)',
                                   }}>
@@ -1881,7 +1881,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               {seg.videos.map((v, i) => (
                                 <span key={i} style={{
                                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                                  padding: '4px 8px 4px 6px', borderRadius: 6,
+                                  padding: '4px 8px 4px 6px', borderRadius: 8,
                                   border: `1px solid ${HAIR}`,
                                   fontSize: 11.5, color: 'rgba(233,234,240,0.7)',
                                   background: 'rgba(233,234,240,0.03)',
@@ -1906,7 +1906,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               display: 'inline-flex', alignItems: 'center', gap: 7,
                               padding: '7px 14px', fontSize: 11, fontWeight: 700,
                               background: accentAlpha + '0.1)', color: accent,
-                              border: `1px solid ${accentAlpha + '0.28)'}`, borderRadius: 7,
+                              border: `1px solid ${accentAlpha + '0.28)'}`, borderRadius: 8,
                             }}
                           >
                             <IconPlus size={10} /> Depuis la banque de médias
@@ -1943,7 +1943,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 {seg.story_texts.map((txt, i) => (
                                   <div key={i} style={{
                                     display: 'flex', alignItems: 'center', gap: 8,
-                                    padding: '7px 10px', borderRadius: 7,
+                                    padding: '7px 10px', borderRadius: 8,
                                     border: `1px solid ${HAIR}`,
                                     background: 'rgba(233,234,240,0.02)',
                                   }}>
@@ -1997,7 +1997,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 display: 'inline-flex', alignItems: 'center', gap: 7,
                                 padding: '7px 13px', fontSize: 11, fontWeight: 700,
                                 background: 'rgba(244,114,182,0.07)', color: storyAccent,
-                                border: '1px solid rgba(244,114,182,0.25)', borderRadius: 7,
+                                border: '1px solid rgba(244,114,182,0.25)', borderRadius: 8,
                               }}
                             >
                               <IconPlus size={10} /> Depuis la banque de captions
@@ -2015,11 +2015,11 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <input type="number" min={1} max={9999} value={seg.recurValue}
                                   onChange={e => patchSegment(idx, { recurValue: Math.max(1, Number(e.target.value) || 24) })}
-                                  style={{ width: 62, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                  style={{ width: 62, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none' }} />
                                 <select value={seg.recurUnit}
                                   onChange={e => patchSegment(idx, { recurUnit: e.target.value as 'minutes' | 'heures' | 'jours' })}
                                   className="cursor-pointer"
-                                  style={{ height: 34, padding: '0 6px', fontSize: 12, background: '#0F1014', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }}>
+                                  style={{ height: 34, padding: '0 6px', fontSize: 12, background: '#0F1014', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none' }}>
                                   <option value="minutes">min</option>
                                   <option value="heures">h</option>
                                   <option value="jours">j</option>
@@ -2031,12 +2031,12 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Premier post</p>
                               <input type="datetime-local" value={seg.next_run_at}
                                 onChange={e => patchSegment(idx, { next_run_at: e.target.value })}
-                                style={{ height: 34, padding: '0 10px', fontSize: 12, colorScheme: 'dark', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+                                style={{ height: 34, padding: '0 10px', fontSize: 12, colorScheme: 'dark', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
                             </div>
                             {/* Mode */}
                             <div>
                               <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Ordre médias</p>
-                              <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 7, overflow: 'hidden', height: 34 }}>
+                              <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 8, overflow: 'hidden', height: 34 }}>
                                 {([{ k: 'seq', l: 'Seq.' }, { k: 'random', l: 'Aléa.' }] as const).map(m => (
                                   <button key={m.k} onClick={() => patchSegment(idx, { mode: m.k })} className="cursor-pointer"
                                     style={{
@@ -2056,7 +2056,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <input type="number" min={0} max={120} value={seg.delay_minutes}
                                     onChange={e => patchSegment(idx, { delay_minutes: Math.max(0, Math.min(120, Number(e.target.value) || 0)) })}
-                                    style={{ width: 54, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none' }} />
+                                    style={{ width: 54, height: 34, padding: '0 8px', fontSize: 13, textAlign: 'center', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none' }} />
                                   <span style={{ fontSize: 11, color: MUTED }}>min</span>
                                 </div>
                               </div>
@@ -2066,7 +2066,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               <div>
                                 <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Reels Trial</p>
                                 <button onClick={() => patchSegment(idx, { reels_trial: !seg.reels_trial })} className="cursor-pointer"
-                                  style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.reels_trial ? GOLD : 'transparent', color: seg.reels_trial ? '#0A0B0E' : MUTED, border: seg.reels_trial ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
+                                  style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.reels_trial ? GOLD : 'transparent', color: seg.reels_trial ? '#0A0B0E' : MUTED, border: seg.reels_trial ? 'none' : `1px solid ${HAIR}`, borderRadius: 8 }}>
                                   {seg.reels_trial ? 'Activé' : 'Désactivé'}
                                 </button>
                               </div>
@@ -2076,7 +2076,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Usage unique</p>
                               <button onClick={() => patchSegment(idx, { auto_remove_videos: !seg.auto_remove_videos })}
                                 title="Retire chaque média du pool après utilisation" className="cursor-pointer"
-                                style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.auto_remove_videos ? '#F59E0B' : 'transparent', color: seg.auto_remove_videos ? '#0A0B0E' : MUTED, border: seg.auto_remove_videos ? 'none' : `1px solid ${HAIR}`, borderRadius: 7 }}>
+                                style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.auto_remove_videos ? '#F59E0B' : 'transparent', color: seg.auto_remove_videos ? '#0A0B0E' : MUTED, border: seg.auto_remove_videos ? 'none' : `1px solid ${HAIR}`, borderRadius: 8 }}>
                                 {seg.auto_remove_videos ? 'Activé' : 'Désactivé'}
                               </button>
                             </div>
@@ -2136,7 +2136,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               padding: '10px 18px', fontSize: 10.5, fontWeight: 700,
               letterSpacing: '0.05em', textTransform: 'uppercase',
               background: 'transparent', color: MUTED,
-              border: `1px solid ${HAIR}`, borderRadius: 7,
+              border: `1px solid ${HAIR}`, borderRadius: 8,
               opacity: submitting ? 0.4 : 1,
             }}
           >
@@ -2152,7 +2152,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               letterSpacing: '0.05em', textTransform: 'uppercase',
               background: canSubmit ? GOLD : 'rgba(233,234,240,0.08)',
               color: canSubmit ? '#fff' : MUTED,
-              border: 'none', borderRadius: 7, transition: 'all 0.18s',
+              border: 'none', borderRadius: 8, transition: 'all 0.18s',
             }}
             onMouseEnter={e => { if (canSubmit) e.currentTarget.style.background = '#818CF8' }}
             onMouseLeave={e => { if (canSubmit) e.currentTarget.style.background = canSubmit ? GOLD : 'rgba(233,234,240,0.08)' }}
@@ -2306,7 +2306,7 @@ function StepEditor({
       {/* Step header: number badge + type chips + move/delete buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{
-          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+          width: 22, height: 22, borderRadius: 8, flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(233,234,240,0.08)', fontSize: 11, fontWeight: 800, color: MUTED,
         }}>
@@ -2322,7 +2322,7 @@ function StepEditor({
               style={{
                 padding: '4px 10px', fontSize: 10, fontWeight: 700,
                 letterSpacing: '0.04em', textTransform: 'uppercase',
-                borderRadius: 6, border: '1px solid',
+                borderRadius: 8, border: '1px solid',
                 borderColor: step.type === t
                   ? (t === 'publication' ? 'rgba(99,102,241,0.55)' : t === 'story' ? 'rgba(236,72,153,0.55)' : 'rgba(245,158,11,0.55)')
                   : 'rgba(233,234,240,0.1)',
@@ -2341,15 +2341,15 @@ function StepEditor({
         {/* Move / delete */}
         <div style={{ display: 'flex', gap: 4 }}>
           <button onClick={onMoveUp} disabled={index === 0} className="cursor-pointer"
-            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === 0 ? 0.3 : 1 }}>
+            style={{ width: 24, height: 24, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === 0 ? 0.3 : 1 }}>
             ↑
           </button>
           <button onClick={onMoveDown} disabled={index === total - 1} className="cursor-pointer"
-            style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === total - 1 ? 0.3 : 1 }}>
+            style={{ width: 24, height: 24, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'none', color: MUTED, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: index === total - 1 ? 0.3 : 1 }}>
             ↓
           </button>
           <button onClick={onDelete} className="cursor-pointer"
-            style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.06)', color: '#F87171', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ width: 24, height: 24, borderRadius: 8, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.06)', color: '#F87171', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <IconX size={8} />
           </button>
         </div>
@@ -2369,7 +2369,7 @@ function StepEditor({
               style={{
                 width: 64, height: 30, padding: '0 10px', fontSize: 12,
                 textAlign: 'center', background: 'rgba(233,234,240,0.03)', color: IVORY,
-                border: `1px solid ${HAIR}`, borderRadius: 6, outline: 'none',
+                border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
               }}
             />
             <span style={{ fontSize: 11, color: MUTED }}>min</span>
@@ -2390,7 +2390,7 @@ function StepEditor({
             {mediaList.map((v, i) => (
               <span key={i} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '3px 7px', borderRadius: 6,
+                padding: '3px 7px', borderRadius: 8,
                 border: `1px solid ${HAIR}`, fontSize: 11,
                 color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
               }}>
@@ -2436,7 +2436,7 @@ function StepEditor({
                   className="cursor-pointer"
                   style={{
                     padding: '4px 10px', fontSize: 10, fontWeight: 700,
-                    borderRadius: 6, border: `1px solid ${active ? 'rgba(99,102,241,0.5)' : HAIR}`,
+                    borderRadius: 8, border: `1px solid ${active ? 'rgba(99,102,241,0.5)' : HAIR}`,
                     background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
                     color: active ? '#818CF8' : MUTED,
                   }}
@@ -2452,7 +2452,7 @@ function StepEditor({
               style={{
                 marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '4px 10px', fontSize: 10, fontWeight: 700,
-                borderRadius: 6, border: `1px solid ${step.auto_remove_videos ? 'rgba(245,158,11,0.45)' : HAIR}`,
+                borderRadius: 8, border: `1px solid ${step.auto_remove_videos ? 'rgba(245,158,11,0.45)' : HAIR}`,
                 background: step.auto_remove_videos ? 'rgba(245,158,11,0.12)' : 'transparent',
                 color: step.auto_remove_videos ? '#F59E0B' : MUTED,
               }}
@@ -2485,7 +2485,7 @@ function StepEditor({
               fontSize: 12, lineHeight: 1.5,
               background: 'rgba(233,234,240,0.02)', color: IVORY,
               resize: 'vertical', border: `1px solid ${HAIR}`,
-              borderRadius: 7, outline: 'none', fontFamily: 'inherit',
+              borderRadius: 8, outline: 'none', fontFamily: 'inherit',
               boxSizing: 'border-box',
             }}
           />
@@ -2518,7 +2518,7 @@ function StepEditor({
                       flex: 1, height: 28, padding: '0 8px', fontSize: 11,
                       background: 'rgba(233,234,240,0.02)', color: IVORY,
                       border: `1px solid ${filled ? 'rgba(52,211,153,0.4)' : 'rgba(245,158,11,0.4)'}`,
-                      borderRadius: 6, outline: 'none',
+                      borderRadius: 8, outline: 'none',
                     }}
                   />
                 </div>
@@ -2544,7 +2544,7 @@ function StepEditor({
               style={{
                 flex: 1, height: 30, padding: '0 10px', fontSize: 12,
                 background: 'rgba(233,234,240,0.02)', color: IVORY,
-                border: `1px solid ${HAIR}`, borderRadius: 7, outline: 'none',
+                border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
               }}
             />
             <button
@@ -2556,7 +2556,7 @@ function StepEditor({
                 letterSpacing: '0.04em', textTransform: 'uppercase',
                 background: storyTextDraft.trim() ? GOLD : 'rgba(233,234,240,0.08)',
                 color: storyTextDraft.trim() ? '#fff' : MUTED,
-                border: 'none', borderRadius: 6,
+                border: 'none', borderRadius: 8,
               }}
             >
               +
@@ -2567,7 +2567,7 @@ function StepEditor({
               {(step.story_texts ?? []).map((txt, i) => (
                 <span key={i} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '3px 7px', borderRadius: 6,
+                  padding: '3px 7px', borderRadius: 8,
                   border: `1px solid ${HAIR}`, fontSize: 11,
                   color: 'rgba(233,234,240,0.7)', background: 'rgba(233,234,240,0.03)',
                 }}>
@@ -2599,7 +2599,7 @@ function StepEditor({
             style={{
               width: 56, height: 28, padding: '0 8px', fontSize: 12,
               textAlign: 'center', background: 'rgba(233,234,240,0.03)', color: IVORY,
-              border: `1px solid ${HAIR}`, borderRadius: 6, outline: 'none',
+              border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
             }}
           />
           <span style={{ fontSize: 11, color: MUTED }}>min avant l'étape suivante</span>
@@ -2632,7 +2632,7 @@ function FlowConnector({ active, from, to, flowDelay }: { active: boolean; from:
           {/* traînée de la comète */}
           <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
           {/* tête lumineuse */}
-          <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+          <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 999, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
         </div>
       )}
     </div>
@@ -2658,7 +2658,7 @@ function FlowNode({ grad, glow, accent, label, sub, index, icon, onAdd, addTitle
         {icon}
         {typeof index === 'number' && (
           <span style={{
-            position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: 99,
+            position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: 999,
             fontSize: 9, fontWeight: 800, color: '#0A0B0E', background: '#F3F4F6',
             display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #0A0B0E',
           }}>{index}</span>
@@ -2749,7 +2749,7 @@ function TaskCard({
             background: isActive ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)',
             border: `1px solid ${isActive ? 'rgba(52,211,153,0.28)' : 'rgba(255,255,255,0.1)'}`,
           }}>
-            {isActive && <span style={{ width: 6, height: 6, borderRadius: 99, background: '#34D399', boxShadow: '0 0 6px rgba(52,211,153,0.8)', animation: 'wf-pulse 2s ease-in-out infinite' }} />}
+            {isActive && <span style={{ width: 6, height: 6, borderRadius: 999, background: '#34D399', boxShadow: '0 0 6px rgba(52,211,153,0.8)', animation: 'wf-pulse 2s ease-in-out infinite' }} />}
             {isActive ? 'Actif' : 'En pause'}
           </span>
 
@@ -2877,7 +2877,7 @@ function TaskCard({
           <FlowConnector active={isActive} from={hasSegments ? (WF_STEP_META[segs[segs.length - 1]?.type] ?? WF_STEP_META.publication).accent : (WF_STEP_META[task.task_type] ?? WF_STEP_META.publication).accent} to="rgba(233,234,240,0.35)" flowDelay={(hasSegments ? segs.length : 1) * 0.4} />
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 99, marginTop: 8,
+              width: 36, height: 36, borderRadius: 999, marginTop: 8,
               border: '1.5px dashed rgba(255,255,255,0.22)', color: 'rgba(233,234,240,0.45)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               animation: isActive ? 'wf-rotate 9s linear infinite' : 'none',
@@ -2956,7 +2956,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
                 <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: 'linear-gradient(90deg, rgba(139,92,246,0.35), rgba(129,140,248,0.35))' }} />
                 <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'wf-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${i * 0.4}s` }}>
                   <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
-                  <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
+                  <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 999, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
                 </div>
               </div>
             )}
@@ -2971,7 +2971,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
           <div style={{ position: 'absolute', inset: 0, borderRadius: 2, background: 'linear-gradient(90deg, rgba(251,191,36,0.35), rgba(233,234,240,0.2))' }} />
         </div>
         <div style={{
-          width: 34, height: 34, borderRadius: 99,
+          width: 34, height: 34, borderRadius: 999,
           border: '1.5px dashed rgba(255,255,255,0.22)', color: 'rgba(233,234,240,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           animation: 'wf-rotate 9s linear infinite',

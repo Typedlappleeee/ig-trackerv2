@@ -13,6 +13,7 @@ import { BankPicker } from '@/pages/Bank'
 import { logActivity } from '@/lib/activityLog'
 import { useT, useLang } from '@/lib/i18n'
 import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
+import { Toggle } from '@/components/ui/Toggle'
 
 interface WarmupProps { user: User }
 
@@ -119,37 +120,23 @@ function IconCircle({ size = 14 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>
 }
 
-// Toggle « Proxy rotatif » : quand activé, l'édition/warmup se fait EN SÉRIE
-// (1 téléphone à la fois) avec rotation d'IP avant chaque démarrage. Un point
-// rouge signale que la rotation n'est pas encore configurée dans les Réglages.
+// Bandeau « Proxy rotatif » : quand activé, l'édition/warmup se fait EN SÉRIE
+// (1 téléphone à la fois) avec rotation d'IP avant chaque démarrage.
 function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) {
   const cfg = getProxyRotation()
   const configured = cfg.enabled && cfg.urls.length > 0
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-      <button
-        onClick={() => setOn(!on)}
-        className="cursor-pointer"
-        role="switch"
-        aria-checked={on}
-        style={{ position: 'relative', width: 38, height: 22, borderRadius: 999, flexShrink: 0, border: 'none', transition: 'background 0.18s',
-          background: on ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.12)' }}>
-        <span style={{ position: 'absolute', top: 2, left: 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'transform 0.18s', transform: on ? 'translateX(16px)' : 'translateX(0)' }} />
-      </button>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>
-          Proxy rotatif
-          {!configured && (
-            <span title="Rotation non configurée — Réglages → Connexions → Rotation d'IP proxy"
-              style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 0 3px rgba(239,68,68,0.18)', flexShrink: 0 }} />
-          )}
-        </span>
-        <span style={{ fontSize: 10.5, color: 'var(--text-4)' }}>
-          {on
-            ? (configured ? 'Traitement 1 par 1 · nouvelle IP avant chaque téléphone' : '⚠ Aucune URL de rotation — configure-la dans les Réglages')
-            : 'Traitement en parallèle · sans rotation d’IP'}
-        </span>
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border-md)' }}>
+      <Toggle
+        on={on}
+        onChange={setOn}
+        warn={!configured}
+        warnTitle="Rotation non configurée — Réglages → Connexions → Rotation d'IP proxy"
+        label="Proxy rotatif"
+        hint={on
+          ? (configured ? 'Traitement 1 par 1 · nouvelle IP avant chaque téléphone' : '⚠ Aucune URL de rotation — configure-la dans les Réglages')
+          : 'Traitement en parallèle · sans rotation d’IP'}
+      />
     </div>
   )
 }
