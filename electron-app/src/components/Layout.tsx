@@ -725,7 +725,10 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   const isVisibleTab = (id: Page): boolean => {
     // Pages internes / superadmin ScaleFlow uniquement (Rapports + Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'tiktokposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
+    // Cross-posting : admins uniquement (owner/admin d'org, ou compte perso) — pas
+    // les membres/viewers, le temps de valider les plateformes en live.
+    if (id === 'crossposting') return effectiveSuperAdmin || !currentOrg || role === 'owner' || role === 'admin'
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Tous les autres onglets sont visibles pour tout le monde.
