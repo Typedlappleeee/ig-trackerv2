@@ -2689,6 +2689,8 @@ function TaskCard({
   onToggle,
   onEdit,
   onDelete,
+  onRunNow,
+  onDuplicate,
   onOpenAddVideos,
   toggling,
   deleting,
@@ -2697,6 +2699,8 @@ function TaskCard({
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
+  onRunNow: () => void
+  onDuplicate: () => void
   onOpenAddVideos: (segmentId?: string) => void
   toggling: boolean
   deleting: boolean
@@ -2767,6 +2771,37 @@ function TaskCard({
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 'auto' }}>
+            <button
+              onClick={onRunNow}
+              disabled={toggling}
+              title="Lancer maintenant"
+              className="cursor-pointer"
+              style={{
+                width: 32, height: 32, borderRadius: 10, border: 'none',
+                background: 'rgba(56,189,248,0.1)', color: '#38BDF8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s', opacity: toggling ? 0.5 : 1, cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(56,189,248,0.22)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(56,189,248,0.1)' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+            </button>
+            <button
+              onClick={onDuplicate}
+              title="Dupliquer"
+              className="cursor-pointer"
+              style={{
+                width: 32, height: 32, borderRadius: 10, border: 'none',
+                background: 'rgba(99,102,241,0.08)', color: '#818CF8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s', cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.18)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
             <button
               onClick={onToggle}
               disabled={toggling}
@@ -3345,6 +3380,66 @@ export function Tasks({ user }: { user: User }) {
     }
   }
 
+  // Dupliquer une tâche — copie toute la config, remise à zéro des timers/compteurs.
+  // Créée EN PAUSE pour éviter une exécution (et une facturation) surprise.
+  async function duplicateTask(task: RecurringTask) {
+    setToggling(task.id)
+    try {
+      const recur = Number(task.recur_hours) || 24
+      const now = Date.now()
+      const segs = (task.segments && task.segments.length > 0)
+        ? task.segments.map(s => ({ ...s, next_run_at: new Date(now + (Number(s.recur_hours) || 24) * 3_600_000).toISOString() }))
+        : []
+      const copy: Record<string, unknown> = {
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        name: `${task.name ?? 'Tâche'} (copie)`, status: 'paused',
+        task_type: task.task_type, phones: task.phones, videos: task.videos,
+        caption: task.caption, story_texts: task.story_texts, mode: task.mode,
+        delay_minutes: task.delay_minutes, recur_hours: recur,
+        next_run_at: new Date(now + recur * 3_600_000).toISOString(),
+        reels_trial: task.reels_trial, auto_remove_videos: (task as { auto_remove_videos?: boolean }).auto_remove_videos ?? false,
+        steps: task.steps ?? [], segments: segs,
+      }
+      const { data, error } = await supabase.from('recurring_tasks').insert(copy).select().single()
+      if (!error && data) setTasks(prev => [data as RecurringTask, ...prev])
+    } finally { setToggling(null) }
+  }
+
+  // Lancer une tâche maintenant : on avance next_run_at à maintenant et on déclenche
+  // l'edge function (qui débite + réserve atomiquement). Permet de tester une config
+  // sans attendre l'échéance.
+  async function runTaskNowManually(task: RecurringTask) {
+    setToggling(task.id)
+    try {
+      const nowIso = new Date().toISOString()
+      const updates: Partial<RecurringTask> = { next_run_at: nowIso, status: 'active' }
+      if (task.segments && task.segments.length > 0) {
+        updates.segments = task.segments.map(s => ({ ...s, next_run_at: nowIso }))
+      }
+      await supabase.from('recurring_tasks').update(updates).eq('id', task.id)
+      await triggerDueTasksOnServer()
+      await load()
+    } finally { setToggling(null) }
+  }
+
+  // Pause / reprise EN MASSE de toutes les tâches.
+  async function pauseAllTasks() {
+    const ids = tasks.filter(t => t.status === 'active').map(t => t.id)
+    if (!ids.length) return
+    await supabase.from('recurring_tasks').update({ status: 'paused' }).in('id', ids)
+    setTasks(prev => prev.map(t => t.status === 'active' ? { ...t, status: 'paused' } : t))
+  }
+  async function resumeAllTasks() {
+    const paused = tasks.filter(t => t.status === 'paused')
+    if (!paused.length) return
+    const now = Date.now()
+    await Promise.all(paused.map(t =>
+      supabase.from('recurring_tasks')
+        .update({ status: 'active', next_run_at: new Date(now + (Number(t.recur_hours) || 24) * 3_600_000).toISOString() })
+        .eq('id', t.id)))
+    await load()
+  }
+
   async function addVideosToTask(taskId: string, newVids: SelVideo[], segmentId?: string) {
     const task = tasks.find(t => t.id === taskId)
     if (!task) return
@@ -3563,6 +3658,23 @@ export function Tasks({ user }: { user: User }) {
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 1120 }}>
+              {(activeTasks.length > 0 || pausedTasks.length > 0) && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', marginRight: 'auto' }}>
+                    {activeTasks.length} active{activeTasks.length > 1 ? 's' : ''} · {pausedTasks.length} en pause
+                  </span>
+                  {activeTasks.length > 0 && (
+                    <button onClick={() => void pauseAllTasks()} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">
+                      ⏸ Tout mettre en pause
+                    </button>
+                  )}
+                  {pausedTasks.length > 0 && (
+                    <button onClick={() => void resumeAllTasks()} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">
+                      ▶ Tout reprendre
+                    </button>
+                  )}
+                </div>
+              )}
               {tasks.map((task, ti) => (
                 <div key={task.id} style={{ animation: 'wf-card-in .45s cubic-bezier(.2,.8,.2,1) both', animationDelay: `${ti * 70}ms` }}>
                   <TaskCard
@@ -3572,6 +3684,8 @@ export function Tasks({ user }: { user: User }) {
                     onToggle={() => void toggleTask(task)}
                     onEdit={() => { setEditTask(task); setShowCreate(true) }}
                     onDelete={() => setDeleteTask(task)}
+                    onRunNow={() => void runTaskNowManually(task)}
+                    onDuplicate={() => void duplicateTask(task)}
                     onOpenAddVideos={(segmentId?: string) => setAddVideosTaskId({ taskId: task.id, segmentId })}
                   />
                 </div>
