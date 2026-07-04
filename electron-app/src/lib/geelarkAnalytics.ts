@@ -11,7 +11,7 @@ import {
   type GeelarkChannel, type GeelarkAnalyticsRow,
 } from './geelark'
 
-interface PhoneRow { id: string; ig_username: string | null; tt_username: string | null; total_views: number | null }
+interface PhoneRow { id: string; ig_username: string | null; total_views: number | null }
 
 export interface AnalyticsSyncResult {
   ok: boolean
@@ -29,36 +29,29 @@ export async function syncGeelarkAnalytics(
 ): Promise<AnalyticsSyncResult> {
   if (!bearer) return { ok: false, updated: 0, error: 'Token GéeLark manquant.' }
 
-  // 1. Comptes à suivre
-  let q = supabase.from('phones').select('id, ig_username, tt_username, total_views')
+  // 1. Comptes à suivre (Instagram — seule colonne username présente sur `phones`)
+  let q = supabase.from('phones').select('id, ig_username, total_views')
   q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)
   const { data: phones, error: pErr } = await q
   if (pErr) return { ok: false, updated: 0, error: pErr.message }
   const list = (phones ?? []) as PhoneRow[]
 
   const ig = list.filter(p => norm(p.ig_username))
-  const tt = list.filter(p => norm(p.tt_username))
 
   // 2. Enregistrement dans le tracking (idempotent : les doublons sont ignorés côté GeeLark)
   if (ig.length) await geelarkAnalyticsAddAccounts(bearer, 2, ig.map(p => ({ account: norm(p.ig_username) })))
-  if (tt.length) await geelarkAnalyticsAddAccounts(bearer, 0, tt.map(p => ({ account: norm(p.tt_username) })))
 
-  // 3. Récupération des stats par plateforme
+  // 3. Récupération des stats Instagram (channel 2)
   const rowsByAccount = new Map<string, GeelarkAnalyticsRow>()
-  let sawPro = true
-  for (const channel of [2, 0] as GeelarkChannel[]) {
-    const r = await geelarkAnalyticsDataAll(bearer, channel)
-    if (r.needsPro) { sawPro = false; break }
-    if (!r.ok) continue
-    for (const row of r.items) rowsByAccount.set(`${channel}:${norm(row.account)}`, row)
-  }
-  if (!sawPro) return { ok: false, updated: 0, needsPro: true, error: 'L\'analytics n\'est pas disponible (plan Pro GéeLark requis).' }
+  const r = await geelarkAnalyticsDataAll(bearer, 2 as GeelarkChannel)
+  if (r.needsPro) return { ok: false, updated: 0, needsPro: true, error: 'L\'analytics n\'est pas disponible (plan Pro GéeLark requis).' }
+  if (r.ok) for (const row of r.items) rowsByAccount.set(`2:${norm(row.account)}`, row)
 
   // 4. Application aux phones + historique. -1 = pas encore synchronisé → on ignore ce champ.
   const nowIso = new Date().toISOString()
   let updated = 0
   for (const p of list) {
-    const row = rowsByAccount.get(`2:${norm(p.ig_username)}`) ?? rowsByAccount.get(`0:${norm(p.tt_username)}`)
+    const row = rowsByAccount.get(`2:${norm(p.ig_username)}`)
     if (!row) continue
     const followers = row.followerCount >= 0 ? row.followerCount : null
     const views     = row.playCount     >= 0 ? row.playCount     : null
