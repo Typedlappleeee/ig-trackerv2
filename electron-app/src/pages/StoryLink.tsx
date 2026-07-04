@@ -376,6 +376,14 @@ export default function StoryLink({ user }: { user: User }) {
       .then(() => {}, () => {})
   }
 
+  // Applique un même lien à TOUS les comptes sélectionnés (évite 200 saisies).
+  const [bulkLink, setBulkLink] = useState('')
+  function applyLinkToAll() {
+    const link = bulkLink.trim()
+    if (!link) return
+    selectedIds.forEach(id => setLink(id, link))
+  }
+
   // ── Load phones ───────────────────────────────────────────────────────────
   async function loadPhones() {
     if (!bearer) return
@@ -1290,6 +1298,30 @@ export default function StoryLink({ user }: { user: User }) {
               </p>
             )}
           </div>
+
+          {/* Barre : appliquer un lien à tous les comptes sélectionnés */}
+          {previewAssignments.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, padding: '8px 10px 0' }}>
+              <input
+                value={bulkLink}
+                onChange={e => setBulkLink(e.target.value)}
+                disabled={running}
+                placeholder="Appliquer un lien à tous les comptes…"
+                className="sf-input"
+                style={{ flex: 1, height: 30, fontSize: 11.5, borderRadius: 8 }}
+                onKeyDown={e => { if (e.key === 'Enter') applyLinkToAll() }}
+              />
+              <button
+                onClick={applyLinkToAll}
+                disabled={running || !bulkLink.trim()}
+                className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+                style={{ flexShrink: 0, opacity: (running || !bulkLink.trim()) ? 0.5 : 1 }}
+                title="Renseigne ce lien pour tous les comptes sélectionnés"
+              >
+                Appliquer à tous
+              </button>
+            </div>
+          )}
 
           {/* Assignment list — anim-stagger */}
           <div className="sf-scroll anim-stagger" style={{ flex: 1, padding: '8px 10px' }}>
