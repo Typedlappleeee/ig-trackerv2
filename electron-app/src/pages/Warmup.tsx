@@ -356,13 +356,23 @@ export function Warmup({ user }: WarmupProps) {
               avatarUrl: config.profilePicUrl,
               rotationUrls,
             }, msg => addLog(phone.id, msg))
-          : await editInstagramProfileNative(bearer, phone.id, {
-              nickname:  config.profileName,
-              username:  config.username,
-              biography: config.bio,
-              avatarUrl: config.profilePicUrl,
-              rotationUrls,
-            }, msg => addLog(phone.id, msg))
+          // Changement de pseudo Instagram : on passe par le chemin ADB, qui EFFACE
+          // le champ (select-all + suppr) avant de taper — le RPA natif, lui,
+          // n'efface pas l'ancien username. Sinon (nom/bio/photo seuls) → natif.
+          : config.username
+            ? await updateInstagramProfile(bearer, phone.id, {
+                profileName:   config.profileName,
+                username:      config.username,
+                bio:           config.bio,
+                profilePicUrl: config.profilePicUrl,
+                rotationUrls,
+              }, msg => addLog(phone.id, msg)).then(() => ({ ok: true as const }))
+            : await editInstagramProfileNative(bearer, phone.id, {
+                nickname:  config.profileName,
+                biography: config.bio,
+                avatarUrl: config.profilePicUrl,
+                rotationUrls,
+              }, msg => addLog(phone.id, msg))
         updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })

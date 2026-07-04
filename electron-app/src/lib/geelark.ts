@@ -777,6 +777,7 @@ export interface MassEditConfig {
   username?:      string  // @handle
   bio?:           string
   profilePicUrl?: string
+  rotationUrls?:  string[] // rotation d'IP avant boot (mode proxy rotatif)
 }
 
 // Helper: tap Save / Done in top-right toolbar then press BACK
@@ -819,7 +820,7 @@ async function _updateInstagramProfileInner(
   config: MassEditConfig,
   log: (m: string) => void,
 ) {
-  const ready = await ensurePhoneRunning(bearer, phoneId, log)
+  const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
   if (!ready) throw new Error('Téléphone non démarré')
 
   // ── Wake + unlock ──────────────────────────────────────────────────────────
