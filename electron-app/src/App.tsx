@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense, type ComponentType } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react'
 import { isChunkError, reloadForChunk } from '@/components/ChunkErrorBoundary'
 import type { User } from '@supabase/supabase-js'
 import { useAuth }           from '@/hooks/useAuth'
@@ -558,16 +558,22 @@ import Hub                   from '@/pages/Hub'
 // → l'import() échoue. Plutôt que de casser la page, on retente une fois (déploiement
 // en cours / réseau), puis on recharge proprement l'app (index.html est en no-cache,
 // donc le reload récupère les nouveaux chunks). Évite le « Failed to fetch module ».
-function lazyWithReload<T extends ComponentType<unknown>>(factory: () => Promise<{ default: T }>) {
-  return lazy(() =>
+// Le générique porte les VRAIES props de la page (ComponentType<P>) au lieu de
+// ComponentType<unknown> — sinon chaque page perd le type de ses props et le
+// typecheck casse (c'était la cause des 54 erreurs TS, toutes dans ce fichier).
+// T extends ComponentType<any> (et non <unknown>) : un composant à props
+// spécifiques (ex. ComponentType<PhonesProps>) reste assignable — c'est ce qui
+// évite les 54 erreurs TS que provoquait la contrainte <unknown>.
+function lazyWithReload<T extends ComponentType<any>>(factory: () => Promise<{ default: T }>): LazyExoticComponent<T> {
+  const load = (): Promise<{ default: T }> =>
     factory().catch(async (err) => {
       const msg = err instanceof Error ? err.message : String(err)
       if (!isChunkError(msg)) throw err
       await new Promise(r => setTimeout(r, 600))
       try { return await factory() } catch { reloadForChunk() }
       return { default: (() => null) as unknown as T }   // le temps que le reload prenne effet
-    }),
-  )
+    })
+  return lazy(load)
 }
 
 const Phones          = lazyWithReload(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
