@@ -12,6 +12,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { logActivity } from '@/lib/activityLog'
 import { useT, useLang } from '@/lib/i18n'
+import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
 
 interface WarmupProps { user: User }
 
@@ -118,6 +119,41 @@ function IconCircle({ size = 14 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>
 }
 
+// Toggle « Proxy rotatif » : quand activé, l'édition/warmup se fait EN SÉRIE
+// (1 téléphone à la fois) avec rotation d'IP avant chaque démarrage. Un point
+// rouge signale que la rotation n'est pas encore configurée dans les Réglages.
+function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) {
+  const cfg = getProxyRotation()
+  const configured = cfg.enabled && cfg.urls.length > 0
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <button
+        onClick={() => setOn(!on)}
+        className="cursor-pointer"
+        role="switch"
+        aria-checked={on}
+        style={{ position: 'relative', width: 38, height: 22, borderRadius: 999, flexShrink: 0, border: 'none', transition: 'background 0.18s',
+          background: on ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.12)' }}>
+        <span style={{ position: 'absolute', top: 2, left: 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'transform 0.18s', transform: on ? 'translateX(16px)' : 'translateX(0)' }} />
+      </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>
+          Proxy rotatif
+          {!configured && (
+            <span title="Rotation non configurée — Réglages → Connexions → Rotation d'IP proxy"
+              style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 0 3px rgba(239,68,68,0.18)', flexShrink: 0 }} />
+          )}
+        </span>
+        <span style={{ fontSize: 10.5, color: 'var(--text-4)' }}>
+          {on
+            ? (configured ? 'Traitement 1 par 1 · nouvelle IP avant chaque téléphone' : '⚠ Aucune URL de rotation — configure-la dans les Réglages')
+            : 'Traitement en parallèle · sans rotation d’IP'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function Warmup({ user }: WarmupProps) {
   const t = useT()
   const { lang } = useLang()
@@ -168,6 +204,11 @@ export function Warmup({ user }: WarmupProps) {
   // ── Job / execution state ─────────────────────────────────────────────────
   const [jobs,    setJobs]    = useState<PhoneJob[]>([])
   const [running, setRunning] = useState(false)
+
+  // Proxy rotatif : quand coché → traitement EN SÉRIE (1 téléphone à la fois) avec
+  // rotation d'IP avant d'allumer chaque téléphone (édition de profil ET warmup).
+  const [rotProxy, setRotProxy] = useState(() => localStorage.getItem('sf-warmup-rotproxy') === '1')
+  useEffect(() => { localStorage.setItem('sf-warmup-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
   const abortRef = useRef<{ abort: boolean }>({ abort: false })
 
   useEffect(() => { return () => { abortRef.current.abort = true } }, [])
@@ -303,7 +344,11 @@ export function Warmup({ user }: WarmupProps) {
       profilePicUrl: editPicUrl.trim() || undefined,
     }
 
-    await pLimit(targets, MAX_CONCURRENCY, async phone => {
+    // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
+    const rotationUrls = rotProxy ? activeRotationUrls() : []
+    const concurrency  = rotProxy ? 1 : MAX_CONCURRENCY
+
+    await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
         updateJob(phone.id, { status: 'error', error: 'Annulé' })
         return
@@ -315,12 +360,14 @@ export function Warmup({ user }: WarmupProps) {
               nickName:  config.profileName,
               bio:       config.bio,
               avatarUrl: config.profilePicUrl,
+              rotationUrls,
             }, msg => addLog(phone.id, msg))
           : await editInstagramProfileNative(bearer, phone.id, {
               nickname:  config.profileName,
               username:  config.username,
               biography: config.bio,
               avatarUrl: config.profilePicUrl,
+              rotationUrls,
             }, msg => addLog(phone.id, msg))
         updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       } catch (e) {
@@ -344,9 +391,12 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets)
 
-    const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested, keyword: warmupKeyword.trim() || undefined }
+    // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
+    const rotationUrls = rotProxy ? activeRotationUrls() : []
+    const concurrency  = rotProxy ? 1 : MAX_CONCURRENCY
+    const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested, keyword: warmupKeyword.trim() || undefined, rotationUrls }
 
-    await pLimit(targets, MAX_CONCURRENCY, async phone => {
+    await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
         updateJob(phone.id, { status: 'error', error: 'Annulé' })
         return
@@ -354,11 +404,11 @@ export function Warmup({ user }: WarmupProps) {
       updateJob(phone.id, { status: 'running' })
       const result = warmupPlatform === 'tiktok'
         // TikTok : warmup natif (recherche/parcours) + engagement (like/follow/commentaire IA)
-        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment }, msg => addLog(phone.id, msg))
+        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment, rotationUrls }, msg => addLog(phone.id, msg))
         // Instagram : mot-clé → recherche ADB ; sinon → warmup IA natif général
         : warmupKeyword.trim()
           ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
-          : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)) }, msg => addLog(phone.id, msg))
+          : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)), rotationUrls }, msg => addLog(phone.id, msg))
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, 'Extinction du téléphone…')
       await stopPhone(bearer, phone.id)
@@ -1147,6 +1197,8 @@ export function Warmup({ user }: WarmupProps) {
                   </div>
                 </div>
 
+                <ProxyRotToggle on={rotProxy} setOn={setRotProxy} />
+
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"
                   style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
@@ -1316,6 +1368,8 @@ export function Warmup({ user }: WarmupProps) {
                     ))}
                   </div>
                 </div>
+
+                <ProxyRotToggle on={rotProxy} setOn={setRotProxy} />
 
                 {/* Launch button — full width, accent, lg */}
                 <button

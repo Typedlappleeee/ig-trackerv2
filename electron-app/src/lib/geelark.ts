@@ -134,6 +134,24 @@ export async function rotateAllProxies(urls: string[], log?: (m: string) => void
   await sleep(6000)
 }
 
+// Rote l'IP proxy (si configurée) AVANT d'allumer le téléphone — pour qu'il boote
+// sur la nouvelle IP — puis démarre le téléphone et logue l'IP obtenue. Utilisé par
+// l'édition de profil et le warmup en mode « Proxy rotatif » (série, 1 par 1).
+async function rotateThenEnsureRunning(
+  bearer: string,
+  phoneId: string,
+  rotationUrls: string[] | undefined,
+  log: (m: string) => void,
+): Promise<boolean> {
+  if (rotationUrls && rotationUrls.length) await rotateAllProxies(rotationUrls, log)
+  const ready = await ensurePhoneRunning(bearer, phoneId, log)
+  if (ready && rotationUrls && rotationUrls.length) {
+    const ip = await getPhonePublicIp(bearer, phoneId)
+    if (ip) log(`🌍 IP actuelle : ${ip}`)
+  }
+  return ready
+}
+
 // Fetch all phones (paginates automatically).
 // Throws a descriptive error if the API rejects the token.
 export async function fetchAllPhones(bearer: string): Promise<GeelarkPhone[]> {
@@ -609,6 +627,7 @@ export interface WarmupConfig {
   watchReels:      boolean
   followSuggested: boolean
   keyword?:        string   // si présent : recherche ce mot puis regarde les Reels des résultats
+  rotationUrls?:   string[] // rotation d'IP avant boot (mode proxy rotatif)
 }
 
 // Parse bounds string "[x1,y1][x2,y2]" → center point
@@ -2412,11 +2431,11 @@ async function pollRpaTask(
 export async function warmupAccountNative(
   bearer: string,
   phoneId: string,
-  config: { browseVideo: number; keyword?: string },
+  config: { browseVideo: number; keyword?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   return withPhoneAutoStop(bearer, phoneId, 30 * 60_000, '30min', log, async () => {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     const browseVideo = Math.max(1, Math.min(100, Math.round(config.browseVideo)))
     log(`🔥 Création de la tâche de warmup IA (${browseVideo} vidéos${config.keyword ? `, mot-clé « ${config.keyword} »` : ''})…`)
@@ -2458,11 +2477,12 @@ async function runTikTokRpa(
 }
 
 export interface TikTokWarmupConfig {
-  keyword?:     string
-  durationMin:  number
-  like?:        boolean   // tiktokRandomStar
-  follow?:      boolean   // tiktokRandomFollow
-  comment?:     boolean   // tiktokRandomComment (IA)
+  keyword?:      string
+  durationMin:   number
+  like?:         boolean   // tiktokRandomStar
+  follow?:       boolean   // tiktokRandomFollow
+  comment?:      boolean   // tiktokRandomComment (IA)
+  rotationUrls?: string[]  // rotation d'IP avant boot (mode proxy rotatif)
 }
 
 export async function warmupTikTokNative(
@@ -2472,7 +2492,7 @@ export async function warmupTikTokNative(
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   return withPhoneAutoStop(bearer, phoneId, 35 * 60_000, '35min', log, async () => {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     const kw = config.keyword?.trim()
     const duration = Math.max(1, Math.min(120, Math.round(config.durationMin)))
@@ -2510,11 +2530,11 @@ export async function warmupTikTokNative(
 export async function editInstagramProfileNative(
   bearer: string,
   phoneId: string,
-  fields: { nickname?: string; username?: string; biography?: string; avatarUrl?: string; linkURL?: string; linkTitle?: string },
+  fields: { nickname?: string; username?: string; biography?: string; avatarUrl?: string; linkURL?: string; linkTitle?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, fields.rotationUrls, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     log('✏️ Création de la tâche d\'édition de profil…')
     const res = await geelarkFetch('POST', '/rpa/task/instagramEdit', {
@@ -2540,11 +2560,11 @@ export async function editInstagramProfileNative(
 export async function editTikTokProfileNative(
   bearer: string,
   phoneId: string,
-  fields: { nickName?: string; bio?: string; avatarUrl?: string; site?: string },
+  fields: { nickName?: string; bio?: string; avatarUrl?: string; site?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, fields.rotationUrls, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     log('✏️ Création de la tâche d\'édition de profil TikTok…')
     const res = await geelarkFetch('POST', '/rpa/task/tiktokEdit', {
@@ -2585,7 +2605,7 @@ async function _warmupAccountInner(
   abortSignal: { abort: boolean },
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré après 120s — vérifier GéeLark et l\'ID du téléphone' }
 
     const hasProfileUpdate = config.profileName || config.bio || config.profilePicUrl
