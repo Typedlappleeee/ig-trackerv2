@@ -99,7 +99,6 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'publishhub',  label: 'navPublishVideo', icon: '🚀' },
-      { id: 'crossposting', label: 'navCrossPosting', icon: '🌐', isNew: true },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
