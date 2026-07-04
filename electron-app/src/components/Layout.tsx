@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
+import { ActivePostingsWidget } from '@/components/ActivePostingsWidget'
 import { useT } from '@/lib/i18n'
 import { useToast }  from '@/components/Toast'
 import { playNav }   from '@/lib/sounds'
@@ -1659,6 +1660,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           </div>
         </div>
       )}
+
+      {/* Suivi global des postings en cours (visible partout, survit au refresh) */}
+      <ActivePostingsWidget onOpen={p => onNavigate(p as Page)} />
     </div>
   )
 }

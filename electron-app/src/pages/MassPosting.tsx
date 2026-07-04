@@ -9,7 +9,8 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp } from '@/lib/geelark'
+import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp, fetchPhoneProxies } from '@/lib/geelark'
+import { startRun, updateRun, endRun, proxyConflicts } from '@/lib/activeRuns'
 import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
@@ -723,6 +724,25 @@ export function MassPosting({ user }: MassPostingProps) {
       details: { phones: phoneList.map(p => p.ig_username ?? p.phone_name), count: phoneList.length, videos: selectedVideos.length },
     })
 
+    // ── Suivi global + alerte même-proxy ────────────────────────────────────
+    const runId = `mass-${Date.now()}`
+    activeRunIdRef.current = runId
+    ;(async () => {
+      let proxyKeys: string[] = []
+      try {
+        const pm = await fetchPhoneProxies(bearer)
+        proxyKeys = [...new Set(phoneList.map(p => {
+          const px = pm.get(p.geelark_id); return px?.server ? `${px.server}:${px.port ?? ''}` : ''
+        }).filter(Boolean))]
+      } catch { /* best-effort */ }
+      const clash = proxyConflicts(proxyKeys, runId)
+      if (clash.length) {
+        log(`⚠️ Un autre posting tourne déjà sur ${clash.length} proxy(s) utilisé(s) ici — mêmes IP en parallèle = risque de ban.`, 'warn')
+        toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — mêmes IP en parallèle, risque de ban.', kind: 'warn' })
+      }
+      startRun({ id: runId, type: 'mass', label: `Mass posting · ${phoneList.length} compte${phoneList.length > 1 ? 's' : ''}`, proxyKeys, done: 0, total: assignments.length, page: 'posting' })
+    })()
+
     try {
       // ── Step 1: upload only videos actually assigned to a phone ──────────
       const usedIndices = [...new Set(assignments.map(a => a.videoIndex).filter(i => i >= 0))]
@@ -1340,6 +1360,13 @@ export function MassPosting({ user }: MassPostingProps) {
       activePhonesRef.current = []
       activeTasksRef.current = []
       setPosting(false)
+      // Clôture le suivi global.
+      if (activeRunIdRef.current) {
+        const fin = getMassPostingState().taskStatuses
+        const errN = [...fin.values()].filter(s => s.status === 'error').length
+        endRun(activeRunIdRef.current, errN > 0 ? 'error' : 'done')
+        activeRunIdRef.current = null
+      }
     }
   }
 
@@ -1368,6 +1395,15 @@ export function MassPosting({ user }: MassPostingProps) {
   const [lastRun, setLastRun] = useState<{ ok: number; err: number; total: number } | null>(null)
   const [failedPhoneIds, setFailedPhoneIds] = useState<string[]>([])
   const [pendingRetry, setPendingRetry]     = useState(false)
+
+  // Suivi global (widget « postings en cours »).
+  const activeRunIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (activeRunIdRef.current && posting) {
+      updateRun(activeRunIdRef.current, { done: doneTasks + errorTasks + cancelledTasks })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doneTasks, errorTasks, cancelledTasks, posting])
 
   // Relance un run en ne (re)sélectionnant que les téléphones en échec.
   function retryFailed() {

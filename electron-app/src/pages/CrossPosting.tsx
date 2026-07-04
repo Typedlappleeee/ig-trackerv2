@@ -4,9 +4,10 @@ import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { supabase } from '@/lib/supabase'
 import {
-  publishVideoCrossPlatform, geelarkUploadForRpa, CROSS_PLATFORMS,
+  publishVideoCrossPlatform, geelarkUploadForRpa, fetchPhoneProxies, CROSS_PLATFORMS,
   type CrossPlatform,
 } from '@/lib/geelark'
+import { startRun, updateRun, endRun, proxyConflicts } from '@/lib/activeRuns'
 import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
 import { BankPicker } from '@/pages/Bank'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -87,6 +88,20 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
     })))
     setJobs(initial)
 
+    // Suivi global + alerte même-proxy.
+    const runId = `threads-${Date.now()}`
+    ;(async () => {
+      let proxyKeys: string[] = []
+      try {
+        const pm = await fetchPhoneProxies(bearer!)
+        proxyKeys = [...new Set(toRun.map(p => { const px = pm.get(p.geelark_id); return px?.server ? `${px.server}:${px.port ?? ''}` : '' }).filter(Boolean))]
+      } catch { /* best-effort */ }
+      if (proxyConflicts(proxyKeys, runId).length) {
+        toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — risque de ban.', kind: 'warn' })
+      }
+      startRun({ id: runId, type: 'threads', label: `Threads · ${toRun.length} compte${toRun.length > 1 ? 's' : ''}`, proxyKeys, done: 0, total: toRun.length, page: 'posting' })
+    })()
+
     // Distribution vidéo/caption par téléphone : séquentiel (tél i → élément i) ou
     // aléatoire.
     const pick = <T,>(arr: T[], i: number): T =>
@@ -140,7 +155,9 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
           err++; setJob(key, { status: 'error', detail: e instanceof Error ? e.message : String(e) })
         }
       }
+      updateRun(runId, { done: i + 1 })
     }
+    endRun(runId, err > 0 ? 'error' : 'done')
     setRunning(false)
     toast.show({
       title: err === 0 ? 'Publication terminée ✓' : 'Terminé avec erreurs',
