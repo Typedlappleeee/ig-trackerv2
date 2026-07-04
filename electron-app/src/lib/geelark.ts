@@ -2650,6 +2650,78 @@ export async function publishVideoCrossPlatform(
   })
 }
 
+// ── Analytics GeeLark (suivi de stats de comptes — inclus au plan Pro) ───────
+// channel : 0 = TikTok, 1 = YouTube, 2 = Instagram.
+export type GeelarkChannel = 0 | 1 | 2
+
+// Enregistre des comptes dans le tracking analytics (max 200 par appel).
+export async function geelarkAnalyticsAddAccounts(
+  bearer: string,
+  channel: GeelarkChannel,
+  accounts: { account: string; remark?: string }[],
+): Promise<{ ok: boolean; successCount?: number; repeatCount?: number; error?: string }> {
+  try {
+    const accountsData = accounts.slice(0, 200)
+      .map(a => ({ account: (a.account ?? '').slice(0, 64), ...(a.remark ? { remark: a.remark } : {}) }))
+      .filter(a => a.account.trim())
+    if (!accountsData.length) return { ok: true, successCount: 0 }
+    const res = await geelarkFetch('POST', '/analytics/accounts/add', { channel, accountsData }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GéeLark: ${res['msg'] ?? res['code']}` }
+    const d = res['data'] as Record<string, number> | undefined
+    return { ok: true, successCount: d?.['successCount'], repeatCount: d?.['repeatCount'] }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export interface GeelarkAnalyticsRow {
+  account:      string   // nom du compte social (le @handle saisi à l'ajout)
+  channel:      number
+  playCount:    number   // vues
+  followerCount:number
+  diggCount:    number   // likes
+  commentCount: number
+  collectCount: number
+  shareCount:   number
+  dataDate:     number
+}
+
+// Récupère une page de stats. -1 sur un compteur = pas encore synchronisé.
+export async function geelarkAnalyticsData(
+  bearer: string,
+  opts: { channel?: GeelarkChannel; account?: string; page?: number; pageSize?: number } = {},
+): Promise<{ ok: boolean; items: GeelarkAnalyticsRow[]; total?: number; needsPro?: boolean; error?: string }> {
+  try {
+    const res = await geelarkFetch('POST', '/analytics/data', {
+      page: opts.page ?? 1,
+      pageSize: opts.pageSize ?? 100,
+      ...(opts.channel != null ? { channel: opts.channel } : {}),
+      ...(opts.account ? { account: opts.account } : {}),
+    }, bearer)
+    if (res['code'] === 43002) return { ok: false, items: [], needsPro: true, error: 'L\'analytics nécessite le plan Pro GéeLark.' }
+    if (res['code'] !== 0)     return { ok: false, items: [], error: `GéeLark: ${res['msg'] ?? res['code']}` }
+    const d = res['data'] as { items?: GeelarkAnalyticsRow[]; total?: number } | undefined
+    return { ok: true, items: d?.items ?? [], total: d?.total }
+  } catch (e) {
+    return { ok: false, items: [], error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+// Récupère TOUTES les pages de stats pour une plateforme (ou toutes si channel omis).
+export async function geelarkAnalyticsDataAll(
+  bearer: string, channel?: GeelarkChannel,
+): Promise<{ ok: boolean; items: GeelarkAnalyticsRow[]; needsPro?: boolean; error?: string }> {
+  const all: GeelarkAnalyticsRow[] = []
+  for (let page = 1; page <= 50; page++) {
+    const r = await geelarkAnalyticsData(bearer, { channel, page, pageSize: 100 })
+    if (r.needsPro) return { ok: false, items: [], needsPro: true, error: r.error }
+    if (!r.ok) return { ok: false, items: all, error: r.error }
+    all.push(...r.items)
+    if (r.items.length < 100) break
+  }
+  return { ok: true, items: all }
+}
+
 // Édition de profil TikTok native (tiktokEdit). avatar = URL d'image 1:1.
 export async function editTikTokProfileNative(
   bearer: string,
