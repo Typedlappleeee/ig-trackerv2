@@ -9,13 +9,15 @@ import { useState, Suspense, lazy } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Spinner } from '@/components/ui/Spinner'
 import { TEXT_2 as MUTED, HAIR } from '@/lib/theme'
+import { useLicense } from '@/lib/license'
 
-const MassPosting = lazy(() => import('@/pages/MassPosting').then(m => ({ default: m.MassPosting })))
+const MassPosting  = lazy(() => import('@/pages/MassPosting').then(m => ({ default: m.MassPosting })))
+const CrossPosting = lazy(() => import('@/pages/CrossPosting').then(m => ({ default: m.CrossPosting })))
 
-type Platform = 'instagram' | 'tiktok'
+type Platform = 'instagram' | 'tiktok' | 'threads'
 
 const PLATFORMS: {
-  k: Platform; label: string; desc: string
+  k: Platform; label: string; desc: string; admin?: boolean
   grad: string; glow: string; accent: string; icon: JSX.Element
 }[] = [
   {
@@ -28,10 +30,18 @@ const PLATFORMS: {
     grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.5)', accent: '#22D3EE',
     icon: <svg width="21" height="21" viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.4 2 4.1 4.5 4.4v3c-1.7.1-3.2-.4-4.6-1.3v6.2c0 3.6-2.7 5.9-6 5.9-3.2 0-5.6-2.5-5.6-5.5 0-3.4 2.9-5.9 6.4-5.3v3.1c-.4-.1-.9-.2-1.3-.2-1.4 0-2.4 1-2.4 2.4 0 1.4 1 2.4 2.5 2.4 1.6 0 2.6-1.1 2.6-2.9V3h3.9z"/></svg>,
   },
+  {
+    k: 'threads', label: 'Threads', desc: 'Vidéos & photos — publication native GeeLark', admin: true,
+    grad: 'linear-gradient(135deg,#111,#333)', glow: 'rgba(255,255,255,0.25)', accent: '#e5e7eb',
+    icon: <svg width="21" height="21" viewBox="0 0 24 24" fill="#fff"><path d="M12.5 2C7 2 4 5.2 4 12s3 10 8.5 10c4 0 6.6-2 7.2-5.3.3-1.7-.2-3.3-1.4-4.4-.9-.8-2.1-1.3-3.6-1.4.1-1-.2-1.8-.8-2.3-.6-.5-1.4-.7-2.3-.6-1.3.1-2.3.9-2.6 2.1l1.8.5c.1-.5.5-.8 1-.9.4 0 .7.1.9.3.1.1.2.3.2.6-2.4.1-4 1.2-4 3.1 0 1.7 1.4 2.8 3.2 2.8 2 0 3.3-1.3 3.6-3.4.8.1 1.4.4 1.8.8.6.5.8 1.3.7 2.2-.4 2.1-2 3.3-4.9 3.3-4 0-6.3-2.5-6.3-8s2.3-8 6.3-8c2.6 0 4.4 1.1 5.4 3.2l1.7-.8C18.4 3.5 15.9 2 12.5 2zm-.3 11.9c-.8 0-1.4-.4-1.4-1 0-.7.7-1.2 2-1.2h.4c-.2 1.4-.9 2.2-1 2.2z"/></svg>,
+  },
 ]
 
 export function Publish({ user }: { user: User }) {
-  // null = popup affiché ; une valeur = MassPosting monté dans ce mode.
+  const { isSuperAdmin } = useLicense()
+  // Threads réservé aux superadmins pour le moment.
+  const platforms = PLATFORMS.filter(p => !p.admin || isSuperAdmin)
+  // null = popup affiché ; une valeur = poster monté dans ce mode.
   const [platform, setPlatform] = useState<Platform | null>(null)
   const last = (localStorage.getItem('sf-mp-platform') as Platform | null) ?? 'instagram'
 
@@ -57,8 +67,8 @@ export function Publish({ user }: { user: User }) {
               Choisis la plateforme pour cette session de publication.
             </p>
           </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
-            {PLATFORMS.map(p => (
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${Math.min(platforms.length, 3)}, 1fr)`, gap: 14, padding: 22 }}>
+            {platforms.map(p => (
               <button
                 key={p.k}
                 onClick={() => choose(p.k)}
@@ -89,6 +99,8 @@ export function Publish({ user }: { user: User }) {
     )
   }
 
+  // Threads → poster multi-plateforme (CrossPosting) ; IG/TikTok → MassPosting.
+  const isThreads = platform === 'threads'
   const cur = PLATFORMS.find(p => p.k === platform) ?? PLATFORMS[0]
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -123,8 +135,8 @@ export function Publish({ user }: { user: User }) {
         </div>
       }>
         {/* key force le remontage au changement de plateforme → MassPosting relit sf-mp-platform */}
-        <div key={platform} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <MassPosting user={user} />
+        <div key={platform} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          {isThreads ? <CrossPosting user={user} /> : <MassPosting user={user} />}
         </div>
       </Suspense>
     </div>
