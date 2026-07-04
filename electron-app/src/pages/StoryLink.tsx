@@ -562,11 +562,14 @@ export default function StoryLink({ user }: { user: User }) {
     // Par défaut : TOUS les téléphones en même temps (comme le Mass Posting).
     // Rotation d'IP UNIQUEMENT si "Proxy rotatif" est coché ET URLs configurées.
     const rotationUrls = rotProxy ? activeRotationUrls() : []
-    const serial = rotProxy  // série seulement si la case est cochée
-    const CONCURRENCY = serial ? 1 : (maxConc > 0 ? maxConc : assignments.length)
+    // Proxy rotatif : autant de téléphones en parallèle qu'il y a de proxies (1 IP
+    // fraîche par proxy). 1 proxy = série. Sinon, concurrence normale.
+    const CONCURRENCY = rotProxy
+      ? Math.max(1, Math.min(rotationUrls.length || 1, assignments.length))
+      : (maxConc > 0 ? maxConc : assignments.length)
     // Petit décalage de démarrage plafonné (~6s) pour ne pas booter tout au même
     // instant. En rotatif un seul worker → aucun décalage.
-    const staggerBase = serial ? 0 : 1000
+    const staggerBase = rotProxy ? 0 : 1000
     const queue = [...assignments]
     let okCount = 0
     const worker = async (staggerMs: number) => {

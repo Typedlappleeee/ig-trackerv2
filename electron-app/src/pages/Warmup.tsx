@@ -340,7 +340,7 @@ export function Warmup({ user }: WarmupProps) {
 
     // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
     const rotationUrls = rotProxy ? activeRotationUrls() : []
-    const concurrency  = rotProxy ? 1 : MAX_CONCURRENCY
+    const concurrency  = rotProxy ? Math.max(1, Math.min(rotationUrls.length || 1, targets.length)) : MAX_CONCURRENCY
 
     await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
@@ -397,7 +397,7 @@ export function Warmup({ user }: WarmupProps) {
 
     // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
     const rotationUrls = rotProxy ? activeRotationUrls() : []
-    const concurrency  = rotProxy ? 1 : MAX_CONCURRENCY
+    const concurrency  = rotProxy ? Math.max(1, Math.min(rotationUrls.length || 1, targets.length)) : MAX_CONCURRENCY
     const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested, keyword: warmupKeyword.trim() || undefined, rotationUrls }
 
     await pLimit(targets, concurrency, async phone => {

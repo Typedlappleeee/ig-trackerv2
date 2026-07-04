@@ -50,9 +50,12 @@ export function loadPostingOpts(): PostingOpts {
 
 // Nombre de téléphones qui postent réellement en même temps.
 // rotatingProxy → 1 ; maxConcurrent 0/≥total → tous d'un coup (comportement legacy).
-export function effectiveConcurrency(opts: PostingOpts, total: number): number {
+// proxyCount = nombre d'URLs de rotation configurées. En proxy rotatif, on peut
+// traiter autant de téléphones EN PARALLÈLE qu'il y a de proxies (1 IP fraîche
+// par proxy) → plus besoin de rester bloqué à 1. 1 proxy = série (comme avant).
+export function effectiveConcurrency(opts: PostingOpts, total: number, proxyCount = 0): number {
   if (total <= 1) return 1
-  if (opts.rotatingProxy) return 1
+  if (opts.rotatingProxy) return Math.max(1, Math.min(proxyCount || 1, total))
   if (!opts.maxConcurrent || opts.maxConcurrent <= 0) return total
   return Math.min(opts.maxConcurrent, total)
 }
