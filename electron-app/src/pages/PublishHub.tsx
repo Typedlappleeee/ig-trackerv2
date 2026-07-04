@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react'
 import type { Page } from '@/components/Layout'
 import { LicenseContext } from '@/lib/license'
+import { useOrg } from '@/lib/orgContext'
 
 // ── Publication — hub premium (grille uniforme + liseré dégradé animé) ────────
 
@@ -177,7 +178,11 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
 
 export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const isSuperAdmin = useContext(LicenseContext)?.isSuperAdmin === true
-  const visibleKinds = KINDS.filter(k => !k.admin || isSuperAdmin)
+  const { currentOrg, role } = useOrg()
+  // Cartes "admin" (ex. cross-posting) : visibles aux admins (superadmin, owner/
+  // admin d'org, ou compte perso), pas aux membres/viewers.
+  const canAdmin = isSuperAdmin || !currentOrg || role === 'owner' || role === 'admin'
+  const visibleKinds = KINDS.filter(k => !k.admin || canAdmin)
   return (
     <div style={{ minHeight: '100%', background: 'var(--base)', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
       <style>{CSS}</style>
