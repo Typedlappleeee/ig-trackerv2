@@ -1472,59 +1472,13 @@ async function _postInstagramStoryInner(
     log('   ✓ Média indexé dans la galerie')
   }
 
-  // ── 2. Open Instagram + load the image into the story composer ─────────────
+  // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
   await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
   await sleep(1200)
 
-  // Accepte les popups de permission ("Autoriser l'accès aux photos"). Définie ici
-  // pour être utilisable par les DEUX chemins (intent direct + navigation galerie).
-  async function dismissPermissionDialog() {
-    const permXml = await dumpXml(bearer, phoneId)
-    const allowPt =
-      findByText(permXml, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser',
-        'While using the app', 'Lorsque l\'application est utilisée', 'Continue', 'Continuer') ??
-      findByResourceId(permXml, 'permission_allow_button', 'permission_allow_all_button',
-        'permission_allow_foreground_only_button')
-    if (allowPt) {
-      log('   ✓ Popup de permission acceptée')
-      await shellExec(bearer, phoneId, `input tap ${allowPt[0]} ${allowPt[1]}`)
-      await sleep(2000)
-      return true
-    }
-    return false
-  }
-
-  let xml = ''
-
-  // Chemin ROBUSTE (toutes versions Android/IG) : charge l'image DIRECTEMENT dans
-  // le composeur de story via le share-handler d'Instagram → saute l'écran caméra
-  // + la sélection galerie (l'étape qui casse sur les Android récents). On tente
-  // plusieurs noms d'activity selon les versions.
-  log('🎬 Ouverture du composeur de story…')
-  const shareActivities = [
-    'com.instagram.share.handleractivity.StoryShareHandlerActivity',
-    'com.instagram.share.handleractivity.ShareHandlerActivity',
-  ]
-  let loadedViaIntent = false
-  for (const act of shareActivities) {
-    await shellExec(bearer, phoneId,
-      `am start -n com.instagram.android/${act} ` +
-      `-a android.intent.action.SEND -t "image/*" ` +
-      `--grant-read-uri-permission --grant-persistable-uri-permission ` +
-      `--eu android.intent.extra.STREAM "file://${imgPath}" 2>/dev/null`)
-    await sleep(6000)
-    await dismissPermissionDialog()
-    xml = await dumpXml(bearer, phoneId)
-    const inComposer =
-      findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'text_tool', 'draw_tool', 'toolbar_sticker_button') ??
-      findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story', 'Send to', 'Envoyer à', 'Recipients')
-    if (inComposer) { loadedViaIntent = true; log('   ✓ Image chargée directement dans la story'); break }
-  }
-
-  if (!loadedViaIntent) {
-  log('   ↩︎ Repli : caméra + galerie…')
-  // Ancien chemin : deep link caméra story puis sélection dans la galerie.
+  // Most reliable path: Instagram's dedicated story-camera deep link. This jumps
+  // straight to the capture screen and skips the fragile home-feed avatar tap.
   log('🎬 Ouverture de la caméra story…')
   await shellExec(bearer, phoneId,
     'am start -a android.intent.action.VIEW -d "instagram://story-camera" com.instagram.android')
@@ -1532,7 +1486,7 @@ async function _postInstagramStoryInner(
 
   // Verify we actually reached the camera. If we're still on the home feed
   // (the deep link was ignored on this IG build), tap the "Your story" avatar.
-  xml = await dumpXml(bearer, phoneId)
+  let xml = await dumpXml(bearer, phoneId)
   const onCamera =
     findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'capture_button', 'camera_shutter_button') ??
     findByText(xml, 'Gallery', 'Galerie', 'Story', 'Boomerang', 'Layout')
@@ -1560,6 +1514,24 @@ async function _postInstagramStoryInner(
     await sleep(5000)
   }
 
+  // Android/IG permission prompts ("Allow access to photos") silently block the
+  // flow if not dismissed — accept them whenever they appear.
+  async function dismissPermissionDialog() {
+    const permXml = await dumpXml(bearer, phoneId)
+    const allowPt =
+      findByText(permXml, 'Allow', 'Autoriser', 'Allow all', 'Tout autoriser',
+        'While using the app', 'Lorsque l\'application est utilisée', 'Continue', 'Continuer') ??
+      findByResourceId(permXml, 'permission_allow_button', 'permission_allow_all_button',
+        'permission_allow_foreground_only_button')
+    if (allowPt) {
+      log('   ✓ Popup de permission détectée — acceptation…')
+      await shellExec(bearer, phoneId, `input tap ${allowPt[0]} ${allowPt[1]}`)
+      await sleep(2000)
+      return true
+    }
+    return false
+  }
+
   await dismissPermissionDialog()
 
   // ── 3. Pick the uploaded image from the gallery ────────────────────────────
@@ -1582,40 +1554,20 @@ async function _postInstagramStoryInner(
   // because the XML order doesn't always match the visual left→right order.
   xml = await dumpXml(bearer, phoneId)
   const firstThumb = (() => {
-    // On analyse chaque <node> : on cherche une vraie MINIATURE PHOTO et on EXCLUT
-    // l'icône appareil photo (le bug : le flow tapait la caméra à gauche au lieu de
-    // l'image). Gère la grille classique ET la mise en page « Recents » (un grand
-    // aperçu centré + une caméra sur le côté).
-    const screenArea = sw * sh
-    type Cand = { cx: number; cy: number; area: number; y1: number; x1: number; photo: boolean }
-    const cands: Cand[] = []
-    for (const n of xml.split('<node').slice(1)) {
-      const b = n.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
-      if (!b) continue
-      const x1 = +b[1], y1 = +b[2], x2 = +b[3], y2 = +b[4]
-      const w = x2 - x1, h = y2 - y1
-      if (w < sw * 0.12 || h < sh * 0.06) continue        // trop petit pour une miniature
-      if (y1 < sh * 0.12 || y2 > sh * 0.82) continue        // header / barre de nav → ignore
-      const meta = ((n.match(/content-desc="([^"]*)"/)?.[1] ?? '') + ' ' +
-                    (n.match(/resource-id="([^"]*)"/)?.[1] ?? '')).toLowerCase()
-      if (/camera|appareil|capture|shutter|prendre une photo|take photo/.test(meta)) continue // pas la caméra !
-      const photo = /photo|video|vidéo|image|gallery|galerie|thumbnail|miniature|media|recent/.test(meta)
-      cands.push({ cx: Math.floor((x1 + x2) / 2), cy: Math.floor((y1 + y2) / 2), area: w * h, y1, x1, photo })
+    const re = /resource-id="[^"]*(?:gallery_grid_item|media_picker_grid_item)[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g
+    let best: [number, number] | null = null
+    let bestScore = Infinity
+    let m: RegExpExecArray | null
+    while ((m = re.exec(xml)) !== null) {
+      const x1 = +m[1], y1 = +m[2], x2 = +m[3], y2 = +m[4]
+      const score = y1 * 10000 + x1 // top row first, then leftmost
+      if (score < bestScore) { bestScore = score; best = [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] }
     }
-    const photos = cands.filter(c => c.photo)
-    const pool = photos.length ? photos : cands
-    // S'il existe un grand aperçu (mise en page « Recents » : une image centrale
-    // dominante), on le prend. Sinon (grille), on prend le plus haut-à-gauche.
-    const big = pool.filter(c => c.area > screenArea * 0.14).sort((a, b) => b.area - a.area)[0]
-    const topLeft = [...pool].sort((a, b) => (a.y1 - b.y1) || (a.x1 - b.x1))[0]
-    const pick = big ?? topLeft
-    // Repli : CENTRE de l'écran (jamais la caméra à gauche), pas le coin haut-gauche.
-    return pick ? [pick.cx, pick.cy] : [Math.floor(sw * 0.5), Math.floor(sh * 0.42)] as [number, number]
+    // Fallback: top-left of the grid (below the gallery header)
+    return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)] as [number, number]
   })()
-  log('   🖼 Sélection de la photo…')
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
-  } // fin du repli caméra + galerie (si l'intent direct a échoué)
 
   // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
   log('🔗 Ajout du sticker lien…')
