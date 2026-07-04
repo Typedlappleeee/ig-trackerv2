@@ -18,6 +18,7 @@ interface NotifySettings {
 }
 
 const EVENT_DEFS: { key: string; label: string; desc: string }[] = [
+  { key: 'account_flagged', label: 'Compte bloqué / shadowban', desc: 'Un compte vient d’être détecté bloqué ou en shadowban' },
   { key: 'task_paused', label: 'Tâche mise en pause', desc: 'Crédits épuisés ou pool de vidéos vide' },
   { key: 'post_failed', label: 'Publication échouée', desc: 'Un post programmé a échoué' },
   { key: 'batch_done',  label: 'Batch terminé',       desc: 'Un mass posting se termine' },

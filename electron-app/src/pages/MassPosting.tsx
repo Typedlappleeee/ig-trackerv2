@@ -208,6 +208,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]     = useState('')
+  const [hideBanned, setHideBanned]       = useState(() => localStorage.getItem('sf-hide-banned') !== '0')
+  useEffect(() => { localStorage.setItem('sf-hide-banned', hideBanned ? '1' : '0') }, [hideBanned])
   const [phonePickMode, setPhonePickMode] = useState<'phones' | 'groups'>('phones')
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
   const [showBankPicker, setShowBankPicker] = useState(false)
@@ -1341,12 +1343,15 @@ export function MassPosting({ user }: MassPostingProps) {
   const visiblePhones = phones.filter(p => {
     if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (groupFilter !== 'Tous' && p.group_name !== groupFilter) return false
+    // Exclut les comptes détectés comme bloqués (évite de payer 2 cr pour un compte mort).
+    if (hideBanned && p.account_state === 'banned') return false
     if (phoneSearch) {
       const q = phoneSearch.toLowerCase()
       return p.phone_name?.toLowerCase().includes(q) || p.ig_username?.toLowerCase().includes(q)
     }
     return true
   })
+  const bannedCount = phones.filter(p => p.account_state === 'banned').length
 
 
   // Live progress stats
@@ -1603,7 +1608,15 @@ export function MassPosting({ user }: MassPostingProps) {
                     style={{ fontSize: 10, letterSpacing: '0.04em', textTransform: 'uppercase', padding: '2px 6px', color: FAINT }}>
                     {t('massPostingNoneGroup')}
                   </button>
-                  <span style={{ marginLeft: 'auto', fontSize: 10.5, color: FAINT, fontVariantNumeric: 'tabular-nums' }}>{visiblePhones.length}</span>
+                  {bannedCount > 0 && (
+                    <button onClick={() => setHideBanned(v => !v)}
+                      className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+                      title="Masquer les comptes détectés comme bloqués"
+                      style={{ fontSize: 10, letterSpacing: '0.04em', textTransform: 'uppercase', padding: '2px 6px', color: hideBanned ? 'var(--danger)' : FAINT }}>
+                      {hideBanned ? '✓ ' : ''}Bannis masqués ({bannedCount})
+                    </button>
+                  )}
+                  <span style={{ marginLeft: bannedCount > 0 ? 0 : 'auto', fontSize: 10.5, color: FAINT, fontVariantNumeric: 'tabular-nums' }}>{visiblePhones.length}</span>
                 </div>
               </div>
             )}
