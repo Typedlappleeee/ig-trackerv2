@@ -298,8 +298,12 @@ export function Reports({ user }: { user: User }) {
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="date" value={day} max={parisToday()} onChange={e => setDay(e.target.value)} className="sf-input" style={{ width: 150, height: 32 }} />
+          <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère followers/vues via l'analytics GeeLark (inclus, sans RapidAPI)">
+            {glSyncing ? '⏳ Synchro…' : '🟢 Sync via GéeLark'}
+          </button>
+          {glMsg && <span style={{ fontSize: 12, color: glMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{glMsg}</span>}
           <button onClick={() => setShowCfg(v => !v)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">{showCfg ? 'Masquer' : 'Configurer'}</button>
         </div>
       </div>
@@ -341,14 +345,13 @@ export function Reports({ user }: { user: User }) {
 
             <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)', marginBottom: 16 }}>
               <p style={{ fontSize: 11.5, color: 'var(--text-2)', margin: 0, lineHeight: 1.5 }}>
-                🔑 L'API Instagram est <b>gérée côté serveur</b> (clé agence) — rien à coller ici. Vues/likes/commentaires arrivent automatiquement. Sans clé serveur, le suivi marche quand même en « posté / pas posté ».
+                🟢 Le bouton <b>« Sync via GéeLark »</b> (en haut) récupère followers/vues via l'analytics GéeLark <b>inclus à ton plan</b> — gratuit, sans RapidAPI. Le suivi automatique quotidien, lui, passe par la clé serveur (agence).
               </p>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: saving ? 0.6 : 1 }}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
               <button onClick={launchNow} disabled={launching} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: launching ? 0.6 : 1 }}>{launching ? '⏳ Synchro en cours…' : '⚡ Lancer maintenant'}</button>
-              <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère les stats via l'analytics GeeLark (inclus au plan Pro, sans RapidAPI)">{glSyncing ? '⏳ Synchro GéeLark…' : '🟢 Sync via GéeLark (gratuit)'}</button>
               <button onClick={testApi} disabled={testing} className="sf-btn sf-btn-secondary cursor-pointer" style={{ opacity: testing ? 0.6 : 1 }}>{testing ? 'Test…' : '🔍 Tester l\'API'}</button>
               {saved && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Enregistré</span>}
               {launched && <span style={{ fontSize: 12, color: launchMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{launchMsg || '✓ Synchronisé'}</span>}
