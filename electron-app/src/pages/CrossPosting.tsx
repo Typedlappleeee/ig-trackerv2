@@ -4,7 +4,7 @@ import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { supabase } from '@/lib/supabase'
 import {
-  geelarkGetMaterialId, publishVideoCrossPlatform, CROSS_PLATFORMS,
+  publishVideoCrossPlatform, CROSS_PLATFORMS,
   type CrossPlatform,
 } from '@/lib/geelark'
 import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
@@ -74,15 +74,9 @@ export function CrossPosting({ user }: CrossPostingProps) {
     })))
     setJobs(initial)
 
-    // Upload la vidéo UNE fois vers le material center GeeLark → token réutilisé partout.
-    const fileName = (video.title || 'video').replace(/[^\w.-]+/g, '_') + (/\.\w+$/.test(video.title) ? '' : '.mp4')
-    const token = await geelarkGetMaterialId(bearer!, video.url, 1, fileName)
-    if (!token) {
-      setJobs(prev => prev.map(j => ({ ...j, status: 'error', detail: 'Envoi de la vidéo à GéeLark échoué' })))
-      setRunning(false)
-      toast.show({ title: 'Échec', body: 'La vidéo n’a pas pu être envoyée à GéeLark.', kind: 'error' })
-      return
-    }
+    // Les templates RPA téléchargent la vidéo depuis une URL directe (URL signée
+    // de la banque) — pas besoin de pré-upload vers un fileId.
+    const videoUrl = video.url
 
     let ok = 0, err = 0
     // Série par téléphone (rotation d'IP éventuelle), plateformes enchaînées par téléphone.
@@ -92,7 +86,7 @@ export function CrossPosting({ user }: CrossPostingProps) {
         setJob(key, { status: 'running' })
         try {
           const r = await publishVideoCrossPlatform(bearer!, phone.geelark_id, pl.key,
-            { videoToken: token, caption: caption.trim() || undefined, title: caption.trim() || video.title, rotationUrls },
+            { videoUrl, caption: caption.trim() || undefined, rotationUrls },
             m => setJob(key, { detail: m }))
           if (r.ok) { ok++; setJob(key, { status: 'done', detail: 'Publié ✓' }) }
           else { err++; setJob(key, { status: 'error', detail: r.error ?? 'Échec' }) }
