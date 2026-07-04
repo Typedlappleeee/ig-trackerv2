@@ -668,7 +668,9 @@ export function MassPosting({ user }: MassPostingProps) {
           createdByName: user.email?.split('@')[0] ?? 'Moi',
           type: 'mass_posting', scheduledAt,
           phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
-          videos: videosToSchedule.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title, desc: (v.caption?.trim() || undefined) })),
+          // Légende par vidéo : sa description de banque, sinon la légende globale
+          // du posting (repli explicite → ne dépend pas du fallback côté serveur).
+          videos: videosToSchedule.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title, desc: (v.caption?.trim() || caption.trim() || undefined) })),
           caption, delayMinutes: 0, mode, bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
           platform,
         })
@@ -676,6 +678,25 @@ export function MassPosting({ user }: MassPostingProps) {
         await refundOnFailure('La programmation a échoué.')
         return
       }
+
+      // Usage unique : à la PROGRAMMATION, on retire de la banque les vidéos
+      // programmées → les prochaines programmations puisent dans ce qui reste.
+      if (postingOpts.deleteAfterPost) {
+        const toDelete = videosToSchedule.filter(sv => sv?.item?.storage_path && !String(sv.item.id).startsWith('local-') && !String(sv.item.id).startsWith('bank-'))
+        if (toDelete.length) {
+          try {
+            const ids = toDelete.map(sv => sv.item.id)
+            const base = supabase.from('content_bank').delete().in('id', ids)
+            await (currentOrg ? (base as any).eq('org_id', currentOrg.id) : (base as any).eq('user_id', user.id).is('org_id', null))
+            const { deleteStorageObjects } = await import('@/lib/storage')
+            deleteStorageObjects(toDelete.flatMap(sv => [sv.item.storage_path, sv.item.thumbnail_path])).catch(() => {})
+            const deletedIds = new Set(ids)
+            setSelVideos(prev => prev.filter(sv => !deletedIds.has(sv.item.id)))
+            log(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, 'ok')
+          } catch { log('Impossible de retirer certaines vidéos de la banque', 'warn') }
+        }
+      }
+
       log(`Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
     } catch (err: any) {
       log('Une erreur est survenue pendant la programmation.', 'error')
