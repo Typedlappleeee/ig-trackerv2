@@ -14,12 +14,14 @@ import { Toggle } from '@/components/ui/Toggle'
 import { useToast } from '@/components/Toast'
 
 interface Phone { id: string; geelark_id: string; phone_name: string; ig_username?: string | null; group_name?: string | null }
-interface CrossPostingProps { user: User }
+// lockedPlatform : quand fourni (ex. 'threads'), la page est verrouillée sur CETTE
+// plateforme — pas de sélecteur multi-plateforme, titre dédié.
+interface CrossPostingProps { user: User; lockedPlatform?: CrossPlatform }
 
 type JobStatus = 'idle' | 'uploading' | 'running' | 'done' | 'error'
 interface Job { key: string; phone: Phone; platform: CrossPlatform; status: JobStatus; detail?: string }
 
-export function CrossPosting({ user }: CrossPostingProps) {
+export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
   const { currentOrg } = useOrg()
   const { bearer } = useConnections(user)
   const toast = useToast()
@@ -28,7 +30,8 @@ export function CrossPosting({ user }: CrossPostingProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [search, setSearch]     = useState('')
 
-  const [platforms, setPlatforms] = useState<Set<CrossPlatform>>(new Set(['threads']))
+  const [platforms, setPlatforms] = useState<Set<CrossPlatform>>(new Set([lockedPlatform ?? 'threads']))
+  const lockedCfg = lockedPlatform ? CROSS_PLATFORMS.find(p => p.key === lockedPlatform) : undefined
   const [videos, setVideos]       = useState<{ url: string; title: string }[]>([])
   const [showPicker, setShowPicker] = useState(false)
   const [captionsText, setCaptionsText] = useState('')
@@ -133,7 +136,7 @@ export function CrossPosting({ user }: CrossPostingProps) {
     }
     setRunning(false)
     toast.show({
-      title: err === 0 ? 'Cross-posting terminé ✓' : 'Terminé avec erreurs',
+      title: err === 0 ? 'Publication terminée ✓' : 'Terminé avec erreurs',
       body: `${ok} publication(s) réussie(s)${err ? ` · ${err} échec(s)` : ''}`,
       kind: err === 0 ? 'ok' : 'error',
     })
@@ -147,8 +150,14 @@ export function CrossPosting({ user }: CrossPostingProps) {
     <div className="sf-page anim-page">
       <div className="sf-page-header">
         <div>
-          <h1 className="sf-page-title" style={{ fontSize: 22 }}>Cross-posting</h1>
-          <p className="sf-page-sub">Mass posting Threads &amp; co : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire sur tes comptes.</p>
+          <h1 className="sf-page-title" style={{ fontSize: 22 }}>
+            {lockedCfg ? `${lockedCfg.emoji} ${lockedCfg.label}` : 'Cross-posting'}
+          </h1>
+          <p className="sf-page-sub">
+            {lockedCfg
+              ? `Mass posting ${lockedCfg.label} : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire.`
+              : 'Mass posting Threads & co : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire sur tes comptes.'}
+          </p>
         </div>
       </div>
 
@@ -156,7 +165,7 @@ export function CrossPosting({ user }: CrossPostingProps) {
         <div className="sf-card" style={{ margin: 24 }}>
           <EmptyState
             title="GéeLark non connecté"
-            description="Ajoute ton token GéeLark pour utiliser le cross-posting."
+            description="Ajoute ton token GéeLark pour publier."
             action={{ label: 'Configurer dans les Réglages', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'settings', tab: 'connexions' } })) }}
           />
         </div>
@@ -165,31 +174,33 @@ export function CrossPosting({ user }: CrossPostingProps) {
 
           {/* Left : config */}
           <div style={{ flex: '1 1 420px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 320 }}>
-            {/* Platforms */}
-            <div className="sf-card" style={{ padding: 16 }}>
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 10 }}>Plateformes</p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {CROSS_PLATFORMS.map(pl => {
-                  const on = platforms.has(pl.key)
-                  return (
-                    <button key={pl.key} onClick={() => togglePlatform(pl.key)}
-                      className="cursor-pointer"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 7, padding: '8px 13px', borderRadius: 'var(--r-md)',
-                        fontSize: 12.5, fontWeight: 600, transition: 'all .15s',
-                        background: on ? 'var(--accent-dim)' : 'var(--surface-2)',
-                        border: `1px solid ${on ? 'var(--border-accent)' : 'var(--border)'}`,
-                        color: on ? 'var(--accent-lt)' : 'var(--text-3)',
-                      }}>
-                      <span>{pl.emoji}</span>{pl.label}
-                    </button>
-                  )
-                })}
+            {/* Platforms — masqué quand la page est verrouillée sur une plateforme */}
+            {!lockedPlatform && (
+              <div className="sf-card" style={{ padding: 16 }}>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 10 }}>Plateformes</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {CROSS_PLATFORMS.map(pl => {
+                    const on = platforms.has(pl.key)
+                    return (
+                      <button key={pl.key} onClick={() => togglePlatform(pl.key)}
+                        className="cursor-pointer"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 7, padding: '8px 13px', borderRadius: 'var(--r-md)',
+                          fontSize: 12.5, fontWeight: 600, transition: 'all .15s',
+                          background: on ? 'var(--accent-dim)' : 'var(--surface-2)',
+                          border: `1px solid ${on ? 'var(--border-accent)' : 'var(--border)'}`,
+                          color: on ? 'var(--accent-lt)' : 'var(--text-3)',
+                        }}>
+                        <span>{pl.emoji}</span>{pl.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 10 }}>
+                  ⚠ Les templates RPA de ces plateformes dépendent de la version de l’API GéeLark ; en cas d’erreur, le message exact est affiché par téléphone.
+                </p>
               </div>
-              <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 10 }}>
-                ⚠ Les templates RPA de ces plateformes dépendent de la version de l’API GéeLark ; en cas d’erreur, le message exact est affiché par téléphone.
-              </p>
-            </div>
+            )}
 
             {/* Vidéos */}
             <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>

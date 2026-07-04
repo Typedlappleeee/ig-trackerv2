@@ -136,7 +136,7 @@ export function Publish({ user }: { user: User }) {
       }>
         {/* key force le remontage au changement de plateforme → MassPosting relit sf-mp-platform */}
         <div key={platform} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
-          {isThreads ? <CrossPosting user={user} /> : <MassPosting user={user} />}
+          {isThreads ? <CrossPosting user={user} lockedPlatform="threads" /> : <MassPosting user={user} />}
         </div>
       </Suspense>
     </div>
