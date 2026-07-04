@@ -1199,6 +1199,8 @@ export function MassPosting({ user }: MassPostingProps) {
       const okN = [...finalStatuses.values()].filter(s => s.status === 'done').length
       const errN = [...finalStatuses.values()].filter(s => s.status === 'error').length
       setLastRun({ ok: okN, err: errN, total: assignments.length })
+      // Mémorise les téléphones en échec pour permettre un « Relancer les échecs ».
+      setFailedPhoneIds(phoneList.filter(p => finalStatuses.get(p.id)?.status !== 'done').map(p => p.id))
 
       // Usage unique : retire de la banque les vidéos réellement publiées (au moins
       // un téléphone en succès), pour ne jamais reposter la même. Bank uniquement
@@ -1355,6 +1357,24 @@ export function MassPosting({ user }: MassPostingProps) {
   const progressPct    = totalTasks > 0 ? Math.round(((doneTasks + errorTasks + cancelledTasks) / totalTasks) * 100) : 0
   const toast = useToast()
   const [lastRun, setLastRun] = useState<{ ok: number; err: number; total: number } | null>(null)
+  const [failedPhoneIds, setFailedPhoneIds] = useState<string[]>([])
+  const [pendingRetry, setPendingRetry]     = useState(false)
+
+  // Relance un run en ne (re)sélectionnant que les téléphones en échec.
+  function retryFailed() {
+    if (failedPhoneIds.length === 0 || posting) return
+    setSelPhones(new Set(failedPhoneIds))
+    setLastRun(null)
+    setFailedPhoneIds([])
+    setPendingRetry(true)  // post() est déclenché par l'effet une fois la sélection à jour
+  }
+  useEffect(() => {
+    if (pendingRetry && !posting) {
+      setPendingRetry(false)
+      post()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRetry, phoneList])
   const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0
   const launchCost = phoneList.length * CREDIT_COSTS.mass_posting
 
@@ -1479,7 +1499,12 @@ export function MassPosting({ user }: MassPostingProps) {
             <span style={{ fontSize: 12.5, fontWeight: 700, color: lastRun.err === 0 ? 'var(--ok)' : 'var(--warn)' }}>
               {lastRun.err === 0 ? '✓' : '!'} Dernier run : {lastRun.ok}/{lastRun.total} réussi{lastRun.ok > 1 ? 's' : ''}{lastRun.err > 0 ? ` · ${lastRun.err} échec${lastRun.err > 1 ? 's' : ''}` : ''}
             </span>
-            <button onClick={() => setLastRun(null)} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ marginLeft: 'auto' }}>
+            {failedPhoneIds.length > 0 && (
+              <button onClick={retryFailed} className="sf-btn sf-btn-primary sf-btn-sm" style={{ marginLeft: 'auto' }}>
+                ↻ Relancer les {failedPhoneIds.length} échec{failedPhoneIds.length > 1 ? 's' : ''}
+              </button>
+            )}
+            <button onClick={() => setLastRun(null)} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ marginLeft: failedPhoneIds.length > 0 ? 0 : 'auto' }}>
               Masquer
             </button>
           </div>
