@@ -16,6 +16,7 @@ import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { pollAllNow } from '@/lib/igStatsPoller'
 import { useToast } from '@/components/Toast'
+import { exportCsv } from '@/lib/exportCsv'
 import {
   ACCENT, ACCENT_L, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT,
   HAIR, BG_1 as BG, BG_2 as BG2, OK, ERR, SANS,
@@ -216,6 +217,23 @@ export function Stats({ user }: StatsProps) {
     following: filtered.reduce((s, p) => s + (p.following ?? 0), 0),
   }), [filtered])
 
+  // Santé de la flotte : vue d'ensemble d'org (actifs / bloqués / silencieux).
+  const fleet = useMemo(() => {
+    const now = Date.now()
+    const SILENT_MS = 3 * 24 * 3600 * 1000
+    let banned = 0, shadow = 0, silent = 0
+    for (const p of filtered) {
+      const st = (p as { account_state?: string }).account_state
+      if (st === 'banned') banned++
+      else if (st === 'shadow') shadow++
+      const last = (p as { last_post_at?: string }).last_post_at
+      if (!last || now - new Date(last).getTime() > SILENT_MS) silent++
+    }
+    const total = filtered.length
+    const healthy = Math.max(0, total - banned - shadow)
+    return { total, banned, shadow, silent, healthy }
+  }, [filtered])
+
   const followersSeries = useMemo(() => buildSeries(snaps, phoneIds, period, 'followers'), [snaps, phoneIds, period])
   const viewsSeries     = useMemo(() => buildSeries(snaps, phoneIds, period, 'total_views'), [snaps, phoneIds, period])
   const postsSeries     = useMemo(() => buildSeries(snaps, phoneIds, period, 'posts'), [snaps, phoneIds, period])
@@ -328,6 +346,23 @@ export function Stats({ user }: StatsProps) {
               <Kpi label="Vues / post" value={avgViewsPerPost !== null ? fmtCompact(avgViewsPerPost) : '—'} sub="moyenne" />
             </div>
 
+            {/* Santé de la flotte */}
+            <div style={{ ...card, padding: '14px 18px', marginBottom: 18, display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: IVORY }}>Santé de la flotte</span>
+              {[
+                { label: 'Comptes', val: fleet.total, color: IVORY },
+                { label: 'Sains', val: fleet.healthy, color: '#22C55E' },
+                { label: 'Shadowban', val: fleet.shadow, color: '#F59E0B' },
+                { label: 'Bloqués', val: fleet.banned, color: '#EF4444' },
+                { label: 'Silencieux 3j+', val: fleet.silent, color: '#94A3B8' },
+              ].map(m => (
+                <div key={m.label} style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: m.color, fontVariantNumeric: 'tabular-nums' }}>{m.val}</span>
+                  <span style={{ fontSize: 10.5, color: FAINT, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{m.label}</span>
+                </div>
+              ))}
+            </div>
+
             {/* Charts */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
               <div style={{ ...card, padding: '16px 18px' }}>
@@ -354,8 +389,30 @@ export function Stats({ user }: StatsProps) {
 
             {/* Leaderboard */}
             <div style={{ ...card, overflow: 'hidden' }}>
-              <div style={{ padding: '14px 18px', borderBottom: `1px solid ${HAIR}` }}>
+              <div style={{ padding: '14px 18px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: IVORY }}>Classement par compte <span style={{ color: FAINT, fontWeight: 500 }}>· clique un compte pour le détail</span></p>
+                <button
+                  onClick={() => exportCsv(`scaleflow-comptes-${new Date().toISOString().slice(0, 10)}`,
+                    [
+                      { key: 'account', label: 'Compte' },
+                      { key: 'followers', label: 'Followers' },
+                      { key: 'views', label: 'Vues' },
+                      { key: 'posts', label: 'Posts' },
+                      { key: 'growth', label: 'Croissance' },
+                    ],
+                    leaderboard.map(r => ({
+                      account: r.phone.ig_username ?? r.phone.phone_name ?? '',
+                      followers: r.phone.followers ?? 0,
+                      views: r.phone.total_views ?? 0,
+                      posts: r.phone.video_count ?? 0,
+                      growth: r.growth ?? '',
+                    })))}
+                  className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+                  style={{ marginLeft: 'auto', fontSize: 11 }}
+                  title="Exporter le classement en CSV"
+                >
+                  ⬇ Export CSV
+                </button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 90px 90px 70px 90px', padding: '8px 18px', fontSize: 10.5, fontWeight: 600, color: FAINT, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${HAIR}` }}>
                 <span>#</span><span>Compte</span>
