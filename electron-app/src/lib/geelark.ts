@@ -69,35 +69,58 @@ async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown
 // interne pour laisser l'IP se couper avant de vérifier.
 export interface RotationResult { ok: boolean; detail: string }
 
+// Traduit la réponse brute d'un fournisseur de proxy (souvent du JSON technique
+// type {"result":"1","message":"Success"}) en un message clair pour l'utilisateur.
+// Les logs sont vus par des clients : jamais de JSON ni de jargon.
+function friendlyRotation(ok: boolean, rawBody?: string, status?: number, error?: string): { ok: boolean; msg: string } {
+  if (error) return { ok: false, msg: `impossible de joindre le proxy` }
+  const body = (rawBody ?? '').trim()
+  let parsed: Record<string, unknown> | null = null
+  try { parsed = JSON.parse(body) } catch { /* réponse en texte simple */ }
+  const field = (k: string) => (parsed ? String((parsed as Record<string, unknown>)[k] ?? '') : '')
+
+  const httpFail    = typeof status === 'number' && status >= 400
+  const explicitFail = httpFail ||
+    /"result"\s*:\s*"?0"?/i.test(body) ||
+    /\b(fail|failed|error|erreur|invalid|forbidden|denied|expir|refus)\b/i.test(body)
+
+  if (ok && !explicitFail) {
+    return { ok: true, msg: 'nouvelle IP demandée au proxy ✓' }
+  }
+  // Échec : on donne une raison compréhensible, sans recracher le JSON.
+  const raw = field('message') || field('msg') || field('error')
+  const reason = raw && !/^success$/i.test(raw)
+    ? raw.toLowerCase()
+    : (status ? `le proxy a répondu par une erreur (${status})` : 'réponse inattendue du proxy')
+  return { ok: false, msg: reason }
+}
+
 export async function rotateProxyIp(url: string, log?: (m: string) => void): Promise<RotationResult> {
   const clean = (url ?? '').trim()
-  if (!clean || !/^https?:\/\//i.test(clean)) return { ok: false, detail: 'URL invalide (doit commencer par http(s)://)' }
-  const short = (s: string) => (s ?? '').slice(0, 120).replace(/\s+/g, ' ').trim()
+  if (!clean || !/^https?:\/\//i.test(clean)) {
+    log?.('⚠ Rotation IP : l’adresse du proxy est invalide (elle doit commencer par http:// ou https://)')
+    return { ok: false, detail: 'Adresse du proxy invalide' }
+  }
+  const emit = (r: { ok: boolean; msg: string }) => {
+    log?.(r.ok ? `🔄 Rotation IP : ${r.msg}` : `⚠ Rotation IP : ${r.msg} — on continue quand même`)
+    return { ok: r.ok, detail: r.msg }
+  }
   try {
     // Electron : GET direct via le module Node https (contourne le "Forbidden URL"
     // de net.fetch). Nécessite la dernière version de l'app desktop.
     if (window.electronAPI?.rotateProxy) {
       const r = await window.electronAPI.rotateProxy(clean)
-      const detail = r.ok ? (r.body ? short(r.body) : `HTTP ${r.status ?? '?'}`) : (r.error ?? 'échec réseau')
-      log?.(`🔄 Rotation IP : ${detail}`)
-      return { ok: !!r.ok, detail }
+      return emit(friendlyRotation(!!r.ok, r.body, r.status, r.error))
     }
     // Web : proxy serverless (contourne CORS ET la CSP connect-src du navigateur).
     const res = await fetch(`/api/rotate?url=${encodeURIComponent(clean)}`)
     if (res.status === 404) {
-      const detail = 'proxy serveur /api/rotate introuvable — déploiement en cours ? (attends 1-2 min + recharge)'
-      log?.(`⚠ Rotation IP : ${detail}`)
-      return { ok: false, detail }
+      return emit({ ok: false, msg: 'service de rotation pas encore prêt (déploiement en cours, réessaie dans 1-2 min)' })
     }
     const j = await res.json().catch(() => null) as { ok?: boolean; body?: string; error?: string; status?: number } | null
-    const ok = res.ok && (j?.ok ?? false)
-    const detail = j?.body ? short(j.body) : (j?.error ? short(j.error) : `HTTP ${j?.status ?? res.status}`)
-    log?.(`🔄 Rotation IP : ${detail}`)
-    return { ok, detail }
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e)
-    log?.(`⚠ Rotation IP échouée : ${detail} — on continue`)
-    return { ok: false, detail }
+    return emit(friendlyRotation(res.ok && (j?.ok ?? false), j?.body, j?.status ?? res.status, j?.error))
+  } catch {
+    return emit({ ok: false, msg: 'le proxy n’a pas répondu' })
   }
 }
 
