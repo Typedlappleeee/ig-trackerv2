@@ -371,6 +371,49 @@ function BugScreen() {
   )
 }
 
+// Annonce ponctuelle : compatibilité universelle de l'automatisation.
+function AndroidCompatPopup({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
+      <div className="bg-[#080610] border border-[#22c55e]/25 rounded-2xl p-8 w-full max-w-md shadow-2xl text-center space-y-5 anim-scale-in">
+        <div className="flex flex-col items-center gap-3">
+          <div style={{ width: 60, height: 60, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)' }}>🤖</div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#22c55e' }}>Nouveauté</div>
+            <h2 className="text-2xl font-black text-white tracking-tight mt-1">Compatible avec tous les Android</h2>
+          </div>
+        </div>
+
+        <p className="text-sm text-text2 leading-relaxed">
+          L'automatisation fonctionne <b>désormais sur tous les Android</b> et est <b>compatible avec toutes les versions d'Instagram</b>. Plus besoin d'une version ou d'une configuration spécifique — tu postes directement.
+        </p>
+
+        <div className="text-left space-y-2">
+          {[
+            { icon: '✅', text: 'Fonctionne sur tous les cloud phones Android' },
+            { icon: '📲', text: 'Compatible avec toutes les versions d\'Instagram' },
+            { icon: '🚀', text: 'Aucune configuration spéciale requise pour poster' },
+          ].map(({ icon, text }) => (
+            <div key={text} className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+              style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)' }}>
+              <span className="text-base flex-shrink-0">{icon}</span>
+              <span className="text-sm text-text2">{text}</span>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{ background: 'linear-gradient(130deg,#16a34a,#22c55e)', border: 'none' }}
+          className="w-full text-white font-bold py-3 rounded-xl text-sm hover:opacity-90 active:scale-[0.98] transition-all"
+        >
+          C'est parti →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function BetaPopup({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
@@ -613,6 +656,7 @@ import type { PageKey }      from '@/lib/supabase'
 
 const BETA_KEY  = 'scaleflow-v1-seen'
 const TOUR_KEY  = 'scaleflow-show-tour'
+const ANDROID_COMPAT_KEY = 'sf-announce-android-compat'
 
 function AppContent({ user }: { user: User }) {
   const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError, role, perms } = useOrg()
@@ -637,6 +681,7 @@ function AppContent({ user }: { user: User }) {
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showTour, setShowTour]             = useState(() => !!localStorage.getItem(TOUR_KEY))
   const [showBeta, setShowBeta]             = useState(false)
+  const [showAndroidCompat, setShowAndroidCompat] = useState(() => !localStorage.getItem(ANDROID_COMPAT_KEY))
   const [phoneCount, setPhoneCount]         = useState(0)
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
   const [refreshTick, setRefreshTick]       = useState(0)
@@ -931,6 +976,9 @@ function AppContent({ user }: { user: User }) {
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
+      {!showBeta && showAndroidCompat && (
+        <AndroidCompatPopup onClose={() => { localStorage.setItem(ANDROID_COMPAT_KEY, '1'); setShowAndroidCompat(false) }} />
+      )}
       {showTour && <AppTour
         onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }}
         onNavigate={p => { setPage(p as Page) }}

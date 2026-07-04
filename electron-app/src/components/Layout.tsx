@@ -226,14 +226,14 @@ function SidebarDivider() {
 // Affiché partout dans l'app : rappelle la config fiable pour l'automatisation
 // (Stories, etc.) + bouton « copier » pour transmettre la consigne aux agences.
 const RECO_LINES = [
-  'Android 15',
-  'Instagram version 433.0.0.42.68 (recommandée par GeeLark pour l\'automatisation)',
-  'Téléphone (cloud phone) en anglais',
+  'Compatible avec toutes les versions d\'Instagram',
+  'Fonctionne sur tous les Android',
+  'Téléphone (cloud phone) en anglais (recommandé)',
 ]
 const RECO_TEXT =
-  '✅ Config recommandée pour que l\'automatisation marche à coup sûr :\n' +
+  '✅ L\'automatisation est désormais compatible avec toutes les versions d\'Instagram et tous les Android.\n' +
   RECO_LINES.map(l => `• ${l}`).join('\n') +
-  '\n\nUne config différente (autre version d\'Instagram, téléphone dans une autre langue) peut faire échouer l\'automatisation.'
+  '\n\nAstuce : garder le cloud phone en anglais reste conseillé pour une fiabilité maximale.'
 
 function RecoBadge() {
   const [open, setOpen] = useState(false)
@@ -252,17 +252,17 @@ function RecoBadge() {
     >
       <button
         onClick={() => setOpen(v => !v)}
-        aria-label="Config recommandée pour l'automatisation"
+        aria-label="Compatibilité de l'automatisation"
         className="cursor-pointer"
         style={{
           width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 15, fontWeight: 900, lineHeight: 1, color: '#fff',
-          background: '#ef4444', border: '1px solid rgba(255,255,255,0.25)',
-          boxShadow: '0 0 0 3px rgba(239,68,68,0.20), 0 2px 8px rgba(239,68,68,0.40)',
+          background: '#22c55e', border: '1px solid rgba(255,255,255,0.25)',
+          boxShadow: '0 0 0 3px rgba(34,197,94,0.18), 0 2px 8px rgba(34,197,94,0.35)',
         }}
       >
-        ?
+        ✓
       </button>
 
       {open && (
@@ -270,13 +270,13 @@ function RecoBadge() {
           style={{
             position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 200,
             width: 320, padding: '14px 15px', borderRadius: 12,
-            background: '#15171c', border: '1px solid rgba(239,68,68,0.35)',
+            background: '#15171c', border: '1px solid rgba(34,197,94,0.35)',
             boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 800, color: '#F1F0F7', marginBottom: 9, display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ fontSize: 15 }}>⚠️</span>
-            Config recommandée
+            <span style={{ fontSize: 15 }}>✅</span>
+            Compatibilité
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {RECO_LINES.map(l => (
@@ -287,7 +287,7 @@ function RecoBadge() {
             ))}
           </div>
           <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)', marginTop: 10, lineHeight: 1.5 }}>
-            Une autre version d'Instagram ou un téléphone dans une autre langue peut faire échouer l'automatisation.
+            L'automatisation fonctionne maintenant sur tous les Android, toutes versions d'Instagram confondues.
           </div>
           <button
             onClick={copy}
