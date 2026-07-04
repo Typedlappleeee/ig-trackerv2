@@ -590,24 +590,29 @@ Deno.serve(async (req) => {
   const todayStr = nowUtc.toISOString().slice(0, 10) // 'YYYY-MM-DD'
   if (nowUtc.getUTCHours() === 0 && !filterUserId) {
     try {
+      // Claim atomique : on pose credits_charged_date = today AVANT de débiter, et
+      // uniquement sur les lignes pas encore débitées aujourd'hui. Le cron tourne
+      // chaque minute et une invocation peut durer plusieurs minutes → plusieurs
+      // instances tournent en parallèle à 00:00. Sans ce claim, elles lisaient
+      // toutes credits_charged_date != today puis débitaient 50 → double débit.
+      // Ici seule la première voit chaque ligne (l'UPDATE reverrouille la ligne :
+      // après le commit de la 1ʳᵉ, la clause ne matche plus pour les autres).
       const { data: activeTasks } = await db.from('recurring_tasks')
-        .select('id, user_id, org_id, name, credits_charged_date')
+        .update({ credits_charged_date: todayStr })
         .eq('status', 'active')
+        .or(`credits_charged_date.is.null,credits_charged_date.neq.${todayStr}`)
+        .select('id, user_id, org_id, name')
       for (const task of activeTasks ?? []) {
-        if (task.credits_charged_date === todayStr) continue  // déjà débité aujourd'hui
         const { data: creditRes } = await db.rpc('deduct_user_credits', {
           p_user_id: task.user_id,
           p_amount:  50,
         })
         if (creditRes?.ok) {
-          await db.from('recurring_tasks')
-            .update({ credits_charged_date: todayStr })
-            .eq('id', task.id)
           summary[`daily:${task.id}`] = 'charged 50'
         } else {
-          // Crédits insuffisants — on suspend la tâche
+          // Débit échoué → on RELÂCHE le claim (date remise à null) et on suspend.
           await db.from('recurring_tasks')
-            .update({ status: 'paused' })
+            .update({ status: 'paused', credits_charged_date: null })
             .eq('id', task.id)
           summary[`daily:${task.id}`] = `paused (${creditRes?.error ?? 'insufficient credits'})`
           await notifyOwner(db, { userId: task.user_id, orgId: task.org_id },

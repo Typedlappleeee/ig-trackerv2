@@ -574,6 +574,16 @@ export default function StoryLink({ user }: { user: User }) {
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
 
+    // Remboursement des stories non publiées (échec, annulation, Stop). Symétrique
+    // au chemin programmation. Uniquement si on a réellement débité (pas en dryRun).
+    if (!dryRun) {
+      const failed = Math.max(0, selectedIds.length - okCount)
+      if (failed > 0) {
+        const refunded = await refundCredits(credits.ownerId, failed * CREDIT_COSTS.story)
+        if (refunded) credits.refresh()
+      }
+    }
+
     // Historique : on enregistre TOUJOURS le run (réussi ou non) pour que la
     // page Historique soit fiable. (table post_runs, fire-and-forget)
     const totalRun = jobs.length || assignments.length

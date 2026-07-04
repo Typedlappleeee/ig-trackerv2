@@ -232,7 +232,20 @@ interface RunUnit {
   recur_hours: number
 }
 
+// Déclenche l'exécution des tâches dues CÔTÉ SERVEUR — la MÊME edge function que
+// le cron (chaque minute). On ne poste plus directement depuis le client : ce
+// chemin ne débitait AUCUN crédit (posting récurrent gratuit tant que l'app était
+// ouverte) et pouvait double-exécuter une tâche (aucun verrou). L'edge function,
+// elle, débite les crédits, réserve la tâche de façon atomique (anti-double) et
+// crée le scheduled_post. Filtrée sur l'utilisateur courant via son JWT.
+async function triggerDueTasksOnServer(): Promise<void> {
+  try { await supabase.functions.invoke('run-scheduled-posts', { body: {} }) }
+  catch { /* le cron serveur prendra le relais à la minute suivante */ }
+}
+
 // Entry point — routes to the segmented or legacy single-task flow.
+// ⚠ Déprécié pour le déclenchement automatique (contournait la facturation) —
+// conservé pour référence ; l'exécution passe par triggerDueTasksOnServer().
 async function runTaskNow(task: RecurringTask, bearer: string): Promise<void> {
   if (task.segments && task.segments.length > 0) {
     const now = Date.now()
@@ -3268,7 +3281,7 @@ export function Tasks({ user }: { user: User }) {
       )
       if (!overdue.length) return
       triggeringRef.current = true
-      Promise.all(overdue.map(t => runTaskNow(t, bearerRef.current).catch(() => {})))
+      triggerDueTasksOnServer()
         .then(() => load())
         .finally(() => { triggeringRef.current = false })
     })
@@ -3287,10 +3300,7 @@ export function Tasks({ user }: { user: User }) {
       if (!hasOverdue) return
       triggeringRef.current = true
       try {
-        const overdue = tasksRef.current.filter(
-          t => t.status === 'active' && isTaskDue(t),
-        )
-        await Promise.all(overdue.map(t => runTaskNow(t, bearerRef.current).catch(() => {})))
+        await triggerDueTasksOnServer()
         await load()
       } catch { /* silent */ }
       finally { triggeringRef.current = false }

@@ -1294,6 +1294,21 @@ export function MassPosting({ user }: MassPostingProps) {
     } catch (e: unknown) {
       log('Une erreur est survenue pendant le posting.', 'error')
     } finally {
+      // Remboursement des crédits : quoi qu'il arrive (crash, sortie anticipée,
+      // aucun téléphone démarré, Stop utilisateur), chaque téléphone qui n'a PAS
+      // publié est remboursé. settle() est idempotent → sûr même appelé une fois.
+      try {
+        const fin = getMassPostingState().taskStatuses
+        const okCount = phoneList.filter(p => fin.get(p.id)?.status === 'done').length
+        const failedCount = phoneList.length - okCount
+        if (failedCount > 0) run.markFailed(failedCount)
+        const { refunded } = await run.settle()
+        if (refunded > 0) {
+          log(`${refunded} crédit(s) remboursé(s) — ${failedCount} téléphone(s) non publié(s)`, 'info')
+          credits.refresh()
+        }
+      } catch { /* best-effort — jamais bloquer l'extinction des téléphones */ }
+
       // Filet de sécurité DUR : quoi qu'il arrive (crash, throttle, tâche jamais
       // confirmée par GéeLark, sortie anticipée), on éteint TOUS les tels encore
       // marqués actifs. C'est ce qui règle « les tels restent allumés ».
