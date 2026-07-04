@@ -67,6 +67,7 @@ export type Page =
   | 'history'
   | 'reports'
   | 'tiktokposting'
+  | 'crossposting'
 
 interface LayoutProps {
   user:      User
@@ -98,6 +99,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'publishhub',  label: 'navPublishVideo', icon: '🚀' },
+      { id: 'crossposting', label: 'navCrossPosting', icon: '🌐', isNew: true },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
@@ -184,6 +186,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   reports:         'chart',
   library:         'book',
   tiktokposting:   'zap',
+  crossposting:    'zap',
 }
 
 // Couleur d'accent par onglet — petite touche de couleur dans le menu (icônes
@@ -723,7 +726,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   const isVisibleTab = (id: Page): boolean => {
     // Pages internes / superadmin ScaleFlow uniquement (Rapports + Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Tous les autres onglets sont visibles pour tout le monde.

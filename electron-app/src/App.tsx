@@ -579,6 +579,7 @@ function lazyWithReload<T extends ComponentType<any>>(factory: () => Promise<{ d
 const Phones          = lazyWithReload(() => import('@/pages/Phones').then(m => ({ default: m.Phones })))
 
 const TikTokPosting   = lazyWithReload(() => import('@/pages/TikTokPosting'))
+const CrossPosting    = lazyWithReload(() => import('@/pages/CrossPosting').then(m => ({ default: m.CrossPosting })))
 const Publish        = lazyWithReload(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
 const Stats          = lazyWithReload(() => import('@/pages/Stats').then(m => ({ default: m.Stats })))
 const BankHub        = lazyWithReload(() => import('@/pages/BankHub').then(m => ({ default: m.BankHub })))
@@ -894,6 +895,7 @@ function AppContent({ user }: { user: User }) {
       case 'phones':          return <Phones          user={user} key={refreshTick} />
 
       case 'tiktokposting':   return <TikTokPosting   user={user} />
+      case 'crossposting':    return <CrossPosting    user={user} />
       case 'posting':      return <Publish     user={user} />
       case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />

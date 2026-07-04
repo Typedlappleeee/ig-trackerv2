@@ -340,7 +340,7 @@ export async function getPhonePublicIp(bearer: string, phoneId: string): Promise
 // le fileId par URL : le fichier n'est uploadé qu'UNE fois, réutilisé partout.
 const _materialCache = new Map<string, Promise<string | null>>()
 
-async function geelarkGetMaterialId(
+export async function geelarkGetMaterialId(
   bearer: string, fileUrl: string, fileType: 1 | 2, fileName: string,
 ): Promise<string | null> {
   const cached = _materialCache.get(fileUrl)
@@ -2552,6 +2552,51 @@ export async function editInstagramProfileNative(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log('   Tâche créée — édition en cours…')
+    return pollRpaTask(bearer, taskId, log, 8 * 60_000)
+  })
+}
+
+// ── Cross-posting multi-plateforme ──────────────────────────────────────────
+// Réutilise toute l'infra (upload → boot → RPA → poll) pour publier une vidéo sur
+// Facebook / YouTube Shorts / X / Threads / Reddit / Pinterest via les templates
+// RPA GeeLark. ⚠ Les noms d'endpoints ci-dessous suivent la convention documentée
+// mais peuvent varier selon la version de l'API GeeLark — le message d'erreur
+// remonte tel quel pour faciliter l'ajustement si un template diffère.
+export type CrossPlatform = 'facebook' | 'youtube' | 'x' | 'threads' | 'reddit' | 'pinterest'
+
+export const CROSS_PLATFORMS: { key: CrossPlatform; label: string; endpoint: string; emoji: string }[] = [
+  { key: 'facebook',  label: 'Facebook Reels', endpoint: '/rpa/task/faceBookReels',    emoji: '📘' },
+  { key: 'youtube',   label: 'YouTube Shorts', endpoint: '/rpa/task/youtubePublish',   emoji: '▶️' },
+  { key: 'x',         label: 'X (Twitter)',    endpoint: '/rpa/task/xPublish',         emoji: '✖️' },
+  { key: 'threads',   label: 'Threads',        endpoint: '/rpa/task/threadsPublish',   emoji: '🧵' },
+  { key: 'reddit',    label: 'Reddit',         endpoint: '/rpa/task/redditPublish',    emoji: '👽' },
+  { key: 'pinterest', label: 'Pinterest',      endpoint: '/rpa/task/pinterestPublish', emoji: '📌' },
+]
+
+export async function publishVideoCrossPlatform(
+  bearer: string,
+  phoneId: string,
+  platform: CrossPlatform,
+  opts: { videoToken: string; caption?: string; title?: string; rotationUrls?: string[] },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  const cfg = CROSS_PLATFORMS.find(p => p.key === platform)!
+  return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, opts.rotationUrls, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log(`📤 Publication ${cfg.label}…`)
+    const res = await geelarkFetch('POST', cfg.endpoint, {
+      id: phoneId,
+      scheduleAt: Math.floor(Date.now() / 1000) + 5,
+      video: [opts.videoToken],
+      ...(opts.title ? { title: opts.title } : {}),
+      ...(opts.caption != null ? { description: opts.caption, caption: opts.caption } : {}),
+      name: `ScaleFlow ${cfg.label}`,
+    }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GéeLark (${cfg.label}) : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GéeLark' }
+    log('   Tâche créée — publication en cours…')
     return pollRpaTask(bearer, taskId, log, 8 * 60_000)
   })
 }
