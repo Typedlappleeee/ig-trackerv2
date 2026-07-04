@@ -502,7 +502,7 @@ export default function StoryLink({ user }: { user: User }) {
       const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
         playError()
-        setJobs(selectedIds.map(id => ({ phoneId: id, status: 'error', logs: [`[err] ${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost})`] })))
+        setJobs(selectedIds.map(id => ({ phoneId: id, status: 'error', logs: [`❌ ${creditRes.error ?? 'Crédits insuffisants'} (${creditCost} crédits nécessaires)`] })))
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
@@ -541,10 +541,10 @@ export default function StoryLink({ user }: { user: User }) {
           m => addLog(asgn.phoneId, m),
         )
         if (res.ok) { setStatus(asgn.phoneId, 'ok'); return 1 }
-        else { setStatus(asgn.phoneId, 'error'); addLog(asgn.phoneId, `[err] ${res.error ?? 'Échec'}`); return 0 }
+        else { setStatus(asgn.phoneId, 'error'); addLog(asgn.phoneId, `❌ ${res.error ?? 'La publication de la story a échoué'}`); return 0 }
       } catch (e) {
         setStatus(asgn.phoneId, 'error')
-        addLog(asgn.phoneId, `[err] ${e instanceof Error ? e.message : String(e)}`)
+        addLog(asgn.phoneId, `❌ La publication de la story a échoué (erreur inattendue)`)
         return 0
       } finally {
         try { await stopPhone(bearer, asgn.phoneId) } catch (_) { /* ignore */ }

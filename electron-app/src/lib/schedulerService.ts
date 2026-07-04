@@ -437,7 +437,7 @@ async function executeScheduledPostInner(
     if (!serialRotate) {
       onLog(`▶ Démarrage de ${phones.length} téléphone(s)…`)
       const startRes = await gPost(bearer, '/phone/start', { ids: geelarkIds }) as any
-      if (startRes.code !== 0) onLog(`⚠ Démarrage: ${startRes.msg ?? startRes.code}`)
+      if (startRes.code !== 0) onLog(`⚠ Le démarrage des téléphones a échoué${startRes.msg ? ` : ${startRes.msg}` : ''}`)
     } else {
       onLog(`▶ Mode rotation d'IP : démarrage séquentiel (1 tél à la fois, IP fraîche par tél)`)
     }
@@ -493,7 +493,7 @@ async function executeScheduledPostInner(
       } else {
         failedCount = phones.length
         phones.forEach(p => phoneResults.push({ name: nameOf(p), ok: false, error: `Tâche refusée: ${res.msg ?? res.code}` }))
-        onLog(`❌ TikTok /task/add refusé: code=${res.code} msg=${res.msg ?? '?'}`)
+        onLog(`❌ TikTok a refusé les publications${res.msg ? ` : ${res.msg}` : ''}`)
       }
     } else {
       for (let i = 0; i < phones.length; i++) {
@@ -513,7 +513,7 @@ async function executeScheduledPostInner(
           await rotateAllProxies(reelsRotationUrls, m => onLog(`   ${m}`))
           onLog(`▶ Démarrage ${nameOf(phone)}…`)
           const sr = await gPost(bearer, '/phone/start', { ids: [phone.geelark_id] }) as any
-          if (sr.code !== 0) onLog(`⚠ Démarrage ${nameOf(phone)}: ${sr.msg ?? sr.code}`)
+          if (sr.code !== 0) onLog(`⚠ Le démarrage de ${nameOf(phone)} a échoué${sr.msg ? ` : ${sr.msg}` : ''}`)
           registerStartedPhones([phone.geelark_id], { orgId: post.org_id ?? null, userId: post.user_id }, {
             stopAt: new Date(Date.now() + 8 * 60_000), reason: 'scheduler',
           })
@@ -530,7 +530,6 @@ async function executeScheduledPostInner(
           video:       [videos[videoIdx].token],
           ...(reels_trial ? { shareType: 2 } : {}),
         }) as any
-        onLog(`📦 Réponse GeelarK (${nameOf(phone)}): code=${res.code} msg=${res.msg ?? '?'} data=${JSON.stringify(res.data ?? null)}`)
         const taskId = res.data?.id ?? res.data?.taskId ?? res.taskId ?? res.id ?? null
         if (res.code === 0) {
           if (taskId) { taskIds.push(taskId); taskPhoneName.set(taskId, nameOf(phone)) }
@@ -538,7 +537,7 @@ async function executeScheduledPostInner(
         } else {
           failedCount++
           phoneResults.push({ name: nameOf(phone), ok: false, error: `Tâche refusée: ${res.msg ?? res.code}` })
-          onLog(`❌ Tâche refusée (${nameOf(phone)}): code=${res.code} msg=${res.msg ?? '?'}`)
+          onLog(`❌ Publication refusée (${nameOf(phone)})${res.msg ? ` : ${res.msg}` : ''}`)
         }
       }
     }
@@ -567,7 +566,7 @@ async function executeScheduledPostInner(
           const st  = Number(it.status)
           const nm  = taskPhoneName.get(tid) ?? tid
           if (st === 3) { pollSuccessCount++; onLog(`✅ Succès : ${nm}`); pending.delete(tid); phoneResults.push({ name: nm, ok: true }) }
-          else if (st === 4) { pollFailCount++; onLog(`❌ Échec GeelarK : ${nm} (${it.failDesc ?? '?'})`); pending.delete(tid); phoneResults.push({ name: nm, ok: false, error: it.failDesc ?? 'Échec GeeLark' }) }
+          else if (st === 4) { pollFailCount++; onLog(`❌ Publication échouée : ${nm}${it.failDesc ? ` (${it.failDesc})` : ''}`); pending.delete(tid); phoneResults.push({ name: nm, ok: false, error: it.failDesc ?? 'Échec GeeLark' }) }
           else if ([7, 8].includes(st)) { pollFailCount++; onLog(`🚫 Annulé : ${nm}`); pending.delete(tid); phoneResults.push({ name: nm, ok: false, error: 'Annulé' }) }
         }
       }
@@ -610,7 +609,7 @@ async function executeScheduledPostInner(
           await deleteStorageObjects(toRemove.flatMap(v => [v.storage_path, v.thumbnail_path]))
           onLog(`🗑️ ${toRemove.length} vidéo(s) retirée(s) de la banque (usage unique)`)
         } catch (e) {
-          onLog(`⚠ Suppression banque échouée : ${e instanceof Error ? e.message : String(e)}`)
+          onLog(`⚠ Impossible de retirer les vidéos de la banque`)
         }
       }
     }

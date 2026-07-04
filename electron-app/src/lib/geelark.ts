@@ -358,7 +358,7 @@ export async function geelarkUploadMediaToPhone(
     // 1. fileId du material center (mis en cache → 1 seul upload par image)
     const fileId = await geelarkGetMaterialId(bearer, fileUrl, opts.fileType, opts.fileName)
     if (!fileId) return { ok: false, error: 'material/temp/upload: pas de fileId' }
-    log(`   ☁️ Matériel GéeLark prêt (${fileId})`)
+    log('   ☁️ Média prêt côté serveur')
 
     // 2. Dépose le matériel sur le téléphone au dossier voulu (retry si tél pas prêt)
     let taskId: string | undefined
@@ -371,7 +371,7 @@ export async function geelarkUploadMediaToPhone(
         await sleepOrAbort(3000, opts.signal)
       }
     }
-    log(`   📥 Dépôt GéeLark vers ${dir}…`)
+    log('   📥 Transfert du média vers le téléphone…')
 
     // 3. Poll du statut (~90 s max) — pending|uploading|success|failed.
     //    Tolérant : une erreur transitoire de polling ne fait PAS échouer, on
@@ -425,7 +425,7 @@ async function ensurePhoneRunning(
     if (p) {
       const st = Number(p.status ?? -1)
       const label = st === 0 ? 'en marche' : st === 1 ? 'arrêté' : st === 2 ? 'démarrage en cours' : st === 3 ? 'arrêt en cours' : `inconnu(${st})`
-      log?.(`📱 Statut: ${label} [raw=${st}] — ${p.serialName ?? p.name ?? p.id}`)
+      log?.(`📱 Statut du téléphone : ${label} — ${p.serialName ?? p.name ?? p.id}`)
       if (st === 3) {
         log?.('⏳ En cours d\'arrêt — attente 15s…')
         await sleepOrAbort(15000, signal)
@@ -443,10 +443,10 @@ async function ensurePhoneRunning(
   const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
   const failed  = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
   const msg     = String(startRes['msg'] ?? startRes['message'] ?? '')
-  log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}${msg ? ` (${msg})` : ''}`)
+  log?.(`  → ${success} téléphone(s) démarré(s)${failed > 0 ? `, ${failed} échec(s)` : ''}`)
 
   if (code !== 0 && success === 0 && failed > 0) {
-    log?.(`❌ Impossible de démarrer: ${msg || code}`)
+    log?.('❌ Impossible de démarrer le téléphone')
     return false
   }
 
@@ -461,16 +461,16 @@ async function ensurePhoneRunning(
       const p = phones.find(x => x.id === phoneId)
       const st = Number(p?.status ?? -1)
       if (st === 0) {
-        log?.('  📱 Téléphone démarré (status=0)')
+        log?.('  📱 Téléphone démarré')
         statusReady = true
         break
       }
-      const label = st === 2 ? 'démarrage…' : st === 1 ? 'arrêté ?' : `status=${st}`
+      const label = st === 2 ? 'démarrage en cours…' : st === 1 ? 'arrêté ?' : 'démarrage en cours…'
       log?.(`  ⏳ ${label} (${(i + 1) * 5}s écoulées)`)
     } catch { /* ignore polling errors */ }
   }
   if (!statusReady) {
-    log?.('  ⚠️ Status API n\'a pas confirmé le démarrage — tentative shell quand même')
+    log?.('  ⚠️ Démarrage non confirmé — on poursuit quand même')
   }
 
   // Phase 2: wait for shell daemon to accept commands — max 120s
@@ -486,7 +486,7 @@ async function warmupShellDelay(
   log?: (m: string) => void,
   signal?: AbortSignal,
 ) {
-  log?.('  ⏳ Attente initialisation du shell (max 150s)…')
+  log?.('  ⏳ Attente que le téléphone soit prêt (max 150s)…')
 
   for (let attempt = 0; attempt < 30; attempt++) {
     if (signal?.aborted) throw new Error('Annulé')
@@ -497,17 +497,16 @@ async function warmupShellDelay(
       const code = Number(r['code'])
       const out  = String((r['data'] as Record<string, unknown>)?.['output'] ?? '')
       if (code === 0 && out.includes('SHELL_OK')) {
-        log?.('  ✅ Shell prêt')
+        log?.('  ✅ Téléphone prêt')
         return
       }
-      const errMsg = String(r['msg'] ?? r['message'] ?? '')
-      log?.(`  ↻ Shell pas encore prêt (code=${code}${errMsg ? ` "${errMsg}"` : ''}) — nouvel essai dans 5s… (${attempt + 1}/30)`)
-    } catch (e) {
-      log?.(`  ↻ Shell probe erreur: ${e instanceof Error ? e.message : String(e)} — nouvel essai…`)
+      log?.(`  ↻ Téléphone pas encore prêt — nouvel essai dans 5s… (${attempt + 1}/30)`)
+    } catch {
+      log?.('  ↻ Téléphone pas encore prêt — nouvel essai…')
     }
   }
 
-  log?.('  ⚠️ Shell toujours indisponible après 150s — poursuite quand même (les commandes réessaieront)')
+  log?.('  ⚠️ Le téléphone n\'a pas répondu à temps — on poursuit quand même')
 }
 
 // Reply to an Instagram comment by driving the cloud phone via shell commands.
@@ -772,12 +771,12 @@ async function saveFieldAndBack(
     findByText(xml, 'Save', 'Sauvegarder', 'Done', 'Terminé') ??
     findByResourceId(xml, 'save_button', 'action_done', 'done_button', 'submit_button')
   if (savePt) {
-    log(`   💾 Save à ${savePt}`)
+    log('   💾 Enregistrement…')
     await shellExec(bearer, phoneId, `input tap ${savePt[0]} ${savePt[1]}`)
   } else {
     const sx = Math.floor(sw * 0.9)
     const sy = Math.floor(sh * 0.055)
-    log(`   💾 Save non trouvé → tap (${sx},${sy})`)
+    log('   💾 Enregistrement…')
     await shellExec(bearer, phoneId, `input tap ${sx} ${sy}`)
   }
   await sleep(2500)
@@ -817,14 +816,12 @@ async function _updateInstagramProfileInner(
   const sw = sm ? parseInt(sm[1]) : 1080
   const sh = sm ? parseInt(sm[2]) : 2340
   const cx = Math.floor(sw / 2)
-  log(`📐 Écran: ${sw}x${sh}`)
 
   // ── Download profile picture if needed ────────────────────────────────────
   if (config.profilePicUrl?.trim()) {
-    log('🖼 Téléchargement photo…')
-    const dl = await shellExec(bearer, phoneId,
+    log('🖼 Téléchargement de la photo…')
+    await shellExec(bearer, phoneId,
       `curl -s -L --max-time 30 -o /sdcard/DCIM/Camera/sf_pfp.jpg "${config.profilePicUrl.trim()}" && echo DONE`)
-    log(`   curl → ${dl.output.trim() || 'no output'}`)
     await shellExec(bearer, phoneId,
       'am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera/sf_pfp.jpg')
     await sleep(2000)
@@ -865,7 +862,7 @@ async function _updateInstagramProfileInner(
   await sleep(2500)
 
   // ── Account Center — directement visible dans le panneau hamburger ────────
-  log('🏛 Account Center…')
+  log('🏛 Ouverture du centre de comptes…')
   xml = await dumpXml(bearer, phoneId)
   let acPt =
     findByText(xml, 'Account Center', 'Centre de comptes', 'Accounts Center',
@@ -931,19 +928,16 @@ async function _updateInstagramProfileInner(
     null
 
   if (igAccountPt) {
-    log(`   Compte trouvé à ${igAccountPt}`)
     await shellExec(bearer, phoneId, `input tap ${igAccountPt[0]} ${igAccountPt[1]}`)
   } else {
     // Fallback : le compte est toujours la première ligne de la liste (~33% hauteur)
-    log(`   Compte non trouvé → tap coordonnée (${cx}, ${Math.floor(sh * 0.33)})`)
     await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.33)}`)
   }
   await sleep(3500)
 
   // ── We are now on the edit screen: Name · Username · Profile picture · Avatar
-  log('📋 Écran édition profil…')
+  log('📋 Écran d\'édition du profil…')
   xml = await dumpXml(bearer, phoneId)
-  log(`   XML: ${xml.length} chars`)
 
   // ── Edit Name ─────────────────────────────────────────────────────────────
   if (config.profileName?.trim()) {
@@ -1045,7 +1039,7 @@ async function _updateInstagramProfileInner(
 
   // ── Bio (via Edit Profile — Account Center doesn't expose bio) ────────────
   if (config.bio?.trim()) {
-    log('📝 Bio → retour vers Edit Profile…')
+    log('📝 Mise à jour de la bio…')
     // Force-restart Instagram and go to Edit Profile
     await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
     await sleep(1200)
@@ -1195,7 +1189,6 @@ async function _postInstagramStoryInner(
   const sw = sm ? parseInt(sm[1]) : 1080
   const sh = sm ? parseInt(sm[2]) : 2340
   const cx = Math.floor(sw / 2)
-  log(`📐 Écran: ${sw}x${sh}`)
 
   // ── 0. Wipe the gallery ────────────────────────────────────────────────────
   // Stale photos/videos make Instagram's story picker grab the wrong (old) media
@@ -1289,7 +1282,7 @@ async function _postInstagramStoryInner(
   if (!imgBase64) {
     return { ok: false, error: 'Impossible de télécharger l\'image (réseau)' }
   }
-  log(`   📥 Image: ${Math.round(imgBase64.length / 1024)} KB`)
+  log('   📥 Image téléchargée')
 
   // Always produce a 720×1280 (9:16) JPEG with the image centered on a black
   // background. This prevents Instagram from cropping non-9:16 source images.
@@ -1321,9 +1314,8 @@ async function _postInstagramStoryInner(
     drawCentered(ctx, bitmap.width, bitmap.height, (dx, dy, dw, dh) => ctx.drawImage(bitmap, dx, dy, dw, dh))
     const blob = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.88 })
     compressed = bufToB64(await blob.arrayBuffer())
-    if (compressed) log(`   🗜️ 9:16 OffscreenCanvas: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(compressed.length / 1024)} KB`)
-  } catch (e) {
-    log(`   ⚠️ OffscreenCanvas: ${e instanceof Error ? e.message : String(e)}`)
+  } catch {
+    /* compression indisponible — on tente une autre méthode ci-dessous */
   }
 
   // Attempt 2: DOM Canvas (fallback)
@@ -1348,9 +1340,9 @@ async function _postInstagramStoryInner(
         img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
         img.src = blobUrl
       })
-      if (c2) { compressed = c2; log(`   🗜️ 9:16 Canvas DOM: ${Math.round(imgBase64.length / 1024)} KB → ${Math.round(c2.length / 1024)} KB`) }
-    } catch (e) {
-      log(`   ⚠️ Canvas DOM: ${e instanceof Error ? e.message : String(e)}`)
+      if (c2) { compressed = c2 }
+    } catch {
+      /* compression indisponible — on utilise l'image d'origine */
     }
   }
 
@@ -1373,10 +1365,10 @@ async function _postInstagramStoryInner(
     if (glUp.ok && glUp.path) {
       const ckg = await shellExec(bearer, phoneId, `wc -c < '${glUp.path}' 2>/dev/null || echo 0`)
       const szg = parseInt(ckg.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
-      if (szg >= 2000) { imgPath = glUp.path; outExt = _imgExt; sz = szg; log(`   ✅ Upload GéeLark: ${szg} octets`) }
-      else log(`   ⚠️ Upload GéeLark: fichier introuvable (${szg} o) — bascule…`)
+      if (szg >= 2000) { imgPath = glUp.path; outExt = _imgExt; sz = szg; log('   ✅ Image transférée sur le téléphone') }
+      else log('   ⚠️ Transfert incomplet — nouvelle méthode…')
     } else {
-      log(`   ⚠️ Upload GéeLark indisponible (${glUp.error}) — bascule…`)
+      log('   ⚠️ Transfert indisponible — nouvelle méthode…')
     }
   }
 
@@ -1400,20 +1392,19 @@ async function _postInstagramStoryInner(
       imgPath = dlPath
       outExt = _imgExt
       sz = szd
-      log(`   ✅ Image téléchargée par le téléphone: ${szd} octets`)
+      log('   ✅ Image téléchargée par le téléphone')
     } else {
-      log(`   ⚠️ Téléchargement direct échoué (${szd} o) — bascule sur base64…`)
+      log('   ⚠️ Téléchargement direct échoué — autre méthode…')
       await shellExec(bearer, phoneId, `rm -f '${dlPath}' 2>/dev/null; true`)
     }
   }
 
   // ── Fallback transfer: base64 chunks via shell (no phone-reachable URL) ──────
   if (sz < 2000) {
-    log(`   📤 Push image base64 (${Math.round(pushData.length / 1024)} KB)…`)
+    log('   📤 Transfert de l\'image…')
     const CHUNK = 3000, BATCH = 20
     const chunks: string[] = []
     for (let i = 0; i < pushData.length; i += CHUNK) chunks.push(pushData.slice(i, i + CHUNK))
-    log(`   📦 ${chunks.length} chunks…`)
     await shellExec(bearer, phoneId,
       `mkdir -p /sdcard/DCIM/Camera && printf '%s' '${chunks[0]}' > '${imgPath}.b64'`)
     for (let b = 1; b < chunks.length; b += BATCH) {
@@ -1425,7 +1416,6 @@ async function _postInstagramStoryInner(
     const ck = await shellExec(bearer, phoneId, `wc -c < '${imgPath}' 2>/dev/null || echo 0`)
     sz = parseInt(ck.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
   }
-  log(`   📎 Fichier: ${sz} octets`)
   if (sz < 2000) {
     return { ok: false, error: `Image non transférée sur le téléphone (${sz} octets)` }
   }
@@ -1452,7 +1442,7 @@ async function _postInstagramStoryInner(
   // `content query` imprime "Row: 0 _id=…" dès qu'une ligne existe → indexé.
   // Sortie vide (ou "No result found") = pas indexé → on relance un scan.
   if (!/Row:/i.test(_mck.output)) {
-    log('   🔁 Ré-indexation MediaStore…')
+    log('   🔁 Actualisation de la galerie…')
     await shellExec(bearer, phoneId,
       `am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard/DCIM 2>/dev/null; ` +
       `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://${imgPath}" 2>/dev/null; true`)
@@ -1480,7 +1470,7 @@ async function _postInstagramStoryInner(
     findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'capture_button', 'camera_shutter_button') ??
     findByText(xml, 'Gallery', 'Galerie', 'Story', 'Boomerang', 'Layout')
   if (!onCamera) {
-    log('   ↩︎ Deep link ignoré — tap sur l\'avatar « Your story »…')
+    log('   ↩︎ Ouverture de la story depuis l\'accueil…')
     // Open the regular home feed first.
     await shellExec(bearer, phoneId,
       'am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ' +
@@ -1555,7 +1545,6 @@ async function _postInstagramStoryInner(
     // Fallback: top-left of the grid (below the gallery header)
     return best ?? [Math.floor(sw * 0.25), Math.floor(sh * 0.30)] as [number, number]
   })()
-  log(`   👆 Tap galerie: ${firstThumb[0]},${firstThumb[1]}`)
   await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
   await sleep(3500)
 
@@ -1646,13 +1635,11 @@ async function _postInstagramStoryInner(
     const wanted = config.linkText.trim()
     const ascii  = toAsciiFallback(wanted)            // accents stripped, emojis dropped
     const needle = ascii.toLowerCase()                // accent-insensitive verify needle
-    log(`   ✏️  Texte du sticker: "${wanted}"${ascii !== wanted ? ` (ascii: "${ascii}")` : ''}`)
+    log(`   ✏️  Texte du sticker : "${wanted}"`)
 
     // Read the current sticker-text field (non-URL EditText). Returns null if none.
     const readTextField = async (): Promise<EditField | null> => {
       const fields = findEditTextFields(await dumpXml(bearer, phoneId))
-      // Diagnostic: list every editable field so we can see the real layout.
-      log(`   🔎 ${fields.length} champ(s): ${fields.map(f => `[${f.center[0]},${f.center[1]} foc=${f.focused ? 1 : 0} "${f.text.slice(0, 20)}"]`).join(' ')}`)
       return fields.find(f => !/https?:\/\/|www\./i.test(f.text)) ?? (fields.length >= 2 ? fields[1] : null)
     }
 
@@ -1693,7 +1680,6 @@ async function _postInstagramStoryInner(
 
     if (field) {
       const pt = field.center
-      log(`   🎯 Champ ciblé: ${pt[0]},${pt[1]}`)
 
       // ── Method 1: plain `input text` (ASCII). This is the proven path — it's
       // exactly how the URL is typed — so if focus is fine it WILL write text. ──
@@ -1701,21 +1687,20 @@ async function _postInstagramStoryInner(
         await focusAndClear(pt)
         await shellExec(bearer, phoneId, `input text "${escapeForInputText(ascii)}"`)
         await sleep(700)
-        if (await verify()) { log('   ✓ Saisi via input text (ASCII)'); done = true }
-        else log('   … input text ASCII n\'a rien écrit')
+        if (await verify()) { log('   ✓ Texte du sticker saisi'); done = true }
+        else log('   … nouvelle tentative de saisie…')
       }
 
       // ── Method 2: clipboard set-text + CTRL+V (Unicode-safe, keeps emojis). ──
       if (!done) {
         await focusAndClear(pt)
         const shellSafe = wanted.replace(/'/g, `'\\''`)
-        const setRes = await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
-        log(`   📋 cmd clipboard → "${(setRes.output || '').trim().slice(0, 60)}"`)
+        await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
         await sleep(300)
         await shellExec(bearer, phoneId, 'input keycombination 113 50') // CTRL+V
         await sleep(700)
-        if (await verify()) { log('   ✓ Saisi via presse-papier (CTRL+V)'); done = true }
-        else log('   … CTRL+V n\'a rien collé')
+        if (await verify()) { log('   ✓ Texte du sticker saisi'); done = true }
+        else log('   … nouvelle tentative de saisie…')
       }
 
       // ── Method 3: clipboard + long-press → "Coller/Paste" menu. ──
@@ -1728,10 +1713,10 @@ async function _postInstagramStoryInner(
         if (pastePt) {
           await shellExec(bearer, phoneId, `input tap ${pastePt[0]} ${pastePt[1]}`)
           await sleep(700)
-          if (await verify()) { log('   ✓ Saisi via menu Coller'); done = true }
-          else log('   … menu Coller n\'a rien collé')
+          if (await verify()) { log('   ✓ Texte du sticker saisi'); done = true }
+          else log('   … saisie du texte impossible')
         } else {
-          log('   … menu Coller introuvable')
+          log('   … saisie du texte impossible')
         }
       }
     } else {
@@ -1770,7 +1755,6 @@ async function _postInstagramStoryInner(
       (config.linkText ? findByText(sxml, config.linkText) : null) ??
       findByText(sxml, 'LINK', 'LIEN', 'Open', 'Ouvrir')
     if (stickerNode) {
-      log(`   🎯 Sticker trouvé via XML: ${stickerNode[0]},${stickerNode[1]}`)
       await shellExec(bearer, phoneId,
         `input swipe ${stickerNode[0]} ${stickerNode[1]} ${_dragTX} ${_dragTY} 1800`)
       await sleep(1200)
@@ -1926,8 +1910,8 @@ async function runWarmupActions(
       await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
       await sleep(3500)
       log('   ✅ Résultats ouverts — visionnage des Reels du mot-clé')
-    } catch (e) {
-      log(`   ⚠️ Recherche échouée (${e instanceof Error ? e.message : String(e)}) — warmup générique`)
+    } catch {
+      log('   ⚠️ Recherche échouée — visionnage général du fil')
     }
   }
 
@@ -2090,13 +2074,12 @@ async function _loginInstagramAccountInner(
     const sh = sm ? parseInt(sm[2]) : 2340
 
     // Use MainTabActivity — LoginActivity immediately redirects to Chrome in recent IG builds
-    log('📲 Lancement d\'Instagram (MainActivity)…')
+    log('📲 Lancement d\'Instagram…')
     await shellExec(bearer, phoneId,
       'am start -n com.instagram.android/.activity.MainTabActivity')
     await sleep(10000)
 
     let xml = await dumpXml(bearer, phoneId)
-    log(`📋 XML initial (${xml.length} chars): ${xml.substring(0, 300)}`)
 
     // If Chrome opened anyway, kill it and bring Instagram back
     const chromeOpen = xml.includes('com.android.chrome') || xml.includes('com.google.android.chrome')
@@ -2109,7 +2092,6 @@ async function _loginInstagramAccountInner(
         'am start -n com.instagram.android/.activity.MainTabActivity')
       await sleep(6000)
       xml = await dumpXml(bearer, phoneId)
-      log(`📋 XML après fermeture Chrome (${xml.length} chars)`)
     }
 
     // Some IG builds show a social-login screen first with "Log in with email" link
@@ -2119,11 +2101,10 @@ async function _loginInstagramAccountInner(
       'Already have an account', 'Log in', 'Se connecter',
     )
     if (alreadyHavePt) {
-      log('📲 Écran "Join Instagram" détecté — tap "I already have a profile"…')
+      log('📲 Écran d\'accueil détecté — sélection « J\'ai déjà un compte »…')
       await shellExec(bearer, phoneId, `input tap ${alreadyHavePt[0]} ${alreadyHavePt[1]}`)
       await sleep(4000)
       xml = await dumpXml(bearer, phoneId)
-      log(`📋 XML après tap (${xml.length} chars)`)
     }
 
     const emailLoginPt = findByText(xml,
@@ -2134,11 +2115,10 @@ async function _loginInstagramAccountInner(
       'Connexion avec un e-mail ou un numéro de téléphone',
     )
     if (emailLoginPt) {
-      log('📧 Tap "Log in with email or phone number"…')
+      log('📧 Choix de la connexion par e-mail ou téléphone…')
       await shellExec(bearer, phoneId, `input tap ${emailLoginPt[0]} ${emailLoginPt[1]}`)
       await sleep(3000)
       xml = await dumpXml(bearer, phoneId)
-      log(`📋 XML après sélection email (${xml.length} chars)`)
     }
 
     // ── Saisie identifiant ─────────────────────────────────────────────────
@@ -2155,7 +2135,6 @@ async function _loginInstagramAccountInner(
         'Email address', 'Adresse e-mail') ??
       [Math.floor(sw / 2), Math.floor(sh * 0.42)]
 
-    log(`   Champ identifiant à [${usernamePt[0]},${usernamePt[1]}]`)
     await shellExec(bearer, phoneId, `input tap ${usernamePt[0]} ${usernamePt[1]}`)
     await sleep(1000)
     await shellExec(bearer, phoneId, `input text "${escapeForInputText(email)}"`)
@@ -2174,11 +2153,10 @@ async function _loginInstagramAccountInner(
     ) ?? findByResourceId(xml, 'next_button', 'action_next', 'button_next')
 
     if (nextAfterEmail) {
-      log('➡️ Bouton Next détecté — Instagram login en 2 étapes')
+      log('➡️ Connexion en deux étapes détectée…')
       await shellExec(bearer, phoneId, `input tap ${nextAfterEmail[0]} ${nextAfterEmail[1]}`)
       await sleep(3000)
       xml = await dumpXml(bearer, phoneId)
-      log(`📋 XML après Next (${xml.length} chars)`)
     }
 
     // Find password field in updated XML
@@ -2192,14 +2170,14 @@ async function _loginInstagramAccountInner(
         : null)
 
     if (passwordPt) {
-      log(`🔑 Champ password à [${passwordPt[0]},${passwordPt[1]}] — double tap pour focus`)
+      log('🔑 Champ mot de passe détecté…')
       await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
       await sleep(400)
       await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
       await sleep(600)
     } else {
       // Single-screen fallback: TAB from email field
-      log('🔑 Champ password non trouvé — TAB depuis email')
+      log('🔑 Champ mot de passe non détecté — navigation au clavier…')
       await shellExec(bearer, phoneId, 'input keyevent 61')
       await sleep(700)
     }
@@ -2210,15 +2188,13 @@ async function _loginInstagramAccountInner(
     await sleep(800)
 
     // ── Soumission : bouton Log In ────────────────────────────────────────
-    log('🔐 Tap bouton Log in…')
+    log('🔐 Connexion…')
     xml = await dumpXml(bearer, phoneId)
     const loginBtn = findByText(xml, 'Log in', 'Log In', 'Se connecter', 'Sign in', 'Connexion') ??
                      findByResourceId(xml, 'log_in_button', 'login_button', 'button_text')
     if (loginBtn) {
-      log(`   Bouton Log in à [${loginBtn[0]},${loginBtn[1]}]`)
       await shellExec(bearer, phoneId, `input tap ${loginBtn[0]} ${loginBtn[1]}`)
     } else {
-      log('   Bouton non trouvé → ENTER')
       await shellExec(bearer, phoneId, 'input keyevent 66')
     }
     log('⏳ Connexion en cours… (attente 15s)')
@@ -2228,7 +2204,6 @@ async function _loginInstagramAccountInner(
 
     // ── Vérification post-connexion ────────────────────────────────────────
     xml = await dumpXml(bearer, phoneId)
-    log(`📋 XML post-login (${xml.length} chars): ${xml.substring(0, 300)}`)
     let xmlLower = xml.toLowerCase()
 
     // Still on the login page = credentials were not accepted
@@ -2251,7 +2226,7 @@ async function _loginInstagramAccountInner(
     ]
     for (const pat of errPatterns) {
       if (xmlLower.includes(pat)) {
-        log(`❌ Erreur détectée: "${pat}"`)
+        log('❌ Connexion refusée par Instagram')
         return { ok: false, error: `Login échoué — ${pat}` }
       }
     }
@@ -2277,7 +2252,7 @@ async function _loginInstagramAccountInner(
 
     if (isDeviceApproval) {
       if (!totpSecret?.trim()) {
-        log('⚠️ Challenge confirmation — aucun secret TOTP configuré')
+        log('⚠️ Vérification de sécurité demandée — aucun code d\'authentification configuré')
         return { ok: false, error: 'Challenge détecté — configure le secret TOTP pour l\'automatiser' }
       }
 
@@ -2291,16 +2266,15 @@ async function _loginInstagramAccountInner(
       ].some(p => xmlLower.includes(p))
 
       if (needsTryAnother) {
-        log('📱 Tap "Try another way"…')
+        log('📱 Choix d\'une autre méthode de vérification…')
         const tryAnotherPt =
           findByText(xml, 'Try another way', 'Essayer une autre méthode', 'Try another method') ??
           [Math.floor(sw / 2), Math.floor(sh * 0.75)]
         await shellExec(bearer, phoneId, `input tap ${tryAnotherPt[0]} ${tryAnotherPt[1]}`)
         await sleep(4000)
         xmlChallenge = await dumpXml(bearer, phoneId)
-        log(`📋 XML écran choix méthode (${xmlChallenge.length} chars)`)
       } else {
-        log('📱 Écran "Choose a way to confirm" détecté directement')
+        log('📱 Écran de choix de méthode de vérification détecté…')
       }
 
       // Select "Authentication app" radio button
@@ -2310,25 +2284,23 @@ async function _loginInstagramAccountInner(
           'Application d\'authentification', 'App d\'authentification',
           'Get a code from your authenticator app',
         ) ?? [Math.floor(sw / 2), Math.floor(sh * 0.38)]
-      log(`   Tap "Authentication app" à [${authAppPt[0]},${authAppPt[1]}]…`)
+      log('   Sélection de l\'application d\'authentification…')
       await shellExec(bearer, phoneId, `input tap ${authAppPt[0]} ${authAppPt[1]}`)
       await sleep(1500)
 
       // "Continue" button is at the bottom of the same screen (~95% height)
       const xmlAfterSelect = await dumpXml(bearer, phoneId)
-      log(`📋 XML après sélection (${xmlAfterSelect.length} chars): ${xmlAfterSelect.substring(0, 400)}`)
       const continuePt =
         findByText(xmlAfterSelect, 'Continue', 'Continuer', 'Next', 'Suivant') ??
         findByResourceId(xmlAfterSelect, 'continue_button', 'next_button', 'primary_button') ??
         [Math.floor(sw / 2), Math.floor(sh * 0.94)]
-      log(`   Tap "Continue" à [${continuePt[0]},${continuePt[1]}]…`)
+      log('   Validation…')
       await shellExec(bearer, phoneId, `input tap ${continuePt[0]} ${continuePt[1]}`)
       await sleep(4000)
 
       // Now on the TOTP code entry screen
       xml = await dumpXml(bearer, phoneId)
       xmlLower = xml.toLowerCase()
-      log(`📋 XML écran TOTP (${xml.length} chars)`)
     }
 
     // ── 2FA screen detection ───────────────────────────────────────────────
@@ -2346,10 +2318,9 @@ async function _loginInstagramAccountInner(
     const is2FA = twoFaPatterns.some(p => xmlLower.includes(p))
 
     if (is2FA && totpSecret?.trim()) {
-      log('🔐 Écran 2FA détecté — génération du code TOTP…')
+      log('🔐 Vérification en deux étapes — génération du code…')
       const { generateTOTP } = await import('./totp')
       const code = await generateTOTP(totpSecret.trim())
-      log(`🔢 Code TOTP généré : ${code}`)
 
       // Find the 6-digit input field
       const codePt: [number, number] =
@@ -2359,7 +2330,6 @@ async function _loginInstagramAccountInner(
         findByText(xml, '______', 'Enter code', 'Entrez le code', 'Code') ??
         [Math.floor(sw / 2), Math.floor(sh * 0.45)]
 
-      log(`   Champ code à [${codePt[0]},${codePt[1]}]`)
       await shellExec(bearer, phoneId, `input tap ${codePt[0]} ${codePt[1]}`)
       await sleep(600)
       await shellExec(bearer, phoneId, `input text "${code}"`)
@@ -2371,14 +2341,12 @@ async function _loginInstagramAccountInner(
         findByText(xml2, 'Confirm', 'Confirmer', 'Submit', 'Valider', 'Verify', 'Vérifier', 'Next', 'Suivant', 'Continue') ??
         findByResourceId(xml2, 'confirmation_button', 'submit_button', 'verify_button', 'next_button')
       if (confirmPt) {
-        log(`   Bouton confirmation à [${confirmPt[0]},${confirmPt[1]}]`)
         await shellExec(bearer, phoneId, `input tap ${confirmPt[0]} ${confirmPt[1]}`)
       } else {
-        log('   Bouton non trouvé → ENTER')
         await shellExec(bearer, phoneId, 'input keyevent 66')
       }
 
-      log('⏳ Validation du code 2FA (12s)…')
+      log('⏳ Validation du code de sécurité…')
       await sleep(12000)
 
       const xml3 = await dumpXml(bearer, phoneId)
@@ -2394,12 +2362,12 @@ async function _loginInstagramAccountInner(
         return { ok: false, error: 'Code 2FA refusé — toujours sur l\'écran 2FA' }
       }
       // Any other screen (home, onboarding, permissions…) = success
-      log('✅ Connexion réussie avec 2FA !')
+      log('✅ Connexion réussie (vérification en deux étapes) !')
       return { ok: true }
     }
 
     if (is2FA) {
-      log('⚠️ Écran 2FA détecté mais aucun secret TOTP configuré')
+      log('⚠️ Vérification en deux étapes demandée mais aucun code d\'authentification configuré')
       return { ok: false, error: 'Écran 2FA — configure le secret TOTP dans le Warmup pour l\'automatiser' }
     }
 
@@ -2462,7 +2430,7 @@ export async function warmupAccountNative(
     if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
-    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — warmup en cours…`)
+    log('   Tâche créée — warmup en cours…')
     return pollRpaTask(bearer, taskId, log, 25 * 60_000)
   })
 }
@@ -2481,11 +2449,11 @@ async function runTikTokRpa(
     const res = await geelarkFetch('POST', path, {
       id: phoneId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'ScaleFlow', ...extra,
     }, bearer)
-    if (res['code'] !== 0) { log(`   ⚠ ${label}: ${res['msg'] ?? res['code']}`); return }
+    if (res['code'] !== 0) { log(`   ⚠ ${label} : non effectué`); return }
     const tid = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (tid) await pollRpaTask(bearer, tid, log, 15 * 60_000)
-  } catch (e) {
-    log(`   ⚠ ${label}: ${e instanceof Error ? e.message : String(e)}`)
+  } catch {
+    log(`   ⚠ ${label} : non effectué`)
   }
 }
 
@@ -2525,7 +2493,7 @@ export async function warmupTikTokNative(
     const ids = ((res['data'] as Record<string, unknown>)?.['taskIds'] ?? []) as string[]
     const taskId = ids[0]
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
-    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — warmup en cours…`)
+    log('   Tâche créée — warmup en cours…')
     await pollRpaTask(bearer, taskId, log, 25 * 60_000)
 
     // 2. Engagement optionnel (même session) — like / follow / commentaire IA
@@ -2563,7 +2531,7 @@ export async function editInstagramProfileNative(
     if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
-    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — édition en cours…`)
+    log('   Tâche créée — édition en cours…')
     return pollRpaTask(bearer, taskId, log, 8 * 60_000)
   })
 }
@@ -2591,7 +2559,7 @@ export async function editTikTokProfileNative(
     if (res['code'] !== 0) return { ok: false, error: `GeeLark: ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
-    log(`   Tâche créée (${String(taskId).slice(0, 12)}…) — édition en cours…`)
+    log('   Tâche créée — édition en cours…')
     return pollRpaTask(bearer, taskId, log, 8 * 60_000)
   })
 }
@@ -2676,77 +2644,65 @@ export async function extractInstagramSessionId(
     ]
 
     // ── Step 2: SQLite cookie DB ──────────────────────────────────────────────
-    log('─── Méthode 1 : base SQLite WebView ───')
+    log('─── Récupération de la session (méthode 1) ───')
     for (const path of cookiePaths) {
       if (signal.aborted) throw new Error('Annulé')
-      log(`  📂 Test chemin: ${path.split('/').pop()}`)
       const cp = await sh(`cp "${path}" "${tmp}" 2>/dev/null && echo OK || echo FAIL`)
-      log(`     → cp: ${cp.output.trim()}`)
       if (!cp.output.includes('OK')) continue
 
-      log('  📋 Fichier trouvé — lecture sqlite3…')
+      log('  📋 Fichier trouvé — lecture…')
       const sql = await sh(
         `sqlite3 "${tmp}" "SELECT value FROM cookies WHERE name='sessionid' LIMIT 1;" 2>/dev/null`)
       const v1 = sql.output.trim()
-      log(`     → sqlite3 output (${v1.length} chars): ${v1.slice(0, 30) || '(vide)'}`)
       if (v1.length > 20) {
         await sh(`rm -f "${tmp}"`)
-        log('✅ sessionid extrait via sqlite3 !')
+        log('✅ Session récupérée !')
         return v1
       }
 
-      log('  📋 sqlite3 vide — essai strings+awk…')
       const str = await sh(
         `strings -n 8 "${tmp}" | awk 'prev=="sessionid"{print;exit}{prev=$0}' 2>/dev/null`)
       const v2 = str.output.trim()
-      log(`     → strings/awk output (${v2.length} chars): ${v2.slice(0, 30) || '(vide)'}`)
       if (v2.length > 20) {
         await sh(`rm -f "${tmp}"`)
-        log('✅ sessionid extrait via strings/awk !')
+        log('✅ Session récupérée !')
         return v2
       }
 
-      log('  📋 strings/awk vide — essai grep pattern…')
       const grep = await sh(
         `cat "${tmp}" | strings | grep -E "^[0-9]{8,15}%3A[A-Za-z0-9_%-]{20,}$" | head -1 2>/dev/null`)
       const v3 = grep.output.trim()
-      log(`     → grep output (${v3.length} chars): ${v3.slice(0, 30) || '(vide)'}`)
       if (v3.length > 20) {
         await sh(`rm -f "${tmp}"`)
-        log('✅ sessionid extrait via grep pattern !')
+        log('✅ Session récupérée !')
         return v3
       }
 
       await sh(`rm -f "${tmp}"`)
-      log(`  ⚠️ Fichier copié mais sessionid non trouvé (path: ${path.split('/').slice(-3).join('/')})`)
+      log('  ⚠️ Session non trouvée dans ce fichier')
     }
 
     // ── Step 3: shared_prefs XML ──────────────────────────────────────────────
     if (signal.aborted) throw new Error('Annulé')
-    log('─── Méthode 2 : shared_prefs XML ───')
+    log('─── Récupération de la session (méthode 2) ───')
     const prefs = await sh(
       `grep -rh "sessionid" /data/data/com.instagram.android/shared_prefs/ 2>/dev/null | grep -oE "[0-9]{8,15}%3A[A-Za-z0-9_%.-]{20,}" | head -1`)
     const v4 = prefs.output.trim()
-    log(`  → shared_prefs output (${v4.length} chars): ${v4.slice(0, 30) || '(vide)'}`)
     if (v4.length > 20) {
-      log('✅ sessionid extrait via shared_prefs !')
+      log('✅ Session récupérée !')
       return v4
     }
 
     // ── Step 4: diagnostic find ───────────────────────────────────────────────
     if (signal.aborted) throw new Error('Annulé')
-    log('─── Diagnostic : fichiers disponibles ───')
     const bin = await sh(
       `find /data/data/com.instagram.android -name "*.db" -o -name "Cookies" 2>/dev/null | head -20`)
     const files = bin.output.trim()
-    if (files) {
-      log('  Fichiers trouvés:')
-      files.split('\n').forEach(f => log(`    ${f}`))
-    } else {
-      log('  ⚠️ Aucun fichier accessible — le shell manque probablement de droits root')
+    if (!files) {
+      log('  ⚠️ Aucune donnée de session accessible sur ce téléphone')
     }
 
-    log('❌ sessionid non trouvé après toutes les méthodes')
+    log('❌ Session introuvable')
     return null
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -2826,19 +2782,18 @@ export async function createInstagramAccount(
       findByTextPartial(xml, 'Create', 'Créer', 'Sign up', 'Inscrire')
 
     if (signupPt) {
-      log(`📝 Tap "Créer un compte" [${signupPt[0]},${signupPt[1]}]…`)
+      log('📝 Création du compte…')
       await shellExec(bearer, phoneId, `input tap ${signupPt[0]} ${signupPt[1]}`, { signal })
       await sleepOrAbort(5000, signal)
       xml = await dumpXml(bearer, phoneId)
     } else {
-      log('⚠️ Bouton inscription non trouvé — deep link…')
+      log('⚠️ Bouton d\'inscription non trouvé — autre méthode d\'ouverture…')
       await shellExec(bearer, phoneId,
         'am start -a android.intent.action.VIEW -d "https://www.instagram.com/accounts/emailsignup/" -p com.instagram.android',
         { signal })
       await sleepOrAbort(7000, signal)
       xml = await dumpXml(bearer, phoneId)
     }
-    log(`📋 Écran inscription (${xml.length} chars)`)
     if (aborted()) return { ok: false, error: 'Annulé' }
 
     // ── Saisie du prénom ────────────────────────────────────────────────────
@@ -2985,7 +2940,6 @@ export async function createInstagramAccount(
       await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
       await sleepOrAbort(6000, signal)
       xml = await dumpXml(bearer, phoneId)
-      log(`📋 Après numéro (${xml.length} chars)`)
       if (aborted()) return { ok: false, error: 'Annulé' }
       // Le code SMS sera capturé par la boucle de vérification ci-dessous
     }
@@ -3009,7 +2963,7 @@ export async function createInstagramAccount(
       if (!verificationCode?.trim()) return { ok: false, error: 'Code de vérification non fourni' }
       if (aborted()) return { ok: false, error: 'Annulé' }
 
-      log(`🔢 Saisie du code: ${verificationCode.trim()}`)
+      log('🔢 Saisie du code de vérification…')
       const codePt: [number, number] =
         findByResourceId(xml,
           'confirmation_code', 'verification_code', 'code',
@@ -3029,7 +2983,6 @@ export async function createInstagramAccount(
       await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
       await sleepOrAbort(7000, signal)
       xml = await dumpXml(bearer, phoneId)
-      log(`📋 Après code tentative ${codeAttempt + 1} (${xml.length} chars)`)
       if (aborted()) return { ok: false, error: 'Annulé' }
 
       const xmlAfterCode = xml.toLowerCase()
@@ -3076,7 +3029,7 @@ export async function createInstagramAccount(
       'create a username'].some(p => xmlLower6.includes(p))) {
 
       if (account.username) {
-        log(`👤 Saisie du username: ${account.username}…`)
+        log(`👤 Saisie du nom d'utilisateur : ${account.username}…`)
         const uPt: [number, number] =
           findByResourceId(xml, 'username', 'username_field', 'username_input') ??
           findByText(xml, 'Username', "Nom d'utilisateur") ??
@@ -3087,7 +3040,7 @@ export async function createInstagramAccount(
       } else {
         const suggestMatch = xml.match(/text="([a-z0-9._]{3,30})"[^>]*resource-id="[^"]*username/i)
         if (suggestMatch) finalUsername = suggestMatch[1]
-        log(`👤 Username suggéré accepté: ${finalUsername ?? '?'}`)
+        log(`👤 Nom d'utilisateur suggéré accepté : ${finalUsername ?? '?'}`)
       }
 
       xml = await dumpXml(bearer, phoneId)
@@ -3119,7 +3072,7 @@ export async function createInstagramAccount(
       // ── Challenge "add phone number for security" → tap "Not now" ─────────
       if (['add your phone number', 'ajouter votre numéro', 'ajoutez votre numéro',
         'add a phone number', 'phone number for security'].some(p => xmlL.includes(p))) {
-        log('📵 Popup "Add phone number" — skip…')
+        log('📵 Fenêtre « Ajouter un numéro » — ignorée…')
         const pt = findByText(xml, 'Not now', 'Pas maintenant', 'Skip', 'Ignorer',
           "I'll add later", 'Later') ??
           [Math.floor(sw / 2), Math.floor(sh * 0.80)]
@@ -3132,7 +3085,7 @@ export async function createInstagramAccount(
       // ── "Save your login info" → "Not now" ──────────────────────────────
       if (['save your login', 'enregistrer vos informations', 'save login info',
         'remembering your password'].some(p => xmlL.includes(p))) {
-        log('💾 Popup "Save login info" — skip…')
+        log('💾 Fenêtre « Enregistrer les identifiants » — ignorée…')
         const pt = findByText(xml, 'Not now', 'Pas maintenant', 'Not Now') ??
           [Math.floor(sw / 2), Math.floor(sh * 0.75)]
         await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { signal })
@@ -3144,7 +3097,7 @@ export async function createInstagramAccount(
       // ── "Turn on notifications" → "Not now" ──────────────────────────────
       if (['turn on notifications', 'activer les notifications',
         'allow notifications', 'get notified'].some(p => xmlL.includes(p))) {
-        log('🔔 Popup notifications — skip…')
+        log('🔔 Fenêtre notifications — ignorée…')
         const pt = findByText(xml, 'Not now', 'Pas maintenant', 'Skip', 'Ignorer') ??
           [Math.floor(sw / 2), Math.floor(sh * 0.75)]
         await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`, { signal })
@@ -3157,7 +3110,7 @@ export async function createInstagramAccount(
       if (['confirm it\'s you', 'confirmez que c\'est vous',
         'unusual activity', 'activité inhabituelle',
         'suspicious activity', 'we detected', 'we noticed'].some(p => xmlL.includes(p))) {
-        log("⚠️ Challenge 'Confirm it's you' — tentative skip / later…")
+        log('⚠️ Vérification « Confirmez que c\'est vous » — tentative de report…')
         const pt =
           findByText(xml, "I'll confirm later", 'Plus tard', 'Later', 'Skip',
             'Not now', 'Dismiss', 'Close') ??
@@ -3178,7 +3131,7 @@ export async function createInstagramAccount(
       // ── "Allow access to contacts/gallery" system permission dialog ───────
       if (['allow instagram', 'allow access', 'autoriser instagram', 'autoriser l\'accès',
         'while using the app', 'only this time'].some(p => xmlL.includes(p))) {
-        log('📂 Popup permission système — deny…')
+        log('📂 Fenêtre d\'autorisation système — refusée…')
         const denyPt =
           findByText(xml, "Don't allow", 'Deny', 'Refuser', 'Not now', 'No thanks') ??
           findByTextPartial(xml, "don't allow", 'deny', 'refuser')
@@ -3203,7 +3156,7 @@ export async function createInstagramAccount(
         findByTextPartial(xml, 'Skip', 'Ignorer', 'Not now', 'Later')
 
       if (skipPt) {
-        log(`⏭️ Tap "Ignorer" [${skipPt[0]},${skipPt[1]}]…`)
+        log('⏭️ Écran optionnel ignoré…')
         await shellExec(bearer, phoneId, `input tap ${skipPt[0]} ${skipPt[1]}`, { signal })
         await sleepOrAbort(3000, signal)
         xml = await dumpXml(bearer, phoneId)
@@ -3216,7 +3169,7 @@ export async function createInstagramAccount(
         findByResourceId(xml, 'next_button', 'primary_button', 'continue_button')
 
       if (contPt) {
-        log(`➡️ Tap "Suivant" [${contPt[0]},${contPt[1]}]…`)
+        log('➡️ Passage à l\'étape suivante…')
         await shellExec(bearer, phoneId, `input tap ${contPt[0]} ${contPt[1]}`, { signal })
         await sleepOrAbort(3000, signal)
         xml = await dumpXml(bearer, phoneId)
@@ -3283,7 +3236,6 @@ async function _postTikTokVideoAdbInner(
     const sizeMatch = sizeOut.match(/(\d+)x(\d+)/)
     const sw = sizeMatch ? parseInt(sizeMatch[1], 10) : 1080
     const sh = sizeMatch ? parseInt(sizeMatch[2], 10) : 1920
-    log(`📐 Écran: ${sw}×${sh}`)
 
     // ── 3. Force stop TikTok ────────────────────────────────────────────────
     log('🛑 Fermeture de TikTok…')
@@ -3304,7 +3256,7 @@ async function _postTikTokVideoAdbInner(
     )
     const wgetOk = wgetStatus === 0 && !wgetOut.includes('ERROR') && !wgetOut.includes('failed')
     if (!wgetOk) {
-      log('   wget échoué, essai avec curl…')
+      log('   Nouvelle tentative de téléchargement…')
       const { output: curlOut } = await shellExec(
         bearer, phoneId,
         `curl -fsSL -o ${dlDest} "${videoUrl}" 2>&1; echo "EXIT:$?"`,
@@ -3313,13 +3265,13 @@ async function _postTikTokVideoAdbInner(
       if (curlOut.includes('curl: (') || curlOut.includes('EXIT:1')) {
         return { ok: false, error: `Téléchargement impossible: ${curlOut.slice(0, 120)}` }
       }
-      log('   ✅ Vidéo téléchargée via curl')
+      log('   ✅ Vidéo téléchargée')
     } else {
-      log('   ✅ Vidéo téléchargée via wget')
+      log('   ✅ Vidéo téléchargée')
     }
 
     // ── 5. Scan media library ───────────────────────────────────────────────
-    log('📚 Scan bibliothèque média…')
+    log('📚 Actualisation de la galerie…')
     await shellExec(
       bearer, phoneId,
       `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${dlDest}`,
@@ -3337,7 +3289,7 @@ async function _postTikTokVideoAdbInner(
       { signal, maxRetries: 2 },
     )
     if (launchStatus !== 0) {
-      log('   Essai package alternatif (aweme)…')
+      log('   Nouvelle tentative d\'ouverture de TikTok…')
       await shellExec(
         bearer, phoneId,
         'am start -n com.ss.android.ugc.aweme/.main.MainActivity',
@@ -3349,26 +3301,24 @@ async function _postTikTokVideoAdbInner(
     await sleepOrAbort(8000, signal)
 
     // ── 9. Tap "+" create button ────────────────────────────────────────────
-    log('➕ Tap bouton créer…')
+    log('➕ Ouverture de l\'outil de création…')
     let xml = await dumpXml(bearer, phoneId)
     let createPt =
       findByResourceId(xml, 'creation_btn', 'tab_add', 'action_create') ??
       findByText(xml, '+', 'Créer', 'Create') ??
       [Math.floor(sw / 2), Math.floor(sh * 0.92)] as [number, number]
-    log(`   Tap [${createPt[0]},${createPt[1]}]`)
     await shellExec(bearer, phoneId, `input tap ${createPt[0]} ${createPt[1]}`, { signal })
 
     // ── 10. Wait ────────────────────────────────────────────────────────────
     await sleepOrAbort(4000, signal)
 
     // ── 11. Tap "Upload" / "Gallery" ────────────────────────────────────────
-    log('📁 Tap galerie / upload…')
+    log('📁 Ouverture de la galerie…')
     xml = await dumpXml(bearer, phoneId)
     let uploadPt =
       findByText(xml, 'Upload', 'Gallery', 'Télécharger', 'Galerie') ??
       findByTextPartial(xml, 'upload', 'galerie') ??
       [Math.floor(sw * 0.85), Math.floor(sh * 0.85)] as [number, number]
-    log(`   Tap [${uploadPt[0]},${uploadPt[1]}]`)
     await shellExec(bearer, phoneId, `input tap ${uploadPt[0]} ${uploadPt[1]}`, { signal })
 
     // ── 12. Wait ────────────────────────────────────────────────────────────
@@ -3380,19 +3330,17 @@ async function _postTikTokVideoAdbInner(
     let videoPt =
       findByResourceId(xml, 'gallery_grid_item', 'media_picker_grid_item', 'item_video') ??
       [Math.floor(sw * 0.17), Math.floor(sh * 0.30)] as [number, number]
-    log(`   Tap [${videoPt[0]},${videoPt[1]}]`)
     await shellExec(bearer, phoneId, `input tap ${videoPt[0]} ${videoPt[1]}`, { signal })
 
     // ── 14. Wait ────────────────────────────────────────────────────────────
     await sleepOrAbort(3000, signal)
 
     // ── 15. Tap "Next" / "Suivant" ──────────────────────────────────────────
-    log('➡️ Tap Suivant (1)…')
+    log('➡️ Étape suivante…')
     xml = await dumpXml(bearer, phoneId)
     let nextPt =
       findByText(xml, 'Next', 'Suivant') ??
       [Math.floor(sw * 0.87), Math.floor(sh * 0.06)] as [number, number]
-    log(`   Tap [${nextPt[0]},${nextPt[1]}]`)
     await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`, { signal })
 
     // ── 16. Wait — may show Sounds or Trim screen ───────────────────────────
@@ -3402,8 +3350,7 @@ async function _postTikTokVideoAdbInner(
     xml = await dumpXml(bearer, phoneId)
     const nextPt2 = findByText(xml, 'Next', 'Suivant')
     if (nextPt2) {
-      log('➡️ Tap Suivant (2 — écran trim/sons)…')
-      log(`   Tap [${nextPt2[0]},${nextPt2[1]}]`)
+      log('➡️ Étape suivante…')
       await shellExec(bearer, phoneId, `input tap ${nextPt2[0]} ${nextPt2[1]}`, { signal })
     }
 
@@ -3417,7 +3364,6 @@ async function _postTikTokVideoAdbInner(
       findByResourceId(xml, 'caption', 'text_input', 'edit_text_desc') ??
       findByText(xml, 'Describe...', 'Ajouter une description', 'Caption') ??
       [Math.floor(sw / 2), Math.floor(sh * 0.35)] as [number, number]
-    log(`   Champ légende [${captionPt[0]},${captionPt[1]}]`)
     // Pre-tap: ferme une éventuelle popup qui se serait ouverte sur cet écran
     await shellExec(bearer, phoneId, `input tap ${captionPt[0]} ${captionPt[1]}`, { signal })
     await sleepOrAbort(700, signal)
@@ -3427,13 +3373,12 @@ async function _postTikTokVideoAdbInner(
     await sleepOrAbort(1000, signal)
 
     // ── 21-22. Find and tap Post button ─────────────────────────────────────
-    log('🚀 Tap Publier…')
+    log('🚀 Publication…')
     xml = await dumpXml(bearer, phoneId)
     const postPt =
       findByText(xml, 'Post', 'Publier', 'Publish') ??
       findByResourceId(xml, 'btn_post', 'post_button') ??
       [Math.floor(sw * 0.85), Math.floor(sh * 0.12)] as [number, number]
-    log(`   Tap [${postPt[0]},${postPt[1]}]`)
     await shellExec(bearer, phoneId, `input tap ${postPt[0]} ${postPt[1]}`, { signal })
 
     // ── 23. Wait for upload + publish ───────────────────────────────────────

@@ -92,10 +92,10 @@ export function Autocomment({ user }: AutocommentProps) {
     setSendingReply(comment.pk)
     try {
       if (useGeelark) {
-        if (!selectedPhone.geelark_id) { log('No geelark_id on this phone'); setSendingReply(null); return }
+        if (!selectedPhone.geelark_id) { log('⚠ Ce téléphone n\'est pas relié à GéeLark'); setSendingReply(null); return }
         const bearer = getBearer()
-        if (!bearer) { log('GéeLark bearer not loaded'); setSendingReply(null); return }
-        log(`Sending via phone @${comment.username}…`)
+        if (!bearer) { log('⚠ Connexion à GéeLark indisponible'); setSendingReply(null); return }
+        log(`📤 Envoi de la réponse à @${comment.username} depuis le téléphone…`)
         const gr = await replyToIgCommentViaPhone(
           bearer,
           selectedPhone.geelark_id,
@@ -107,15 +107,15 @@ export function Autocomment({ user }: AutocommentProps) {
         if (gr.ok) {
           setComments(prev => prev.map(c => c.pk === comment.pk ? { ...c, replied: text } : c))
           setManualReplies(prev => { const n = { ...prev }; delete n[comment.pk]; return n })
-          log(`Reply sent to @${comment.username} via phone`)
+          log(`✅ Réponse envoyée à @${comment.username} depuis le téléphone`)
         } else {
-          log(`Phone error: ${gr.error ?? 'unknown'}`)
+          log(`❌ La réponse n'a pas pu être envoyée depuis le téléphone`)
         }
         setSendingReply(null)
         return
       }
 
-      if (!selectedPhone.ig_sessionid) { log('No sessionid on this phone'); setSendingReply(null); return }
+      if (!selectedPhone.ig_sessionid) { log('⚠ Aucune session Instagram configurée pour ce téléphone'); setSendingReply(null); return }
       const r = await window.electronAPI?.postIgComment({
         mediaId: selectedPost.id,
         text,
@@ -124,18 +124,18 @@ export function Autocomment({ user }: AutocommentProps) {
       if (r?.ok) {
         setComments(prev => prev.map(c => c.pk === comment.pk ? { ...c, replied: text } : c))
         setManualReplies(prev => { const n = { ...prev }; delete n[comment.pk]; return n })
-        log(`Reply sent to @${comment.username}`)
+        log(`✅ Réponse envoyée à @${comment.username}`)
       } else {
-        log(`Error sending reply: ${r?.error ?? 'unknown'}`)
+        log(`❌ La réponse à @${comment.username} n'a pas pu être envoyée`)
         if (r?.sessionExpired || /login_required|logout_reason|HTTP 401/.test(r?.error ?? '')) {
           if (selectedPhone) {
             await supabase.from('phones').update({ ig_status: 'expired' }).eq('id', selectedPhone.id)
-            log(`Instagram session expired — re-login required on the phone`)
+            log(`⚠ Session Instagram expirée — reconnecte le compte sur le téléphone`)
           }
         }
       }
-    } catch (e) {
-      log(`Error: ${e instanceof Error ? e.message : String(e)}`)
+    } catch {
+      log(`❌ Une erreur est survenue lors de l'envoi de la réponse`)
     }
     setSendingReply(null)
   }
@@ -150,7 +150,7 @@ export function Autocomment({ user }: AutocommentProps) {
     setSelPost(null)
     setComments([])
     if (!phone.ig_sessionid) {
-      log(`${phone.ig_username}: no session ID configured`)
+      log(`⚠ @${phone.ig_username} : aucune session Instagram configurée`)
       return
     }
     setLoading(true)
@@ -172,7 +172,7 @@ export function Autocomment({ user }: AutocommentProps) {
           }))
           setPosts(ps)
         } else {
-          log(`${phone.ig_username}: ${r.error ?? 'error'}`)
+          log(`❌ @${phone.ig_username} : impossible de récupérer les publications`)
           setPosts([])
         }
       }
@@ -184,7 +184,7 @@ export function Autocomment({ user }: AutocommentProps) {
   async function loadComments(post: IgPost) {
     const sessionid = selectedPhone?.ig_sessionid
     if (!sessionid) {
-      log('No IG session configured for this phone — go to Phones → configure session')
+      log('⚠ Aucune session Instagram pour ce téléphone — configure-la dans l\'onglet Téléphones')
       setComments([])
       return
     }
@@ -193,14 +193,14 @@ export function Autocomment({ user }: AutocommentProps) {
       const r = await window.electronAPI?.fetchIgComments({ mediaId: post.id, sessionid })
       if (r?.ok && r.comments) {
         setComments(r.comments.map(c => ({ pk: c.pk, username: c.username, text: c.text, replied: null })))
-        log(`${r.comments.length} comment${r.comments.length !== 1 ? 's' : ''} loaded`)
+        log(`✅ ${r.comments.length} commentaire${r.comments.length !== 1 ? 's' : ''} chargé${r.comments.length !== 1 ? 's' : ''}`)
       } else {
         setComments([])
-        log(`Failed to load comments: ${r?.error ?? 'unknown error'}`)
+        log(`❌ Impossible de charger les commentaires`)
       }
-    } catch (e) {
+    } catch {
       setComments([])
-      log(`Error: ${e instanceof Error ? e.message : String(e)}`)
+      log(`❌ Une erreur est survenue lors du chargement des commentaires`)
     }
     setLoadingC(false)
   }
@@ -211,17 +211,16 @@ export function Autocomment({ user }: AutocommentProps) {
   }
 
   function start() {
-    if (!groqKey) { log('Missing Groq key — configure it in Settings'); return }
+    if (!groqKey) { log('⚠ Clé Groq manquante — renseigne-la dans les Réglages'); return }
     setRunning(true)
     stopRef.current = false
-    log(`Started — interval ${interval} min`)
-    log('Groq worker to be connected to IPC backend (reply + post comment)')
+    log(`🔄 Démarrage — vérification toutes les ${interval} min`)
   }
 
   function stop() {
     stopRef.current = true
     setRunning(false)
-    log('Stopped')
+    log('⏹ Arrêté')
   }
 
   const visiblePosts = posts.filter(p => {

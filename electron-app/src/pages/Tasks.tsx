@@ -338,7 +338,7 @@ async function executeUnit(
   }
 
   if (!bearer) {
-    log('❌ Aucun token GéeLark configuré (bearer vide)')
+    log('❌ Configuration GéeLark manquante')
     await saveResult('failed', 'bearer vide')
     return
   }
@@ -368,7 +368,7 @@ async function executeUnit(
         try {
           imageUrls.push(await resolveTaskMediaUrl(unit.videos[i]))
         } catch (err) {
-          log(`❌ Image échouée (${unit.videos[i].title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
+          log(`❌ Image indisponible (${unit.videos[i].title || '?'})`)
           imageUrls.push(null)
         }
       }
@@ -396,7 +396,7 @@ async function executeUnit(
         const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
         log(`  ${started} démarré(s)`)
         registerStartedPhones(storyIds, { orgId: task.org_id ?? null, userId: task.user_id }, { reason: 'task_story' })
-        log('⏳ Attente 30s (boot)…')
+        log('⏳ Attente 30s (démarrage)…')
         await new Promise(r => setTimeout(r, 30_000))
       }
 
@@ -417,7 +417,7 @@ async function executeUnit(
           if (res.ok) { log(`✅ ${name} — story publiée`); return true }
           else { log(`❌ ${name} : ${res.error ?? 'échec'}`); return false }
         } catch (err) {
-          log(`❌ ${name} : ${err instanceof Error ? err.message : String(err)}`)
+          log(`❌ ${name} : échec de la story`)
           return false
         } finally {
           try { await stopPhone(bearer, phone.geelark_id) } catch { /* ignore */ }
@@ -429,7 +429,7 @@ async function executeUnit(
       await saveResult(okN > 0 ? 'done' : 'failed', okN > 0 ? undefined : 'Aucune story publiée')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      log(`❌ Erreur inattendue: ${msg}`)
+      log('❌ Erreur inattendue')
       await saveResult('failed', msg)
     }
     return
@@ -448,7 +448,7 @@ async function executeUnit(
     // ── Step 1 : upload des vidéos vers GéeLark (séquentiel, AVANT le démarrage) ──
     // Exactement comme MassPosting : on upload d'abord, on démarre les téléphones
     // après. Sinon le téléphone reste inactif pendant l'upload et GéeLark l'éteint.
-    log(`▶ Upload de ${unit.videos.length} vidéo(s) vers GéeLark (parallèle)…`)
+    log(`📤 Envoi de ${unit.videos.length} vidéo(s)…`)
     const tokenByIndex: (string | null)[] = await Promise.all(
       unit.videos.map(async (v, i) => {
         try {
@@ -456,14 +456,14 @@ async function executeUnit(
           log(`✅ Vidéo ${i + 1}/${unit.videos.length} prête`)
           return tok
         } catch (err) {
-          log(`❌ Vidéo ${i + 1} échouée (${v.title || '?'}): ${err instanceof Error ? err.message : String(err)}`)
+          log(`❌ Vidéo ${i + 1} indisponible (${v.title || '?'})`)
           return null
         }
       })
     )
     const validTokens = tokenByIndex.filter((t): t is string => Boolean(t))
     if (!validTokens.length) {
-      const errMsg = 'Upload de toutes les vidéos a échoué'
+      const errMsg = 'Envoi de toutes les vidéos a échoué'
       log(`❌ ${errMsg}`)
       await saveResult('failed', errMsg)
       return
@@ -483,7 +483,7 @@ async function executeUnit(
     }
 
     // ── Step 3 : attente boot 20s ─────────────────────────────────────────────
-    log('⏳ Attente 20s (boot)…')
+    log('⏳ Attente 20s (démarrage)…')
     await new Promise(r => setTimeout(r, 20_000))
 
     // ── Step 4 : création des tâches RPA (séquentiel) ─────────────────────────
@@ -526,10 +526,10 @@ async function executeUnit(
         console.log('[Task] instagramPubReels response data:', JSON.stringify(d))
         if (tid) { rpaIds.push(tid); taskIdByGid[phone.geelark_id] = tid }
         if (useTrialReels) trialReelsActive.add(phone.geelark_id)
-        log(`✅ Tâche créée : ${name}${tid ? '' : ' (ID non récupéré)'}`)
+        log(`✅ Publication lancée : ${name}`)
       } else {
         fails++
-        log(`❌ ${name}: ${res['msg'] ?? 'code=' + String(res['code'])}`)
+        log(`❌ ${name} : ${res['msg'] ?? 'Instagram a refusé la publication'}`)
         // Task refused while trial reels was active → mark phone
         if (useTrialReels) {
           await supabase.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', phone.geelark_id)
@@ -540,7 +540,7 @@ async function executeUnit(
     }
 
     if (rpaCreated === 0) {
-      log('❌ Aucune tâche RPA créée')
+      log('❌ Aucune publication lancée')
       log(`⏰ Prochain post dans ${recurHours}h`)
       await saveResult('failed', 'Aucune tâche RPA créée')
       await new Promise(r => setTimeout(r, 5_000))
@@ -550,7 +550,7 @@ async function executeUnit(
 
     // Si tâches créées mais IDs non extraits → même logique qu'MassPosting : auto-stop 5 min
     if (rpaIds.length === 0) {
-      log(`⏳ ${rpaCreated} tâche(s) RPA lancée(s) — arrêt auto dans 5 min (IDs non trackables)…`)
+      log(`⏳ ${rpaCreated} publication(s) lancée(s) — arrêt automatique dans 5 min…`)
       await new Promise(r => setTimeout(r, 5 * 60 * 1000))
       log(`⏰ Prochain post dans ${recurHours}h`)
       await saveResult('done')
@@ -559,7 +559,7 @@ async function executeUnit(
     }
 
     // ── Step 5 : poll jusqu'à complétion (max 8 min) — éteint chaque tél fini ──
-    log(`⏳ Suivi de ${rpaIds.length} tâche(s)…`)
+    log(`⏳ Suivi de ${rpaIds.length} publication(s)…`)
     let pollDone = 0
     let pollFail = 0
     const pending  = new Set(rpaIds)
@@ -567,7 +567,7 @@ async function executeUnit(
     const deadline = Date.now() + 8 * 60 * 1000
     const gidByTid = new Map<string, string>()
     for (const [gid, tid] of Object.entries(taskIdByGid)) gidByTid.set(tid, gid)
-    const STATUS: Record<number, string> = { 1: 'Pending', 2: 'En cours', 3: '✅ Done', 4: '❌ Failed', 7: 'Annulé' }
+    const STATUS: Record<number, string> = { 1: 'En attente', 2: 'En cours', 3: '✅ Terminé', 4: '❌ Échec', 7: 'Annulé' }
     while (pending.size > 0 && Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 10_000))
       let qRes: Record<string, unknown>

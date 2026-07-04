@@ -510,7 +510,7 @@ export function MassRemix({ user }: MassRemixProps) {
               : window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
             60_000, 'détection scène'
           )
-          if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
+          if (!det.ok) addLog(job.id, `❌ Détection de la scène impossible`)
 
           detDuration = det.duration
           // Ignore detected splits that are too early (< 20% of duration, min 2s)
@@ -518,12 +518,12 @@ export function MassRemix({ user }: MassRemixProps) {
           const minSplit = 2.0
           if (det.ok && det.splitTime != null && det.splitTime >= minSplit) {
             splitTime = Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
-            addLog(job.id, `✅ Scène: splitTime=${splitTime}s, durée=${det.duration ?? '?'}s`)
+            addLog(job.id, `✅ Scène détectée à ${splitTime}s (durée ${det.duration ?? '?'}s)`)
           } else {
             splitTime = undefined
             addLog(job.id, det.ok && det.splitTime != null
-              ? `⚠️ Scène trop tôt (${det.splitTime?.toFixed(1)}s < ${minSplit}s min) → secondaire uniquement`
-              : `⚠️ Pas de scène détectée → secondaire uniquement`)
+              ? `⚠️ Scène détectée trop tôt → vidéo secondaire uniquement`
+              : `⚠️ Aucune scène détectée → vidéo secondaire uniquement`)
           }
 
           // Vérif. décor — si le BACKGROUND/LIEU est le même des 2 côtés du cut → annuler
@@ -532,7 +532,7 @@ export function MassRemix({ user }: MassRemixProps) {
             try {
               const totalDur = det.duration ?? 60
               const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
-              addLog(job.id, `🤖 Vérif. décor (cut à ${splitTime}s)…`)
+              addLog(job.id, `🤖 Vérification du décor (coupe à ${splitTime}s)…`)
               const extractFn = (args: { filePath: string; startTime: number; endTime: number }) =>
                 isWeb ? extractFramesWeb(args) : window.electronAPI!.extractFrames!(args)
               const [fr1, fr2] = await Promise.all([
@@ -567,7 +567,7 @@ export function MassRemix({ user }: MassRemixProps) {
                 }
               }
             } catch (e) {
-              addLog(job.id, `⚠️ Vérif. décor ignorée: ${String(e).slice(0, 60)}`)
+              addLog(job.id, `⚠️ Vérification du décor ignorée`)
             }
           }
         }
@@ -607,7 +607,7 @@ export function MassRemix({ user }: MassRemixProps) {
             180_000, 'extraction frames'
           )
           if (fr.ok && fr.frames?.length) {
-            addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu’à ${analyzeEnd.toFixed(1)}s)`)
+            addLog(job.id, `   ${fr.frames.length} images extraites (jusqu’à ${analyzeEnd.toFixed(1)}s)`)
             const interval = analyzeEnd / fr.frames.length
             const imageBlocks = fr.frames.flatMap((f, fi) => [
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
@@ -733,19 +733,19 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     endTime:   item.endTime,
                   })
                 })
-                addLog(job.id, `   ${parsed.length} texte(s) → ${textOverlays.length} overlay(s): ${textOverlays.map(o => `"${o.text}"@${o.fontSize}px`).join(', ')}`)
+                addLog(job.id, `   ${textOverlays.length} texte(s) ajouté(s) : ${textOverlays.map(o => `"${o.text}"`).join(', ')}`)
               }
             } else {
-              addLog(job.id, `   Analyse IA échouée: ${(res as any).error ?? 'inconnu'}`)
+              addLog(job.id, `   Analyse du texte par l’IA impossible`)
             }
           } else {
-            addLog(job.id, `   Extraction frames échouée: ${fr.ok ? 'aucune frame' : (fr as any).error ?? 'inconnu'}`)
+            addLog(job.id, `   Impossible d’extraire les images de la vidéo`)
           }
         }
 
         // ── 3. Generate ──────────────────────────────────────────────────────
         updateJob(job.id, { status: 'generating' })
-        addLog(job.id, `⚙️ FFmpeg — splitTime=${splitTime != null ? splitTime + 's' : 'null'}, preset=${preset}, overlays=${textOverlays.length}`)
+        addLog(job.id, `⚙️ Génération de la vidéo en cours…`)
 
         const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
         let outputPath: string
@@ -788,15 +788,13 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           360_000, 'FFmpeg'
         )
 
-        if ((gen as any).command) addLog(job.id, `   cmd: ${(gen as any).command}`)
-
         if (!gen.ok) {
-          addLog(job.id, `❌ FFmpeg: ${gen.error ?? 'erreur inconnue'}`)
+          addLog(job.id, `❌ La génération de la vidéo a échoué`)
           updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg' })
           playError()
           return
         }
-        addLog(job.id, '✅ FFmpeg OK')
+        addLog(job.id, '✅ Vidéo générée')
         const finalPath = gen.outputPath ?? outputPath
         updateJob(job.id, { outputPath: finalPath })
 
@@ -805,7 +803,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         // On Electron, upload only when exportMode === 'bank'.
         if (isWeb || exportMode === 'bank') {
           updateJob(job.id, { status: 'uploading' })
-          addLog(job.id, '☁️ Upload banque…')
+          addLog(job.id, '☁️ Envoi vers la banque…')
           const up = await withTimeout(
             uploadVideoFromPath(finalPath, scope),
             90_000, 'upload'
@@ -817,14 +815,14 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             folder: bankFolder.trim() || null,
             tags: [], notes: '',
           })
-          addLog(job.id, '✅ Upload banque OK')
+          addLog(job.id, '✅ Vidéo ajoutée à la banque')
         }
 
         updateJob(job.id, { status: 'done' })
         playSuccess()
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
-        addLog(job.id, `❌ Erreur fatale: ${msg}`)
+        addLog(job.id, `❌ Une erreur est survenue pendant le remix`)
         updateJob(job.id, { status: 'error', error: msg })
         playError()
       }
