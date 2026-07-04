@@ -2613,20 +2613,25 @@ export async function editInstagramProfileNative(
 // remonte tel quel pour faciliter l'ajustement si un template diffère.
 export type CrossPlatform = 'facebook' | 'youtube' | 'x' | 'threads' | 'reddit' | 'pinterest'
 
-export const CROSS_PLATFORMS: { key: CrossPlatform; label: string; endpoint: string; emoji: string }[] = [
-  { key: 'facebook',  label: 'Facebook Reels', endpoint: '/rpa/task/faceBookReels',    emoji: '📘' },
-  { key: 'youtube',   label: 'YouTube Shorts', endpoint: '/rpa/task/youtubePublish',   emoji: '▶️' },
-  { key: 'x',         label: 'X (Twitter)',    endpoint: '/rpa/task/xPublish',         emoji: '✖️' },
-  { key: 'threads',   label: 'Threads',        endpoint: '/rpa/task/threadsPublish',   emoji: '🧵' },
-  { key: 'reddit',    label: 'Reddit',         endpoint: '/rpa/task/redditPublish',    emoji: '👽' },
-  { key: 'pinterest', label: 'Pinterest',      endpoint: '/rpa/task/pinterestPublish', emoji: '📌' },
+// Endpoints de publication VIDÉO. Contrat commun (vérifié sur Threads) :
+//   { id, scheduleAt (Unix, requis), title (texte, max 500), video: [URL] }
+// Le média est une URL directe (pas un fileId). ✅ Threads vérifié sur la doc ;
+// ✅ Facebook confirmé dans l'openapi.yaml ; les autres suivent la même
+// convention (à confirmer en test live — le message d'erreur remonte tel quel).
+export const CROSS_PLATFORMS: { key: CrossPlatform; label: string; endpoint: string; emoji: string; verified?: boolean }[] = [
+  { key: 'threads',   label: 'Threads',        endpoint: '/rpa/task/threadsVideo',    emoji: '🧵', verified: true },
+  { key: 'facebook',  label: 'Facebook Reels', endpoint: '/rpa/task/facebookReels',   emoji: '📘', verified: true },
+  { key: 'youtube',   label: 'YouTube Shorts', endpoint: '/rpa/task/youtubePubShort', emoji: '▶️' },
+  { key: 'x',         label: 'X (Twitter)',    endpoint: '/rpa/task/xPublish',        emoji: '✖️' },
+  { key: 'reddit',    label: 'Reddit',         endpoint: '/rpa/task/redditVideo',     emoji: '👽' },
+  { key: 'pinterest', label: 'Pinterest',      endpoint: '/rpa/task/pinterestVideo',  emoji: '📌' },
 ]
 
 export async function publishVideoCrossPlatform(
   bearer: string,
   phoneId: string,
   platform: CrossPlatform,
-  opts: { videoToken: string; caption?: string; title?: string; rotationUrls?: string[] },
+  opts: { videoUrl: string; caption?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   const cfg = CROSS_PLATFORMS.find(p => p.key === platform)!
@@ -2637,10 +2642,9 @@ export async function publishVideoCrossPlatform(
     const res = await geelarkFetch('POST', cfg.endpoint, {
       id: phoneId,
       scheduleAt: Math.floor(Date.now() / 1000) + 5,
-      video: [opts.videoToken],
-      ...(opts.title ? { title: opts.title } : {}),
-      ...(opts.caption != null ? { description: opts.caption, caption: opts.caption } : {}),
-      name: `ScaleFlow ${cfg.label}`,
+      title: (opts.caption ?? '').slice(0, 500),
+      video: [opts.videoUrl],
+      name: `ScaleFlow ${cfg.label}`.slice(0, 128),
     }, bearer)
     if (res['code'] !== 0) return { ok: false, error: `GéeLark (${cfg.label}) : ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
