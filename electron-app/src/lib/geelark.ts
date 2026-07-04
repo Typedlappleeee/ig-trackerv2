@@ -130,8 +130,9 @@ export async function rotateAllProxies(urls: string[], log?: (m: string) => void
   const list = (urls ?? []).map(u => (u ?? '').trim()).filter(u => /^https?:\/\//i.test(u))
   if (list.length === 0) return
   await Promise.all(list.map(u => rotateProxyIp(u, log)))
-  // Laisse le(s) dongle(s) couper l'ancienne IP avant que le check de connectivité tourne.
-  await sleep(6000)
+  // Laisse le(s) dongle(s) couper l'ancienne IP avant le check de connectivité.
+  // (Le waitForPhoneConnectivity qui suit fait de toute façon office de filet.)
+  await sleep(4000)
 }
 
 // Rote l'IP proxy (si configurée) AVANT d'allumer le téléphone — pour qu'il boote
