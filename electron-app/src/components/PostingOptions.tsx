@@ -118,7 +118,9 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         </button>
       </div>
 
-      {/* ── Intervalle entre posts (juste au-dessus du proxy rotatif) ────────── */}
+      {/* ── Intervalle entre posts — masqué en proxy rotatif (inutile : chaque
+           téléphone poste déjà sur une IP fraîche) ──────────────────────────── */}
+      {!opts.rotatingProxy && (<>
       <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
         <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
           <IconTimer size={14} />
@@ -181,6 +183,7 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           </div>
         </div>
       )}
+      </>)}
 
       {/* ── Proxy rotatif / concurrence ─────────────────────────────────────── */}
       <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
@@ -201,7 +204,7 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Poste 1 téléphone à la fois (évite les coupures de co)</p>
         </div>
         <button
-          onClick={() => set({ rotatingProxy: !opts.rotatingProxy })}
+          onClick={() => set({ rotatingProxy: !opts.rotatingProxy, ...(!opts.rotatingProxy ? { intervalMode: 'none' as IntervalMode } : {}) })}
           className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
           style={{ background: opts.rotatingProxy ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
         >
