@@ -784,7 +784,7 @@ export function MassPosting({ user }: MassPostingProps) {
           const deadline = Date.now() + 6 * 60 * 1000
           while (pending.size > 0 && Date.now() < deadline) {
             if (stopRef.current) break
-            await new Promise(r => setTimeout(r, 10000))
+            await new Promise(r => setTimeout(r, 7000))
             if (stopRef.current) break
             let qRes: Record<string, unknown>
             try { qRes = await geelark(bearer, '/task/query', { ids: [...pending] }) } catch { continue }
@@ -835,8 +835,10 @@ export function MassPosting({ user }: MassPostingProps) {
             continue
           }
           if (stopRef.current) break
-          log('Attente 30s (boot)…')
-          await new Promise(r => setTimeout(r, 30000))
+          // Boot réduit : la vérif de connectivité par téléphone (plus bas) sert de
+          // filet — on repart dès que le tél répond, pas besoin d'un 30s fixe.
+          log('Attente du boot (~20s)…')
+          await new Promise(r => setTimeout(r, 20000))
           if (stopRef.current) break
 
           const batchTaskIds: Record<string, string> = {}
