@@ -780,7 +780,7 @@ export function MassPosting({ user }: MassPostingProps) {
       startRun({
         id: runId, type: 'mass', label: `Mass posting · ${phoneList.length} compte${phoneList.length > 1 ? 's' : ''}`,
         proxyKeys, done: 0, total: assignments.length, page: 'posting',
-        phones: phoneList.map(p => ({ id: p.id, name: p.phone_name ?? p.id.slice(-6), status: 'idle' as PhaseStatus })),
+        phones: phoneList.map(p => ({ id: p.id, name: p.ig_username ? `@${p.ig_username}` : (p.phone_name ?? p.id.slice(-6)), status: 'idle' as PhaseStatus })),
       })
     })()
 
