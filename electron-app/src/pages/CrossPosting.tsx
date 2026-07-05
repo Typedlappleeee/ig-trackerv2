@@ -33,7 +33,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
 
   const [platforms, setPlatforms] = useState<Set<CrossPlatform>>(new Set([lockedPlatform ?? 'threads']))
   const lockedCfg = lockedPlatform ? CROSS_PLATFORMS.find(p => p.key === lockedPlatform) : undefined
-  const [videos, setVideos]       = useState<{ url: string; title: string }[]>([])
+  const [videos, setVideos]       = useState<{ url: string; title: string; isImage: boolean }[]>([])
   const [showPicker, setShowPicker] = useState(false)
   const [captionsText, setCaptionsText] = useState('')
   const [mode, setMode]           = useState<'seq' | 'random'>('seq')
@@ -147,7 +147,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
         setJob(key, { status: 'running' })
         try {
           const r = await publishVideoCrossPlatform(bearer!, phone.geelark_id, pl.key,
-            { mediaUrl: hosted.resourceUrl, isImage: hosted.isImage, caption: cap || undefined, rotationUrls },
+            { mediaUrl: hosted.resourceUrl, isImage: vid.isImage, caption: cap || undefined, rotationUrls },
             m => setJob(key, { detail: m }))
           if (r.ok) { ok++; setJob(key, { status: 'done', detail: 'Publié ✓' }) }
           else { err++; setJob(key, { status: 'error', detail: r.error ?? 'Échec' }) }
@@ -229,7 +229,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
             {/* Vidéos */}
             <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Vidéos</p>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Vidéos &amp; photos</p>
                 {videos.length > 0 && <span className="sf-badge sf-badge-accent" style={{ fontSize: 10 }}>{videos.length}</span>}
                 {videos.length > 0 && <button onClick={() => setVideos([])} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>Vider</button>}
               </div>
@@ -354,8 +354,15 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
           user={user}
           mode="multi"
           resolveMode="signed-url"
-          onSelect={(paths, titles) => {
-            const added = paths.map((p, i) => ({ url: p, title: titles?.[i] ?? 'video' }))
+          onSelect={(paths, titles, _descs, items) => {
+            const IMG = /\.(jpg|jpeg|png|gif|bmp|webp|heif|heic)(\?|$)/i
+            const added = paths.map((p, i) => {
+              // Détection image FIABLE : on regarde le vrai fichier de banque
+              // (storage_path / file_url / titre), pas seulement l'URL signée.
+              const it = items?.[i] as { storage_path?: string | null; file_url?: string | null } | undefined
+              const src = `${it?.storage_path ?? ''} ${it?.file_url ?? ''} ${titles?.[i] ?? ''} ${p}`
+              return { url: p, title: titles?.[i] ?? 'media', isImage: IMG.test(src) }
+            })
             setVideos(prev => {
               const seen = new Set(prev.map(v => v.url))
               return [...prev, ...added.filter(a => !seen.has(a.url))]
