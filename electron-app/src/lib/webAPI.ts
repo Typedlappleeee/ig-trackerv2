@@ -289,14 +289,16 @@ export function buildWebAPI() {
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       const V = '[CLIENT-v8]'
       console.log(`${V} uploadVideoGeelark filePath=${opts.filePath.slice(0, 80)}`)
-      // Dérive l'extension réelle (photo vs vidéo) : GéeLark encode l'extension
-      // dans la resourceUrl, donc une photo envoyée en 'mp4' casse threadsImage.
+      // Photo vs vidéo. Pour une PHOTO on garde l'extension réelle (threadsImage la
+      // veut dans la resourceUrl). Pour une VIDÉO on force 'mp4' : les templates RPA
+      // Insta/TikTok/Threads exigent du mp4 — envoyer 'mov'/'webm' casse le posting.
       const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heif', 'heic']
-      const fileType = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
-      const isImage = IMAGE_EXTS.includes(fileType)
+      const realExt = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+      const isImage = IMAGE_EXTS.includes(realExt)
+      const fileType = isImage ? realExt : 'mp4'
       const putCT = isImage
         ? (fileType === 'jpg' ? 'image/jpeg' : `image/${fileType}`)
-        : (fileType === 'mov' ? 'video/quicktime' : `video/${fileType}`)
+        : 'video/mp4'
       try {
         // Preferred path: server-side proxy (/api/geelark-upload) does
         // download + getUrl + PUT entirely côté serveur — pas de CORS.
