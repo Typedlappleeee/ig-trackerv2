@@ -36,7 +36,7 @@ export interface ActiveRun {
 }
 
 const KEY = 'sf-active-runs'
-const STALE_MS = 2 * 60 * 60 * 1000  // un run "running" > 2h = probablement mort (app fermée)
+const STALE_MS = 24 * 60 * 60 * 1000  // un run "running" > 24h = mort (aligné sur la fenêtre de reprise mass posting)
 const ORPHAN_GRACE_MS = 30_000       // délai laissé à une reprise pour adopter un run
 
 function loadRuns(): Map<string, ActiveRun> {
