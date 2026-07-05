@@ -10,7 +10,7 @@ import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp, fetchPhoneProxies } from '@/lib/geelark'
-import { startRun, updateRun, endRun, setRunPhase, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
+import { startRun, updateRun, endRun, setRunPhase, finishRun, findOrphanRun, adoptRun, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
@@ -337,6 +337,12 @@ export function MassPosting({ user }: MassPostingProps) {
     if (age > 25 * 60_000) { clearPersistedRun(); return }  // trop vieux → on oublie
     resumedRef.current = true
 
+    // Adopte le run du registre global (carte « En cours ») laissé orphelin par
+    // le refresh : on reprend son pilotage → il continue d'avancer puis se clôt,
+    // au lieu de rester figé « En cours » à l'infini.
+    const orphan = findOrphanRun('mass')
+    if (orphan) { activeRunIdRef.current = orphan.id; adoptRun(orphan.id) }
+
     // Rehydrate l'état visible.
     const statuses = new Map<string, TaskStatus>(persisted.taskStatuses)
     setMassPostingState({ posting: true, logs: persisted.logs, taskStatuses: statuses, runPhones: persisted.runPhones, startedAt: persisted.startedAt })
@@ -378,6 +384,8 @@ export function MassPosting({ user }: MassPostingProps) {
       const gids = persisted.runPhones.map(p => p.geelarkId)
       if (gids.length) { try { await geelark(bearer, '/phone/stop', { ids: gids }) } catch { /* watchdog serveur */ } unregisterPhones(gids).catch(() => {}) }
       setPosting(false)
+      // Clôture la carte « En cours » adoptée (statut déduit du détail par tél).
+      if (activeRunIdRef.current) { finishRun(activeRunIdRef.current); activeRunIdRef.current = null }
       clearPersistedRun()
       log('✅ Suivi terminé (reprise après refresh)', 'ok')
     })()
