@@ -15,7 +15,7 @@ import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
-  type TaskLog, type TaskStatus, type SelectedVideo,
+  type TaskLog, type TaskStatus, type SelectedVideo, type RunPhone,
   resetMassPosting, loadPersistedRun, clearPersistedRun,
 } from '@/lib/massPostingStore'
 import { playSuccess } from '@/lib/sounds'
@@ -350,15 +350,81 @@ export function MassPosting({ user }: MassPostingProps) {
     log('🔄 Reprise du suivi du posting en cours (relancé avant refresh)…', 'info')
 
     ;(async () => {
-      const byTask = new Map<string, { phoneId: string; geelarkId: string; phoneName: string }>()
+      const STATUS_B: Record<number, string> = { 3: 'Publié', 4: 'Échec', 7: 'Annulé' }
+      const byTask = new Map<string, RunPhone>()
       for (const rp of persisted.runPhones) {
         const st = statuses.get(rp.phoneId)
         if (st?.taskId && (st.status === 'posting' || st.status === 'pending' || st.status === 'uploading')) {
           byTask.set(st.taskId, rp)
         }
       }
-      const deadline = (persisted.startedAt || Date.now()) + 12 * 60_000
-      const STATUS_B: Record<number, string> = { 3: 'Publié', 4: 'Échec', 7: 'Annulé' }
+
+      // ── Reprise d'EXÉCUTION : téléphones jamais partis (aucun taskId) mais dont
+      // le média est déjà hébergé (token persisté) → on les RELANCE. Ceux qui ont
+      // déjà un taskId sont exclus → jamais de double post. Crédits déjà débités
+      // au lancement → aucun nouveau débit.
+      const toLaunch = persisted.runPhones.filter(rp => {
+        const st = statuses.get(rp.phoneId)
+        const dispatched = Boolean(st?.taskId)
+        const finalized  = st?.status === 'done' || st?.status === 'error' || st?.status === 'cancelled'
+        return Boolean(rp.token) && !dispatched && !finalized
+      })
+      if (toLaunch.length && !stopRef.current) {
+        log(`↻ Reprise : ${toLaunch.length} téléphone(s) pas encore parti(s) — relance de la publication…`, 'info')
+        const ids = toLaunch.map(rp => rp.geelarkId)
+        activePhonesRef.current = [...new Set([...activePhonesRef.current, ...ids])]
+        try { await geelark(bearer, '/phone/start', { ids }) } catch { /* watchdog serveur */ }
+        registerStartedPhones(ids, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
+        log('Attente du boot (~30s)…')
+        await new Promise(r => setTimeout(r, 30000))
+
+        if (persisted.platform === 'tiktok') {
+          // TikTok : un seul /task/add pour tous les téléphones restants.
+          const list = toLaunch.map(rp => ({ scheduleAt: Math.floor(Date.now() / 1000), envId: rp.geelarkId, video: rp.token!, videoDesc: rp.caption ?? '' }))
+          try {
+            const taskRes = await geelark(bearer, '/task/add', { taskType: 1, list })
+            const tids = ((taskRes['data'] as Record<string, unknown>)?.['taskIds'] ?? []) as string[]
+            if (taskRes['code'] === 0 && Array.isArray(tids) && tids.length) {
+              toLaunch.forEach((rp, i) => {
+                const tid = tids[i]
+                if (!tid) { setPhoneStatus(rp.phoneId, { status: 'error', detail: 'no task id' }); return }
+                byTask.set(tid, rp); setPhoneTaskId(rp.geelarkId, tid); setPhoneStatus(rp.phoneId, { status: 'posting', taskId: tid })
+                log(`  Tâche TikTok recréée pour ${rp.phoneName}`, 'ok')
+              })
+            } else {
+              toLaunch.forEach(rp => setPhoneStatus(rp.phoneId, { status: 'error', detail: String(taskRes['msg'] ?? 'reprise refusée') }))
+            }
+          } catch { toLaunch.forEach(rp => setPhoneStatus(rp.phoneId, { status: 'error', detail: 'reprise échouée' })) }
+        } else {
+          // Instagram : une tâche instagramPubReels par téléphone (espacée + retry).
+          for (const rp of toLaunch) {
+            if (stopRef.current) break
+            setPhoneStatus(rp.phoneId, { status: 'posting' })
+            postingStartRef.current.set(rp.geelarkId, Date.now())
+            await waitForPhoneConnectivity(bearer, rp.geelarkId, m => log(`  ${rp.phoneName}: ${m.trim()}`))
+            let taskRes: Record<string, unknown> | null = null
+            for (let attempt = 0; attempt < 3; attempt++) {
+              taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
+                id: rp.geelarkId, scheduleAt: Math.floor(Date.now() / 1000),
+                description: rp.caption ?? '', video: [rp.token!], ...(persisted.reelsTrial ? { shareType: 2 } : {}),
+              })
+              if (taskRes['code'] === 0) break
+              if (attempt < 2) { log(`  ${rp.phoneName} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
+            }
+            if (taskRes && taskRes['code'] === 0) {
+              const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
+              byTask.set(tid, rp); setPhoneTaskId(rp.geelarkId, tid); setPhoneStatus(rp.phoneId, { status: 'posting', taskId: tid })
+              log(`  Tâche recréée pour ${rp.phoneName}`, 'ok')
+            } else {
+              setPhoneStatus(rp.phoneId, { status: 'error', detail: String(taskRes?.['msg'] ?? 'échec reprise') })
+            }
+            await new Promise(r => setTimeout(r, 500))
+          }
+        }
+      }
+
+      // On laisse le temps aux tâches (anciennes + relancées) de se terminer.
+      const deadline = Date.now() + 12 * 60_000
       while (byTask.size > 0 && Date.now() < deadline && !stopRef.current) {
         await new Promise(r => setTimeout(r, 12000))
         if (stopRef.current) break
@@ -830,6 +896,17 @@ export function MassPosting({ user }: MassPostingProps) {
         tokenMap.set(vi, up.token)
         log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
       }
+
+      // Persiste le média + légende PAR téléphone (+ options) : après un refresh,
+      // la reprise pourra RELANCER les téléphones jamais partis sans ré-upload ni
+      // nouveau débit (crédits déjà pris ici, tâches déjà envoyées exclues).
+      setMassPostingState({
+        platform, reelsTrial: postingOpts.reelsTrial,
+        runPhones: assignments.map(a => ({
+          phoneId: a.phone.id, geelarkId: a.phone.geelark_id, phoneName: a.phone.phone_name,
+          token: tokenMap.get(a.videoIndex), caption: capFor(a.video),
+        })),
+      })
 
       // ── Concurrence limitée (proxys rotatifs) : postage par lots ──────────
       // Allumer tous les téléphones d'un coup fait tomber la co sur proxy rotatif.

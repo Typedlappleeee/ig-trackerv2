@@ -25,7 +25,9 @@ export interface SelectedVideo {
 
 // Téléphones impliqués dans le run en cours (pour reprendre le suivi après un
 // refresh : on garde de quoi poller les tâches GeeLark et éteindre les tél).
-export interface RunPhone { phoneId: string; geelarkId: string; phoneName: string }
+// token + caption permettent en plus de RELANCER un téléphone jamais parti
+// (média déjà hébergé chez GeeLark → pas de ré-upload, pas de nouveau débit).
+export interface RunPhone { phoneId: string; geelarkId: string; phoneName: string; token?: string; caption?: string }
 
 interface MassPostingState {
   posting:        boolean
@@ -36,6 +38,8 @@ interface MassPostingState {
   caption:        string
   startedAt:      number        // timestamp du lancement (0 si aucun run)
   runPhones:      RunPhone[]     // téléphones du run courant
+  platform:       string        // 'instagram' | 'tiktok' — pour la reprise d'exécution
+  reelsTrial:     boolean        // option shareType (reprise d'exécution)
 }
 
 const state: MassPostingState = {
@@ -47,6 +51,8 @@ const state: MassPostingState = {
   caption:        '',
   startedAt:      0,
   runPhones:      [],
+  platform:       'instagram',
+  reelsTrial:     false,
 }
 
 const subs = new Set<() => void>()
@@ -59,6 +65,8 @@ export interface PersistedRun {
   logs:         TaskLog[]
   taskStatuses: [string, TaskStatus][]
   runPhones:    RunPhone[]
+  platform?:    string
+  reelsTrial?:  boolean
 }
 function persistRun() {
   try {
@@ -68,6 +76,8 @@ function persistRun() {
         logs: state.logs.slice(-200),
         taskStatuses: [...state.taskStatuses.entries()],
         runPhones: state.runPhones,
+        platform: state.platform,
+        reelsTrial: state.reelsTrial,
       }
       localStorage.setItem(RUN_KEY, JSON.stringify(payload))
     } else {
