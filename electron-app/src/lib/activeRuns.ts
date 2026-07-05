@@ -29,10 +29,15 @@ export interface ActiveRun {
   startedAt: number
   page?:     string        // page à ouvrir au clic (ex. 'posting')
   phones?:   RunPhase[]    // détail par téléphone (optionnel)
+  // Chargé depuis localStorage après un refresh : plus aucune boucle cliente ne
+  // pilote ce run. Il doit être « adopté » (repris par une reprise de suivi) ou,
+  // à défaut, clôturé automatiquement — sinon il resterait « En cours » à l'infini.
+  orphaned?: boolean
 }
 
 const KEY = 'sf-active-runs'
 const STALE_MS = 2 * 60 * 60 * 1000  // un run "running" > 2h = probablement mort (app fermée)
+const ORPHAN_GRACE_MS = 30_000       // délai laissé à une reprise pour adopter un run
 
 function loadRuns(): Map<string, ActiveRun> {
   const m = new Map<string, ActiveRun>()
@@ -42,7 +47,9 @@ function loadRuns(): Map<string, ActiveRun> {
     const now = Date.now()
     for (const r of JSON.parse(raw) as ActiveRun[]) {
       if (r.status === 'running' && now - r.startedAt > STALE_MS) continue  // purge les morts
-      m.set(r.id, r)
+      // Tout run « running » relu au démarrage est orphelin tant qu'une reprise
+      // ne l'a pas adopté.
+      m.set(r.id, r.status === 'running' ? { ...r, orphaned: true } : r)
     }
   } catch { /* ignore */ }
   return m
@@ -80,6 +87,45 @@ export function setRunPhase(runId: string, phoneId: string, status: PhaseStatus)
   runs.set(runId, { ...r, phones, done })
   notify()
 }
+
+// ── Reprise après refresh : adoption / clôture des orphelins ─────────────────
+
+// Un run orphelin (relu du localStorage après un refresh) de ce type, le plus
+// récent. Sert à une page de reprise pour retrouver SON run et continuer à le
+// mettre à jour au lieu d'en créer un nouveau.
+export function findOrphanRun(type: RunType): ActiveRun | undefined {
+  return [...runs.values()]
+    .filter(r => r.type === type && r.status === 'running' && r.orphaned)
+    .sort((a, b) => b.startedAt - a.startedAt)[0]
+}
+
+// Une reprise a repris le pilotage de ce run : il n'est plus orphelin, donc la
+// clôture automatique ne le touchera pas.
+export function adoptRun(id: string): void {
+  const r = runs.get(id); if (!r) return
+  runs.set(id, { ...r, orphaned: false })
+}
+
+// Après le délai de grâce, tout run encore orphelin n'a aucune boucle pour le
+// faire avancer (warmup/threads non repris, ou reprise mass/story absente) → on
+// le clôture (statut déduit du détail par téléphone) au lieu de le laisser figé.
+function reconcileOrphans(): void {
+  let changed = false
+  for (const r of [...runs.values()]) {
+    if (r.status === 'running' && r.orphaned) {
+      const status = r.phones?.some(p => p.status === 'error') ? 'error' : 'done'
+      runs.set(r.id, { ...r, status, orphaned: false })
+      changed = true
+    }
+  }
+  if (!changed) return
+  notify()
+  setTimeout(() => {
+    for (const [id, r] of [...runs.entries()]) if (r.status !== 'running') runs.delete(id)
+    notify()
+  }, 10_000)
+}
+try { if (typeof window !== 'undefined') setTimeout(reconcileOrphans, ORPHAN_GRACE_MS) } catch { /* SSR */ }
 
 // Termine un run en déduisant le statut du détail par téléphone : erreur si au
 // moins un téléphone a échoué, sinon terminé. À utiliser quand chaque téléphone
