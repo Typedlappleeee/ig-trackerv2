@@ -85,6 +85,53 @@ async function gPost(bearer: string, path: string, body: unknown): Promise<Recor
   return await r.json().catch(() => ({}))
 }
 
+// ── Rotation d'IP proxy (posts programmés avec rotating_proxy=true) ──────────
+// La config { enabled, urls[] } est stockée dans la colonne `proxy` de
+// org_config / app_config (même format que le client proxyRotation.ts). Chaque
+// dongle a sa propre « Change IP URL » → un appel GET par dongle donne une IP
+// fraîche à chaque compte. Best-effort : ne throw jamais.
+function parseRotationUrls(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  const s = String(raw).trim()
+  if (!s) return []
+  try {
+    const j = JSON.parse(s)
+    if (j && typeof j === 'object' && Array.isArray(j.urls)) {
+      return j.enabled
+        ? j.urls.filter((u: unknown) => typeof u === 'string' && /^https?:\/\//i.test(u.trim())).map((u: string) => u.trim())
+        : []
+    }
+  } catch { /* ancienne valeur = une URL unique en texte brut */ }
+  return /^https?:\/\//i.test(s) ? [s] : []
+}
+
+// deno-lint-ignore no-explicit-any
+async function loadRotationUrls(db: any, orgId: string | null, userId: string): Promise<string[]> {
+  try {
+    if (orgId) {
+      const { data } = await db.from('org_config').select('proxy').eq('org_id', orgId).maybeSingle()
+      return parseRotationUrls(data?.proxy)
+    }
+    const { data } = await db.from('app_config').select('proxy').eq('user_id', userId).maybeSingle()
+    return parseRotationUrls(data?.proxy)
+  } catch { return [] }
+}
+
+async function rotateAllProxies(urls: string[], log: (m: string) => void): Promise<void> {
+  const list = (urls ?? []).map(u => (u ?? '').trim()).filter(u => /^https?:\/\//i.test(u))
+  if (!list.length) return
+  await Promise.all(list.map(async (u) => {
+    try {
+      const r = await fetch(u, { method: 'GET' })
+      log(r.ok ? `   🔄 Rotation IP OK` : `   ⚠ Rotation IP : HTTP ${r.status} — on continue`)
+    } catch {
+      log(`   ⚠ Rotation IP : le proxy n'a pas répondu — on continue`)
+    }
+  }))
+  // Laisse les dongles couper l'ancienne IP avant le boot des téléphones.
+  await sleep(4000)
+}
+
 // Upload a file URL to GeeLark and return the GeeLark resourceUrl token.
 // Used when a task video is stored as a Supabase signed URL instead of a pre-uploaded GeeLark token.
 async function uploadUrlToGeelark(bearer: string, fileUrl: string): Promise<string | null> {
@@ -799,6 +846,19 @@ Deno.serve(async (req) => {
       const geelarkIds = phones.map(p => p.geelark_id)
       const delayMin: number = post.delay_minutes ?? 0
       log(`🗓 Exécution serveur — ${post.platform ?? 'instagram'} · ${phones.length} compte(s) · ${videos.length} vidéo(s)${delayMin ? ` · ${delayMin} min d'écart` : ''}.`)
+
+      // 4bis. Proxy rotatif : rote l'IP AVANT de démarrer les téléphones (ils
+      // bootent sur l'IP fraîche, ne touchent jamais l'ancienne). Chaque dongle a
+      // sa propre Change-IP URL → chaque compte part sur une IP distincte.
+      if (post.rotating_proxy) {
+        const rotationUrls = await loadRotationUrls(db, post.org_id, post.user_id)
+        if (rotationUrls.length) {
+          log(`🔄 Proxy rotatif : rotation de ${rotationUrls.length} IP(s) avant démarrage…`)
+          await rotateAllProxies(rotationUrls, log)
+        } else {
+          log(`⚠ Proxy rotatif activé mais aucune URL de rotation configurée (Paramètres → Connexions) — démarrage sans rotation`)
+        }
+      }
 
       // 5. Démarrage des téléphones
       log(`▶ Démarrage de ${phones.length} téléphone(s)…`)

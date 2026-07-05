@@ -12,6 +12,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { createScheduledPost, defaultSchedValue, type ScheduledVideoRecord } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { useProxyRotation } from '@/lib/proxyRotation'
 
 const GOLD  = '#6366F1'
 const IVORY = '#E9EAF0'
@@ -48,6 +49,10 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
   const delayMin = 0   // délai entre comptes retiré de l'UI (toujours 0)
   const [reelsTrial, setReelsTrial]     = useState(false)
   const [deleteAfterPost, setDeleteAfterPost] = useState(false)
+  const [rotatingProxy, setRotatingProxy]     = useState(false)
+  // Config de rotation d'IP de l'org (pour le voyant « non configuré »)
+  const { cfg: rotationCfg } = useProxyRotation(user)
+  const rotationConfigured = rotationCfg.enabled && rotationCfg.urls.some(u => /^https?:\/\//i.test(u.trim()))
   const [platform, setPlatform]         = useState<'instagram' | 'tiktok'>(initialPlatform ?? 'instagram')
   const [submitting, setSubmitting]     = useState(false)
   const [progress, setProgress]         = useState('')
@@ -138,6 +143,7 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
         mode,
         bearerToken:   bearer,
         reelsTrial,
+        rotatingProxy,
         platform,
       })
       onCreated()
@@ -368,7 +374,32 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
                 {deleteAfterPost ? 'Activé' : 'Désactivé'}
               </button>
             </div>
+            <div>
+              <span style={labelStyle}>
+                Proxy rotatif
+                {rotatingProxy && !rotationConfigured && (
+                  <span title="Rotation d'IP non configurée — Paramètres → Connexions → Rotation d'IP proxy"
+                    style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#F87171', marginLeft: 6, verticalAlign: 'middle' }} />
+                )}
+              </span>
+              <button onClick={() => setRotatingProxy(v => !v)} className="cursor-pointer"
+                title="Rote l'IP avant chaque compte (démarrage 1 tél à la fois, évite les bans sur IP partagée)"
+                style={{
+                  height: 34, padding: '0 16px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                  background: rotatingProxy ? GOLD : 'transparent', color: rotatingProxy ? '#0A0B0E' : MUTED,
+                  border: rotatingProxy ? 'none' : `1px solid ${HAIR}`, transition: 'all 0.18s',
+                }}>
+                {rotatingProxy ? 'Activé' : 'Désactivé'}
+              </button>
+            </div>
           </section>
+
+          {rotatingProxy && !rotationConfigured && (
+            <div style={{ padding: '10px 14px', border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.09)', fontSize: 11.5, color: 'rgba(233,234,240,0.75)', lineHeight: 1.5 }}>
+              <strong style={{ color: '#F87171' }}>Rotation d'IP non configurée — risque de ban.</strong>{' '}
+              Ajoute ton lien de changement d'IP dans <strong style={{ color: '#fff' }}>Paramètres → Connexions → Rotation d'IP proxy</strong>, sinon les comptes partiront tous sur la même IP.
+            </div>
+          )}
 
           <p style={{ fontSize: 11, color: MUTED, margin: 0, lineHeight: 1.6 }}>
             Besoin d'un post qui se répète automatiquement ? Crée une{' '}

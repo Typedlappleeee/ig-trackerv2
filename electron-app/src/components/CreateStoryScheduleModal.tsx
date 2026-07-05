@@ -11,6 +11,7 @@ import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, type GeelarkPhone } from '@/lib/geelark'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { useProxyRotation } from '@/lib/proxyRotation'
 import { BankPicker } from '@/pages/Bank'
 import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
 
@@ -117,6 +118,9 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
   // ── Schedule ──────────────────────────────────────────────────────────────
   const [schedAt, setSchedAt]       = useState(() => defaultSchedValue(60))
   const [delay, setDelay]           = useState(2)
+  const [rotatingProxy, setRotatingProxy] = useState(false)
+  const { cfg: rotationCfg } = useProxyRotation(user)
+  const rotationConfigured = rotationCfg.enabled && rotationCfg.urls.some(u => /^https?:\/\//i.test(u.trim()))
   const [submitting, setSubmitting] = useState(false)
   const [schedDone, setSchedDone]   = useState('')
   const [schedErr, setSchedErr]     = useState('')
@@ -231,6 +235,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
           mode:         'seq',
           bearerToken:  '',
           reelsTrial:   false,
+          rotatingProxy,
         })
       } catch (e) {
         // createScheduledPost failed — refund
@@ -721,6 +726,31 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                         >{m === 0 ? 'Aucun' : `${m} min`}</button>
                       ))}
                     </div>
+                  </div>
+
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>
+                      Proxy rotatif
+                      {rotatingProxy && !rotationConfigured && (
+                        <span title="Rotation d'IP non configurée — Paramètres → Connexions → Rotation d'IP proxy"
+                          style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#F87171', marginLeft: 6, verticalAlign: 'middle' }} />
+                      )}
+                    </label>
+                    <button
+                      onClick={() => setRotatingProxy(v => !v)}
+                      title="Rote l'IP avant chaque compte (évite les bans sur IP partagée)"
+                      style={{
+                        width: '100%', height: 32, borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        background: rotatingProxy ? 'rgba(99,102,241,0.15)' : 'transparent',
+                        border: `1px solid ${rotatingProxy ? 'rgba(99,102,241,0.4)' : HAIR}`,
+                        color: rotatingProxy ? ACCENT_L : 'rgba(233,234,240,0.35)', transition: 'all 0.15s',
+                      }}
+                    >{rotatingProxy ? 'Activé — IP fraîche par compte' : 'Désactivé'}</button>
+                    {rotatingProxy && !rotationConfigured && (
+                      <p style={{ margin: '6px 0 0', fontSize: 10.5, color: '#F87171', lineHeight: 1.5 }}>
+                        Rotation d'IP non configurée — ajoute ton lien dans Paramètres → Connexions.
+                      </p>
+                    )}
                   </div>
 
                   <p style={{ margin: '10px 0 0', fontSize: 11, color: 'rgba(233,234,240,0.3)', lineHeight: 1.55 }}>

@@ -24,8 +24,6 @@ import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { startCreditRun } from '@/lib/withCredits'
 import { ACCENT, ACCENT_L, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR, OK, WARN, ERR, SANS } from '@/lib/theme'
 import { useToast } from '@/components/Toast'
-import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
-import { ScheduleModal } from '@/components/ScheduleModal'
 import { loadPostingOpts, savePostingOpts, buildScheduleTimes, effectiveConcurrency, type PostingOpts } from '@/lib/postingOpts'
 import { PostingOptions } from '@/components/PostingOptions'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -219,7 +217,6 @@ export function MassPosting({ user }: MassPostingProps) {
   const [bankFolders, setBankFolders]       = useState<{ name: string; count: number }[]>([])
   const [folderLoading, setFolderLoading]   = useState(false)
   const [addingFolder, setAddingFolder]     = useState<string | null>(null)
-  const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [randomSeed, setRandomSeed]               = useState(0)
   const stopRef                           = useRef(false)
   const runActiveRef                      = useRef(false)  // ce session pilote un run
@@ -688,111 +685,6 @@ export function MassPosting({ user }: MassPostingProps) {
       return getSignedUrl(sv.item.storage_path).catch(() => null)
     }
     return null
-  }
-
-  async function scheduleMassPost(scheduledAt: Date) {
-    if (!bearer)                    { log('Connexion GéeLark manquante — ajoute ton token dans les Paramètres', 'error'); return }
-    if (phoneList.length === 0)     { log('Sélectionne au moins un téléphone', 'warn'); return }
-    if (selectedVideos.length === 0){ log('Sélectionne au moins une vidéo', 'warn'); return }
-    // GéeLark expire les fichiers uploadés après 30 jours — bloque au-delà de 25
-    if (scheduledAt.getTime() > Date.now() + 25 * 24 * 60 * 60 * 1000) {
-      log('Programmation limitée à 25 jours (les vidéos uploadées chez GéeLark expirent après 30 jours)', 'error')
-      return
-    }
-    setShowScheduleModal(false)
-    setPosting(true); setLogs([])
-    postingStartRef.current.clear()
-    notifiedRef.current.clear()
-    // Request desktop notification permission upfront (user gesture context)
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {})
-    }
-    try {
-      // Assignation EXPLICITE et FIGÉE (comme le posting direct) : téléphone i →
-      // vidéo (i % nb vidéos) en séquentiel, ou aléatoire. On calcule le mapping
-      // MAINTENANT et on stocke UNE entrée de vidéo par téléphone → l'exécution
-      // (serveur ou client) ne peut plus se tromper d'ordre (elle lit videos[i]).
-      const V = selectedVideos.length
-      const perPhoneIdx = phoneList.map((_, i) => mode === 'random' ? Math.floor(Math.random() * V) : i % V)
-      const distinctIdx = [...new Set(perPhoneIdx)]
-
-      // Crédits débités à la programmation (remboursés si annulation avant exécution)
-      const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
-      const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
-      if (!creditRes.ok) {
-        log(`${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost} pour ${phoneList.length} téléphone${phoneList.length > 1 ? 's' : ''})`, 'error')
-        return
-      }
-      if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
-      log(`${creditCost} crédits débités — remboursés si tu annules avant l'exécution`, 'ok')
-
-      // Refund helper: any failure between deduction and creation gives the credits back
-      const refundOnFailure = async (reason: string) => {
-        const { refundCredits } = await import('@/lib/credits')
-        const ok = await refundCredits(credits.ownerId, creditCost)
-        log(`${reason}${ok ? ` — ${creditCost} crédits remboursés` : ''}`, 'error')
-        if (ok) credits.refresh()
-      }
-
-      // Upload chaque vidéo DISTINCTE une seule fois (dédup).
-      log(`Upload de ${distinctIdx.length} vidéo(s) vers GéeLark…`)
-      const tokenByIdx = new Map<number, string>()
-      for (let k = 0; k < distinctIdx.length; k++) {
-        const vi = distinctIdx[k]
-        const sv = selectedVideos[vi]
-        const filePath = await resolveVideoPath(sv)
-        if (!filePath) { await refundOnFailure(`Fichier introuvable pour « ${sv.item.title} »`); return }
-        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
-        if (!up.ok || !up.token) { await refundOnFailure(`Échec de l'envoi de « ${sv.item.title} » vers GéeLark`); return }
-        tokenByIdx.set(vi, up.token)
-        log(`Vidéo ${k + 1}/${distinctIdx.length} prête`, 'ok')
-      }
-      try {
-        await createScheduledPost({
-          userId: user.id, orgId: currentOrg?.id ?? null,
-          createdByName: user.email?.split('@')[0] ?? 'Moi',
-          type: 'mass_posting', scheduledAt,
-          phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
-          // UNE entrée par téléphone : videos[i] = la vidéo du téléphone i (mapping
-          // figé). Légende : description de banque de la vidéo, sinon légende globale.
-          videos: perPhoneIdx.map(vi => {
-            const sv = selectedVideos[vi]
-            return { token: tokenByIdx.get(vi)!, title: sv.item.title, desc: (sv.caption?.trim() || caption.trim() || undefined) }
-          }),
-          // On force 'seq' : le mapping téléphone→vidéo est déjà figé dans l'ordre
-          // ci-dessus (videos[i] = tél i), donc l'exécution fait juste i → videos[i].
-          caption, delayMinutes: 0, mode: 'seq', bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
-          platform,
-        })
-      } catch (err: any) {
-        await refundOnFailure('La programmation a échoué.')
-        return
-      }
-
-      // Usage unique : à la PROGRAMMATION, on retire de la banque les vidéos
-      // programmées → les prochaines programmations puisent dans ce qui reste.
-      if (postingOpts.deleteAfterPost) {
-        const toDelete = distinctIdx.map(vi => selectedVideos[vi]).filter(sv => sv?.item?.storage_path && !String(sv.item.id).startsWith('local-') && !String(sv.item.id).startsWith('bank-'))
-        if (toDelete.length) {
-          try {
-            const ids = toDelete.map(sv => sv.item.id)
-            const base = supabase.from('content_bank').delete().in('id', ids)
-            await (currentOrg ? (base as any).eq('org_id', currentOrg.id) : (base as any).eq('user_id', user.id).is('org_id', null))
-            const { deleteStorageObjects } = await import('@/lib/storage')
-            deleteStorageObjects(toDelete.flatMap(sv => [sv.item.storage_path, sv.item.thumbnail_path])).catch(() => {})
-            const deletedIds = new Set(ids)
-            setSelVideos(prev => prev.filter(sv => !deletedIds.has(sv.item.id)))
-            log(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, 'ok')
-          } catch { log('Impossible de retirer certaines vidéos de la banque', 'warn') }
-        }
-      }
-
-      log(`Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
-    } catch (err: any) {
-      log('Une erreur est survenue pendant la programmation.', 'error')
-    } finally {
-      setPosting(false)
-    }
   }
 
   async function post() {
@@ -2318,15 +2210,9 @@ export function MassPosting({ user }: MassPostingProps) {
                 </button>
               )}
               <button
-                onClick={() => setShowScheduleModal(true)}
-                disabled={!canLaunch}
-                title={canLaunch ? undefined
-                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
-                  : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
-                  : selectedVideos.length === 0 ? 'Sélectionne des vidéos dans la banque'
-                  : 'Publication en cours…'}
-                className="sf-btn sf-btn-secondary cursor-pointer"
-                style={{ opacity: canLaunch ? 1 : 0.4 }}>
+                onClick={() => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'scheduler' } }))}
+                title="Ouvrir la page Programmer pour planifier une publication"
+                className="sf-btn sf-btn-secondary cursor-pointer">
                 {t('schedule')}
               </button>
               <button
@@ -2444,17 +2330,6 @@ export function MassPosting({ user }: MassPostingProps) {
             setShowBankPicker(false)
           }}
           onClose={() => setShowBankPicker(false)}
-        />
-      )}
-
-      {showScheduleModal && (
-        <ScheduleModal
-          type="mass_posting"
-          phonesCount={phoneList.length}
-          videosCount={selectedVideos.length}
-          videoTitle={selectedVideos.length === 1 ? selectedVideos[0].item.title : `${selectedVideos.length} vidéos`}
-          onConfirm={scheduleMassPost}
-          onClose={() => setShowScheduleModal(false)}
         />
       )}
     </div>

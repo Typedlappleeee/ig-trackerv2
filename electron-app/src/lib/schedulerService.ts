@@ -46,6 +46,8 @@ export interface ScheduledPost {
   mode:            'seq' | 'random'
   bearer_token:    string
   reels_trial:     boolean
+  // Proxy rotatif : rote l'IP avant de démarrer/poster (comme le toggle du Posting).
+  rotating_proxy:  boolean
   recur_hours:     number | null
   platform?:       'instagram' | 'tiktok'
   result:          { logs?: string[]; phone_results?: PhoneResult[] } | null
@@ -87,6 +89,7 @@ export interface CreateScheduledPostInput {
   mode:            'seq' | 'random'
   bearerToken:     string
   reelsTrial:      boolean
+  rotatingProxy?:  boolean
   recurHours?:     number | null
   platform?:       'instagram' | 'tiktok'
 }
@@ -111,6 +114,7 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
     // time from org_config / app_config instead.
     bearer_token:     '',
     reels_trial:      input.reelsTrial,
+    rotating_proxy:   input.rotatingProxy ?? false,
     recur_hours:      input.recurHours ?? null,
     platform:         input.platform ?? 'instagram',
   }).select().single()
@@ -276,6 +280,7 @@ export async function loadManualRuns(): Promise<ScheduledPost[]> {
       mode:            'seq',
       bearer_token:    '',
       reels_trial:     false,
+      rotating_proxy:  false,
       recur_hours:     null,
       platform:        r['type'] === 'tiktok' ? 'tiktok' : 'instagram',
       result:          results.length ? { phone_results: results } : null,
@@ -341,10 +346,12 @@ async function executeScheduledStory(
 ): Promise<boolean> {
   const { postInstagramStory, stopPhone } = await import('./geelark')
   const { loadProxyRotation } = await import('./proxyRotation')
-  // Charge la config de rotation d'IP de l'org du post (persistée dans le config).
-  const rotationUrls = (await loadProxyRotation(post.org_id ?? null, post.user_id)
-    .then(c => c.enabled ? c.urls.filter(u => /^https?:\/\//i.test(u.trim())) : [])
-    .catch(() => []))
+  // Rotation d'IP uniquement si le post a le toggle « Proxy rotatif » activé.
+  const rotationUrls = post.rotating_proxy
+    ? (await loadProxyRotation(post.org_id ?? null, post.user_id)
+        .then(c => c.enabled ? c.urls.filter(u => /^https?:\/\//i.test(u.trim())) : [])
+        .catch(() => []))
+    : []
   const phones = (typeof post.phones === 'string'
     ? JSON.parse(post.phones as unknown as string)
     : post.phones) as ScheduledPhoneRecord[]
@@ -412,11 +419,14 @@ async function executeScheduledPostInner(
 
   if (post.type === 'story') return executeScheduledStory(post, bearer, onLog)
 
-  // Rotation d'IP (reels programmés) : config de l'org du post.
-  const reelsRotationUrls = await (await import('./proxyRotation'))
-    .loadProxyRotation(post.org_id ?? null, post.user_id)
-    .then(c => c.enabled ? c.urls.filter(u => /^https?:\/\//i.test(u.trim())) : [])
-    .catch(() => [])
+  // Rotation d'IP (reels programmés) : uniquement si le toggle « Proxy rotatif »
+  // du post est activé — sinon comportement normal (démarrage groupé).
+  const reelsRotationUrls = post.rotating_proxy
+    ? await (await import('./proxyRotation'))
+        .loadProxyRotation(post.org_id ?? null, post.user_id)
+        .then(c => c.enabled ? c.urls.filter(u => /^https?:\/\//i.test(u.trim())) : [])
+        .catch(() => [])
+    : []
 
   // Supabase Realtime can deliver jsonb columns as strings — parse defensively
   const phones = (typeof post.phones === 'string'

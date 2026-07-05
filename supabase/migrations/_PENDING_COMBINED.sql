@@ -65,5 +65,9 @@ alter table if exists public.scheduled_posts
 alter table if exists public.recurring_tasks
   add column if not exists platform text not null default 'instagram';
 
+-- 5) Proxy rotatif par post programmé (toggle par post, respecté à l'exécution)
+alter table if exists public.scheduled_posts
+  add column if not exists rotating_proxy boolean not null default false;
+
 -- ✅ Terminé. Redéploie aussi l'edge function :
 --    supabase functions deploy run-scheduled-posts --no-verify-jwt
