@@ -287,8 +287,16 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
-      const V = '[CLIENT-v7]'
+      const V = '[CLIENT-v8]'
       console.log(`${V} uploadVideoGeelark filePath=${opts.filePath.slice(0, 80)}`)
+      // Dérive l'extension réelle (photo vs vidéo) : GéeLark encode l'extension
+      // dans la resourceUrl, donc une photo envoyée en 'mp4' casse threadsImage.
+      const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heif', 'heic']
+      const fileType = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+      const isImage = IMAGE_EXTS.includes(fileType)
+      const putCT = isImage
+        ? (fileType === 'jpg' ? 'image/jpeg' : `image/${fileType}`)
+        : (fileType === 'mov' ? 'video/quicktime' : `video/${fileType}`)
       try {
         // Preferred path: server-side proxy (/api/geelark-upload) does
         // download + getUrl + PUT entirely côté serveur — pas de CORS.
@@ -298,7 +306,7 @@ export function buildWebAPI() {
             const r = await fetch('/api/geelark-upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer }),
+              body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer, fileType }),
             })
             const j = await r.json() as { ok: boolean; token?: string; error?: string }
             if (j.ok && j.token) return { ok: true, token: j.token }
@@ -332,7 +340,7 @@ export function buildWebAPI() {
           method: 'POST',
           url: 'https://openapi.geelark.com/open/v1/upload/getUrl',
           headers: { Authorization: `Bearer ${opts.bearer}` },
-          body: { fileType: 'mp4' },
+          body: { fileType },
         }) as Record<string, unknown>
         if (!urlData['ok']) return { ok: false, error: String(urlData['error'] ?? 'GéeLark URL error') }
         const apiResp = ((urlData['data'] as Record<string, unknown>)?.['data'] ?? urlData['data']) as Record<string, unknown>
@@ -345,7 +353,7 @@ export function buildWebAPI() {
         try {
           let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
           if (!putRes.ok) {
-            putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
+            putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': putCT }, body: bytes.buffer as ArrayBuffer })
           }
           if (!putRes.ok) return { ok: false, error: `S3 PUT échoué: ${putRes.status}` }
         } catch {

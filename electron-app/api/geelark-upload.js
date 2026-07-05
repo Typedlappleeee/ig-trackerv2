@@ -15,7 +15,17 @@ function getSupabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-const SV = '[SERVER-v4]'
+const SV = '[SERVER-v5]'
+
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heif', 'heic']
+
+// Devine le type de fichier GéeLark depuis l'URL/chemin source. GéeLark encode
+// l'extension dans la resourceUrl : envoyer 'mp4' pour une photo produit une URL
+// .mp4 que le template threadsImage refuse. On dérive donc l'extension réelle.
+function guessFileType(src) {
+  const ext = (String(src || '').split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+  return ext
+}
 
 // Network errors ("fetch failed") are usually transient — DNS hiccup, connection
 // reset, TLS, or a momentary timeout. Retrying with backoff absorbs most of them.
@@ -56,7 +66,10 @@ module.exports = async (req, res) => {
       return res.status(405).json({ ok: false, error: `${SV} Method not allowed` })
     }
 
-    const { storagePath, bucket = 'content', bearer, signedUrl } = req.body ?? {}
+    const { storagePath, bucket = 'content', bearer, signedUrl, fileType: fileTypeArg } = req.body ?? {}
+    // fileType explicite (fourni par l'appelant) sinon dérivé de l'URL source.
+    const fileType = (fileTypeArg || guessFileType(signedUrl || storagePath) || 'mp4').toLowerCase()
+    const isImage = IMAGE_EXTS.includes(fileType)
     console.log(`${SV} body keys: ${Object.keys(req.body ?? {}).join(',')} | signedUrl=${!!signedUrl} | storagePath=${!!storagePath}`)
 
     if ((!storagePath && !signedUrl) || !bearer) {
@@ -87,7 +100,7 @@ module.exports = async (req, res) => {
     const glUrlRes = await fetchRetry('SV-C:getUrl', 'https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-      body: JSON.stringify({ fileType: 'mp4' }),
+      body: JSON.stringify({ fileType }),
     }, { tries: 3, timeoutMs: 20000 })
     if (!glUrlRes.ok) {
       return res.status(200).json({ ok: false, error: `${SV}[SV-E004a] GéeLark URL HTTP: ${glUrlRes.status}` })
@@ -103,17 +116,20 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: false, error: `${SV}[SV-E005] No uploadUrl/resourceUrl. Keys: ${Object.keys(d).join(',')}` })
     }
 
+    const putCT = isImage
+      ? (fileType === 'jpg' ? 'image/jpeg' : `image/${fileType}`)
+      : (fileType === 'mov' ? 'video/quicktime' : `video/${fileType}`)
     let putRes = await fetchRetry('SV-D:put', uploadUrl, { method: 'PUT', body: bytes }, { tries: 3, timeoutMs: 45000 })
     if (!putRes.ok) {
-      putRes = await fetchRetry('SV-D:put2', uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes }, { tries: 2, timeoutMs: 45000 })
+      putRes = await fetchRetry('SV-D:put2', uploadUrl, { method: 'PUT', headers: { 'Content-Type': putCT }, body: bytes }, { tries: 2, timeoutMs: 45000 })
       if (!putRes.ok) {
         const errBody = await putRes.text().catch(() => '')
         return res.status(200).json({ ok: false, error: `${SV}[SV-E006] S3 PUT failed: ${putRes.status} — ${errBody.slice(0, 200)}` })
       }
     }
 
-    console.log(`${SV} [OK] token=${token.slice(0, 40)}`)
-    return res.status(200).json({ ok: true, token })
+    console.log(`${SV} [OK] token=${token.slice(0, 40)} isImage=${isImage}`)
+    return res.status(200).json({ ok: true, token, isImage })
   } catch (err) {
     const msg = err?.message ?? String(err)
     console.error(`${SV} exception:`, msg)
