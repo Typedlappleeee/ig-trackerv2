@@ -656,8 +656,15 @@ const RUN_META: Record<ActiveRun['type'], { emoji: string; page: string }> = {
   threads: { emoji: '🧵', page: 'posting' },
 }
 
+const PHASE_ICON: Record<'idle' | 'running' | 'done' | 'error', string> = { idle: '○', running: '◔', done: '✓', error: '✕' }
+const PHASE_COLOR: Record<'idle' | 'running' | 'done' | 'error', string> = {
+  idle: 'var(--text-4)', running: 'var(--accent)', done: 'var(--ok)', error: 'var(--danger)',
+}
+
 function ActiveRunsSection({ onNavigate }: { onNavigate?: (p: Page) => void }) {
   const [runs, setRuns] = useState<ActiveRun[]>(getActiveRuns())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggleExpand = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   useEffect(() => subscribeActiveRuns(() => setRuns(getActiveRuns())), [])
 
   if (runs.length === 0) return null
@@ -680,10 +687,12 @@ function ActiveRunsSection({ onNavigate }: { onNavigate?: (p: Page) => void }) {
           const pct = r.total > 0 ? Math.round((r.done / r.total) * 100) : 0
           const conflicted = r.status === 'running' && r.proxyKeys.some(k => clash.has(k))
           const color = r.status === 'error' ? 'var(--danger)' : r.status === 'done' ? 'var(--ok)' : 'var(--accent)'
+          const hasPhases = Boolean(r.phones?.length)
+          const isExp = expanded.has(r.id)
           return (
             <div key={r.id}
-              onClick={() => r.page && onNavigate?.(r.page as Page)}
-              className={r.page ? 'cursor-pointer' : ''}
+              onClick={() => hasPhases ? toggleExpand(r.id) : r.page && onNavigate?.(r.page as Page)}
+              className={hasPhases || r.page ? 'cursor-pointer' : ''}
               style={{ padding: '11px 14px', borderRadius: 12, background: 'var(--surface-2)', border: `1px solid ${conflicted ? 'rgba(239,68,68,0.5)' : 'var(--border-md)'}`, display: 'flex', flexDirection: 'column', gap: 7 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                 <span style={{ fontSize: 16 }}>{m.emoji}</span>
@@ -692,10 +701,21 @@ function ActiveRunsSection({ onNavigate }: { onNavigate?: (p: Page) => void }) {
                 <span style={{ marginLeft: 'auto', fontSize: 12.5, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>
                   {r.status === 'running' ? `${r.done}/${r.total} · ${pct}%` : r.status === 'done' ? '✓ terminé' : '✕ échec'}
                 </span>
+                {hasPhases && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{isExp ? '▾' : '▸'}</span>}
               </div>
               <div style={{ height: 5, borderRadius: 5, background: 'var(--surface-3)', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${r.status === 'done' ? 100 : pct}%`, background: color, transition: 'width .3s' }} />
               </div>
+              {hasPhases && isExp && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
+                  {r.phones!.map(p => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
+                      <span style={{ color: PHASE_COLOR[p.status], width: 12, textAlign: 'center', ...(p.status === 'running' ? { animation: 'spin 1.2s linear infinite' } : {}) }}>{PHASE_ICON[p.status]}</span>
+                      <span style={{ color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}

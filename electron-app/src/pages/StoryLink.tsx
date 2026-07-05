@@ -5,7 +5,7 @@ import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, postInstagramStory, stopPhone, fetchPhoneProxies, type GeelarkPhone } from '@/lib/geelark'
-import { startRun, updateRun, endRun, proxyConflicts } from '@/lib/activeRuns'
+import { startRun, updateRun, endRun, setRunPhase, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { activeRotationUrls, useProxyRotation, getProxyRotation } from '@/lib/proxyRotation'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
@@ -582,7 +582,14 @@ export default function StoryLink({ user }: { user: User }) {
       if (proxyConflicts(proxyKeys, runId).length) {
         toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — risque de ban.', kind: 'warn' })
       }
-      startRun({ id: runId, type: 'story', label: `Story · ${assignments.length} compte${assignments.length > 1 ? 's' : ''}`, proxyKeys, done: 0, total: assignments.length, page: 'storylink' })
+      startRun({
+        id: runId, type: 'story', label: `Story · ${assignments.length} compte${assignments.length > 1 ? 's' : ''}`,
+        proxyKeys, done: 0, total: assignments.length, page: 'storylink',
+        phones: assignments.map(a => {
+          const p = phones.find(ph => ph.id === a.phoneId)
+          return { id: a.phoneId, name: p ? phoneName(p) : a.phoneId.slice(-6), status: 'idle' as PhaseStatus }
+        }),
+      })
     })()
 
     const queue = [...assignments]
@@ -591,7 +598,10 @@ export default function StoryLink({ user }: { user: User }) {
       if (staggerMs > 0) await new Promise(r => setTimeout(r, staggerMs))
       while (queue.length && !abortRef.current) {
         const asgn = queue.shift()!
-        okCount += await runOne(asgn)
+        setRunPhase(runId, asgn.phoneId, 'running')
+        const r = await runOne(asgn)
+        okCount += r
+        setRunPhase(runId, asgn.phoneId, r > 0 ? 'done' : 'error')
         updateRun(runId, { done: ++doneCount })
       }
     }

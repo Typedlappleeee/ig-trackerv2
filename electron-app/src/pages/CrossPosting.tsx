@@ -7,7 +7,7 @@ import {
   publishVideoCrossPlatform, geelarkUploadForRpa, fetchPhoneProxies, CROSS_PLATFORMS,
   type CrossPlatform,
 } from '@/lib/geelark'
-import { startRun, updateRun, endRun, proxyConflicts } from '@/lib/activeRuns'
+import { startRun, updateRun, endRun, setRunPhase, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
 import { BankPicker } from '@/pages/Bank'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -99,7 +99,11 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
       if (proxyConflicts(proxyKeys, runId).length) {
         toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — risque de ban.', kind: 'warn' })
       }
-      startRun({ id: runId, type: 'threads', label: `Threads · ${toRun.length} compte${toRun.length > 1 ? 's' : ''}`, proxyKeys, done: 0, total: toRun.length, page: 'posting' })
+      startRun({
+        id: runId, type: 'threads', label: `Threads · ${toRun.length} compte${toRun.length > 1 ? 's' : ''}`,
+        proxyKeys, done: 0, total: toRun.length, page: 'posting',
+        phones: toRun.map(p => ({ id: p.id, name: p.ig_username ? `@${p.ig_username}` : p.phone_name, status: 'idle' as PhaseStatus })),
+      })
     })()
 
     // Distribution vidéo/caption par téléphone : séquentiel (tél i → élément i) ou
@@ -134,14 +138,17 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
       const cap = caps.length ? pick(caps, i) : ''
       const phoneKeys = plats.map(pl => `${phone.id}:${pl.key}`)
       phoneKeys.forEach(k => setJob(k, { status: 'uploading', detail: 'Envoi de la vidéo au téléphone…' }))
+      setRunPhase(runId, phone.id, 'running')
       const res = await ensureHosted(vid.url)
       const hosted = res && 'resourceUrl' in res ? res : null
       if (!hosted) {
         err += plats.length
         const reason = res && 'err' in res && res.err ? res.err : 'upload échoué'
         phoneKeys.forEach(k => setJob(k, { status: 'error', detail: `Média non envoyé : ${reason}` }))
+        setRunPhase(runId, phone.id, 'error')
         continue
       }
+      let phoneErr = false
       for (const pl of plats) {
         const key = `${phone.id}:${pl.key}`
         setJob(key, { status: 'running' })
@@ -150,11 +157,12 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
             { mediaUrl: hosted.resourceUrl, isImage: vid.isImage, caption: cap || undefined, rotationUrls },
             m => setJob(key, { detail: m }))
           if (r.ok) { ok++; setJob(key, { status: 'done', detail: 'Publié ✓' }) }
-          else { err++; setJob(key, { status: 'error', detail: r.error ?? 'Échec' }) }
+          else { err++; phoneErr = true; setJob(key, { status: 'error', detail: r.error ?? 'Échec' }) }
         } catch (e) {
-          err++; setJob(key, { status: 'error', detail: e instanceof Error ? e.message : String(e) })
+          err++; phoneErr = true; setJob(key, { status: 'error', detail: e instanceof Error ? e.message : String(e) })
         }
       }
+      setRunPhase(runId, phone.id, phoneErr ? 'error' : 'done')
       updateRun(runId, { done: i + 1 })
     }
     endRun(runId, err > 0 ? 'error' : 'done')
