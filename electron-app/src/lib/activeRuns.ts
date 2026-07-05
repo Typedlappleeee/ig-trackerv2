@@ -8,6 +8,16 @@
  */
 export type RunType = 'mass' | 'story' | 'warmup' | 'threads'
 
+export type PhaseStatus = 'idle' | 'running' | 'done' | 'error'
+
+// Détail par téléphone d'un run — permet d'afficher « quel tel a fini, lequel
+// est en cours » quand on déplie une carte du widget.
+export interface RunPhase {
+  id:     string
+  name:   string
+  status: PhaseStatus
+}
+
 export interface ActiveRun {
   id:        string
   type:      RunType
@@ -18,6 +28,7 @@ export interface ActiveRun {
   status:    'running' | 'done' | 'error'
   startedAt: number
   page?:     string        // page à ouvrir au clic (ex. 'posting')
+  phones?:   RunPhase[]    // détail par téléphone (optionnel)
 }
 
 const KEY = 'sf-active-runs'
@@ -59,6 +70,24 @@ export function endRun(id: string, status: 'done' | 'error' = 'done'): void {
   setTimeout(() => { runs.delete(id); notify() }, 10_000)
 }
 export function removeRun(id: string): void { runs.delete(id); notify() }
+
+// Met à jour le statut d'UN téléphone d'un run et recalcule `done`
+// (nb de téléphones terminés = done + error). No-op si le run n'a pas de détail.
+export function setRunPhase(runId: string, phoneId: string, status: PhaseStatus): void {
+  const r = runs.get(runId); if (!r || !r.phones) return
+  const phones = r.phones.map(p => p.id === phoneId ? { ...p, status } : p)
+  const done = phones.filter(p => p.status === 'done' || p.status === 'error').length
+  runs.set(runId, { ...r, phones, done })
+  notify()
+}
+
+// Termine un run en déduisant le statut du détail par téléphone : erreur si au
+// moins un téléphone a échoué, sinon terminé. À utiliser quand chaque téléphone
+// a été suivi via setRunPhase.
+export function finishRun(id: string): void {
+  const r = runs.get(id); if (!r) return
+  endRun(id, r.phones?.some(p => p.status === 'error') ? 'error' : 'done')
+}
 
 export function getActiveRuns(): ActiveRun[] {
   return [...runs.values()].sort((a, b) => b.startedAt - a.startedAt)

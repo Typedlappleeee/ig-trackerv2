@@ -1,5 +1,25 @@
 import { useEffect, useState } from 'react'
-import { getActiveRuns, subscribeActiveRuns, removeRun, type ActiveRun } from '@/lib/activeRuns'
+import { getActiveRuns, subscribeActiveRuns, removeRun, type ActiveRun, type PhaseStatus } from '@/lib/activeRuns'
+
+const PHASE_ICON: Record<PhaseStatus, string> = { idle: '○', running: '◔', done: '✓', error: '✕' }
+const PHASE_COLOR: Record<PhaseStatus, string> = {
+  idle: 'var(--text-4)', running: 'var(--accent)', done: 'var(--ok)', error: 'var(--danger)',
+}
+
+// Liste dépliable « quel téléphone a fini / est en cours » d'un run.
+function PhaseList({ run }: { run: ActiveRun }) {
+  if (!run.phones?.length) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, maxHeight: 160, overflow: 'auto' }}>
+      {run.phones.map(p => (
+        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+          <span style={{ color: PHASE_COLOR[p.status], width: 12, textAlign: 'center', ...(p.status === 'running' ? { animation: 'spin 1.2s linear infinite' } : {}) }}>{PHASE_ICON[p.status]}</span>
+          <span style={{ color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const TYPE_META: Record<ActiveRun['type'], { emoji: string; label: string }> = {
   mass:    { emoji: '🚀', label: 'Mass posting' },
@@ -13,6 +33,8 @@ const TYPE_META: Record<ActiveRun['type'], { emoji: string; label: string }> = {
 export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => void }) {
   const [runs, setRuns] = useState<ActiveRun[]>(getActiveRuns())
   const [open, setOpen] = useState(true)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggleExpand = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   useEffect(() => subscribeActiveRuns(() => setRuns(getActiveRuns())), [])
 
@@ -59,10 +81,12 @@ export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => vo
               const pct = r.total > 0 ? Math.round((r.done / r.total) * 100) : 0
               const clash = runClashes(r)
               const color = r.status === 'error' ? 'var(--danger)' : r.status === 'done' ? 'var(--ok)' : 'var(--accent)'
+              const hasPhases = Boolean(r.phones?.length)
+              const isExp = expanded.has(r.id)
               return (
                 <div key={r.id}
-                  onClick={() => r.page && onOpen?.(r.page)}
-                  className={r.page ? 'cursor-pointer' : ''}
+                  onClick={() => hasPhases ? toggleExpand(r.id) : r.page && onOpen?.(r.page)}
+                  className={hasPhases || r.page ? 'cursor-pointer' : ''}
                   style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span>{m.emoji}</span>
@@ -71,6 +95,7 @@ export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => vo
                     <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
                       {r.status === 'running' ? `${r.done}/${r.total}` : r.status === 'done' ? '✓ terminé' : '✕ échec'}
                     </span>
+                    {hasPhases && <span style={{ fontSize: 10, color: 'var(--text-4)' }}>{isExp ? '▾' : '▸'}</span>}
                     {r.status !== 'running' && (
                       <button onClick={e => { e.stopPropagation(); removeRun(r.id) }} className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12 }}>✕</button>
                     )}
@@ -78,6 +103,7 @@ export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => vo
                   <div style={{ height: 4, borderRadius: 4, background: 'var(--surface-3)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${r.status === 'done' ? 100 : pct}%`, background: color, transition: 'width .3s' }} />
                   </div>
+                  {hasPhases && isExp && <PhaseList run={r} />}
                 </div>
               )
             })}

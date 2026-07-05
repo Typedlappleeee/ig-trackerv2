@@ -1469,61 +1469,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
         </>
       )}
 
-      {/* ── Active posting progress pill ─────────────────────────────────── */}
-      {activeTask && (
-        <div
-          className="fixed bottom-5 right-5 z-[9990] anim-slide-down"
-          style={{
-            background: 'rgba(6,3,16,0.96)',
-            border: '1px solid rgba(99,102,241,0.3)',
-            backdropFilter: 'blur(22px)',
-            borderRadius: 16, padding: '14px 16px', width: 230,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.08), 0 0 40px -8px rgba(99,102,241,0.25), 0 0 60px -12px rgba(99,102,241,0.4)',
-          }}
-        >
-          <div className="flex items-center gap-2.5 mb-3">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#6366F122,#818CF822)', border: '1px solid rgba(99,102,241,0.25)' }}
-            >
-              <NavIcon d={activeTask.kind === 'mass' ? ICONS.zap : ICONS.send} size={14} color="#6366F1" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-semibold text-white leading-tight">
-                {activeTask.kind === 'mass' ? 'Mass Posting' : 'Posting'} {t('taskInProgress')}
-              </p>
-              <p className="text-[10px] leading-tight" style={{ color: 'rgba(233,234,240,0.45)' }}>
-                {activeTask.kind === 'mass' && activeTask.total > 0
-                  ? `${activeTask.done} / ${activeTask.total} ${t('phones')}`
-                  : `${t('taskPending')}…`}
-              </p>
-            </div>
-            <span className="relative w-2 h-2 flex-shrink-0">
-              <span className="absolute inset-0 rounded-full bg-ok animate-ping opacity-60" />
-              <span className="absolute inset-0 rounded-full bg-ok" />
-            </span>
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px]" style={{ color: 'rgba(233,234,240,0.4)' }}>{t('progress')}</span>
-              <span className="text-[10px] font-mono" style={{ color: 'rgba(233,234,240,0.6)' }}>{activeTask.progress}%</span>
-            </div>
-            <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(99,102,241,0.12)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${activeTask.progress}%`, background: 'linear-gradient(90deg,#6366F1,#818CF8)' }}
-              />
-            </div>
-          </div>
-          <button
-            onClick={() => { playNav(); onNavigate(activeTask.kind === 'mass' ? 'massposting' : 'posting') }}
-            className="mt-3 w-full text-[11px] font-semibold py-1.5 rounded-lg transition-all hover:opacity-90"
-            style={{ background: 'rgba(99,102,241,0.14)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}
-          >
-            {t('viewDetails')}
-          </button>
-        </div>
-      )}
+      {/* Ancien pill « posting en cours » retiré : remplacé par ActivePostingsWidget
+          (registre global persistant, survit au refresh + détail par téléphone). */}
 
       {/* ── User account switcher menu ────────────────────────────────────── */}
       {userMenuOpen && userMenuPos && (

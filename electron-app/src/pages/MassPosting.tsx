@@ -10,7 +10,7 @@ import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp, fetchPhoneProxies } from '@/lib/geelark'
-import { startRun, updateRun, endRun, proxyConflicts } from '@/lib/activeRuns'
+import { startRun, updateRun, endRun, setRunPhase, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
@@ -309,6 +309,14 @@ export function MassPosting({ user }: MassPostingProps) {
 
   function setPhoneStatus(phoneId: string, status: TaskStatus) {
     setTaskStatuses(prev => new Map(prev).set(phoneId, status))
+    // Miroir vers le registre global (widget + Historique) : détail par téléphone.
+    if (activeRunIdRef.current) {
+      const s = status.status
+      const phase: PhaseStatus = s === 'done' ? 'done'
+        : (s === 'error' || s === 'cancelled') ? 'error'
+        : s === 'idle' ? 'idle' : 'running'
+      setRunPhase(activeRunIdRef.current, phoneId, phase)
+    }
   }
 
   // ── Reprise du suivi après un refresh ────────────────────────────────────────
@@ -769,7 +777,11 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`⚠️ Un autre posting tourne déjà sur ${clash.length} proxy(s) utilisé(s) ici — mêmes IP en parallèle = risque de ban.`, 'warn')
         toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — mêmes IP en parallèle, risque de ban.', kind: 'warn' })
       }
-      startRun({ id: runId, type: 'mass', label: `Mass posting · ${phoneList.length} compte${phoneList.length > 1 ? 's' : ''}`, proxyKeys, done: 0, total: assignments.length, page: 'posting' })
+      startRun({
+        id: runId, type: 'mass', label: `Mass posting · ${phoneList.length} compte${phoneList.length > 1 ? 's' : ''}`,
+        proxyKeys, done: 0, total: assignments.length, page: 'posting',
+        phones: phoneList.map(p => ({ id: p.id, name: p.phone_name ?? p.id.slice(-6), status: 'idle' as PhaseStatus })),
+      })
     })()
 
     try {

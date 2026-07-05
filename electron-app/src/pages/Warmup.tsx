@@ -13,6 +13,7 @@ import { BankPicker } from '@/pages/Bank'
 import { logActivity } from '@/lib/activityLog'
 import { useT, useLang } from '@/lib/i18n'
 import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
+import { startRun, setRunPhase, finishRun } from '@/lib/activeRuns'
 import { Toggle } from '@/components/ui/Toggle'
 
 interface WarmupProps { user: User }
@@ -204,8 +205,15 @@ export function Warmup({ user }: WarmupProps) {
   useEffect(() => { localStorage.setItem('sf-wu-follow', followSuggested ? '1' : '0') }, [followSuggested])
   useEffect(() => { localStorage.setItem('sf-wu-keyword', warmupKeyword) }, [warmupKeyword])
   const abortRef = useRef<{ abort: boolean }>({ abort: false })
+  const runIdRef = useRef<string | null>(null)
 
   useEffect(() => { return () => { abortRef.current.abort = true } }, [])
+
+  // Fin de run → clôture l'entrée du registre global (statut déduit du détail
+  // par téléphone). Couvre les 3 flux (login / édition / warmup).
+  useEffect(() => {
+    if (!running && runIdRef.current) { finishRun(runIdRef.current); runIdRef.current = null }
+  }, [running])
 
   // ── Load phones ───────────────────────────────────────────────────────────
   async function loadPhones() {
@@ -273,15 +281,29 @@ export function Warmup({ user }: WarmupProps) {
   // ── Job helpers ───────────────────────────────────────────────────────────
   function updateJob(id: string, patch: Partial<PhoneJob>) {
     setJobs(prev => prev.map(j => j.phone.id === id ? { ...j, ...patch } : j))
+    // Miroir vers le registre global (widget flottant + Historique « En cours »).
+    if (patch.status && runIdRef.current) setRunPhase(runIdRef.current, id, patch.status)
   }
   function addLog(id: string, msg: string) {
     setJobs(prev => prev.map(j => j.phone.id === id ? { ...j, logs: [...j.logs, msg] } : j))
   }
 
-  function initJobs(phoneList: GeelarkPhone[]) {
+  function initJobs(phoneList: GeelarkPhone[], runLabel: string) {
     setJobs(phoneList.map(phone => ({ phone, status: 'idle', logs: [] })))
     setRunning(true)
     abortRef.current = { abort: false }
+    // Enregistre le run dans le registre global : progression visible partout
+    // (widget flottant + Historique), avec le détail par téléphone au clic.
+    const runId = `warmup-${Date.now()}`
+    runIdRef.current = runId
+    const proxyKeys = phoneList
+      .map(p => (p.proxy?.server ? `${p.proxy.server}:${p.proxy.port ?? ''}` : ''))
+      .filter(Boolean)
+    startRun({
+      id: runId, type: 'warmup', label: runLabel, proxyKeys,
+      done: 0, total: phoneList.length, page: 'warmup',
+      phones: phoneList.map(p => ({ id: p.id, name: phoneName(p), status: 'idle' })),
+    })
   }
 
   // ── Launch LOG IN ─────────────────────────────────────────────────────────
@@ -293,7 +315,7 @@ export function Warmup({ user }: WarmupProps) {
       action: 'login_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets)
+    initJobs(targets, `Login · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
 
     await pLimit(targets, MAX_CONCURRENCY, async phone => {
       if (abortRef.current.abort) {
@@ -329,7 +351,7 @@ export function Warmup({ user }: WarmupProps) {
       action: 'mass_edit_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets)
+    initJobs(targets, `Édition profil · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
 
     const config = {
       profileName:   editName.trim()    || undefined,
@@ -393,7 +415,7 @@ export function Warmup({ user }: WarmupProps) {
       action: 'warmup_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets)
+    initJobs(targets, `Warmup · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
 
     // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
     const rotationUrls = rotProxy ? activeRotationUrls() : []
