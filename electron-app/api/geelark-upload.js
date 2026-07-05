@@ -67,9 +67,12 @@ module.exports = async (req, res) => {
     }
 
     const { storagePath, bucket = 'content', bearer, signedUrl, fileType: fileTypeArg } = req.body ?? {}
-    // fileType explicite (fourni par l'appelant) sinon dérivé de l'URL source.
-    const fileType = (fileTypeArg || guessFileType(signedUrl || storagePath) || 'mp4').toLowerCase()
-    const isImage = IMAGE_EXTS.includes(fileType)
+    // Extension réelle (photo vs vidéo). Pour une VIDÉO on force 'mp4' : les
+    // templates RPA (Insta/TikTok/Threads) exigent du mp4 — une resourceUrl .mov
+    // /.webm casse le posting. Une PHOTO garde son extension (threadsImage la veut).
+    const realExt = (fileTypeArg || guessFileType(signedUrl || storagePath) || 'mp4').toLowerCase()
+    const isImage = IMAGE_EXTS.includes(realExt)
+    const fileType = isImage ? realExt : 'mp4'
     console.log(`${SV} body keys: ${Object.keys(req.body ?? {}).join(',')} | signedUrl=${!!signedUrl} | storagePath=${!!storagePath}`)
 
     if ((!storagePath && !signedUrl) || !bearer) {
@@ -118,7 +121,7 @@ module.exports = async (req, res) => {
 
     const putCT = isImage
       ? (fileType === 'jpg' ? 'image/jpeg' : `image/${fileType}`)
-      : (fileType === 'mov' ? 'video/quicktime' : `video/${fileType}`)
+      : 'video/mp4'
     let putRes = await fetchRetry('SV-D:put', uploadUrl, { method: 'PUT', body: bytes }, { tries: 3, timeoutMs: 45000 })
     if (!putRes.ok) {
       putRes = await fetchRetry('SV-D:put2', uploadUrl, { method: 'PUT', headers: { 'Content-Type': putCT }, body: bytes }, { tries: 2, timeoutMs: 45000 })
