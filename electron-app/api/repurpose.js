@@ -14,6 +14,17 @@ const os = require('os')
 
 const execFileAsync = promisify(execFile)
 
+// Détecte si le fichier a au moins une piste audio (ffmpeg -i sort les streams
+// sur stderr et quitte en erreur quand aucune sortie n'est spécifiée).
+async function hasAudioStream(file) {
+  try {
+    await execFileAsync(ffmpegPath, ['-hide_banner', '-i', file], { maxBuffer: 20 * 1024 * 1024 })
+    return false
+  } catch (e) {
+    return /Stream #\d+:\d+.*:\s*Audio:/i.test(String(e.stderr || e.message || ''))
+  }
+}
+
 // ── Spoofing presets / cities ──────────────────────────────────────────────────
 const PRESETS = {
   iphone17pro:  { make: 'Apple', model: 'iPhone 17 Pro',  software: 'iOS 26.2', encoder: 'com.apple.quicktime', lens: 'iPhone 17 Pro back triple camera 6.9mm f/1.78' },
@@ -173,7 +184,13 @@ async function handleSpoof(req, res) {
     const bframes     = [0, 1, 2][Math.floor(Math.random() * 3)]
     const encoderNoise = (Math.random() * 0.002).toFixed(4)          // imperceptible
 
-    const ffArgs = ['-nostdin', '-threads', '0', '-i', inputPath]
+    // Détecte l'audio AVANT de construire la commande (spoof audio uniquement si son).
+    const audioPresent = await hasAudioStream(inputPath)
+
+    // -map_metadata -1 / -map_chapters -1 : EFFACE toutes les métadonnées d'origine
+    // (on réinjecte ensuite un jeu neuf et unique). Sans ça, les tags non écrasés
+    // survivraient → « toutes les métadonnées changées » comme demandé.
+    const ffArgs = ['-nostdin', '-threads', '0', '-i', inputPath, '-map_metadata', '-1', '-map_chapters', '-1']
 
     // Container-level (moov-level) metadata
     ffArgs.push(
@@ -252,8 +269,27 @@ async function handleSpoof(req, res) {
     // Force even dimensions — libx264 + yuv420p reject odd width/height
     filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
 
-    // Audio : atempo accordé à la micro-vitesse pour garder le son synchro.
-    if (spd !== 1) ffArgs.push('-af', `atempo=${spd.toFixed(4)}`)
+    // ── SPOOF AUDIO — casse l'empreinte audio (fingerprint type Shazam de Meta),
+    // le point le plus important pour ne pas être matché. Toujours appliqué s'il y
+    // a du son (pas seulement quand la vitesse change) :
+    //   • décalage de PITCH (asetrate) ±1–3 % → change la signature fréquentielle,
+    //   • atempo pour garder la DURÉE synchro avec la vidéo (compense le pitch + speed),
+    //   • EQ légère sur une fréquence aléatoire → altère encore l'empreinte.
+    // L'ensemble reste quasi inaudible mais rend l'empreinte audio différente.
+    if (audioPresent) {
+      const asign  = () => (Math.random() > 0.5 ? 1 : -1)
+      const pitchR = 1 + asign() * (0.012 + Math.random() * 0.02)      // ±1.2–3.2 %
+      const tempo  = clamp(spd / pitchR, 0.5, 2)                        // durée ≈ vidéo (speed), pitch conservé
+      const eqFreq = Math.floor(1500 + Math.random() * 4500)           // 1.5–6 kHz
+      const eqGain = (asign() * (0.8 + Math.random() * 1.6)).toFixed(2) // ±0.8–2.4 dB
+      const af = [
+        `asetrate=44100*${pitchR.toFixed(5)}`,
+        'aresample=44100',
+        `atempo=${tempo.toFixed(5)}`,
+        `equalizer=f=${eqFreq}:width_type=q:w=1.6:g=${eqGain}`,
+      ].join(',')
+      ffArgs.push('-af', af)
+    }
 
     ffArgs.push(
       '-vf', filters.join(','),
