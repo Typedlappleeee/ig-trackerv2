@@ -175,6 +175,19 @@ async function handleSpoof(req, res) {
       gamma = 1, hue = 0, sharpen = 0, panX = 0, panY = 0, speed = 1,
     } = adjustments
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+    const asign = () => (Math.random() > 0.5 ? 1 : -1)
+
+    // ── Plancher de spoof VISUEL — garantit un vrai décalage d'empreinte
+    // (perceptual hash) à CHAQUE export, même en mode manuel avec les réglages à 0.
+    // Le zoom/recadrage est le levier le plus efficace pour changer le pHash ; on
+    // ajoute une petite dérive couleur. Reste discret à l'œil (pas de flip/texte).
+    const effZoom   = zoomPct >= 3 ? zoomPct : 3 + Math.random() * 3          // ≥ 3–6 %
+    const effPanX   = panX || asign() * (10 + Math.random() * 20)            // décale le crop
+    const effPanY   = panY || asign() * (10 + Math.random() * 20)
+    const effHue    = hue || asign() * (4 + Math.random() * 5)               // ±4–9°
+    const effBright = brightness || asign() * (3 + Math.random() * 4)        // ±3–7 → eq ±0.03–0.07
+    const effSat    = saturation || asign() * (6 + Math.random() * 8)        // ±6–14 %
+    const effCon    = contrast || asign() * (3 + Math.random() * 4)          // ±3–7 %
 
     // Per-export encoding variation — every file has a different CRF, audio bitrate,
     // GOP size, and a tiny sub-pixel noise so the compressed bitstream differs.
@@ -224,14 +237,14 @@ async function handleSpoof(req, res) {
     // pas d'overlay/drawtext) — uniquement des micro-variations imperceptibles.
     const filters = []
     const eqParts = []
-    if (brightness !== 0) eqParts.push(`brightness=${(brightness / 100).toFixed(3)}`)
-    if (saturation !== 0) eqParts.push(`saturation=${((saturation + 50) / 50).toFixed(3)}`)
-    if (contrast !== 0) eqParts.push(`contrast=${(1.0 + contrast / 100).toFixed(3)}`)
+    eqParts.push(`brightness=${(effBright / 100).toFixed(3)}`)
+    eqParts.push(`saturation=${((effSat + 50) / 50).toFixed(3)}`)
+    eqParts.push(`contrast=${(1.0 + effCon / 100).toFixed(3)}`)
     if (gamma && gamma !== 1) eqParts.push(`gamma=${clamp(gamma, 0.5, 1.5).toFixed(3)}`)
-    if (eqParts.length > 0) filters.push(`eq=${eqParts.join(':')}`)
+    filters.push(`eq=${eqParts.join(':')}`)
 
-    // Teinte (hue) — micro décalage colorimétrique, invisible mais binairement unique
-    if (hue && hue !== 0) filters.push(`hue=h=${clamp(hue, -20, 20)}`)
+    // Teinte (hue) — décalage colorimétrique (toujours appliqué → change le pHash)
+    filters.push(`hue=h=${clamp(effHue, -20, 20).toFixed(2)}`)
 
     if (noise > 0) {
       const strength = Math.round((noise / 100) * 50)
@@ -246,13 +259,13 @@ async function handleSpoof(req, res) {
     // Netteté subtile (unsharp) — modifie chaque pixel sans toucher la lisibilité
     if (sharpen && sharpen > 0) filters.push(`unsharp=5:5:${clamp(sharpen, 0, 1.5).toFixed(2)}:5:5:0`)
 
-    if (zoomPct > 0) {
-      const factor = (zoomPct / 100).toFixed(4)
+    if (effZoom > 0) {
+      const factor = (effZoom / 100).toFixed(4)
       // Recadrage avec léger décalage (pan) dans la marge disponible — la position
       // panX/panY est une fraction (0.5 = centré) de la marge de crop, bornée pour
       // rester dans l'image.
-      const fx = clamp(0.5 + panX / 100, 0, 1).toFixed(4)
-      const fy = clamp(0.5 + panY / 100, 0, 1).toFixed(4)
+      const fx = clamp(0.5 + effPanX / 100, 0, 1).toFixed(4)
+      const fy = clamp(0.5 + effPanY / 100, 0, 1).toFixed(4)
       filters.push(
         `crop=in_w*(1-${factor}):in_h*(1-${factor}):in_w*${factor}*${fx}:in_h*${factor}*${fy},` +
         `scale=in_w/(1-${factor}):in_h/(1-${factor})`,
@@ -277,7 +290,6 @@ async function handleSpoof(req, res) {
     //   • EQ légère sur une fréquence aléatoire → altère encore l'empreinte.
     // L'ensemble reste quasi inaudible mais rend l'empreinte audio différente.
     if (audioPresent) {
-      const asign  = () => (Math.random() > 0.5 ? 1 : -1)
       const pitchR = 1 + asign() * (0.012 + Math.random() * 0.02)      // ±1.2–3.2 %
       const tempo  = clamp(spd / pitchR, 0.5, 2)                        // durée ≈ vidéo (speed), pitch conservé
       const eqFreq = Math.floor(1500 + Math.random() * 4500)           // 1.5–6 kHz
