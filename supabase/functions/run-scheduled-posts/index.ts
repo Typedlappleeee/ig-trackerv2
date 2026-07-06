@@ -132,6 +132,155 @@ async function rotateAllProxies(urls: string[], log: (m: string) => void): Promi
   await sleep(4000)
 }
 
+// Auto-remove pool de la tâche parente (usage unique) + reprogrammation récurrente.
+// Réutilisé par le flow proxy rotatif (parité avec le flow groupé).
+// deno-lint-ignore no-explicit-any
+async function finalizeTaskPoolAndRecur(db: any, post: any, usedVideoIndices: Set<number>, log: (m: string) => void): Promise<void> {
+  if (post.task_id) {
+    try {
+      const { data: parentTask } = await db.from('recurring_tasks')
+        .select('videos, auto_remove_videos, status').eq('id', post.task_id).maybeSingle()
+      if (parentTask?.auto_remove_videos) {
+        const pool = (parentTask.videos ?? []) as VideoRec[]
+        const remaining = pool.filter((_v: VideoRec, idx: number) => !usedVideoIndices.has(idx))
+        if (remaining.length === 0) {
+          await db.from('recurring_tasks').update({ videos: [], status: 'paused' }).eq('id', post.task_id)
+          log('⏸ Pool de vidéos vide — tâche mise en pause.')
+          await notifyOwner(db, { userId: post.user_id, orgId: post.org_id }, 'task_paused',
+            '⏸️ Tâche automatique en pause',
+            `La tâche a été mise en pause : toutes les vidéos de la pool ont été utilisées (usage unique). Ajoute de nouvelles vidéos puis réactive-la.`)
+        } else {
+          await db.from('recurring_tasks').update({ videos: remaining }).eq('id', post.task_id)
+          log(`🗑 ${pool.length - remaining.length} vidéo(s) retirée(s) de la pool (${remaining.length} restante(s)).`)
+        }
+      }
+    } catch (_e) { /* best-effort */ }
+  }
+  const recurHours: number | null = post.recur_hours ?? null
+  if (recurHours && recurHours > 0) {
+    const nextAt = new Date(Date.now() + recurHours * 60 * 60 * 1000).toISOString()
+    await db.from('scheduled_posts').insert({
+      user_id: post.user_id, org_id: post.org_id, created_by_name: post.created_by_name,
+      type: post.type, status: 'pending', scheduled_at: nextAt,
+      phones: post.phones, videos: post.videos, caption: post.caption,
+      delay_minutes: post.delay_minutes, mode: post.mode, bearer_token: '',
+      reels_trial: post.reels_trial, recur_hours: recurHours, rotating_proxy: post.rotating_proxy,
+    })
+    log(`🔄 Prochain post récurrent programmé dans ${recurHours}h`)
+  }
+}
+
+// ── Reels programmés en PROXY ROTATIF — série stricte, 1 téléphone à la fois ──
+// Pour CHAQUE téléphone : 🔄 rote l'IP → 📱 allume → 📤 poste → ⏳ attend la fin
+// de publication → ⏹ éteint → passe au suivant. Un seul téléphone est allumé à
+// la fois (les autres restent éteints), donc jamais deux comptes sur la même IP.
+// Le cycle complet d'un tél (~2-3 min) dépasse une invocation serverless : on
+// traite donc UN téléphone par invocation, on enregistre la progression dans
+// result.reels_progress, on remet le post en « pending », et le prochain tick du
+// cron reprend au téléphone suivant. Progression → done quand tous sont traités.
+// deno-lint-ignore no-explicit-any
+async function runRotatingReels(
+  db: any, post: any, bearer: string, phones: PhoneRec[], videos: VideoRec[], fnStart: number,
+): Promise<string> {
+  const existing = (typeof post.result === 'string' ? JSON.parse(post.result) : post.result) as Record<string, any> | null
+  const progress = (existing?.reels_progress ?? {}) as { done?: string[]; used?: number[]; logs?: string[] }
+  const doneSet = new Set<string>(progress.done ?? [])
+  const usedIdx = new Set<number>(progress.used ?? [])
+  const logs: string[] = progress.logs ?? []
+  const log = (m: string) => logs.push(m)
+
+  const rotationUrls = await loadRotationUrls(db, post.org_id, post.user_id)
+  const mode: string = post.mode ?? 'seq'
+  const tokenCache = new Map<number, string>()
+  const tokenFor = async (idx: number): Promise<string> => {
+    if (!tokenCache.has(idx)) tokenCache.set(idx, await resolveVideoToken(db, bearer, videos[idx]))
+    return tokenCache.get(idx)!
+  }
+
+  let processed = 0
+  for (let i = 0; i < phones.length; i++) {
+    const phone = phones[i]
+    if (doneSet.has(phone.geelark_id)) continue
+    if (processed >= 1) break                                    // 1 téléphone par invocation
+    if (Date.now() - fnStart > FN_BUDGET_MS - 130_000) break     // plus assez de budget pour un cycle complet
+
+    const name = phone.ig_username ?? phone.phone_name
+    const videoIdx = mode === 'random' ? Math.floor(Math.random() * videos.length) : i % videos.length
+    usedIdx.add(videoIdx)
+
+    // Watchdog : si l'invocation meurt avant le finally, le tél est éteint après 8 min.
+    await db.from('phone_power_watch').upsert(
+      [{ geelark_id: phone.geelark_id, org_id: post.org_id, user_id: post.user_id, reason: 'server_post_rot', stop_at: new Date(Date.now() + 8 * 60_000).toISOString() }],
+      { onConflict: 'geelark_id' },
+    ).then(() => {}, () => {})
+
+    try {
+      // 1) Rotation d'IP (les autres téléphones sont éteints → sans impact)
+      if (rotationUrls.length) { log(`🔄 ${name} : rotation IP…`); await rotateAllProxies(rotationUrls, m => log(`  ${m}`)) }
+      else log(`⚠ ${name} : aucune URL de rotation configurée — publication sans rotation`)
+
+      // 2) Démarre le téléphone (il boote sur l'IP fraîche)
+      log(`▶ ${name} : démarrage…`)
+      const sr = await gPost(bearer, '/phone/start', { ids: [phone.geelark_id] })
+      if (sr.code !== 0) log(`⚠ ${name} : démarrage code=${sr.code} msg=${sr.msg ?? '?'}`)
+      await sleep(30_000)
+
+      // 3) Poste le reel
+      const token = await tokenFor(videoIdx)
+      const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
+        id:          phone.geelark_id,
+        scheduleAt:  Math.floor(Date.now() / 1000),
+        description: (videos[videoIdx]?.desc?.trim() || post.caption),
+        video:       [token],
+        ...(post.reels_trial ? { shareType: 2 } : {}),
+      })
+      const taskId = res.data?.id ?? res.data?.taskId ?? null
+      if (res.code !== 0 || !taskId) {
+        log(`❌ ${name} : publication refusée code=${res.code} msg=${res.msg ?? '?'}`)
+      } else {
+        // 4) Attend la fin de publication (poll) dans le budget de l'invocation
+        log(`⏳ ${name} : publication en cours…`)
+        let posted = false
+        while (Date.now() - fnStart < FN_BUDGET_MS - 20_000) {
+          await sleep(15_000)
+          const q = await gPost(bearer, '/task/query', { ids: [taskId] })
+          const d = (q.data ?? q) as any
+          const items: any[] = d.items ?? d.list ?? d.tasks ?? d.records ?? []
+          const st = Number(items[0]?.status)
+          if (st === 3) { posted = true; log(`✅ ${name} : publié`); break }
+          if (st === 4) { log(`❌ ${name} : échec publication${items[0]?.failDesc ? ` (${items[0].failDesc})` : ''}`); break }
+          if ([7, 8].includes(st)) { log(`🚫 ${name} : annulé`); break }
+        }
+        // 4bis) Marge d'upload avant l'arrêt (IG continue d'envoyer en arrière-plan)
+        if (posted) { log(`⏳ ${name} : marge d'upload (30 s)…`); await sleep(30_000) }
+      }
+    } catch (e) {
+      log(`❌ ${name} : ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      // 5) Éteint le téléphone AVANT de passer au suivant (rotation propre)
+      log(`⏹ ${name} : arrêt du téléphone`)
+      await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] }).catch(() => {})
+      await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+    }
+    doneSet.add(phone.geelark_id)
+    processed++
+  }
+
+  const allDone = phones.every(p => doneSet.has(p.geelark_id))
+  const reels_progress = { done: [...doneSet], used: [...usedIdx], logs }
+  if (!allDone) {
+    // Reprise au prochain tick — remet en pending, garde la progression.
+    await db.from('scheduled_posts').update({ status: 'pending', result: { logs, reels_progress } }).eq('id', post.id)
+    return `in progress (${doneSet.size}/${phones.length}, +${processed} ce tick)`
+  }
+  // Tous les téléphones traités → done + usage unique + pool/récurrence.
+  await db.from('scheduled_posts').update({ status: 'done', error_msg: null, result: { logs, reels_progress } }).eq('id', post.id)
+  const removed = await removeUsedBankVideos(db, post.org_id, post.user_id, videos)
+  if (removed) log(`🗑️ ${removed} vidéo(s) retirée(s) de la banque (usage unique).`)
+  await finalizeTaskPoolAndRecur(db, post, usedIdx, log)
+  return `done (${doneSet.size}/${phones.length})`
+}
+
 // Upload a file URL to GeeLark and return the GeeLark resourceUrl token.
 // Used when a task video is stored as a Supabase signed URL instead of a pre-uploaded GeeLark token.
 async function uploadUrlToGeelark(bearer: string, fileUrl: string): Promise<string | null> {
@@ -847,10 +996,17 @@ Deno.serve(async (req) => {
       const delayMin: number = post.delay_minutes ?? 0
       log(`🗓 Exécution serveur — ${post.platform ?? 'instagram'} · ${phones.length} compte(s) · ${videos.length} vidéo(s)${delayMin ? ` · ${delayMin} min d'écart` : ''}.`)
 
-      // 4bis. Proxy rotatif : rote l'IP AVANT de démarrer les téléphones (ils
-      // bootent sur l'IP fraîche, ne touchent jamais l'ancienne). Chaque dongle a
-      // sa propre Change-IP URL → chaque compte part sur une IP distincte.
-      if (post.rotating_proxy) {
+      // Proxy rotatif (reels Instagram) : flow SÉRIE strict, 1 téléphone à la
+      // fois (rota IP → allume → poste → attend → éteint → suivant), repris sur
+      // plusieurs invocations. On sort du flow groupé ci-dessous.
+      if (post.rotating_proxy && post.platform !== 'tiktok') {
+        summary[post.id] = await runRotatingReels(db, post, bearer, phones, videos, fnStart)
+        continue
+      }
+
+      // 4bis. Proxy rotatif TikTok (batch) : rote l'IP une fois avant de démarrer
+      // les téléphones (chaque dongle a sa propre Change-IP URL → IP par compte).
+      if (post.rotating_proxy && post.platform === 'tiktok') {
         const rotationUrls = await loadRotationUrls(db, post.org_id, post.user_id)
         if (rotationUrls.length) {
           log(`🔄 Proxy rotatif : rotation de ${rotationUrls.length} IP(s) avant démarrage…`)
@@ -1072,6 +1228,7 @@ Deno.serve(async (req) => {
           bearer_token:    '',
           reels_trial:     post.reels_trial,
           recur_hours:     recurHours,
+          rotating_proxy:  post.rotating_proxy,
         })
         log(`🔄 Prochain post récurrent programmé dans ${recurHours}h`)
       }

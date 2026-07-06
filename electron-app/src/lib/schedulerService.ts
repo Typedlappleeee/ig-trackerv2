@@ -429,12 +429,21 @@ async function executeScheduledPostInner(
     : []
 
   // Supabase Realtime can deliver jsonb columns as strings — parse defensively
-  const phones = (typeof post.phones === 'string'
+  const allPhones = (typeof post.phones === 'string'
     ? JSON.parse(post.phones as unknown as string)
     : post.phones) as ScheduledPhoneRecord[]
   const videos = (typeof post.videos === 'string'
     ? JSON.parse(post.videos as unknown as string)
     : post.videos) as ScheduledVideoRecord[]
+
+  // Reprise : si le serveur (proxy rotatif) a déjà traité des téléphones et remis
+  // le post en pending, on saute ceux-là pour ne pas re-poster (anti-doublon).
+  const doneFromServer = new Set<string>(((post.result as any)?.reels_progress?.done as string[] | undefined) ?? [])
+  const phones = doneFromServer.size ? allPhones.filter(p => !doneFromServer.has(p.geelark_id)) : allPhones
+  if (phones.length === 0) {
+    onLog('✅ Tous les téléphones ont déjà été traités (rien à reprendre).')
+    return true
+  }
 
   const geelarkIds = phones.map(p => p.geelark_id)
   const isTikTok = post.platform === 'tiktok'
