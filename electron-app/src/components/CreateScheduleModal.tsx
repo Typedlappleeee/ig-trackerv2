@@ -306,6 +306,20 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
                 + Depuis la banque
               </button>
             </div>
+            {/* Aide : comportement selon le mode d'attribution */}
+            {videos.length > 0 && (
+              <p style={{ fontSize: 11, color: MUTED, margin: '8px 0 0', lineHeight: 1.5 }}>
+                {mode === 'random'
+                  ? '🎲 Aléatoire : chaque téléphone reçoit une vidéo au hasard parmi la sélection.'
+                  : <>↕️ Séquentiel : vidéo 1 → tél 1, vidéo 2 → tél 2… <strong style={{ color: IVORY }}>Sélectionne uniquement les vidéos voulues, dans l'ordre.</strong></>}
+              </p>
+            )}
+            {mode === 'seq' && phoneList.length > 0 && videos.length > phoneList.length && (
+              <div style={{ marginTop: 8, padding: '10px 12px', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.09)', fontSize: 11.5, color: 'rgba(233,234,240,0.82)', lineHeight: 1.55 }}>
+                ⚠ Tu as sélectionné <strong style={{ color: '#FBBF24' }}>{videos.length}</strong> vidéos pour <strong style={{ color: '#FBBF24' }}>{phoneList.length}</strong> téléphone{phoneList.length > 1 ? 's' : ''}. En <strong>séquentiel</strong>, seules les <strong style={{ color: '#FBBF24' }}>{phoneList.length} premières</strong> seront postées (1 par téléphone) — les {videos.length - phoneList.length} autres sont <strong>ignorées</strong>.
+                <br />L'usage unique ne « garde pas le reste pour la prochaine fois » sur une programmation ponctuelle : ça, c'est les <strong style={{ color: '#fff' }}>Tâches automatiques</strong>.
+              </div>
+            )}
           </section>
 
           {/* ── Légende ────────────────────────────────────────────────────── */}
