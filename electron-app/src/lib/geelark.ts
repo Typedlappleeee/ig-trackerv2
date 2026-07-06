@@ -201,6 +201,15 @@ export async function stopPhones(bearer: string, phoneIds: string[]): Promise<nu
   return Number.isFinite(success) ? success : phoneIds.length
 }
 
+// Démarre plusieurs téléphones en un appel. Renvoie le nombre démarré selon GéeLark.
+export async function startPhones(bearer: string, phoneIds: string[]): Promise<number> {
+  if (phoneIds.length === 0) return 0
+  const res = await geelarkFetch('POST', '/phone/start', { ids: phoneIds }, bearer)
+  const data = (res?.data ?? res) as Record<string, unknown>
+  const success = Number(data?.successAmount ?? phoneIds.length)
+  return Number.isFinite(success) ? success : phoneIds.length
+}
+
 // Lightweight: fetch only the status of all phones (same endpoint, minimal processing)
 export async function fetchPhoneStatuses(bearer: string): Promise<Map<string, string>> {
   const phones = await fetchAllPhones(bearer)
@@ -240,7 +249,7 @@ function sleepOrAbort(ms: number, signal?: AbortSignal): Promise<void> {
 // ── Direct phone shell (Android adb-style commands) ─────────────────────────
 // Retries up to maxRetries times when GéeLark reports the phone shell isn't ready.
 // Pass maxRetries:2 for quick one-shot operations (e.g. extraction).
-async function shellExec(
+export async function shellExec(
   bearer: string,
   phoneId: string,
   cmd: string,

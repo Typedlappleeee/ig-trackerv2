@@ -12,11 +12,14 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { syncGeelarkAnalytics } from '@/lib/geelarkAnalytics'
 
-interface TrackingConfig { enabled: boolean; sync_time: string; force_run?: string }
+// Groupes stockés DANS la config (jsonb tracking_config) → aucune migration.
+interface AccountGroups { groups: string[]; assignments: Record<string, string> }
+interface TrackingConfig { enabled: boolean; sync_time: string; force_run?: string; account_groups?: AccountGroups }
 
-// Un compte = un téléphone avec un ig_username, enrichi des données du jour.
+// Un compte = un téléphone (1 tél = 1 compte IG). ig_username peut être vide
+// (compte pas encore renseigné → on propose de l'ajouter).
 interface Account {
-  id: string; ig_username: string; phone_name: string | null
+  id: string; ig_username: string | null; phone_name: string | null
   account_group: string | null
   followers: number | null; pp_url: string | null
   account_state: string | null   // 'ok' | 'banned' | 'shadow'
@@ -70,12 +73,8 @@ export function Reports({ user }: { user: User }) {
   const [loading, setLoading] = useState(true)
   const [trend, setTrend]     = useState<TrendPoint[]>([])
 
-  // Groupes : dérivés des comptes + groupes créés vides (persistés en localStorage).
-  const groupsKey = `sf-acct-groups-${keyVal}`
-  const [sessionGroups, setSessionGroups] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(groupsKey) || '[]') } catch { return [] }
-  })
-  useEffect(() => { try { localStorage.setItem(groupsKey, JSON.stringify(sessionGroups)) } catch { /* quota */ } }, [sessionGroups, groupsKey])
+  // Groupes stockés dans la config serveur (jsonb) → persistant, aucune migration.
+  const [ag, setAg] = useState<AccountGroups>({ groups: [], assignments: {} })
   const [activeGroup, setActiveGroup] = useState<string>('__all__')
   const [search, setSearch] = useState('')
   const [newGroupOpen, setNewGroupOpen] = useState(false)
@@ -105,10 +104,10 @@ export function Reports({ user }: { user: User }) {
   const load = useCallback(async () => {
     setLoading(true)
     const cfgQ = supabase.from(table).select('tracking_config').eq(keyCol, keyVal).maybeSingle()
-    // Base : TOUS les comptes = phones avec un ig_username.
+    // Base : TOUS les téléphones (1 tél = 1 compte ; ig_username éventuellement vide).
     let pQ = supabase.from('phones')
-      .select('id, ig_username, phone_name, account_group, followers, pp_url, account_state, last_post_at')
-      .not('ig_username', 'is', null)
+      .select('id, ig_username, phone_name, followers, pp_url, account_state, last_post_at')
+      .order('phone_name')
     pQ = currentOrg ? pQ.eq('org_id', currentOrg.id) : pQ.eq('user_id', user.id).is('org_id', null)
     // Données du jour (posté / vues) mergées par phone_id.
     let dQ = supabase.from('account_daily').select('*').eq('day', day)
@@ -119,14 +118,17 @@ export function Reports({ user }: { user: User }) {
     tQ = currentOrg ? tQ.eq('org_id', currentOrg.id) : tQ.eq('user_id', user.id).is('org_id', null)
 
     const [{ data: cfgData }, { data: pData }, { data: dData }, { data: tData }] = await Promise.all([cfgQ, pQ, dQ, tQ])
-    setCfg({ ...DEFAULT_CFG, ...((cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>) })
+    const tc = (cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>
+    setCfg({ ...DEFAULT_CFG, ...tc })
+    const groups = tc.account_groups ?? { groups: [], assignments: {} }
+    setAg({ groups: Array.isArray(groups.groups) ? groups.groups : [], assignments: groups.assignments ?? {} })
 
     const dMap = new Map<string, any>((dData ?? []).map((r: any) => [r.phone_id, r]))
     const list: Account[] = ((pData ?? []) as any[]).map(p => {
       const d = dMap.get(p.id)
       return {
-        id: p.id, ig_username: p.ig_username, phone_name: p.phone_name ?? null,
-        account_group: p.account_group ?? null,
+        id: p.id, ig_username: p.ig_username ?? null, phone_name: p.phone_name ?? null,
+        account_group: groups.assignments?.[p.id] ?? null,
         followers: p.followers ?? null, pp_url: p.pp_url ?? null,
         account_state: p.account_state ?? null, last_post_at: p.last_post_at ?? null,
         posted: !!d?.posted, posted_at: d?.posted_at ?? null, posts_today: d?.posts_today ?? null,
@@ -134,7 +136,11 @@ export function Reports({ user }: { user: User }) {
         synced_at: d?.synced_at ?? null,
       }
     })
-    list.sort((a, b) => (b.followers ?? 0) - (a.followers ?? 0) || a.ig_username.localeCompare(b.ig_username))
+    // Comptes renseignés d'abord (par followers), puis les tels sans @pseudo.
+    list.sort((a, b) => {
+      if (!!a.ig_username !== !!b.ig_username) return a.ig_username ? -1 : 1
+      return (b.followers ?? 0) - (a.followers ?? 0) || (a.ig_username ?? a.phone_name ?? '').localeCompare(b.ig_username ?? b.phone_name ?? '')
+    })
     setAccounts(list)
 
     const byDay = new Map<string, number>()
@@ -150,9 +156,9 @@ export function Reports({ user }: { user: User }) {
 
   useEffect(() => { load() }, [load])
 
-  // ── Groupes ────────────────────────────────────────────────────────────────
+  // ── Groupes (persistés dans tracking_config.account_groups) ──────────────────
   const groupNames = (() => {
-    const set = new Set<string>(sessionGroups)
+    const set = new Set<string>(ag.groups)
     for (const a of accounts) if (a.account_group) set.add(a.account_group)
     return [...set].sort((x, y) => x.localeCompare(y))
   })()
@@ -160,16 +166,34 @@ export function Reports({ user }: { user: User }) {
     ? accounts.filter(a => !a.account_group).length
     : accounts.filter(a => a.account_group === g).length
 
+  // Écrit account_groups dans la config (merge dans tracking_config existant).
+  async function persistGroups(next: AccountGroups) {
+    setAg(next)
+    const nextCfg = { ...cfg, account_groups: next }
+    setCfg(nextCfg)
+    const { error } = await supabase.from(table).upsert({ [keyCol]: keyVal, tracking_config: nextCfg }, { onConflict: keyCol })
+    if (error) { console.error('[Reports] persistGroups', error); load() }
+  }
   async function assignGroup(acc: Account, group: string | null) {
     setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, account_group: group } : a))
-    const { error } = await supabase.from('phones').update({ account_group: group }).eq('id', acc.id)
-    if (error) { console.error('[Reports] assignGroup', error); load() }
+    const assignments = { ...ag.assignments }
+    if (group) assignments[acc.id] = group; else delete assignments[acc.id]
+    const groups = group && !ag.groups.includes(group) ? [...ag.groups, group] : ag.groups
+    await persistGroups({ groups, assignments })
   }
   function createGroup() {
     const name = newGroupName.trim()
     if (!name) return
-    if (!sessionGroups.includes(name) && !groupNames.includes(name)) setSessionGroups(g => [...g, name])
+    if (!ag.groups.includes(name)) persistGroups({ ...ag, groups: [...ag.groups, name] })
     setActiveGroup(name); setNewGroupName(''); setNewGroupOpen(false)
+  }
+  // Ajoute / modifie le compte IG d'un téléphone (1 tél = 1 compte).
+  async function setUsername(acc: Account, raw: string) {
+    const clean = raw.trim().replace(/^@+/, '').toLowerCase() || null
+    if (clean === (acc.ig_username ?? null)) return
+    setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ig_username: clean } : a))
+    const { error } = await supabase.from('phones').update({ ig_username: clean }).eq('id', acc.id)
+    if (error) { console.error('[Reports] setUsername', error); load() }
   }
 
   // ── Sync ───────────────────────────────────────────────────────────────────
@@ -202,12 +226,17 @@ export function Reports({ user }: { user: User }) {
     if (activeGroup === '__all__') { /* tous */ }
     else if (activeGroup === NO_GROUP) { if (a.account_group) return false }
     else if (a.account_group !== activeGroup) return false
-    if (search.trim()) return a.ig_username.toLowerCase().includes(search.trim().toLowerCase())
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      return (a.ig_username ?? '').toLowerCase().includes(q) || (a.phone_name ?? '').toLowerCase().includes(q)
+    }
     return true
   })
-  const totalFollowers = accounts.reduce((s, a) => s + (a.followers ?? 0), 0)
-  const okCount        = accounts.filter(a => !a.account_state || a.account_state === 'ok').length
-  const postedToday    = accounts.filter(a => a.posted).length
+  const named          = accounts.filter(a => a.ig_username)      // comptes IG renseignés
+  const noIgCount      = accounts.length - named.length
+  const totalFollowers = named.reduce((s, a) => s + (a.followers ?? 0), 0)
+  const okCount        = named.filter(a => !a.account_state || a.account_state === 'ok').length
+  const postedToday    = named.filter(a => a.posted).length
   const lastSync       = accounts.reduce<string | null>((m, a) => (a.synced_at && (!m || a.synced_at > m)) ? a.synced_at : m, null)
   const hasTrend       = trend.some(t => t.views > 0)
 
@@ -273,9 +302,9 @@ export function Reports({ user }: { user: User }) {
         {!loading && accounts.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
             <StatCard icon="👥" label="Abonnés (total)" value={fmt(totalFollowers)} accent="var(--text-1)" />
-            <StatCard icon="📱" label="Comptes" value={String(accounts.length)} sub={`${groupNames.length} groupe${groupNames.length > 1 ? 's' : ''}`} />
-            <StatCard icon="✅" label="Comptes OK" value={`${okCount}/${accounts.length}`} accent={okCount === accounts.length ? 'var(--ok)' : '#fbbf24'} />
-            <StatCard icon="🚀" label="Postés aujourd'hui" value={`${postedToday}/${accounts.length}`} accent="var(--accent-l)" />
+            <StatCard icon="📱" label="Comptes" value={String(named.length)} sub={noIgCount > 0 ? `+${noIgCount} tél. sans compte` : `${groupNames.length} groupe${groupNames.length > 1 ? 's' : ''}`} />
+            <StatCard icon="✅" label="Comptes OK" value={`${okCount}/${named.length || 0}`} accent={named.length && okCount === named.length ? 'var(--ok)' : '#fbbf24'} />
+            <StatCard icon="🚀" label="Postés aujourd'hui" value={`${postedToday}/${named.length || 0}`} accent="var(--accent-l)" />
           </div>
         )}
 
@@ -300,10 +329,10 @@ export function Reports({ user }: { user: User }) {
         ) : accounts.length === 0 ? (
           <div className="sf-card" style={{ padding: '44px 24px', textAlign: 'center', maxWidth: 560, margin: '10px auto' }}>
             <div style={{ fontSize: 34, marginBottom: 10 }}>📱</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucun compte pour l'instant</p>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucun téléphone pour l'instant</p>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
-              Chaque compte correspond à un téléphone GéeLark avec un pseudo Instagram renseigné.
-              Renseigne le pseudo de tes téléphones, puis clique <b>Sync</b> pour récupérer les followers.
+              Synchronise tes cloud phones GéeLark depuis l'onglet <b>Téléphones</b>.
+              Chaque téléphone devient un compte ici : tu lui donnes son <b>@pseudo Instagram</b>, tu le ranges dans un groupe, puis <b>Sync</b> récupère les followers.
             </p>
           </div>
         ) : filtered.length === 0 ? (
@@ -313,7 +342,7 @@ export function Reports({ user }: { user: User }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 960 }}>
             {filtered.map(a => (
-              <AccountRow key={a.id} a={a} groups={groupNames} onOpen={() => openDetail(a)} onAssign={g => assignGroup(a, g)} />
+              <AccountRow key={a.id} a={a} groups={groupNames} onOpen={() => a.ig_username && openDetail(a)} onAssign={g => assignGroup(a, g)} onSetUsername={v => setUsername(a, v)} />
             ))}
           </div>
         )}
@@ -340,28 +369,45 @@ function GroupChip({ label, count, active, onClick, muted }: { label: string; co
 }
 
 // ── Ligne compte ──────────────────────────────────────────────────────────────
-function AccountRow({ a, groups, onOpen, onAssign }: { a: Account; groups: string[]; onOpen: () => void; onAssign: (g: string | null) => void }) {
+function AccountRow({ a, groups, onOpen, onAssign, onSetUsername }: { a: Account; groups: string[]; onOpen: () => void; onAssign: (g: string | null) => void; onSetUsername: (v: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(a.ig_username ?? '')
+  useEffect(() => { setVal(a.ig_username ?? '') }, [a.ig_username])
+  const hasIg = !!a.ig_username
   const state = a.account_state
   const pill = state === 'banned' ? { t: 'BANNI', c: '#f87171', b: 'rgba(239,68,68,0.15)', bd: 'rgba(239,68,68,0.3)' }
     : state === 'shadow' ? { t: 'SHADOW?', c: '#fbbf24', b: 'rgba(251,191,36,0.15)', bd: 'rgba(251,191,36,0.3)' }
     : { t: 'OK', c: 'var(--ok)', b: 'rgba(34,197,94,0.12)', bd: 'rgba(34,197,94,0.25)' }
+  const commit = () => { setEditing(false); onSetUsername(val) }
   return (
-    <div className="sf-card sf-card-lift cursor-pointer" onClick={onOpen} style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 13 }}>
+    <div className={hasIg ? 'sf-card sf-card-lift cursor-pointer' : 'sf-card'} onClick={hasIg && !editing ? onOpen : undefined}
+      style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 13, opacity: hasIg ? 1 : 0.92, borderStyle: hasIg ? 'solid' : 'dashed' }}>
       {/* Avatar */}
       <div style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-        {a.pp_url ? <img src={igimg(a.pp_url)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-3)' }}>{a.ig_username.charAt(0).toUpperCase()}</span>}
+        {a.pp_url ? <img src={igimg(a.pp_url)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-3)' }}>{(a.ig_username ?? a.phone_name ?? '?').charAt(0).toUpperCase()}</span>}
       </div>
       {/* Identité */}
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{a.ig_username}</span>
-          <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: pill.b, color: pill.c, border: `1px solid ${pill.bd}`, flexShrink: 0 }}>{pill.t}</span>
-          {a.account_group && <span className="sf-badge" style={{ fontSize: 9.5 }}>{a.account_group}</span>}
-        </div>
+        {editing ? (
+          <input autoFocus value={val} onClick={e => e.stopPropagation()} onChange={e => setVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setVal(a.ig_username ?? ''); setEditing(false) } }}
+            onBlur={commit} placeholder="pseudo Instagram (sans @)" className="sf-input" style={{ height: 30, fontSize: 13, maxWidth: 240 }} />
+        ) : hasIg ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{a.ig_username}</span>
+            <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: pill.b, color: pill.c, border: `1px solid ${pill.bd}`, flexShrink: 0 }}>{pill.t}</span>
+            {a.account_group && <span className="sf-badge" style={{ fontSize: 9.5 }}>{a.account_group}</span>}
+            <button onClick={e => { e.stopPropagation(); setEditing(true) }} className="cursor-pointer" title="Modifier le pseudo" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, padding: 0 }}>✎</button>
+          </div>
+        ) : (
+          <button onClick={e => { e.stopPropagation(); setEditing(true) }} className="cursor-pointer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px dashed var(--border-md)', background: 'transparent', borderRadius: 8, padding: '4px 10px', color: 'var(--accent-l)', fontSize: 12.5, fontWeight: 600 }}>
+            ＋ Ajouter le compte Instagram
+          </button>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 3, fontSize: 11, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-          <span>👥 {fmt(a.followers)} abonnés</span>
-          <span style={{ color: a.posted ? 'var(--ok)' : 'var(--text-4)' }}>{a.posted ? '● posté aujourd\'hui' : '○ pas posté'}</span>
-          {a.synced_at && <span style={{ color: 'var(--text-4)' }}>· {agoLabel(a.synced_at)}</span>}
+          <span style={{ color: 'var(--text-4)' }}>📱 {a.phone_name ?? a.id.slice(-6)}</span>
+          {hasIg && <><span>👥 {fmt(a.followers)} abonnés</span>
+          <span style={{ color: a.posted ? 'var(--ok)' : 'var(--text-4)' }}>{a.posted ? '● posté' : '○ pas posté'}</span></>}
         </div>
       </div>
       {/* Sélecteur de groupe */}
