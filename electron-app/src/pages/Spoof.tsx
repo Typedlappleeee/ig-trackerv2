@@ -107,10 +107,10 @@ export function Spoof({ user }: { user: User }) {
     hue:        randInt(-6, 6),          // teinte ±6°
     noise:      randInt(4, 12),          // grain/pixels
     sharpen:    randFloat(0, 0.5, 2),    // netteté subtile
-    zoomPct:    randInt(2, 7),           // léger zoom
-    panX:       randInt(-20, 20),        // recadrage horizontal (% de la marge)
-    panY:       randInt(-20, 20),        // recadrage vertical
-    speed:      randFloat(0.97, 1.03),   // micro-vitesse
+    zoomPct:    randInt(13, 18),         // recadrage EFFICACE (casse le perceptual hash)
+    panX:       randInt(-25, 25),        // recadrage horizontal (% de la marge)
+    panY:       randInt(-25, 25),        // recadrage vertical
+    speed:      (Math.random() > 0.5 ? 1 : -1) * randFloat(0.06, 0.075) + 1,  // vitesse ±6–7,5 % (casse le fingerprint audio)
     vignette:   Math.random() < 0.35,
     flipH:      false,                   // JAMAIS — le miroir casse le texte
   })
@@ -478,7 +478,7 @@ export function Spoof({ user }: { user: User }) {
                   </button>
                   {autoMode && (
                     <p style={{ fontSize: 11, color: 'var(--accent-l)', margin: '0 0 2px', lineHeight: 1.5 }}>
-                      Chaque vidéo reçoit ses propres micro-variations (luminosité, gamma, teinte, saturation, contraste, grain/pixels, netteté, zoom, recadrage, micro-vitesse, vignette). Pas de miroir → le texte à l'écran reste intact. Les réglages manuels ci-dessous sont ignorés.
+                      Transformation <strong>réelle</strong> par vidéo pour casser l'empreinte perceptuelle d'Instagram (visuelle + audio) : <strong>recadrage/zoom ~13–17 %</strong> et <strong>vitesse ±6–7 %</strong> (visibles/audibles — c'est ce qui rend la vidéo non-dupliquée), + variations couleur et métadonnées uniques. Note : les changements sont perceptibles, c'est normal — une transformation invisible ne trompe PAS la détection. Pas de miroir → texte à l'écran préservé.
                     </p>
                   )}
 

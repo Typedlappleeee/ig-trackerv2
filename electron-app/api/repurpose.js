@@ -181,7 +181,7 @@ async function handleSpoof(req, res) {
     // (perceptual hash) à CHAQUE export, même en mode manuel avec les réglages à 0.
     // Le zoom/recadrage est le levier le plus efficace pour changer le pHash ; on
     // ajoute une petite dérive couleur. Reste discret à l'œil (pas de flip/texte).
-    const effZoom   = zoomPct >= 3 ? zoomPct : 3 + Math.random() * 3          // ≥ 3–6 %
+    const effZoom   = zoomPct >= 13 ? zoomPct : 13 + Math.random() * 4        // ≥ 13–17 % — recadrage EFFICACE (visible) : ~25–30 % d'aire retirée, seuil pour casser TMK/PDQ
     const effPanX   = panX || asign() * (10 + Math.random() * 20)            // décale le crop
     const effPanY   = panY || asign() * (10 + Math.random() * 20)
     const effHue    = hue || asign() * (4 + Math.random() * 5)               // ±4–9°
@@ -274,33 +274,21 @@ async function handleSpoof(req, res) {
     if (flipH) filters.push('hflip')
     if (vignette) filters.push('vignette=PI/5')
 
-    // Micro-vitesse — change légèrement la durée (signal d'unicité fort) en gardant
-    // l'audio synchro via atempo. Sans toucher au contenu visuel.
-    const spd = clamp(Number(speed) || 1, 0.9, 1.1)
+    // ── VITESSE GLOBALE — le seul levier audio propre qui MARCHE réellement.
+    // Les tests des algos Meta montrent qu'il faut ≥ ~6 % de changement de tempo
+    // pour casser le fingerprint audio (≤ 5 % = toujours matché ; EQ/volume/bruit
+    // = inefficaces). On applique donc un vrai changement de vitesse ±6–7,5 %,
+    // audible/visible mais efficace, sur la vidéo (setpts) ET l'audio (atempo, qui
+    // reste synchro et indépendant du sample-rate).
+    let spd = clamp(Number(speed) || 1, 0.85, 1.15)
+    if (Math.abs(spd - 1) < 0.06) spd = 1 + asign() * (0.06 + Math.random() * 0.015)  // ±6–7,5 %
     if (spd !== 1) filters.push(`setpts=PTS/${spd.toFixed(4)}`)
 
     // Force even dimensions — libx264 + yuv420p reject odd width/height
     filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
 
-    // ── SPOOF AUDIO — casse l'empreinte audio (fingerprint type Shazam de Meta),
-    // le point le plus important pour ne pas être matché. Toujours appliqué s'il y
-    // a du son (pas seulement quand la vitesse change) :
-    //   • décalage de PITCH (asetrate) ±1–3 % → change la signature fréquentielle,
-    //   • atempo pour garder la DURÉE synchro avec la vidéo (compense le pitch + speed),
-    //   • EQ légère sur une fréquence aléatoire → altère encore l'empreinte.
-    // L'ensemble reste quasi inaudible mais rend l'empreinte audio différente.
-    if (audioPresent) {
-      const pitchR = 1 + asign() * (0.012 + Math.random() * 0.02)      // ±1.2–3.2 %
-      const tempo  = clamp(spd / pitchR, 0.5, 2)                        // durée ≈ vidéo (speed), pitch conservé
-      const eqFreq = Math.floor(1500 + Math.random() * 4500)           // 1.5–6 kHz
-      const eqGain = (asign() * (0.8 + Math.random() * 1.6)).toFixed(2) // ±0.8–2.4 dB
-      const af = [
-        `asetrate=44100*${pitchR.toFixed(5)}`,
-        'aresample=44100',
-        `atempo=${tempo.toFixed(5)}`,
-        `equalizer=f=${eqFreq}:width_type=q:w=1.6:g=${eqGain}`,
-      ].join(',')
-      ffArgs.push('-af', af)
+    if (audioPresent && spd !== 1) {
+      ffArgs.push('-af', `atempo=${clamp(spd, 0.5, 2).toFixed(5)}`)
     }
 
     ffArgs.push(
