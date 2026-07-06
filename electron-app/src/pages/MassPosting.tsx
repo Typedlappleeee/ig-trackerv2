@@ -334,7 +334,11 @@ export function MassPosting({ user }: MassPostingProps) {
     const persisted = loadPersistedRun()
     if (!persisted) return
     const age = Date.now() - (persisted.startedAt || 0)
-    if (age > 25 * 60_000) { clearPersistedRun(); return }  // trop vieux → on oublie
+    // Fenêtre de reprise : 24 h. Au-delà, on oublie (token média probablement
+    // périmé, run considéré terminé). La reprise ne repost jamais là où c'est
+    // déjà posté (les tels avec taskId sont exclus) → une reprise tardive est
+    // sans risque : au pire une relance échoue proprement.
+    if (age > 24 * 60 * 60_000) { clearPersistedRun(); return }
     resumedRef.current = true
 
     // Adopte le run du registre global (carte « En cours ») laissé orphelin par
@@ -643,6 +647,9 @@ export function MassPosting({ user }: MassPostingProps) {
         setPhoneStatus(phoneId, { status: 'cancelled' })
       }
     }
+    // Clôture IMMÉDIATE du suivi global → pas de fausse alerte « même proxy »
+    // sur un posting relancé juste après l'annulation.
+    if (activeRunIdRef.current) { endRun(activeRunIdRef.current); activeRunIdRef.current = null }
     log('Arrêté.', 'warn')
   }
 

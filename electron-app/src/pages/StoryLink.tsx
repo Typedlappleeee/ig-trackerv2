@@ -348,6 +348,10 @@ export default function StoryLink({ user }: { user: User }) {
   const [schedDone, setSchedDone]           = useState('')
   const [schedErr, setSchedErr]             = useState('')
   const abortRef = useRef(false)
+  // Run courant dans le registre global — pour le clôturer IMMÉDIATEMENT à
+  // l'annulation (sinon il reste « running » et déclenche une fausse alerte
+  // « même proxy » au posting suivant).
+  const runIdRef = useRef<string | null>(null)
 
   useEffect(() => () => { abortRef.current = true }, [])
 
@@ -564,15 +568,18 @@ export default function StoryLink({ user }: { user: User }) {
     // Rotation d'IP UNIQUEMENT si "Proxy rotatif" est coché ET URLs configurées.
     const rotationUrls = rotProxy ? activeRotationUrls() : []
     // Proxy rotatif : autant de téléphones en parallèle qu'il y a de proxies (1 IP
-    // fraîche par proxy). 1 proxy = série. Sinon, concurrence normale.
+    // fraîche par proxy). 1 proxy = série. Sinon : concurrence = réglage utilisateur,
+    // ou par défaut PLAFONNÉE à 5 — poster TOUS les téléphones d'un coup sature la
+    // limite GeeLark (200 req/min, ~40 appels ADB/story) → moitié des stories ratées.
     const CONCURRENCY = rotProxy
       ? Math.max(1, Math.min(rotationUrls.length || 1, assignments.length))
-      : (maxConc > 0 ? maxConc : assignments.length)
+      : (maxConc > 0 ? maxConc : Math.min(assignments.length, 5))
     // Petit décalage de démarrage plafonné (~6s) pour ne pas booter tout au même
     // instant. En rotatif un seul worker → aucun décalage.
     const staggerBase = rotProxy ? 0 : 1000
     // Suivi global + alerte même-proxy.
     const runId = `story-${Date.now()}`
+    runIdRef.current = runId
     ;(async () => {
       let proxyKeys: string[] = []
       try {
@@ -608,7 +615,11 @@ export default function StoryLink({ user }: { user: User }) {
     await Promise.all(
       Array.from({ length: Math.min(CONCURRENCY, assignments.length) }, (_, i) => worker(Math.min(i, 6) * staggerBase)),
     )
-    endRun(runId, okCount === 0 && assignments.length > 0 ? 'error' : 'done')
+    // Si annulé, le run a déjà été clôturé par le bouton — on évite le double-endRun.
+    if (runIdRef.current === runId) {
+      endRun(runId, okCount === 0 && assignments.length > 0 ? 'error' : 'done')
+      runIdRef.current = null
+    }
     if (okCount > 0) playSuccess(); else playError()
     setRunning(false)
 
@@ -1479,7 +1490,7 @@ export default function StoryLink({ user }: { user: User }) {
           {running && (
             <div style={{ flexShrink: 0, padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
               <button
-                onClick={() => { abortRef.current = true; setRunning(false) }}
+                onClick={() => { abortRef.current = true; setRunning(false); if (runIdRef.current) { endRun(runIdRef.current); runIdRef.current = null } }}
                 className="sf-btn sf-btn-danger cursor-pointer"
                 style={{ width: '100%', justifyContent: 'center' }}
               >
