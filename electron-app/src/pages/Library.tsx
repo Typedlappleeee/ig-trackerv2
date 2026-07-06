@@ -5,16 +5,24 @@ import { useConnections } from '@/lib/connections'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import {
   fetchAllPhones, startPhones, stopPhone, warmupAccountNative, editInstagramProfileNative,
-  shellExec, type GeelarkPhone,
+  warmupTikTokNative, editTikTokProfileNative, forceInstagramEnglish,
+  getPhonePublicIp, waitForPhoneConnectivity, shellExec, type GeelarkPhone,
 } from '@/lib/geelark'
 import { startRun, setRunPhase, finishRun } from '@/lib/activeRuns'
+
+// Allume le téléphone et attend qu'il réponde — pour les tâches shell brutes
+// (les warmup/édition gèrent déjà le démarrage en interne).
+async function ensureOn(bearer: string, id: string, log: (m: string) => void): Promise<boolean> {
+  await startPhones(bearer, [id]).catch(() => {})
+  return waitForPhoneConnectivity(bearer, id, log, { tries: 10 })
+}
 
 // ── Bibliothèque d'automatisations ───────────────────────────────────────────
 // Superadmin : on choisit des téléphones puis une tâche simple → elle s'exécute
 // sur les tels (avec suivi par téléphone). Utilisateurs : écran « Bientôt ».
 
-type FieldType = 'text' | 'number'
-interface Field { key: string; label: string; type: FieldType; placeholder?: string; def?: string | number; required?: boolean }
+type FieldType = 'text' | 'number' | 'bool'
+interface Field { key: string; label: string; type: FieldType; placeholder?: string; def?: string | number | boolean; required?: boolean }
 interface Task {
   key: string; title: string; desc: string; emoji: string; accent: string; grad: string; glow: string
   superOnly?: boolean
@@ -23,56 +31,93 @@ interface Task {
   run: (bearer: string, phoneId: string, cfg: Record<string, string>, log: (m: string) => void) => Promise<{ ok: boolean; error?: string }>
 }
 
+const GRAD = {
+  green: { grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
+  slate: { grad: 'linear-gradient(135deg,#64748B,#475569)', glow: 'rgba(148,163,184,0.4)', accent: '#94A3B8' },
+  amber: { grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
+  pink:  { grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)',  accent: '#F472B6' },
+  cyan:  { grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.42)', accent: '#22D3EE' },
+  indigo:{ grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)',  accent: '#818CF8' },
+  violet:{ grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
+}
+const IG = 'com.instagram.android'
+const TT = 'com.zhiliaoapp.musically'
+const openApp = (pkg: string) => `monkey -p ${pkg} -c android.intent.category.LAUNCHER 1`
+const isOn = (cfg: Record<string, string>, k: string) => cfg[k] === 'true'
+
 const TASKS: Task[] = [
-  {
-    key: 'power_on', title: 'Allumer', desc: 'Démarre les téléphones sélectionnés.', emoji: '🔌',
-    accent: '#34D399', grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)',
-    run: async (bearer, id) => { const n = await startPhones(bearer, [id]); return { ok: n > 0, error: n > 0 ? undefined : 'démarrage refusé' } },
-  },
-  {
-    key: 'power_off', title: 'Éteindre', desc: 'Stoppe les téléphones (libère le proxy).', emoji: '⏻',
-    accent: '#94A3B8', grad: 'linear-gradient(135deg,#64748B,#475569)', glow: 'rgba(148,163,184,0.4)',
-    run: async (bearer, id) => { await stopPhone(bearer, id); return { ok: true } },
-  },
-  {
-    key: 'warmup_ig', title: 'Warmup Instagram', desc: 'Chauffe le compte : navigation IA naturelle dans le feed.', emoji: '🔥',
-    accent: '#FBBF24', grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)',
+  // ── Cycle de vie ──
+  { key: 'power_on', title: 'Allumer', desc: 'Démarre les téléphones sélectionnés.', emoji: '🔌', ...GRAD.green,
+    run: async (bearer, id) => { const n = await startPhones(bearer, [id]); return { ok: n > 0, error: n > 0 ? undefined : 'démarrage refusé' } } },
+  { key: 'power_off', title: 'Éteindre', desc: 'Stoppe les téléphones (libère le proxy).', emoji: '⏻', ...GRAD.slate,
+    run: async (bearer, id) => { await stopPhone(bearer, id); return { ok: true } } },
+  { key: 'reboot', title: 'Redémarrer', desc: 'Éteint puis rallume le téléphone.', emoji: '🔁', ...GRAD.slate,
+    run: async (bearer, id, _c, log) => { await stopPhone(bearer, id); log('éteint, rallumage…'); await new Promise(r => setTimeout(r, 4000)); const on = await ensureOn(bearer, id, log); return { ok: on, error: on ? undefined : 'ne répond pas' } } },
+
+  // ── Warmup ──
+  { key: 'warmup_ig', title: 'Warmup Instagram', desc: 'Navigation IA naturelle dans le feed pour chauffer le compte.', emoji: '🔥', ...GRAD.amber,
     fields: [
       { key: 'browseVideo', label: 'Nombre de vidéos à parcourir', type: 'number', def: 15 },
       { key: 'keyword', label: 'Mot-clé (optionnel)', type: 'text', placeholder: 'ex. fitness' },
     ],
-    run: (bearer, id, cfg, log) => warmupAccountNative(bearer, id, {
-      browseVideo: Number(cfg.browseVideo) || 15,
-      keyword: cfg.keyword?.trim() || undefined,
-    }, log),
-  },
-  {
-    key: 'edit_ig', title: 'Éditer le profil', desc: 'Change nom, bio et lien du profil Instagram.', emoji: '✏️',
-    accent: '#F472B6', grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)',
+    run: (bearer, id, cfg, log) => warmupAccountNative(bearer, id, { browseVideo: Number(cfg.browseVideo) || 15, keyword: cfg.keyword?.trim() || undefined }, log) },
+  { key: 'warmup_tt', title: 'Warmup TikTok', desc: 'Parcourt le feed TikTok + like/follow/commentaires IA optionnels.', emoji: '🎵', ...GRAD.cyan,
+    fields: [
+      { key: 'durationMin', label: 'Durée (minutes)', type: 'number', def: 10 },
+      { key: 'keyword', label: 'Mot-clé (optionnel)', type: 'text', placeholder: 'ex. gym' },
+      { key: 'like', label: 'Liker aléatoirement', type: 'bool', def: true },
+      { key: 'follow', label: 'Suivre aléatoirement', type: 'bool', def: false },
+      { key: 'comment', label: 'Commenter (IA)', type: 'bool', def: false },
+    ],
+    run: (bearer, id, cfg, log) => warmupTikTokNative(bearer, id, { durationMin: Number(cfg.durationMin) || 10, keyword: cfg.keyword?.trim() || undefined, like: isOn(cfg, 'like'), follow: isOn(cfg, 'follow'), comment: isOn(cfg, 'comment') }, log) },
+
+  // ── Profil ──
+  { key: 'edit_ig', title: 'Éditer profil IG', desc: 'Change nom, bio et lien du profil Instagram.', emoji: '✏️', ...GRAD.pink,
     fields: [
       { key: 'nickname', label: 'Nom affiché', type: 'text', placeholder: 'laisser vide = inchangé' },
       { key: 'biography', label: 'Bio', type: 'text', placeholder: 'laisser vide = inchangé' },
       { key: 'linkURL', label: 'Lien', type: 'text', placeholder: 'https://…' },
     ],
-    run: (bearer, id, cfg, log) => editInstagramProfileNative(bearer, id, {
-      nickname: cfg.nickname?.trim() || undefined,
-      biography: cfg.biography?.trim() || undefined,
-      linkURL: cfg.linkURL?.trim() || undefined,
-    }, log),
-  },
-  {
-    key: 'shell', title: 'Commande ADB', desc: 'Exécute une commande Android brute (avancé).', emoji: '⌨️',
-    accent: '#22D3EE', grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.42)',
-    superOnly: true, danger: true,
+    run: (bearer, id, cfg, log) => editInstagramProfileNative(bearer, id, { nickname: cfg.nickname?.trim() || undefined, biography: cfg.biography?.trim() || undefined, linkURL: cfg.linkURL?.trim() || undefined }, log) },
+  { key: 'edit_tt', title: 'Éditer profil TikTok', desc: 'Change nom, bio et site du profil TikTok.', emoji: '🎬', ...GRAD.pink,
+    fields: [
+      { key: 'nickName', label: 'Nom affiché', type: 'text', placeholder: 'laisser vide = inchangé' },
+      { key: 'bio', label: 'Bio', type: 'text', placeholder: 'laisser vide = inchangé' },
+      { key: 'site', label: 'Site', type: 'text', placeholder: 'https://…' },
+    ],
+    run: (bearer, id, cfg, log) => editTikTokProfileNative(bearer, id, { nickName: cfg.nickName?.trim() || undefined, bio: cfg.bio?.trim() || undefined, site: cfg.site?.trim() || undefined }, log) },
+
+  // ── Apps ──
+  { key: 'open_ig', title: 'Ouvrir Instagram', desc: 'Lance l\'app Instagram sur le téléphone.', emoji: '📸', ...GRAD.indigo,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, openApp(IG)); return { ok: true } } },
+  { key: 'open_tt', title: 'Ouvrir TikTok', desc: 'Lance l\'app TikTok sur le téléphone.', emoji: '🎶', ...GRAD.indigo,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, openApp(TT)); return { ok: true } } },
+  { key: 'restart_ig', title: 'Redémarrer Instagram', desc: 'Ferme puis relance Instagram (débloque l\'app figée).', emoji: '♻️', ...GRAD.indigo,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${IG}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(IG)); return { ok: true } } },
+  { key: 'close_apps', title: 'Fermer les apps', desc: 'Tue les applis en arrière-plan (libère la RAM).', emoji: '🧹', ...GRAD.slate,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, 'am kill-all'); return { ok: true } } },
+  { key: 'ig_english', title: 'Instagram en anglais', desc: 'Force la langue d\'Instagram en anglais (RPA plus fiable).', emoji: '🇬🇧', ...GRAD.violet,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await forceInstagramEnglish(bearer, id); log('langue forcée en anglais'); return { ok: true } } },
+
+  // ── Diagnostic ──
+  { key: 'check_ip', title: 'Vérifier l\'IP', desc: 'Affiche l\'IP publique actuelle du téléphone (proxy).', emoji: '🌍', ...GRAD.green,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; const ip = await getPhonePublicIp(bearer, id); log(ip ? `IP : ${ip}` : 'IP introuvable'); return { ok: !!ip, error: ip ? undefined : 'IP introuvable' } } },
+  { key: 'check_conn', title: 'Tester la connexion', desc: 'Vérifie que le téléphone a bien accès à Internet.', emoji: '📶', ...GRAD.green,
+    run: async (bearer, id, _c, log) => { const ok = await ensureOn(bearer, id, log); return { ok, error: ok ? undefined : 'pas de connexion' } } },
+
+  // ── Avancé (superadmin) ──
+  { key: 'clear_ig', title: 'Vider le cache IG', desc: 'Efface les données d\'Instagram (⚠ déconnecte le compte).', emoji: '🗑️', ...GRAD.slate, superOnly: true, danger: true,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `pm clear ${IG}`); log('données Instagram effacées'); return { ok: true } } },
+  { key: 'shell', title: 'Commande ADB', desc: 'Exécute une commande Android brute (avancé).', emoji: '⌨️', ...GRAD.cyan, superOnly: true, danger: true,
     fields: [{ key: 'cmd', label: 'Commande shell', type: 'text', placeholder: 'ex. input keyevent 3', required: true }],
     run: async (bearer, id, cfg, log) => {
       const cmd = cfg.cmd?.trim()
       if (!cmd) return { ok: false, error: 'commande vide' }
+      if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }
       const r = await shellExec(bearer, id, cmd)
       log(`↳ ${(r.output || '(vide)').slice(0, 300)}`)
       return { ok: true }
-    },
-  },
+    } },
 ]
 
 const CSS = `
@@ -330,7 +375,12 @@ function GeelarkLauncher({ user }: { user: User }) {
               </div>
             </div>
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {(modalTask.fields ?? []).map(f => (
+              {(modalTask.fields ?? []).map(f => f.type === 'bool' ? (
+                <label key={f.key} className="cursor-pointer" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-2)' }}>
+                  <input type="checkbox" checked={cfgVals[f.key] === 'true'} onChange={e => setCfgVals(v => ({ ...v, [f.key]: e.target.checked ? 'true' : 'false' }))} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />
+                  {f.label}
+                </label>
+              ) : (
                 <div key={f.key}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 5 }}>{f.label}</label>
                   <input type={f.type} value={cfgVals[f.key] ?? ''} onChange={e => setCfgVals(v => ({ ...v, [f.key]: e.target.value }))} placeholder={f.placeholder} className="sf-input" style={{ width: '100%', height: 36 }} />
