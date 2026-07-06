@@ -212,7 +212,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
   const [error, setError]       = useState<string | null>(null)
 
   useEffect(() => {
-    let q = supabase.from('phones').select('*').order('phone_name')
+    let q = supabase.from('phones').select('*').order('sort_index', { ascending: true, nullsFirst: false }).order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ data }) => {
       const ps = (data ?? []).filter(p => !role || canAccessPhoneGroup(role, perms, p.group_name)) as Phone[]

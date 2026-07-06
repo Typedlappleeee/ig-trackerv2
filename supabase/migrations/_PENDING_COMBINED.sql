@@ -69,5 +69,10 @@ alter table if exists public.recurring_tasks
 alter table if exists public.scheduled_posts
   add column if not exists rotating_proxy boolean not null default false;
 
+-- 6) Ordre GéeLark des téléphones (sort_index) — voir 20260706_phones_sort_index.sql
+--    pour la mise à jour complète de la RPC sync_geelark_phones.
+alter table if exists public.phones
+  add column if not exists sort_index integer;
+
 -- ✅ Terminé. Redéploie aussi l'edge function :
 --    supabase functions deploy run-scheduled-posts --no-verify-jwt

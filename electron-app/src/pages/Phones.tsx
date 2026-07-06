@@ -782,7 +782,7 @@ export function Phones({ user }: PhonesProps) {
     setError(null)
     if (!bearer) { setPhones([]); setLoading(false); return }
     setLoading(true)
-    let q = supabase.from('phones').select('*').order('phone_name')
+    let q = supabase.from('phones').select('*').order('sort_index', { ascending: true, nullsFirst: false }).order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data, error: err } = await q
     if (err) setError('Error loading phones.')
@@ -822,7 +822,7 @@ export function Phones({ user }: PhonesProps) {
         items = items.slice(0, phoneLimit)
       }
 
-      const rows = items.map(p => ({
+      const rows = items.map((p, i) => ({
         user_id:    user.id,
         org_id:     currentOrg?.id ?? null,
         geelark_id: p.id,
@@ -832,6 +832,9 @@ export function Phones({ user }: PhonesProps) {
         status:     geelarkStatusLabel(p.status),
         remark:     p.remark ?? null,
         synced_at:  new Date().toISOString(),
+        // Ordre GéeLark : index dans /phone/list → ScaleFlow affiche/assigne dans
+        // le même ordre que GéeLark (posting séquentiel cohérent).
+        sort_index: i,
       }))
       const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
 

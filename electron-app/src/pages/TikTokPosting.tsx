@@ -148,7 +148,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
     setPhonesLoading(true)
     setPhonesError(null)
     try {
-      let q = supabase.from('phones').select('*').order('phone_name')
+      let q = supabase.from('phones').select('*').order('sort_index', { ascending: true, nullsFirst: false }).order('phone_name')
       if (currentOrg) {
         q = q.eq('org_id', currentOrg.id)
       } else {

@@ -46,7 +46,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
   const [running, setRunning] = useState(false)
 
   const loadPhones = useCallback(async () => {
-    let q = supabase.from('phones').select('id, geelark_id, phone_name, ig_username, group_name').order('phone_name')
+    let q = supabase.from('phones').select('id, geelark_id, phone_name, ig_username, group_name').order('sort_index', { ascending: true, nullsFirst: false }).order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id)
     const { data } = await q
     setPhones((data ?? []) as Phone[])
