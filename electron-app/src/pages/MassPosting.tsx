@@ -2071,6 +2071,12 @@ export function MassPosting({ user }: MassPostingProps) {
                     <span className="sf-badge sf-badge-accent" style={{ fontSize: 9 }}>{assignments.length}</span>
                     <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
                   </div>
+                  {/* Rappel du mode d'attribution tél → vidéo */}
+                  <p style={{ fontSize: 11.5, color: MUTED, margin: '0 0 10px', lineHeight: 1.5 }}>
+                    {mode === 'random'
+                      ? '🎲 Aléatoire — chaque téléphone reçoit une vidéo au hasard.'
+                      : '↕️ Séquentiel — tél 1 → vidéo 1, tél 2 → vidéo 2… (dans l\'ordre GéeLark). Chaque tél garde SA vidéo.'}
+                  </p>
                   <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
@@ -2103,12 +2109,31 @@ export function MassPosting({ user }: MassPostingProps) {
                                 {phone.ig_username && <p style={{ fontSize: 10, color: 'rgba(99,102,241,0.6)' }}>@{phone.ig_username}</p>}
                               </td>
                               <td style={{ padding: '9px 14px' }}>
-                                {video ? (
-                                  <span style={{ fontSize: 11.5, color: MUTED, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span className="sf-badge sf-badge-accent" style={{ fontSize: 9, fontVariantNumeric: 'tabular-nums' }}>{videoIndex + 1}</span>
-                                    {video.item.title.length > 32 ? video.item.title.slice(0, 32) + '…' : video.item.title}
-                                  </span>
-                                ) : <span style={{ fontSize: 11.5, color: FAINT }}>—</span>}
+                                {video ? (() => {
+                                  // Légende réellement postée : description de banque de la vidéo,
+                                  // sinon repli sur la légende globale saisie au posting.
+                                  const bankCap = video.caption?.trim()
+                                  const capUsed = bankCap || caption.trim()
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                      <span style={{ fontSize: 11.5, color: MUTED, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span className="sf-badge sf-badge-accent" style={{ fontSize: 9, fontVariantNumeric: 'tabular-nums' }}>{videoIndex + 1}</span>
+                                        {video.item.title.length > 32 ? video.item.title.slice(0, 32) + '…' : video.item.title}
+                                      </span>
+                                      <span style={{ fontSize: 10, color: FAINT, display: 'flex', alignItems: 'center', gap: 5, maxWidth: 260 }}>
+                                        <span style={{
+                                          fontSize: 8, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
+                                          padding: '1px 5px', borderRadius: 4, flexShrink: 0,
+                                          background: bankCap ? 'rgba(52,211,153,0.14)' : 'rgba(148,163,184,0.14)',
+                                          color: bankCap ? '#34D399' : 'rgba(148,163,184,0.9)',
+                                        }}>{bankCap ? 'banque' : 'globale'}</span>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {capUsed ? (capUsed.length > 40 ? capUsed.slice(0, 40) + '…' : capUsed) : '(aucune légende)'}
+                                        </span>
+                                      </span>
+                                    </div>
+                                  )
+                                })() : <span style={{ fontSize: 11.5, color: FAINT }}>—</span>}
                               </td>
                               <td style={{ padding: '9px 14px', textAlign: 'right' }}>
                                 <span className={STATUS_BADGE[status] ?? 'sf-badge sf-badge-muted'} style={{ fontSize: 9, display: 'inline-flex' }}>
