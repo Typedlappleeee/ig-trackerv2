@@ -15,11 +15,6 @@ import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/li
 import { checkLicense, LicenseContext, type LicenseStatus } from '@/lib/license'
 import { LicenseGate } from '@/components/LicenseGate'
 import { CreditContext, fetchBalance, fetchOrgBalance, maybeGrantMonthlyCredits } from '@/lib/credits'
-import {
-  loadScheduledPosts, claimScheduledPost,
-  executeScheduledPost, finishScheduledPost,
-  type ScheduledPost,
-} from '@/lib/schedulerService'
 
 // ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
 function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
@@ -728,70 +723,12 @@ function AppContent({ user }: { user: User }) {
     return () => clearInterval(id)
   }, [license?.valid, user.id, currentOrg?.id])
 
-  // ── Background scheduler daemon ────────────────────────────────────────────
-  // Runs at app level so scheduled posts execute even when the Scheduler page
-  // is not open. Uses the same atomic claimScheduledPost guard so it never
-  // double-executes with the Scheduler page's own timers.
-  useEffect(() => {
-    // Runs on desktop AND web: main.tsx installs the webAPI shim as
-    // window.electronAPI in the browser, so GéeLark calls go through /api/*.
-    // The atomic claim prevents double-execution across tabs/devices.
-    if (!window.electronAPI) return
-    const timers = new Map<string, ReturnType<typeof setTimeout>>()
-    const running = new Set<string>()
-
-    const run = async (post: ScheduledPost) => {
-      if (running.has(post.id)) return
-      running.add(post.id)
-      const claimed = await claimScheduledPost(post.id)
-      if (!claimed) { running.delete(post.id); return }
-      const logs: string[] = []
-      const ok = await executeScheduledPost(post, msg => logs.push(msg))
-      await finishScheduledPost(post.id, ok, logs, ok ? undefined : logs[logs.length - 1])
-      running.delete(post.id)
-      // Notify completion — the user may be on any page (or away)
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        const typeLabel = post.type === 'story' ? 'Stories' : post.type === 'mass_posting' ? 'Mass posting' : 'Posting'
-        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
-          body: `${post.phones?.length ?? 0} compte(s) — ScaleFlow`,
-        })
-      }
-    }
-
-    const schedule = (post: ScheduledPost) => {
-      if (timers.has(post.id) || running.has(post.id)) return
-      const delay = new Date(post.scheduled_at).getTime() - Date.now()
-      if (delay <= 0) { run(post); return }
-      timers.set(post.id, setTimeout(() => { timers.delete(post.id); run(post) }, delay))
-    }
-
-    let cancelled = false
-    loadScheduledPosts().then(posts => {
-      if (cancelled) return
-      posts.filter(p => p.status === 'pending').forEach(schedule)
-    })
-
-    const ch = supabase.channel('app-scheduler-daemon')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scheduled_posts' }, payload => {
-        const raw = payload.new as any
-        if (raw.status === 'pending' && raw.user_id === user.id) {
-          schedule({
-            ...raw,
-            phones: typeof raw.phones === 'string' ? JSON.parse(raw.phones) : (raw.phones ?? []),
-            videos: typeof raw.videos === 'string' ? JSON.parse(raw.videos) : (raw.videos ?? []),
-            result: typeof raw.result === 'string' ? JSON.parse(raw.result) : raw.result,
-          } as ScheduledPost)
-        }
-      })
-      .subscribe()
-
-    return () => {
-      cancelled = true
-      timers.forEach(t => clearTimeout(t))
-      timers.clear()
-      supabase.removeChannel(ch)
-    }
-  }, [user.id])
+  // ── Exécution des posts programmés : SERVEUR UNIQUEMENT ────────────────────
+  // Les programmations (scheduled_posts) sont exécutées EXCLUSIVEMENT par
+  // l'edge function run-scheduled-posts (cron chaque minute). L'app — desktop
+  // ET web — ne poste plus les programmations côté client : ça garantit un flow
+  // d'exécution unique (rotation proxy en série côté serveur, PC éteint) et
+  // évite tout doublon. (Ancien daemon de planification client retiré.)
 
   function refreshCredits() {
     const isOrgMember = currentOrg?.owner_id && currentOrg.owner_id !== user.id

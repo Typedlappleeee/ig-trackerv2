@@ -1258,11 +1258,12 @@ Deno.serve(async (req) => {
   // restent gérées côté client). filterUserId limite au client authentifié.
   // ───────────────────────────────────────────────────────────────────────────
   try {
+    // task_id null (stories programmées à la main) OU non null (issues d'une tâche) :
+    // le serveur exécute les deux (l'app ne poste plus les programmations côté client).
     let storyQuery = db.from('scheduled_posts')
       .select('*')
       .eq('status', 'pending')
       .eq('type', 'story')
-      .not('task_id', 'is', null)
       .lte('scheduled_at', nowIso)
       .order('scheduled_at', { ascending: true })
       .limit(3)
@@ -1303,13 +1304,21 @@ Deno.serve(async (req) => {
         if (!bearer) bearer = post.bearer_token || ''
         if (!bearer) throw new Error('Aucun token GéeLark configuré')
 
-        const phones: Array<PhoneRec & { link?: string }> =
+        const phones: Array<PhoneRec & { link?: string; story_photo?: string; story_link?: string; story_text?: string }> =
           typeof post.phones === 'string' ? JSON.parse(post.phones) : post.phones
         const images: VideoRec[] = typeof post.videos === 'string' ? JSON.parse(post.videos) : (post.videos ?? [])
         const storyTexts: string[] = Array.isArray(existingResult?.story_texts) ? existingResult!.story_texts : []
         const mode: string = post.mode ?? 'seq'
+        // Stories « manuelles » (onglet Story → Programmer) : image + lien FIGÉS par
+        // compte dans phones[] (story_photo/story_link/story_text). Stories issues
+        // d'une tâche : pool d'images (post.videos) + textes (result.story_texts) +
+        // lien par compte (phone.link). On gère les deux modèles ci-dessous.
+        const hasFrozen = phones.some(p => (p.story_photo ?? '').trim())
+        if (!images.length && !hasFrozen) throw new Error('Aucune image dans la story')
 
-        if (!images.length) throw new Error('Aucune image dans la story')
+        // Rotation d'IP en série : on rote AVANT de booter chaque téléphone (un seul
+        // allumé à la fois → jamais deux comptes sur la même IP).
+        const rotationUrls = post.rotating_proxy ? await loadRotationUrls(db, post.org_id, post.user_id) : []
 
         // Traite UN téléphone par invocation : le boot du téléphone (~30-60s) +
         // l'automation story (~2 min) tiennent dans le budget serverless pour un
@@ -1321,22 +1330,30 @@ Deno.serve(async (req) => {
           if (processedThisRun >= 1) break  // un seul téléphone par invocation
 
           const name = phone.ig_username ?? phone.phone_name
-          const link = (phone.link ?? '').trim()
+          // Lien : figé par compte (story_link) sinon lien de tâche (link).
+          const link = (phone.story_link ?? phone.link ?? '').trim()
           if (!link) { log(`❌ ${name} : aucun lien configuré`); doneSet.add(phone.geelark_id); continue }
 
-          const imgIdx = mode === 'random' ? Math.floor(Math.random() * images.length) : i % images.length
-          const imageUrl = await resolveImageUrl(db, images[imgIdx])
-          const linkText = storyTexts.length
+          // Image : figée par compte (story_photo, URL signée) sinon pool de tâche.
+          const frozenPhoto = (phone.story_photo ?? '').trim()
+          const imgIdx = images.length ? (mode === 'random' ? Math.floor(Math.random() * images.length) : i % images.length) : -1
+          const imageUrl = frozenPhoto || (imgIdx >= 0 ? await resolveImageUrl(db, images[imgIdx]) : '')
+          if (!imageUrl) { log(`❌ ${name} : aucune image configurée`); doneSet.add(phone.geelark_id); continue }
+          // Texte sticker : figé par compte (story_text) sinon pool de textes.
+          const frozenText = (phone.story_text ?? '').trim()
+          const linkText = frozenText || (storyTexts.length
             ? (mode === 'random' ? storyTexts[Math.floor(Math.random() * storyTexts.length)] : storyTexts[i % storyTexts.length])
-            : undefined
+            : undefined)
 
           log(`▶ [serveur] Story ${name}…`)
-          // Watchdog : si l'invocation meurt avant le finally, le phone est éteint après 5 min.
+          // Watchdog : si l'invocation meurt avant le finally, le phone est éteint après 8 min.
           await db.from('phone_power_watch').upsert(
-            [{ geelark_id: phone.geelark_id, org_id: post.org_id, user_id: post.user_id, reason: 'server_story', stop_at: new Date(Date.now() + 5 * 60_000).toISOString() }],
+            [{ geelark_id: phone.geelark_id, org_id: post.org_id, user_id: post.user_id, reason: 'server_story', stop_at: new Date(Date.now() + 8 * 60_000).toISOString() }],
             { onConflict: 'geelark_id' },
           ).then(() => {}, () => {})
           try {
+            // Proxy rotatif : rote l'IP avant le boot (postStoryServer démarre le tél).
+            if (rotationUrls.length) { log(`🔄 ${name} : rotation IP…`); await rotateAllProxies(rotationUrls, m => log(`  ${name}: ${m}`)) }
             const res = await postStoryServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText }, m => log(`  ${name}: ${m}`))
             if (res.ok) log(`✅ ${name} — story publiée`)
             else log(`❌ ${name} : ${res.error ?? 'échec'}`)

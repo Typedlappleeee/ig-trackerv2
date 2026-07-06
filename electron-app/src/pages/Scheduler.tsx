@@ -819,12 +819,12 @@ export function Scheduler({ user, onNavigate }: Props) {
     })
   }, [reload])
 
-  // Auto-schedule pending posts when list is loaded
-  useEffect(() => {
-    posts.filter(p => p.status === 'pending').forEach(scheduleExecution)
-  }, [posts, scheduleExecution])
+  // Exécution des posts programmés = SERVEUR UNIQUEMENT (edge function
+  // run-scheduled-posts). L'app ne poste plus les programmations côté client :
+  // on n'arme donc plus de timer d'exécution ici. La page reste en lecture
+  // (calendrier, création, annulation) ; le serveur fait tout le posting.
 
-  // Realtime: new post → schedule it
+  // Realtime: nouveau post → l'ajoute au calendrier (affichage seulement)
   useEffect(() => {
     const ch = supabase.channel('scheduler-page')
       .on('postgres_changes', {
@@ -839,8 +839,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           result: typeof raw.result === 'string' ? JSON.parse(raw.result) : raw.result,
         }
         setPosts(prev => prev.some(x => x.id === p.id) ? prev : [p, ...prev])
-        // Only auto-execute our own posts
-        if (p.status === 'pending' && p.user_id === user.id) scheduleExecution(p)
+        // Exécution = serveur uniquement → pas d'auto-exécution côté app.
       })
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'scheduled_posts',
