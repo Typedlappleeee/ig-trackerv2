@@ -5,7 +5,7 @@ import { useConnections } from '@/lib/connections'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import {
   fetchAllPhones, startPhones, stopPhone, warmupAccountNative, editInstagramProfileNative,
-  warmupTikTokNative, editTikTokProfileNative, forceInstagramEnglish,
+  warmupTikTokNative, editTikTokProfileNative, forceInstagramEnglish, postInstagramStory,
   getPhonePublicIp, waitForPhoneConnectivity, shellExec, type GeelarkPhone,
 } from '@/lib/geelark'
 import { startRun, setRunPhase, finishRun } from '@/lib/activeRuns'
@@ -72,20 +72,35 @@ const TASKS: Task[] = [
     run: (bearer, id, cfg, log) => warmupTikTokNative(bearer, id, { durationMin: Number(cfg.durationMin) || 10, keyword: cfg.keyword?.trim() || undefined, like: isOn(cfg, 'like'), follow: isOn(cfg, 'follow'), comment: isOn(cfg, 'comment') }, log) },
 
   // ── Profil ──
-  { key: 'edit_ig', title: 'Éditer profil IG', desc: 'Change nom, bio et lien du profil Instagram.', emoji: '✏️', ...GRAD.pink,
+  { key: 'edit_ig', title: 'Éditer profil IG', desc: 'Change nom, bio, lien et photo du profil Instagram.', emoji: '✏️', ...GRAD.pink,
     fields: [
       { key: 'nickname', label: 'Nom affiché', type: 'text', placeholder: 'laisser vide = inchangé' },
       { key: 'biography', label: 'Bio', type: 'text', placeholder: 'laisser vide = inchangé' },
       { key: 'linkURL', label: 'Lien', type: 'text', placeholder: 'https://…' },
+      { key: 'avatarUrl', label: 'Photo de profil (URL)', type: 'text', placeholder: 'https://…/photo.jpg' },
     ],
-    run: (bearer, id, cfg, log) => editInstagramProfileNative(bearer, id, { nickname: cfg.nickname?.trim() || undefined, biography: cfg.biography?.trim() || undefined, linkURL: cfg.linkURL?.trim() || undefined }, log) },
-  { key: 'edit_tt', title: 'Éditer profil TikTok', desc: 'Change nom, bio et site du profil TikTok.', emoji: '🎬', ...GRAD.pink,
+    run: (bearer, id, cfg, log) => editInstagramProfileNative(bearer, id, { nickname: cfg.nickname?.trim() || undefined, biography: cfg.biography?.trim() || undefined, linkURL: cfg.linkURL?.trim() || undefined, avatarUrl: cfg.avatarUrl?.trim() || undefined }, log) },
+  { key: 'edit_tt', title: 'Éditer profil TikTok', desc: 'Change nom, bio, site et photo du profil TikTok.', emoji: '🎬', ...GRAD.pink,
     fields: [
       { key: 'nickName', label: 'Nom affiché', type: 'text', placeholder: 'laisser vide = inchangé' },
       { key: 'bio', label: 'Bio', type: 'text', placeholder: 'laisser vide = inchangé' },
       { key: 'site', label: 'Site', type: 'text', placeholder: 'https://…' },
+      { key: 'avatarUrl', label: 'Photo de profil (URL)', type: 'text', placeholder: 'https://…/photo.jpg' },
     ],
-    run: (bearer, id, cfg, log) => editTikTokProfileNative(bearer, id, { nickName: cfg.nickName?.trim() || undefined, bio: cfg.bio?.trim() || undefined, site: cfg.site?.trim() || undefined }, log) },
+    run: (bearer, id, cfg, log) => editTikTokProfileNative(bearer, id, { nickName: cfg.nickName?.trim() || undefined, bio: cfg.bio?.trim() || undefined, site: cfg.site?.trim() || undefined, avatarUrl: cfg.avatarUrl?.trim() || undefined }, log) },
+
+  // ── Publication ──
+  { key: 'story', title: 'Poster une story', desc: 'Publie une image en story Instagram avec un sticker lien cliquable.', emoji: '📖', ...GRAD.amber,
+    fields: [
+      { key: 'imageUrl', label: 'Image (URL publique)', type: 'text', placeholder: 'https://…/image.jpg', required: true },
+      { key: 'linkUrl', label: 'Lien du sticker', type: 'text', placeholder: 'https://…', required: true },
+      { key: 'linkText', label: 'Texte du sticker (optionnel)', type: 'text', placeholder: 'ex. Voir plus' },
+    ],
+    run: (bearer, id, cfg, log) => {
+      const imageUrl = cfg.imageUrl?.trim(), linkUrl = cfg.linkUrl?.trim()
+      if (!imageUrl || !linkUrl) return Promise.resolve({ ok: false, error: 'image + lien requis' })
+      return postInstagramStory(bearer, id, { imageUrl, linkUrl, linkText: cfg.linkText?.trim() || undefined }, log)
+    } },
 
   // ── Apps ──
   { key: 'open_ig', title: 'Ouvrir Instagram', desc: 'Lance l\'app Instagram sur le téléphone.', emoji: '📸', ...GRAD.indigo,
@@ -94,20 +109,20 @@ const TASKS: Task[] = [
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, openApp(TT)); return { ok: true } } },
   { key: 'restart_ig', title: 'Redémarrer Instagram', desc: 'Ferme puis relance Instagram (débloque l\'app figée).', emoji: '♻️', ...GRAD.indigo,
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${IG}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(IG)); return { ok: true } } },
-  { key: 'close_apps', title: 'Fermer les apps', desc: 'Tue les applis en arrière-plan (libère la RAM).', emoji: '🧹', ...GRAD.slate,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, 'am kill-all'); return { ok: true } } },
+  { key: 'restart_tt', title: 'Redémarrer TikTok', desc: 'Ferme puis relance TikTok (débloque l\'app figée).', emoji: '🔂', ...GRAD.indigo,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${TT}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(TT)); return { ok: true } } },
   { key: 'ig_english', title: 'Instagram en anglais', desc: 'Force la langue d\'Instagram en anglais (RPA plus fiable).', emoji: '🇬🇧', ...GRAD.violet,
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await forceInstagramEnglish(bearer, id); log('langue forcée en anglais'); return { ok: true } } },
 
   // ── Diagnostic ──
   { key: 'check_ip', title: 'Vérifier l\'IP', desc: 'Affiche l\'IP publique actuelle du téléphone (proxy).', emoji: '🌍', ...GRAD.green,
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; const ip = await getPhonePublicIp(bearer, id); log(ip ? `IP : ${ip}` : 'IP introuvable'); return { ok: !!ip, error: ip ? undefined : 'IP introuvable' } } },
-  { key: 'check_conn', title: 'Tester la connexion', desc: 'Vérifie que le téléphone a bien accès à Internet.', emoji: '📶', ...GRAD.green,
-    run: async (bearer, id, _c, log) => { const ok = await ensureOn(bearer, id, log); return { ok, error: ok ? undefined : 'pas de connexion' } } },
 
   // ── Avancé (superadmin) ──
   { key: 'clear_ig', title: 'Vider le cache IG', desc: 'Efface les données d\'Instagram (⚠ déconnecte le compte).', emoji: '🗑️', ...GRAD.slate, superOnly: true, danger: true,
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `pm clear ${IG}`); log('données Instagram effacées'); return { ok: true } } },
+  { key: 'clear_tt', title: 'Vider le cache TikTok', desc: 'Efface les données de TikTok (⚠ déconnecte le compte).', emoji: '🧽', ...GRAD.slate, superOnly: true, danger: true,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `pm clear ${TT}`); log('données TikTok effacées'); return { ok: true } } },
   { key: 'shell', title: 'Commande ADB', desc: 'Exécute une commande Android brute (avancé).', emoji: '⌨️', ...GRAD.cyan, superOnly: true, danger: true,
     fields: [{ key: 'cmd', label: 'Commande shell', type: 'text', placeholder: 'ex. input keyevent 3', required: true }],
     run: async (bearer, id, cfg, log) => {
