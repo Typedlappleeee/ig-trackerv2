@@ -91,7 +91,7 @@ export function Spoof({ user }: { user: User }) {
   const [copies, setCopies]               = useState(1)
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
-  const [autoMode, setAutoMode]           = useState(false)
+  const [autoMode, setAutoMode]           = useState(true)   // ON par défaut → chaque copie entièrement aléatoire (toutes différentes)
 
   // Réglages aléatoires (modérés) générés PAR VIDÉO en mode automatique.
   // Objectif : un max de petits détails uniques entre chaque vidéo SANS jamais
