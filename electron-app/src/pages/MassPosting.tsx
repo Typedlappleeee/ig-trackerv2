@@ -647,6 +647,9 @@ export function MassPosting({ user }: MassPostingProps) {
         setPhoneStatus(phoneId, { status: 'cancelled' })
       }
     }
+    // Clôture IMMÉDIATE du suivi global → pas de fausse alerte « même proxy »
+    // sur un posting relancé juste après l'annulation.
+    if (activeRunIdRef.current) { endRun(activeRunIdRef.current); activeRunIdRef.current = null }
     log('Arrêté.', 'warn')
   }
 
