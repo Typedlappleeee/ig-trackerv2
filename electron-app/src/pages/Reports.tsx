@@ -7,7 +7,7 @@
  * Niveau gratuit : posté/pas posté via l'historique ScaleFlow (aucune API).
  * Niveau API : vidéo + stats par post (clé RapidAPI dans la config).
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -133,6 +133,24 @@ export function Reports({ user }: { user: User }) {
   }, [table, keyCol, keyVal, currentOrg?.id, user.id, day])
 
   useEffect(() => { load() }, [load])
+
+  // Sync auto via l'analytics GeeLark à l'ouverture — les vues/followers se mettent
+  // à jour tout seuls, sans cliquer. Garde-fou : au plus 1×/30 min par périmètre
+  // (localStorage), pour ne pas spammer l'API. Silencieux ; recharge si des comptes
+  // ont été mis à jour. Enregistre aussi les comptes dans le tracking GeeLark.
+  const autoSyncedRef = useRef(false)
+  useEffect(() => {
+    if (autoSyncedRef.current || !bearer) return
+    autoSyncedRef.current = true
+    const KEY = `sf-gl-analytics-sync-${keyVal}`
+    let last = 0
+    try { last = Number(localStorage.getItem(KEY) || 0) } catch { /* ignore */ }
+    if (Date.now() - last < 30 * 60_000) return   // synchronisé récemment → on saute
+    try { localStorage.setItem(KEY, String(Date.now())) } catch { /* ignore */ }
+    syncGeelarkAnalytics(bearer, currentOrg?.id ?? null, user.id)
+      .then(r => { if (r.ok && r.updated > 0) load() })
+      .catch(() => { /* best-effort — le bouton manuel reste dispo */ })
+  }, [bearer, currentOrg?.id, user.id, keyVal, load])
 
   async function save() {
     setSaving(true); setSaved(false)
