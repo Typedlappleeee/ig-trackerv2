@@ -540,6 +540,7 @@ export default function StoryLink({ user }: { user: User }) {
     const runOne = async (asgn: typeof assignments[number]): Promise<number> => {
       if (abortRef.current) return 0
       setStatus(asgn.phoneId, 'running')
+      let posted = false
       try {
         // La vérification de connexion (proxy rotatif) est faite AU DÉBUT de
         // postInstagramStory. Pas de retry sur échec : re-poster risquerait un
@@ -549,13 +550,21 @@ export default function StoryLink({ user }: { user: User }) {
           { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun, rotationUrls },
           m => addLog(asgn.phoneId, m),
         )
-        if (res.ok) { setStatus(asgn.phoneId, 'ok'); return 1 }
+        if (res.ok) { setStatus(asgn.phoneId, 'ok'); posted = true; return 1 }
         else { setStatus(asgn.phoneId, 'error'); addLog(asgn.phoneId, `❌ ${res.error ?? 'La publication de la story a échoué'}`); return 0 }
       } catch (e) {
         setStatus(asgn.phoneId, 'error')
         addLog(asgn.phoneId, `❌ La publication de la story a échoué (erreur inattendue)`)
         return 0
       } finally {
+        // Marge d'upload : après le tap « Partager », Instagram continue d'envoyer
+        // la story en arrière-plan. Sans cette pause on éteignait le téléphone trop
+        // tôt → l'upload était coupé et la story ne partait pas. On patiente 60 s
+        // avant l'arrêt quand la story a été validée (rien en dry-run).
+        if (posted && !dryRun && !abortRef.current) {
+          addLog(asgn.phoneId, "⏳ Story envoyée — marge d'upload (60s) avant l'arrêt du téléphone…")
+          await new Promise(r => setTimeout(r, 60_000))
+        }
         try { await stopPhone(bearer, asgn.phoneId) } catch (_) { /* ignore */ }
       }
     }
