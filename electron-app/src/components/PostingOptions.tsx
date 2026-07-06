@@ -117,6 +117,13 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.deleteAfterPost ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
       </div>
+      {opts.deleteAfterPost && (
+        <div style={{ marginLeft: 26, padding: '8px 11px', borderRadius: 8, background: 'rgba(248,113,113,0.09)', border: '1px solid rgba(248,113,113,0.35)' }}>
+          <p className="text-[11px]" style={{ color: '#F87171', margin: 0, fontWeight: 700, lineHeight: 1.5 }}>
+            ⚠ Les vidéos publiées seront <strong>supprimées définitivement de la banque</strong> (fichier + miniature). C'est <strong>irréversible</strong>.
+          </p>
+        </div>
+      )}
 
       {/* ── Intervalle entre posts — masqué en proxy rotatif (inutile : chaque
            téléphone poste déjà sur une IP fraîche) ──────────────────────────── */}

@@ -408,6 +408,12 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
             </div>
           </section>
 
+          {deleteAfterPost && (
+            <div style={{ padding: '10px 14px', border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.09)', fontSize: 11.5, color: '#F87171', fontWeight: 700, lineHeight: 1.5 }}>
+              ⚠ Usage unique : les vidéos publiées seront <strong>supprimées définitivement de la banque</strong> (fichier + miniature). C'est <strong>irréversible</strong>.
+            </div>
+          )}
+
           {rotatingProxy && !rotationConfigured && (
             <div style={{ padding: '10px 14px', border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.09)', fontSize: 11.5, color: 'rgba(233,234,240,0.75)', lineHeight: 1.5 }}>
               <strong style={{ color: '#F87171' }}>Rotation d'IP non configurée — risque de ban.</strong>{' '}
