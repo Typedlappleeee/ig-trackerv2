@@ -691,6 +691,14 @@ Deno.serve(async (req) => {
         // Usage unique : supprime de la banque les vidéos marquées (PC éteint).
         const spVideos: VideoRec[] = Array.isArray(sp.videos) ? sp.videos : (typeof sp.videos === 'string' ? JSON.parse(sp.videos) : [])
         const removed = await removeUsedBankVideos(db, sp.org_id, sp.user_id, spVideos)
+        // Usage unique TÂCHE : vide le pool (recurring_tasks.videos) avec les index
+        // réellement utilisés — ce que la branche inline fait, mais que le balayage
+        // (qui finalise les posts sans délai) oubliait de faire.
+        if (sp.task_id) {
+          const spResult = (typeof sp.result === 'string' ? JSON.parse(sp.result) : sp.result) as Record<string, any> | null
+          const usedIdx = new Set<number>(Array.isArray(spResult?.used_video_indices) ? spResult.used_video_indices : [])
+          if (usedIdx.size) await finalizeTaskPoolAndRecur(db, sp, usedIdx, (m) => { summary[`pool:${sp.id}`] = m })
+        }
         summary[`heal:${sp.id}`] = `recovered → done (${success} ok)${removed ? ` · ${removed} vidéo(s) retirée(s)` : ''}`
       } else if (failed > 0 && pending === 0) {
         if (geelarkIds.length > 0) await gPost(bearer, '/phone/stop', { ids: geelarkIds }).catch(() => {})
@@ -1130,15 +1138,19 @@ Deno.serve(async (req) => {
         geelarkIds.map(id => ({ geelark_id: id, org_id: post.org_id, user_id: post.user_id, reason: 'server_post', stop_at: safetyStopAt })),
         { onConflict: 'geelark_id' },
       ).then(() => {}, () => {})
+      // used_video_indices : indices RÉELS des vidéos utilisées ce run → permet au
+      // balayage (qui finalise les posts delay=0) de vider le pool de la tâche
+      // (usage unique) avec les bons index, même sans avoir exécuté le posting.
+      const usedIdxArr = [...usedVideoIndices]
       const safetyUpd = await db.from('scheduled_posts').update({
-        result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds },
+        result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds, used_video_indices: usedIdxArr },
         stop_phones_at: safetyStopAt, stop_phone_ids: geelarkIds,
       }).eq('id', post.id)
       if (safetyUpd.error && /stop_phones?_(at|ids)/i.test(safetyUpd.error.message)) {
         // Colonnes stop_phones_at/stop_phone_ids absentes (migration non appliquée) :
         // on persiste au moins les task_ids pour la vérification anti-faux-timeout.
         await db.from('scheduled_posts').update({
-          result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds },
+          result: { logs, geelark_task_ids: taskIds, geelark_ids: geelarkIds, used_video_indices: usedIdxArr },
         }).eq('id', post.id)
       }
 

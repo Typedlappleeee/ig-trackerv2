@@ -1261,13 +1261,23 @@ export function MassPosting({ user }: MassPostingProps) {
           try {
             const ids = toDelete.map(sv => sv.item.id)
             const base = supabase.from('content_bank').delete().in('id', ids)
-            await (currentOrg ? (base as any).eq('org_id', currentOrg.id) : (base as any).eq('user_id', user.id).is('org_id', null))
-            const { deleteStorageObjects } = await import('@/lib/storage')
-            deleteStorageObjects(toDelete.flatMap(sv => [sv.item.storage_path, sv.item.thumbnail_path])).catch(() => {})
-            // Retire aussi de la sélection courante pour ne pas les re-proposer.
-            const deletedIds = new Set(ids)
-            setSelVideos(prev => prev.filter(sv => !deletedIds.has(sv.item.id)))
-            log(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, 'ok')
+            // .select() → on connaît le NB réellement supprimé (une suppression bloquée
+            // par les permissions RLS renvoie 0 ligne SANS erreur → il faut le détecter).
+            const { data: deleted } = await (currentOrg
+              ? (base as any).eq('org_id', currentOrg.id).select('id')
+              : (base as any).eq('user_id', user.id).is('org_id', null).select('id'))
+            const nDeleted: number = Array.isArray(deleted) ? deleted.length : 0
+            if (nDeleted > 0) {
+              const { deleteStorageObjects } = await import('@/lib/storage')
+              const okIds = new Set((deleted as { id: string }[]).map(d => d.id))
+              deleteStorageObjects(toDelete.filter(sv => okIds.has(sv.item.id)).flatMap(sv => [sv.item.storage_path, sv.item.thumbnail_path])).catch(() => {})
+              setSelVideos(prev => prev.filter(sv => !okIds.has(sv.item.id)))
+            }
+            if (nDeleted < ids.length) {
+              log(`⚠ Usage unique : ${nDeleted}/${ids.length} vidéo(s) retirée(s) — les autres n'ont pas pu être supprimées (droit « bank_delete » manquant sur l'organisation ?)`, 'warn')
+            } else {
+              log(`🗑️ ${nDeleted} vidéo(s) retirée(s) de la banque (usage unique)`, 'ok')
+            }
           } catch (e) {
             log('Impossible de retirer certaines vidéos de la banque', 'warn')
           }
