@@ -20,7 +20,8 @@ interface TrackingConfig { enabled: boolean; sync_time: string; force_run?: stri
 // (compte pas encore renseigné → on propose de l'ajouter).
 interface Account {
   id: string; ig_username: string | null; phone_name: string | null
-  account_group: string | null
+  account_group: string | null   // groupe custom (app)
+  group_name: string | null      // groupe GéeLark natif
   followers: number | null; pp_url: string | null
   account_state: string | null   // 'ok' | 'banned' | 'shadow'
   last_post_at: string | null
@@ -75,8 +76,12 @@ export function Reports({ user }: { user: User }) {
 
   // Groupes stockés dans la config serveur (jsonb) → persistant, aucune migration.
   const [ag, setAg] = useState<AccountGroups>({ groups: [], assignments: {} })
-  const [activeGroup, setActiveGroup] = useState<string>('__all__')
+  const [tab, setTab] = useState<'linked' | 'unlinked'>('linked')
+  const [activeGroup, setActiveGroup] = useState<string>('__all__')  // groupe custom (chips)
+  const [geeGroup, setGeeGroup] = useState<string>('__all__')        // groupe GéeLark (dropdown)
   const [search, setSearch] = useState('')
+  const [limit, setLimit] = useState(60)                             // pagination : 700 tels → on cape l'affichage
+  useEffect(() => { setLimit(60) }, [tab, activeGroup, geeGroup, search])
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
 
@@ -106,7 +111,7 @@ export function Reports({ user }: { user: User }) {
     const cfgQ = supabase.from(table).select('tracking_config').eq(keyCol, keyVal).maybeSingle()
     // Base : TOUS les téléphones (1 tél = 1 compte ; ig_username éventuellement vide).
     let pQ = supabase.from('phones')
-      .select('id, ig_username, phone_name, followers, pp_url, account_state, last_post_at')
+      .select('id, ig_username, phone_name, group_name, followers, pp_url, account_state, last_post_at')
       .order('phone_name')
     pQ = currentOrg ? pQ.eq('org_id', currentOrg.id) : pQ.eq('user_id', user.id).is('org_id', null)
     // Données du jour (posté / vues) mergées par phone_id.
@@ -129,6 +134,7 @@ export function Reports({ user }: { user: User }) {
       return {
         id: p.id, ig_username: p.ig_username ?? null, phone_name: p.phone_name ?? null,
         account_group: groups.assignments?.[p.id] ?? null,
+        group_name: p.group_name ?? null,
         followers: p.followers ?? null, pp_url: p.pp_url ?? null,
         account_state: p.account_state ?? null, last_post_at: p.last_post_at ?? null,
         posted: !!d?.posted, posted_at: d?.posted_at ?? null, posts_today: d?.posts_today ?? null,
@@ -222,18 +228,25 @@ export function Reports({ user }: { user: User }) {
   }
 
   // ── Dérivés ──────────────────────────────────────────────────────────────
-  const filtered = accounts.filter(a => {
-    if (activeGroup === '__all__') { /* tous */ }
-    else if (activeGroup === NO_GROUP) { if (a.account_group) return false }
-    else if (a.account_group !== activeGroup) return false
+  const named    = accounts.filter(a => a.ig_username)   // comptes IG liés
+  const unlinked = accounts.filter(a => !a.ig_username)  // tels sans compte
+  const geeGroups = [...new Set(accounts.map(a => a.group_name).filter(Boolean) as string[])].sort()
+
+  const base = tab === 'linked' ? named : unlinked
+  const filtered = base.filter(a => {
+    if (geeGroup !== '__all__' && (a.group_name ?? '') !== geeGroup) return false
+    if (tab === 'linked') {
+      if (activeGroup === NO_GROUP) { if (a.account_group) return false }
+      else if (activeGroup !== '__all__' && a.account_group !== activeGroup) return false
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       return (a.ig_username ?? '').toLowerCase().includes(q) || (a.phone_name ?? '').toLowerCase().includes(q)
     }
     return true
   })
-  const named          = accounts.filter(a => a.ig_username)      // comptes IG renseignés
-  const noIgCount      = accounts.length - named.length
+  const shown = filtered.slice(0, limit)
+
   const totalFollowers = named.reduce((s, a) => s + (a.followers ?? 0), 0)
   const okCount        = named.filter(a => !a.account_state || a.account_state === 'ok').length
   const postedToday    = named.filter(a => a.posted).length
@@ -302,7 +315,7 @@ export function Reports({ user }: { user: User }) {
         {!loading && accounts.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
             <StatCard icon="👥" label="Abonnés (total)" value={fmt(totalFollowers)} accent="var(--text-1)" />
-            <StatCard icon="📱" label="Comptes" value={String(named.length)} sub={noIgCount > 0 ? `+${noIgCount} tél. sans compte` : `${groupNames.length} groupe${groupNames.length > 1 ? 's' : ''}`} />
+            <StatCard icon="📱" label="Comptes liés" value={String(named.length)} sub={unlinked.length > 0 ? `${unlinked.length} tél. à lier` : `${groupNames.length} groupe${groupNames.length > 1 ? 's' : ''}`} />
             <StatCard icon="✅" label="Comptes OK" value={`${okCount}/${named.length || 0}`} accent={named.length && okCount === named.length ? 'var(--ok)' : '#fbbf24'} />
             <StatCard icon="🚀" label="Postés aujourd'hui" value={`${postedToday}/${named.length || 0}`} accent="var(--accent-l)" />
           </div>
@@ -311,13 +324,38 @@ export function Reports({ user }: { user: User }) {
         {/* Courbe (seulement si on a des données) */}
         {!loading && hasTrend && <ViewsChart data={trend} />}
 
-        {/* Filtres groupes */}
+        {/* Onglets : comptes liés / à lier */}
+        {!loading && accounts.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, borderBottom: '1px solid var(--border)' }}>
+            {([['linked', `Comptes (${named.length})`], ['unlinked', `À lier (${unlinked.length})`]] as const).map(([t, lbl]) => (
+              <button key={t} onClick={() => setTab(t)} className="cursor-pointer" style={{
+                padding: '9px 16px', fontSize: 13, fontWeight: 700, background: 'transparent', border: 'none',
+                color: tab === t ? 'var(--text-1)' : 'var(--text-4)',
+                borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, marginBottom: -1,
+              }}>{lbl}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Filtres : groupe GéeLark (dropdown) + recherche + groupes custom (onglet liés) */}
         {!loading && accounts.length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
-            <GroupChip label="Tous" count={accounts.length} active={activeGroup === '__all__'} onClick={() => setActiveGroup('__all__')} />
+            {geeGroups.length > 0 && (
+              <select value={geeGroup} onChange={e => setGeeGroup(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }} title="Filtrer par groupe GéeLark">
+                <option value="__all__">Tous les groupes GéeLark</option>
+                {geeGroups.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            )}
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (pseudo, téléphone)…" className="sf-input" style={{ flex: 1, minWidth: 180, maxWidth: 320, height: 32, fontSize: 12.5 }} />
+            <span style={{ fontSize: 12, color: 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span>
+          </div>
+        )}
+        {/* Groupes custom (chips) — onglet comptes liés uniquement */}
+        {!loading && tab === 'linked' && named.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+            <GroupChip label="Tous" count={named.length} active={activeGroup === '__all__'} onClick={() => setActiveGroup('__all__')} />
             {groupNames.map(g => <GroupChip key={g} label={g} count={countInGroup(g)} active={activeGroup === g} onClick={() => setActiveGroup(g)} />)}
-            {accounts.some(a => !a.account_group) && <GroupChip label={NO_GROUP} count={countInGroup(NO_GROUP)} active={activeGroup === NO_GROUP} onClick={() => setActiveGroup(NO_GROUP)} muted />}
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un compte…" className="sf-input" style={{ marginLeft: 'auto', width: 200, height: 32, fontSize: 12.5 }} />
+            {named.some(a => !a.account_group) && <GroupChip label={NO_GROUP} count={named.filter(a => !a.account_group).length} active={activeGroup === NO_GROUP} onClick={() => setActiveGroup(NO_GROUP)} muted />}
           </div>
         )}
 
@@ -331,20 +369,28 @@ export function Reports({ user }: { user: User }) {
             <div style={{ fontSize: 34, marginBottom: 10 }}>📱</div>
             <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucun téléphone pour l'instant</p>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
-              Synchronise tes cloud phones GéeLark depuis l'onglet <b>Téléphones</b>.
-              Chaque téléphone devient un compte ici : tu lui donnes son <b>@pseudo Instagram</b>, tu le ranges dans un groupe, puis <b>Sync</b> récupère les followers.
+              Synchronise tes cloud phones GéeLark depuis l'onglet <b>Téléphones</b>, puis reviens ici les lier à un compte Instagram.
             </p>
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-4)', fontSize: 13.5 }}>
-            Aucun compte dans « {activeGroup === '__all__' ? 'ce filtre' : activeGroup} ».
+            {tab === 'unlinked' ? 'Aucun téléphone à lier dans ce filtre. 🎉' : 'Aucun compte dans ce filtre.'}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 960 }}>
-            {filtered.map(a => (
-              <AccountRow key={a.id} a={a} groups={groupNames} onOpen={() => a.ig_username && openDetail(a)} onAssign={g => assignGroup(a, g)} onSetUsername={v => setUsername(a, v)} />
-            ))}
-          </div>
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 960 }}>
+              {shown.map(a => (
+                <AccountRow key={a.id} a={a} groups={groupNames} onOpen={() => a.ig_username && openDetail(a)} onAssign={g => assignGroup(a, g)} onSetUsername={v => setUsername(a, v)} />
+              ))}
+            </div>
+            {filtered.length > shown.length && (
+              <div style={{ textAlign: 'center', marginTop: 14 }}>
+                <button onClick={() => setLimit(l => l + 60)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">
+                  Voir plus ({filtered.length - shown.length} restant{filtered.length - shown.length > 1 ? 's' : ''})
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
