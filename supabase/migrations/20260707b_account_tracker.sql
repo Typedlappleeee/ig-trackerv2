@@ -32,19 +32,19 @@ alter table public.account_tracker enable row level security;
 
 create policy "acct_tracker_select" on public.account_tracker for select using (
   auth.uid() = user_id
-  or (org_id is not null and exists (select 1 from org_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid()))
+  or (org_id is not null and exists (select 1 from organization_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid()))
 );
 create policy "acct_tracker_insert" on public.account_tracker for insert with check (
   auth.uid() = user_id
-  or (org_id is not null and exists (select 1 from org_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid()))
+  or (org_id is not null and exists (select 1 from organization_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid()))
 );
 create policy "acct_tracker_update" on public.account_tracker for update using (
   auth.uid() = user_id
-  or (org_id is not null and exists (select 1 from org_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid()))
+  or (org_id is not null and exists (select 1 from organization_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid()))
 );
 create policy "acct_tracker_delete" on public.account_tracker for delete using (
   auth.uid() = user_id
-  or (org_id is not null and exists (select 1 from org_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid()))
+  or (org_id is not null and exists (select 1 from organization_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid()))
 );
 
 notify pgrst, 'reload schema';

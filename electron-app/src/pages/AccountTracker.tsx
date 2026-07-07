@@ -101,10 +101,10 @@ create table if not exists public.account_tracker (
 alter table public.account_tracker enable row level security;
 create policy "at_all" on public.account_tracker for all using (
   auth.uid() = user_id or (org_id is not null and exists (
-    select 1 from org_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid())))
+    select 1 from organization_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid())))
   with check (
   auth.uid() = user_id or (org_id is not null and exists (
-    select 1 from org_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid())));
+    select 1 from organization_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid())));
 notify pgrst, 'reload schema';`}</pre>
         <button onClick={load} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ marginTop: 14 }}>J'ai lancé le SQL — Recharger</button>
       </div>
