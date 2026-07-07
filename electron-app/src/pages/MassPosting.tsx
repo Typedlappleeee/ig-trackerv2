@@ -2344,9 +2344,9 @@ export function MassPosting({ user }: MassPostingProps) {
                 {t('schedule')}
               </button>
               <button
-                onClick={() => scheduleMassPost(new Date())}
+                onClick={post}
                 disabled={!canLaunch}
-                title={canLaunch ? 'Poste côté serveur — tu peux fermer ton PC une fois l\'upload terminé'
+                title={canLaunch ? 'Poste maintenant (garde l\'app ouverte). Pour PC éteint : utilise Programmer.'
                   : !bearer ? 'Connecte GéeLark dans les Paramètres'
                   : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
                   : selectedVideos.length === 0 ? 'Sélectionne des vidéos dans la banque'
