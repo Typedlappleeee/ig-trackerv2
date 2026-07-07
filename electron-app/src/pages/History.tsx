@@ -144,7 +144,7 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
 
     if (filter !== 'direct') {
       const { data: sp } = await baseQ('scheduled_posts')
-        .in('status', ['done', 'failed', 'cancelled'])
+        .in('status', ['pending', 'running', 'done', 'failed', 'cancelled'])
         .order('executed_at', { ascending: false })
         .range(from, to)
       for (const row of (sp ?? []) as ScheduledPost[]) {
@@ -174,6 +174,15 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
     setPage(0)
     load(0, true)
   }, [filter, currentOrg?.id])
+
+  // Rafraîchit tant qu'un post serveur est en cours (pending/running) → l'avancement
+  // se met à jour tout seul sans recharger la page.
+  const hasInProgress = items.some(it => it.kind === 'scheduled' && (it.data.status === 'pending' || it.data.status === 'running'))
+  useEffect(() => {
+    if (!hasInProgress) return
+    const t = setInterval(() => load(0, true), 20_000)
+    return () => clearInterval(t)
+  }, [hasInProgress, load])
 
   function loadMore() {
     const next = page + 1

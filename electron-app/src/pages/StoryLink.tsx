@@ -662,12 +662,13 @@ export default function StoryLink({ user }: { user: User }) {
   // ── Schedule ──────────────────────────────────────────────────────────────
   const canSchedule = !!bearer && selectedIds.length > 0 && photoPool.length > 0 && missingLinkIds.length === 0 && !running
 
-  async function scheduleRun() {
+  // whenOverride : posting « maintenant » côté serveur (date imposée ~now).
+  async function scheduleRun(whenOverride?: Date) {
     if (!canSchedule || scheduling) return
     setSchedErr(''); setScheduling(true)
     try {
-      const when = new Date(schedAt)
-      if (isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
+      const when = whenOverride ?? new Date(schedAt)
+      if (isNaN(when.getTime()) || when.getTime() < Date.now() + 30_000) {
         setSchedErr('Choisis une date au moins 1 minute dans le futur.')
         setScheduling(false)
         return
@@ -708,8 +709,11 @@ export default function StoryLink({ user }: { user: User }) {
         reelsTrial:   false,
       })
       playSuccess()
-      setSchedDone(`${assignments.length} story(s) programmée(s) pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
-      setTimeout(() => { setShowSchedule(false); setSchedDone('') }, 2200)
+      const soon = when.getTime() <= Date.now() + 2 * 60_000
+      setSchedDone(soon
+        ? `✅ ${assignments.length} story(s) envoyée(s) au serveur — elles partent d'ici ~1 min. Tu peux fermer ton PC.`
+        : `${assignments.length} story(s) programmée(s) pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
+      setTimeout(() => { setShowSchedule(false); setSchedDone('') }, soon ? 4000 : 2200)
     } catch (e) {
       const refundAmount = selectedIds.length * CREDIT_COSTS.story
       const refunded = await refundCredits(credits.ownerId, refundAmount)
@@ -891,15 +895,16 @@ export default function StoryLink({ user }: { user: User }) {
             </button>
           ) : (
             <button
-              onClick={run}
-              disabled={!canRun}
-              title={canRun ? (dryRun ? 'Test — ne publie pas réellement' : `Publier la story sur ${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} · ${storyCost} crédits`) : blockReason || undefined}
+              onClick={() => dryRun ? run() : scheduleRun(new Date(Date.now() + 45_000))}
+              disabled={!canRun || scheduling}
+              title={canRun ? (dryRun ? 'Test — ne publie pas réellement (tourne sur ton PC)' : `Poste côté serveur sur ${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} · ${storyCost} crédits · tu peux fermer ton PC`) : blockReason || undefined}
               className={`sf-btn sf-btn-lg sf-btn-primary cursor-pointer`}
-              style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9, opacity: canRun ? 1 : 0.5 }}
+              style={{ cursor: (canRun && !scheduling) ? 'pointer' : 'not-allowed', gap: 9, opacity: (canRun && !scheduling) ? 1 : 0.5 }}
             >
               <IconSend />
               {dryRun
                 ? `Tester${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`
+                : scheduling ? 'Envoi…'
                 : `Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}${storyCost > 0 ? ` · ${storyCost} cr.` : ''}`}
             </button>
           )}
