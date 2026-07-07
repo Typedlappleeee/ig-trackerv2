@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { useLicense } from '@/lib/license'
 import { useConnections } from '@/lib/connections'
 import { syncGeelarkAnalytics } from '@/lib/geelarkAnalytics'
 import { AccountTracker } from './AccountTracker'
@@ -59,13 +60,16 @@ function agoLabel(iso: string | null): string {
 }
 
 export function Reports({ user }: { user: User }) {
-  const { currentOrg } = useOrg()
+  const { currentOrg, role } = useOrg()
+  const isSuperAdmin = useLicense()?.isSuperAdmin === true
+  // Stats réservées à l'agence (owner/admin/superadmin, ou solo) — « bientôt » pour les autres.
+  const canStats = isSuperAdmin || !currentOrg || role === 'owner' || role === 'admin'
   const { bearer } = useConnections(user)
   const table  = currentOrg ? 'org_config' : 'app_config'
   const keyCol = currentOrg ? 'org_id' : 'user_id'
   const keyVal = currentOrg ? currentOrg.id : user.id
 
-  const [view, setView]       = useState<'accounts' | 'tracker'>('accounts')
+  const [view, setView]       = useState<'gestion' | 'stats' | 'tracker'>('gestion')
   const [cfg, setCfg]         = useState<TrackingConfig>(DEFAULT_CFG)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [day]                 = useState(parisToday())
@@ -224,32 +228,38 @@ export function Reports({ user }: { user: User }) {
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <div>
-            <h1 className="sf-page-title">{view === 'tracker' ? 'Suivi des comptes' : 'Mes comptes'}</h1>
+            <h1 className="sf-page-title">{view === 'tracker' ? 'Suivi des comptes' : view === 'stats' ? 'Stats' : 'Gestion des comptes'}</h1>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
               {view === 'tracker'
                 ? 'Tableau partagé — le suivi de tous vos comptes par plateforme'
-                : `1 téléphone = 1 compte Instagram${lastSync ? ` · dernière synchro ${agoLabel(lastSync)}` : ''}`}
+                : view === 'stats'
+                ? `Followers & vues de tes comptes${lastSync ? ` · dernière synchro ${agoLabel(lastSync)}` : ''}`
+                : 'Lie tes téléphones à un compte Instagram (1 téléphone = 1 compte)'}
             </p>
           </div>
         </div>
-        {view === 'accounts' && (
+        {view === 'gestion' && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ position: 'relative' }}>
+              🔗 Lier des comptes
+              {unlinked.length > 0 && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: 'rgba(255,255,255,0.22)' }}>{unlinked.length}</span>}
+            </button>
+          </div>
+        )}
+        {view === 'stats' && canStats && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère followers/vues via l'analytics GéeLark (inclus)">
               {glSyncing ? '⏳ Synchro…' : '🟢 Sync'}
             </button>
             <button onClick={() => setShowCfg(v => !v)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{showCfg ? 'Masquer' : '⚙︎'}</button>
-            <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ position: 'relative' }}>
-              🔗 Lier des comptes
-              {unlinked.length > 0 && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: 'rgba(255,255,255,0.22)' }}>{unlinked.length}</span>}
-            </button>
             {glMsg && <span style={{ fontSize: 12, color: glMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{glMsg}</span>}
           </div>
         )}
       </div>
 
-      {/* Onglets : Mes comptes (synchro téléphones) / Suivi (tableau manuel) */}
+      {/* Onglets : Gestion (liaison tél↔IG) · Stats · Suivi (tableau) */}
       <div style={{ display: 'flex', gap: 6, padding: '0 28px', borderBottom: '1px solid var(--border)' }}>
-        {([['accounts', '📱 Mes comptes'], ['tracker', '🗂️ Suivi des comptes']] as const).map(([v, lbl]) => (
+        {([['gestion', '🔗 Gestion des comptes'], ['stats', '📊 Stats'], ['tracker', '🗂️ Suivi des comptes']] as const).map(([v, lbl]) => (
           <button key={v} onClick={() => setView(v)} className="cursor-pointer" style={{
             padding: '10px 16px', fontSize: 13, fontWeight: 700, background: 'transparent', border: 'none',
             color: view === v ? 'var(--text-1)' : 'var(--text-4)',
@@ -262,8 +272,16 @@ export function Reports({ user }: { user: User }) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
           <AccountTracker user={user} orgId={currentOrg?.id ?? null} />
         </div>
-      ) : (
+      ) : view === 'stats' ? (
       <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
+        {!canStats ? (
+          <div className="sf-card" style={{ padding: '44px 26px', textAlign: 'center', maxWidth: 520, margin: '20px auto' }}>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>📊</div>
+            <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 6px' }}>Bientôt disponible</p>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0, lineHeight: 1.6 }}>Les statistiques de tes comptes (followers, vues, croissance) arrivent très bientôt. En attendant, gère tes comptes dans l'onglet « Gestion des comptes ».</p>
+          </div>
+        ) : (
+        <>
         {/* Config (repliée par défaut) */}
         {showCfg && (
           <div className="sf-card" style={{ padding: 18, marginBottom: 18, maxWidth: 620 }}>
@@ -300,7 +318,14 @@ export function Reports({ user }: { user: User }) {
 
         {/* Courbe (seulement si on a des données) */}
         {!loading && hasTrend && <ViewsChart data={trend} />}
-
+        {!loading && named.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-4)', fontSize: 13 }}>Aucune stat pour l'instant — lie des comptes puis clique « Sync ».</div>
+        )}
+        </>
+        )}
+      </div>
+      ) : (
+      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
         {/* Filtres : groupe GéeLark (dropdown) + recherche */}
         {!loading && named.length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
