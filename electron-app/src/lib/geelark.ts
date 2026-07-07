@@ -235,13 +235,18 @@ export async function listRpaFlows(bearer: string): Promise<RpaFlow[]> {
   return items
 }
 
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+// Anti-détection : « humanise » chaque pause en l'allongeant d'un aléa de 0..+25 %.
+// On n'ajoute JAMAIS de temps en moins → aucune pause ne passe sous une durée déjà
+// testée, donc zéro nouvelle race condition. Ça casse juste la signature « timing
+// robotique au millième » (un humain n'attend jamais pile le même délai deux fois).
+const humanize = (ms: number) => Math.round(ms * (1 + Math.random() * 0.25))
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, humanize(ms)))
 
 // Like sleep but rejects immediately if the AbortSignal fires.
 function sleepOrAbort(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     if (signal?.aborted) { reject(new Error('Annulé')); return }
-    const timer = setTimeout(resolve, ms)
+    const timer = setTimeout(resolve, humanize(ms))
     signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('Annulé')) }, { once: true })
   })
 }
