@@ -903,16 +903,15 @@ export default function StoryLink({ user }: { user: User }) {
             </button>
           ) : (
             <button
-              onClick={() => dryRun ? run() : scheduleRun(new Date(Date.now() + 45_000))}
-              disabled={!canRun || scheduling}
-              title={canRun ? (dryRun ? 'Test — ne publie pas réellement (tourne sur ton PC)' : `Poste côté serveur sur ${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} · ${storyCost} crédits · tu peux fermer ton PC`) : blockReason || undefined}
+              onClick={run}
+              disabled={!canRun}
+              title={canRun ? (dryRun ? 'Test — ne publie pas réellement' : `Publie la story sur ${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} (~5 en parallèle · garde l'app ouverte) · ${storyCost} crédits`) : blockReason || undefined}
               className={`sf-btn sf-btn-lg sf-btn-primary cursor-pointer`}
-              style={{ cursor: (canRun && !scheduling) ? 'pointer' : 'not-allowed', gap: 9, opacity: (canRun && !scheduling) ? 1 : 0.5 }}
+              style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9, opacity: canRun ? 1 : 0.5 }}
             >
               <IconSend />
               {dryRun
                 ? `Tester${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`
-                : scheduling ? 'Envoi…'
                 : `Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}${storyCost > 0 ? ` · ${storyCost} cr.` : ''}`}
             </button>
           )}
