@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { syncGeelarkAnalytics } from '@/lib/geelarkAnalytics'
+import { AccountTracker } from './AccountTracker'
 
 interface TrackingConfig { enabled: boolean; sync_time: string; force_run?: string }
 
@@ -64,6 +65,7 @@ export function Reports({ user }: { user: User }) {
   const keyCol = currentOrg ? 'org_id' : 'user_id'
   const keyVal = currentOrg ? currentOrg.id : user.id
 
+  const [view, setView]       = useState<'accounts' | 'tracker'>('accounts')
   const [cfg, setCfg]         = useState<TrackingConfig>(DEFAULT_CFG)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [day]                 = useState(parisToday())
@@ -222,25 +224,45 @@ export function Reports({ user }: { user: User }) {
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <div>
-            <h1 className="sf-page-title">Mes comptes</h1>
+            <h1 className="sf-page-title">{view === 'tracker' ? 'Suivi des comptes' : 'Mes comptes'}</h1>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
-              1 téléphone = 1 compte Instagram{lastSync ? ` · dernière synchro ${agoLabel(lastSync)}` : ''}
+              {view === 'tracker'
+                ? 'Tableau partagé — le suivi de tous vos comptes par plateforme'
+                : `1 téléphone = 1 compte Instagram${lastSync ? ` · dernière synchro ${agoLabel(lastSync)}` : ''}`}
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère followers/vues via l'analytics GéeLark (inclus)">
-            {glSyncing ? '⏳ Synchro…' : '🟢 Sync'}
-          </button>
-          <button onClick={() => setShowCfg(v => !v)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{showCfg ? 'Masquer' : '⚙︎'}</button>
-          <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ position: 'relative' }}>
-            🔗 Lier des comptes
-            {unlinked.length > 0 && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: 'rgba(255,255,255,0.22)' }}>{unlinked.length}</span>}
-          </button>
-          {glMsg && <span style={{ fontSize: 12, color: glMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{glMsg}</span>}
-        </div>
+        {view === 'accounts' && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère followers/vues via l'analytics GéeLark (inclus)">
+              {glSyncing ? '⏳ Synchro…' : '🟢 Sync'}
+            </button>
+            <button onClick={() => setShowCfg(v => !v)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{showCfg ? 'Masquer' : '⚙︎'}</button>
+            <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ position: 'relative' }}>
+              🔗 Lier des comptes
+              {unlinked.length > 0 && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: 'rgba(255,255,255,0.22)' }}>{unlinked.length}</span>}
+            </button>
+            {glMsg && <span style={{ fontSize: 12, color: glMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{glMsg}</span>}
+          </div>
+        )}
       </div>
 
+      {/* Onglets : Mes comptes (synchro téléphones) / Suivi (tableau manuel) */}
+      <div style={{ display: 'flex', gap: 6, padding: '0 28px', borderBottom: '1px solid var(--border)' }}>
+        {([['accounts', '📱 Mes comptes'], ['tracker', '🗂️ Suivi des comptes']] as const).map(([v, lbl]) => (
+          <button key={v} onClick={() => setView(v)} className="cursor-pointer" style={{
+            padding: '10px 16px', fontSize: 13, fontWeight: 700, background: 'transparent', border: 'none',
+            color: view === v ? 'var(--text-1)' : 'var(--text-4)',
+            borderBottom: `2px solid ${view === v ? 'var(--accent)' : 'transparent'}`, marginBottom: -1,
+          }}>{lbl}</button>
+        ))}
+      </div>
+
+      {view === 'tracker' ? (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
+          <AccountTracker user={user} orgId={currentOrg?.id ?? null} />
+        </div>
+      ) : (
       <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
         {/* Config (repliée par défaut) */}
         {showCfg && (
@@ -334,6 +356,7 @@ export function Reports({ user }: { user: User }) {
           </>
         )}
       </div>
+      )}
 
       {linkOpen && <LinkModal phones={unlinked} geeGroups={geeGroups} onClose={() => setLinkOpen(false)} onBulkLink={bulkLink} />}
 
