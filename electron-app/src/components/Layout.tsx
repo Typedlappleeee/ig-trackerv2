@@ -1609,7 +1609,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       )}
 
       {/* Suivi global des postings en cours (visible partout, survit au refresh) */}
-      <ActivePostingsWidget onOpen={p => onNavigate(p as Page)} />
+      <ActivePostingsWidget onOpen={p => onNavigate(p as Page)} orgId={currentOrg?.id ?? null} userId={user.id} />
     </div>
   )
 }
