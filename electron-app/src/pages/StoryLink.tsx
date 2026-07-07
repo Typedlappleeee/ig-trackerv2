@@ -569,11 +569,11 @@ export default function StoryLink({ user }: { user: User }) {
     const rotationUrls = rotProxy ? activeRotationUrls() : []
     // Proxy rotatif : autant de téléphones en parallèle qu'il y a de proxies (1 IP
     // fraîche par proxy). 1 proxy = série. Sinon : concurrence = réglage utilisateur,
-    // ou par défaut PLAFONNÉE à 5 — poster TOUS les téléphones d'un coup sature la
-    // limite GeeLark (200 req/min, ~40 appels ADB/story) → moitié des stories ratées.
+    // ou par défaut TOUS d'un coup (« Tous »). Si tu vois des échecs par saturation,
+    // mets un nombre dans le champ Concurrence pour brider.
     const CONCURRENCY = rotProxy
       ? Math.max(1, Math.min(rotationUrls.length || 1, assignments.length))
-      : (maxConc > 0 ? maxConc : Math.min(assignments.length, 5))
+      : (maxConc > 0 ? maxConc : assignments.length)
     // Petit décalage de démarrage plafonné (~6s) pour ne pas booter tout au même
     // instant. En rotatif un seul worker → aucun décalage.
     const staggerBase = rotProxy ? 0 : 1000
