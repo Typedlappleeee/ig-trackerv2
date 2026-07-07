@@ -84,6 +84,9 @@ export function Reports({ user }: { user: User }) {
   useEffect(() => { setLimit(60) }, [tab, activeGroup, geeGroup, search])
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   // Synchro / config
   const [glSyncing, setGlSyncing] = useState(false)
@@ -200,6 +203,18 @@ export function Reports({ user }: { user: User }) {
     setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ig_username: clean } : a))
     const { error } = await supabase.from('phones').update({ ig_username: clean }).eq('id', acc.id)
     if (error) { console.error('[Reports] setUsername', error); load() }
+  }
+  // Liaison en masse : un pseudo par ligne, associé aux téléphones affichés DANS
+  // L'ORDRE (comme le collage groupé du Warmup). Scopé au filtre courant.
+  async function bulkLink(targets: Account[]) {
+    const names = bulkText.split('\n').map(s => s.trim().replace(/^@+/, '').toLowerCase()).filter(Boolean)
+    if (!names.length) return
+    setBulkBusy(true)
+    const updates = targets.map((a, i) => ({ id: a.id, u: names[i] })).filter(x => x.u)
+    setAccounts(prev => prev.map(a => { const up = updates.find(x => x.id === a.id); return up ? { ...a, ig_username: up.u } : a }))
+    try { await Promise.all(updates.map(up => supabase.from('phones').update({ ig_username: up.u }).eq('id', up.id))) }
+    catch (e) { console.error('[Reports] bulkLink', e); load() }
+    setBulkBusy(false); setBulkText(''); setBulkOpen(false)
   }
 
   // ── Sync ───────────────────────────────────────────────────────────────────
@@ -359,10 +374,38 @@ export function Reports({ user }: { user: User }) {
           </div>
         )}
 
+        {/* À lier : liaison en masse */}
+        {!loading && tab === 'unlinked' && (geeGroup !== '__all__' || search.trim() || filtered.length <= 150) && filtered.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            {!bulkOpen ? (
+              <button onClick={() => setBulkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">⚡ Lier en masse ({filtered.length})</button>
+            ) : (
+              <div className="sf-card sf-anim-slide-up" style={{ padding: 14, maxWidth: 520 }}>
+                <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '0 0 8px', lineHeight: 1.5 }}>
+                  Colle <b>un pseudo Instagram par ligne</b>, dans l'ordre des {filtered.length} téléphones affichés. Ligne vide = téléphone ignoré.
+                </p>
+                <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={6} placeholder={'compte1\ncompte2\ncompte3'} className="sf-input" style={{ width: '100%', fontFamily: 'monospace', fontSize: 12.5, resize: 'vertical' }} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button onClick={() => bulkLink(filtered)} disabled={bulkBusy} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">{bulkBusy ? 'Liaison…' : 'Lier'}</button>
+                  <button onClick={() => { setBulkOpen(false); setBulkText('') }} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">Annuler</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Liste */}
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 900 }}>
             {[0, 1, 2, 3].map(i => <div key={i} className="sf-card sf-skeleton" style={{ height: 60 }} />)}
+          </div>
+        ) : tab === 'unlinked' && geeGroup === '__all__' && !search.trim() && filtered.length > 150 ? (
+          <div className="sf-card" style={{ padding: '36px 24px', textAlign: 'center', maxWidth: 560, margin: '10px auto' }}>
+            <div style={{ fontSize: 30, marginBottom: 10 }}>🗂️</div>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>{filtered.length} téléphones à lier</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
+              Trop pour tout afficher d'un coup. <b>Choisis un groupe GéeLark</b> (menu ci-dessus) ou fais une recherche pour traiter les comptes par lot, puis lie-les en masse.
+            </p>
           </div>
         ) : accounts.length === 0 ? (
           <div className="sf-card" style={{ padding: '44px 24px', textAlign: 'center', maxWidth: 560, margin: '10px auto' }}>
@@ -456,18 +499,20 @@ function AccountRow({ a, groups, onOpen, onAssign, onSetUsername }: { a: Account
           <span style={{ color: a.posted ? 'var(--ok)' : 'var(--text-4)' }}>{a.posted ? '● posté' : '○ pas posté'}</span></>}
         </div>
       </div>
-      {/* Sélecteur de groupe */}
-      <select
-        value={a.account_group ?? ''}
-        onClick={e => e.stopPropagation()}
-        onChange={e => { e.stopPropagation(); onAssign(e.target.value || null) }}
-        className="sf-input cursor-pointer"
-        style={{ width: 'auto', minWidth: 120, height: 30, fontSize: 12, flexShrink: 0 }}
-        title="Ranger dans un groupe"
-      >
-        <option value="">— Sans groupe —</option>
-        {groups.map(g => <option key={g} value={g}>{g}</option>)}
-      </select>
+      {/* Sélecteur de groupe custom — seulement pour les comptes liés */}
+      {hasIg && (
+        <select
+          value={a.account_group ?? ''}
+          onClick={e => e.stopPropagation()}
+          onChange={e => { e.stopPropagation(); onAssign(e.target.value || null) }}
+          className="sf-input cursor-pointer"
+          style={{ width: 'auto', minWidth: 120, height: 30, fontSize: 12, flexShrink: 0 }}
+          title="Ranger dans un groupe"
+        >
+          <option value="">— Sans groupe —</option>
+          {groups.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+      )}
     </div>
   )
 }
