@@ -27,6 +27,7 @@ const MARKETS = ['', 'FR', 'US', 'UK', 'ES', 'DE', 'Autre']
 
 export function AccountTracker({ user, orgId }: { user: User; orgId: string | null }) {
   const [rows, setRows] = useState<Row[]>([])
+  const [phoneAccounts, setPhoneAccounts] = useState<{ ig_username: string; phone_name: string | null }[]>([])
   const [loading, setLoading] = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
   const [marketFilter, setMarketFilter] = useState<string>('__all__')
@@ -45,9 +46,26 @@ export function AccountTracker({ user, orgId }: { user: User; orgId: string | nu
       setRows([]); setLoading(false); return
     }
     setRows((data ?? []) as Row[])
+    // Comptes IG déjà assignés aux téléphones → suggestions + import.
+    let pq = supabase.from('phones').select('ig_username, phone_name').not('ig_username', 'is', null)
+    pq = orgId ? pq.eq('org_id', orgId) : pq.eq('user_id', user.id).is('org_id', null)
+    const { data: pd } = await pq
+    setPhoneAccounts((pd ?? []) as { ig_username: string; phone_name: string | null }[])
     setLoading(false)
   }, [orgId, user.id])
   useEffect(() => { load() }, [load])
+
+  // Crée une ligne pour chaque compte IG des téléphones pas encore dans le tableau.
+  async function importFromPhones() {
+    const existing = new Set(rows.map(r => (r.pseudo ?? '').replace(/^@+/, '').toLowerCase()).filter(Boolean))
+    const toAdd = phoneAccounts.filter(p => p.ig_username && !existing.has(p.ig_username.replace(/^@+/, '').toLowerCase()))
+    if (!toAdd.length) return
+    let sort = rows.reduce((m, r) => Math.max(m, r.sort ?? 0), 0)
+    const payload = toAdd.map(p => ({ org_id: orgId, user_id: user.id, pseudo: p.ig_username, name: p.phone_name ?? p.ig_username, sort: ++sort }))
+    const { data, error } = await supabase.from('account_tracker').insert(payload).select('*')
+    if (error) { console.error('[AccountTracker] import', error); return }
+    if (data) setRows(prev => [...prev, ...(data as Row[])])
+  }
 
   async function patch(id: string, col: keyof Row, value: string) {
     setRows(prev => prev.map(r => r.id === id ? { ...r, [col]: value } : r))
@@ -78,6 +96,9 @@ export function AccountTracker({ user, orgId }: { user: User; orgId: string | nu
     }
     return true
   })
+  const trackedPseudos = new Set(rows.map(r => (r.pseudo ?? '').replace(/^@+/, '').toLowerCase()).filter(Boolean))
+  const importCount = phoneAccounts.filter(p => p.ig_username && !trackedPseudos.has(p.ig_username.replace(/^@+/, '').toLowerCase())).length
+  const pseudoSuggestions = [...new Set(phoneAccounts.map(p => p.ig_username).filter(Boolean))].sort()
 
   if (needsSetup) {
     return (
@@ -130,6 +151,11 @@ notify pgrst, 'reload schema';`}</pre>
             </select>
           )}
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…" className="sf-input" style={{ width: 160, height: 32, fontSize: 12.5 }} />
+          {importCount > 0 && (
+            <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" title="Crée une ligne pour chaque compte Instagram déjà assigné à un téléphone">
+              ↧ Importer mes comptes ({importCount})
+            </button>
+          )}
           <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">＋ Ajouter une ligne</button>
         </div>
       </div>
@@ -165,7 +191,7 @@ notify pgrst, 'reload schema';`}</pre>
                     </td>
                     <td style={{ padding: '6px 8px' }}><SelectCell value={r.market} options={MARKETS} onSave={v => patch(r.id, 'market', v)} /></td>
                     <td style={{ padding: '6px 8px', minWidth: 110 }}><TextCell value={r.folder} placeholder="—" onSave={v => patch(r.id, 'folder', v)} /></td>
-                    <td style={{ padding: '6px 8px', minWidth: 120 }}><TextCell value={r.pseudo} placeholder="@pseudo" onSave={v => patch(r.id, 'pseudo', v)} /></td>
+                    <td style={{ padding: '6px 8px', minWidth: 120 }}><TextCell value={r.pseudo} placeholder="@pseudo" list={pseudoSuggestions} onSave={v => patch(r.id, 'pseudo', v)} /></td>
                     <td style={{ padding: '6px 8px' }}><StatusCell value={r.insta} onSave={v => patch(r.id, 'insta', v)} /></td>
                     <td style={{ padding: '6px 8px' }}><StatusCell value={r.tiktok} onSave={v => patch(r.id, 'tiktok', v)} /></td>
                     <td style={{ padding: '6px 8px' }}><StatusCell value={r.threads} onSave={v => patch(r.id, 'threads', v)} /></td>
@@ -186,11 +212,15 @@ notify pgrst, 'reload schema';`}</pre>
 }
 
 // ── Cellules ──────────────────────────────────────────────────────────────────
-function TextCell({ value, placeholder, bold, small, onSave }: { value: string | null; placeholder?: string; bold?: boolean; small?: boolean; onSave: (v: string) => void }) {
+function TextCell({ value, placeholder, bold, small, list, onSave }: { value: string | null; placeholder?: string; bold?: boolean; small?: boolean; list?: string[]; onSave: (v: string) => void }) {
   const [v, setV] = useState(value ?? '')
   useEffect(() => { setV(value ?? '') }, [value])
+  const [listId] = useState(() => `dl-${Math.random().toString(36).slice(2, 9)}`)
   return (
+    <>
+    {list && list.length > 0 && <datalist id={listId}>{list.map(o => <option key={o} value={o} />)}</datalist>}
     <input
+      list={list && list.length > 0 ? listId : undefined}
       value={v} placeholder={placeholder}
       onChange={e => setV(e.target.value)}
       onBlur={() => { if ((v ?? '') !== (value ?? '')) onSave(v) }}
@@ -203,6 +233,7 @@ function TextCell({ value, placeholder, bold, small, onSave }: { value: string |
       onFocus={e => { e.currentTarget.style.border = '1px solid var(--accent)'; e.currentTarget.style.background = 'var(--surface-2)' }}
       onBlurCapture={e => { e.currentTarget.style.border = '1px solid transparent'; e.currentTarget.style.background = 'transparent' }}
     />
+    </>
   )
 }
 
