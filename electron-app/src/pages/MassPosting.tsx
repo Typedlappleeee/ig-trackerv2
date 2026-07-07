@@ -56,6 +56,20 @@ async function geelark(bearer: string, path: string, body: unknown) {
   return r.data as Record<string, unknown>
 }
 
+// Anti-double-post : classe le résultat d'une création de tâche GeeLark.
+//  'ok'       → tâche créée (code 0).
+//  'rejected' → GeeLark a RÉPONDU par une erreur (code numérique ≠ 0) : la tâche
+//               n'a PAS été créée → il est sûr de retenter.
+//  'unknown'  → réponse vide/perdue (sur desktop, geelark() renvoie {} en cas de
+//               timeout IPC/réseau, donc pas de champ `code`). La tâche a PEUT-ÊTRE
+//               été créée côté GeeLark → on ne DOIT jamais retenter (sinon double post).
+type TaskOutcome = 'ok' | 'rejected' | 'unknown'
+function classifyTaskRes(r: Record<string, unknown> | null | undefined): TaskOutcome {
+  if (r && r['code'] === 0) return 'ok'
+  if (r && typeof r['code'] === 'number') return 'rejected'
+  return 'unknown'
+}
+
 const LS_MODE = 'sf-mass-posting-mode'
 
 const STATUS_DOT: Record<string, string> = {
@@ -363,15 +377,17 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       }
 
-      // ── Reprise d'EXÉCUTION : téléphones jamais partis (aucun taskId) mais dont
-      // le média est déjà hébergé (token persisté) → on les RELANCE. Ceux qui ont
-      // déjà un taskId sont exclus → jamais de double post. Crédits déjà débités
-      // au lancement → aucun nouveau débit.
+      // ── Reprise d'EXÉCUTION : téléphones JAMAIS PARTIS (boucle interrompue avant
+      // eux) dont le média est déjà hébergé (token persisté) → on les RELANCE.
+      // Anti-double : on ne relance QUE les tél qui n'ont jamais atteint l'étape de
+      // création. Dès que le statut est 'posting' (même sans taskId enregistré : cas
+      // d'un crash pile après l'envoi à GeeLark, où la tâche a peut-être été créée),
+      // on NE relance PAS → on se contente de suivre. Crédits déjà débités → 0 débit.
       const toLaunch = persisted.runPhones.filter(rp => {
         const st = statuses.get(rp.phoneId)
-        const dispatched = Boolean(st?.taskId)
-        const finalized  = st?.status === 'done' || st?.status === 'error' || st?.status === 'cancelled'
-        return Boolean(rp.token) && !dispatched && !finalized
+        const attempted = st?.status === 'posting' || st?.status === 'uploading' || Boolean(st?.taskId)
+        const finalized = st?.status === 'done' || st?.status === 'error' || st?.status === 'cancelled'
+        return Boolean(rp.token) && !attempted && !finalized
       })
       if (toLaunch.length && !stopRef.current) {
         log(`↻ Reprise : ${toLaunch.length} téléphone(s) pas encore parti(s) — relance de la publication…`, 'info')
@@ -407,18 +423,24 @@ export function MassPosting({ user }: MassPostingProps) {
             postingStartRef.current.set(rp.geelarkId, Date.now())
             await waitForPhoneConnectivity(bearer, rp.geelarkId, m => log(`  ${rp.phoneName}: ${m.trim()}`))
             let taskRes: Record<string, unknown> | null = null
+            let outcome: TaskOutcome = 'unknown'
             for (let attempt = 0; attempt < 3; attempt++) {
               taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
                 id: rp.geelarkId, scheduleAt: Math.floor(Date.now() / 1000),
                 description: rp.caption ?? '', video: [rp.token!], ...(persisted.reelsTrial ? { shareType: 2 } : {}),
               })
-              if (taskRes['code'] === 0) break
+              outcome = classifyTaskRes(taskRes)
+              if (outcome === 'ok') break
+              if (outcome === 'unknown') break  // réponse perdue → tâche peut-être créée → pas de retry (anti-double)
               if (attempt < 2) { log(`  ${rp.phoneName} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
             }
-            if (taskRes && taskRes['code'] === 0) {
-              const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
+            if (outcome === 'ok') {
+              const tid = (taskRes!['data'] as Record<string, unknown>)?.['id'] as string
               byTask.set(tid, rp); setPhoneTaskId(rp.geelarkId, tid); setPhoneStatus(rp.phoneId, { status: 'posting', taskId: tid })
               log(`  Tâche recréée pour ${rp.phoneName}`, 'ok')
+            } else if (outcome === 'unknown') {
+              log(`  ${rp.phoneName} : réponse GeeLark perdue (réseau) — on ne recrée pas (anti-double)`, 'warn')
+              setPhoneStatus(rp.phoneId, { status: 'posting', detail: 'non confirmé (réseau)' })
             } else {
               setPhoneStatus(rp.phoneId, { status: 'error', detail: String(taskRes?.['msg'] ?? 'échec reprise') })
             }
@@ -1175,6 +1197,7 @@ export function MassPosting({ user }: MassPostingProps) {
           postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
 
           let taskRes: Record<string, unknown> | null = null
+          let outcome: TaskOutcome = 'unknown'
           for (let attempt = 0; attempt < 3; attempt++) {
             taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
               id:          asgn.phone.geelark_id,
@@ -1183,20 +1206,33 @@ export function MassPosting({ user }: MassPostingProps) {
               video:       [token],
               ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
             })
-            // Succès → on sort. Sinon backoff avant de réessayer (throttle probable).
-            if (taskRes['code'] === 0) break
+            outcome = classifyTaskRes(taskRes)
+            if (outcome === 'ok') break
+            // Réponse perdue (réseau/timeout) : la tâche a PEUT-ÊTRE été créée →
+            // on NE retente PAS (sinon double post). On la traite comme « en vol non
+            // confirmée » plus bas.
+            if (outcome === 'unknown') break
+            // 'rejected' = GeeLark a bien refusé (tâche non créée) → retry sûr.
             if (attempt < 2) {
               log(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, 'warn')
               await new Promise(r => setTimeout(r, 3000 * (attempt + 1)))
             }
           }
-          if (taskRes && taskRes['code'] === 0) {
-            const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
+          if (outcome === 'ok') {
+            const tid = (taskRes!['data'] as Record<string, unknown>)?.['id'] as string
             taskIds[asgn.phone.geelark_id] = tid
             activeTasksRef.current = [...activeTasksRef.current, tid]
             setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
             setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
             log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
+            armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
+          } else if (outcome === 'unknown') {
+            // Ambiguë : pas de taskId à suivre, mais la publication est peut-être
+            // partie. On la laisse « posting (non confirmé) » SANS taskId → elle ne
+            // sera JAMAIS relancée (ni par le retry, ni par la reprise) → zéro double.
+            // On arme quand même l'auto-stop pour éteindre le tél et clore l'UI.
+            log(`  ${asgn.phone.phone_name} : réponse GeeLark perdue (réseau) — publication peut-être partie, on ne retente pas (anti-double)`, 'warn')
+            setPhoneStatus(asgn.phone.id, { status: 'posting', detail: 'non confirmé (réseau)' })
             armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
           } else {
             log(`  ${asgn.phone.phone_name}: ${taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec'}`, 'error')
