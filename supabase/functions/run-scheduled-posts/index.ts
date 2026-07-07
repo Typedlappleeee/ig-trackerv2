@@ -1094,6 +1094,23 @@ Deno.serve(async (req) => {
 
         if (!images.length) throw new Error('Aucune image dans la story')
 
+        // Proxy rotatif : URLs de rotation (org/user) → nouvelle IP avant chaque
+        // boot de téléphone, comme le fait l'app côté client. Stocké dans
+        // org_config.proxy / app_config.proxy (JSON { enabled, urls }).
+        let rotationUrls: string[] = []
+        try {
+          const cfgQ = post.org_id
+            ? db.from('org_config').select('proxy').eq('org_id', post.org_id).maybeSingle()
+            : db.from('app_config').select('proxy').eq('user_id', post.user_id).is('org_id', null).maybeSingle()
+          const { data: cfgD } = await cfgQ
+          const raw = (cfgD as { proxy?: unknown } | null)?.proxy
+          const j = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
+          if (j && j.enabled && Array.isArray(j.urls)) {
+            rotationUrls = j.urls.filter((u: unknown) => typeof u === 'string' && /^https?:\/\//i.test(String(u).trim()))
+          }
+        } catch { /* config absente / invalide → pas de rotation */ }
+        if (rotationUrls.length) log(`🔄 Proxy rotatif serveur : ${rotationUrls.length} URL(s) de rotation`)
+
         // Traite UN téléphone par invocation : le boot du téléphone (~30-60s) +
         // l'automation story (~2 min) tiennent dans le budget serverless pour un
         // seul compte. Les autres comptes sont repris aux ticks suivants du cron.
@@ -1120,7 +1137,7 @@ Deno.serve(async (req) => {
             { onConflict: 'geelark_id' },
           ).then(() => {}, () => {})
           try {
-            const res = await postStoryServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText }, m => log(`  ${name}: ${m}`))
+            const res = await postStoryServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText, rotationUrls }, m => log(`  ${name}: ${m}`))
             if (res.ok) log(`✅ ${name} — story publiée`)
             else log(`❌ ${name} : ${res.error ?? 'échec'}`)
           } catch (e) {

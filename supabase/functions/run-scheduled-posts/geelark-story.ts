@@ -26,6 +26,21 @@ async function gFetch(bearer: string, path: string, body: unknown): Promise<Reco
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
+// ── Rotation d'IP proxy (proxy rotatif) ──────────────────────────────────────
+// Appelle l'URL « change IP » de chaque dongle puis laisse le temps à l'IP de se
+// réattribuer. À faire AVANT de booter le téléphone → il démarre sur la nouvelle
+// IP. Best-effort : ne throw jamais (une rotation ratée ne doit pas bloquer).
+async function rotateProxies(urls: string[], log: (m: string) => void): Promise<void> {
+  const list = (urls ?? []).map(u => (u ?? '').trim()).filter(u => /^https?:\/\//i.test(u))
+  if (list.length === 0) return
+  log(`🔄 Rotation IP (${list.length} proxy)…`)
+  await Promise.all(list.map(async u => {
+    try { await fetch(u, { signal: AbortSignal.timeout(15000) }) }
+    catch (e) { log(`   ⚠ rotation proxy échouée : ${e instanceof Error ? e.message : String(e)}`) }
+  }))
+  await sleep(4000)  // laisse le dongle couper l'ancienne IP avant le boot
+}
+
 // ── Nouveau système d'upload média : natif GéeLark ─────────────────────────
 // GéeLark télécharge le fichier dans son material center puis le dépose sur le
 // téléphone au chemin voulu (DCIM/Camera). Plus fiable que curl/base64 + le
@@ -345,6 +360,7 @@ export interface StoryServerConfig {
   linkUrl: string
   linkText?: string
   dryRun?: boolean
+  rotationUrls?: string[]   // proxy rotatif : rote l'IP AVANT de booter le téléphone
 }
 
 export async function postStoryServer(
@@ -353,6 +369,8 @@ export async function postStoryServer(
   config: StoryServerConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
+  // Proxy rotatif : nouvelle IP avant le boot → le téléphone démarre dessus.
+  if (config.rotationUrls?.length) await rotateProxies(config.rotationUrls, log)
   const ready = await ensurePhoneRunning(bearer, phoneId, log)
   if (!ready) throw new Error('Téléphone non démarré')
 
