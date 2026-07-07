@@ -190,6 +190,14 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
     load(next, false)
   }
 
+  // Annule un post en attente / bloqué (le sort du « en cours » et l'empêche de
+  // repartir plus tard). Utile pour dégager un post serveur figé.
+  async function cancelPost(post: ScheduledPost) {
+    setCtxMenu(null)
+    await supabase.from('scheduled_posts').update({ status: 'cancelled', error_msg: 'Annulé manuellement' }).eq('id', post.id)
+    load(0, true)
+  }
+
   // Duplique un post programmé : recrée la même config (téléphones, vidéos,
   // légende) dans un NOUVEAU post en attente, programmé dans ~1h.
   async function duplicatePost(post: ScheduledPost) {
@@ -550,6 +558,21 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
               </svg>
               {duplicating ? 'Duplication…' : 'Dupliquer ce post'}
             </button>
+            {(ctxMenu.post.status === 'pending' || ctxMenu.post.status === 'running') && (
+              <button
+                onClick={() => cancelPost(ctxMenu.post)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                  padding: '9px 12px', borderRadius: 7, background: 'transparent', border: 'none',
+                  color: ERR, fontSize: 13, fontFamily: SANS, cursor: 'pointer',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                Annuler ce post
+              </button>
+            )}
           </div>
         </>
       )}
