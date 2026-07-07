@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getActiveRuns, subscribeActiveRuns, removeRun, type ActiveRun, type PhaseStatus } from '@/lib/activeRuns'
 
 const PHASE_ICON: Record<PhaseStatus, string> = { idle: '○', running: '◔', done: '✓', error: '✕' }
@@ -30,11 +30,41 @@ const TYPE_META: Record<ActiveRun['type'], { emoji: string; label: string }> = {
 
 // Widget flottant (bas-droite) listant les postings en cours — visible sur toutes
 // les pages, survit à la navigation et au refresh. Alerte si 2 runs partagent un proxy.
+const POS_KEY = 'sf-widget-pos'
+
 export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => void }) {
   const [runs, setRuns] = useState<ActiveRun[]>(getActiveRuns())
   const [open, setOpen] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const toggleExpand = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  // Position libre (déplaçable). null = coin bas-droite par défaut.
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
+    try { const r = localStorage.getItem(POS_KEY); return r ? JSON.parse(r) : null } catch { return null }
+  })
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null)
+  function onDragStart(e: React.PointerEvent) {
+    e.preventDefault()
+    const el = (e.currentTarget as HTMLElement).closest('[data-widget]') as HTMLElement
+    const rect = el.getBoundingClientRect()
+    dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top }
+    const move = (ev: PointerEvent) => {
+      if (!dragRef.current) return
+      const W = el.offsetWidth, H = el.offsetHeight
+      const x = Math.max(6, Math.min(window.innerWidth - W - 6, ev.clientX - dragRef.current.dx))
+      const y = Math.max(6, Math.min(window.innerHeight - H - 6, ev.clientY - dragRef.current.dy))
+      setPos({ x, y })
+    }
+    const up = () => {
+      dragRef.current = null
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      setPos(p => { if (p) { try { localStorage.setItem(POS_KEY, JSON.stringify(p)) } catch { /* quota */ } } return p })
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+  function resetPos() { setPos(null); try { localStorage.removeItem(POS_KEY) } catch { /* ignore */ } }
 
   useEffect(() => subscribeActiveRuns(() => setRuns(getActiveRuns())), [])
 
@@ -52,22 +82,32 @@ export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => vo
 
   const runningCount = runs.filter(r => r.status === 'running').length
 
+  const posStyle: React.CSSProperties = pos
+    ? { left: pos.x, top: pos.y }
+    : { bottom: 18, right: 18 }
+
   return (
-    <div style={{ position: 'fixed', bottom: 18, right: 18, zIndex: 90, width: open ? 320 : 'auto', maxWidth: 'calc(100vw - 36px)' }}>
+    <div data-widget style={{ position: 'fixed', ...posStyle, zIndex: 90, width: open ? 320 : 'auto', maxWidth: 'calc(100vw - 36px)' }}>
       <div className="sf-card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--shadow-lg)', border: anyClash ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--border-md)' }}>
         {/* Header */}
-        <button onClick={() => setOpen(o => !o)} className="cursor-pointer"
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', border: 'none', background: anyClash ? 'rgba(239,68,68,0.10)' : 'var(--surface-2)', textAlign: 'left' }}>
-          <span style={{ position: 'relative', display: 'flex' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: runningCount ? 'var(--ok)' : 'var(--text-4)' }} />
-            {runningCount > 0 && <span style={{ position: 'absolute', inset: -3, borderRadius: '50%', border: '2px solid var(--ok)', opacity: 0.5, animation: 'sf-pulse 1.6s ease-out infinite' }} />}
-          </span>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)' }}>
-            {runningCount > 0 ? `${runningCount} posting${runningCount > 1 ? 's' : ''} en cours` : 'Postings'}
-          </span>
-          {anyClash && <span title="Deux postings sur le même proxy — risque de ban" style={{ fontSize: 11 }}>⚠️</span>}
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)' }}>{open ? '▾' : '▸'}</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', background: anyClash ? 'rgba(239,68,68,0.10)' : 'var(--surface-2)' }}>
+          {/* Poignée de déplacement */}
+          <span onPointerDown={onDragStart} title="Glisser pour déplacer" className="cursor-pointer"
+            style={{ padding: '10px 4px 10px 10px', color: 'var(--text-4)', fontSize: 13, cursor: 'grab', touchAction: 'none', userSelect: 'none' }}>⠿</span>
+          <button onClick={() => setOpen(o => !o)} className="cursor-pointer"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px 10px 4px', border: 'none', background: 'transparent', textAlign: 'left' }}>
+            <span style={{ position: 'relative', display: 'flex' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: runningCount ? 'var(--ok)' : 'var(--text-4)' }} />
+              {runningCount > 0 && <span style={{ position: 'absolute', inset: -3, borderRadius: '50%', border: '2px solid var(--ok)', opacity: 0.5, animation: 'sf-pulse 1.6s ease-out infinite' }} />}
+            </span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)' }}>
+              {runningCount > 0 ? `${runningCount} posting${runningCount > 1 ? 's' : ''} en cours` : 'Postings'}
+            </span>
+            {anyClash && <span title="Deux postings sur le même proxy — risque de ban" style={{ fontSize: 11 }}>⚠️</span>}
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)' }}>{open ? '▾' : '▸'}</span>
+          </button>
+          {pos && <button onClick={resetPos} title="Remettre en bas à droite" className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, padding: '10px 10px 10px 4px' }}>⟲</button>}
+        </div>
 
         {open && (
           <div style={{ maxHeight: 320, overflow: 'auto' }}>
