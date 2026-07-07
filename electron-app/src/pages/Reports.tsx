@@ -1,7 +1,7 @@
 /**
  * Reports — « Mes comptes ».
  * 1 téléphone = 1 compte Instagram. On liste TOUS les comptes (phones avec un
- * ig_username), rangeables dans des GROUPES libres (colonne phones.account_group).
+ * ig_username), organisés par leur groupe GéeLark natif (group_name).
  * Les stats (followers, posté aujourd'hui, vues) s'affichent quand elles sont là
  * — le fetch/synchro se branche derrière (bouton Sync via GéeLark ou cron).
  */
@@ -12,15 +12,12 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { syncGeelarkAnalytics } from '@/lib/geelarkAnalytics'
 
-// Groupes stockés DANS la config (jsonb tracking_config) → aucune migration.
-interface AccountGroups { groups: string[]; assignments: Record<string, string> }
-interface TrackingConfig { enabled: boolean; sync_time: string; force_run?: string; account_groups?: AccountGroups }
+interface TrackingConfig { enabled: boolean; sync_time: string; force_run?: string }
 
 // Un compte = un téléphone (1 tél = 1 compte IG). ig_username peut être vide
-// (compte pas encore renseigné → on propose de l'ajouter).
+// (téléphone pas encore lié à un compte).
 interface Account {
   id: string; ig_username: string | null; phone_name: string | null
-  account_group: string | null   // groupe custom (app)
   group_name: string | null      // groupe GéeLark natif
   followers: number | null; pp_url: string | null
   account_state: string | null   // 'ok' | 'banned' | 'shadow'
@@ -34,7 +31,6 @@ interface TrendPoint { day: string; views: number }
 interface ReelInfo { postedAt: string | null; views: number; likes: number; comments: number; url: string | null; thumb: string | null }
 
 const DEFAULT_CFG: TrackingConfig = { enabled: false, sync_time: '12:00' }
-const NO_GROUP = 'Sans groupe'
 
 const _isWeb = typeof window !== 'undefined' && !(window as unknown as { electronAPI?: unknown }).electronAPI
 function igimg(u: string | null | undefined): string | undefined {
@@ -74,19 +70,12 @@ export function Reports({ user }: { user: User }) {
   const [loading, setLoading] = useState(true)
   const [trend, setTrend]     = useState<TrendPoint[]>([])
 
-  // Groupes stockés dans la config serveur (jsonb) → persistant, aucune migration.
-  const [ag, setAg] = useState<AccountGroups>({ groups: [], assignments: {} })
-  const [tab, setTab] = useState<'linked' | 'unlinked'>('linked')
-  const [activeGroup, setActiveGroup] = useState<string>('__all__')  // groupe custom (chips)
-  const [geeGroup, setGeeGroup] = useState<string>('__all__')        // groupe GéeLark (dropdown)
+  // Organisation par groupe GéeLark natif (les 700 tels y sont déjà rangés).
+  const [geeGroup, setGeeGroup] = useState<string>('__all__')
   const [search, setSearch] = useState('')
-  const [limit, setLimit] = useState(60)                             // pagination : 700 tels → on cape l'affichage
-  useEffect(() => { setLimit(60) }, [tab, activeGroup, geeGroup, search])
-  const [newGroupOpen, setNewGroupOpen] = useState(false)
-  const [newGroupName, setNewGroupName] = useState('')
-  const [bulkOpen, setBulkOpen] = useState(false)
-  const [bulkText, setBulkText] = useState('')
-  const [bulkBusy, setBulkBusy] = useState(false)
+  const [limit, setLimit] = useState(60)   // pagination : on cape l'affichage
+  useEffect(() => { setLimit(60) }, [geeGroup, search])
+  const [linkOpen, setLinkOpen] = useState(false)   // modale « Lier des comptes »
 
   // Synchro / config
   const [glSyncing, setGlSyncing] = useState(false)
@@ -126,17 +115,13 @@ export function Reports({ user }: { user: User }) {
     tQ = currentOrg ? tQ.eq('org_id', currentOrg.id) : tQ.eq('user_id', user.id).is('org_id', null)
 
     const [{ data: cfgData }, { data: pData }, { data: dData }, { data: tData }] = await Promise.all([cfgQ, pQ, dQ, tQ])
-    const tc = (cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>
-    setCfg({ ...DEFAULT_CFG, ...tc })
-    const groups = tc.account_groups ?? { groups: [], assignments: {} }
-    setAg({ groups: Array.isArray(groups.groups) ? groups.groups : [], assignments: groups.assignments ?? {} })
+    setCfg({ ...DEFAULT_CFG, ...((cfgData?.tracking_config ?? {}) as Partial<TrackingConfig>) })
 
     const dMap = new Map<string, any>((dData ?? []).map((r: any) => [r.phone_id, r]))
     const list: Account[] = ((pData ?? []) as any[]).map(p => {
       const d = dMap.get(p.id)
       return {
         id: p.id, ig_username: p.ig_username ?? null, phone_name: p.phone_name ?? null,
-        account_group: groups.assignments?.[p.id] ?? null,
         group_name: p.group_name ?? null,
         followers: p.followers ?? null, pp_url: p.pp_url ?? null,
         account_state: p.account_state ?? null, last_post_at: p.last_post_at ?? null,
@@ -165,38 +150,7 @@ export function Reports({ user }: { user: User }) {
 
   useEffect(() => { load() }, [load])
 
-  // ── Groupes (persistés dans tracking_config.account_groups) ──────────────────
-  const groupNames = (() => {
-    const set = new Set<string>(ag.groups)
-    for (const a of accounts) if (a.account_group) set.add(a.account_group)
-    return [...set].sort((x, y) => x.localeCompare(y))
-  })()
-  const countInGroup = (g: string) => g === NO_GROUP
-    ? accounts.filter(a => !a.account_group).length
-    : accounts.filter(a => a.account_group === g).length
-
-  // Écrit account_groups dans la config (merge dans tracking_config existant).
-  async function persistGroups(next: AccountGroups) {
-    setAg(next)
-    const nextCfg = { ...cfg, account_groups: next }
-    setCfg(nextCfg)
-    const { error } = await supabase.from(table).upsert({ [keyCol]: keyVal, tracking_config: nextCfg }, { onConflict: keyCol })
-    if (error) { console.error('[Reports] persistGroups', error); load() }
-  }
-  async function assignGroup(acc: Account, group: string | null) {
-    setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, account_group: group } : a))
-    const assignments = { ...ag.assignments }
-    if (group) assignments[acc.id] = group; else delete assignments[acc.id]
-    const groups = group && !ag.groups.includes(group) ? [...ag.groups, group] : ag.groups
-    await persistGroups({ groups, assignments })
-  }
-  function createGroup() {
-    const name = newGroupName.trim()
-    if (!name) return
-    if (!ag.groups.includes(name)) persistGroups({ ...ag, groups: [...ag.groups, name] })
-    setActiveGroup(name); setNewGroupName(''); setNewGroupOpen(false)
-  }
-  // Ajoute / modifie le compte IG d'un téléphone (1 tél = 1 compte).
+  // ── Liaison compte ↔ téléphone (1 tél = 1 compte) ────────────────────────────
   async function setUsername(acc: Account, raw: string) {
     const clean = raw.trim().replace(/^@+/, '').toLowerCase() || null
     if (clean === (acc.ig_username ?? null)) return
@@ -204,17 +158,13 @@ export function Reports({ user }: { user: User }) {
     const { error } = await supabase.from('phones').update({ ig_username: clean }).eq('id', acc.id)
     if (error) { console.error('[Reports] setUsername', error); load() }
   }
-  // Liaison en masse : un pseudo par ligne, associé aux téléphones affichés DANS
-  // L'ORDRE (comme le collage groupé du Warmup). Scopé au filtre courant.
-  async function bulkLink(targets: Account[]) {
-    const names = bulkText.split('\n').map(s => s.trim().replace(/^@+/, '').toLowerCase()).filter(Boolean)
-    if (!names.length) return
-    setBulkBusy(true)
-    const updates = targets.map((a, i) => ({ id: a.id, u: names[i] })).filter(x => x.u)
+  // Liaison en masse : une paire {id, pseudo} par téléphone → un seul aller-retour.
+  async function bulkLink(pairs: { id: string; u: string }[]) {
+    const updates = pairs.filter(p => p.u)
+    if (!updates.length) return
     setAccounts(prev => prev.map(a => { const up = updates.find(x => x.id === a.id); return up ? { ...a, ig_username: up.u } : a }))
     try { await Promise.all(updates.map(up => supabase.from('phones').update({ ig_username: up.u }).eq('id', up.id))) }
     catch (e) { console.error('[Reports] bulkLink', e); load() }
-    setBulkBusy(false); setBulkText(''); setBulkOpen(false)
   }
 
   // ── Sync ───────────────────────────────────────────────────────────────────
@@ -247,13 +197,8 @@ export function Reports({ user }: { user: User }) {
   const unlinked = accounts.filter(a => !a.ig_username)  // tels sans compte
   const geeGroups = [...new Set(accounts.map(a => a.group_name).filter(Boolean) as string[])].sort()
 
-  const base = tab === 'linked' ? named : unlinked
-  const filtered = base.filter(a => {
+  const filtered = named.filter(a => {
     if (geeGroup !== '__all__' && (a.group_name ?? '') !== geeGroup) return false
-    if (tab === 'linked') {
-      if (activeGroup === NO_GROUP) { if (a.account_group) return false }
-      else if (activeGroup !== '__all__' && a.account_group !== activeGroup) return false
-    }
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       return (a.ig_username ?? '').toLowerCase().includes(q) || (a.phone_name ?? '').toLowerCase().includes(q)
@@ -284,24 +229,19 @@ export function Reports({ user }: { user: User }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => setNewGroupOpen(v => !v)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">＋ Nouveau groupe</button>
-          <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère followers/vues via l'analytics GéeLark (inclus)">
+          <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère followers/vues via l'analytics GéeLark (inclus)">
             {glSyncing ? '⏳ Synchro…' : '🟢 Sync'}
           </button>
           <button onClick={() => setShowCfg(v => !v)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{showCfg ? 'Masquer' : '⚙︎'}</button>
+          <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ position: 'relative' }}>
+            🔗 Lier des comptes
+            {unlinked.length > 0 && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: 'rgba(255,255,255,0.22)' }}>{unlinked.length}</span>}
+          </button>
           {glMsg && <span style={{ fontSize: 12, color: glMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{glMsg}</span>}
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
-        {/* Création de groupe */}
-        {newGroupOpen && (
-          <div className="sf-card sf-anim-slide-up" style={{ padding: 14, marginBottom: 16, maxWidth: 420, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input autoFocus value={newGroupName} onChange={e => setNewGroupName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createGroup()} placeholder="Nom du groupe (ex. Fitness FR)" className="sf-input" style={{ flex: 1, height: 34 }} />
-            <button onClick={createGroup} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">Créer</button>
-          </div>
-        )}
-
         {/* Config (repliée par défaut) */}
         {showCfg && (
           <div className="sf-card" style={{ padding: 18, marginBottom: 18, maxWidth: 620 }}>
@@ -330,7 +270,7 @@ export function Reports({ user }: { user: User }) {
         {!loading && accounts.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
             <StatCard icon="👥" label="Abonnés (total)" value={fmt(totalFollowers)} accent="var(--text-1)" />
-            <StatCard icon="📱" label="Comptes liés" value={String(named.length)} sub={unlinked.length > 0 ? `${unlinked.length} tél. à lier` : `${groupNames.length} groupe${groupNames.length > 1 ? 's' : ''}`} />
+            <StatCard icon="📱" label="Comptes liés" value={String(named.length)} sub={unlinked.length > 0 ? `${unlinked.length} tél. à lier` : `${geeGroups.length} groupe${geeGroups.length > 1 ? 's' : ''}`} />
             <StatCard icon="✅" label="Comptes OK" value={`${okCount}/${named.length || 0}`} accent={named.length && okCount === named.length ? 'var(--ok)' : '#fbbf24'} />
             <StatCard icon="🚀" label="Postés aujourd'hui" value={`${postedToday}/${named.length || 0}`} accent="var(--accent-l)" />
           </div>
@@ -339,91 +279,49 @@ export function Reports({ user }: { user: User }) {
         {/* Courbe (seulement si on a des données) */}
         {!loading && hasTrend && <ViewsChart data={trend} />}
 
-        {/* Onglets : comptes liés / à lier */}
-        {!loading && accounts.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14, borderBottom: '1px solid var(--border)' }}>
-            {([['linked', `Comptes (${named.length})`], ['unlinked', `À lier (${unlinked.length})`]] as const).map(([t, lbl]) => (
-              <button key={t} onClick={() => setTab(t)} className="cursor-pointer" style={{
-                padding: '9px 16px', fontSize: 13, fontWeight: 700, background: 'transparent', border: 'none',
-                color: tab === t ? 'var(--text-1)' : 'var(--text-4)',
-                borderBottom: `2px solid ${tab === t ? 'var(--accent)' : 'transparent'}`, marginBottom: -1,
-              }}>{lbl}</button>
-            ))}
-          </div>
-        )}
-
-        {/* Filtres : groupe GéeLark (dropdown) + recherche + groupes custom (onglet liés) */}
-        {!loading && accounts.length > 0 && (
+        {/* Filtres : groupe GéeLark (dropdown) + recherche */}
+        {!loading && named.length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
             {geeGroups.length > 0 && (
               <select value={geeGroup} onChange={e => setGeeGroup(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }} title="Filtrer par groupe GéeLark">
-                <option value="__all__">Tous les groupes GéeLark</option>
+                <option value="__all__">Tous les groupes</option>
                 {geeGroups.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             )}
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (pseudo, téléphone)…" className="sf-input" style={{ flex: 1, minWidth: 180, maxWidth: 320, height: 32, fontSize: 12.5 }} />
-            <span style={{ fontSize: 12, color: 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span>
-          </div>
-        )}
-        {/* Groupes custom (chips) — onglet comptes liés uniquement */}
-        {!loading && tab === 'linked' && named.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
-            <GroupChip label="Tous" count={named.length} active={activeGroup === '__all__'} onClick={() => setActiveGroup('__all__')} />
-            {groupNames.map(g => <GroupChip key={g} label={g} count={countInGroup(g)} active={activeGroup === g} onClick={() => setActiveGroup(g)} />)}
-            {named.some(a => !a.account_group) && <GroupChip label={NO_GROUP} count={named.filter(a => !a.account_group).length} active={activeGroup === NO_GROUP} onClick={() => setActiveGroup(NO_GROUP)} muted />}
+            <span style={{ fontSize: 12, color: 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>{filtered.length} compte{filtered.length > 1 ? 's' : ''}</span>
           </div>
         )}
 
-        {/* À lier : liaison en masse */}
-        {!loading && tab === 'unlinked' && (geeGroup !== '__all__' || search.trim() || filtered.length <= 150) && filtered.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            {!bulkOpen ? (
-              <button onClick={() => setBulkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">⚡ Lier en masse ({filtered.length})</button>
-            ) : (
-              <div className="sf-card sf-anim-slide-up" style={{ padding: 14, maxWidth: 520 }}>
-                <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '0 0 8px', lineHeight: 1.5 }}>
-                  Colle <b>un pseudo Instagram par ligne</b>, dans l'ordre des {filtered.length} téléphones affichés. Ligne vide = téléphone ignoré.
-                </p>
-                <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={6} placeholder={'compte1\ncompte2\ncompte3'} className="sf-input" style={{ width: '100%', fontFamily: 'monospace', fontSize: 12.5, resize: 'vertical' }} />
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button onClick={() => bulkLink(filtered)} disabled={bulkBusy} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">{bulkBusy ? 'Liaison…' : 'Lier'}</button>
-                  <button onClick={() => { setBulkOpen(false); setBulkText('') }} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">Annuler</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Liste */}
+        {/* Liste des comptes liés */}
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 900 }}>
             {[0, 1, 2, 3].map(i => <div key={i} className="sf-card sf-skeleton" style={{ height: 60 }} />)}
-          </div>
-        ) : tab === 'unlinked' && geeGroup === '__all__' && !search.trim() && filtered.length > 150 ? (
-          <div className="sf-card" style={{ padding: '36px 24px', textAlign: 'center', maxWidth: 560, margin: '10px auto' }}>
-            <div style={{ fontSize: 30, marginBottom: 10 }}>🗂️</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>{filtered.length} téléphones à lier</p>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
-              Trop pour tout afficher d'un coup. <b>Choisis un groupe GéeLark</b> (menu ci-dessus) ou fais une recherche pour traiter les comptes par lot, puis lie-les en masse.
-            </p>
           </div>
         ) : accounts.length === 0 ? (
           <div className="sf-card" style={{ padding: '44px 24px', textAlign: 'center', maxWidth: 560, margin: '10px auto' }}>
             <div style={{ fontSize: 34, marginBottom: 10 }}>📱</div>
             <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucun téléphone pour l'instant</p>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
-              Synchronise tes cloud phones GéeLark depuis l'onglet <b>Téléphones</b>, puis reviens ici les lier à un compte Instagram.
+              Synchronise tes cloud phones GéeLark depuis l'onglet <b>Téléphones</b>, puis clique <b>Lier des comptes</b> pour les associer à un Instagram.
             </p>
           </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-4)', fontSize: 13.5 }}>
-            {tab === 'unlinked' ? 'Aucun téléphone à lier dans ce filtre. 🎉' : 'Aucun compte dans ce filtre.'}
+        ) : named.length === 0 ? (
+          <div className="sf-card" style={{ padding: '44px 24px', textAlign: 'center', maxWidth: 560, margin: '10px auto' }}>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>🔗</div>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucun compte lié</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.5 }}>
+              Tu as <b>{unlinked.length} téléphone{unlinked.length > 1 ? 's' : ''}</b> à associer à un compte Instagram.
+            </p>
+            <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary cursor-pointer">🔗 Lier des comptes</button>
           </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-4)', fontSize: 13.5 }}>Aucun compte dans ce filtre.</div>
         ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 960 }}>
               {shown.map(a => (
-                <AccountRow key={a.id} a={a} groups={groupNames} onOpen={() => a.ig_username && openDetail(a)} onAssign={g => assignGroup(a, g)} onSetUsername={v => setUsername(a, v)} />
+                <AccountRow key={a.id} a={a} onOpen={() => openDetail(a)} onSetUsername={v => setUsername(a, v)} />
               ))}
             </div>
             {filtered.length > shown.length && (
@@ -437,82 +335,139 @@ export function Reports({ user }: { user: User }) {
         )}
       </div>
 
+      {linkOpen && <LinkModal phones={unlinked} geeGroups={geeGroups} onClose={() => setLinkOpen(false)} onBulkLink={bulkLink} />}
+
       {detailRow && <AccountDetailModal row={detailRow} data={detail} loading={detailLoading} onClose={() => setDetailRow(null)} />}
     </div>
   )
 }
 
-// ── Puce de groupe ────────────────────────────────────────────────────────────
-function GroupChip({ label, count, active, onClick, muted }: { label: string; count: number; active: boolean; onClick: () => void; muted?: boolean }) {
-  return (
-    <button onClick={onClick} className="cursor-pointer" style={{
-      display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 12px', borderRadius: 99, fontSize: 12.5, fontWeight: 600,
-      border: `1px solid ${active ? 'var(--accent)' : 'var(--border-md)'}`,
-      background: active ? 'rgba(99,102,241,0.16)' : 'var(--surface-2)',
-      color: active ? 'var(--accent-l)' : muted ? 'var(--text-4)' : 'var(--text-2)',
-    }}>
-      {label}
-      <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
-    </button>
-  )
-}
-
-// ── Ligne compte ──────────────────────────────────────────────────────────────
-function AccountRow({ a, groups, onOpen, onAssign, onSetUsername }: { a: Account; groups: string[]; onOpen: () => void; onAssign: (g: string | null) => void; onSetUsername: (v: string) => void }) {
+// ── Ligne compte (lié) ────────────────────────────────────────────────────────
+function AccountRow({ a, onOpen, onSetUsername }: { a: Account; onOpen: () => void; onSetUsername: (v: string) => void }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(a.ig_username ?? '')
   useEffect(() => { setVal(a.ig_username ?? '') }, [a.ig_username])
-  const hasIg = !!a.ig_username
   const state = a.account_state
   const pill = state === 'banned' ? { t: 'BANNI', c: '#f87171', b: 'rgba(239,68,68,0.15)', bd: 'rgba(239,68,68,0.3)' }
     : state === 'shadow' ? { t: 'SHADOW?', c: '#fbbf24', b: 'rgba(251,191,36,0.15)', bd: 'rgba(251,191,36,0.3)' }
     : { t: 'OK', c: 'var(--ok)', b: 'rgba(34,197,94,0.12)', bd: 'rgba(34,197,94,0.25)' }
   const commit = () => { setEditing(false); onSetUsername(val) }
   return (
-    <div className={hasIg ? 'sf-card sf-card-lift cursor-pointer' : 'sf-card'} onClick={hasIg && !editing ? onOpen : undefined}
-      style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 13, opacity: hasIg ? 1 : 0.92, borderStyle: hasIg ? 'solid' : 'dashed' }}>
-      {/* Avatar */}
+    <div className="sf-card sf-card-lift cursor-pointer" onClick={!editing ? onOpen : undefined}
+      style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 13 }}>
       <div style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-        {a.pp_url ? <img src={igimg(a.pp_url)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-3)' }}>{(a.ig_username ?? a.phone_name ?? '?').charAt(0).toUpperCase()}</span>}
+        {a.pp_url ? <img src={igimg(a.pp_url)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-3)' }}>{(a.ig_username ?? '?').charAt(0).toUpperCase()}</span>}
       </div>
-      {/* Identité */}
       <div style={{ minWidth: 0, flex: 1 }}>
         {editing ? (
           <input autoFocus value={val} onClick={e => e.stopPropagation()} onChange={e => setVal(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setVal(a.ig_username ?? ''); setEditing(false) } }}
-            onBlur={commit} placeholder="pseudo Instagram (sans @)" className="sf-input" style={{ height: 30, fontSize: 13, maxWidth: 240 }} />
-        ) : hasIg ? (
+            onBlur={commit} placeholder="pseudo (vide = délier)" className="sf-input" style={{ height: 30, fontSize: 13, maxWidth: 240 }} />
+        ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{a.ig_username}</span>
             <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: pill.b, color: pill.c, border: `1px solid ${pill.bd}`, flexShrink: 0 }}>{pill.t}</span>
-            {a.account_group && <span className="sf-badge" style={{ fontSize: 9.5 }}>{a.account_group}</span>}
-            <button onClick={e => { e.stopPropagation(); setEditing(true) }} className="cursor-pointer" title="Modifier le pseudo" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, padding: 0 }}>✎</button>
+            {a.group_name && <span className="sf-badge" style={{ fontSize: 9.5 }}>{a.group_name}</span>}
+            <button onClick={e => { e.stopPropagation(); setEditing(true) }} className="cursor-pointer" title="Modifier / délier" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, padding: 0 }}>✎</button>
           </div>
-        ) : (
-          <button onClick={e => { e.stopPropagation(); setEditing(true) }} className="cursor-pointer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px dashed var(--border-md)', background: 'transparent', borderRadius: 8, padding: '4px 10px', color: 'var(--accent-l)', fontSize: 12.5, fontWeight: 600 }}>
-            ＋ Ajouter le compte Instagram
-          </button>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 3, fontSize: 11, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
+          <span>👥 {fmt(a.followers)} abonnés</span>
+          <span style={{ color: a.posted ? 'var(--ok)' : 'var(--text-4)' }}>{a.posted ? '● posté' : '○ pas posté'}</span>
           <span style={{ color: 'var(--text-4)' }}>📱 {a.phone_name ?? a.id.slice(-6)}</span>
-          {hasIg && <><span>👥 {fmt(a.followers)} abonnés</span>
-          <span style={{ color: a.posted ? 'var(--ok)' : 'var(--text-4)' }}>{a.posted ? '● posté' : '○ pas posté'}</span></>}
         </div>
       </div>
-      {/* Sélecteur de groupe custom — seulement pour les comptes liés */}
-      {hasIg && (
-        <select
-          value={a.account_group ?? ''}
-          onClick={e => e.stopPropagation()}
-          onChange={e => { e.stopPropagation(); onAssign(e.target.value || null) }}
-          className="sf-input cursor-pointer"
-          style={{ width: 'auto', minWidth: 120, height: 30, fontSize: 12, flexShrink: 0 }}
-          title="Ranger dans un groupe"
-        >
-          <option value="">— Sans groupe —</option>
-          {groups.map(g => <option key={g} value={g}>{g}</option>)}
-        </select>
-      )}
+    </div>
+  )
+}
+
+// ── Modale « Lier des comptes » ────────────────────────────────────────────────
+// On associe chaque téléphone (non lié) à un @pseudo. Deux modes : saisie ligne
+// par ligne, ou collage en masse (un pseudo par ligne, dans l'ordre affiché).
+function LinkModal({ phones, geeGroups, onClose, onBulkLink }: {
+  phones: Account[]; geeGroups: string[]; onClose: () => void
+  onBulkLink: (pairs: { id: string; u: string }[]) => Promise<void>
+}) {
+  const [group, setGroup] = useState<string>(geeGroups[0] ?? '__all__')
+  const [search, setSearch] = useState('')
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+
+  const list = phones.filter(p => {
+    if (group !== '__all__' && (p.group_name ?? '') !== group) return false
+    if (search.trim()) return (p.phone_name ?? '').toLowerCase().includes(search.trim().toLowerCase())
+    return true
+  })
+  const capped = list.slice(0, 300)  // garde-fou anti-lag
+
+  function pasteBulk(text: string) {
+    const names = text.split('\n').map(s => s.trim().replace(/^@+/, '').toLowerCase())
+    setVals(prev => {
+      const next = { ...prev }
+      capped.forEach((p, i) => { if (names[i]) next[p.id] = names[i] })
+      return next
+    })
+  }
+  async function save() {
+    const pairs = Object.entries(vals).map(([id, u]) => ({ id, u: u.trim().replace(/^@+/, '').toLowerCase() })).filter(p => p.u)
+    if (!pairs.length) { onClose(); return }
+    setBusy(true); await onBulkLink(pairs); setBusy(false); onClose()
+  }
+  const filledCount = Object.values(vals).filter(v => v.trim()).length
+
+  return (
+    <div className="sf-modal-bg" onClick={onClose} style={{ zIndex: 9100 }}>
+      <div className="sf-modal anim-scale-in" onClick={e => e.stopPropagation()} style={{ width: 'min(680px, 95vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-1)' }}>🔗 Lier des comptes</h3>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-3)' }}>{phones.length} téléphone{phones.length > 1 ? 's' : ''} sans compte · associe un @pseudo Instagram à chacun</p>
+          </div>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label="Fermer">✕</button>
+        </div>
+
+        {/* Filtres + collage en masse */}
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {geeGroups.length > 0 && (
+              <select value={group} onChange={e => setGroup(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }}>
+                <option value="__all__">Tous les groupes</option>
+                {geeGroups.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            )}
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filtrer par nom de téléphone…" className="sf-input" style={{ flex: 1, minWidth: 160, height: 32, fontSize: 12.5 }} />
+            <span style={{ fontSize: 12, color: 'var(--text-4)', alignSelf: 'center', fontVariantNumeric: 'tabular-nums' }}>{list.length} tél.</span>
+          </div>
+          <details>
+            <summary style={{ fontSize: 12, color: 'var(--accent-l)', cursor: 'pointer' }}>⚡ Coller une liste (un pseudo par ligne, dans l'ordre)</summary>
+            <textarea onChange={e => pasteBulk(e.target.value)} rows={4} placeholder={'compte1\ncompte2\ncompte3'} className="sf-input" style={{ width: '100%', marginTop: 8, fontFamily: 'monospace', fontSize: 12.5, resize: 'vertical' }} />
+          </details>
+        </div>
+
+        {/* Liste des tels à lier */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px' }}>
+          {list.length === 0 ? (
+            <p style={{ textAlign: 'center', color: 'var(--text-4)', fontSize: 13, padding: '30px 0' }}>Aucun téléphone à lier dans ce filtre. 🎉</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {capped.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-2)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📱 {p.phone_name ?? p.id.slice(-6)}</span>
+                  <span style={{ color: 'var(--text-4)', fontSize: 13 }}>@</span>
+                  <input value={vals[p.id] ?? ''} onChange={e => setVals(v => ({ ...v, [p.id]: e.target.value }))} placeholder="pseudo Instagram" className="sf-input" style={{ width: 220, height: 30, fontSize: 12.5 }} />
+                </div>
+              ))}
+              {list.length > capped.length && <p style={{ fontSize: 11.5, color: 'var(--text-4)', textAlign: 'center', marginTop: 6 }}>+{list.length - capped.length} autres — affine le filtre pour les voir.</p>}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', marginRight: 'auto' }}>{filledCount} à lier</span>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost cursor-pointer">Annuler</button>
+          <button onClick={save} disabled={busy || filledCount === 0} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: (busy || filledCount === 0) ? 0.6 : 1 }}>{busy ? 'Liaison…' : `Lier ${filledCount} compte${filledCount > 1 ? 's' : ''}`}</button>
+        </div>
+      </div>
     </div>
   )
 }
