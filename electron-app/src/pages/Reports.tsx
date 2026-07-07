@@ -69,7 +69,7 @@ export function Reports({ user }: { user: User }) {
   const keyCol = currentOrg ? 'org_id' : 'user_id'
   const keyVal = currentOrg ? currentOrg.id : user.id
 
-  const [view, setView]       = useState<'gestion' | 'stats' | 'tracker'>('gestion')
+  const [view, setView]       = useState<'tracker' | 'soon'>('tracker')
   const [cfg, setCfg]         = useState<TrackingConfig>(DEFAULT_CFG)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [day]                 = useState(parisToday())
@@ -228,38 +228,27 @@ export function Reports({ user }: { user: User }) {
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <div>
-            <h1 className="sf-page-title">{view === 'tracker' ? 'Suivi des comptes' : view === 'stats' ? 'Stats' : 'Gestion des comptes'}</h1>
+            <h1 className="sf-page-title">{view === 'tracker' ? 'Suivi des comptes' : 'Gestion & Stats'}</h1>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
               {view === 'tracker'
                 ? 'Tableau partagé — le suivi de tous vos comptes par plateforme'
-                : view === 'stats'
-                ? `Followers & vues de tes comptes${lastSync ? ` · dernière synchro ${agoLabel(lastSync)}` : ''}`
-                : 'Lie tes téléphones à un compte Instagram (1 téléphone = 1 compte)'}
+                : 'Gestion des comptes & statistiques — bientôt disponible'}
             </p>
           </div>
         </div>
-        {view === 'gestion' && (
+        {view === 'tracker' && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ position: 'relative' }}>
+            <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ position: 'relative' }} title="Associer tes téléphones à un compte Instagram (1 téléphone = 1 compte)">
               🔗 Lier des comptes
               {unlinked.length > 0 && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: 'rgba(255,255,255,0.22)' }}>{unlinked.length}</span>}
             </button>
           </div>
         )}
-        {view === 'stats' && canStats && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={syncViaGeelark} disabled={glSyncing || !bearer} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: (glSyncing || !bearer) ? 0.6 : 1 }} title="Récupère followers/vues via l'analytics GéeLark (inclus)">
-              {glSyncing ? '⏳ Synchro…' : '🟢 Sync'}
-            </button>
-            <button onClick={() => setShowCfg(v => !v)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{showCfg ? 'Masquer' : '⚙︎'}</button>
-            {glMsg && <span style={{ fontSize: 12, color: glMsg.startsWith('❌') ? 'var(--err)' : 'var(--ok)' }}>{glMsg}</span>}
-          </div>
-        )}
       </div>
 
-      {/* Onglets : Gestion (liaison tél↔IG) · Stats · Suivi (tableau) */}
+      {/* Onglets : Suivi (tableau) · Gestion & Stats (bientôt) */}
       <div style={{ display: 'flex', gap: 6, padding: '0 28px', borderBottom: '1px solid var(--border)' }}>
-        {([['gestion', '🔗 Gestion des comptes'], ['stats', '📊 Stats'], ['tracker', '🗂️ Suivi des comptes']] as const).map(([v, lbl]) => (
+        {([['tracker', '🗂️ Suivi des comptes'], ['soon', '📊 Gestion & Stats']] as const).map(([v, lbl]) => (
           <button key={v} onClick={() => setView(v)} className="cursor-pointer" style={{
             padding: '10px 16px', fontSize: 13, fontWeight: 700, background: 'transparent', border: 'none',
             color: view === v ? 'var(--text-1)' : 'var(--text-4)',
@@ -272,115 +261,17 @@ export function Reports({ user }: { user: User }) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
           <AccountTracker user={user} orgId={currentOrg?.id ?? null} />
         </div>
-      ) : view === 'stats' ? (
-      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
-        {!canStats ? (
-          <div className="sf-card" style={{ padding: '44px 26px', textAlign: 'center', maxWidth: 520, margin: '20px auto' }}>
-            <div style={{ fontSize: 34, marginBottom: 10 }}>📊</div>
-            <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 6px' }}>Bientôt disponible</p>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0, lineHeight: 1.6 }}>Les statistiques de tes comptes (followers, vues, croissance) arrivent très bientôt. En attendant, gère tes comptes dans l'onglet « Gestion des comptes ».</p>
-          </div>
-        ) : (
-        <>
-        {/* Config (repliée par défaut) */}
-        {showCfg && (
-          <div className="sf-card" style={{ padding: 18, marginBottom: 18, maxWidth: 620 }}>
-            <button onClick={() => setCfg(c => ({ ...c, enabled: !c.enabled }))} className="cursor-pointer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '10px 12px', borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', marginBottom: 14 }}>
-              <div style={{ textAlign: 'left' }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Synchro quotidienne automatique</p>
-                <p style={{ fontSize: 11, color: 'var(--text-4)', margin: '2px 0 0' }}>Met à jour followers & stats 1×/jour</p>
-              </div>
-              <span style={{ width: 34, height: 19, borderRadius: 99, position: 'relative', background: cfg.enabled ? 'var(--accent)' : 'rgba(255,255,255,0.12)', flexShrink: 0 }}>
-                <span style={{ position: 'absolute', top: 2, left: cfg.enabled ? 17 : 2, width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
-              </span>
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Heure (FR)</span>
-              <input type="time" value={cfg.sync_time} onChange={e => setCfg(c => ({ ...c, sync_time: e.target.value }))} className="sf-input" style={{ width: 120, height: 32 }} />
-            </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <button onClick={saveCfg} disabled={saving} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">{saving ? '…' : 'Enregistrer'}</button>
-              <button onClick={launchNow} disabled={launching} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">{launching ? '⏳ Synchro…' : '⚡ Lancer maintenant'}</button>
-              {saved && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Enregistré</span>}
-            </div>
-          </div>
-        )}
-
-        {/* Tuiles */}
-        {!loading && accounts.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
-            <StatCard icon="👥" label="Abonnés (total)" value={fmt(totalFollowers)} accent="var(--text-1)" />
-            <StatCard icon="📱" label="Comptes liés" value={String(named.length)} sub={unlinked.length > 0 ? `${unlinked.length} tél. à lier` : `${geeGroups.length} groupe${geeGroups.length > 1 ? 's' : ''}`} />
-            <StatCard icon="✅" label="Comptes OK" value={`${okCount}/${named.length || 0}`} accent={named.length && okCount === named.length ? 'var(--ok)' : '#fbbf24'} />
-            <StatCard icon="🚀" label="Postés aujourd'hui" value={`${postedToday}/${named.length || 0}`} accent="var(--accent-l)" />
-          </div>
-        )}
-
-        {/* Courbe (seulement si on a des données) */}
-        {!loading && hasTrend && <ViewsChart data={trend} />}
-        {!loading && named.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-4)', fontSize: 13 }}>Aucune stat pour l'instant — lie des comptes puis clique « Sync ».</div>
-        )}
-        </>
-        )}
-      </div>
       ) : (
-      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
-        {/* Filtres : groupe GéeLark (dropdown) + recherche */}
-        {!loading && named.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
-            {geeGroups.length > 0 && (
-              <select value={geeGroup} onChange={e => setGeeGroup(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }} title="Filtrer par groupe GéeLark">
-                <option value="__all__">Tous les groupes</option>
-                {geeGroups.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            )}
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (pseudo, téléphone)…" className="sf-input" style={{ flex: 1, minWidth: 180, maxWidth: 320, height: 32, fontSize: 12.5 }} />
-            <span style={{ fontSize: 12, color: 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>{filtered.length} compte{filtered.length > 1 ? 's' : ''}</span>
-          </div>
-        )}
-
-        {/* Liste des comptes liés */}
-        {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 900 }}>
-            {[0, 1, 2, 3].map(i => <div key={i} className="sf-card sf-skeleton" style={{ height: 60 }} />)}
-          </div>
-        ) : accounts.length === 0 ? (
-          <div className="sf-card" style={{ padding: '44px 24px', textAlign: 'center', maxWidth: 560, margin: '10px auto' }}>
-            <div style={{ fontSize: 34, marginBottom: 10 }}>📱</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucun téléphone pour l'instant</p>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
-              Synchronise tes cloud phones GéeLark depuis l'onglet <b>Téléphones</b>, puis clique <b>Lier des comptes</b> pour les associer à un Instagram.
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
+          <div className="sf-card" style={{ padding: '48px 28px', textAlign: 'center', maxWidth: 540, margin: '30px auto' }}>
+            <div style={{ fontSize: 38, marginBottom: 12 }}>📊</div>
+            <p style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 8px' }}>Bientôt disponible</p>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0, lineHeight: 1.6 }}>
+              La gestion des comptes et les statistiques (followers, vues, croissance) arrivent très bientôt.
+              En attendant, retrouve tous tes comptes dans l'onglet <b>« Suivi des comptes »</b> et lie tes téléphones à un Instagram avec le bouton <b>« Lier des comptes »</b>.
             </p>
           </div>
-        ) : named.length === 0 ? (
-          <div className="sf-card" style={{ padding: '44px 24px', textAlign: 'center', maxWidth: 560, margin: '10px auto' }}>
-            <div style={{ fontSize: 34, marginBottom: 10 }}>🔗</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucun compte lié</p>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.5 }}>
-              Tu as <b>{unlinked.length} téléphone{unlinked.length > 1 ? 's' : ''}</b> à associer à un compte Instagram.
-            </p>
-            <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary cursor-pointer">🔗 Lier des comptes</button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-4)', fontSize: 13.5 }}>Aucun compte dans ce filtre.</div>
-        ) : (
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 960 }}>
-              {shown.map(a => (
-                <AccountRow key={a.id} a={a} onOpen={() => openDetail(a)} onSetUsername={v => setUsername(a, v)} />
-              ))}
-            </div>
-            {filtered.length > shown.length && (
-              <div style={{ textAlign: 'center', marginTop: 14 }}>
-                <button onClick={() => setLimit(l => l + 60)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">
-                  Voir plus ({filtered.length - shown.length} restant{filtered.length - shown.length > 1 ? 's' : ''})
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+        </div>
       )}
 
       {linkOpen && <LinkModal phones={unlinked} geeGroups={geeGroups} onClose={() => setLinkOpen(false)} onBulkLink={bulkLink} />}
