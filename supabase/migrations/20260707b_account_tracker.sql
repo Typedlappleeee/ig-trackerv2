@@ -17,6 +17,8 @@ create table if not exists public.account_tracker (
   folder     text,     -- dossier
   pseudo     text,     -- @pseudo
   mail       text,
+  password   text,     -- mot de passe du compte
+  comment    text,     -- commentaire / note
   insta      text,     -- statut : Bon / Warm-up / Shadowban / Banni / …
   tiktok     text,
   threads    text,

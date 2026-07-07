@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 interface Row {
   id: string
   name: string | null; model: string | null; market: string | null; folder: string | null
-  pseudo: string | null; mail: string | null
+  pseudo: string | null; mail: string | null; password: string | null; comment: string | null
   insta: string | null; tiktok: string | null; threads: string | null; youtube: string | null
   sort: number
 }
@@ -113,7 +113,7 @@ create table if not exists public.account_tracker (
   id uuid primary key default gen_random_uuid(),
   org_id uuid, user_id uuid not null,
   name text, model text, market text, folder text,
-  pseudo text, mail text,
+  pseudo text, mail text, password text, comment text,
   insta text, tiktok text, threads text, youtube text,
   sort int not null default 0,
   created_at timestamptz not null default now(),
@@ -173,10 +173,10 @@ notify pgrst, 'reload schema';`}</pre>
       ) : (
         <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 980, fontSize: 12.5 }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1280, fontSize: 12.5 }}>
               <thead>
                 <tr style={{ background: 'var(--surface-2)' }}>
-                  {['Compte', 'Marché', 'Dossier', 'Pseudo', 'Insta', 'TikTok', 'Threads', 'YouTube', 'Mail', ''].map((h, i) => (
+                  {['Compte', 'Marché', 'Dossier', 'Pseudo', 'Insta', 'TikTok', 'Threads', 'YouTube', 'Mail', 'Mot de passe', 'Commentaire', ''].map((h, i) => (
                     <th key={i} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-4)', borderBottom: '1px solid var(--border-md)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -197,6 +197,8 @@ notify pgrst, 'reload schema';`}</pre>
                     <td style={{ padding: '6px 8px' }}><StatusCell value={r.threads} onSave={v => patch(r.id, 'threads', v)} /></td>
                     <td style={{ padding: '6px 8px' }}><StatusCell value={r.youtube} onSave={v => patch(r.id, 'youtube', v)} /></td>
                     <td style={{ padding: '6px 8px', minWidth: 130 }}><TextCell value={r.mail} placeholder="mail@…" onSave={v => patch(r.id, 'mail', v)} /></td>
+                    <td style={{ padding: '6px 8px', minWidth: 120 }}><TextCell value={r.password} placeholder="mot de passe" onSave={v => patch(r.id, 'password', v)} /></td>
+                    <td style={{ padding: '6px 8px', minWidth: 180 }}><TextCell value={r.comment} placeholder="commentaire…" onSave={v => patch(r.id, 'comment', v)} /></td>
                     <td style={{ padding: '6px 8px' }}>
                       <button onClick={() => delRow(r.id)} title="Supprimer la ligne" className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 13, padding: 4 }}>🗑️</button>
                     </td>
