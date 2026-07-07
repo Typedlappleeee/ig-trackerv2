@@ -713,6 +713,14 @@ export default function StoryLink({ user }: { user: User }) {
       setSchedDone(soon
         ? `✅ ${assignments.length} story(s) envoyée(s) au serveur — elles partent d'ici ~1 min. Tu peux fermer ton PC.`
         : `${assignments.length} story(s) programmée(s) pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
+      // Toast VISIBLE même sans la modale ouverte (bouton « Publier » direct).
+      toast.show({
+        title: soon ? '✅ Story envoyée au serveur' : '🗓 Story programmée',
+        body: soon
+          ? `${assignments.length} story(s) partent d'ici ~1 min. Suis-les dans l'Historique — tu peux fermer ton PC.`
+          : `Programmée${assignments.length > 1 ? 's' : ''} pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}.`,
+        kind: 'ok',
+      })
       setTimeout(() => { setShowSchedule(false); setSchedDone('') }, soon ? 4000 : 2200)
     } catch (e) {
       const refundAmount = selectedIds.length * CREDIT_COSTS.story

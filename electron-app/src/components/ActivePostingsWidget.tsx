@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { getActiveRuns, subscribeActiveRuns, removeRun, type ActiveRun, type PhaseStatus } from '@/lib/activeRuns'
+import { supabase } from '@/lib/supabase'
+
+// Post serveur en cours (scheduled_posts pending/running) — pour les voir dans le
+// suivi même quand ça tourne côté serveur (PC éteignable).
+interface ServerRun { id: string; type: string; label: string; done: number; total: number }
+const SRV_META: Record<string, { emoji: string; label: string }> = {
+  mass_posting: { emoji: '🚀', label: 'Mass posting' },
+  posting:      { emoji: '🚀', label: 'Posting' },
+  story:        { emoji: '📸', label: 'Story' },
+  tiktok:       { emoji: '🎵', label: 'TikTok' },
+}
 
 const PHASE_ICON: Record<PhaseStatus, string> = { idle: '○', running: '◔', done: '✓', error: '✕' }
 const PHASE_COLOR: Record<PhaseStatus, string> = {
@@ -32,8 +43,41 @@ const TYPE_META: Record<ActiveRun['type'], { emoji: string; label: string }> = {
 // les pages, survit à la navigation et au refresh. Alerte si 2 runs partagent un proxy.
 const POS_KEY = 'sf-widget-pos'
 
-export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => void }) {
+export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page: string) => void; orgId?: string | null; userId?: string }) {
   const [runs, setRuns] = useState<ActiveRun[]>(getActiveRuns())
+  const [serverRuns, setServerRuns] = useState<ServerRun[]>([])
+
+  // Poll des posts serveur en cours (pending échu / running) toutes les 15 s.
+  useEffect(() => {
+    if (!userId) return
+    let alive = true
+    const fetchServer = async () => {
+      try {
+        let q = supabase.from('scheduled_posts')
+          .select('id, type, status, scheduled_at, phones, result')
+          .in('status', ['pending', 'running'])
+        q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)
+        const { data } = await q
+        if (!alive) return
+        const now = Date.now()
+        const rows: ServerRun[] = (data ?? []).flatMap((r: Record<string, unknown>) => {
+          // Un post pending PROGRAMMÉ dans le futur n'est pas "en cours".
+          const at = r['scheduled_at'] ? new Date(r['scheduled_at'] as string).getTime() : 0
+          if (r['status'] === 'pending' && at > now + 30_000) return []
+          const phones = typeof r['phones'] === 'string' ? JSON.parse(r['phones'] as string) : (r['phones'] ?? [])
+          const total = Array.isArray(phones) ? phones.length : 0
+          const res = (typeof r['result'] === 'string' ? JSON.parse(r['result'] as string) : r['result']) as Record<string, any> ?? {}
+          const done = (res?.story_progress?.done ?? res?.mass_progress?.done ?? []).length
+          const m = SRV_META[r['type'] as string] ?? { emoji: '🖥️', label: String(r['type']) }
+          return [{ id: r['id'] as string, type: r['type'] as string, label: `${m.label} · ${total} compte${total > 1 ? 's' : ''}`, done, total }]
+        })
+        setServerRuns(rows)
+      } catch { /* réseau — on réessaie au prochain tick */ }
+    }
+    fetchServer()
+    const t = setInterval(fetchServer, 15_000)
+    return () => { alive = false; clearInterval(t) }
+  }, [orgId, userId])
   const [open, setOpen] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const toggleExpand = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -68,7 +112,7 @@ export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => vo
 
   useEffect(() => subscribeActiveRuns(() => setRuns(getActiveRuns())), [])
 
-  if (runs.length === 0) return null
+  if (runs.length === 0 && serverRuns.length === 0) return null
 
   // Détection de conflit : un proxy utilisé par ≥ 2 runs actifs en même temps.
   const proxyCount = new Map<string, number>()
@@ -80,7 +124,7 @@ export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => vo
   const runClashes = (r: ActiveRun) => r.status === 'running' && r.proxyKeys.some(k => clashKeys.has(k))
   const anyClash = runs.some(runClashes)
 
-  const runningCount = runs.filter(r => r.status === 'running').length
+  const runningCount = runs.filter(r => r.status === 'running').length + serverRuns.length
 
   const posStyle: React.CSSProperties = pos
     ? { left: pos.x, top: pos.y }
@@ -144,6 +188,28 @@ export function ActivePostingsWidget({ onOpen }: { onOpen?: (page: string) => vo
                     <div style={{ height: '100%', width: `${r.status === 'done' ? 100 : pct}%`, background: color, transition: 'width .3s' }} />
                   </div>
                   {hasPhases && isExp && <PhaseList run={r} />}
+                </div>
+              )
+            })}
+
+            {/* Posts SERVEUR en cours (PC éteignable) */}
+            {serverRuns.map(s => {
+              const m = SRV_META[s.type] ?? { emoji: '🖥️', label: s.type }
+              const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0
+              return (
+                <div key={`srv-${s.id}`} onClick={() => onOpen?.('history')} className="cursor-pointer"
+                  style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span>{m.emoji}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                    <span style={{ fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(52,211,153,0.14)', color: 'var(--ok)', border: '1px solid rgba(52,211,153,0.3)', flexShrink: 0 }}>SERVEUR</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+                      {s.total > 0 ? `${s.done}/${s.total}` : 'en cours'}
+                    </span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 4, background: 'var(--surface-3)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${s.total > 0 ? pct : 30}%`, background: 'var(--accent)', transition: 'width .3s', ...(s.total === 0 ? { animation: 'sf-pulse 1.6s ease-in-out infinite' } : {}) }} />
+                  </div>
                 </div>
               )
             })}
