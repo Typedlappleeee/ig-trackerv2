@@ -794,7 +794,14 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       }
 
-      log(`Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
+      // Post « maintenant » (≤ 2 min) vs vraiment programmé plus tard.
+      const soon = scheduledAt.getTime() <= Date.now() + 2 * 60_000
+      if (soon) {
+        log(`✅ Envoyé au serveur — ${phoneList.length} téléphone(s) postent d'ici ~1 min. Tu peux fermer ton PC.`, 'ok')
+        toast.show({ title: 'Posting lancé côté serveur', body: 'Les publications partent dans ~1 min. Tu peux fermer ton PC — suis l\'avancement dans Historique.', kind: 'ok' })
+      } else {
+        log(`Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
+      }
     } catch (err: any) {
       log('Une erreur est survenue pendant la programmation.', 'error')
     } finally {
@@ -2337,9 +2344,9 @@ export function MassPosting({ user }: MassPostingProps) {
                 {t('schedule')}
               </button>
               <button
-                onClick={post}
+                onClick={() => scheduleMassPost(new Date())}
                 disabled={!canLaunch}
-                title={canLaunch ? undefined
+                title={canLaunch ? 'Poste côté serveur — tu peux fermer ton PC une fois l\'upload terminé'
                   : !bearer ? 'Connecte GéeLark dans les Paramètres'
                   : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
                   : selectedVideos.length === 0 ? 'Sélectionne des vidéos dans la banque'
