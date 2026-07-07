@@ -85,6 +85,39 @@ async function gPost(bearer: string, path: string, body: unknown): Promise<Recor
   return await r.json().catch(() => ({}))
 }
 
+// Proxy rotatif : appelle l'URL « change IP » de chaque dongle puis attend que
+// l'IP se réattribue. À faire AVANT de booter le téléphone. Best-effort.
+async function rotateProxies(urls: string[], log: (m: string) => void): Promise<void> {
+  const list = (urls ?? []).map(u => (u ?? '').trim()).filter(u => /^https?:\/\//i.test(u))
+  if (list.length === 0) return
+  log(`🔄 Rotation IP (${list.length} proxy)…`)
+  await Promise.all(list.map(async u => {
+    try { await fetch(u, { signal: AbortSignal.timeout(15000) }) }
+    catch (e) { log(`   ⚠ rotation échouée : ${e instanceof Error ? e.message : String(e)}`) }
+  }))
+  await new Promise(r => setTimeout(r, 4000))
+}
+
+// Lit les URLs de rotation proxy de l'org/user (org_config.proxy / app_config.proxy,
+// JSON { enabled, urls }). Renvoie [] si désactivé/absent → posting parallèle normal.
+async function loadRotationUrls(
+  db: ReturnType<typeof import('npm:@supabase/supabase-js@2').createClient>,
+  orgId: string | null, userId: string,
+): Promise<string[]> {
+  try {
+    const q = orgId
+      ? db.from('org_config').select('proxy').eq('org_id', orgId).maybeSingle()
+      : db.from('app_config').select('proxy').eq('user_id', userId).is('org_id', null).maybeSingle()
+    const { data } = await q
+    const raw = (data as { proxy?: unknown } | null)?.proxy
+    const j = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
+    if (j && j.enabled && Array.isArray(j.urls)) {
+      return j.urls.filter((u: unknown) => typeof u === 'string' && /^https?:\/\//i.test(String(u).trim()))
+    }
+  } catch { /* absent/invalide → pas de rotation */ }
+  return []
+}
+
 // Upload a file URL to GeeLark and return the GeeLark resourceUrl token.
 // Used when a task video is stored as a Supabase signed URL instead of a pre-uploaded GeeLark token.
 async function uploadUrlToGeelark(bearer: string, fileUrl: string): Promise<string | null> {
@@ -800,6 +833,87 @@ Deno.serve(async (req) => {
       const delayMin: number = post.delay_minutes ?? 0
       log(`🗓 Exécution serveur — ${post.platform ?? 'instagram'} · ${phones.length} compte(s) · ${videos.length} vidéo(s)${delayMin ? ` · ${delayMin} min d'écart` : ''}.`)
 
+      // ── PROXY ROTATIF (Instagram) : série, 1 téléphone par invocation ─────────
+      // On rote l'IP → boote 1 tél → poste → poll court → éteint → reprend au tick
+      // suivant. Reprise via result.mass_progress (comme les stories). Le flux
+      // NON-rotatif ci-dessous (boot tous d'un coup + parallèle) reste inchangé.
+      const rotationUrls = await loadRotationUrls(db, post.org_id, post.user_id)
+      if (rotationUrls.length > 0 && post.platform !== 'tiktok') {
+        log(`🔄 Proxy rotatif serveur : ${rotationUrls.length} URL(s) — traitement 1 téléphone / invocation.`)
+        const prog = ((typeof post.result === 'string' ? JSON.parse(post.result) : post.result) ?? {}) as Record<string, any>
+        const mp = (prog.mass_progress ?? {}) as { done?: string[]; tokens?: string[]; logs?: string[] }
+        const doneSet = new Set<string>(mp.done ?? [])
+        const prevLogs: string[] = mp.logs ?? []
+
+        // Tokens vidéo : résolus une fois puis mis en cache dans le result (évite de
+        // ré-uploader à chaque tick).
+        let tokens: string[] = Array.isArray(mp.tokens) && mp.tokens.length ? mp.tokens : []
+        if (!tokens.length) {
+          tokens = []
+          for (let vi = 0; vi < videos.length; vi++) tokens.push(await resolveVideoToken(db, bearer, videos[vi]))
+          log(`   ✅ ${tokens.length} vidéo(s) préparée(s).`)
+        }
+
+        let processedThisRun = 0
+        for (let i = 0; i < phones.length && processedThisRun < 1; i++) {
+          const phone = phones[i]
+          if (doneSet.has(phone.geelark_id)) continue
+          const name = phone.ig_username ?? phone.phone_name
+          const vIdx = post.mode === 'random' ? Math.floor(Math.random() * videos.length) : i % videos.length
+          log(`▶ [rotatif] ${name}…`)
+          await db.from('phone_power_watch').upsert(
+            [{ geelark_id: phone.geelark_id, org_id: post.org_id, user_id: post.user_id, reason: 'server_mass', stop_at: new Date(Date.now() + 5 * 60_000).toISOString() }],
+            { onConflict: 'geelark_id' },
+          ).then(() => {}, () => {})
+          try {
+            await rotateProxies(rotationUrls, log)
+            await gPost(bearer, '/phone/start', { ids: [phone.geelark_id] })
+            log('   ⏳ Boot 30 s…'); await sleep(30_000)
+            const r = await gPost(bearer, '/rpa/task/instagramPubReels', {
+              id: phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
+              description: (videos[vIdx]?.desc?.trim() || post.caption), video: [tokens[vIdx]],
+            })
+            const tid = r.data?.id ?? r.data?.taskId ?? null
+            if (r.code === 0 && tid) {
+              // Poll borné (~75 s) : on DOIT attendre la fin avant de roter le dongle
+              // partagé pour le tél suivant (sinon on coupe l'IP en plein post).
+              const deadline = Date.now() + 75_000
+              let st = 0
+              while (Date.now() < deadline) {
+                await sleep(8000)
+                const q = await gPost(bearer, '/task/query', { ids: [tid] })
+                const items = (q.data?.items ?? q.data?.list ?? q.data?.tasks ?? q.data?.records ?? []) as any[]
+                const it = Array.isArray(items) ? items.find(x => String(x.id ?? x.taskId) === String(tid)) : null
+                st = Number(it?.status ?? 0)
+                if ([3, 4, 7].includes(st)) break
+              }
+              log(st === 3 ? `   ✅ ${name} publié` : st === 4 ? `   ❌ ${name} échec` : `   ⏱ ${name} (non confirmé)`)
+            } else {
+              log(`   ❌ ${name} : tâche refusée (code ${r.code} ${r.msg ?? ''})`)
+            }
+          } catch (e) {
+            log(`   ❌ ${name} : ${e instanceof Error ? e.message : String(e)}`)
+          } finally {
+            await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] }).catch(() => {})
+            await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+          }
+          doneSet.add(phone.geelark_id)
+          processedThisRun++
+        }
+
+        const allLogs = [...prevLogs, ...logs]
+        const allDone = phones.every(p => doneSet.has(p.geelark_id))
+        await db.from('scheduled_posts').update({
+          status: allDone ? 'done' : 'pending',
+          error_msg: null,
+          result: { logs: allLogs, mass_progress: { done: [...doneSet], tokens, logs: allLogs } },
+        }).eq('id', post.id)
+        summary[`mass:${post.id}`] = allDone
+          ? `done rotatif (${doneSet.size}/${phones.length})`
+          : `in progress rotatif (${doneSet.size}/${phones.length}, +${processedThisRun} ce tick)`
+        continue  // ← saute tout le flux non-rotatif ci-dessous
+      }
+
       // 5. Démarrage des téléphones
       log(`▶ Démarrage de ${phones.length} téléphone(s)…`)
       const startRes = await gPost(bearer, '/phone/start', { ids: geelarkIds })
@@ -1095,20 +1209,8 @@ Deno.serve(async (req) => {
         if (!images.length) throw new Error('Aucune image dans la story')
 
         // Proxy rotatif : URLs de rotation (org/user) → nouvelle IP avant chaque
-        // boot de téléphone, comme le fait l'app côté client. Stocké dans
-        // org_config.proxy / app_config.proxy (JSON { enabled, urls }).
-        let rotationUrls: string[] = []
-        try {
-          const cfgQ = post.org_id
-            ? db.from('org_config').select('proxy').eq('org_id', post.org_id).maybeSingle()
-            : db.from('app_config').select('proxy').eq('user_id', post.user_id).is('org_id', null).maybeSingle()
-          const { data: cfgD } = await cfgQ
-          const raw = (cfgD as { proxy?: unknown } | null)?.proxy
-          const j = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
-          if (j && j.enabled && Array.isArray(j.urls)) {
-            rotationUrls = j.urls.filter((u: unknown) => typeof u === 'string' && /^https?:\/\//i.test(String(u).trim()))
-          }
-        } catch { /* config absente / invalide → pas de rotation */ }
+        // boot de téléphone, comme le fait l'app côté client.
+        const rotationUrls = await loadRotationUrls(db, post.org_id, post.user_id)
         if (rotationUrls.length) log(`🔄 Proxy rotatif serveur : ${rotationUrls.length} URL(s) de rotation`)
 
         // Traite UN téléphone par invocation : le boot du téléphone (~30-60s) +
