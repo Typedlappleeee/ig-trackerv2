@@ -37,6 +37,7 @@ export const EN = {
   navHistory: 'History',
   navReports: 'Reports',
   navLibrary: 'Library',
+  navOrganization: 'My organization',
   navMontage: 'Montage',
 
   navTikTokPosting: 'TikTok Posting',
@@ -1590,6 +1591,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   navHistory: 'Historique',
   navReports: 'Rapports',
   navLibrary: 'Bibliothèque',
+  navOrganization: 'Mon organisation',
   navMontage: 'Montage',
 
   navTikTokPosting: 'TikTok Posting',

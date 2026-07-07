@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/Toast'
-import { OrganizationPanel } from '@/components/OrganizationPanel'
 import { NotificationChannels } from '@/components/NotificationChannels'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
@@ -621,7 +620,6 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     { k: 'general' as Panel,      l: t('panelGeneral') },
     { k: 'profile' as Panel,      l: t('panelProfile') },
     ...(canSeeConnexions ? [{ k: 'connexions' as Panel, l: t('panelConnexions') }] : []),
-    { k: 'organization' as Panel, l: t('panelOrganization') },
     ...(license.isSuperAdmin ? [{ k: 'admin' as Panel, l: t('panelAdmin') }] : []),
     { k: 'abonnement' as Panel,   l: t('panelPlan') },
     { k: 'desktop' as Panel,      l: t('panelDesktop') },
@@ -1453,10 +1451,20 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 </div>
               )}
 
-              {/* Organisation */}
+              {/* Organisation — désormais dans son propre onglet « Mon organisation ».
+                  On garde un renvoi gracieux au cas où un ancien lien pointe encore ici. */}
               {panel === 'organization' && (
                 <div className="sf-anim-slide-up" style={{ maxWidth: 720 }}>
-                  <OrganizationPanel user={user} />
+                  <div className="sf-card" style={{ padding: '32px 24px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 30, marginBottom: 10 }}>🏢</div>
+                    <p style={{ fontSize: 15, fontWeight: 700, margin: '0 0 6px' }}>{t('navOrganization')}</p>
+                    <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.5 }}>
+                      La gestion de l'équipe (membres, invitations, rôles & permissions) a désormais son propre onglet dans le menu.
+                    </p>
+                    <button onClick={() => onNavigate?.('organization')} className="sf-btn sf-btn-primary cursor-pointer">
+                      Ouvrir « {t('navOrganization')} »
+                    </button>
+                  </div>
                 </div>
               )}
 

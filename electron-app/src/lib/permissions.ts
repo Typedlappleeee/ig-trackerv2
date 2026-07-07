@@ -9,24 +9,28 @@ const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true, subtitles: true, spoof: true,
+    history: true, library: true, reports: true,
     settings: true,
   },
   admin: {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true, subtitles: true, spoof: true,
+    history: true, library: true, reports: true,
     settings: true,
   },
   member: {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true, subtitles: false, spoof: true,
+    history: true, library: true, reports: true,
     settings: false,
   },
   viewer: {
     phones: true,
     posting: false, massposting: false, scheduler: false, tasks: false, storylink: false, bank: true, captionbank: true, warmup: false, aitools: false,
     remix: false, repurpose: false, montage: false, mixer: false, subtitles: false, spoof: false,
+    history: true, library: false, reports: true,
     settings: false,
   },
 }
@@ -100,6 +104,9 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string; group: strin
   { key: 'phones',      label: 'Téléphones',      icon: '📱', group: 'Principal' },
   { key: 'bank',        label: 'Banque vidéos',   icon: '🗂', group: 'Principal' },
   { key: 'captionbank', label: 'Banque captions', icon: '💬', group: 'Principal' },
+  { key: 'library',     label: 'Bibliothèque',    icon: '📚', group: 'Principal' },
+  { key: 'history',     label: 'Historique',      icon: '🕑', group: 'Principal' },
+  { key: 'reports',     label: 'Rapports',        icon: '📊', group: 'Principal' },
   // Instagram
   { key: 'storylink',   label: 'Story / Link',    icon: '🔗', group: 'Instagram' },
   { key: 'posting',     label: 'Posting',         icon: '🚀', group: 'Instagram' },

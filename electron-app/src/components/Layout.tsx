@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import type { PageKey } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
+import { canSeeTab } from '@/lib/permissions'
 import { ActivePostingsWidget } from '@/components/ActivePostingsWidget'
 import { useT } from '@/lib/i18n'
 import { useToast }  from '@/components/Toast'
@@ -64,6 +66,7 @@ export type Page =
   | 'community' | 'support'
   | 'library'
   | 'settings' | 'licences'
+  | 'organization'
   | 'scaleia'
   | 'history'
   | 'reports'
@@ -113,6 +116,18 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ]
+
+// Correspondance onglet de nav (Page) → clé de permission (PageKey). Seules les
+// pages présentes ici sont soumises aux permissions par membre ; les hubs de
+// navigation (publishhub, videostudio, hub…) et les pages superadmin ne le sont
+// pas. Les clés absentes = visibles pour tout le monde.
+const PAGE_PERM_KEY: Partial<Record<Page, PageKey>> = {
+  phones: 'phones', bank: 'bank', captionbank: 'captionbank', library: 'library',
+  history: 'history', reports: 'reports', storylink: 'storylink', posting: 'posting',
+  massposting: 'massposting', scheduler: 'scheduler', warmup: 'warmup', aitools: 'aitools',
+  remix: 'remix', repurpose: 'repurpose', montage: 'montage', mixer: 'mixer',
+  subtitles: 'subtitles', spoof: 'spoof',
+}
 
 // ── SVG Icon helper ──────────────────────────────────────────────────────────
 function NavIcon({ d, size = 16, color = 'currentColor' }: { d: string; size?: number; color?: string }) {
@@ -729,6 +744,14 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
+    // Permissions par membre : un membre/lecteur d'une orga ne voit que les onglets
+    // que son rôle (ou ses overrides) autorisent. Owner/admin voient tout ; en solo
+    // (role === null) aucune restriction. C'est ce qui donne enfin de l'effet réel à
+    // la matrice de permissions de « Mon organisation ».
+    if (role && role !== 'owner' && role !== 'admin') {
+      const pk = PAGE_PERM_KEY[id]
+      if (pk && !canSeeTab(role, perms, pk)) return false
+    }
     // Tous les autres onglets sont visibles pour tout le monde.
     return true
   }
@@ -795,6 +818,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     licences:    t('pageLicences'),
     reports:     t('navReports'),
     library:     t('navLibrary'),
+    organization: t('navOrganization'),
   }
 
   return (
@@ -928,6 +952,17 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
         {/* ── Bottom section ────────────────────────────────────────────── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+          {/* Mon organisation */}
+          <button
+            className={`sf-sidebar-item${page === 'organization' ? ' is-active' : ''}`}
+            onClick={() => { playNav(); onNavigate('organization') }}
+            style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+            title={t('navOrganization')}
+          >
+            <span className="sf-sidebar-icon"><NavIcon d={ICONS.building} size={17} /></span>
+            {!collapsed && <span style={{ flex: 1 }}>{t('navOrganization')}</span>}
+          </button>
 
           {/* Settings */}
           <button
@@ -1458,11 +1493,11 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               </button>
             ))}
             <button
-              onClick={() => { setOrgMenuOpen(false); onNavigate('settings', 'organization') }}
+              onClick={() => { setOrgMenuOpen(false); onNavigate('organization') }}
               className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-white/[0.04] border-t text-left transition-colors flex items-center gap-2"
               style={{ borderColor: 'rgba(99,102,241,0.12)' }}
             >
-              <NavIcon d={ICONS.settings} size={11} color="currentColor" />
+              <NavIcon d={ICONS.building} size={11} color="currentColor" />
               {t('manageOrganizations')}
             </button>
           </div>
@@ -1559,7 +1594,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             { id: 'phones',   iconKey: 'phone',    label: 'Phones'   },
             { id: 'scheduler',iconKey: 'calendar', label: 'Planif.'  },
             { id: 'settings', iconKey: 'settings', label: 'Config'   },
-          ] as Array<{ id: Page; iconKey: IconKey; label: string }>).map(item => {
+          ] as Array<{ id: Page; iconKey: IconKey; label: string }>).filter(item => isVisibleTab(item.id)).map(item => {
             const active = page === item.id
             return (
               <button

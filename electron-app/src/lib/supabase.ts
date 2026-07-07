@@ -44,6 +44,7 @@ export type PageKey =
   | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'warmup' | 'aitools' | 'storylink'
   | 'remix' | 'repurpose' | 'montage' | 'mixer' | 'subtitles' | 'spoof'
+  | 'history' | 'library' | 'reports'
   | 'settings'
 
 // Granular action permissions (on top of tab visibility).

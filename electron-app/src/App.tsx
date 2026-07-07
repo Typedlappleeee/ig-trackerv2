@@ -601,6 +601,7 @@ const Support        = lazyWithReload(() => import('@/pages/Support').then(m => 
 const History        = lazyWithReload(() => import('@/pages/History').then(m => ({ default: m.History })))
 const Reports        = lazyWithReload(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
 const Library        = lazyWithReload(() => import('@/pages/Library').then(m => ({ default: m.Library })))
+const Organization   = lazyWithReload(() => import('@/pages/Organization').then(m => ({ default: m.Organization })))
 const Community      = lazyWithReload(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazyWithReload(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazyWithReload(() => import('@/pages/StoryLink'))
@@ -923,6 +924,7 @@ function AppContent({ user }: { user: User }) {
       case 'history':      return <History     user={user} onNavigate={handleNavigate} />
       case 'reports':      return <Reports     user={user} />
       case 'library':      return <Library     user={user} />
+      case 'organization': return <Organization user={user} />
 
     }
   })()
