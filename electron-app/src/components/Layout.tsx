@@ -92,7 +92,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'library',     label: 'navLibrary',      icon: '📚', isNew: true },
       { id: 'history',     label: 'navHistory',      icon: '🕑' },
-      { id: 'reports',     label: 'navReports',      icon: '📊', beta: true },
+      { id: 'reports',     label: 'navReports',      icon: '📊', isNew: true },
     ],
   },
   {
@@ -725,8 +725,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const hasContentCreation = effectiveSuperAdmin || planNow === 'pro' || planNow === 'organisation'
 
   const isVisibleTab = (id: Page): boolean => {
-    // Pages internes / superadmin ScaleFlow uniquement (Rapports + Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
+    // Pages internes / superadmin ScaleFlow uniquement (Tâches inclus).
+    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Tous les autres onglets sont visibles pour tout le monde.
