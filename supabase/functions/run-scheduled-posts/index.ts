@@ -1213,27 +1213,17 @@ Deno.serve(async (req) => {
         const rotationUrls = await loadRotationUrls(db, post.org_id, post.user_id)
         if (rotationUrls.length) log(`🔄 Proxy rotatif serveur : ${rotationUrls.length} URL(s) de rotation`)
 
-        // Traite UN téléphone par invocation : le boot du téléphone (~30-60s) +
-        // l'automation story (~2 min) tiennent dans le budget serverless pour un
-        // seul compte. Les autres comptes sont repris aux ticks suivants du cron.
-        let processedThisRun = 0
-        for (let i = 0; i < phones.length; i++) {
-          const phone = phones[i]
-          if (doneSet.has(phone.geelark_id)) continue
-          if (processedThisRun >= 1) break  // un seul téléphone par invocation
-
+        // Traite un téléphone : image → watchdog → automation story → extinction.
+        const processPhone = async (phone: PhoneRec & { link?: string }, i: number) => {
           const name = phone.ig_username ?? phone.phone_name
           const link = (phone.link ?? '').trim()
-          if (!link) { log(`❌ ${name} : aucun lien configuré`); doneSet.add(phone.geelark_id); continue }
-
+          if (!link) { log(`❌ ${name} : aucun lien configuré`); doneSet.add(phone.geelark_id); return }
           const imgIdx = mode === 'random' ? Math.floor(Math.random() * images.length) : i % images.length
           const imageUrl = await resolveImageUrl(db, images[imgIdx])
           const linkText = storyTexts.length
             ? (mode === 'random' ? storyTexts[Math.floor(Math.random() * storyTexts.length)] : storyTexts[i % storyTexts.length])
             : undefined
-
           log(`▶ [serveur] Story ${name}…`)
-          // Watchdog : si l'invocation meurt avant le finally, le phone est éteint après 5 min.
           await db.from('phone_power_watch').upsert(
             [{ geelark_id: phone.geelark_id, org_id: post.org_id, user_id: post.user_id, reason: 'server_story', stop_at: new Date(Date.now() + 5 * 60_000).toISOString() }],
             { onConflict: 'geelark_id' },
@@ -1249,7 +1239,20 @@ Deno.serve(async (req) => {
             await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
           }
           doneSet.add(phone.geelark_id)
-          processedThisRun++
+        }
+
+        const todo = phones.map((p, i) => ({ p, i })).filter(({ p }) => !doneSet.has(p.geelark_id))
+        let processedThisRun = 0
+        if (rotationUrls.length > 0) {
+          // PROXY ROTATIF : 1 téléphone par invocation (série) — rotation d'IP avant
+          // chaque boot. Le reste est repris aux ticks suivants du cron.
+          if (todo.length) { await processPhone(todo[0].p, todo[0].i); processedThisRun = 1 }
+        } else {
+          // NON-ROTATIF : TOUS les téléphones en même temps (parallèle) dans une seule
+          // invocation. Temps total ≈ celui d'une story (~2-3 min) car elles tournent
+          // en même temps. Chaque compte a son propre proxy dédié → pas de collision.
+          await Promise.all(todo.map(({ p, i }) => processPhone(p, i)))
+          processedThisRun = todo.length
         }
 
         const allDone = phones.every(p => doneSet.has(p.geelark_id))
