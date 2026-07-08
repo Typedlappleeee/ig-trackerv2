@@ -1830,11 +1830,24 @@ async function _postInstagramStoryInner(
   // after a successful publish IG returns to the home feed, whose story tray
   // contains "Your story" — matching it produced false "failed" results on
   // stories that were actually published.
-  const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
-  const stillEditing = /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text/.test(finalXml)
+  //
+  // ANTI FAUX-NÉGATIF : on a DÉJÀ tapé « Partager ». On ne compte en échec QUE si
+  // on détecte POSITIVEMENT qu'on est encore dans l'éditeur. Si le dump de
+  // vérification plante (shell « pas prêt » sous charge) ou est inconclusif, on
+  // considère la story comme publiée — sinon des stories réellement postées sont
+  // comptées « échec » (et re-tenter risquerait un double post).
+  let stillEditing = false
+  try {
+    const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
+    if (finalXml.trim()) {
+      stillEditing = /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text/.test(finalXml)
+    }
+  } catch {
+    log('   ⚠️ Vérification impossible (shell occupé) — story considérée publiée.')
+  }
   if (stillEditing) {
-    log('   ⚠️ L\'éditeur semble encore ouvert — vérifie manuellement.')
-    return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }
+    log('   ⚠️ L\'éditeur est encore ouvert — publication non aboutie.')
+    return { ok: false, error: 'Éditeur encore ouvert — story non publiée' }
   }
 
   log('✅ Story publiée !')

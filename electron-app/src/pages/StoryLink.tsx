@@ -340,10 +340,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [dryRun, setDryRun]                 = useState(false)
   // Concurrence (proxys rotatifs) — persistée
   const [rotProxy, setRotProxy]   = useState(() => localStorage.getItem('sf-story-rotproxy') === '1')
-  // Défaut STORY = 5 téléphones à la fois. Une story = ~40 appels ADB en temps réel
-  // (pas de template RPA côté GeeLark), donc « Tous » sature la limite ~200 req/min
-  // et fait échouer la majorité. 5 = tous les comptes passent, par petits lots.
-  const [maxConc,  setMaxConc]    = useState(() => { migrateConcurrencyOnce(); const v = parseInt(localStorage.getItem('sf-story-maxconc') ?? '5', 10); return v > 0 ? v : 5 })
+  const [maxConc,  setMaxConc]    = useState(() => { migrateConcurrencyOnce(); return parseInt(localStorage.getItem('sf-story-maxconc') ?? '0', 10) || 0 })
   // Proxys à roter pour ce lancement (sous-ensemble). Vide = tous. Persisté.
   const [rotUrls, setRotUrls]     = useState<string[]>(() => {
     try { const v = JSON.parse(localStorage.getItem('sf-story-roturls') ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
@@ -548,9 +545,10 @@ export default function StoryLink({ user }: { user: User }) {
       setJobs(prev => prev.map(j => j.phoneId === id ? { ...j, status } : j))
     }
 
-    // Une story = des dizaines d'appels ADB (shell/execute) sur ~2 min. Lancer TOUS
-    // les téléphones en parallèle sature la limite GeeLark (200 req/min) → la moitié
-    // des appels échouent → stories ratées. On borne la concurrence à 3 téléphones.
+    // Une story = des dizaines d'appels ADB (shell/execute) sur ~2 min. Beaucoup de
+    // téléphones en parallèle peut multiplier les réponses « shell pas prêt » (le
+    // démon shell est occupé) → certaines actions ratent. Concurrence réglable via
+    // « Téléphones simultanés » ; défaut = Tous.
     const runOne = async (asgn: typeof assignments[number]): Promise<number> => {
       if (abortRef.current) return 0
       setStatus(asgn.phoneId, 'running')
@@ -1314,16 +1312,11 @@ export default function StoryLink({ user }: { user: User }) {
               </button>
             </div>
             {!rotProxy && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Téléphones simultanés</span>
-                  <input type="number" min={1} max={200} value={maxConc || 5} placeholder="5"
-                    onChange={e => setMaxConc(Math.max(1, parseInt(e.target.value) || 5))}
-                    className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
-                </div>
-                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '4px 0 0' }}>
-                  Une story = ~40 actions/téléphone. Au-delà de ~5-8 en même temps, GéeLark sature et des stories échouent.
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Téléphones simultanés</span>
+                <input type="number" min={0} max={200} value={maxConc || ''} placeholder="Tous"
+                  onChange={e => setMaxConc(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
               </div>
             )}
             {rotProxy && (() => {
