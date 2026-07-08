@@ -1180,10 +1180,9 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       } else {
         // ── Instagram : une tâche RPA instagramPubReels par téléphone ──
-        // Anti rate-limit GéeLark (200 req/min) : petit espacement entre chaque
-        // création + retry/backoff sur les codes transitoires (throttle/lock).
-        // C'est ce qui fait « ça marche sur certains tels, plus du tout sur
-        // d'autres » quand on lance beaucoup de tels d'un coup.
+        // Petit espacement entre chaque création + retry/backoff sur les codes
+        // transitoires GéeLark (throttle/lock) — évite le « ça marche sur certains
+        // tels, plus du tout sur d'autres » quand on lance beaucoup de tels d'un coup.
         for (let ai = 0; ai < assignments.length; ai++) {
           if (stopRef.current) { log('Création des tâches interrompue (stop)', 'warn'); break }
           const asgn = assignments[ai]

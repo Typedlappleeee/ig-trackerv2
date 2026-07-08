@@ -577,8 +577,8 @@ export default function StoryLink({ user }: { user: User }) {
     const rotationUrls = rotProxy ? resolveRotationUrls(rotUrls) : []
     // Proxy rotatif : autant de téléphones en parallèle qu'il y a de proxies (1 IP
     // fraîche par proxy). 1 proxy = série. Sinon : concurrence = réglage utilisateur,
-    // ou par défaut TOUS d'un coup (« Tous »). Si tu vois des échecs par saturation,
-    // mets un nombre dans le champ Concurrence pour brider.
+    // ou par défaut TOUS d'un coup (« Tous »). Si tu vois des échecs quand tu lances
+    // beaucoup de tels, mets un nombre dans le champ pour brider.
     const CONCURRENCY = rotProxy
       ? Math.max(1, Math.min(rotationUrls.length || 1, assignments.length))
       : (maxConc > 0 ? maxConc : assignments.length)
