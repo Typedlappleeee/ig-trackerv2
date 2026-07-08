@@ -11,7 +11,7 @@ import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp, fetchPhoneProxies } from '@/lib/geelark'
 import { startRun, updateRun, endRun, setRunPhase, finishRun, findOrphanRun, adoptRun, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
-import { activeRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
+import { resolveRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
@@ -950,7 +950,7 @@ export function MassPosting({ user }: MassPostingProps) {
       // lot est démarré → posté → éteint avant le suivant, avec délai optionnel.
       // Rotation d'IP : UNIQUEMENT si "Proxy rotatif" est coché ET des URLs sont
       // configurées. Sinon rien ne change (pas de série forcée).
-      const rotationUrls  = postingOpts.rotatingProxy ? activeRotationUrls() : []
+      const rotationUrls  = postingOpts.rotatingProxy ? resolveRotationUrls(postingOpts.rotateProxyUrls) : []
       // En proxy rotatif : autant de téléphones en parallèle qu'il y a de proxies.
       const _concurrency  = effectiveConcurrency(postingOpts, assignments.length, rotationUrls.length)
       if (platform === 'instagram' && _concurrency < assignments.length) {

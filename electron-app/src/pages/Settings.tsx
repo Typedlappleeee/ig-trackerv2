@@ -1330,7 +1330,22 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                   {!currentOrg || canEditOrgConnexions ? (() => {
                     const cfg = proxyRot.cfg
                     const canEdit = !currentOrg || canEditOrgConnexions
-                    const setUrls = (urls: string[]) => proxyRot.setCfg({ ...cfg, urls })
+                    const patchCfg = (p: Partial<typeof cfg>) => proxyRot.setCfg({ ...cfg, ...p })
+                    const setUrls = (urls: string[]) => patchCfg({ urls })
+                    const setName = (i: number, val: string) => {
+                      const names = [...(cfg.names ?? [])]
+                      while (names.length <= i) names.push('')
+                      names[i] = val
+                      patchCfg({ names })
+                    }
+                    const addRow = () => patchCfg({
+                      urls:  [...(cfg.urls.length ? cfg.urls : ['']), ''],
+                      names: [...(cfg.names ?? (cfg.urls.length ? cfg.urls.map(() => '') : [''])), ''],
+                    })
+                    const removeRow = (i: number) => patchCfg({
+                      urls:  cfg.urls.filter((_, j) => j !== i),
+                      names: (cfg.names ?? []).filter((_, j) => j !== i),
+                    })
                     const testUrl = async (i: number) => {
                       const url = (cfg.urls[i] ?? '').trim()
                       if (!url) return
@@ -1340,7 +1355,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     }
                     const saveRot = async () => {
                       setRotSaving(true)
-                      try { await proxyRot.save({ enabled: cfg.enabled, urls: cfg.urls.map(u => u.trim()).filter(Boolean) }); setRotSaved(true); setTimeout(() => setRotSaved(false), 2500) }
+                      try { await proxyRot.save(cfg); setRotSaved(true); setTimeout(() => setRotSaved(false), 2500) }
                       finally { setRotSaving(false) }
                     }
                     return (
@@ -1370,6 +1385,12 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                 <input
+                                  className="sf-input" placeholder={`Nom (ex. Dongle ${i + 1})`} value={cfg.names?.[i] ?? ''}
+                                  disabled={!canEdit}
+                                  onChange={e => setName(i, e.target.value)}
+                                  style={{ width: 180, flexShrink: 0, fontSize: 12 }}
+                                />
+                                <input
                                   className="sf-input" placeholder="https://…/changeip?u=…" value={url}
                                   disabled={!canEdit}
                                   onChange={e => { const next = [...(cfg.urls.length ? cfg.urls : [''])]; next[i] = e.target.value; setUrls(next); setRotTest(p => ({ ...p, [i]: {} })) }}
@@ -1379,7 +1400,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                                   {rotTest[i]?.busy ? 'Test…' : 'Tester'}
                                 </button>
                                 {canEdit && (cfg.urls.length > 1) && (
-                                  <button onClick={() => setUrls(cfg.urls.filter((_, j) => j !== i))} title="Retirer" className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" style={{ flexShrink: 0, color: '#F87171' }}>
+                                  <button onClick={() => removeRow(i)} title="Retirer" className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" style={{ flexShrink: 0, color: '#F87171' }}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                                   </button>
                                 )}
@@ -1390,7 +1411,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             </div>
                           ))}
                           {canEdit && (
-                            <button onClick={() => setUrls([...(cfg.urls.length ? cfg.urls : ['']), ''])} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <button onClick={addRow} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
                               Ajouter un proxy
                             </button>

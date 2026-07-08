@@ -1,5 +1,6 @@
 import { type PostingOpts, type IntervalMode, savePostingOpts } from '@/lib/postingOpts'
 import { getProxyRotation } from '@/lib/proxyRotation'
+import { ProxyPicker } from '@/components/ProxyPicker'
 
 interface Props {
   opts: PostingOpts
@@ -242,6 +243,12 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           </div>
         )
       })()}
+
+      {/* Sélecteur de proxys — sur quel(s) proxy sont les téléphones de ce post.
+          Ne s'affiche que s'il y a ≥2 proxys configurés (sinon rien à choisir). */}
+      {opts.rotatingProxy && (
+        <ProxyPicker selected={opts.rotateProxyUrls} onChange={urls => set({ rotateProxyUrls: urls })} />
+      )}
 
       {/* Concurrence (masquée si proxy rotatif = 1 forcé) */}
       {!opts.rotatingProxy && (

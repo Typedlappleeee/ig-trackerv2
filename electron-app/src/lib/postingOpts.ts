@@ -16,6 +16,9 @@ export interface PostingOpts {
   rotatingProxy: boolean  // raccourci : force 1 téléphone à la fois
   maxConcurrent: number   // nb de téléphones simultanés (0 = tous d'un coup)
   deleteAfterPost: boolean // usage unique : supprime la vidéo de la banque après publication
+  // Proxys à roter pour CE lancement (sous-ensemble des proxys configurés). Vide =
+  // tous. Permet de lancer plusieurs postings en parallèle, chacun sur son proxy.
+  rotateProxyUrls: string[]
 }
 
 const KEY = 'sf_posting_opts'
@@ -29,6 +32,7 @@ const DEFAULTS: PostingOpts = {
   rotatingProxy: false,
   maxConcurrent: 0,
   deleteAfterPost: false,
+  rotateProxyUrls: [],
 }
 
 export function loadPostingOpts(): PostingOpts {
@@ -43,6 +47,7 @@ export function loadPostingOpts(): PostingOpts {
       rotatingProxy:   saved.rotatingProxy   ?? DEFAULTS.rotatingProxy,
       maxConcurrent:   saved.maxConcurrent   ?? DEFAULTS.maxConcurrent,
       deleteAfterPost: saved.deleteAfterPost ?? DEFAULTS.deleteAfterPost,
+      rotateProxyUrls: Array.isArray(saved.rotateProxyUrls) ? saved.rotateProxyUrls : DEFAULTS.rotateProxyUrls,
       intervalMode:  'none',
     }
   } catch { return { ...DEFAULTS } }

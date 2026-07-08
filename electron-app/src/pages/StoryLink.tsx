@@ -6,7 +6,8 @@ import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, postInstagramStory, stopPhone, fetchPhoneProxies, type GeelarkPhone } from '@/lib/geelark'
 import { startRun, updateRun, endRun, setRunPhase, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
-import { activeRotationUrls, useProxyRotation, getProxyRotation } from '@/lib/proxyRotation'
+import { resolveRotationUrls, useProxyRotation, getProxyRotation } from '@/lib/proxyRotation'
+import { ProxyPicker } from '@/components/ProxyPicker'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
@@ -339,8 +340,13 @@ export default function StoryLink({ user }: { user: User }) {
   // Concurrence (proxys rotatifs) — persistée
   const [rotProxy, setRotProxy]   = useState(() => localStorage.getItem('sf-story-rotproxy') === '1')
   const [maxConc,  setMaxConc]    = useState(() => parseInt(localStorage.getItem('sf-story-maxconc') ?? '0', 10) || 0)
+  // Proxys à roter pour ce lancement (sous-ensemble). Vide = tous. Persisté.
+  const [rotUrls, setRotUrls]     = useState<string[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem('sf-story-roturls') ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
+  })
   useEffect(() => { localStorage.setItem('sf-story-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
   useEffect(() => { localStorage.setItem('sf-story-maxconc', String(maxConc)) }, [maxConc])
+  useEffect(() => { localStorage.setItem('sf-story-roturls', JSON.stringify(rotUrls)) }, [rotUrls])
   const [showSchedule, setShowSchedule]     = useState(false)
   const [schedAt, setSchedAt]               = useState(() => defaultSchedValue(60))
   const [schedDelay, setSchedDelay]         = useState(2)
@@ -566,7 +572,7 @@ export default function StoryLink({ user }: { user: User }) {
 
     // Par défaut : TOUS les téléphones en même temps (comme le Mass Posting).
     // Rotation d'IP UNIQUEMENT si "Proxy rotatif" est coché ET URLs configurées.
-    const rotationUrls = rotProxy ? activeRotationUrls() : []
+    const rotationUrls = rotProxy ? resolveRotationUrls(rotUrls) : []
     // Proxy rotatif : autant de téléphones en parallèle qu'il y a de proxies (1 IP
     // fraîche par proxy). 1 proxy = série. Sinon : concurrence = réglage utilisateur,
     // ou par défaut TOUS d'un coup (« Tous »). Si tu vois des échecs par saturation,
@@ -1332,6 +1338,7 @@ export default function StoryLink({ user }: { user: User }) {
                 </div>
               )
             })()}
+            {rotProxy && <div style={{ marginTop: 12 }}><ProxyPicker selected={rotUrls} onChange={setRotUrls} /></div>}
           </div>
         </div>
 
