@@ -339,7 +339,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [dryRun, setDryRun]                 = useState(false)
   // Concurrence (proxys rotatifs) — persistée
   const [rotProxy, setRotProxy]   = useState(() => localStorage.getItem('sf-story-rotproxy') === '1')
-  const [maxConc,  setMaxConc]    = useState(() => { const v = parseInt(localStorage.getItem('sf-story-maxconc') ?? '1', 10); return v > 0 ? v : 1 })
+  const [maxConc,  setMaxConc]    = useState(() => parseInt(localStorage.getItem('sf-story-maxconc') ?? '0', 10) || 0)
   // Proxys à roter pour ce lancement (sous-ensemble). Vide = tous. Persisté.
   const [rotUrls, setRotUrls]     = useState<string[]>(() => {
     try { const v = JSON.parse(localStorage.getItem('sf-story-roturls') ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
@@ -1312,8 +1312,8 @@ export default function StoryLink({ user }: { user: User }) {
             {!rotProxy && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Téléphones simultanés</span>
-                <input type="number" min={1} max={200} value={maxConc || 1} placeholder="1"
-                  onChange={e => setMaxConc(Math.max(1, parseInt(e.target.value) || 1))}
+                <input type="number" min={0} max={200} value={maxConc || ''} placeholder="Tous"
+                  onChange={e => setMaxConc(Math.max(0, parseInt(e.target.value) || 0))}
                   className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
               </div>
             )}

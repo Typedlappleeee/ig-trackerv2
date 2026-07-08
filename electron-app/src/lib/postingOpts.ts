@@ -30,7 +30,7 @@ const DEFAULTS: PostingOpts = {
   reelsTrial:   false,
   alsoStory:    false,
   rotatingProxy: false,
-  maxConcurrent: 1,   // 1 téléphone à la fois par défaut (plus sûr anti-détection)
+  maxConcurrent: 0,   // 0 = « Tous » (tous les téléphones d'un coup) par défaut
   deleteAfterPost: false,
   rotateProxyUrls: [],
 }
@@ -45,8 +45,7 @@ export function loadPostingOpts(): PostingOpts {
       intervalMax:   saved.intervalMax   ?? DEFAULTS.intervalMax,
       alsoStory:     saved.alsoStory     ?? DEFAULTS.alsoStory,
       rotatingProxy:   saved.rotatingProxy   ?? DEFAULTS.rotatingProxy,
-      // Ancien 0 (= « Tous ») migré vers 1 : on ne poste plus tous les tél d'un coup par défaut.
-      maxConcurrent:   (typeof saved.maxConcurrent === 'number' && saved.maxConcurrent > 0) ? saved.maxConcurrent : DEFAULTS.maxConcurrent,
+      maxConcurrent:   saved.maxConcurrent   ?? DEFAULTS.maxConcurrent,
       deleteAfterPost: saved.deleteAfterPost ?? DEFAULTS.deleteAfterPost,
       rotateProxyUrls: Array.isArray(saved.rotateProxyUrls) ? saved.rotateProxyUrls : DEFAULTS.rotateProxyUrls,
       intervalMode:  'none',
