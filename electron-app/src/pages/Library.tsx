@@ -5,10 +5,51 @@ import { useConnections } from '@/lib/connections'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import {
   fetchAllPhones, startPhones, stopPhone, warmupAccountNative, editInstagramProfileNative,
-  warmupTikTokNative, editTikTokProfileNative, forceInstagramEnglish, postInstagramStory,
+  warmupTikTokNative, editTikTokProfileNative, forceInstagramEnglish, geelarkUploadMediaToPhone,
   getPhonePublicIp, waitForPhoneConnectivity, shellExec, type GeelarkPhone,
 } from '@/lib/geelark'
 import { startRun, setRunPhase, finishRun } from '@/lib/activeRuns'
+import { BankPicker } from './Bank'
+import type { ContentItem } from '@/lib/supabase'
+
+// Un média sélectionné à pousser dans la galerie d'un téléphone.
+export interface PushMedia { url: string; name: string; fileType: 1 | 2 }
+
+// Déduit le type (1=image, 2=vidéo) + un nom de fichier propre depuis l'item de
+// banque. Le préfixe sf_<i>_ évite les collisions quand on envoie plusieurs médias.
+function mediaMeta(it: ContentItem | undefined, url: string, i: number): PushMedia {
+  const src = it?.storage_path || it?.title || url
+  const m = /\.(mp4|mov|webm|mkv|avi|m4v|jpe?g|png|webp|gif|heic)(?:\?|$)/i.exec(src)
+  let ext = m ? m[1].toLowerCase().replace('jpeg', 'jpg') : ''
+  const isVideo = /^(mp4|mov|webm|mkv|avi|m4v)$/.test(ext) || (it?.duration != null && it.duration > 0)
+  if (!ext) ext = isVideo ? 'mp4' : 'jpg'
+  const base = (it?.title || 'media').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 32) || 'media'
+  return { url, name: `sf_${i}_${base}.${ext}`, fileType: isVideo ? 2 : 1 }
+}
+
+// Pousse une liste de médias dans la galerie (/sdcard/DCIM/Camera) d'un téléphone
+// via l'API GéeLark (material center → phone/file/upload), puis rescanne le
+// MediaStore pour qu'ils apparaissent dans la galerie.
+async function pushMediaToPhone(
+  bearer: string, phoneId: string, items: PushMedia[], log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!await ensureOn(bearer, phoneId, log)) return { ok: false, error: 'téléphone injoignable' }
+  let done = 0
+  for (const m of items) {
+    log(`📤 ${m.name}`)
+    const r = await geelarkUploadMediaToPhone(bearer, phoneId, m.url, {
+      fileType: m.fileType, fileName: m.name, dir: '/sdcard/DCIM/Camera', log,
+    })
+    if (r.ok) done++
+    else log(`✕ ${m.name} — ${r.error ?? 'échec'}`)
+  }
+  // Rescan pour que la galerie affiche les nouveaux fichiers immédiatement.
+  await shellExec(bearer, phoneId,
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; ` +
+    `am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard 2>/dev/null; true`).catch(() => {})
+  if (done === 0) return { ok: false, error: 'aucun média transféré' }
+  return { ok: true, error: done < items.length ? `${done}/${items.length} transféré(s)` : undefined }
+}
 
 // Allume le téléphone et attend qu'il réponde — pour les tâches shell brutes
 // (les warmup/édition gèrent déjà le démarrage en interne).
@@ -27,6 +68,7 @@ interface Task {
   key: string; title: string; desc: string; emoji: string; accent: string; grad: string; glow: string
   superOnly?: boolean
   danger?: boolean
+  pickMedia?: boolean   // ouvre le sélecteur de médias (banque) au lieu du formulaire
   fields?: Field[]
   run: (bearer: string, phoneId: string, cfg: Record<string, string>, log: (m: string) => void) => Promise<{ ok: boolean; error?: string }>
 }
@@ -53,6 +95,10 @@ const TASKS: Task[] = [
     run: async (bearer, id) => { await stopPhone(bearer, id); return { ok: true } } },
   { key: 'reboot', title: 'Redémarrer', desc: 'Éteint puis rallume le téléphone.', emoji: '🔁', ...GRAD.slate,
     run: async (bearer, id, _c, log) => { await stopPhone(bearer, id); log('éteint, rallumage…'); await new Promise(r => setTimeout(r, 4000)); const on = await ensureOn(bearer, id, log); return { ok: on, error: on ? undefined : 'ne répond pas' } } },
+
+  // ── Médias ──
+  { key: 'push_media', title: 'Envoyer des médias', desc: 'Choisis des photos/vidéos dans ta banque → elles sont déposées dans la galerie des téléphones.', emoji: '📥', ...GRAD.violet, pickMedia: true,
+    run: async () => ({ ok: true }) },   // routé spécialement (sélecteur de médias)
 
   // ── Warmup ──
   { key: 'warmup_ig', title: 'Warmup Instagram', desc: 'Navigation IA naturelle dans le feed pour chauffer le compte.', emoji: '🔥', ...GRAD.amber,
@@ -89,25 +135,8 @@ const TASKS: Task[] = [
     ],
     run: (bearer, id, cfg, log) => editTikTokProfileNative(bearer, id, { nickName: cfg.nickName?.trim() || undefined, bio: cfg.bio?.trim() || undefined, site: cfg.site?.trim() || undefined, avatarUrl: cfg.avatarUrl?.trim() || undefined }, log) },
 
-  // ── Publication ──
-  { key: 'story', title: 'Poster une story', desc: 'Publie une image en story Instagram avec un sticker lien cliquable.', emoji: '📖', ...GRAD.amber,
-    fields: [
-      { key: 'imageUrl', label: 'Image (URL publique)', type: 'text', placeholder: 'https://…/image.jpg', required: true },
-      { key: 'linkUrl', label: 'Lien du sticker', type: 'text', placeholder: 'https://…', required: true },
-      { key: 'linkText', label: 'Texte du sticker (optionnel)', type: 'text', placeholder: 'ex. Voir plus' },
-    ],
-    run: (bearer, id, cfg, log) => {
-      const imageUrl = cfg.imageUrl?.trim(), linkUrl = cfg.linkUrl?.trim()
-      if (!imageUrl || !linkUrl) return Promise.resolve({ ok: false, error: 'image + lien requis' })
-      return postInstagramStory(bearer, id, { imageUrl, linkUrl, linkText: cfg.linkText?.trim() || undefined }, log)
-    } },
-
   // ── Apps ──
-  { key: 'open_ig', title: 'Ouvrir Instagram', desc: 'Lance l\'app Instagram sur le téléphone.', emoji: '📸', ...GRAD.indigo,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, openApp(IG)); return { ok: true } } },
-  { key: 'open_tt', title: 'Ouvrir TikTok', desc: 'Lance l\'app TikTok sur le téléphone.', emoji: '🎶', ...GRAD.indigo,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, openApp(TT)); return { ok: true } } },
-  { key: 'restart_ig', title: 'Redémarrer Instagram', desc: 'Ferme puis relance Instagram (débloque l\'app figée).', emoji: '♻️', ...GRAD.indigo,
+  { key: 'restart_ig', title: 'Débloquer Instagram', desc: 'Ferme puis relance Instagram (débloque l\'app figée).', emoji: '♻️', ...GRAD.indigo,
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${IG}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(IG)); return { ok: true } } },
   { key: 'restart_tt', title: 'Redémarrer TikTok', desc: 'Ferme puis relance TikTok (débloque l\'app figée).', emoji: '🔂', ...GRAD.indigo,
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${TT}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(TT)); return { ok: true } } },
@@ -162,7 +191,7 @@ const TEASERS = [
   { emoji: '🔌', title: 'Allumer / Éteindre', desc: 'Démarre et arrête tes cloud phones en un clic.', grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
   { emoji: '🔥', title: 'Warmup automatique', desc: 'Chauffe les comptes de façon naturelle avant de publier.', grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
   { emoji: '✏️', title: 'Édition de profil', desc: 'Nom, bio et lien mis à jour en masse sur tous les comptes.', grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6' },
-  { emoji: '🔄', title: 'Séquences complètes', desc: 'Enchaîner warmup, édition et posting dans un workflow.', grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.45)', accent: '#22D3EE' },
+  { emoji: '📥', title: 'Envoyer des médias', desc: 'Dépose des photos/vidéos de ta banque dans la galerie des téléphones.', grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
 ]
 function ComingSoon() {
   return (
@@ -204,6 +233,7 @@ function GeelarkLauncher({ user }: { user: User }) {
   const [search, setSearch] = useState('')
 
   const [modalTask, setModalTask] = useState<Task | null>(null)
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
   const [cfgVals, setCfgVals] = useState<Record<string, string>>({})
   const [running, setRunning] = useState(false)
   const [jobs, setJobs] = useState<Record<string, Job>>({})
@@ -229,25 +259,26 @@ function GeelarkLauncher({ user }: { user: User }) {
   const tasks = TASKS.filter(t => !t.superOnly || isSuper)
 
   function openTask(t: Task) {
-    if (!selected.size) return
+    if (!selected.size || running) return
+    if (t.pickMedia) { setMediaPickerOpen(true); return }   // → sélecteur de médias
     setModalTask(t)
     const init: Record<string, string> = {}
     for (const f of t.fields ?? []) init[f.key] = f.def != null ? String(f.def) : ''
     setCfgVals(init)
   }
 
-  async function launch() {
-    const task = modalTask
-    if (!task || !bearer) return
+  // Exécute un worker sur chaque téléphone sélectionné, avec suivi (jobs + carte « en cours »).
+  async function runOnPhones(label: string, worker: (b: string, id: string, log: (m: string) => void) => Promise<{ ok: boolean; error?: string }>) {
+    if (!bearer) return
     const targets = phones.filter(p => selected.has(p.id))
     if (!targets.length) return
-    setModalTask(null); setRunning(true); setLogs([])
+    setRunning(true); setLogs([])
     setJobs(Object.fromEntries(targets.map(p => [p.id, { status: 'idle' as JobStatus }])))
     const addLog = (m: string) => setLogs(l => [...l.slice(-200), m])
 
     const runId = `lib-${Date.now()}`
     startRun({
-      id: runId, type: 'warmup', label: `${task.emoji} ${task.title} · ${targets.length} tél.`,
+      id: runId, type: 'warmup', label: `${label} · ${targets.length} tél.`,
       proxyKeys: [], done: 0, total: targets.length, page: 'library',
       phones: targets.map(p => ({ id: p.id, name: phoneName(p), status: 'idle' })),
     })
@@ -257,8 +288,8 @@ function GeelarkLauncher({ user }: { user: User }) {
       setJobs(j => ({ ...j, [phone.id]: { status: 'running' } }))
       setRunPhase(runId, phone.id, 'running')
       try {
-        const r = await task.run(bearer, phone.id, cfgVals, m => addLog(`${phoneName(phone)}: ${m}`))
-        if (r.ok) { ok++; setJobs(j => ({ ...j, [phone.id]: { status: 'done' } })); setRunPhase(runId, phone.id, 'done') }
+        const r = await worker(bearer, phone.id, m => addLog(`${phoneName(phone)}: ${m}`))
+        if (r.ok) { ok++; setJobs(j => ({ ...j, [phone.id]: { status: 'done', detail: r.error } })); setRunPhase(runId, phone.id, 'done') }
         else { setJobs(j => ({ ...j, [phone.id]: { status: 'error', detail: r.error } })); setRunPhase(runId, phone.id, 'error') }
       } catch (e) {
         setJobs(j => ({ ...j, [phone.id]: { status: 'error', detail: e instanceof Error ? e.message : String(e) } }))
@@ -268,6 +299,22 @@ function GeelarkLauncher({ user }: { user: User }) {
     finishRun(runId)
     setRunning(false)
     addLog(`✓ Terminé — ${ok}/${targets.length} réussi(s)`)
+  }
+
+  async function launch() {
+    const task = modalTask
+    if (!task) return
+    const cfg = { ...cfgVals }
+    setModalTask(null)
+    await runOnPhones(`${task.emoji} ${task.title}`, (b, id, log) => task.run(b, id, cfg, log))
+  }
+
+  // Médias choisis dans la banque → dépôt dans la galerie de chaque téléphone.
+  async function launchPushMedia(paths: string[], items?: ContentItem[]) {
+    setMediaPickerOpen(false)
+    const media: PushMedia[] = paths.map((url, i) => mediaMeta(items?.[i], url, i))
+    if (!media.length) return
+    await runOnPhones('📥 Envoi de médias', (b, id, log) => pushMediaToPhone(b, id, media, log))
   }
 
   const doneN = Object.values(jobs).filter(j => j.status === 'done').length
@@ -376,6 +423,17 @@ function GeelarkLauncher({ user }: { user: User }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Sélecteur de médias (banque) → envoi dans la galerie */}
+      {mediaPickerOpen && (
+        <BankPicker
+          user={user}
+          mode="multi"
+          resolveMode="signed-url"
+          onClose={() => setMediaPickerOpen(false)}
+          onSelect={(paths, _titles, _descs, items) => { launchPushMedia(paths, items) }}
+        />
       )}
 
       {/* Modal de config + lancement */}
