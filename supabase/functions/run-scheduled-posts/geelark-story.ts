@@ -24,10 +24,7 @@ async function gFetch(bearer: string, path: string, body: unknown): Promise<Reco
   return await r.json().catch(() => ({}))
 }
 
-// Anti-détection : allonge chaque pause d'un aléa de 0..+25 % (jamais moins →
-// aucune nouvelle race condition), pour casser la signature « timing robotique ».
-const humanize = (ms: number) => Math.round(ms * (1 + Math.random() * 0.25))
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, humanize(ms)))
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
 // ── Rotation d'IP proxy (proxy rotatif) ──────────────────────────────────────
 // Appelle l'URL « change IP » de chaque dongle puis laisse le temps à l'IP de se
