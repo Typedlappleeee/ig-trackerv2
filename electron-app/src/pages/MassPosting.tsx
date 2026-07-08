@@ -894,6 +894,12 @@ export function MassPosting({ user }: MassPostingProps) {
       })
     })()
 
+    // Snapshot des statuts finaux (avant resetMassPosting) — le finally l'utilise
+    // pour calculer le remboursement. Sinon il relit le store DÉJÀ vidé par le
+    // reset → 0 publié → rembourse TOUT (bug : « 78 crédits remboursés » alors que
+    // 37 tél ont posté).
+    let finalStatusSnapshot: Map<string, TaskStatus> | null = null
+
     try {
       // ── Step 1: upload only videos actually assigned to a phone ──────────
       const usedIndices = [...new Set(assignments.map(a => a.videoIndex).filter(i => i >= 0))]
@@ -1397,6 +1403,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
       // Read final counts from sync store (not stale React closure)
       const finalStatuses = getMassPostingState().taskStatuses
+      finalStatusSnapshot = finalStatuses   // conservé pour le calcul du remboursement (finally)
       const okN = [...finalStatuses.values()].filter(s => s.status === 'done').length
       const errN = [...finalStatuses.values()].filter(s => s.status === 'error').length
       setLastRun({ ok: okN, err: errN, total: assignments.length })
@@ -1501,7 +1508,9 @@ export function MassPosting({ user }: MassPostingProps) {
       // aucun téléphone démarré, Stop utilisateur), chaque téléphone qui n'a PAS
       // publié est remboursé. settle() est idempotent → sûr même appelé une fois.
       try {
-        const fin = getMassPostingState().taskStatuses
+        // Utilise le snapshot pris AVANT resetMassPosting ; fallback sur le store
+        // vivant si on a crashé avant de l'avoir capturé.
+        const fin = finalStatusSnapshot ?? getMassPostingState().taskStatuses
         const okCount = phoneList.filter(p => fin.get(p.id)?.status === 'done').length
         const failedCount = phoneList.length - okCount
         if (failedCount > 0) run.markFailed(failedCount)
