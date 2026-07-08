@@ -254,9 +254,9 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
       {!opts.rotatingProxy && (
         <div className="flex items-center gap-2 pl-[26px]">
           <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Téléphones simultanés</span>
-          <input type="number" min={0} max={200} value={opts.maxConcurrent || ''}
-            placeholder="Tous"
-            onChange={e => set({ maxConcurrent: Math.max(0, parseInt(e.target.value) || 0) })}
+          <input type="number" min={1} max={200} value={opts.maxConcurrent || 1}
+            placeholder="1"
+            onChange={e => set({ maxConcurrent: Math.max(1, parseInt(e.target.value) || 1) })}
             className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
         </div>
