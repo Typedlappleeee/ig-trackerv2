@@ -190,47 +190,63 @@ export function Spoof({ user }: { user: User }) {
           ? FRANCE_CITY_KEYS[Math.floor(Math.random() * FRANCE_CITY_KEYS.length)]
           : gpsCity
 
-        try {
-          const res = await fetch('/api/repurpose', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sourceUrl: job.url,
-              userId: user.id,
-              mode: 'spoof',
-              preset,
-              gpsCity: resolvedCity,
-              customDate: customDate.replace(/-/g, ':'),
-              adjustments: adj,
-              supabaseToken: session?.access_token,
-              supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-            }),
-          })
-          const data = await res.json()
-          if (data.ok) {
-            // Auto-enregistrement dans la banque dès qu'une vidéo est prête
-            // (dossier choisi, ou racine si aucun) — plus besoin de cliquer.
-            let savedOk = false
-            if (data.storagePath) {
-              const { error: bankErr } = await supabase.from('content_bank').insert({
-                user_id: user.id, org_id: currentOrg?.id ?? null,
-                title: `Spoof — ${job.name}`,
-                file_url: null, storage_path: data.storagePath, thumbnail_path: null,
-                folder: saveFolder,
-                // meta dans les tags (pas dans notes, qui sert de description/légende).
-                tags: ['spoof', ...(data.appliedMeta ? [data.appliedMeta.model, data.appliedMeta.city].filter(Boolean) : [])],
-                notes: '',
-              })
-              savedOk = !bankErr
-              if (bankErr) console.error('[Spoof] auto-save bank failed', bankErr)
+        // Auto-retry : les échecs du spoof sont surtout transitoires (timeout 60s
+        // Vercel + cold start, hoquet réseau) → re-tenter suffit presque toujours.
+        // Jusqu'à 3 tentatives avec backoff. Pas de risque de double débit (le
+        // spoof est gratuit) ; une tentative qui a timeout n'a rien enregistré en
+        // banque côté client, donc on ne crée pas de doublon.
+        const MAX_TRIES = 3
+        let lastErr = 'Erreur inconnue'
+        let succeeded = false
+        for (let attempt = 1; attempt <= MAX_TRIES && !succeeded; attempt++) {
+          try {
+            const res = await fetch('/api/repurpose', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sourceUrl: job.url,
+                userId: user.id,
+                mode: 'spoof',
+                preset,
+                gpsCity: resolvedCity,
+                customDate: customDate.replace(/-/g, ':'),
+                adjustments: adj,
+                supabaseToken: session?.access_token,
+                supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+              }),
+            })
+            const data = await res.json().catch(() => ({ ok: false, error: `Réponse serveur invalide (HTTP ${res.status})` }))
+            if (data.ok) {
+              // Auto-enregistrement dans la banque dès qu'une vidéo est prête
+              // (dossier choisi, ou racine si aucun) — plus besoin de cliquer.
+              let savedOk = false
+              if (data.storagePath) {
+                const { error: bankErr } = await supabase.from('content_bank').insert({
+                  user_id: user.id, org_id: currentOrg?.id ?? null,
+                  title: `Spoof — ${job.name}`,
+                  file_url: null, storage_path: data.storagePath, thumbnail_path: null,
+                  folder: saveFolder,
+                  // meta dans les tags (pas dans notes, qui sert de description/légende).
+                  tags: ['spoof', ...(data.appliedMeta ? [data.appliedMeta.model, data.appliedMeta.city].filter(Boolean) : [])],
+                  notes: '',
+                })
+                savedOk = !bankErr
+                if (bankErr) console.error('[Spoof] auto-save bank failed', bankErr)
+              }
+              updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta, savedToBank: savedOk })
+              succeeded = true
+            } else {
+              lastErr = data.error ?? 'Erreur inconnue'
             }
-            updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta, savedToBank: savedOk })
-          } else {
-            updateJob(job.id, { status: 'error', error: data.error ?? 'Erreur inconnue' })
+          } catch (err) {
+            lastErr = String(err)
           }
-        } catch (err) {
-          updateJob(job.id, { status: 'error', error: String(err) })
+          if (!succeeded && attempt < MAX_TRIES) {
+            updateJob(job.id, { status: 'processing', error: `nouvelle tentative ${attempt + 1}/${MAX_TRIES}…` })
+            await new Promise(r => setTimeout(r, 2500 * attempt))
+          }
         }
+        if (!succeeded) updateJob(job.id, { status: 'error', error: lastErr })
       }
     } finally {
       setRunning(false)
