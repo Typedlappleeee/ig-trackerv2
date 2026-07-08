@@ -8,6 +8,7 @@ import { fetchAllPhones, postInstagramStory, stopPhone, fetchPhoneProxies, type 
 import { startRun, updateRun, endRun, setRunPhase, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { resolveRotationUrls, useProxyRotation, getProxyRotation } from '@/lib/proxyRotation'
 import { ProxyPicker } from '@/components/ProxyPicker'
+import { migrateConcurrencyOnce } from '@/lib/postingOpts'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
@@ -339,7 +340,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [dryRun, setDryRun]                 = useState(false)
   // Concurrence (proxys rotatifs) — persistée
   const [rotProxy, setRotProxy]   = useState(() => localStorage.getItem('sf-story-rotproxy') === '1')
-  const [maxConc,  setMaxConc]    = useState(() => parseInt(localStorage.getItem('sf-story-maxconc') ?? '0', 10) || 0)
+  const [maxConc,  setMaxConc]    = useState(() => { migrateConcurrencyOnce(); return parseInt(localStorage.getItem('sf-story-maxconc') ?? '0', 10) || 0 })
   // Proxys à roter pour ce lancement (sous-ensemble). Vide = tous. Persisté.
   const [rotUrls, setRotUrls]     = useState<string[]>(() => {
     try { const v = JSON.parse(localStorage.getItem('sf-story-roturls') ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
@@ -1299,7 +1300,7 @@ export default function StoryLink({ user }: { user: User }) {
                     )
                   })()}
                 </span>
-                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Poste 1 téléphone à la fois (évite les coupures de co)</p>
+                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Change l'IP avant chaque téléphone</p>
               </div>
               <button
                 onClick={() => setRotProxy(v => !v)}

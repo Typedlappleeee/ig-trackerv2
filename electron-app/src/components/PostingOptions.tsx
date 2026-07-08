@@ -186,7 +186,25 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
       )}
       </>)}
 
-      {/* ── Proxy rotatif / concurrence ─────────────────────────────────────── */}
+      {/* ── Téléphones simultanés — réglage indépendant (« Tous » par défaut) ── */}
+      {!opts.rotatingProxy && (
+        <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+          <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="7" y="3" width="10" height="14" rx="2"/><path d="M4 7v12a2 2 0 0 0 2 2h9"/></svg>
+          </span>
+          <div className="flex-1 min-w-0">
+            <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Téléphones simultanés</span>
+            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Combien de téléphones postent en même temps · « Tous » par défaut</p>
+          </div>
+          <input type="number" min={0} max={200} value={opts.maxConcurrent || ''}
+            placeholder="Tous"
+            onChange={e => set({ maxConcurrent: Math.max(0, parseInt(e.target.value) || 0) })}
+            className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
+        </div>
+      )}
+
+      {/* ── Proxy rotatif ───────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
         <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
           <IconNetwork size={14} />
@@ -202,7 +220,7 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
               )
             })()}
           </span>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Poste 1 téléphone à la fois (évite les coupures de co)</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Change l'IP avant chaque téléphone</p>
         </div>
         <button
           onClick={() => set({ rotatingProxy: !opts.rotatingProxy, ...(!opts.rotatingProxy ? { intervalMode: 'none' as IntervalMode } : {}) })}
@@ -250,17 +268,6 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         <ProxyPicker selected={opts.rotateProxyUrls} onChange={urls => set({ rotateProxyUrls: urls })} />
       )}
 
-      {/* Concurrence (masquée si proxy rotatif = 1 forcé) */}
-      {!opts.rotatingProxy && (
-        <div className="flex items-center gap-2 pl-[26px]">
-          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Téléphones simultanés</span>
-          <input type="number" min={0} max={200} value={opts.maxConcurrent || ''}
-            placeholder="Tous"
-            onChange={e => set({ maxConcurrent: Math.max(0, parseInt(e.target.value) || 0) })}
-            className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
-        </div>
-      )}
 
     </div>
   )

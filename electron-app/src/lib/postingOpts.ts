@@ -23,6 +23,23 @@ export interface PostingOpts {
 
 const KEY = 'sf_posting_opts'
 
+// Migration one-shot : un défaut bugué avait posé « Téléphones simultanés » = 1,
+// qui s'est enregistré en localStorage → le posting restait en série même sans
+// proxy rotatif. On remet 1 → 0 (« Tous ») une seule fois, sur les deux clés
+// (posting + story). Ne touche jamais une valeur volontaire ≥ 2.
+export function migrateConcurrencyOnce() {
+  try {
+    if (localStorage.getItem('sf-conc-reset-v1')) return
+    localStorage.setItem('sf-conc-reset-v1', '1')
+    const raw = localStorage.getItem(KEY)
+    if (raw) {
+      const o = JSON.parse(raw)
+      if (o && o.maxConcurrent === 1) { o.maxConcurrent = 0; localStorage.setItem(KEY, JSON.stringify(o)) }
+    }
+    if (localStorage.getItem('sf-story-maxconc') === '1') localStorage.setItem('sf-story-maxconc', '0')
+  } catch { /* localStorage indispo — best effort */ }
+}
+
 const DEFAULTS: PostingOpts = {
   intervalMode: 'none',
   intervalMin:  1,
@@ -36,6 +53,7 @@ const DEFAULTS: PostingOpts = {
 }
 
 export function loadPostingOpts(): PostingOpts {
+  migrateConcurrencyOnce()
   // intervalMode always starts as 'none' (off) — only numeric values are restored
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}')
