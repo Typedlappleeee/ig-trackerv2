@@ -643,7 +643,9 @@ export default function StoryLink({ user }: { user: User }) {
 
     // Historique : on enregistre TOUJOURS le run (réussi ou non) pour que la
     // page Historique soit fiable. (table post_runs, fire-and-forget)
-    const totalRun = jobs.length || assignments.length
+    // `assignments` = const local frais (pas le state `jobs` potentiellement périmé
+    // dans cette closure async de ~2 min) → total cohérent avec okCount.
+    const totalRun = assignments.length
     supabase.from('post_runs').insert({
       user_id:   user.id,
       org_id:    currentOrg?.id ?? null,

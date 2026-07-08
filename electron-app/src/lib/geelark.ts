@@ -697,8 +697,20 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
 
 async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
-  const { output } = await shellExec(bearer, phoneId, `uiautomator dump ${f} && cat ${f}`)
-  return output
+  // Sous charge, `uiautomator dump` peut échouer/renvoyer un XML vide ou tronqué
+  // → findByText/findByResourceId ne trouve rien → on tape une coordonnée de repli
+  // au mauvais endroit → story ratée par intermittence. On valide la présence de la
+  // racine <hierarchy et on retente le dump (lire l'UI est idempotent, aucun risque).
+  let last = ''
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { output } = await shellExec(bearer, phoneId, `rm -f ${f}; uiautomator dump ${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`)
+      last = output
+      if (output.includes('<hierarchy') && output.includes('</hierarchy>')) return output
+    } catch { /* retry */ }
+    if (attempt < 2) await sleep(1200)
+  }
+  return last   // dernier recours : renvoie ce qu'on a (comportement d'avant)
 }
 
 // Find every EditText node in the dump, with its current text and center point.
@@ -1172,7 +1184,11 @@ export async function postInstagramStory(
   config: StoryConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
-  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+  // Budget 10 min : sous charge, boot (jusqu'à ~4 min) + connectivité + ~40 actions
+  // ADB peut dépasser 5 min → l'ancien timer coupait le téléphone EN PLEINE story
+  // (échecs aléatoires « certains OK, d'autres KO »). runOne éteint déjà le tél dans
+  // son finally, donc ce timer n'est qu'un garde anti-blocage : l'allonger est sûr.
+  return withPhoneAutoStop(bearer, phoneId, 10 * 60_000, '10min', log,
     () => _postInstagramStoryInner(bearer, phoneId, config, log))
 }
 
@@ -1582,8 +1598,9 @@ async function _postInstagramStoryInner(
   log('🔗 Ajout du sticker lien…')
   xml = await dumpXml(bearer, phoneId)
   const stickerBtn =
-    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button') ??
-    findByText(xml, 'Sticker', 'Autocollant', 'Stickers')
+    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker') ??
+    findByText(xml, 'Sticker', 'Autocollant', 'Stickers') ??
+    findByTextPartial(xml, 'sticker', 'autocollant')   // capte « Add sticker », « Stickers, GIFs… »
   if (stickerBtn) {
     await shellExec(bearer, phoneId, `input tap ${stickerBtn[0]} ${stickerBtn[1]}`)
   } else {
@@ -1616,8 +1633,13 @@ async function _postInstagramStoryInner(
         findByTextPartial(xml2, 'link', 'lien') ??
         findByResourceId(xml2, 'link_sticker', 'sticker_link')
       if (!lk2) {
-        // Clear and try English "link"
-        await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long del to clear
+        // Vide le champ puis essaie l'anglais « link ». `input keyevent --longpress 67`
+        // n'injecte qu'UN seul DEL (le flag longpress ne maintient pas la touche) →
+        // « lien » restait et « link » s'ajoutait → recherche cassée. On sélectionne
+        // tout (Ctrl+A) puis on supprime, avec un filet de plusieurs DEL.
+        await shellExec(bearer, phoneId, 'input keyevent KEYCODE_MOVE_END')
+        await sleep(200)
+        await shellExec(bearer, phoneId, 'input keyevent ' + Array(24).fill('67').join(' '))
         await sleep(400)
         await shellExec(bearer, phoneId, `input text "link"`)
         await sleep(2000)
@@ -2029,24 +2051,19 @@ async function runWarmupActions(
 }
 
 // Escape text for use inside an Android `input text "..."` shell command.
-// Rules: the string is passed as a double-quoted shell argument, so only
-// the chars special in that context need escaping.  Single quote ' is
-// NOT special inside double quotes — escaping it as \' would inject a
-// literal backslash which Android keyboards often map to / or other chars.
+// Rules: the string is passed as a DOUBLE-QUOTED shell argument. Inside "…",
+// a POSIX shell only consumes a backslash before  \  "  `  $  (and newline).
+// Devant &  ;  !  <  >  |  le backslash reste LITTÉRAL → il était TAPÉ tel quel
+// dans le champ (URL type https://x?a=1\&b=2 = lien cassé). On n'échappe donc QUE
+// les 4 caractères réellement spéciaux entre guillemets doubles + l'espace (%s).
+// (Le shell GéeLark /shell/execute est non-interactif → pas d'expansion `!`.)
 function escapeForInputText(text: string): string {
   return text
     .replace(/\\/g, '\\\\')  // \ → \\ (must be first)
     .replace(/"/g,  '\\"')   // " → \"
-    // ' is literal inside "…" — no escaping needed
-    .replace(/&/g,  '\\&')
-    .replace(/</g,  '\\<')
-    .replace(/>/g,  '\\>')
-    .replace(/\|/g, '\\|')
-    .replace(/;/g,  '\\;')
-    .replace(/`/g,  '\\`')
-    .replace(/\$/g, '\\$')
-    .replace(/!/g,  '\\!')
-    .replace(/ /g,  '%s')
+    .replace(/`/g,  '\\`')   // ` → \`
+    .replace(/\$/g, '\\$')   // $ → \$
+    .replace(/ /g,  '%s')    // espace → %s (convention Android input text)
 }
 
 // Strip diacritics (é→e, à→a…) and drop any remaining non-ASCII (emojis).
