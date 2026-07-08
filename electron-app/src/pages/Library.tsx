@@ -82,9 +82,6 @@ const GRAD = {
   indigo:{ grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)',  accent: '#818CF8' },
   violet:{ grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
 }
-const IG = 'com.instagram.android'
-const TT = 'com.zhiliaoapp.musically'
-const openApp = (pkg: string) => `monkey -p ${pkg} -c android.intent.category.LAUNCHER 1`
 const isOn = (cfg: Record<string, string>, k: string) => cfg[k] === 'true'
 
 const TASKS: Task[] = [
@@ -136,10 +133,6 @@ const TASKS: Task[] = [
     run: (bearer, id, cfg, log) => editTikTokProfileNative(bearer, id, { nickName: cfg.nickName?.trim() || undefined, bio: cfg.bio?.trim() || undefined, site: cfg.site?.trim() || undefined, avatarUrl: cfg.avatarUrl?.trim() || undefined }, log) },
 
   // ── Apps ──
-  { key: 'restart_ig', title: 'Débloquer Instagram', desc: 'Ferme puis relance Instagram (débloque l\'app figée).', emoji: '♻️', ...GRAD.indigo,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${IG}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(IG)); return { ok: true } } },
-  { key: 'restart_tt', title: 'Redémarrer TikTok', desc: 'Ferme puis relance TikTok (débloque l\'app figée).', emoji: '🔂', ...GRAD.indigo,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${TT}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(TT)); return { ok: true } } },
   { key: 'ig_english', title: 'Instagram en anglais', desc: 'Force la langue d\'Instagram en anglais (RPA plus fiable).', emoji: '🇬🇧', ...GRAD.violet,
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await forceInstagramEnglish(bearer, id); log('langue forcée en anglais'); return { ok: true } } },
 
@@ -148,10 +141,6 @@ const TASKS: Task[] = [
     run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; const ip = await getPhonePublicIp(bearer, id); log(ip ? `IP : ${ip}` : 'IP introuvable'); return { ok: !!ip, error: ip ? undefined : 'IP introuvable' } } },
 
   // ── Avancé (superadmin) ──
-  { key: 'clear_ig', title: 'Vider le cache IG', desc: 'Efface les données d\'Instagram (⚠ déconnecte le compte).', emoji: '🗑️', ...GRAD.slate, superOnly: true, danger: true,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `pm clear ${IG}`); log('données Instagram effacées'); return { ok: true } } },
-  { key: 'clear_tt', title: 'Vider le cache TikTok', desc: 'Efface les données de TikTok (⚠ déconnecte le compte).', emoji: '🧽', ...GRAD.slate, superOnly: true, danger: true,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `pm clear ${TT}`); log('données TikTok effacées'); return { ok: true } } },
   { key: 'shell', title: 'Commande ADB', desc: 'Exécute une commande Android brute (avancé).', emoji: '⌨️', ...GRAD.cyan, superOnly: true, danger: true,
     fields: [{ key: 'cmd', label: 'Commande shell', type: 'text', placeholder: 'ex. input keyevent 3', required: true }],
     run: async (bearer, id, cfg, log) => {
