@@ -18,6 +18,10 @@ import {
   type TaskLog, type TaskStatus, type SelectedVideo, type RunPhone,
   resetMassPosting, loadPersistedRun, clearPersistedRun,
 } from '@/lib/massPostingStore'
+import {
+  createMassRun, massRunLog, massRunSetStatus, endMassRun,
+  listMassRuns, subscribeMassRuns, hasRunningMassRun, type MassRunLive,
+} from '@/lib/massRuns'
 import { playSuccess } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
@@ -219,6 +223,10 @@ export function MassPosting({ user }: MassPostingProps) {
   const [customPrompt, setCustomPrompt]   = useState('')
   const [logs, _setLogs]                  = useState<TaskLog[]>(ms.logs)
   const [taskStatuses, _setTaskStatuses]  = useState<Map<string, TaskStatus>>(ms.taskStatuses)
+  // Runs parallèles : liste des runs vivants + run affiché dans le panneau.
+  const [massRunsList, setMassRunsList]   = useState<MassRunLive[]>(() => listMassRuns())
+  const [focusedRunId, setFocusedRunId]   = useState<string | null>(null)
+  const [anyRunning, setAnyRunning]       = useState(false)
   const [groupFilter, _setGroupFilter]    = useState(loadLastGroup)
   const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [groups, setGroups]               = useState<string[]>(['Tous'])
@@ -269,20 +277,36 @@ export function MassPosting({ user }: MassPostingProps) {
     _setTaskStatuses(prev => { const next = typeof v === 'function' ? v(prev) : v; setMassPostingState({ taskStatuses: next }); return next })
   }
 
+  // Le panneau reflète le run « focalisé » (dernier lancé par défaut). Quand des
+  // runs parallèles tournent, on affiche celui sélectionné ; sinon on retombe sur
+  // le store singleton (reprise après refresh du dernier run).
   useEffect(() => {
-    const unsub = subscribeMassPosting(() => {
-      const st = getMassPostingState()
-      _setPosting(st.posting)
-      _setLogs(st.logs)
-      _setTaskStatuses(st.taskStatuses)
-    })
-    return unsub
-  }, [])
+    const recompute = () => {
+      const list = listMassRuns()
+      setMassRunsList(list)
+      setAnyRunning(list.some(r => r.running) || (list.length === 0 && getMassPostingState().posting))
+      if (list.length) {
+        const focused = list.find(r => r.id === focusedRunId) ?? list[0]
+        _setPosting(focused.running)
+        _setLogs(focused.logs.slice())
+        _setTaskStatuses(new Map(focused.statuses))
+      } else {
+        const st = getMassPostingState()
+        _setPosting(st.posting)
+        _setLogs(st.logs)
+        _setTaskStatuses(st.taskStatuses)
+      }
+    }
+    const un1 = subscribeMassRuns(recompute)
+    const un2 = subscribeMassPosting(recompute)
+    recompute()
+    return () => { un1(); un2() }
+  }, [focusedRunId])
 
   // ⚠️ Le posting tourne dans le navigateur : un refresh/fermeture l'interrompt.
   // Tant qu'un run est en cours, on demande confirmation avant de quitter.
   useEffect(() => {
-    if (!posting) return
+    if (!anyRunning) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
       e.returnValue = 'Un posting est en cours. Si tu quittes ou rafraîchis, il sera interrompu.'
@@ -290,7 +314,7 @@ export function MassPosting({ user }: MassPostingProps) {
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [posting])
+  }, [anyRunning])
 
   // Pull the active connection (org_config when an org is active, app_config otherwise)
   const conns = useConnections(user)
@@ -631,7 +655,17 @@ export function MassPosting({ user }: MassPostingProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phoneList.map(p => p.id).join(','), selectedVideos.map(v => v.item.id).join(','), mode, randomSeed])
 
-  async function stop() {
+  // Arrête le run affiché dans le panneau (chaque run porte sa propre annulation).
+  // Repli sur l'ancien chemin singleton si c'est une reprise après refresh (aucun
+  // run vivant en mémoire).
+  async function stopFocused() {
+    const list = listMassRuns()
+    const focused = list.find(r => r.id === focusedRunId) ?? list.find(r => r.running) ?? list[0]
+    if (focused) { focused.cancel(); return }
+    await stopLegacy()
+  }
+
+  async function stopLegacy() {
     // Guard : un seul appel simultané, évite les "Stop requested" en boucle
     // quand plusieurs timers auto-stop se déclenchent en même temps.
     if (stopRef.current) return
@@ -832,9 +866,12 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function post() {
-    if (!bearer)                  { log('Connexion GéeLark manquante — ajoute ton token dans les Paramètres', 'error'); return }
-    if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
-    if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
+    // ⚠️ Ces gardes s'exécutent AVANT la création du run : elles utilisent `toast`
+    // (et non `log`, qui est masqué plus bas par un shadow par-run → TDZ si appelé
+    // ici). Feedback utilisateur via toast, pas de journal (aucun run encore).
+    if (!bearer)                  { toast.show({ title: 'GéeLark non connecté', body: 'Ajoute ton token dans les Paramètres', kind: 'error' }); return }
+    if (phoneList.length === 0)   { toast.show({ title: 'Aucun téléphone', body: 'Sélectionne au moins un téléphone', kind: 'warn' }); return }
+    if (selectedVideos.length === 0) { toast.show({ title: 'Aucune vidéo', body: 'Sélectionne au moins une vidéo', kind: 'warn' }); return }
 
     // Légende à poster pour une vidéo donnée : sa description de banque si elle
     // en a une, sinon la légende globale saisie. Corrige le cas où chaque vidéo
@@ -846,20 +883,69 @@ export function MassPosting({ user }: MassPostingProps) {
     const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
     const run = await startCreditRun(credits.ownerId, CREDIT_COSTS.mass_posting, phoneList.length)
     if (!run.ok) {
-      log(`${run.error} (requis: ${creditCost} pour ${phoneList.length} téléphone${phoneList.length > 1 ? 's' : ''})`, 'error')
-      toast.show({ title: 'Crédits insuffisants', body: `${creditCost} crédits requis — solde : ${credits.balance}`, kind: 'error' })
+      toast.show({ title: 'Crédits insuffisants', body: `${run.error} — ${creditCost} crédits requis, solde : ${credits.balance}`, kind: 'error' })
       return
     }
     if (typeof run.balance === 'number') credits.setBalance(run.balance)
 
     playSuccess()
     runActiveRef.current = true  // ce session pilote le run (pas une reprise)
+
+    // ── Isolation PAR RUN — permet plusieurs postings en parallèle ───────────
+    // Tout l'état vivant de CE run (logs, statut par téléphone, refs d'annulation)
+    // est local à `post()`. Les shadows ci-dessous masquent les refs/fonctions de
+    // composant partagées pour TOUT le corps de la fonction (y compris armAutoStop,
+    // la boucle de polling, checkPhoneScreen imbriqués) → aucun run ne piétine un
+    // autre. La logique de crédits/upload/poll reste inchangée.
+    const runId = `mass-${Date.now()}-${phoneList.length}`
+    const runLabel = `Mass posting · ${phoneList.length} compte${phoneList.length > 1 ? 's' : ''}`
+    const stopRef           = { current: false }
+    const activeTasksRef    = { current: [] as string[] }
+    const activePhonesRef   = { current: [] as string[] }
+    const postingStartRef   = { current: new Map<string, number>() }
+    const notifiedRef       = { current: new Set<string>() }
+    const autoStopTimersRef = { current: [] as number[] }
+    const activeRunIdRef    = { current: runId as string | null }
+    const log = (message: string, level: TaskLog['level'] = 'info') => massRunLog(runId, message, level)
+    const setPhoneStatus = (phoneId: string, status: TaskStatus) => {
+      massRunSetStatus(runId, phoneId, status)
+      const s = status.status
+      const phase: PhaseStatus = s === 'done' ? 'done'
+        : (s === 'error' || s === 'cancelled') ? 'error'
+        : s === 'idle' ? 'idle' : 'running'
+      setRunPhase(runId, phoneId, phase)
+    }
+    const setTaskStatuses = (map: Map<string, TaskStatus>) => { map.forEach((st, id) => massRunSetStatus(runId, id, st)) }
+
+    // Annulation propre de CE run uniquement (bouton Stop du run).
+    let live: MassRunLive
+    const cancelRun = async () => {
+      if (stopRef.current) return
+      stopRef.current = true
+      autoStopTimersRef.current.forEach(id => window.clearTimeout(id))
+      autoStopTimersRef.current = []
+      log('Stop — annulation des tâches et extinction des téléphones…', 'warn')
+      const tasks = [...activeTasksRef.current]
+      const phs   = [...activePhonesRef.current]
+      try { if (tasks.length) { await geelark(bearer, '/rpa/task/cancel', { ids: tasks }); log(`  ${tasks.length} tâche(s) annulée(s)`, 'warn') } }
+      catch { log('  Impossible d\'annuler certaines tâches', 'warn') }
+      try { if (phs.length) { await geelark(bearer, '/phone/stop', { ids: phs }); unregisterPhones(phs).catch(() => {}); log(`  ${phs.length} téléphone(s) éteint(s)`, 'warn') } }
+      catch { log('  Impossible d\'éteindre certains téléphones', 'warn') }
+      activeTasksRef.current = []
+      activePhonesRef.current = []
+      for (const [phoneId, st] of live.statuses.entries()) {
+        if (st.status !== 'done' && st.status !== 'error') setPhoneStatus(phoneId, { status: 'cancelled' })
+      }
+      if (activeRunIdRef.current) endRun(activeRunIdRef.current)
+      log('Arrêté.', 'warn')
+    }
+    live = createMassRun(runId, runLabel, phoneList.length, () => { void cancelRun() })
+    setFocusedRunId(runId)  // affiche ce nouveau run dans le panneau
+
     setPosting(true)
-    // Mémorise le run pour reprendre le suivi après un éventuel refresh.
+    // Mémorise le run pour reprendre le suivi après un éventuel refresh (dernier run).
     setMassPostingState({ startedAt: Date.now(), runPhones: phoneList.map(p => ({ phoneId: p.id, geelarkId: p.geelark_id, phoneName: p.phone_name })) })
-    setLogs([])
     setLastRun(null)
-    stopRef.current = false
     log(`${creditCost} crédits débités — les échecs seront remboursés en fin de run`, 'info')
     const newStatuses = new Map<string, TaskStatus>()
     phoneList.forEach(p => newStatuses.set(p.id, { status: 'pending' }))
@@ -872,8 +958,6 @@ export function MassPosting({ user }: MassPostingProps) {
     })
 
     // ── Suivi global + alerte même-proxy ────────────────────────────────────
-    const runId = `mass-${Date.now()}`
-    activeRunIdRef.current = runId
     ;(async () => {
       let proxyKeys: string[] = []
       try {
@@ -1081,7 +1165,7 @@ export function MassPosting({ user }: MassPostingProps) {
           // n'a pas confirmé à temps, ex. GeeLark a fermé le tél à 5 min) est
           // marqué "publié (non confirmé)" au lieu de rester bloqué. Sauf si stop.
           if (!stopRef.current) {
-            const cur = getMassPostingState().taskStatuses
+            const cur = live.statuses
             for (const asgn of batch) {
               const st = cur.get(asgn.phone.id)?.status
               if (st === 'posting' || st === 'pending' || st === 'uploading') {
@@ -1107,7 +1191,7 @@ export function MassPosting({ user }: MassPostingProps) {
       // Aucun téléphone démarré → inutile de continuer : abort + refund total
       if (started === 0) {
         run.abort()
-        const cur = getMassPostingState().taskStatuses
+        const cur = live.statuses
         for (const p of phoneList) {
           if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: 'démarrage échoué' })
         }
@@ -1393,7 +1477,7 @@ export function MassPosting({ user }: MassPostingProps) {
       } // fin du mode standard (else de la concurrence limitée)
 
       // Mark only phones without a final status yet as done (preserve 'error' states)
-      const currentStatuses = getMassPostingState().taskStatuses
+      const currentStatuses = live.statuses
       for (const p of phoneList) {
         const existing = currentStatuses.get(p.id)?.status
         if (existing !== 'done' && existing !== 'error') {
@@ -1402,7 +1486,7 @@ export function MassPosting({ user }: MassPostingProps) {
       }
 
       // Read final counts from sync store (not stale React closure)
-      const finalStatuses = getMassPostingState().taskStatuses
+      const finalStatuses = live.statuses
       finalStatusSnapshot = finalStatuses   // conservé pour le calcul du remboursement (finally)
       const okN = [...finalStatuses.values()].filter(s => s.status === 'done').length
       const errN = [...finalStatuses.values()].filter(s => s.status === 'error').length
@@ -1495,11 +1579,8 @@ export function MassPosting({ user }: MassPostingProps) {
           }
         } catch (e) { console.error('[MassPosting] account_daily write failed', e) }
       })()
-      log('Terminé ! Réinitialisation dans 5s…', 'ok')
+      log('Terminé ! Ce run se ferme dans 5s — tu peux en lancer d\'autres en parallèle.', 'ok')
       await new Promise(r => setTimeout(r, 5000))
-      resetMassPosting()
-      setSelPhones(new Set())
-      setSelVideos([])
 
     } catch (e: unknown) {
       log('Une erreur est survenue pendant le posting.', 'error')
@@ -1510,7 +1591,7 @@ export function MassPosting({ user }: MassPostingProps) {
       try {
         // Utilise le snapshot pris AVANT resetMassPosting ; fallback sur le store
         // vivant si on a crashé avant de l'avoir capturé.
-        const fin = finalStatusSnapshot ?? getMassPostingState().taskStatuses
+        const fin = finalStatusSnapshot ?? live.statuses
         const okCount = phoneList.filter(p => fin.get(p.id)?.status === 'done').length
         const failedCount = phoneList.length - okCount
         if (failedCount > 0) run.markFailed(failedCount)
@@ -1543,14 +1624,18 @@ export function MassPosting({ user }: MassPostingProps) {
       autoStopTimersRef.current = []
       activePhonesRef.current = []
       activeTasksRef.current = []
-      setPosting(false)
       // Clôture le suivi global.
       if (activeRunIdRef.current) {
-        const fin = getMassPostingState().taskStatuses
+        const fin = live.statuses
         const errN = [...fin.values()].filter(s => s.status === 'error').length
         endRun(activeRunIdRef.current, errN > 0 ? 'error' : 'done')
         activeRunIdRef.current = null
       }
+      // Ferme CE run (garde la carte ~10s pour le bilan). Le flag singleton et la
+      // persistance de reprise ne sont remis à zéro que si plus AUCUN run ne tourne
+      // (sinon on effacerait la reprise d'un run parallèle encore actif).
+      endMassRun(runId)
+      if (!hasRunningMassRun()) { setPosting(false); resetMassPosting() }
     }
   }
 
@@ -1604,7 +1689,8 @@ export function MassPosting({ user }: MassPostingProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRetry, phoneList])
-  const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0
+  // Plus de verrou global : on peut lancer plusieurs postings en parallèle.
+  const canLaunch = !!bearer && phoneList.length > 0 && selectedVideos.length > 0
   const launchCost = phoneList.length * CREDIT_COSTS.mass_posting
 
   // Readiness checklist — tells the user exactly what's missing
@@ -1736,6 +1822,28 @@ export function MassPosting({ user }: MassPostingProps) {
             <button onClick={() => setLastRun(null)} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ marginLeft: failedPhoneIds.length > 0 ? 0 : 'auto' }}>
               Masquer
             </button>
+          </div>
+        )}
+
+        {/* Sélecteur de run — plusieurs postings en parallèle. Clique pour voir
+            les logs/l'avancement de chacun. */}
+        {massRunsList.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingBottom: 12 }}>
+            {massRunsList.map(r => {
+              const done = [...r.statuses.values()].filter(s => s.status === 'done' || s.status === 'error' || s.status === 'cancelled').length
+              const active = (focusedRunId ?? massRunsList[0]?.id) === r.id
+              return (
+                <button key={r.id} onClick={() => setFocusedRunId(r.id)} className="cursor-pointer" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                  background: active ? 'rgba(99,102,241,0.16)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${active ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                  color: active ? '#c7cbff' : 'var(--text-3)',
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: r.running ? 'var(--accent)' : OK, boxShadow: r.running ? '0 0 6px var(--accent-l)' : 'none' }} />
+                  {r.label.replace('Mass posting · ', '')} · {done}/{r.total}
+                </button>
+              )
+            })}
           </div>
         )}
 
@@ -2370,7 +2478,7 @@ export function MassPosting({ user }: MassPostingProps) {
             {/* Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
               {posting && (
-                <button onClick={stop} className="sf-btn sf-btn-danger cursor-pointer" style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                <button onClick={stopFocused} className="sf-btn sf-btn-danger cursor-pointer" style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
                   <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><rect x="1" y="1" width="8" height="8" rx="1"/></svg>
                   {t('stop')}
                 </button>
@@ -2390,20 +2498,22 @@ export function MassPosting({ user }: MassPostingProps) {
               <button
                 onClick={post}
                 disabled={!canLaunch}
-                title={canLaunch ? 'Poste maintenant (garde l\'app ouverte). Pour PC éteint : utilise Programmer.'
+                title={canLaunch ? 'Poste maintenant (garde l\'app ouverte). Tu peux en lancer plusieurs en parallèle. Pour PC éteint : utilise Programmer.'
                   : !bearer ? 'Connecte GéeLark dans les Paramètres'
                   : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
-                  : selectedVideos.length === 0 ? 'Sélectionne des vidéos dans la banque'
-                  : 'Publication en cours…'}
+                  : 'Sélectionne des vidéos dans la banque'}
                 className="sf-btn sf-btn-lg cursor-pointer"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff',
                   background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-                  boxShadow: canLaunch && !posting ? '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 0 rgba(255,255,255,0.3)' : 'none',
-                  opacity: !canLaunch ? 0.4 : posting ? 0.7 : 1,
+                  boxShadow: canLaunch ? '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 0 rgba(255,255,255,0.3)' : 'none',
+                  opacity: !canLaunch ? 0.4 : 1,
                 }}>
-                {posting ? (
-                  <><div className="sf-spinner" style={{ width: 13, height: 13 }} />{t('running')}…</>
+                {/* On peut toujours lancer un nouveau run (parallèle) : le bouton reste
+                    « Lancer », même si un autre run tourne. L'avancement est dans le
+                    panneau + le widget « en cours ». */}
+                {anyRunning ? (
+                  <><svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><polygon points="2.5 1.5 10.5 6 2.5 10.5"/></svg>{t('launch')} +</>
                 ) : (
                   <><svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><polygon points="2.5 1.5 10.5 6 2.5 10.5"/></svg>{t('launch')}</>
                 )}
