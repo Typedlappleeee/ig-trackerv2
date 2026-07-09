@@ -117,8 +117,6 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string; group: strin
   { key: 'aitools',     label: 'Outils IA',       icon: '🔧', group: 'Instagram' },
   // Outils vidéo
   { key: 'remix',       label: 'Remix',           icon: '🔀', group: 'Outils vidéo' },
-  { key: 'repurpose',   label: 'Repurpose',       icon: '♻️', group: 'Outils vidéo' },
-  { key: 'montage',     label: 'Montage',         icon: '✂️', group: 'Outils vidéo' },
   { key: 'mixer',       label: 'Mixer',           icon: '🎞️', group: 'Outils vidéo' },
   { key: 'subtitles',   label: 'Sous-titres',     icon: '💬', group: 'Outils vidéo' },
   { key: 'spoof',       label: 'Spoofing',        icon: '🛡️', group: 'Outils vidéo' },
