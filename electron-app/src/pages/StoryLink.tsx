@@ -995,6 +995,31 @@ export default function StoryLink({ user }: { user: User }) {
               </select>
             )}
 
+            {/* Sélection par groupe(s) — clic = ajoute/retire tout le groupe (cumulable). */}
+            {groups.filter(g => g !== 'Tous').length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sélectionner un/des groupe(s)</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
+                  {groups.filter(g => g !== 'Tous').map(g => {
+                    const ids = phones.filter(p => (p.group?.name ?? p.groupName ?? null) === g).map(p => p.id)
+                    const allSel = ids.length > 0 && ids.every(id => selected.has(id))
+                    return (
+                      <button key={g} onClick={() => setSelected(prev => {
+                        const n = new Set(prev)
+                        if (allSel) ids.forEach(id => n.delete(id)); else ids.forEach(id => n.add(id))
+                        return n
+                      })} className="cursor-pointer" style={{
+                        fontSize: 10.5, fontWeight: 600, padding: '3px 8px', borderRadius: 7,
+                        background: allSel ? 'rgba(99,102,241,0.16)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${allSel ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                        color: allSel ? '#c7cbff' : 'var(--text-3)',
+                      }}>{g} ({ids.length})</button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Search input */}
             <div style={{ position: 'relative', marginBottom: 10 }}>
               <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-3)' }}>
@@ -1192,14 +1217,26 @@ export default function StoryLink({ user }: { user: User }) {
                   Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.
                 </p>
               </div>
-              <button
-                onClick={() => setShowCaptionPicker(true)}
-                className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
-                style={{ flexShrink: 0, marginLeft: 12 }}
-              >
-                <IconPlus />
-                Depuis la banque
-              </button>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                <label className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ cursor: 'pointer' }} title="Importer un fichier .txt/.csv — un texte par ligne">
+                  <IconPlus />
+                  Importer un fichier
+                  <input type="file" accept=".txt,.csv,text/plain" style={{ display: 'none' }} onChange={async e => {
+                    const f = e.target.files?.[0]; e.target.value = ''
+                    if (!f) return
+                    const raw = await f.text()
+                    const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+                    if (lines.length) setTextPool(prev => [...prev, ...lines])
+                  }} />
+                </label>
+                <button
+                  onClick={() => setShowCaptionPicker(true)}
+                  className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+                >
+                  <IconPlus />
+                  Depuis la banque
+                </button>
+              </div>
             </div>
 
             {textPool.length > 0 && (
