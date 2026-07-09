@@ -558,6 +558,8 @@ export default function StoryLink({ user }: { user: User }) {
     function setStatus(id: string, status: JobStatus) {
       setJobs(prev => prev.map(j => j.phoneId === id ? { ...j, status } : j))
     }
+    // Résultat par compte (fiable, hors state React) → détail par compte de l'Historique.
+    const phoneOutcome = new Map<string, { ok: boolean; error?: string }>()
 
     // Une story = des dizaines d'appels ADB (shell/execute) sur ~2 min. Beaucoup de
     // téléphones en parallèle peut multiplier les réponses « shell pas prêt » (le
@@ -571,7 +573,7 @@ export default function StoryLink({ user }: { user: User }) {
         // simulation possible côté client) → on valide juste l'assignation.
         if (dryRun) {
           addLog(asgn.phoneId, '🧪 Test — image + lien assignés (aucune publication)')
-          setStatus(asgn.phoneId, 'ok'); return 1
+          setStatus(asgn.phoneId, 'ok'); phoneOutcome.set(asgn.phoneId, { ok: true }); return 1
         }
         // Story via RPA GeeLark (import auto du flow + exécution native). Pas de
         // retry : re-poster risquerait un double post si GeeLark rapporte un faux échec.
@@ -586,10 +588,11 @@ export default function StoryLink({ user }: { user: User }) {
           },
           m => addLog(asgn.phoneId, m),
         )
-        if (res.ok) { setStatus(asgn.phoneId, 'ok'); return 1 }
-        else { setStatus(asgn.phoneId, 'error'); addLog(asgn.phoneId, `❌ ${res.error ?? 'La publication de la story a échoué'}`); return 0 }
+        if (res.ok) { setStatus(asgn.phoneId, 'ok'); phoneOutcome.set(asgn.phoneId, { ok: true }); return 1 }
+        else { setStatus(asgn.phoneId, 'error'); phoneOutcome.set(asgn.phoneId, { ok: false, error: res.error || 'Échec' }); addLog(asgn.phoneId, `❌ ${res.error ?? 'La publication de la story a échoué'}`); return 0 }
       } catch (e) {
         setStatus(asgn.phoneId, 'error')
+        phoneOutcome.set(asgn.phoneId, { ok: false, error: 'Erreur inattendue' })
         addLog(asgn.phoneId, `❌ La publication de la story a échoué (erreur inattendue)`)
         return 0
       } finally {
@@ -670,14 +673,26 @@ export default function StoryLink({ user }: { user: User }) {
     // `assignments` = const local frais (pas le state `jobs` potentiellement périmé
     // dans cette closure async de ~2 min) → total cohérent avec okCount.
     const totalRun = assignments.length
-    supabase.from('post_runs').insert({
+    // Détail par compte pour l'Historique cliquable (réussis / échoués + raison).
+    const phoneResults = assignments.map(a => {
+      const o = phoneOutcome.get(a.phoneId)
+      const p = phones.find(ph => ph.id === a.phoneId)
+      const name = igByPhone[a.phoneId] ? `@${igByPhone[a.phoneId]}` : (p ? phoneName(p) : a.phoneId.slice(-6))
+      return { name, ok: !!o?.ok, ...(o?.ok ? {} : { error: o?.error || 'Échec' }) }
+    })
+    const base = {
       user_id:   user.id,
       org_id:    currentOrg?.id ?? null,
       type:      'story',
       ok_count:  okCount,
       err_count: Math.max(0, totalRun - okCount),
       total:     totalRun,
-    }).then(() => {}, () => {})
+    }
+    supabase.from('post_runs').insert({ ...base, phone_results: phoneResults })
+      .then(({ error }) => {
+        // Colonne phone_results absente (migration non appliquée) → insert sans.
+        if (error && /phone_results/i.test(error.message)) supabase.from('post_runs').insert(base).then(() => {}, () => {})
+      }, () => {})
 
     // Reset après un run réussi : vide pool photos, textes et sélection téléphones
     if (okCount > 0) {
