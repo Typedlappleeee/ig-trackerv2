@@ -4,7 +4,7 @@ import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
-import { fetchAllPhones, postInstagramStory, stopPhone, fetchPhoneProxies, type GeelarkPhone } from '@/lib/geelark'
+import { fetchAllPhones, postInstagramStoryRpa, stopPhone, fetchPhoneProxies, type GeelarkPhone } from '@/lib/geelark'
 import { startRun, updateRun, endRun, setRunPhase, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { resolveRotationUrls, useProxyRotation, getProxyRotation } from '@/lib/proxyRotation'
 import { ProxyPicker } from '@/components/ProxyPicker'
@@ -348,6 +348,13 @@ export default function StoryLink({ user }: { user: User }) {
   useEffect(() => { localStorage.setItem('sf-story-rotproxy', rotProxy ? '1' : '0') }, [rotProxy])
   useEffect(() => { localStorage.setItem('sf-story-maxconc', String(maxConc)) }, [maxConc])
   useEffect(() => { localStorage.setItem('sf-story-roturls', JSON.stringify(rotUrls)) }, [rotUrls])
+  // Highlights (option RPA) — ajouter la story à un highlight après publication.
+  const [addToHl, setAddToHl] = useState(() => localStorage.getItem('sf-story-hl') === '1')
+  const [hlMode,  setHlMode]  = useState<'existing' | 'create'>(() => (localStorage.getItem('sf-story-hlmode') as 'existing' | 'create') || 'existing')
+  const [hlName,  setHlName]  = useState(() => localStorage.getItem('sf-story-hlname') || '')
+  useEffect(() => { localStorage.setItem('sf-story-hl', addToHl ? '1' : '0') }, [addToHl])
+  useEffect(() => { localStorage.setItem('sf-story-hlmode', hlMode) }, [hlMode])
+  useEffect(() => { localStorage.setItem('sf-story-hlname', hlName) }, [hlName])
   const [showSchedule, setShowSchedule]     = useState(false)
   const [schedAt, setSchedAt]               = useState(() => defaultSchedValue(60))
   const [schedDelay, setSchedDelay]         = useState(2)
@@ -553,12 +560,23 @@ export default function StoryLink({ user }: { user: User }) {
       if (abortRef.current) return 0
       setStatus(asgn.phoneId, 'running')
       try {
-        // La vérification de connexion (proxy rotatif) est faite AU DÉBUT de
-        // postInstagramStory. Pas de retry sur échec : re-poster risquerait un
-        // double post si GéeLark rapporte un faux échec.
-        const res = await postInstagramStory(
+        // Mode test : on ne poste pas réellement (RPA GeeLark exécute tout, pas de
+        // simulation possible côté client) → on valide juste l'assignation.
+        if (dryRun) {
+          addLog(asgn.phoneId, '🧪 Test — image + lien assignés (aucune publication)')
+          setStatus(asgn.phoneId, 'ok'); return 1
+        }
+        // Story via RPA GeeLark (import auto du flow + exécution native). Pas de
+        // retry : re-poster risquerait un double post si GeeLark rapporte un faux échec.
+        const res = await postInstagramStoryRpa(
           bearer, asgn.phoneId,
-          { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, dryRun, rotationUrls },
+          {
+            imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined,
+            rotationUrls,
+            addToHighlights: addToHl,
+            createHighlight:    addToHl && hlMode === 'create'   ? hlName.trim() : '',
+            addToHighlightName: addToHl && hlMode === 'existing' ? hlName.trim() : '',
+          },
           m => addLog(asgn.phoneId, m),
         )
         if (res.ok) { setStatus(asgn.phoneId, 'ok'); return 1 }
@@ -1343,6 +1361,49 @@ export default function StoryLink({ user }: { user: User }) {
               )
             })()}
             {rotProxy && <div style={{ marginTop: 12 }}><ProxyPicker selected={rotUrls} onChange={setRotUrls} /></div>}
+          </div>
+
+          {/* ── Highlights (option) : ajouter la story à la une après publication ── */}
+          <div className="sf-card" style={{ padding: 14, marginTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <span className="sf-section-label" style={{ margin: 0 }}>Ajouter à la une (highlight)</span>
+                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Après la story, l'épingle dans un highlight du profil.</p>
+              </div>
+              <button
+                onClick={() => setAddToHl(v => !v)}
+                className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+                style={{ background: addToHl ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${addToHl ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+            </div>
+            {addToHl && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['existing', 'create'] as const).map(m => (
+                    <button key={m} onClick={() => setHlMode(m)}
+                      className="cursor-pointer" style={{
+                        flex: 1, padding: '6px 8px', borderRadius: 8, fontSize: 11.5, fontWeight: 600,
+                        background: hlMode === m ? 'rgba(99,102,241,0.16)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${hlMode === m ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                        color: hlMode === m ? '#c7cbff' : 'var(--text-3)',
+                      }}>
+                      {m === 'existing' ? 'Highlight existant' : 'Créer un highlight'}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={hlName} onChange={e => setHlName(e.target.value)}
+                  placeholder={hlMode === 'create' ? 'Nom du nouveau highlight' : 'Nom du highlight existant'}
+                  className="sf-input" style={{ height: 32, fontSize: 12.5 }} />
+                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0 }}>
+                  {hlMode === 'create'
+                    ? 'Un nouveau highlight portant ce nom sera créé sur chaque compte.'
+                    : 'La story sera ajoutée au highlight portant ce nom (déjà présent sur le profil).'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

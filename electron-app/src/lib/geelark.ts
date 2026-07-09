@@ -1,4 +1,5 @@
 import { registerStartedPhonesAuto, unregisterPhones } from './phoneWatch'
+import storyFlowDef from './geelarkStoryFlow.json'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -2642,6 +2643,98 @@ export async function geelarkUploadForRpa(
     log?.(`   ⚠ upload média échoué : ${e instanceof Error ? e.message : String(e)}`)
     return null
   }
+}
+
+// ── Story via RPA custom GeeLark (remplace l'automation ADB fragile) ─────────
+// Le flow « Story Scaleflow » est importé AUTOMATIQUEMENT dans le compte GeeLark
+// (une seule fois), puis exécuté par téléphone via /task/rpa/add. C'est GeeLark
+// qui pilote la RPA en natif (clics par élément) → bien plus fiable + empreinte
+// plus propre que nos `input tap` + `uiautomator dump`.
+const STORY_FLOW_TITLE = (storyFlowDef as { title: string }).title   // « Story Scaleflow »
+const _storyFlowIdCache = new Map<string, Promise<string | null>>()
+
+async function ensureStoryFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
+  const cached = _storyFlowIdCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    // 1. Déjà importé ? Recherche tolérante (le champ peut s'appeler title/name/
+    //    remark selon l'API) → évite de ré-importer un doublon à chaque session.
+    try {
+      const flows = await listRpaFlows(bearer)
+      const existing = flows.find(f => {
+        const hay = `${f.title ?? ''} ${(f as unknown as { name?: string }).name ?? ''} ${f.remark ?? ''}`
+        return hay.includes(STORY_FLOW_TITLE)
+      })
+      if (existing?.id) return existing.id
+    } catch { /* on tente l'import */ }
+    // 2. Import automatique (gal = définition du flow en STRING)
+    log?.('📥 Import du flow « Story Scaleflow » dans GeeLark (une seule fois)…')
+    try {
+      const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(storyFlowDef) }, bearer)
+      if (res['code'] !== 0) { log?.(`⚠ Import du flow story : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      return id ?? null
+    } catch (e) { log?.(`⚠ Import du flow story : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _storyFlowIdCache.set(bearer, p)
+  p.then(v => { if (!v) _storyFlowIdCache.delete(bearer) }).catch(() => _storyFlowIdCache.delete(bearer))
+  return p
+}
+
+export interface StoryRpaConfig {
+  imageUrl:            string
+  linkUrl:             string
+  linkText?:           string
+  addToHighlights?:    boolean
+  createHighlight?:    string   // nom d'un highlight à CRÉER (prioritaire)
+  addToHighlightName?: string   // nom d'un highlight EXISTANT où ajouter
+  rotationUrls?:       string[]
+}
+
+export async function postInstagramStoryRpa(
+  bearer: string,
+  phoneId: string,
+  config: StoryRpaConfig,
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
+    // 1. flowId (import auto la 1re fois, mis en cache ensuite)
+    const flowId = await ensureStoryFlowId(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow story RPA indisponible (import GeeLark échoué)' }
+
+    // 2. Rotation IP éventuelle + démarrage du téléphone
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+
+    // 3. Upload de l'image vers GeeLark (le param Media attend une URL hébergée GeeLark)
+    log('📤 Préparation de l\'image…')
+    const up = await geelarkUploadForRpa(bearer, config.imageUrl, log)
+    if (!up) return { ok: false, error: 'Image non préparée (upload GeeLark)' }
+
+    // 4. Création de la tâche RPA (paramMap = variables du flow)
+    const addHl = !!config.addToHighlights
+    const paramMap: Record<string, unknown> = {
+      Media:              [up.resourceUrl],
+      Link:               config.linkUrl ?? '',
+      NameLink:           config.linkText ?? '',
+      AddtoHighlights:    addHl,
+      CreateHighlights:   addHl ? (config.createHighlight ?? '') : '',
+      AddtoHighlightName: addHl ? (config.addToHighlightName ?? '') : '',
+    }
+    log('🚀 Lancement de la story (RPA GeeLark)…')
+    const res = await geelarkFetch('POST', '/task/rpa/add', {
+      id: phoneId,
+      flowId,
+      scheduleAt: Math.floor(Date.now() / 1000) + 3,
+      name: 'Story Scaleflow'.slice(0, 128),
+      paramMap,
+    }, bearer)
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark story RPA : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log('   Tâche créée — story en cours…')
+    return pollRpaTask(bearer, taskId, log, 10 * 60_000)
+  })
 }
 
 export async function publishVideoCrossPlatform(

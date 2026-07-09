@@ -1,0 +1,1440 @@
+{
+  "content": {
+    "contentType": "phone",
+    "contents": [
+      {
+        "config": {
+          "content": "pm grant com.instagram.android android.permission.CAMERA ; pm grant com.instagram.android android.permission.RECORD_AUDIO ; pm grant com.instagram.android android.permission.WRITE_CONTACTS ; pm grant com.instagram.android android.permission.READ_CONTACTS ; pm grant com.instagram.android android.permission.POST_NOTIFICATIONS ; pm grant com.instagram.android android.permission.READ_EXTERNAL_STORAGE ; pm grant com.instagram.android android.permission.WRITE_EXTERNAL_STORAGE ; pm grant com.instagram.android android.permission.READ_MEDIA_IMAGES ; pm grant com.instagram.android android.permission.READ_MEDIA_VIDEO ; pm grant com.instagram.android android.permission.READ_MEDIA_AUDIO ; pm grant com.instagram.android android.permission.READ_CALENDAR ; pm grant com.instagram.android android.permission.WRITE_CALENDAR ; pm grant com.instagram.android android.permission.READ_CALL_LOG ; pm grant com.instagram.android android.permission.WRITE_CALL_LOG ; pm grant com.instagram.android android.permission.ACCESS_FINE_LOCATION ; pm grant com.instagram.android android.permission.ACCESS_COARSE_LOCATION ; pm grant com.instagram.android android.permission.BLUETOOTH_SCAN ; pm grant com.instagram.android android.permission.BLUETOOTH_CONNECT ; pm grant com.instagram.android android.permission.UWB_RANGING ; pm grant com.instagram.android android.permission.READ_PHONE_STATE ; pm grant com.instagram.android android.permission.CALL_PHONE ; pm grant com.instagram.android android.permission.READ_PHONE_NUMBERS",
+          "timeout": 30000
+        },
+        "id": "1a061a94-7ccb-4694-b192-f7f90cb56f57",
+        "isNewAdd": false,
+        "name": "Run ADB",
+        "type": "executeADB"
+      },
+      {
+        "config": {
+          "path": "/sdcard/Download"
+        },
+        "id": "5e42db67-89c0-4309-b6ed-23f5974caf3d",
+        "isNewAdd": false,
+        "name": "Clear the folder",
+        "type": "deleteFolder"
+      },
+      {
+        "config": {
+          "inputType": "taskOrder",
+          "isUseVariable": false,
+          "useVariable": "Media"
+        },
+        "id": "a67cc9ec-0f01-463d-a3f3-86d001fb50c2",
+        "isNewAdd": false,
+        "name": "Upload file",
+        "type": "uploadFile"
+      },
+      {
+        "config": {
+          "packgename": "com.instagram.android"
+        },
+        "id": "a926f94f-71c4-4c04-b3f0-4a4ac663f583",
+        "isNewAdd": false,
+        "name": "Open App",
+        "type": "openApp"
+      },
+      {
+        "config": {
+          "timeout": 6000,
+          "timeoutType": "fixedValue"
+        },
+        "id": "474f094e-f73a-43b6-8610-4b64fb7a13ee",
+        "isNewAdd": false,
+        "name": "Time",
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "content": "content query --uri content://media/external/video/media",
+          "timeout": 30000,
+          "variable": "RawVideoOutput"
+        },
+        "id": "a3ddbbd7-11f0-4726-b0bc-7acce45932f7",
+        "isNewAdd": false,
+        "name": "Run ADB",
+        "type": "executeADB"
+      },
+      {
+        "config": {
+          "content": "${RawVideoOutput}"
+        },
+        "id": "2f539806-ea87-413f-a68f-5eb7e25af44d",
+        "isNewAdd": false,
+        "name": "Logs",
+        "type": "log"
+      },
+      {
+        "config": {
+          "content": "content query --uri content://media/external/images/media",
+          "timeout": 30000,
+          "variable": "RawImageOutput"
+        },
+        "id": "7fcb324f-590e-4120-bcdf-d1a10756e85a",
+        "isNewAdd": false,
+        "name": "Run ADB",
+        "type": "executeADB"
+      },
+      {
+        "config": {
+          "content": "${RawImageOutput}"
+        },
+        "id": "8d3e846a-157b-4401-8fc0-d097bacea052",
+        "isNewAdd": false,
+        "name": "Logs",
+        "type": "log"
+      },
+      {
+        "config": {
+          "injectVariables": [
+            "RawVideoOutput",
+            "RawImageOutput"
+          ],
+          "script": "async function main({ RawVideoOutput, RawImageOutput }) {\nvar mediaId = null\nvar mediaType = null\nvar mediaUri = null\nvar adbCmd = null\nvar mediaFormat = null\n\nvar videoRows = RawVideoOutput.split('Row:')\nvar i = 0\nwhile (i < videoRows.length) {\n    if (videoRows[i].indexOf('bucket_display_name=Download') !== -1) {\n        var matchId = videoRows[i].match(/_id=(\\d+)/)\n        var matchMime = videoRows[i].match(/mime_type=([^\\s,]+)/)\n        if (matchId && matchMime) {\n            mediaId = matchId[1]\n            mediaType = matchMime[1]\n            mediaUri = 'content://media/external/video/media/' + mediaId\n        }\n    }\n    i++\n}\n\nif (!mediaId) {\n    var imageRows = RawImageOutput.split('Row:')\n    var j = 0\n    while (j < imageRows.length) {\n        if (imageRows[j].indexOf('bucket_display_name=Download') !== -1) {\n            var matchId2 = imageRows[j].match(/_id=(\\d+)/)\n            var matchMime2 = imageRows[j].match(/mime_type=([^\\s,]+)/)\n            if (matchId2 && matchMime2) {\n                mediaId = matchId2[1]\n                mediaType = matchMime2[1]\n                mediaUri = 'content://media/external/images/media/' + mediaId\n            }\n        }\n        j++\n    }\n}\n\nif (mediaType && mediaType.indexOf('video') !== -1) {\n    mediaFormat = 'VIDEO'\n    adbCmd = 'am start -n com.instagram.android/com.instagram.mainactivity.InstagramMainActivity ; sleep 4 ; am start -a com.instagram.share.ADD_TO_STORY -n com.instagram.android/com.instagram.share.handleractivity.StoryShareHandlerActivity --eu android.intent.extra.STREAM ' + mediaUri + ' -t video/mp4 --grant-read-uri-permission'\n} else {\n    mediaFormat = 'IMAGE'\n    adbCmd = 'am start -n com.instagram.android/com.instagram.mainactivity.InstagramMainActivity ; sleep 4 ; am start -a android.intent.action.SEND -n com.instagram.android/com.instagram.share.handleractivity.StoryShareHandlerActivity --eu android.intent.extra.STREAM ' + mediaUri + ' -t image/jpeg --grant-read-uri-permission'\n}\n\nreturn { AdbCmd: adbCmd, MediaFormat: mediaFormat }\n}",
+          "type": "js",
+          "variableMap": [
+            {
+              "value": "AdbCmd",
+              "variable": "AdbCmd"
+            },
+            {
+              "value": "MediaFormat",
+              "variable": "MediaFormat"
+            }
+          ]
+        },
+        "id": "2594f912-7eb1-40f5-8836-7f1716ee9780",
+        "isNewAdd": false,
+        "name": "Code script",
+        "type": "script"
+      },
+      {
+        "config": {
+          "content": "${AdbCmd}",
+          "timeout": 30000,
+          "variable": ""
+        },
+        "id": "91615064-603b-4ca8-a2f4-f6c21fb061c6",
+        "isNewAdd": false,
+        "name": "Run ADB",
+        "type": "executeADB"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "timeout": 2000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "4cc73ea8-a1c7-4c79-b5fc-6c5d4652128f",
+              "isNewAdd": false,
+              "name": "Time",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Not now",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "POPUP"
+              },
+              "id": "82402ee5-c3fb-48a3-8c57-2e22c602c2ed",
+              "isNewAdd": false,
+              "name": "Element appears",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "OK",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "POPUP2"
+              },
+              "id": "26b92a15-b42a-4588-98fc-4afec3844d98",
+              "isNewAdd": false,
+              "name": "Element appears",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Not now",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "a8f3f729-5053-492a-be59-cd17825f0b26",
+                    "isNewAdd": false,
+                    "name": "Click",
+                    "type": "click"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "POPUP"
+                    }
+                  ]
+                ]
+              },
+              "id": "66d96c68-14e3-4de4-bc02-c8696100f9d7",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "OK",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "6cf2dd3b-036d-492b-9498-bbc0ba76a513",
+                    "isNewAdd": false,
+                    "name": "Click",
+                    "type": "click"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "POPUP2"
+                    }
+                  ]
+                ]
+              },
+              "id": "41c70700-27e4-4e33-9999-1605409a92dc",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Stickers",
+                            "filterType": "equal",
+                            "type": "desc"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false,
+                      "variable": "STICKERS"
+                    },
+                    "id": "31c40f0c-9ff6-49b6-ad8f-4513a33cdef4",
+                    "name": "Click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "timeout": 10000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "d17c51a1-709c-4669-8404-e6936ec5966b",
+                    "name": "Time",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "clear": true,
+                      "content": [
+                        "Link"
+                      ],
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Search",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "inputType": "taskOrder",
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "simulate": true,
+                      "waitTime": 300
+                    },
+                    "id": "8275cebd-b42f-43a6-b734-e3a59ca7050a",
+                    "name": "Input",
+                    "type": "inputContent"
+                  },
+                  {
+                    "config": {
+                      "timeout": 10000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "899ab419-e5ac-448b-8070-bc66f6ae62d4",
+                    "name": "Time",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Link Sticker",
+                            "filterType": "equal",
+                            "type": "desc"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false,
+                      "variable": ""
+                    },
+                    "id": "f7288068-cd7b-4a0b-b817-736f11e94eb4",
+                    "name": "Click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "timeout": 10000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "2cb7a0ca-83fe-482b-96e6-0855b1b30a66",
+                    "name": "Time",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "clear": true,
+                      "content": [
+                        "${Link}"
+                      ],
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "http://example.com",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "inputType": "taskOrder",
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "simulate": true,
+                      "waitTime": 300
+                    },
+                    "id": "1becd09f-b5bc-49cb-8b5e-397aa31a9769",
+                    "name": "Input",
+                    "type": "inputContent"
+                  },
+                  {
+                    "config": {
+                      "clear": true,
+                      "content": [
+                        "${NameLink}"
+                      ],
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Customize sticker text",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "inputType": "taskOrder",
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "simulate": true,
+                      "waitTime": 300
+                    },
+                    "id": "e59b4d69-53d2-42c7-80d0-100ffd822b79",
+                    "name": "Input",
+                    "type": "inputContent"
+                  },
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Done",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false,
+                      "variable": ""
+                    },
+                    "id": "44c03035-7147-4767-8dbd-29ead3ba46d8",
+                    "name": "Click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "timeout": 10000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "06b1c393-0a89-459b-8e92-cdc9b48fc0e5",
+                    "name": "Time",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Your story",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "a454a743-4d39-4473-95da-7684fea6481d",
+                    "name": "Click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {},
+                    "id": "ecfd3b17-3ee6-4d38-95c1-134aa9c9b160",
+                    "name": "Exit Loop",
+                    "type": "breakLoop"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "Link"
+                    }
+                  ]
+                ]
+              },
+              "id": "a7625906-a8ba-4c1a-a7e4-8710cb65ac2a",
+              "name": "Statement if",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Your story",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "YOURSTORY"
+              },
+              "id": "14e7e046-c2e8-4e11-a893-2148510bfa70",
+              "isNewAdd": false,
+              "name": "Element appears",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Your story",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "0c1732d3-7001-417c-a0e0-be919a9afcba",
+                    "isNewAdd": false,
+                    "name": "Click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {},
+                    "id": "37eb51dd-6b67-4aff-a805-11c9ca91db55",
+                    "name": "Exit Loop",
+                    "type": "breakLoop"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "YOURSTORY"
+                    }
+                  ]
+                ]
+              },
+              "id": "f693e6d6-0082-442e-9800-b17822ae31e2",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            }
+          ],
+          "serialType": "fixedValue",
+          "times": "4"
+        },
+        "id": "019b571a-bf88-47f0-adfd-dd4029ce4c18",
+        "isNewAdd": false,
+        "name": "For Loop Times",
+        "type": "forTimes"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "OK",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": true,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "OK1"
+              },
+              "id": "5bff80c0-5f5f-4368-ac45-ce4f6130dd26",
+              "isNewAdd": false,
+              "name": "Element appears",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "OK",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": true,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "86872698-4a4f-4876-8796-2435fad04ae8",
+                    "isNewAdd": false,
+                    "name": "Click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {},
+                    "id": "34359a47-8159-48ce-81c7-9c973a35bbee",
+                    "name": "Exit Loop",
+                    "type": "breakLoop"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "OK1"
+                    }
+                  ]
+                ]
+              },
+              "id": "d614cefc-972a-4537-8723-5d04938d929c",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            }
+          ],
+          "remark": "Click OK1",
+          "serialType": "fixedValue",
+          "times": "2"
+        },
+        "id": "9a02ad27-dec1-4cc4-920d-733908c98211",
+        "isNewAdd": false,
+        "name": "For Loop Times",
+        "type": "forTimes"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "timeout": 5000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "34bf585e-f624-440f-80ae-70e3870e74d0",
+              "isNewAdd": false,
+              "name": "Time",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "content": "dumpsys notification | grep \"ig_posting_status\"",
+                "timeout": 30000,
+                "variable": "PostStatus"
+              },
+              "id": "2ffdb20c-3821-48f5-b810-6ae2c426495f",
+              "isNewAdd": false,
+              "name": "Run ADB",
+              "type": "executeADB"
+            },
+            {
+              "config": {
+                "content": "${PostStatus}"
+              },
+              "id": "778b6b31-4dd3-4a6c-b802-e15f8a153534",
+              "isNewAdd": false,
+              "name": "Logs",
+              "type": "log"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {},
+                    "id": "9636ee20-d107-4aaf-ad62-713bd59496dd",
+                    "name": "Exit Loop",
+                    "type": "breakLoop"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "contain",
+                      "result": "AUTO_CANCEL",
+                      "useVariable": "PostStatus"
+                    }
+                  ]
+                ]
+              },
+              "id": "59aad016-9ec4-49d8-8c19-4c9fdbdfd665",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            }
+          ],
+          "serialType": "fixedValue",
+          "times": "15"
+        },
+        "id": "1cdadf4e-5213-4467-921f-6e0370c41019",
+        "isNewAdd": false,
+        "name": "For Loop Times",
+        "type": "forTimes"
+      },
+      {
+        "config": {
+          "packgename": "com.instagram.android",
+          "uri": "instagram://profile"
+        },
+        "id": "5f33785f-be02-4374-a574-352ead4547e1",
+        "isNewAdd": false,
+        "name": "Open App",
+        "type": "openApp"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "timeout": 5000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "4c646e39-ea78-4407-9f35-11afa3c417da",
+              "isNewAdd": false,
+              "name": "Time",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "OK",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": true,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "OK2"
+              },
+              "id": "0ff65b58-28de-42c6-afd6-c6ac8bf1555b",
+              "isNewAdd": false,
+              "name": "Element appears",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "OK",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": true,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "041208c5-be04-453a-9fd5-aeff9bf7dee3",
+                    "isNewAdd": false,
+                    "name": "Click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {},
+                    "id": "dc3578b3-163a-4db6-ae7f-5a0390f471bd",
+                    "name": "Exit Loop",
+                    "type": "breakLoop"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "OK2"
+                    }
+                  ]
+                ]
+              },
+              "id": "84f21f28-cfbb-4be5-9047-ee12944ddd4b",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            }
+          ],
+          "remark": "Click OK2",
+          "serialType": "fixedValue",
+          "times": "2"
+        },
+        "id": "f542f4de-7f99-4ab8-94a6-4318214ea971",
+        "isNewAdd": false,
+        "name": "For Loop Times",
+        "type": "forTimes"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "timeout": 5000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "824d7e54-ad31-4478-9ec7-d762a05d1b38",
+              "isNewAdd": false,
+              "name": "Time",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/row_profile_header_imageview_frame_layout",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "STORY"
+              },
+              "id": "3e0d4b27-ade1-45f0-bad6-d8090a33c10d",
+              "isNewAdd": false,
+              "name": "Element appears",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "com.instagram.android:id/row_profile_header_imageview_frame_layout",
+                            "filterType": "equal",
+                            "type": "id"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 1,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "ccb4f9d4-c82a-4d77-bad0-6b35fafa767a",
+                    "isNewAdd": false,
+                    "name": "Click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "isBase64": false,
+                            "isScope": false
+                          },
+                          "id": "3d29e4a3-c054-489e-99fa-60d59440bbe8",
+                          "isNewAdd": false,
+                          "name": "Screenshot",
+                          "type": "screenshotPage"
+                        },
+                        {
+                          "config": {},
+                          "id": "d1858460-9d3b-458a-ad2a-1549cf9ea7a4",
+                          "name": "End Task",
+                          "type": "endTask"
+                        }
+                      ],
+                      "conditionV3": [
+                        [
+                          {
+                            "probability": 50,
+                            "relation": "false",
+                            "useVariable": "AddtoHighlights"
+                          }
+                        ]
+                      ]
+                    },
+                    "id": "2c8051ec-3994-44fa-9940-c3cc67477c13",
+                    "isNewAdd": false,
+                    "name": "Statement if",
+                    "type": "ifElse"
+                  },
+                  {
+                    "config": {},
+                    "id": "12e7ab65-e7a3-40e6-bc50-ce82bbc587d6",
+                    "name": "Exit Loop",
+                    "type": "breakLoop"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "STORY"
+                    }
+                  ]
+                ]
+              },
+              "id": "17d53cbc-d4ed-4bb7-8ec1-8700ae656ff6",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            }
+          ],
+          "remark": "Click Story",
+          "serialType": "fixedValue",
+          "times": "4"
+        },
+        "id": "2c2867a5-7d27-4e23-bafa-ed734e5edbd6",
+        "isNewAdd": false,
+        "name": "For Loop Times",
+        "type": "forTimes"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "com.instagram.android:id/highlights_label",
+                            "filterType": "equal",
+                            "type": "id"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "variable": "lights"
+                    },
+                    "id": "800a1111-12fb-4fb9-8ff3-cd2603be1ee2",
+                    "isNewAdd": false,
+                    "name": "Element appears",
+                    "type": "waitEle"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "doubleClick": false,
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "com.instagram.android:id/highlights_label",
+                                  "filterType": "equal",
+                                  "type": "id"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false,
+                            "variable": ""
+                          },
+                          "id": "f2978651-d9a9-4261-b188-f31c90106980",
+                          "isNewAdd": false,
+                          "name": "Click",
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "isBase64": false,
+                            "isScope": false
+                          },
+                          "id": "9ea23b96-49ae-4356-84e5-5b24ab664086",
+                          "isNewAdd": false,
+                          "name": "Screenshot",
+                          "type": "screenshotPage"
+                        },
+                        {
+                          "config": {},
+                          "id": "3a1a909a-2c75-4480-81ee-cbaa06635122",
+                          "name": "Exit Loop",
+                          "type": "breakLoop"
+                        }
+                      ],
+                      "conditionV3": [
+                        [
+                          {
+                            "probability": 50,
+                            "relation": "exist",
+                            "useVariable": "lights"
+                          }
+                        ]
+                      ]
+                    },
+                    "id": "2711ac5e-5014-406d-921c-fb42d01dab06",
+                    "isNewAdd": false,
+                    "name": "Statement if",
+                    "type": "ifElse"
+                  }
+                ],
+                "remark": "View Story - clickmore",
+                "serialType": "fixedValue",
+                "times": "4"
+              },
+              "id": "d753f227-0f71-4157-a75c-169469cffe1c",
+              "isNewAdd": false,
+              "name": "For Loop Times",
+              "type": "forTimes"
+            },
+            {
+              "config": {
+                "timeout": 5000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "99b66bd2-4bdb-4a1d-8f57-d86c45e2da91",
+              "isNewAdd": false,
+              "name": "Time",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Add",
+                            "filterType": "equal",
+                            "type": "desc"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "38f9fc68-f9d9-4152-aa20-a46dc7001d53",
+                    "isNewAdd": false,
+                    "name": "Click",
+                    "type": "click"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "CreateHighlights"
+                    }
+                  ]
+                ]
+              },
+              "id": "7164a818-59f8-4a92-b1dd-9d8fb7a54770",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "com.instagram.android:id/highlight_title",
+                                  "filterType": "equal",
+                                  "type": "id"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "variable": "HighlightCreate"
+                          },
+                          "id": "c58ca9f4-0764-4b07-a566-6afe240b92aa",
+                          "isNewAdd": false,
+                          "name": "Element appears",
+                          "type": "waitEle"
+                        },
+                        {
+                          "config": {
+                            "children": [
+                              {
+                                "config": {
+                                  "clear": true,
+                                  "content": [
+                                    "${CreateHighlights}"
+                                  ],
+                                  "filterCollection": [
+                                    [
+                                      {
+                                        "content": "com.instagram.android:id/highlight_title",
+                                        "filterType": "equal",
+                                        "type": "id"
+                                      }
+                                    ]
+                                  ],
+                                  "hiddenChildren": false,
+                                  "inputType": "taskOrder",
+                                  "searchTime": 3000,
+                                  "serial": 1,
+                                  "serialType": "fixedValue",
+                                  "simulate": true,
+                                  "waitTime": 300
+                                },
+                                "id": "4f050f2e-3f01-4be0-8b64-68781c851d39",
+                                "isNewAdd": false,
+                                "name": "Input",
+                                "type": "inputContent"
+                              },
+                              {
+                                "config": {
+                                  "doubleClick": false,
+                                  "filterCollection": [
+                                    [
+                                      {
+                                        "content": "Add",
+                                        "filterType": "equal",
+                                        "type": "text"
+                                      }
+                                    ]
+                                  ],
+                                  "hiddenChildren": false,
+                                  "randomDistance": 0,
+                                  "searchTime": 3000,
+                                  "serial": 1,
+                                  "serialType": "fixedValue",
+                                  "useOffset": false
+                                },
+                                "id": "ca9f63a1-df01-4645-b4b1-542f93308214",
+                                "isNewAdd": false,
+                                "name": "Click",
+                                "type": "click"
+                              },
+                              {
+                                "config": {
+                                  "timeout": 6000,
+                                  "timeoutType": "fixedValue"
+                                },
+                                "id": "33dc3c50-4046-4930-8bc3-7b1f16694a32",
+                                "isNewAdd": false,
+                                "name": "Time",
+                                "type": "waitTime"
+                              },
+                              {
+                                "config": {},
+                                "id": "6524f6c6-9eb0-4d97-8af5-a71a9d4960d5",
+                                "name": "End Task",
+                                "type": "endTask"
+                              }
+                            ],
+                            "conditionV3": [
+                              [
+                                {
+                                  "probability": 50,
+                                  "relation": "exist",
+                                  "useVariable": "HighlightCreate"
+                                }
+                              ]
+                            ]
+                          },
+                          "id": "9f923c28-836e-41c4-aa15-227d482a390c",
+                          "isNewAdd": false,
+                          "name": "Statement if",
+                          "type": "ifElse"
+                        }
+                      ],
+                      "remark": "View Story - Create",
+                      "serialType": "fixedValue",
+                      "times": "4"
+                    },
+                    "id": "006b2ed2-669a-40c1-ab62-030d77caa37c",
+                    "isNewAdd": false,
+                    "name": "For Loop Times",
+                    "type": "forTimes"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "CreateHighlights"
+                    }
+                  ]
+                ]
+              },
+              "id": "8f7127b0-eb47-4b73-a24d-c67235b12d44",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "com.instagram.android:id/title_container",
+                                  "filterType": "equal",
+                                  "type": "id"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "variable": "Highlight2"
+                          },
+                          "id": "083fe95a-13b4-4dce-bcce-88917517edc9",
+                          "isNewAdd": false,
+                          "name": "Element appears",
+                          "type": "waitEle"
+                        },
+                        {
+                          "config": {
+                            "children": [
+                              {
+                                "config": {
+                                  "doubleClick": false,
+                                  "filterCollection": [
+                                    [
+                                      {
+                                        "content": "${AddtoHighlightName}",
+                                        "filterType": "equal",
+                                        "type": "text"
+                                      }
+                                    ]
+                                  ],
+                                  "hiddenChildren": false,
+                                  "randomDistance": 0,
+                                  "searchTime": 3000,
+                                  "serial": 1,
+                                  "serialType": "fixedValue",
+                                  "useOffset": false
+                                },
+                                "id": "eea29e09-8c00-44d2-b83e-781d91e0a098",
+                                "isNewAdd": false,
+                                "name": "Click",
+                                "type": "click"
+                              },
+                              {
+                                "config": {},
+                                "id": "52963f06-b955-4b54-90ed-923c37c3c273",
+                                "name": "End Task",
+                                "type": "endTask"
+                              }
+                            ],
+                            "conditionV3": [
+                              [
+                                {
+                                  "probability": 50,
+                                  "relation": "exist",
+                                  "useVariable": "Highlight2"
+                                }
+                              ]
+                            ]
+                          },
+                          "id": "59ec5a62-cfa6-4f1b-afb5-dfa17fbade65",
+                          "isNewAdd": false,
+                          "name": "Statement if",
+                          "type": "ifElse"
+                        }
+                      ],
+                      "remark": "View Story - highlight story",
+                      "serialType": "fixedValue",
+                      "times": "4"
+                    },
+                    "id": "20fbe24d-5dcf-414a-89c5-b60d0e164d1f",
+                    "isNewAdd": false,
+                    "name": "For Loop Times",
+                    "type": "forTimes"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "notExist",
+                      "useVariable": "CreateHighlights"
+                    }
+                  ]
+                ]
+              },
+              "id": "f9838721-bab6-458d-bc9d-c562e360c6e0",
+              "isNewAdd": false,
+              "name": "Statement if",
+              "type": "ifElse"
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "probability": 50,
+                "relation": "true",
+                "useVariable": "AddtoHighlights"
+              }
+            ]
+          ]
+        },
+        "id": "b845b356-7281-443b-b375-178632920973",
+        "isNewAdd": false,
+        "name": "Statement if",
+        "type": "ifElse"
+      }
+    ],
+    "errorType": "skip",
+    "isDebug": false,
+    "startParamMap": [
+      {
+        "id": "8d04141b-d361-42d3-a043-8ff83b65f353",
+        "isNotRequired": false,
+        "key": "Media",
+        "tips": "Video or Image",
+        "type": "file",
+        "value": []
+      },
+      {
+        "id": "ec02d437-47d9-4846-abad-6eb0b070dbd7",
+        "isNotRequired": true,
+        "key": "Link",
+        "tips": "google.com",
+        "type": "textarea",
+        "value": []
+      },
+      {
+        "id": "96ccb13f-cef6-4db2-8678-082dae6cb091",
+        "isNotRequired": true,
+        "key": "NameLink",
+        "tips": "NameLink",
+        "type": "textarea",
+        "value": []
+      },
+      {
+        "id": "818b1410-a967-45ca-a595-ef4cf14469d1",
+        "isNotRequired": true,
+        "key": "AddtoHighlights",
+        "tips": "Add Story to Highlight?",
+        "type": "boolean",
+        "value": true
+      },
+      {
+        "id": "2aa1a189-28bc-444d-8f60-b0f53144080c",
+        "isNotRequired": true,
+        "key": "CreateHighlights",
+        "tips": "Name of the Highlight for creation",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "id": "4996e7ac-faa2-4314-b0f0-f9ffca42eda4",
+        "isNotRequired": true,
+        "key": "AddtoHighlightName",
+        "tips": "Name the Highlight to add the story",
+        "type": "string",
+        "value": ""
+      }
+    ]
+  },
+  "desc": "Story Scaleflow (auto-import)",
+  "title": "Story Scaleflow"
+}
