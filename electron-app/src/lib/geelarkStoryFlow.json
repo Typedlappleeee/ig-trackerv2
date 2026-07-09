@@ -473,10 +473,21 @@
                   },
                   {
                     "config": {
+                      "content": "uiautomator dump /sdcard/sf_st.xml >/dev/null 2>&1; cat /sdcard/sf_st.xml",
+                      "timeout": 30000,
+                      "variable": "StickerXml"
+                    },
+                    "id": "b1000005-0000-4000-8000-000000000005",
+                    "name": "Dump screen",
+                    "type": "executeADB"
+                  },
+                  {
+                    "config": {
                       "injectVariables": [
-                        "WmSize"
+                        "WmSize",
+                        "StickerXml"
                       ],
-                      "script": "async function main({ WmSize }) {\n  var m = String(WmSize).match(/(\\d+)x(\\d+)/)\n  var w = m ? parseInt(m[1]) : 1080\n  var h = m ? parseInt(m[2]) : 1920\n  var cx = Math.floor(w / 2)\n  var cy = Math.floor(h / 2)\n  var tx = Math.floor(w * 0.72)\n  var ty = Math.floor(h * 0.80)\n  return { DragCmd: 'input swipe ' + cx + ' ' + cy + ' ' + tx + ' ' + ty + ' 1300' }\n}",
+                      "script": "async function main({ WmSize, StickerXml }) {\n  var sm = String(WmSize).match(/(\\d+)x(\\d+)/)\n  var w = sm ? parseInt(sm[1]) : 1080\n  var h = sm ? parseInt(sm[2]) : 1920\n  var xml = String(StickerXml || '')\n  var nodes = xml.split('<node')\n  var keys = ['link_sticker', 'interactive_sticker', 'sticker_view', 'reel_sticker']\n  var sx = null, sy = null\n  for (var i = 0; i < nodes.length && sx === null; i++) {\n    var n = nodes[i]\n    var hit = false\n    for (var k = 0; k < keys.length; k++) { if (n.indexOf(keys[k]) !== -1) { hit = true; break } }\n    if (!hit) continue\n    var b = n.match(/bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"/)\n    if (b) { sx = Math.floor((parseInt(b[1]) + parseInt(b[3])) / 2); sy = Math.floor((parseInt(b[2]) + parseInt(b[4])) / 2) }\n  }\n  if (sx === null) { sx = Math.floor(w / 2); sy = Math.floor(h * 0.42) }\n  var tx = Math.floor(w * 0.72)\n  var ty = Math.floor(h * 0.80)\n  return { DragCmd: 'input swipe ' + sx + ' ' + sy + ' ' + tx + ' ' + ty + ' 1800' }\n}",
                       "type": "js",
                       "variableMap": [
                         {
@@ -486,7 +497,7 @@
                       ]
                     },
                     "id": "b1000002-0000-4000-8000-000000000002",
-                    "name": "Build drag command",
+                    "name": "Find sticker + build drag",
                     "type": "script"
                   },
                   {
