@@ -602,6 +602,7 @@ const History        = lazyWithReload(() => import('@/pages/History').then(m => 
 const Reports        = lazyWithReload(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
 const Library        = lazyWithReload(() => import('@/pages/Library').then(m => ({ default: m.Library })))
 const Organization   = lazyWithReload(() => import('@/pages/Organization').then(m => ({ default: m.Organization })))
+const ProxyHealth    = lazyWithReload(() => import('@/pages/ProxyHealth').then(m => ({ default: m.ProxyHealth })))
 const Community      = lazyWithReload(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazyWithReload(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazyWithReload(() => import('@/pages/StoryLink'))
@@ -925,6 +926,7 @@ function AppContent({ user }: { user: User }) {
       case 'reports':      return <Reports     user={user} />
       case 'library':      return <Library     user={user} />
       case 'organization': return <Organization user={user} />
+      case 'proxyhealth':  return <ProxyHealth  user={user} />
 
     }
   })()

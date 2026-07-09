@@ -72,6 +72,7 @@ export type Page =
   | 'reports'
   | 'tiktokposting'
   | 'crossposting'
+  | 'proxyhealth'
 
 interface LayoutProps {
   user:      User
@@ -92,6 +93,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'phones',      label: 'navPhones',       icon: '📱' },
+      { id: 'proxyhealth', label: 'navProxyHealth',  icon: '🌐', isNew: true },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'library',     label: 'navLibrary',      icon: '📚', isNew: true },
       { id: 'history',     label: 'navHistory',      icon: '🕑' },
@@ -169,6 +171,7 @@ type IconKey = keyof typeof ICONS
 // Map page id -> icon key
 const PAGE_ICON: Record<string, IconKey> = {
   phones:          'phone',
+  proxyhealth:     'refresh',
   stats:           'monitor',
   monitor:         'monitor',
   posting:         'send',
@@ -819,6 +822,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     reports:     t('navReports'),
     library:     t('navLibrary'),
     organization: t('navOrganization'),
+    proxyhealth: t('navProxyHealth'),
   }
 
   return (
