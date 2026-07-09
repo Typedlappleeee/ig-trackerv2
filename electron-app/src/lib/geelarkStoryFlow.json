@@ -463,6 +463,53 @@
                   },
                   {
                     "config": {
+                      "content": "wm size",
+                      "timeout": 30000,
+                      "variable": "WmSize"
+                    },
+                    "id": "b1000001-0000-4000-8000-000000000001",
+                    "name": "Get screen size",
+                    "type": "executeADB"
+                  },
+                  {
+                    "config": {
+                      "injectVariables": [
+                        "WmSize"
+                      ],
+                      "script": "async function main({ WmSize }) {\n  var m = String(WmSize).match(/(\\d+)x(\\d+)/)\n  var w = m ? parseInt(m[1]) : 1080\n  var h = m ? parseInt(m[2]) : 1920\n  var cx = Math.floor(w / 2)\n  var cy = Math.floor(h / 2)\n  var tx = Math.floor(w * 0.72)\n  var ty = Math.floor(h * 0.80)\n  return { DragCmd: 'input swipe ' + cx + ' ' + cy + ' ' + tx + ' ' + ty + ' 700' }\n}",
+                      "type": "js",
+                      "variableMap": [
+                        {
+                          "value": "DragCmd",
+                          "variable": "DragCmd"
+                        }
+                      ]
+                    },
+                    "id": "b1000002-0000-4000-8000-000000000002",
+                    "name": "Build drag command",
+                    "type": "script"
+                  },
+                  {
+                    "config": {
+                      "content": "${DragCmd}",
+                      "timeout": 30000,
+                      "variable": ""
+                    },
+                    "id": "b1000003-0000-4000-8000-000000000003",
+                    "name": "Drag sticker bottom-right",
+                    "type": "executeADB"
+                  },
+                  {
+                    "config": {
+                      "timeout": 1500,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "b1000004-0000-4000-8000-000000000004",
+                    "name": "Time",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
                       "doubleClick": false,
                       "filterCollection": [
                         [

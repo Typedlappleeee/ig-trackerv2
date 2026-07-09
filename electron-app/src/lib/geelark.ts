@@ -2651,21 +2651,24 @@ export async function geelarkUploadForRpa(
 // qui pilote la RPA en natif (clics par élément) → bien plus fiable + empreinte
 // plus propre que nos `input tap` + `uiautomator dump`.
 const STORY_FLOW_TITLE = (storyFlowDef as { title: string }).title   // « Story Scaleflow »
+// Bump à chaque MODIFICATION du flow JSON → met à jour le flow déjà importé
+// (import avec `id` = update en place) au lieu de garder l'ancienne version.
+const STORY_FLOW_VERSION = '2'   // v2 = sticker lien glissé en bas à droite
 const _storyFlowIdCache = new Map<string, Promise<string | null>>()
 
-// Clé de persistance du flowId, par compte GeeLark (suffixe du token). On mémorise
-// le flowId EN DUR une fois importé → on ne ré-importe JAMAIS (même après reload),
-// ce qui évite les doublons « Story Scaleflow » dans la librairie.
+// Persistance par compte GeeLark (suffixe du token). On mémorise le flowId EN DUR
+// une fois importé → on ne ré-importe JAMAIS (même après reload) → pas de doublons.
 function storyFlowLsKey(bearer: string): string { return `sf-story-flowid:${bearer.slice(-14)}` }
+function storyFlowVerKey(bearer: string): string { return `sf-story-flowver:${bearer.slice(-14)}` }
 function readStoredFlowId(bearer: string): string | null {
   try { return localStorage.getItem(storyFlowLsKey(bearer)) || null } catch { return null }
 }
-function writeStoredFlowId(bearer: string, id: string): void {
-  try { localStorage.setItem(storyFlowLsKey(bearer), id) } catch { /* ignore */ }
+function writeStoredFlow(bearer: string, id: string): void {
+  try { localStorage.setItem(storyFlowLsKey(bearer), id); localStorage.setItem(storyFlowVerKey(bearer), STORY_FLOW_VERSION) } catch { /* ignore */ }
 }
 // Oublie le flowId mémorisé (flow supprimé côté GeeLark → on ré-importera).
 export function forgetStoryFlowId(bearer: string): void {
-  try { localStorage.removeItem(storyFlowLsKey(bearer)) } catch { /* ignore */ }
+  try { localStorage.removeItem(storyFlowLsKey(bearer)); localStorage.removeItem(storyFlowVerKey(bearer)) } catch { /* ignore */ }
   _storyFlowIdCache.delete(bearer)
 }
 
@@ -2673,9 +2676,20 @@ async function ensureStoryFlowId(bearer: string, log?: (m: string) => void): Pro
   const cached = _storyFlowIdCache.get(bearer)
   if (cached) return cached
   const p = (async (): Promise<string | null> => {
-    // 0. Déjà mémorisé en localStorage ? → on réutilise SANS lister ni importer.
+    // 0. Déjà mémorisé ? On réutilise SANS lister ni importer — SAUF si la version du
+    //    flow a changé : on pousse alors une MISE À JOUR en place (import avec `id`).
     const stored = readStoredFlowId(bearer)
-    if (stored) return stored
+    let storedVer: string | null = null
+    try { storedVer = localStorage.getItem(storyFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && storedVer === STORY_FLOW_VERSION) return stored
+    if (stored && storedVer !== STORY_FLOW_VERSION) {
+      log?.('🔄 Mise à jour du flow « Story Scaleflow »…')
+      try {
+        const upd = await geelarkFetch('POST', '/task/flow/import', { id: stored, gal: JSON.stringify(storyFlowDef) }, bearer)
+        if (upd['code'] === 0) { writeStoredFlow(bearer, stored); return stored }
+      } catch { /* le flow a peut-être été supprimé → on recrée plus bas */ }
+      forgetStoryFlowId(bearer)   // update impossible → on repart de zéro
+    }
     // 1. Déjà présent dans la librairie ? (best-effort : le flow importé n'apparaît
     //    pas toujours dans /task/rpa/flow/list — d'où la mémorisation ci-dessus).
     try {
@@ -2684,7 +2698,11 @@ async function ensureStoryFlowId(bearer: string, log?: (m: string) => void): Pro
         const hay = `${f.title ?? ''} ${(f as unknown as { name?: string }).name ?? ''} ${f.remark ?? ''}`
         return hay.includes(STORY_FLOW_TITLE)
       })
-      if (existing?.id) { writeStoredFlowId(bearer, existing.id); return existing.id }
+      if (existing?.id) {
+        // on met à la bonne version au passage
+        try { await geelarkFetch('POST', '/task/flow/import', { id: existing.id, gal: JSON.stringify(storyFlowDef) }, bearer) } catch { /* best-effort */ }
+        writeStoredFlow(bearer, existing.id); return existing.id
+      }
     } catch { /* on tente l'import */ }
     // 2. Import automatique (gal = définition du flow en STRING) — UNE seule fois.
     log?.('📥 Import du flow « Story Scaleflow » dans GeeLark (une seule fois)…')
@@ -2692,7 +2710,7 @@ async function ensureStoryFlowId(bearer: string, log?: (m: string) => void): Pro
       const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(storyFlowDef) }, bearer)
       if (res['code'] !== 0) { log?.(`⚠ Import du flow story : ${res['msg'] ?? res['code']}`); return null }
       const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
-      if (id) { writeStoredFlowId(bearer, id); return id }
+      if (id) { writeStoredFlow(bearer, id); return id }
       return null
     } catch (e) { log?.(`⚠ Import du flow story : ${e instanceof Error ? e.message : String(e)}`); return null }
   })()
