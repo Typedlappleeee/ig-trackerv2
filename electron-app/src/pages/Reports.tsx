@@ -251,7 +251,7 @@ export function Reports({ user }: { user: User }) {
       <div style={{ display: 'flex', gap: 6, padding: '0 28px', borderBottom: '1px solid var(--border)' }}>
         {([
           ['tracker', '🗂️ Suivi des comptes'],
-          ...(isSuperAdmin ? [['proxy', '🌐 Suivi des proxys'] as const] : []),
+          ['proxy', '🌐 Suivi des proxys'],
           ['soon', '📊 Gestion & Stats'],
         ] as const).map(([v, lbl]) => (
           <button key={v} onClick={() => setView(v)} className="cursor-pointer" style={{
