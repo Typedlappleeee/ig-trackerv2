@@ -2653,27 +2653,47 @@ export async function geelarkUploadForRpa(
 const STORY_FLOW_TITLE = (storyFlowDef as { title: string }).title   // « Story Scaleflow »
 const _storyFlowIdCache = new Map<string, Promise<string | null>>()
 
+// Clé de persistance du flowId, par compte GeeLark (suffixe du token). On mémorise
+// le flowId EN DUR une fois importé → on ne ré-importe JAMAIS (même après reload),
+// ce qui évite les doublons « Story Scaleflow » dans la librairie.
+function storyFlowLsKey(bearer: string): string { return `sf-story-flowid:${bearer.slice(-14)}` }
+function readStoredFlowId(bearer: string): string | null {
+  try { return localStorage.getItem(storyFlowLsKey(bearer)) || null } catch { return null }
+}
+function writeStoredFlowId(bearer: string, id: string): void {
+  try { localStorage.setItem(storyFlowLsKey(bearer), id) } catch { /* ignore */ }
+}
+// Oublie le flowId mémorisé (flow supprimé côté GeeLark → on ré-importera).
+export function forgetStoryFlowId(bearer: string): void {
+  try { localStorage.removeItem(storyFlowLsKey(bearer)) } catch { /* ignore */ }
+  _storyFlowIdCache.delete(bearer)
+}
+
 async function ensureStoryFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
   const cached = _storyFlowIdCache.get(bearer)
   if (cached) return cached
   const p = (async (): Promise<string | null> => {
-    // 1. Déjà importé ? Recherche tolérante (le champ peut s'appeler title/name/
-    //    remark selon l'API) → évite de ré-importer un doublon à chaque session.
+    // 0. Déjà mémorisé en localStorage ? → on réutilise SANS lister ni importer.
+    const stored = readStoredFlowId(bearer)
+    if (stored) return stored
+    // 1. Déjà présent dans la librairie ? (best-effort : le flow importé n'apparaît
+    //    pas toujours dans /task/rpa/flow/list — d'où la mémorisation ci-dessus).
     try {
       const flows = await listRpaFlows(bearer)
       const existing = flows.find(f => {
         const hay = `${f.title ?? ''} ${(f as unknown as { name?: string }).name ?? ''} ${f.remark ?? ''}`
         return hay.includes(STORY_FLOW_TITLE)
       })
-      if (existing?.id) return existing.id
+      if (existing?.id) { writeStoredFlowId(bearer, existing.id); return existing.id }
     } catch { /* on tente l'import */ }
-    // 2. Import automatique (gal = définition du flow en STRING)
+    // 2. Import automatique (gal = définition du flow en STRING) — UNE seule fois.
     log?.('📥 Import du flow « Story Scaleflow » dans GeeLark (une seule fois)…')
     try {
       const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(storyFlowDef) }, bearer)
       if (res['code'] !== 0) { log?.(`⚠ Import du flow story : ${res['msg'] ?? res['code']}`); return null }
       const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
-      return id ?? null
+      if (id) { writeStoredFlowId(bearer, id); return id }
+      return null
     } catch (e) { log?.(`⚠ Import du flow story : ${e instanceof Error ? e.message : String(e)}`); return null }
   })()
   _storyFlowIdCache.set(bearer, p)
@@ -2734,13 +2754,19 @@ export async function postInstagramStoryRpa(
       AddtoHighlightName: addHl ? (config.addToHighlightName ?? '') : '',
     }
     log('🚀 Lancement de la story (RPA GeeLark)…')
-    const res = await geelarkFetch('POST', '/task/rpa/add', {
-      id: phoneId,
-      flowId,
-      scheduleAt: Math.floor(Date.now() / 1000) + 3,
-      name: 'Story Scaleflow'.slice(0, 128),
-      paramMap,
+    const addTask = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
+      id: phoneId, flowId: fid, scheduleAt: Math.floor(Date.now() / 1000) + 3,
+      name: 'Story Scaleflow'.slice(0, 128), paramMap,
     }, bearer)
+    let res = await addTask(flowId)
+    // flowId mémorisé mais flow supprimé côté GeeLark (code 48002 « flow not found »)
+    // → on oublie l'ID, on ré-importe une fois, et on relance.
+    if (res['code'] !== 0 && (Number(res['code']) === 48002 || /not found|introuvable|flow/i.test(String(res['msg'] ?? '')))) {
+      log('   ↻ Flow introuvable — ré-import puis nouvelle tentative…')
+      forgetStoryFlowId(bearer)
+      const fresh = await ensureStoryFlowId(bearer, log)
+      if (fresh) res = await addTask(fresh)
+    }
     if (res['code'] !== 0) return { ok: false, error: `GeeLark story RPA : ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
