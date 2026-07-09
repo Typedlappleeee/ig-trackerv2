@@ -323,6 +323,7 @@ export default function StoryLink({ user }: { user: User }) {
   const setGroupFilter = (g: string) => { _setGroupFilter(g); saveLastGroup(g) }
   const [groups, setGroups]           = useState<string[]>(['Tous'])
   const [selected, setSelected]       = useState<Set<string>>(new Set())
+  const [pickMode, setPickMode]       = useState<'phones' | 'groups'>('phones')
 
   // ── Pool config (persisted) ───────────────────────────────────────────────
   const [photoPool, setPhotoPool]     = useState<PoolPhoto[]>([])
@@ -984,70 +985,123 @@ export default function StoryLink({ user }: { user: User }) {
               )}
             </div>
 
-            {groups.length > 1 && (
-              <select
-                value={groupFilter}
-                onChange={e => setGroupFilter(e.target.value)}
-                className="sf-input"
-                style={{ height: 32, marginBottom: 8, cursor: 'pointer', fontSize: 12 }}
-              >
-                {groups.map(g => <option key={g} value={g} style={{ background: '#0C0C15' }}>{g}</option>)}
-              </select>
-            )}
-
-            {/* Sélection par groupe(s) — clic = ajoute/retire tout le groupe (cumulable). */}
+            {/* Toggle Téléphones / Groupes */}
             {groups.filter(g => g !== 'Tous').length > 0 && (
-              <div style={{ marginBottom: 8 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sélectionner un/des groupe(s)</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
-                  {groups.filter(g => g !== 'Tous').map(g => {
-                    const ids = phones.filter(p => (p.group?.name ?? p.groupName ?? null) === g).map(p => p.id)
-                    const allSel = ids.length > 0 && ids.every(id => selected.has(id))
-                    return (
-                      <button key={g} onClick={() => setSelected(prev => {
-                        const n = new Set(prev)
-                        if (allSel) ids.forEach(id => n.delete(id)); else ids.forEach(id => n.add(id))
-                        return n
-                      })} className="cursor-pointer" style={{
-                        fontSize: 10.5, fontWeight: 600, padding: '3px 8px', borderRadius: 7,
-                        background: allSel ? 'rgba(99,102,241,0.16)' : 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${allSel ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                        color: allSel ? '#c7cbff' : 'var(--text-3)',
-                      }}>{g} ({ids.length})</button>
-                    )
-                  })}
-                </div>
+              <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+                {([{ k: 'phones', l: 'Téléphones' }, { k: 'groups', l: 'Groupes' }] as const).map(m => (
+                  <button key={m.k} onClick={() => setPickMode(m.k)} className="cursor-pointer" style={{
+                    flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 700, letterSpacing: '0.03em',
+                    background: pickMode === m.k ? 'rgba(99,102,241,0.14)' : 'transparent',
+                    color: pickMode === m.k ? 'var(--accent-l)' : 'var(--text-3)',
+                    border: 'none',
+                    borderBottom: pickMode === m.k ? '2px solid var(--accent)' : '2px solid transparent',
+                    transition: 'all 0.15s',
+                  }}>{m.l}</button>
+                ))}
               </div>
             )}
 
-            {/* Search input */}
-            <div style={{ position: 'relative', marginBottom: 10 }}>
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-3)' }}>
-                <IconSearch />
-              </span>
-              <input
-                value={phoneSearch}
-                onChange={e => setPhoneSearch(e.target.value)}
-                placeholder="Rechercher…"
-                className="sf-input"
-                style={{ height: 32, paddingLeft: 32, fontSize: 12 }}
-              />
-            </div>
+            {pickMode === 'phones' && (
+              <>
+                {groups.length > 1 && (
+                  <select
+                    value={groupFilter}
+                    onChange={e => setGroupFilter(e.target.value)}
+                    className="sf-input"
+                    style={{ height: 32, marginBottom: 8, cursor: 'pointer', fontSize: 12 }}
+                  >
+                    {groups.map(g => <option key={g} value={g} style={{ background: '#0C0C15' }}>{g}</option>)}
+                  </select>
+                )}
 
-            {/* Select / Clear */}
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={selectAll} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
-                Tout sélectionner
-              </button>
-              <button onClick={clearAll} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
-                Effacer
-              </button>
-            </div>
+                {/* Search input */}
+                <div style={{ position: 'relative', marginBottom: 10 }}>
+                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-3)' }}>
+                    <IconSearch />
+                  </span>
+                  <input
+                    value={phoneSearch}
+                    onChange={e => setPhoneSearch(e.target.value)}
+                    placeholder="Rechercher…"
+                    className="sf-input"
+                    style={{ height: 32, paddingLeft: 32, fontSize: 12 }}
+                  />
+                </div>
+
+                {/* Select / Clear */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={selectAll} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
+                    Tout sélectionner
+                  </button>
+                  <button onClick={clearAll} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
+                    Effacer
+                  </button>
+                </div>
+              </>
+            )}
+
+            {pickMode === 'groups' && (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setSelected(new Set(phones.map(p => p.id)))} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
+                  Tout sélectionner
+                </button>
+                <button onClick={clearAll} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
+                  Effacer
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Phone list — anim-stagger */}
           <div className="sf-scroll anim-stagger" style={{ flex: 1, padding: '6px 8px 10px' }}>
-            {loadingPhones ? (
+            {pickMode === 'groups' ? (
+              groups.filter(g => g !== 'Tous').length === 0 ? (
+                <div style={{ padding: '28px 16px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 4px' }}>Aucun groupe</p>
+                  <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>Crée des groupes dans l'onglet Téléphones.</p>
+                </div>
+              ) : groups.filter(g => g !== 'Tous').map(g => {
+                const ids = phones.filter(p => (p.group?.name ?? p.groupName ?? null) === g).map(p => p.id)
+                const selCount = ids.filter(id => selected.has(id)).length
+                const allSel = ids.length > 0 && selCount === ids.length
+                return (
+                  <div
+                    key={g}
+                    role="checkbox"
+                    aria-checked={allSel}
+                    tabIndex={0}
+                    onClick={() => setSelected(prev => {
+                      const n = new Set(prev)
+                      if (allSel) ids.forEach(id => n.delete(id)); else ids.forEach(id => n.add(id))
+                      return n
+                    })}
+                    className="sf-card-lift cursor-pointer"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '11px 10px', borderRadius: 9, cursor: 'pointer', marginBottom: 3,
+                      background: selCount > 0 ? 'rgba(99,102,241,0.09)' : 'transparent',
+                      border: `1px solid ${selCount > 0 ? 'rgba(99,102,241,0.32)' : 'transparent'}`,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span style={{
+                      width: 16, height: 16, borderRadius: 5, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: allSel ? 'var(--accent)' : selCount > 0 ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.05)',
+                      border: selCount > 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    }}>
+                      {selCount > 0 && <IconCheck />}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 12.5, fontWeight: selCount > 0 ? 600 : 400, color: selCount > 0 ? 'var(--text-1)' : 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{g}</p>
+                      <p style={{ fontSize: 10.5, color: selCount > 0 ? 'var(--accent-l)' : 'var(--text-4)', margin: '2px 0 0' }}>
+                        {selCount > 0 ? `${selCount}/${ids.length} sélectionné${ids.length > 1 ? 's' : ''}` : `${ids.length} compte${ids.length > 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })
+            ) : loadingPhones ? (
               <div style={{ padding: '32px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <div className="sf-spinner" />
                 <p style={{ fontSize: 12, color: 'var(--text-3)' }}>Chargement…</p>
@@ -1218,17 +1272,6 @@ export default function StoryLink({ user }: { user: User }) {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 12 }}>
-                <label className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ cursor: 'pointer' }} title="Importer un fichier .txt/.csv — un texte par ligne">
-                  <IconPlus />
-                  Importer un fichier
-                  <input type="file" accept=".txt,.csv,text/plain" style={{ display: 'none' }} onChange={async e => {
-                    const f = e.target.files?.[0]; e.target.value = ''
-                    if (!f) return
-                    const raw = await f.text()
-                    const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
-                    if (lines.length) setTextPool(prev => [...prev, ...lines])
-                  }} />
-                </label>
                 <button
                   onClick={() => setShowCaptionPicker(true)}
                   className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
