@@ -13,6 +13,7 @@ import { useLicense } from '@/lib/license'
 import { useConnections } from '@/lib/connections'
 import { syncGeelarkAnalytics } from '@/lib/geelarkAnalytics'
 import { AccountTracker } from './AccountTracker'
+import { ProxyHealth } from './ProxyHealth'
 
 interface TrackingConfig { enabled: boolean; sync_time: string; force_run?: string }
 
@@ -69,7 +70,7 @@ export function Reports({ user }: { user: User }) {
   const keyCol = currentOrg ? 'org_id' : 'user_id'
   const keyVal = currentOrg ? currentOrg.id : user.id
 
-  const [view, setView]       = useState<'tracker' | 'soon'>('tracker')
+  const [view, setView]       = useState<'tracker' | 'proxy' | 'soon'>('tracker')
   const [cfg, setCfg]         = useState<TrackingConfig>(DEFAULT_CFG)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [day]                 = useState(parisToday())
@@ -228,7 +229,7 @@ export function Reports({ user }: { user: User }) {
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <div>
-            <h1 className="sf-page-title">{view === 'tracker' ? 'Suivi des comptes' : 'Gestion & Stats'}</h1>
+            <h1 className="sf-page-title">{view === 'tracker' ? 'Suivi des comptes' : view === 'proxy' ? 'Suivi des proxys' : 'Gestion & Stats'}</h1>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
               {view === 'tracker'
                 ? 'Tableau partagé — le suivi de tous vos comptes par plateforme'
@@ -246,9 +247,13 @@ export function Reports({ user }: { user: User }) {
         )}
       </div>
 
-      {/* Onglets : Suivi (tableau) · Gestion & Stats (bientôt) */}
+      {/* Onglets : Suivi comptes · Suivi proxys (admin) · Gestion & Stats (bientôt) */}
       <div style={{ display: 'flex', gap: 6, padding: '0 28px', borderBottom: '1px solid var(--border)' }}>
-        {([['tracker', '🗂️ Suivi des comptes'], ['soon', '📊 Gestion & Stats']] as const).map(([v, lbl]) => (
+        {([
+          ['tracker', '🗂️ Suivi des comptes'],
+          ...(isSuperAdmin ? [['proxy', '🌐 Suivi des proxys'] as const] : []),
+          ['soon', '📊 Gestion & Stats'],
+        ] as const).map(([v, lbl]) => (
           <button key={v} onClick={() => setView(v)} className="cursor-pointer" style={{
             padding: '10px 16px', fontSize: 13, fontWeight: 700, background: 'transparent', border: 'none',
             color: view === v ? 'var(--text-1)' : 'var(--text-4)',
@@ -260,6 +265,10 @@ export function Reports({ user }: { user: User }) {
       {view === 'tracker' ? (
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
           <AccountTracker user={user} orgId={currentOrg?.id ?? null} />
+        </div>
+      ) : view === 'proxy' ? (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
+          <ProxyHealth user={user} />
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>

@@ -93,7 +93,6 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'phones',      label: 'navPhones',       icon: '📱' },
-      { id: 'proxyhealth', label: 'navProxyHealth',  icon: '🌐', isNew: true },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'library',     label: 'navLibrary',      icon: '📚', isNew: true },
       { id: 'history',     label: 'navHistory',      icon: '🕑' },

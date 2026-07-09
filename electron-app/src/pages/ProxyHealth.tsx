@@ -95,17 +95,9 @@ export function ProxyHealth({ user }: { user: User }) {
   }
 
   return (
-    <div className="sf-page">
-      <div className="sf-toolbar" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 13, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: 'linear-gradient(135deg,#0EA5E9,#6366F1)' }}>
-            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          </div>
-          <div>
-            <h1 className="sf-page-title">Santé des proxys</h1>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>Proxy par téléphone, proxys partagés (risque de ban) et IP en direct.</p>
-          </div>
-        </div>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+        <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0 }}>Proxy par téléphone, proxys partagés (risque de ban) et IP en direct.</p>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={checkIps} disabled={!selected.size || checking} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ opacity: (!selected.size || checking) ? 0.5 : 1 }} title="Allume les téléphones sélectionnés et lit leur IP publique réelle">
             {checking ? '⏳ Vérification…' : `🌍 Vérifier l'IP (${selected.size})`}
@@ -114,7 +106,7 @@ export function ProxyHealth({ user }: { user: User }) {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
+      <div>
         {!bearer ? (
           <div className="sf-card" style={{ padding: 24, maxWidth: 480 }}>
             <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--warn)', margin: '0 0 6px' }}>Connexion GéeLark manquante</p>
