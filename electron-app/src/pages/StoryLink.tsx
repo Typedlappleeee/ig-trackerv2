@@ -336,6 +336,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [editingText, setEditingText]               = useState('')
   const [running, setRunning]               = useState(false)
   const [jobs, setJobs]                     = useState<Job[]>([])
+  const [igByPhone, setIgByPhone]           = useState<Record<string, string>>({})   // geelark_id → @pseudo IG
   const [openLog, setOpenLog]               = useState<string | null>(null)
   const [dryRun, setDryRun]                 = useState(false)
   // Concurrence (proxys rotatifs) — persistée
@@ -414,9 +415,13 @@ export default function StoryLink({ user }: { user: User }) {
       setGroups(['Tous', ...grps])
       if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
       // Prefer DB link column (set from Phones tab) over localStorage fallback.
-      const { data: dbPhones } = await supabase.from('phones').select('id,geelark_id,link').in(
+      const { data: dbPhones } = await supabase.from('phones').select('id,geelark_id,link,ig_username').in(
         'geelark_id', list.map(p => p.id),
       )
+      // Map geelark_id → @pseudo IG (pour afficher le COMPTE dans les résultats).
+      setIgByPhone(Object.fromEntries(
+        (dbPhones ?? []).filter(r => r.ig_username).map(r => [r.geelark_id as string, r.ig_username as string])
+      ))
       // Map: geelark_id → { link, supabase_uuid }
       const dbInfoMap = new Map(
         (dbPhones ?? []).map(r => [
@@ -455,6 +460,8 @@ export default function StoryLink({ user }: { user: User }) {
 
   const phoneName = (p: GeelarkPhone) => p.serialName ?? p.name ?? p.serialNo ?? p.id.slice(-6)
   const phoneById = (id: string) => phones.find(p => p.id === id)
+  // Libellé « compte » : @pseudo IG si connu, sinon le nom du téléphone.
+  const accountLabel = (id: string) => igByPhone[id] ? `@${igByPhone[id]}` : (phoneById(id) ? phoneName(phoneById(id)!) : id.slice(-6))
 
   const visiblePhones = phones.filter(p => {
     const grp = p.group?.name ?? p.groupName ?? null
@@ -618,10 +625,9 @@ export default function StoryLink({ user }: { user: User }) {
       startRun({
         id: runId, type: 'story', label: `Story · ${assignments.length} compte${assignments.length > 1 ? 's' : ''}`,
         proxyKeys, done: 0, total: assignments.length, page: 'storylink',
-        phones: assignments.map(a => {
-          const p = phones.find(ph => ph.id === a.phoneId)
-          return { id: a.phoneId, name: p ? phoneName(p) : a.phoneId.slice(-6), status: 'idle' as PhaseStatus }
-        }),
+        phones: assignments.map(a => (
+          { id: a.phoneId, name: accountLabel(a.phoneId), status: 'idle' as PhaseStatus }
+        )),
       })
     })()
 
@@ -722,7 +728,7 @@ export default function StoryLink({ user }: { user: User }) {
             id:               a.phoneId,
             geelark_id:       a.phoneId,
             phone_name:       p ? phoneName(p) : a.phoneId.slice(-6),
-            ig_username:      null,
+            ig_username:      igByPhone[a.phoneId] ?? null,
             story_photo:      a.photo.url,
             story_photo_name: a.photo.name,
             story_link:       a.link,
@@ -1051,7 +1057,7 @@ export default function StoryLink({ user }: { user: User }) {
                       color: sel ? 'var(--text-1)' : 'var(--text-2)',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {phoneName(p)}
+                      {accountLabel(p.id)}
                     </p>
                     {grp && (
                       <p style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 1 }}>{grp}</p>
@@ -1482,7 +1488,7 @@ export default function StoryLink({ user }: { user: User }) {
                       flex: 1, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       color: j?.status === 'ok' ? 'var(--ok)' : j?.status === 'error' ? 'var(--err)' : 'var(--text-1)',
                     }}>
-                      {p ? phoneName(p) : a.phoneId.slice(-6)}
+                      {accountLabel(a.phoneId)}
                     </span>
                     {/* Status badge */}
                     {j && j.status !== 'idle' && (
