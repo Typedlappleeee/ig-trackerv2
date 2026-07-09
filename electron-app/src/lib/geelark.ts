@@ -2651,9 +2651,10 @@ export async function geelarkUploadForRpa(
 // qui pilote la RPA en natif (clics par élément) → bien plus fiable + empreinte
 // plus propre que nos `input tap` + `uiautomator dump`.
 const STORY_FLOW_TITLE = (storyFlowDef as { title: string }).title   // « Story Scaleflow »
-// Bump à chaque MODIFICATION du flow JSON → met à jour le flow déjà importé
-// (import avec `id` = update en place) au lieu de garder l'ancienne version.
-const STORY_FLOW_VERSION = '2'   // v2 = sticker lien glissé en bas à droite
+// Bump à CHAQUE modification du flow JSON. Comme l'update-en-place (import avec `id`)
+// s'est révélé peu fiable, un changement de version → on RÉ-IMPORTE un flow frais
+// (garanti à jour). L'ancien flow devient orphelin (à supprimer 1 fois côté GeeLark).
+const STORY_FLOW_VERSION = '3'   // v3 = drag sticker bas-droite, ré-import fiable
 const _storyFlowIdCache = new Map<string, Promise<string | null>>()
 
 // Persistance par compte GeeLark (suffixe du token). On mémorise le flowId EN DUR
@@ -2676,36 +2677,16 @@ async function ensureStoryFlowId(bearer: string, log?: (m: string) => void): Pro
   const cached = _storyFlowIdCache.get(bearer)
   if (cached) return cached
   const p = (async (): Promise<string | null> => {
-    // 0. Déjà mémorisé ? On réutilise SANS lister ni importer — SAUF si la version du
-    //    flow a changé : on pousse alors une MISE À JOUR en place (import avec `id`).
+    // Réutilisation rapide UNIQUEMENT si le flowId mémorisé est de la BONNE version.
+    // Sinon (rien de mémorisé, ou version périmée) → on importe un flow frais et à jour.
     const stored = readStoredFlowId(bearer)
     let storedVer: string | null = null
     try { storedVer = localStorage.getItem(storyFlowVerKey(bearer)) } catch { /* ignore */ }
     if (stored && storedVer === STORY_FLOW_VERSION) return stored
-    if (stored && storedVer !== STORY_FLOW_VERSION) {
-      log?.('🔄 Mise à jour du flow « Story Scaleflow »…')
-      try {
-        const upd = await geelarkFetch('POST', '/task/flow/import', { id: stored, gal: JSON.stringify(storyFlowDef) }, bearer)
-        if (upd['code'] === 0) { writeStoredFlow(bearer, stored); return stored }
-      } catch { /* le flow a peut-être été supprimé → on recrée plus bas */ }
-      forgetStoryFlowId(bearer)   // update impossible → on repart de zéro
-    }
-    // 1. Déjà présent dans la librairie ? (best-effort : le flow importé n'apparaît
-    //    pas toujours dans /task/rpa/flow/list — d'où la mémorisation ci-dessus).
-    try {
-      const flows = await listRpaFlows(bearer)
-      const existing = flows.find(f => {
-        const hay = `${f.title ?? ''} ${(f as unknown as { name?: string }).name ?? ''} ${f.remark ?? ''}`
-        return hay.includes(STORY_FLOW_TITLE)
-      })
-      if (existing?.id) {
-        // on met à la bonne version au passage
-        try { await geelarkFetch('POST', '/task/flow/import', { id: existing.id, gal: JSON.stringify(storyFlowDef) }, bearer) } catch { /* best-effort */ }
-        writeStoredFlow(bearer, existing.id); return existing.id
-      }
-    } catch { /* on tente l'import */ }
-    // 2. Import automatique (gal = définition du flow en STRING) — UNE seule fois.
-    log?.('📥 Import du flow « Story Scaleflow » dans GeeLark (une seule fois)…')
+
+    // Import d'un flow frais (gal = définition en STRING). Garanti à la bonne version.
+    log?.(stored ? '🔄 Mise à jour du flow « Story Scaleflow » (nouvel import)…'
+                 : '📥 Import du flow « Story Scaleflow » dans GeeLark…')
     try {
       const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(storyFlowDef) }, bearer)
       if (res['code'] !== 0) { log?.(`⚠ Import du flow story : ${res['msg'] ?? res['code']}`); return null }
