@@ -2654,7 +2654,7 @@ const STORY_FLOW_TITLE = (storyFlowDef as { title: string }).title   // « Story
 // Bump à CHAQUE modification du flow JSON. Comme l'update-en-place (import avec `id`)
 // s'est révélé peu fiable, un changement de version → on RÉ-IMPORTE un flow frais
 // (garanti à jour). L'ancien flow devient orphelin (à supprimer 1 fois côté GeeLark).
-const STORY_FLOW_VERSION = '4'   // v4 = drag depuis la VRAIE position du sticker (dump), comme l'ancien flow
+const STORY_FLOW_VERSION = '5'   // v5 = sticker plus a droite (82%/82%)
 const _storyFlowIdCache = new Map<string, Promise<string | null>>()
 
 // Persistance par compte GeeLark (suffixe du token). On mémorise le flowId EN DUR
@@ -2758,9 +2758,10 @@ export async function postInstagramStoryRpa(
       name: 'Story Scaleflow'.slice(0, 128), paramMap,
     }, bearer)
     let res = await addTask(flowId)
-    // flowId mémorisé mais flow supprimé côté GeeLark (code 48002 « flow not found »)
-    // → on oublie l'ID, on ré-importe une fois, et on relance.
-    if (res['code'] !== 0 && (Number(res['code']) === 48002 || /not found|introuvable|flow/i.test(String(res['msg'] ?? '')))) {
+    // flowId mémorisé mais flow supprimé côté GeeLark → code EXACT 48002 « flow not
+    // found » uniquement (pas de regex large) : la tâche n'a PAS été créée (code≠0),
+    // donc ré-essayer ne peut PAS doubler le post. On ré-importe une fois et on relance.
+    if (res['code'] !== 0 && Number(res['code']) === 48002) {
       log('   ↻ Flow introuvable — ré-import puis nouvelle tentative…')
       forgetStoryFlowId(bearer)
       const fresh = await ensureStoryFlowId(bearer, log)
