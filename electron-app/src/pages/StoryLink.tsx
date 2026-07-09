@@ -245,12 +245,30 @@ function CaptionBankPicker({
           <div style={{ padding: '10px 14px 0', display: 'flex', gap: 6, flexWrap: 'wrap', flexShrink: 0, borderBottom: `1px solid ${HAIR}` }}>
             {folders.map(f => {
               const active = (folder ?? 'Tous') === f
+              const folderIds = f === 'Tous' ? [] : items.filter(i => i.folder === f && i.content).map(i => i.id)
+              const allSel = folderIds.length > 0 && folderIds.every(id => selected.has(id))
               return (
-                <button key={f} onClick={() => setFolder(f === 'Tous' ? null : f)}
-                  style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11.5, fontWeight: active ? 700 : 400, cursor: 'pointer', marginBottom: 10,
-                    background: active ? 'rgba(99,102,241,0.15)' : 'transparent', border: `1px solid ${active ? 'rgba(99,102,241,0.4)' : HAIR}`, color: active ? ACCENT_L : 'var(--text-3)', transition: 'all 0.12s' }}>
-                  {f}
-                </button>
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 6px 4px 10px', borderRadius: 20, marginBottom: 10,
+                  background: active ? 'rgba(99,102,241,0.15)' : 'transparent', border: `1px solid ${active ? 'rgba(99,102,241,0.4)' : HAIR}`, transition: 'all 0.12s' }}>
+                  <button onClick={() => setFolder(f === 'Tous' ? null : f)}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11.5, fontWeight: active ? 700 : 400, color: active ? ACCENT_L : 'var(--text-3)' }}>
+                    {f}
+                  </button>
+                  {f !== 'Tous' && folderIds.length > 0 && (
+                    <button
+                      onClick={() => setSelected(prev => {
+                        const n = new Set(prev)
+                        if (allSel) folderIds.forEach(id => n.delete(id)); else folderIds.forEach(id => n.add(id))
+                        return n
+                      })}
+                      title={allSel ? `Retirer le dossier "${f}"` : `Sélectionner tout le dossier "${f}"`}
+                      className="cursor-pointer"
+                      style={{ width: 15, height: 15, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4,
+                        background: allSel ? 'var(--accent)' : 'transparent', border: allSel ? 'none' : `1px solid ${HAIR}`, color: '#fff' }}>
+                      {allSel ? <IconCheck /> : <IconPlus />}
+                    </button>
+                  )}
+                </div>
               )
             })}
           </div>

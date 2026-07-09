@@ -2438,21 +2438,53 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
               <span className="text-xs text-text flex-1">{t('bankAllItems')}</span>
               <span className="text-[10px] text-text2">{items.length}</span>
             </button>
-            {folders.map(f => (
-              <button
-                key={f}
-                onClick={() => setSelectedFolder(f)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors cursor-pointer ${
-                  selectedFolder === f ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
-                }`}
-              >
-                <span className="text-text2"><IconFolder size={14} /></span>
-                <span className="text-xs text-text flex-1 truncate">{f}</span>
-                <span className="text-[10px] text-text2">
-                  {items.filter(i => (i as unknown as {folder?: string}).folder === f).length}
-                </span>
-              </button>
-            ))}
+            {folders.map(f => {
+              const folderItems = items.filter(i => (i as unknown as {folder?: string}).folder === f)
+              const pickable = folderItems.filter(i => i.file_url || i.storage_path)
+              const selCount = pickable.filter(i => selected.has(i.id)).length
+              const allSel = pickable.length > 0 && selCount === pickable.length
+              return (
+                <div
+                  key={f}
+                  className={`w-full flex items-center gap-2 px-3 py-2 transition-colors ${
+                    selectedFolder === f ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
+                  }`}
+                >
+                  {mode === 'multi' && pickable.length > 0 && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        setSelected(prev => {
+                          const next = new Set(prev)
+                          if (allSel) pickable.forEach(i => next.delete(i.id))
+                          else        pickable.forEach(i => next.add(i.id))
+                          return next
+                        })
+                      }}
+                      title={allSel ? `Retirer le dossier "${f}"` : `Sélectionner tout le dossier "${f}"`}
+                      className="flex-shrink-0 flex items-center justify-center cursor-pointer rounded"
+                      style={{
+                        width: 15, height: 15,
+                        background: allSel ? 'var(--accent)' : selCount > 0 ? 'rgba(99,102,241,0.4)' : 'transparent',
+                        border: selCount > 0 ? 'none' : '1px solid rgba(255,255,255,0.18)',
+                      }}
+                    >
+                      {selCount > 0 && <IconCheck size={9} />}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedFolder(f)}
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer"
+                  >
+                    <span className="text-text2"><IconFolder size={14} /></span>
+                    <span className="text-xs text-text flex-1 truncate">{f}</span>
+                    <span className="text-[10px] text-text2">
+                      {selCount > 0 ? `${selCount}/${folderItems.length}` : folderItems.length}
+                    </span>
+                  </button>
+                </div>
+              )
+            })}
           </div>
 
           {/* Grid */}
