@@ -2706,15 +2706,27 @@ export async function postInstagramStoryRpa(
     const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
 
-    // 3. Upload de l'image vers GeeLark (le param Media attend une URL hébergée GeeLark)
+    // 3. Upload de l'image vers GeeLark. On passe par window.electronAPI.uploadVideoGeelark
+    //    (proxy serveur /api/geelark-upload sur le web → PAS de blocage CORS sur le PUT OSS ;
+    //    natif sur desktop). geelarkUploadForRpa faisait le PUT directement depuis le
+    //    navigateur → « Failed to fetch » (CORS). Repli direct hors navigateur.
     log('📤 Préparation de l\'image…')
-    const up = await geelarkUploadForRpa(bearer, config.imageUrl, log)
-    if (!up) return { ok: false, error: 'Image non préparée (upload GeeLark)' }
+    let mediaResourceUrl: string | null = null
+    if (window.electronAPI?.uploadVideoGeelark) {
+      const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: config.imageUrl })
+      if (up?.ok && up.token) mediaResourceUrl = up.token
+      else if (up?.error) log(`   ⚠ upload : ${up.error}`)
+    }
+    if (!mediaResourceUrl) {
+      const up = await geelarkUploadForRpa(bearer, config.imageUrl, log)
+      if (up) mediaResourceUrl = up.resourceUrl
+    }
+    if (!mediaResourceUrl) return { ok: false, error: 'Image non préparée (upload GeeLark)' }
 
     // 4. Création de la tâche RPA (paramMap = variables du flow)
     const addHl = !!config.addToHighlights
     const paramMap: Record<string, unknown> = {
-      Media:              [up.resourceUrl],
+      Media:              [mediaResourceUrl],
       Link:               config.linkUrl ?? '',
       NameLink:           config.linkText ?? '',
       AddtoHighlights:    addHl,
