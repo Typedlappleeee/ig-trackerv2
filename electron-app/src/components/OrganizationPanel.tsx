@@ -147,19 +147,19 @@ function MultiSelect({ options, selected, onChange, placeholder }: {
         <span className="text-text2"><Icon name="chevron-down" size={14} /></span>
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-1 z-[9991] bg-surface border border-border rounded-xl shadow-2xl max-h-48 overflow-auto">
-            {options.length === 0 ? (
-              <p className="text-text2 text-xs px-3 py-2 italic">Aucun élément disponible</p>
-            ) : options.map(opt => (
-              <label key={opt} className="flex items-center gap-2 px-3 py-2 text-sm text-text hover:bg-surface2 cursor-pointer">
-                <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggle(opt)} className="accent-accent" />
-                <span className="flex-1 truncate">{opt}</span>
-              </label>
-            ))}
-          </div>
-        </>
+        // Liste INLINE (dans le flux) : sinon un dropdown absolu est coupé par le
+        // conteneur scrollable du modal et par le bas du modal → « on ne voit pas
+        // les groupes ». Ici le corps du modal scrolle jusqu'à la liste.
+        <div className="mt-1 bg-surface border border-border rounded-xl max-h-48 overflow-auto">
+          {options.length === 0 ? (
+            <p className="text-text2 text-xs px-3 py-2 italic">Aucun élément disponible</p>
+          ) : options.map(opt => (
+            <label key={opt} className="flex items-center gap-2 px-3 py-2 text-sm text-text hover:bg-surface2 cursor-pointer">
+              <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggle(opt)} className="accent-accent" />
+              <span className="flex-1 truncate">{opt}</span>
+            </label>
+          ))}
+        </div>
       )}
     </div>
   )
