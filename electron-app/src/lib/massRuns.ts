@@ -66,6 +66,20 @@ export function endMassRun(id: string): void {
   setTimeout(() => { runs.delete(id); notify() }, 10_000)
 }
 
+// Téléphones actuellement « occupés » : présents dans un run EN COURS et pas
+// encore dans un état final. Sert à empêcher qu'un même téléphone parte dans deux
+// runs en parallèle (sinon il posterait 2× et serait débité 2×).
+export function busyPhoneIds(): Set<string> {
+  const s = new Set<string>()
+  for (const r of runs.values()) {
+    if (!r.running) continue
+    for (const [phoneId, st] of r.statuses) {
+      if (st.status !== 'done' && st.status !== 'error' && st.status !== 'cancelled') s.add(phoneId)
+    }
+  }
+  return s
+}
+
 export function getMassRun(id: string): MassRunLive | undefined { return runs.get(id) }
 export function listMassRuns(): MassRunLive[] {
   return [...runs.values()].sort((a, b) => b.startedAt - a.startedAt)

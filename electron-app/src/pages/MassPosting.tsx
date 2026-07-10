@@ -20,7 +20,7 @@ import {
 } from '@/lib/massPostingStore'
 import {
   createMassRun, massRunLog, massRunSetStatus, endMassRun,
-  listMassRuns, subscribeMassRuns, hasRunningMassRun, type MassRunLive,
+  listMassRuns, subscribeMassRuns, hasRunningMassRun, busyPhoneIds, type MassRunLive,
 } from '@/lib/massRuns'
 import { playSuccess } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
@@ -873,6 +873,20 @@ export function MassPosting({ user }: MassPostingProps) {
     if (phoneList.length === 0)   { toast.show({ title: 'Aucun téléphone', body: 'Sélectionne au moins un téléphone', kind: 'warn' }); return }
     if (selectedVideos.length === 0) { toast.show({ title: 'Aucune vidéo', body: 'Sélectionne au moins une vidéo', kind: 'warn' }); return }
 
+    // ⛔ Anti-doublon : un téléphone déjà en cours dans un autre run ne doit PAS
+    // repartir ici — sinon il posterait 2× ET serait débité 2× (runs parallèles).
+    const busy = busyPhoneIds()
+    const clashPhones = phoneList.filter(p => busy.has(p.id))
+    if (clashPhones.length > 0) {
+      const names = clashPhones.map(p => p.ig_username ? `@${p.ig_username}` : (p.phone_name ?? p.id.slice(-6)))
+      toast.show({
+        title: `${clashPhones.length} téléphone(s) déjà en cours`,
+        body: `${names.slice(0, 5).join(', ')}${names.length > 5 ? '…' : ''} — déjà dans un posting actif. Attends qu'il finisse ou désélectionne-les.`,
+        kind: 'warn',
+      })
+      return
+    }
+
     // Légende à poster pour une vidéo donnée : sa description de banque si elle
     // en a une, sinon la légende globale saisie. Corrige le cas où chaque vidéo
     // a sa propre description mais toutes recevaient la même légende globale.
@@ -1476,12 +1490,18 @@ export function MassPosting({ user }: MassPostingProps) {
       }
       } // fin du mode standard (else de la concurrence limitée)
 
-      // Mark only phones without a final status yet as done (preserve 'error' states)
-      const currentStatuses = live.statuses
-      for (const p of phoneList) {
-        const existing = currentStatuses.get(p.id)?.status
-        if (existing !== 'done' && existing !== 'error') {
-          setPhoneStatus(p.id, { status: 'done' })
+      // Marque comme "done" uniquement les téléphones sans statut final — MAIS
+      // jamais si le run a été STOPPÉ : dans ce cas cancelRun a (ou va) marquer les
+      // téléphones actifs en "cancelled", et les repasser en "done" ici fausserait
+      // l'historique/les stats (comptes annulés comptés comme publiés) ET le
+      // remboursement (sous-remboursement). On préserve aussi 'cancelled'.
+      if (!stopRef.current) {
+        const currentStatuses = live.statuses
+        for (const p of phoneList) {
+          const existing = currentStatuses.get(p.id)?.status
+          if (existing !== 'done' && existing !== 'error' && existing !== 'cancelled') {
+            setPhoneStatus(p.id, { status: 'done' })
+          }
         }
       }
 
