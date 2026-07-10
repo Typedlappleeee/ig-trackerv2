@@ -17,6 +17,7 @@
 
 const https = require('https')
 const http  = require('http')
+const { hostIsPrivate } = require('./_ssrf')
 
 module.exports.config = { maxDuration: 15 }
 
@@ -61,7 +62,7 @@ module.exports = async (req, res) => {
   let host
   try {
     host = new URL(url).hostname
-    if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.|::1)$/i.test(host) || /^(10\.|192\.168\.|169\.254\.)/.test(host)) {
+    if (hostIsPrivate(host)) {
       res.status(400).json({ ok: false, error: 'host non autorisé' })
       return
     }

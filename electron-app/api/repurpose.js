@@ -8,6 +8,7 @@ const ffmpegPath = require('ffmpeg-static')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { createClient } = require('@supabase/supabase-js')
+const { assertAllowedMediaUrl } = require('./_ssrf')
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
@@ -123,7 +124,8 @@ async function handleSpoof(req, res) {
 
   try {
     if (sourceUrl) {
-      const resp = await fetch(sourceUrl)
+      assertAllowedMediaUrl(sourceUrl)  // anti-SSRF : uniquement une URL de la banque Supabase
+      const resp = await fetch(sourceUrl, { signal: AbortSignal.timeout(30000) })
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch source: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {
@@ -332,7 +334,8 @@ module.exports = async (req, res) => {
   try {
     // ── Download source video ──────────────────────────────────────────────
     if (sourceUrl) {
-      const resp = await fetch(sourceUrl)
+      assertAllowedMediaUrl(sourceUrl)  // anti-SSRF : uniquement une URL de la banque Supabase
+      const resp = await fetch(sourceUrl, { signal: AbortSignal.timeout(30000) })
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch source: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {
@@ -344,6 +347,14 @@ module.exports = async (req, res) => {
     // ── Build one FFmpeg call for all variants (single decode pass) ────────
     const outPaths = variants.map((_, i) => path.join(tmpDir, `rp_out_${ts}_${i}.mov`))
 
+    // Anti-lecture-de-fichiers : les filtres source `movie=`/`amovie=` de FFmpeg
+    // permettraient de lire un fichier arbitraire du serveur (ex. movie=/etc/passwd)
+    // et de l'exfiltrer dans la vidéo de sortie. Aucun preset légitime n'en contient.
+    for (const v of variants) {
+      if (typeof v.vf !== 'string' || /a?movie\b/i.test(v.vf)) {
+        return res.status(400).json({ ok: false, error: 'filtre vidéo non autorisé' })
+      }
+    }
     // filter_complex: each variant gets its own named output [v0], [v1], …
     const filterComplex = variants.map((v, i) => `[0:v:0]${v.vf}[v${i}]`).join(';')
 
@@ -418,7 +429,12 @@ module.exports = async (req, res) => {
     res.status(500).json({ ok: false, error: String(err) })
   } finally {
     fs.rmSync(inputPath, { force: true })
-    if (storagePath) supabase.storage.from(bucket).remove([storagePath]).catch(() => {})
+    // Ne supprime QUE dans l'arborescence de l'app (videos/users/…) et jamais un
+    // chemin avec traversée : sinon un `storagePath` arbitraire ferait supprimer
+    // le fichier d'un autre utilisateur via la clé service-role.
+    if (storagePath && /^videos\/users\/[^/]+\//.test(storagePath) && !storagePath.includes('..')) {
+      supabase.storage.from(bucket).remove([storagePath]).catch(() => {})
+    }
   }
 }
 

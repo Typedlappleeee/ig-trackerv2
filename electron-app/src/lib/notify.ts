@@ -21,10 +21,12 @@ export async function sendNotification(opts: {
     const s = data?.notification_settings as { events?: Record<string, boolean> } | null
     if (!s || Object.keys(s).length === 0) return
     if (s.events && s.events[opts.event] === false) return
+    // Jeton d'auth : l'endpoint /api/notify le vérifie (anti-relais email/SSRF).
+    const { data: { session } } = await supabase.auth.getSession()
     await fetch('/api/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ settings: s, subject: opts.subject, message: opts.message }),
+      body: JSON.stringify({ settings: s, subject: opts.subject, message: opts.message, supabaseToken: session?.access_token }),
     }).catch(() => {})
   } catch { /* best-effort */ }
 }
