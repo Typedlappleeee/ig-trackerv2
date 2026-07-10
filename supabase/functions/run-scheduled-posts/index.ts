@@ -417,14 +417,26 @@ Deno.serve(async (req) => {
         if (!byBearer.has(bearer)) byBearer.set(bearer, [])
         byBearer.get(bearer)!.push(row.geelark_id)
       }
-      let stopped = 0
+      const stoppedIds: string[] = []
       for (const [bearer, ids] of byBearer) {
-        await gPost(bearer, '/phone/stop', { ids }).catch(() => {})
-        stopped += ids.length
+        try {
+          const r = await gPost(bearer, '/phone/stop', { ids })
+          // On ne considère « traité » (→ supprimable) QUE si GeeLark a répondu OK.
+          if (r && (r.code === 0 || r.code === undefined)) stoppedIds.push(...ids)
+        } catch { /* réseau : on GARDE la ligne → réessai au prochain tick */ }
       }
-      // Purge les lignes traitées (qu'on ait pu résoudre le bearer ou non)
-      await db.from('phone_power_watch').delete().in('geelark_id', due.map(r => r.geelark_id))
-      summary['watchdog'] = `éteint ${stopped} téléphone(s) en dépassement (5 min)`
+      // ⚠️ On ne supprime QUE les lignes réellement éteintes. Avant, on supprimait
+      // TOUTES les lignes dues même si le bearer était introuvable ou le stop en
+      // échec → le téléphone restait allumé pour toujours (jamais réessayé). C'est
+      // ce qui laissait des tél allumés très longtemps.
+      if (stoppedIds.length > 0) {
+        await db.from('phone_power_watch').delete().in('geelark_id', stoppedIds)
+      }
+      // Les lignes dont le bearer est introuvable depuis > 1 h sont abandonnées
+      // (compte supprimé/token retiré) pour ne pas boucler indéfiniment.
+      const orphanCutoff = new Date(Date.now() - 60 * 60_000).toISOString()
+      await db.from('phone_power_watch').delete().lt('stop_at', orphanCutoff)
+      summary['watchdog'] = `éteint ${stoppedIds.length}/${due.length} téléphone(s) en dépassement`
     }
   } catch (err) {
     summary['watchdog'] = `error: ${err instanceof Error ? err.message : String(err)}`

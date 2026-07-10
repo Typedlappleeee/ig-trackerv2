@@ -1086,7 +1086,8 @@ export function MassPosting({ user }: MassPostingProps) {
           const list = Object.values(ids)
           if (!list.length) return
           const pending = new Set(list)
-          const deadline = Date.now() + 6 * 60 * 1000
+          // 5 min de poll : + boot (~1 min) reste sous le garde-fou 7 min du lot.
+          const deadline = Date.now() + 5 * 60 * 1000
           while (pending.size > 0 && Date.now() < deadline) {
             if (stopRef.current) break
             await new Promise(r => setTimeout(r, 7000))
@@ -1132,14 +1133,28 @@ export function MassPosting({ user }: MassPostingProps) {
           log(`Lot ${bi + 1}/${batches.length} — démarrage de ${batch.length} téléphone(s)…`)
           activePhonesRef.current = [...new Set([...activePhonesRef.current, ...ids])]
           const startRes = await geelark(bearer, '/phone/start', { ids })
-          registerStartedPhones(ids, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
+          // Backstop serveur (PC fermé) : 8 min → laisse le garde-fou client 7 min
+          // agir d'abord, le serveur ne rattrape que si le client meurt vraiment.
+          registerStartedPhones(ids, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting', stopAt: new Date(Date.now() + 8 * 60_000) })
           const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
           if (started === 0) {
             batch.forEach(a => setPhoneStatus(a.phone.id, { status: 'error', detail: 'démarrage échoué' }))
             activePhonesRef.current = activePhonesRef.current.filter(id => !ids.includes(id))
             continue
           }
-          if (stopRef.current) break
+          // 🛡️ GARDE-FOU DUR : quoi qu'il arrive (boucle bloquée sur un await, onglet
+          // mis en arrière-plan par le navigateur, réseau qui pend), les téléphones de
+          // CE lot sont éteints au bout de 7 min. C'est le filet qui manquait sur le
+          // chemin proxy rotatif (l'ancien armAutoStop n'existait que sur le chemin
+          // standard) → des tél restaient allumés indéfiniment.
+          const batchSafety = window.setTimeout(() => {
+            geelark(bearer, '/phone/stop', { ids }).catch(() => {})
+            unregisterPhones(ids).catch(() => {})
+            activePhonesRef.current = activePhonesRef.current.filter(id => !ids.includes(id))
+            log(`⏱ Garde-fou 7 min — extinction forcée du lot ${bi + 1}/${batches.length}`, 'warn')
+          }, 7 * 60_000)
+          autoStopTimersRef.current.push(batchSafety)
+          if (stopRef.current) { window.clearTimeout(batchSafety); break }
           // Boot réduit : la vérif de connectivité par téléphone (plus bas) sert de
           // filet — on repart dès que le tél répond, pas besoin d'un 30s fixe.
           log('Attente du boot (~20s)…')
@@ -1186,6 +1201,9 @@ export function MassPosting({ user }: MassPostingProps) {
 
           await pollBatch(batchTaskIds)
 
+          // Lot terminé normalement → on désarme le garde-fou 7 min de ce lot.
+          window.clearTimeout(batchSafety)
+          autoStopTimersRef.current = autoStopTimersRef.current.filter(t => t !== batchSafety)
           // Éteint les téléphones de ce lot (libère le proxy avant le suivant).
           const strag = ids.filter(id => activePhonesRef.current.includes(id))
           if (strag.length) {
