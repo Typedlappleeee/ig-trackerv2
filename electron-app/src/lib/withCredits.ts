@@ -16,7 +16,9 @@ export interface CreditRun {
   balance?: number
   /** Marque une unité comme échouée — sera remboursée au settle() */
   markFailed: (count?: number) => void
-  /** Marque tout le reste comme non exécuté (Stop utilisateur, erreur fatale) */
+  /** Annule TOUT le run (aucune unité consommée) → settle() rembourse la totalité.
+   *  À utiliser quand rien n'a été exécuté (Stop/erreur avant tout post). Pour un
+   *  arrêt EN COURS d'exécution, préférer markFailed(nb_non_publiés). */
   abort: () => void
   /** Rembourse les unités échouées/non exécutées. Idempotent. */
   settle: () => Promise<{ refunded: number }>
@@ -49,15 +51,12 @@ export async function startCreditRun(
     settle: async () => {
       if (settled) return { refunded: 0 }
       settled = true
-      // Unités à rembourser : échecs explicites + (si abort) tout ce qui n'a
-      // été ni marqué échoué ni implicitement réussi. On rembourse de façon
-      // conservatrice : failed seulement, sauf abort où on rembourse
-      // units - succeeded (succeeded = units - failed - remaining... inconnu),
-      // donc l'appelant doit marquer failed pour chaque unité non exécutée.
-      void completed; void aborted
-      const refundUnits = failed
+      void completed
+      // abort() = tout le run annulé → remboursement TOTAL (borné aux unités).
+      // Sinon : uniquement les unités explicitement marquées en échec.
+      const refundUnits = aborted ? units : failed
       if (refundUnits <= 0) return { refunded: 0 }
-      const amount = refundUnits * costPerUnit
+      const amount = Math.min(refundUnits, units) * costPerUnit
       const ok = await refundCredits(ownerId, amount)
       return { refunded: ok ? amount : 0 }
     },

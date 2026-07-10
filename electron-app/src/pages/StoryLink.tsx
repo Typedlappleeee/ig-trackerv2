@@ -962,7 +962,7 @@ export default function StoryLink({ user }: { user: User }) {
           {/* Launch / Stop button */}
           {running ? (
             <button
-              onClick={() => { abortRef.current = true; setRunning(false) }}
+              onClick={() => { abortRef.current = true; setRunning(false); if (runIdRef.current) { endRun(runIdRef.current); runIdRef.current = null } }}
               className="sf-btn sf-btn-lg sf-btn-danger"
               style={{ cursor: 'pointer', gap: 8 }}
             >
