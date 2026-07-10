@@ -1820,7 +1820,7 @@ export default function StoryLink({ user }: { user: User }) {
                     style={{ flex: 1, justifyContent: 'center' }}
                   >Annuler</button>
                   <button
-                    onClick={scheduleRun}
+                    onClick={() => scheduleRun()}
                     disabled={scheduling}
                     className="sf-btn sf-btn-primary cursor-pointer"
                     style={{
