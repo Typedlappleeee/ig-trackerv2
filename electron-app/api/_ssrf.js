@@ -58,4 +58,13 @@ function safeMediaFetchOpts(timeoutMs = 30000) {
   return { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) }
 }
 
-module.exports = { assertAllowedMediaUrl, hostIsPrivate, safeMediaFetchOpts }
+// Un storagePath fourni par le client doit rester dans l'arborescence de l'app
+// (videos/users/<id>/… ou videos/orgs/<id>/…) et sans traversée : sinon la clé
+// service-role permettrait de lire/supprimer le fichier d'un autre tenant.
+// Retourne true si le chemin est acceptable.
+function isOwnStoragePath(p) {
+  const s = String(p || '')
+  return /^videos\/(users|orgs)\/[^/]+\//.test(s) && !s.includes('..')
+}
+
+module.exports = { assertAllowedMediaUrl, hostIsPrivate, safeMediaFetchOpts, isOwnStoragePath }

@@ -8,7 +8,7 @@ const ffmpegPath = require('ffmpeg-static')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { createClient } = require('@supabase/supabase-js')
-const { assertAllowedMediaUrl, safeMediaFetchOpts } = require('./_ssrf')
+const { assertAllowedMediaUrl, safeMediaFetchOpts, isOwnStoragePath } = require('./_ssrf')
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
@@ -129,6 +129,7 @@ async function handleSpoof(req, res) {
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch source: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {
+      if (!isOwnStoragePath(storagePath)) return res.status(400).json({ ok: false, error: 'chemin storage non autorisé' })
       const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
       if (dlErr) return res.status(400).json({ ok: false, error: dlErr.message })
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
@@ -339,6 +340,7 @@ module.exports = async (req, res) => {
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch source: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {
+      if (!isOwnStoragePath(storagePath)) return res.status(400).json({ ok: false, error: 'chemin storage non autorisé' })
       const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
       if (dlErr) return res.status(400).json({ ok: false, error: dlErr.message })
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
@@ -432,7 +434,7 @@ module.exports = async (req, res) => {
     // Ne supprime QUE dans l'arborescence de l'app (videos/users/…) et jamais un
     // chemin avec traversée : sinon un `storagePath` arbitraire ferait supprimer
     // le fichier d'un autre utilisateur via la clé service-role.
-    if (storagePath && /^videos\/users\/[^/]+\//.test(storagePath) && !storagePath.includes('..')) {
+    if (storagePath && isOwnStoragePath(storagePath)) {
       supabase.storage.from(bucket).remove([storagePath]).catch(() => {})
     }
   }

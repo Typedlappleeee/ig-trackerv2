@@ -7,6 +7,7 @@
 module.exports.config = { maxDuration: 60 }
 
 const { createClient } = require('@supabase/supabase-js')
+const { assertAllowedMediaUrl } = require('./_ssrf')
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
@@ -81,16 +82,24 @@ module.exports = async (req, res) => {
 
     let bytes
     if (signedUrl) {
-      // Direct fetch — no admin key needed (signed URL already contains auth token)
+      // Anti-SSRF : le signedUrl doit être une URL de la banque Supabase de l'app,
+      // et on ne suit PAS les redirections (une 3xx vers une IP interne
+      // contournerait l'allowlist). Sinon cet endpoint fetch n'importe quelle URL.
+      try { assertAllowedMediaUrl(signedUrl) }
+      catch (e) { return res.status(400).json({ ok: false, error: `${SV}[SV-E002s] ${e.message}` }) }
       console.log(`${SV} [SV-A] fetch signedUrl (${String(signedUrl).slice(0, 80)})`)
-      const dlRes = await fetchRetry('SV-A:download', signedUrl, {}, { tries: 3, timeoutMs: 30000 })
+      const dlRes = await fetchRetry('SV-A:download', signedUrl, { redirect: 'manual' }, { tries: 3, timeoutMs: 30000 })
       if (!dlRes.ok) {
         return res.status(200).json({ ok: false, error: `${SV}[SV-E002] Fetch vidéo échoué: ${dlRes.status}` })
       }
       bytes = Buffer.from(await dlRes.arrayBuffer())
       console.log(`${SV} [SV-A] fetch ok, ${bytes.length} bytes`)
     } else {
-      // storagePath — requires SUPABASE_SERVICE_ROLE_KEY
+      // storagePath — clé service-role : on limite à l'arborescence de l'app pour
+      // qu'un storagePath arbitraire ne puisse pas lire le fichier d'un autre tenant.
+      if (!/^videos\/(users|orgs)\/[^/]+\//.test(String(storagePath)) || String(storagePath).includes('..')) {
+        return res.status(400).json({ ok: false, error: `${SV}[SV-E003p] chemin non autorisé` })
+      }
       console.log(`${SV} [SV-B] storagePath path, tentative admin client`)
       const supabase = getSupabaseAdmin()
       const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
