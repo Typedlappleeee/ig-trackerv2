@@ -554,10 +554,18 @@ Deno.serve(async (req) => {
     .eq('status', 'running')
     .eq('type', 'story')
     .or(`executed_at.lt.${storyCutoff},and(executed_at.is.null,created_at.lt.${storyCutoff})`)
+  // ⚠️ On ne re-met en file QUE les stories que le SERVEUR traitait réellement,
+  // reconnaissables à leur `result.story_progress` (le serveur re-remet en pending
+  // par téléphone avec un executed_at frais → une story serveur saine ne paraît
+  // jamais bloquée). Une story pilotée CÔTÉ CLIENT n'écrit pas story_progress :
+  // la re-mettre en pending ici la ferait re-traiter par la boucle serveur avec un
+  // doneSet vide → double publication sur tous les comptes. On l'exclut donc ; sa
+  // reprise est gérée côté client, et le failsafe > 6 h l'attrape si vraiment morte.
   await db.from('scheduled_posts')
     .update({ status: 'pending' })
     .eq('status', 'running')
     .eq('type', 'story')
+    .not('result->story_progress', 'is', null)
     .lt('executed_at', storyStale)
     .gte('executed_at', storyCutoff)
 
@@ -697,7 +705,11 @@ Deno.serve(async (req) => {
           p_amount:  totalCost,
         })
         if (!creditRes?.ok) {
-          await db.from('recurring_tasks').update({ status: 'paused' }).eq('id', task.id)
+          // ⚠️ Le claim atomique a posé next_run_at à +999h (sentinelle). Si on met
+          // juste en pause sans le remettre, la tâche est morte : même réactivée,
+          // elle ne re-fire pas avant ~41 jours. On remet next_run_at à « maintenant »
+          // → dès réactivation, le prochain tick la voit due (et re-vérifie les crédits).
+          await db.from('recurring_tasks').update({ status: 'paused', next_run_at: nowIso }).eq('id', task.id)
           summary[`task:${task.id}`] = `paused — crédits insuffisants (${creditRes?.error ?? ''})`
           await notifyOwner(db, { userId: task.user_id, orgId: task.org_id },
             'task_paused',
@@ -809,10 +821,14 @@ Deno.serve(async (req) => {
 
     const logs: string[] = []
     const log = (m: string) => logs.push(m)
+    // Hissés hors du try : le catch en a besoin pour ÉTEINDRE les téléphones déjà
+    // démarrés si l'exécution échoue (sinon ils restent allumés = facturation
+    // GeeLark en continu).
+    let bearer = ''
+    let geelarkIds: string[] = []
 
     try {
       // 4. Résolution du bearer (jamais stocké dans la ligne)
-      let bearer = ''
       if (post.org_id) {
         const { data } = await db.from('org_config')
           .select('bearer_token').eq('org_id', post.org_id).maybeSingle()
@@ -829,7 +845,7 @@ Deno.serve(async (req) => {
 
       const phones: PhoneRec[] = typeof post.phones === 'string' ? JSON.parse(post.phones) : post.phones
       const videos: VideoRec[] = typeof post.videos === 'string' ? JSON.parse(post.videos) : post.videos
-      const geelarkIds = phones.map(p => p.geelark_id)
+      geelarkIds = phones.map(p => p.geelark_id)
       const delayMin: number = post.delay_minutes ?? 0
       log(`🗓 Exécution serveur — ${post.platform ?? 'instagram'} · ${phones.length} compte(s) · ${videos.length} vidéo(s)${delayMin ? ` · ${delayMin} min d'écart` : ''}.`)
 
@@ -1134,6 +1150,12 @@ Deno.serve(async (req) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logs.push(`❌ Erreur : ${msg}`)
+      // Filet de sécurité : éteindre les téléphones déjà démarrés avant l'échec —
+      // sinon ils restent allumés indéfiniment (facturation GeeLark). Best-effort.
+      if (bearer && geelarkIds.length > 0) {
+        try { await gPost(bearer, '/phone/stop', { ids: geelarkIds }); logs.push(`🔌 ${geelarkIds.length} téléphone(s) éteint(s) après erreur.`) }
+        catch { /* le garde-fou phone_power_watch rattrapera */ }
+      }
       await db.from('scheduled_posts').update({
         status: 'failed', result: { logs }, error_msg: msg,
       }).eq('id', post.id)
