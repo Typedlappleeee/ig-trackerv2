@@ -690,6 +690,11 @@ Deno.serve(async (req) => {
     const { data: dueTasks } = await claimQuery
 
     for (const task of dueTasks ?? []) {
+     // Isolé par tâche : si une tâche plante après le claim (+999h sentinelle), on
+     // remet son next_run_at à maintenant (catch ci-dessous) pour qu'elle re-fire
+     // au prochain tick, au lieu de rester bloquée ~41 jours — et les autres tâches
+     // du lot continuent.
+     try {
       const phones: unknown[] = typeof task.phones === 'string' ? JSON.parse(task.phones) : (task.phones ?? [])
       const phoneCount = phones.length
       const perRunCost = phoneCount * 2  // même logique que mass_posting
@@ -792,6 +797,10 @@ Deno.serve(async (req) => {
         run_count:   (Number(task.run_count) || 0) + 1,
       }).eq('id', task.id)
       summary[`task:${task.id}`] = insErr ? `task insert failed: ${insErr.message}` : `task queued (−${totalCost} crédits, type=${effectiveType})`
+     } catch (taskErr) {
+       try { await db.from('recurring_tasks').update({ next_run_at: nowIso }).eq('id', task.id) } catch { /* ignore */ }
+       summary[`task:${task.id}`] = `error: ${taskErr instanceof Error ? taskErr.message : String(taskErr)}`
+     }
     }
   } catch (err) {
     summary['recurring_tasks'] = `error: ${err instanceof Error ? err.message : String(err)}`
@@ -826,6 +835,10 @@ Deno.serve(async (req) => {
     // GeeLark en continu).
     let bearer = ''
     let geelarkIds: string[] = []
+    // Devient true dès qu'au moins une tâche RPA a été créée : le catch NE DOIT PAS
+    // éteindre les téléphones dans ce cas (ça tuerait des reels en cours). Le stop
+    // n'est un filet de sécurité que pour l'échec AVANT création (upload raté, etc.).
+    let tasksCreated = false
 
     try {
       // 4. Résolution du bearer (jamais stocké dans la ligne)
@@ -979,6 +992,7 @@ Deno.serve(async (req) => {
         const ids: string[] = res.data?.taskIds ?? []
         if (res.code === 0 && Array.isArray(ids) && ids.length > 0) {
           ids.forEach((tid, idx) => { taskIds.push(tid); if (phones[idx]) taskPhoneMap.set(tid, phones[idx]) })
+          tasksCreated = true
           log(`✅ ${ids.length} tâche(s) TikTok créée(s)`)
         } else {
           failedCount = phones.length
@@ -1006,7 +1020,7 @@ Deno.serve(async (req) => {
         })
         const taskId = res.data?.id ?? res.data?.taskId ?? null
         if (res.code === 0) {
-          if (taskId) { taskIds.push(taskId); taskPhoneMap.set(taskId, phone) }
+          if (taskId) { taskIds.push(taskId); taskPhoneMap.set(taskId, phone); tasksCreated = true }
           log(`✅ Tâche créée : ${phone.ig_username ?? phone.phone_name}${delayMin && i ? ` (départ +${i * delayMin} min)` : ''}`)
         } else {
           failedCount++
@@ -1152,8 +1166,11 @@ Deno.serve(async (req) => {
       logs.push(`❌ Erreur : ${msg}`)
       // Filet de sécurité : éteindre les téléphones déjà démarrés avant l'échec —
       // sinon ils restent allumés indéfiniment (facturation GeeLark). Best-effort.
-      if (bearer && geelarkIds.length > 0) {
-        try { await gPost(bearer, '/phone/stop', { ids: geelarkIds }); logs.push(`🔌 ${geelarkIds.length} téléphone(s) éteint(s) après erreur.`) }
+      // MAIS uniquement si AUCUNE tâche RPA n'a été créée : sinon on tuerait des
+      // reels en cours (le sweep stop_phones_at / phone_power_watch les éteindra
+      // proprement une fois publiés).
+      if (bearer && geelarkIds.length > 0 && !tasksCreated) {
+        try { await gPost(bearer, '/phone/stop', { ids: geelarkIds }); logs.push(`🔌 ${geelarkIds.length} téléphone(s) éteint(s) après erreur (aucune tâche créée).`) }
         catch { /* le garde-fou phone_power_watch rattrapera */ }
       }
       await db.from('scheduled_posts').update({
