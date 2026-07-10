@@ -1178,7 +1178,9 @@ async function withPhoneAutoStop<T>(
   log: (m: string) => void,
   fn: () => Promise<T>,
 ): Promise<T> {
+  let timedOut = false
   const timer = setTimeout(() => {
+    timedOut = true
     log(`⏱ Timeout ${label} — arrêt automatique du téléphone`)
     stopPhone(bearer, phoneId).catch(() => {})
   }, ms)
@@ -1186,6 +1188,11 @@ async function withPhoneAutoStop<T>(
     return await fn()
   } finally {
     clearTimeout(timer)
+    // Éteint le téléphone une fois l'opération finie (succès OU échec) — sinon les
+    // chemins RPA (story, cross-posting) qui ne stoppent pas eux-mêmes laissent le
+    // téléphone allumé = facturation GeeLark. Le timeout ci-dessus a déjà stoppé le
+    // cas « hang », inutile de redoubler.
+    if (!timedOut) stopPhone(bearer, phoneId).catch(() => {})
   }
 }
 
@@ -2726,7 +2733,9 @@ export async function postInstagramStoryRpa(
   config: StoryRpaConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
-  return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
+  // Budget = boot (rotation + connectivité, ~1-3 min) + poll RPA (10 min ci-dessous)
+  // + marge. 12 min était trop juste → le téléphone était coupé EN PLEINE story.
+  return withPhoneAutoStop(bearer, phoneId, 15 * 60_000, '15min', log, async () => {
     // 1. flowId (import auto la 1re fois, mis en cache ensuite)
     const flowId = await ensureStoryFlowId(bearer, log)
     if (!flowId) return { ok: false, error: 'Flow story RPA indisponible (import GeeLark échoué)' }

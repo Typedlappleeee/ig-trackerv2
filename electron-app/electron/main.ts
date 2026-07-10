@@ -842,9 +842,12 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS)
   try {
-    // Step 1: get presigned upload URL. Le type de fichier est déduit de
-    // l'extension (mp4 par défaut) → gère aussi les images (jpg/png/…).
-    const ext = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+    // Step 1: get presigned upload URL. Une IMAGE garde sa vraie extension (encodée
+    // dans la resourceUrl) ; une VIDÉO force 'mp4' — les templates RPA Insta/TikTok/
+    // Threads rejettent 'mov'/'webm'. (Doit rester aligné sur webAPI.ts.)
+    const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heif', 'heic']
+    const realExt = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+    const ext = IMAGE_EXTS.includes(realExt) ? realExt : 'mp4'
     const urlRes = await net.fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
       headers: {
@@ -887,7 +890,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     const isTimeout = abort.signal.aborted || msg.includes('abort') || msg.includes('Abort')
-    return { ok: false, error: isTimeout ? `Upload timeout (90s dépassé)` : msg }
+    return { ok: false, error: isTimeout ? `Upload timeout (${Math.round(TIMEOUT_MS / 1000)}s dépassé)` : msg }
   } finally {
     clearTimeout(timer)
   }
