@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { ACCENT, ACCENT_L, TEXT_1, TEXT_2, TEXT_3, HAIR, BG_1, BG_2, OK, WARN, ERR } from '@/lib/theme'
-import { supabase, type ContentItem } from '@/lib/supabase'
+import { supabase, fetchAllRows, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { getSignedUrl, uploadVideoFromPath } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
@@ -112,13 +112,14 @@ function VideoPicker({
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    q.then(({ data }) => {
-      const rows = (data ?? []) as ContentItem[]
+    fetchAllRows<ContentItem>((from, to) => {
+      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, to)
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      return q
+    }).then((rows) => {
       setItems(rows.filter(i => i.storage_path?.match(/\.(mp4|mov)$/i) || i.file_url?.match(/\.(mp4|mov)$/i)))
       setLoading(false)
-    })
+    }).catch(() => setLoading(false))
   }, [currentOrg?.id, user.id])
 
   const folders = [...new Set(items.map(i => i.folder).filter((f): f is string => Boolean(f)))].sort()

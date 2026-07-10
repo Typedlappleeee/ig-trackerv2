@@ -11,7 +11,7 @@
  *    Stats écoute cette table en Realtime, l'UI est donc « live »
  *  - account_stats_history (snapshot max 1×/h par compte) → courbes 7/30 j
  */
-import { supabase } from './supabase'
+import { supabase, fetchAllRows } from './supabase'
 import { fetchIgStats } from './instagram'
 import type { User } from '@supabase/supabase-js'
 
@@ -34,13 +34,17 @@ let _lastSnapshot = new Map<string, number>()
 async function refillQueue() {
   // Pas de filtre user_id : en mode organisation les téléphones peuvent avoir
   // été synchronisés par un autre membre — la RLS limite déjà la visibilité.
-  const { data } = await supabase
-    .from('phones')
-    .select('id, org_id, ig_username, ig_sessionid')
-    .not('ig_username', 'is', null)
-    .limit(200)
+  // Pagination complète : l'ancien .limit(200) laissait TOUJOURS les comptes au-delà
+  // de 200 sans stats (followers/vues) → courbes vides pour les grosses orgs.
+  const data = await fetchAllRows<Phone>((from, to) =>
+    supabase
+      .from('phones')
+      .select('id, org_id, ig_username, ig_sessionid')
+      .not('ig_username', 'is', null)
+      .range(from, to),
+  ).catch(() => [] as Phone[])
   // Le pseudo IG suffit — le sessionid est optionnel (fetch anonyme sinon)
-  _queue = ((data ?? []) as Phone[]).filter(p => p.ig_username?.trim())
+  _queue = data.filter(p => p.ig_username?.trim())
 }
 
 async function writeStats(

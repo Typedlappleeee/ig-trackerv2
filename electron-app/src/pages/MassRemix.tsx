@@ -5,7 +5,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { BankPicker } from './Bank'
 import { playSuccess, playError } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
-import { supabase } from '@/lib/supabase'
+import { supabase, fetchAllRows } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
@@ -297,12 +297,14 @@ export function MassRemix({ user }: MassRemixProps) {
 
   // Load existing bank folders for the folder selector
   useEffect(() => {
-    let q = supabase.from('content_bank').select('folder')
-    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
-    q.then(({ data }: { data: Array<{ folder?: string | null }> | null }) => {
-      const folders = [...new Set((data ?? []).map(r => r.folder).filter((f): f is string => Boolean(f)))].sort()
+    fetchAllRows<{ folder?: string | null }>((from, to) => {
+      let q = supabase.from('content_bank').select('folder').range(from, to)
+      q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+      return q as any
+    }).then((data) => {
+      const folders = [...new Set(data.map(r => r.folder).filter((f): f is string => Boolean(f)))].sort()
       setBankFolders(folders)
-    })
+    }).catch(() => {})
   }, [currentOrg?.id])
 
   // Abort generation when component unmounts (user navigates away)
@@ -357,12 +359,14 @@ export function MassRemix({ user }: MassRemixProps) {
   async function openFolderPick(target: 'orig' | 'sec') {
     setFolderLoading(true)
     setFolderTarget(target)
-    let q = supabase.from('content_bank').select('folder')
-    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
-    const { data } = await q
+    const data = await fetchAllRows<{ folder?: string | null }>((from, to) => {
+      let q = supabase.from('content_bank').select('folder').range(from, to)
+      q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+      return q as any
+    }).catch(() => [] as { folder?: string | null }[])
     const counts = new Map<string, number>()
-    for (const row of data ?? []) {
-      const f = (row as { folder?: string | null }).folder
+    for (const row of data) {
+      const f = row.folder
       if (f) counts.set(f, (counts.get(f) ?? 0) + 1)
     }
     setFolderList([...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count })))
@@ -375,12 +379,14 @@ export function MassRemix({ user }: MassRemixProps) {
     setAddingFolder(folderName)
     setAddingTarget(target)
     try {
-      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-      q = currentOrg
-        ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
-        : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
-      const { data } = await q
-      const items = (data ?? []) as Array<{ storage_path: string | null; file_url: string | null }>
+      const data = await fetchAllRows<{ storage_path: string | null; file_url: string | null }>((from, to) => {
+        let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, to)
+        q = currentOrg
+          ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
+          : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
+        return q as any
+      })
+      const items = data
       if (!items.length) return
       const { resolveContentToLocalPath } = await import('@/lib/storage')
       const paths: string[] = []

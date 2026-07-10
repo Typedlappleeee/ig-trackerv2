@@ -11,7 +11,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type Phone } from '@/lib/supabase'
+import { supabase, fetchAllRows, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { pollAllNow } from '@/lib/igStatsPoller'
@@ -166,21 +166,27 @@ export function Stats({ user }: StatsProps) {
   const [detail, setDetail]       = useState<Phone | null>(null)
 
   const loadPhones = useCallback(async () => {
-    let q = supabase.from('phones').select('*').order('followers', { ascending: false })
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await q
-    const visible = (data ?? []).filter(p => !role || canAccessPhoneGroup(role, perms, p.group_name)) as Phone[]
+    const data = await fetchAllRows<Phone>((from, to) => {
+      let q = supabase.from('phones').select('*').order('followers', { ascending: false }).range(from, to)
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      return q
+    }).catch(() => [] as Phone[])
+    const visible = data.filter(p => !role || canAccessPhoneGroup(role, perms, p.group_name))
     setPhones(visible)
   }, [currentOrg?.id, user.id, role, perms])
 
   const loadHistory = useCallback(async () => {
     const since = new Date(); since.setUTCDate(since.getUTCDate() - period)
-    let q = supabase.from('account_stats_history')
-      .select('phone_id, followers, following, posts, total_views, recorded_at')
-      .gte('recorded_at', since.toISOString()).order('recorded_at', { ascending: true }).limit(8000)
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await q
-    setSnaps((data ?? []) as Snapshot[])
+    // Pagination complète : l'ancien .limit(8000) en ordre ASCENDANT tronquait les
+    // jours les plus RÉCENTS pour les grosses orgs (des milliers de snapshots).
+    const data = await fetchAllRows<Snapshot>((from, to) => {
+      let q = supabase.from('account_stats_history')
+        .select('phone_id, followers, following, posts, total_views, recorded_at')
+        .gte('recorded_at', since.toISOString()).order('recorded_at', { ascending: true }).range(from, to)
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      return q
+    }).catch(() => [] as Snapshot[])
+    setSnaps(data)
   }, [currentOrg?.id, user.id, period])
 
   useEffect(() => {

@@ -170,8 +170,15 @@ export function Reports({ user }: { user: User }) {
     const updates = pairs.filter(p => p.u)
     if (!updates.length) return
     setAccounts(prev => prev.map(a => { const up = updates.find(x => x.id === a.id); return up ? { ...a, ig_username: up.u } : a }))
-    try { await Promise.all(updates.map(up => supabase.from('phones').update({ ig_username: up.u }).eq('id', up.id))) }
-    catch (e) { console.error('[Reports] bulkLink', e); load() }
+    // Chaque téléphone reçoit un pseudo DIFFÉRENT → pas de collapse en un seul
+    // .in(). On borne la concurrence (25) pour ne pas envoyer des centaines de
+    // requêtes d'un coup (tempête de connexions / throttle).
+    try {
+      for (let i = 0; i < updates.length; i += 25) {
+        const chunk = updates.slice(i, i + 25)
+        await Promise.all(chunk.map(up => supabase.from('phones').update({ ig_username: up.u }).eq('id', up.id)))
+      }
+    } catch (e) { console.error('[Reports] bulkLink', e); load() }
   }
 
   // ── Sync ───────────────────────────────────────────────────────────────────

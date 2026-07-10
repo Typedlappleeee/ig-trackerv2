@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { igImg } from '@/lib/igimg'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type Phone } from '@/lib/supabase'
+import { supabase, fetchAllRows, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { useT, useLang } from '@/lib/i18n'
@@ -782,11 +782,16 @@ export function Phones({ user }: PhonesProps) {
     setError(null)
     if (!bearer) { setPhones([]); setLoading(false); return }
     setLoading(true)
-    let q = supabase.from('phones').select('*').order('phone_name')
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data, error: err } = await q
-    if (err) setError('Error loading phones.')
-    else setPhones(data ?? [])
+    try {
+      const data = await fetchAllRows<Phone>((from, to) => {
+        let q = supabase.from('phones').select('*').order('phone_name').range(from, to)
+        q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+        return q
+      })
+      setPhones(data)
+    } catch {
+      setError('Error loading phones.')
+    }
     setLoading(false)
     poller.pollNow()
   }, [bearer, currentOrg, user.id])

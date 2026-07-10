@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type ContentItem } from '@/lib/supabase'
+import { supabase, fetchAllRows, type ContentItem } from '@/lib/supabase'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
@@ -457,11 +457,13 @@ export function Montage({ user }: MontageProps) {
   const [osDragging, setOsDrag] = useState(false)
 
   useEffect(() => {
-    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-    if (currentOrg) q = q.eq('org_id', currentOrg.id)
-    else q = q.eq('user_id', user.id)
-    Promise.resolve(q)
-      .then(({ data }) => { setBankItems(data ?? []); setLL(false) })
+    fetchAllRows<ContentItem>((from, to) => {
+      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, to)
+      if (currentOrg) q = q.eq('org_id', currentOrg.id)
+      else q = q.eq('user_id', user.id)
+      return q
+    })
+      .then((data) => { setBankItems(data); setLL(false) })
       .catch((err: unknown) => { console.error('[Montage] bank load failed:', err); setLL(false) })
   }, [currentOrg?.id])
 

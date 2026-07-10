@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, fetchAllRows } from '@/lib/supabase'
 
 export function BankFolderSelect({
   value,
@@ -21,12 +21,14 @@ export function BankFolderSelect({
   useEffect(() => {
     let alive = true
     ;(async () => {
-      let q = supabase.from('content_bank').select('folder')
-      q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)
-      const { data } = await q
-      if (!alive || !data) return
+      const data = await fetchAllRows<{ folder: string | null }>((from, to) => {
+        let q = supabase.from('content_bank').select('folder').range(from, to)
+        q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)
+        return q
+      }).catch(() => [] as { folder: string | null }[])
+      if (!alive) return
       const uniq = [...new Set(
-        data.map(r => (r as { folder: string | null }).folder).filter((f): f is string => Boolean(f)),
+        data.map(r => r.folder).filter((f): f is string => Boolean(f)),
       )].sort((a, b) => a.localeCompare(b))
       setFolders(uniq)
     })()
