@@ -5,7 +5,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, fetchAllRows, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { canAccessPhoneGroup, canDoAction } from '@/lib/permissions'
 import { fetchAllPhones, geelarkStatusLabel, stopPhones } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
@@ -242,6 +242,7 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
 
 // ── Detail panel : Lien OnlyFans / sticker ────────────────────────────────────
 function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, link: string) => Promise<void> }) {
+  const tr = useTr()
   // DB d'abord, sinon valeur héritée de l'onglet Story (localStorage)
   const initial = phone.link ?? localStorage.getItem(`sf-story-link-${phone.id}`) ?? ''
   const [value, setValue] = useState(initial)
@@ -267,7 +268,7 @@ function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, 
   return (
     <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
       <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }}>
-        Lien OnlyFans
+        {tr('Lien OnlyFans', 'OnlyFans link')}
       </p>
       <div style={{ display: 'flex', gap: 6 }}>
         <input
@@ -294,7 +295,7 @@ function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, 
         </button>
       </div>
       <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', margin: '7px 0 0' }}>
-        Utilisé par les Stories et les tâches automatiques.
+        {tr('Utilisé par les Stories et les tâches automatiques.', 'Used by Stories and automatic tasks.')}
       </p>
     </div>
   )
@@ -352,6 +353,7 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
 
 // ── Link cell (OnlyFans / story link) ────────────────────────────────────────
 function LinkCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
+  const tr = useTr()
   const [editing, setEditing] = useState(false)
   const [value, setValue]     = useState(phone.link ?? '')
   const [saving, setSaving]   = useState(false)
@@ -397,7 +399,7 @@ function LinkCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
           {phone.link}
         </span>
       ) : (
-        <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)', fontStyle: 'normal' }}>— Ajouter un lien</span>
+        <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)', fontStyle: 'normal' }}>{tr('— Ajouter un lien', '— Add a link')}</span>
       )}
     </button>
   )
@@ -560,6 +562,7 @@ const PhoneCard = memo(function PhoneCard({
   saveLink: (id: string, v: string) => Promise<void>
 }) {
   const t = useT()
+  const tr = useTr()
   const [hover, setHover] = useState(false)
   const online  = phone.status === 'online'
   const warming = phone.status === 'warming'
@@ -633,7 +636,7 @@ const PhoneCard = memo(function PhoneCard({
           )}
           {/* Pastille statut compte */}
           {(phone.account_state === 'banned' || phone.account_state === 'shadow') && (
-            <span title={phone.account_state === 'banned' ? 'Compte non joignable (banni ?)' : 'Portée faible (shadowban ?)'} style={{
+            <span title={phone.account_state === 'banned' ? tr('Compte non joignable (banni ?)', 'Account unreachable (banned?)') : tr('Portée faible (shadowban ?)', 'Low reach (shadowban?)')} style={{
               position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9,
               background: phone.account_state === 'banned' ? '#ef4444' : '#fbbf24',
@@ -679,7 +682,7 @@ const PhoneCard = memo(function PhoneCard({
         border: `1px solid ${phone.link ? 'rgba(34,211,238,0.2)' : HAIR}`,
       }} onClick={e => e.stopPropagation()}>
         <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(233,234,240,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>
-          Lien OnlyFans
+          {tr('Lien OnlyFans', 'OnlyFans link')}
         </p>
         <LinkCell phone={phone} onSave={saveLink} />
       </div>
@@ -790,11 +793,11 @@ export function Phones({ user }: PhonesProps) {
       })
       setPhones(data)
     } catch {
-      setError('Error loading phones.')
+      setError(fr('Erreur de chargement des téléphones.', 'Error loading phones.'))
     }
     setLoading(false)
     poller.pollNow()
-  }, [bearer, currentOrg, user.id])
+  }, [bearer, currentOrg, user.id, fr])
 
   useEffect(() => {
     if (conns.loading) return
@@ -859,7 +862,7 @@ export function Phones({ user }: PhonesProps) {
       await loadPhones()
       setLastUpdated(new Date())
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Sync error.')
+      setError(e instanceof Error ? e.message : fr('Erreur de synchronisation.', 'Sync error.'))
     }
     setSyncing(false)
   }, [bearer, user.id, currentOrg, phoneLimit, license, t, toast, fr, loadPhones])
@@ -1518,8 +1521,8 @@ export function Phones({ user }: PhonesProps) {
                         <th style={{ ...TH_BASE, width: 44 }}></th>
                         <th style={TH_BASE}>{t('phonesDetailModel')}</th>
                         <th style={{ ...TH_BASE, width: 120 }}>{t('phonesDetailGroup')}</th>
-                        <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
-                        <th style={{ ...TH_BASE, width: 150 }}>Note</th>
+                        <th style={{ ...TH_BASE, width: 200 }}>{fr('Lien OnlyFans', 'OnlyFans link')}</th>
+                        <th style={{ ...TH_BASE, width: 150 }}>{fr('Note', 'Note')}</th>
                         <th style={{ ...TH_BASE, width: 90 }}></th>
                       </tr>
                     </thead>
@@ -1560,7 +1563,7 @@ export function Phones({ user }: PhonesProps) {
                   </div>
                   <p className="sf-empty-title">{t('phonesNoConfigured')}</p>
                   <p className="sf-empty-desc">
-                    {bearer ? t('phonesNoConfiguredDesc') : 'Connecte d’abord ton compte GéeLark (token) dans les Réglages, puis synchronise tes téléphones.'}
+                    {bearer ? t('phonesNoConfiguredDesc') : fr('Connecte d’abord ton compte GéeLark (token) dans les Réglages, puis synchronise tes téléphones.', 'First connect your GeeLark account (token) in Settings, then sync your phones.')}
                   </p>
                   {bearer ? (
                     <button
@@ -1581,7 +1584,7 @@ export function Phones({ user }: PhonesProps) {
                       className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
                       style={{ display: 'flex', alignItems: 'center', gap: 8 }}
                     >
-                      Connecter GéeLark dans les Réglages
+                      {fr('Connecter GéeLark dans les Réglages', 'Connect GeeLark in Settings')}
                     </button>
                   )}
                 </div>
@@ -1651,8 +1654,8 @@ export function Phones({ user }: PhonesProps) {
                         {sortTh(t('phonesDetailModel'), 'name')}
                         {/* Group sort */}
                         {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
-                        <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
-                        <th style={{ ...TH_BASE, width: 150 }}>Note</th>
+                        <th style={{ ...TH_BASE, width: 200 }}>{fr('Lien OnlyFans', 'OnlyFans link')}</th>
+                        <th style={{ ...TH_BASE, width: 150 }}>{fr('Note', 'Note')}</th>
                         <th style={{ ...TH_BASE, width: 100 }}></th>
                       </tr>
                     </thead>
@@ -1968,6 +1971,7 @@ function IgBulkModal({ phones, saveIgUsername, onClose }: {
   saveIgUsername: (id: string, u: string) => Promise<void>
   onClose: () => void
 }) {
+  const tr = useTr()
   const [vals, setVals]       = useState<Record<string, string>>(() => Object.fromEntries(phones.map(p => [p.id, p.ig_username ?? ''])))
   const [search, setSearch]   = useState('')
   const [saving, setSaving]   = useState(false)
@@ -1995,13 +1999,13 @@ function IgBulkModal({ phones, saveIgUsername, onClose }: {
       <div onClick={e => e.stopPropagation()} className="sf-card" style={{ width: '100%', maxWidth: 560, maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div>
-            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>@ Comptes Instagram</p>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' }}>Renseigne le @ de chaque compte — le suivi (Stats / Rapports) s'appuie dessus.</p>
+            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{tr('@ Comptes Instagram', '@ Instagram accounts')}</p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' }}>{tr('Renseigne le @ de chaque compte — le suivi (Stats / Rapports) s\'appuie dessus.', 'Set the @ for each account — tracking (Stats / Reports) relies on it.')}</p>
           </div>
           <button onClick={onClose} className="cursor-pointer" style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
         <div style={{ padding: '12px 20px 8px' }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un téléphone…" className="sf-input" style={{ width: '100%' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher un téléphone…', 'Search a phone…')} className="sf-input" style={{ width: '100%' }} />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {visible.map(p => (
@@ -2013,9 +2017,9 @@ function IgBulkModal({ phones, saveIgUsername, onClose }: {
           ))}
         </div>
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, alignItems: 'center' }}>
-          {savedCount !== null && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ {savedCount} mis à jour</span>}
-          <button onClick={onClose} className="sf-btn sf-btn-ghost cursor-pointer">Fermer</button>
-          <button onClick={saveAll} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer">{saving ? 'Enregistrement…' : 'Tout enregistrer'}</button>
+          {savedCount !== null && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ {tr(`${savedCount} mis à jour`, `${savedCount} updated`)}</span>}
+          <button onClick={onClose} className="sf-btn sf-btn-ghost cursor-pointer">{tr('Fermer', 'Close')}</button>
+          <button onClick={saveAll} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer">{saving ? tr('Enregistrement…', 'Saving…') : tr('Tout enregistrer', 'Save all')}</button>
         </div>
       </div>
     </div>,

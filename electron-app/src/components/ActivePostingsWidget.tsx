@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getActiveRuns, subscribeActiveRuns, removeRun, type ActiveRun, type PhaseStatus } from '@/lib/activeRuns'
 import { supabase } from '@/lib/supabase'
+import { useTr } from '@/lib/i18n'
 
 // Post serveur en cours (scheduled_posts pending/running) — pour les voir dans le
 // suivi même quand ça tourne côté serveur (PC éteignable).
@@ -44,6 +45,7 @@ const TYPE_META: Record<ActiveRun['type'], { emoji: string; label: string }> = {
 const POS_KEY = 'sf-widget-pos'
 
 export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page: string) => void; orgId?: string | null; userId?: string }) {
+  const tr = useTr()
   const [runs, setRuns] = useState<ActiveRun[]>(getActiveRuns())
   const [serverRuns, setServerRuns] = useState<ServerRun[]>([])
 
@@ -69,7 +71,7 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
           const res = (typeof r['result'] === 'string' ? JSON.parse(r['result'] as string) : r['result']) as Record<string, any> ?? {}
           const done = (res?.story_progress?.done ?? res?.mass_progress?.done ?? []).length
           const m = SRV_META[r['type'] as string] ?? { emoji: '🖥️', label: String(r['type']) }
-          return [{ id: r['id'] as string, type: r['type'] as string, label: `${m.label} · ${total} compte${total > 1 ? 's' : ''}`, done, total }]
+          return [{ id: r['id'] as string, type: r['type'] as string, label: `${m.label} · ${total} ${tr(`compte${total > 1 ? 's' : ''}`, `account${total > 1 ? 's' : ''}`)}`, done, total }]
         })
         setServerRuns(rows)
       } catch { /* réseau — on réessaie au prochain tick */ }
@@ -136,7 +138,7 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', background: anyClash ? 'rgba(239,68,68,0.10)' : 'var(--surface-2)' }}>
           {/* Poignée de déplacement */}
-          <span onPointerDown={onDragStart} title="Glisser pour déplacer" className="cursor-pointer"
+          <span onPointerDown={onDragStart} title={tr('Glisser pour déplacer', 'Drag to move')} className="cursor-pointer"
             style={{ padding: '10px 4px 10px 10px', color: 'var(--text-4)', fontSize: 13, cursor: 'grab', touchAction: 'none', userSelect: 'none' }}>⠿</span>
           <button onClick={() => setOpen(o => !o)} className="cursor-pointer"
             style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px 10px 4px', border: 'none', background: 'transparent', textAlign: 'left' }}>
@@ -145,19 +147,19 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
               {runningCount > 0 && <span style={{ position: 'absolute', inset: -3, borderRadius: '50%', border: '2px solid var(--ok)', opacity: 0.5, animation: 'sf-pulse 1.6s ease-out infinite' }} />}
             </span>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)' }}>
-              {runningCount > 0 ? `${runningCount} posting${runningCount > 1 ? 's' : ''} en cours` : 'Postings'}
+              {runningCount > 0 ? tr(`${runningCount} posting${runningCount > 1 ? 's' : ''} en cours`, `${runningCount} posting${runningCount > 1 ? 's' : ''} running`) : 'Postings'}
             </span>
-            {anyClash && <span title="Deux postings sur le même proxy — risque de ban" style={{ fontSize: 11 }}>⚠️</span>}
+            {anyClash && <span title={tr('Deux postings sur le même proxy — risque de ban', 'Two postings on the same proxy — ban risk')} style={{ fontSize: 11 }}>⚠️</span>}
             <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)' }}>{open ? '▾' : '▸'}</span>
           </button>
-          {pos && <button onClick={resetPos} title="Remettre en bas à droite" className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, padding: '10px 10px 10px 4px' }}>⟲</button>}
+          {pos && <button onClick={resetPos} title={tr('Remettre en bas à droite', 'Reset to bottom-right')} className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, padding: '10px 10px 10px 4px' }}>⟲</button>}
         </div>
 
         {open && (
           <div style={{ maxHeight: 320, overflow: 'auto' }}>
             {anyClash && (
               <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--danger)', background: 'rgba(239,68,68,0.06)', borderBottom: '1px solid var(--border)' }}>
-                ⚠️ Deux postings tournent sur le <b>même proxy</b> → mêmes IP en parallèle, <b>risque de ban</b>. Attends la fin de l'un ou utilise un autre proxy.
+                ⚠️ {tr('Deux postings tournent sur le ', 'Two postings are running on the ')}<b>{tr('même proxy', 'same proxy')}</b>{tr(' → mêmes IP en parallèle, ', ' → same IPs in parallel, ')}<b>{tr('risque de ban', 'ban risk')}</b>{tr(". Attends la fin de l'un ou utilise un autre proxy.", '. Wait for one to finish or use a different proxy.')}
               </div>
             )}
             {runs.map(r => {
@@ -175,9 +177,9 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span>{m.emoji}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
-                    {clash && <span title="Même proxy qu'un autre run" style={{ fontSize: 10 }}>⚠️</span>}
+                    {clash && <span title={tr("Même proxy qu'un autre run", 'Same proxy as another run')} style={{ fontSize: 10 }}>⚠️</span>}
                     <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
-                      {r.status === 'running' ? `${r.done}/${r.total}` : r.status === 'done' ? '✓ terminé' : '✕ échec'}
+                      {r.status === 'running' ? `${r.done}/${r.total}` : r.status === 'done' ? tr('✓ terminé', '✓ done') : tr('✕ échec', '✕ failed')}
                     </span>
                     {hasPhases && <span style={{ fontSize: 10, color: 'var(--text-4)' }}>{isExp ? '▾' : '▸'}</span>}
                     {r.status !== 'running' && (
@@ -202,9 +204,9 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span>{m.emoji}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                    <span style={{ fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(52,211,153,0.14)', color: 'var(--ok)', border: '1px solid rgba(52,211,153,0.3)', flexShrink: 0 }}>SERVEUR</span>
+                    <span style={{ fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(52,211,153,0.14)', color: 'var(--ok)', border: '1px solid rgba(52,211,153,0.3)', flexShrink: 0 }}>{tr('SERVEUR', 'SERVER')}</span>
                     <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
-                      {s.total > 0 ? `${s.done}/${s.total}` : 'en cours'}
+                      {s.total > 0 ? `${s.done}/${s.total}` : tr('en cours', 'running')}
                     </span>
                   </div>
                   <div style={{ height: 4, borderRadius: 4, background: 'var(--surface-3)', overflow: 'hidden' }}>

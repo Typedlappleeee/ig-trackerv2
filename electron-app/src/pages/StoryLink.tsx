@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase'
 import { playSuccess, playError } from '@/lib/sounds'
 import { useToast } from '@/components/Toast'
 import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
+import { useTr } from '@/lib/i18n'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type JobStatus = 'idle' | 'running' | 'ok' | 'error'
@@ -190,6 +191,7 @@ function CaptionBankPicker({
   onClose: () => void
 }) {
   const { currentOrg } = useOrg()
+  const tr = useTr()
   const [items,    setItems]    = useState<CaptionItem[]>([])
   const [loading,  setLoading]  = useState(true)
   const [folder,   setFolder]   = useState<string | null>(null)
@@ -234,8 +236,8 @@ function CaptionBankPicker({
         {/* Header */}
         <div style={{ padding: '14px 18px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
-            <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0 }}>Banque de captions</p>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0', fontVariantNumeric: 'tabular-nums' }}>{selected.size} sélectionné{selected.size !== 1 ? 's' : ''}</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0 }}>{tr('Banque de captions', 'Caption bank')}</p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0', fontVariantNumeric: 'tabular-nums' }}>{tr(`${selected.size} sélectionné${selected.size !== 1 ? 's' : ''}`, `${selected.size} selected`)}</p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', lineHeight: 1, display: 'flex' }}><IconX /></button>
         </div>
@@ -252,7 +254,7 @@ function CaptionBankPicker({
                   background: active ? 'rgba(99,102,241,0.15)' : 'transparent', border: `1px solid ${active ? 'rgba(99,102,241,0.4)' : HAIR}`, transition: 'all 0.12s' }}>
                   <button onClick={() => setFolder(f === 'Tous' ? null : f)}
                     style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11.5, fontWeight: active ? 700 : 400, color: active ? ACCENT_L : 'var(--text-3)' }}>
-                    {f}
+                    {f === 'Tous' ? tr('Tous', 'All') : f}
                   </button>
                   {f !== 'Tous' && folderIds.length > 0 && (
                     <button
@@ -261,7 +263,7 @@ function CaptionBankPicker({
                         if (allSel) folderIds.forEach(id => n.delete(id)); else folderIds.forEach(id => n.add(id))
                         return n
                       })}
-                      title={allSel ? `Retirer le dossier "${f}"` : `Sélectionner tout le dossier "${f}"`}
+                      title={allSel ? tr(`Retirer le dossier "${f}"`, `Remove folder "${f}"`) : tr(`Sélectionner tout le dossier "${f}"`, `Select entire folder "${f}"`)}
                       className="cursor-pointer"
                       style={{ width: 15, height: 15, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4,
                         background: allSel ? 'var(--accent)' : 'transparent', border: allSel ? 'none' : `1px solid ${HAIR}`, color: '#fff' }}>
@@ -279,14 +281,14 @@ function CaptionBankPicker({
           {loading ? (
             <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}><div className="sf-spinner" /></div>
           ) : visible.length === 0 ? (
-            <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '32px 0' }}>Aucune caption trouvée</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '32px 0' }}>{tr('Aucune caption trouvée', 'No caption found')}</p>
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 4px', marginBottom: 4 }}>
                 <button onClick={toggleAll} style={{ fontSize: 11, color: ACCENT_L, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  {visible.every(i => selected.has(i.id)) ? 'Tout désélectionner' : 'Tout sélectionner'}
+                  {visible.every(i => selected.has(i.id)) ? tr('Tout désélectionner', 'Deselect all') : tr('Tout sélectionner', 'Select all')}
                 </button>
-                <span style={{ fontSize: 11, color: 'var(--text-4)' }}>({visible.length} caption{visible.length !== 1 ? 's' : ''})</span>
+                <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{tr(`(${visible.length} caption${visible.length !== 1 ? 's' : ''})`, `(${visible.length} caption${visible.length !== 1 ? 's' : ''})`)}</span>
               </div>
               {visible.map(item => {
                 const sel = selected.has(item.id)
@@ -312,10 +314,10 @@ function CaptionBankPicker({
 
         {/* Footer */}
         <div style={{ padding: '12px 16px', borderTop: `1px solid ${HAIR}`, display: 'flex', gap: 9, flexShrink: 0 }}>
-          <button onClick={onClose} className="sf-btn sf-btn-secondary cursor-pointer" style={{ flex: 1, justifyContent: 'center' }}>Annuler</button>
+          <button onClick={onClose} className="sf-btn sf-btn-secondary cursor-pointer" style={{ flex: 1, justifyContent: 'center' }}>{tr('Annuler', 'Cancel')}</button>
           <button onClick={confirm} disabled={selected.size === 0} className="sf-btn sf-btn-primary cursor-pointer"
             style={{ flex: 2, justifyContent: 'center', opacity: selected.size === 0 ? 0.45 : 1, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}>
-            Ajouter {selected.size > 0 ? `(${selected.size})` : ''} caption{selected.size !== 1 ? 's' : ''}
+            {tr(`Ajouter ${selected.size > 0 ? `(${selected.size})` : ''} caption${selected.size !== 1 ? 's' : ''}`, `Add ${selected.size > 0 ? `(${selected.size})` : ''} caption${selected.size !== 1 ? 's' : ''}`)}
           </button>
         </div>
       </div>
@@ -330,6 +332,7 @@ export default function StoryLink({ user }: { user: User }) {
   const { role, perms, currentOrg } = useOrg()
   const credits = useCredits()
   const toast = useToast()
+  const tr = useTr()
 
   const [storyPlatformChosen, setStoryPlatformChosen] = useState(false)
 
@@ -394,7 +397,7 @@ export default function StoryLink({ user }: { user: User }) {
     if (!running) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      e.returnValue = 'Une publication est en cours. Si tu quittes ou rafraîchis, elle sera interrompue.'
+      e.returnValue = tr('Une publication est en cours. Si tu quittes ou rafraîchis, elle sera interrompue.', 'A publication is in progress. If you leave or refresh, it will be interrupted.')
       return e.returnValue
     }
     window.addEventListener('beforeunload', onBeforeUnload)
@@ -539,10 +542,10 @@ export default function StoryLink({ user }: { user: User }) {
   const canRun = !!bearer && selectedIds.length > 0 && photoPool.length > 0 && missingLinkIds.length === 0 && !running
 
   // Raison précise du blocage — pour expliquer un bouton grisé (tooltip).
-  const blockReason = !bearer ? 'Connecte GéeLark dans les Paramètres'
-    : selectedIds.length === 0 ? 'Sélectionne au moins un compte'
-    : photoPool.length === 0 ? 'Ajoute au moins une photo'
-    : missingLinkIds.length > 0 ? `${missingLinkIds.length} compte${missingLinkIds.length > 1 ? 's' : ''} sans lien — renseigne le lien de chaque compte`
+  const blockReason = !bearer ? tr('Connecte GéeLark dans les Paramètres', 'Connect GeeLark in Settings')
+    : selectedIds.length === 0 ? tr('Sélectionne au moins un compte', 'Select at least one account')
+    : photoPool.length === 0 ? tr('Ajoute au moins une photo', 'Add at least one photo')
+    : missingLinkIds.length > 0 ? tr(`${missingLinkIds.length} compte${missingLinkIds.length > 1 ? 's' : ''} sans lien — renseigne le lien de chaque compte`, `${missingLinkIds.length} account${missingLinkIds.length > 1 ? 's' : ''} without a link — set the link for each account`)
     : ''
   const storyCost = selectedIds.length * CREDIT_COSTS.story
 
@@ -555,7 +558,7 @@ export default function StoryLink({ user }: { user: User }) {
       const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
         playError()
-        setJobs(selectedIds.map(id => ({ phoneId: id, status: 'error', logs: [`❌ ${creditRes.error ?? 'Crédits insuffisants'} (${creditCost} crédits nécessaires)`] })))
+        setJobs(selectedIds.map(id => ({ phoneId: id, status: 'error', logs: [`❌ ${creditRes.error ?? tr('Crédits insuffisants', 'Insufficient credits')} ${tr(`(${creditCost} crédits nécessaires)`, `(${creditCost} credits required)`)}`] })))
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
@@ -591,7 +594,7 @@ export default function StoryLink({ user }: { user: User }) {
         // Mode test : on ne poste pas réellement (RPA GeeLark exécute tout, pas de
         // simulation possible côté client) → on valide juste l'assignation.
         if (dryRun) {
-          addLog(asgn.phoneId, '🧪 Test — image + lien assignés (aucune publication)')
+          addLog(asgn.phoneId, tr('🧪 Test — image + lien assignés (aucune publication)', '🧪 Test — image + link assigned (no publication)'))
           setStatus(asgn.phoneId, 'ok'); phoneOutcome.set(asgn.phoneId, { ok: true }); return 1
         }
         // Story via RPA GeeLark (import auto du flow + exécution native). Pas de
@@ -608,11 +611,11 @@ export default function StoryLink({ user }: { user: User }) {
           m => addLog(asgn.phoneId, m),
         )
         if (res.ok) { setStatus(asgn.phoneId, 'ok'); phoneOutcome.set(asgn.phoneId, { ok: true }); return 1 }
-        else { setStatus(asgn.phoneId, 'error'); phoneOutcome.set(asgn.phoneId, { ok: false, error: res.error || 'Échec' }); addLog(asgn.phoneId, `❌ ${res.error ?? 'La publication de la story a échoué'}`); return 0 }
+        else { setStatus(asgn.phoneId, 'error'); phoneOutcome.set(asgn.phoneId, { ok: false, error: res.error || tr('Échec', 'Failed') }); addLog(asgn.phoneId, `❌ ${res.error ?? tr('La publication de la story a échoué', 'The story publication failed')}`); return 0 }
       } catch (e) {
         setStatus(asgn.phoneId, 'error')
-        phoneOutcome.set(asgn.phoneId, { ok: false, error: 'Erreur inattendue' })
-        addLog(asgn.phoneId, `❌ La publication de la story a échoué (erreur inattendue)`)
+        phoneOutcome.set(asgn.phoneId, { ok: false, error: tr('Erreur inattendue', 'Unexpected error') })
+        addLog(asgn.phoneId, `❌ ${tr('La publication de la story a échoué (erreur inattendue)', 'The story publication failed (unexpected error)')}`)
         return 0
       } finally {
         try { await stopPhone(bearer, asgn.phoneId) } catch (_) { /* ignore */ }
@@ -642,10 +645,10 @@ export default function StoryLink({ user }: { user: User }) {
         proxyKeys = [...new Set(assignments.map(a => { const px = pm.get(a.phoneId); return px?.server ? `${px.server}:${px.port ?? ''}` : '' }).filter(Boolean))]
       } catch { /* best-effort */ }
       if (proxyConflicts(proxyKeys, runId).length) {
-        toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — risque de ban.', kind: 'warn' })
+        toast.show({ title: tr('⚠️ Même proxy déjà utilisé', '⚠️ Same proxy already in use'), body: tr('Un autre posting tourne sur le même proxy — risque de ban.', 'Another posting is running on the same proxy — risk of ban.'), kind: 'warn' })
       }
       startRun({
-        id: runId, type: 'story', label: `Story · ${assignments.length} compte${assignments.length > 1 ? 's' : ''}`,
+        id: runId, type: 'story', label: tr(`Story · ${assignments.length} compte${assignments.length > 1 ? 's' : ''}`, `Story · ${assignments.length} account${assignments.length > 1 ? 's' : ''}`),
         proxyKeys, done: 0, total: assignments.length, page: 'storylink',
         phones: assignments.map(a => (
           { id: a.phoneId, name: accountLabel(a.phoneId), status: 'idle' as PhaseStatus }
@@ -697,7 +700,7 @@ export default function StoryLink({ user }: { user: User }) {
       const o = phoneOutcome.get(a.phoneId)
       const p = phones.find(ph => ph.id === a.phoneId)
       const name = igByPhone[a.phoneId] ? `@${igByPhone[a.phoneId]}` : (p ? phoneName(p) : a.phoneId.slice(-6))
-      return { name, ok: !!o?.ok, ...(o?.ok ? {} : { error: o?.error || 'Échec' }) }
+      return { name, ok: !!o?.ok, ...(o?.ok ? {} : { error: o?.error || tr('Échec', 'Failed') }) }
     })
     const base = {
       user_id:   user.id,
@@ -722,7 +725,7 @@ export default function StoryLink({ user }: { user: User }) {
         saveTextPool([])
         setSelected(new Set())
         setJobs([])
-        toast.show({ title: 'Configuration réinitialisée', body: 'Photos, textes et comptes ont été vidés après la publication.', kind: 'info' })
+        toast.show({ title: tr('Configuration réinitialisée', 'Configuration reset'), body: tr('Photos, textes et comptes ont été vidés après la publication.', 'Photos, texts and accounts were cleared after publishing.'), kind: 'info' })
       }, 3000)
     }
   }
@@ -737,14 +740,14 @@ export default function StoryLink({ user }: { user: User }) {
     try {
       const when = whenOverride ?? new Date(schedAt)
       if (isNaN(when.getTime()) || when.getTime() < Date.now() + 30_000) {
-        setSchedErr('Choisis une date au moins 1 minute dans le futur.')
+        setSchedErr(tr('Choisis une date au moins 1 minute dans le futur.', 'Pick a date at least 1 minute in the future.'))
         setScheduling(false)
         return
       }
       const creditCost = selectedIds.length * CREDIT_COSTS.story
       const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
-        setSchedErr(`${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost} crédits)`)
+        setSchedErr(`${creditRes.error ?? tr('Crédits insuffisants', 'Insufficient credits')} ${tr(`(requis : ${creditCost} crédits)`, `(required: ${creditCost} credits)`)}`)
         setScheduling(false)
         return
       }
@@ -753,7 +756,7 @@ export default function StoryLink({ user }: { user: User }) {
       await createScheduledPost({
         userId:        user.id,
         orgId:         currentOrg?.id ?? null,
-        createdByName: user.email?.split('@')[0] ?? 'Moi',
+        createdByName: user.email?.split('@')[0] ?? tr('Moi', 'Me'),
         type:          'story',
         scheduledAt:   when,
         phones: assignments.map(a => {
@@ -779,14 +782,14 @@ export default function StoryLink({ user }: { user: User }) {
       playSuccess()
       const soon = when.getTime() <= Date.now() + 2 * 60_000
       setSchedDone(soon
-        ? `✅ ${assignments.length} story(s) envoyée(s) au serveur — elles partent d'ici ~1 min. Tu peux fermer ton PC.`
-        : `${assignments.length} story(s) programmée(s) pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
+        ? tr(`✅ ${assignments.length} story(s) envoyée(s) au serveur — elles partent d'ici ~1 min. Tu peux fermer ton PC.`, `✅ ${assignments.length} story(s) sent to the server — they go out in ~1 min. You can close your PC.`)
+        : tr(`${assignments.length} story(s) programmée(s) pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`, `${assignments.length} story(s) scheduled for ${when.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}`))
       // Toast VISIBLE même sans la modale ouverte (bouton « Publier » direct).
       toast.show({
-        title: soon ? '✅ Story envoyée au serveur' : '🗓 Story programmée',
+        title: soon ? tr('✅ Story envoyée au serveur', '✅ Story sent to the server') : tr('🗓 Story programmée', '🗓 Story scheduled'),
         body: soon
-          ? `${assignments.length} story(s) partent d'ici ~1 min. Suis-les dans l'Historique — tu peux fermer ton PC.`
-          : `Programmée${assignments.length > 1 ? 's' : ''} pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}.`,
+          ? tr(`${assignments.length} story(s) partent d'ici ~1 min. Suis-les dans l'Historique — tu peux fermer ton PC.`, `${assignments.length} story(s) go out in ~1 min. Track them in History — you can close your PC.`)
+          : tr(`Programmée${assignments.length > 1 ? 's' : ''} pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}.`, `Scheduled for ${when.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}.`),
         kind: 'ok',
       })
       setTimeout(() => { setShowSchedule(false); setSchedDone('') }, soon ? 4000 : 2200)
@@ -794,7 +797,7 @@ export default function StoryLink({ user }: { user: User }) {
       const refundAmount = selectedIds.length * CREDIT_COSTS.story
       const refunded = await refundCredits(credits.ownerId, refundAmount)
       if (refunded) credits.refresh()
-      setSchedErr(`${e instanceof Error ? e.message : String(e)}${refunded ? ` — ${refundAmount} crédits remboursés` : ''}`)
+      setSchedErr(`${e instanceof Error ? e.message : String(e)}${refunded ? tr(` — ${refundAmount} crédits remboursés`, ` — ${refundAmount} credits refunded`) : ''}`)
     } finally {
       setScheduling(false)
     }
@@ -812,9 +815,9 @@ export default function StoryLink({ user }: { user: User }) {
         <div className="sf-empty-icon" style={{ color: 'var(--accent-l)' }}>
           <IconNoConnection />
         </div>
-        <p className="sf-empty-title">GéeLark non connecté</p>
+        <p className="sf-empty-title">{tr('GéeLark non connecté', 'GeeLark not connected')}</p>
         <p className="sf-empty-desc">
-          Ajoute ta clé GéeLark dans les Paramètres pour automatiser tes stories.
+          {tr('Ajoute ta clé GéeLark dans les Paramètres pour automatiser tes stories.', 'Add your GeeLark key in Settings to automate your stories.')}
         </p>
       </div>
     </div>
@@ -834,8 +837,8 @@ export default function StoryLink({ user }: { user: User }) {
             <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(245,158,11,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: '24px 24px 4px', textAlign: 'center' }}>
               <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(251,191,36,0.75)' }}>Story</p>
-              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>Quelle plateforme ?</h2>
-              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>Les stories sont disponibles sur Instagram.</p>
+              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>{tr('Quelle plateforme ?', 'Which platform?')}</h2>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>{tr('Les stories sont disponibles sur Instagram.', 'Stories are available on Instagram.')}</p>
             </div>
             <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
               <button
@@ -855,7 +858,7 @@ export default function StoryLink({ user }: { user: User }) {
                 </div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Instagram</div>
-                  <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.5)', marginTop: 4 }}>Story + sticker lien</div>
+                  <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.5)', marginTop: 4 }}>{tr('Story + sticker lien', 'Story + link sticker')}</div>
                 </div>
               </button>
               <div style={{
@@ -871,7 +874,7 @@ export default function StoryLink({ user }: { user: User }) {
                   <div style={{ fontSize: 15, fontWeight: 800, color: 'rgba(233,234,240,0.6)' }}>TikTok</div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#22D3EE', background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.24)', borderRadius: 99, padding: '3px 9px', marginTop: 5 }}>
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-                    Bientôt
+                    {tr('Bientôt', 'Soon')}
                   </div>
                 </div>
               </div>
@@ -919,7 +922,7 @@ export default function StoryLink({ user }: { user: User }) {
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
             <h1 className="sf-page-title">Story</h1>
-            <p className="sf-page-sub">Publie ou programme des stories avec lien sur tous tes comptes.</p>
+            <p className="sf-page-sub">{tr('Publie ou programme des stories avec lien sur tous tes comptes.', 'Publish or schedule stories with a link across all your accounts.')}</p>
           </div>
         </div>
 
@@ -928,7 +931,7 @@ export default function StoryLink({ user }: { user: User }) {
           <button
             onClick={() => setDryRun(v => !v)}
             disabled={running}
-            title={running ? 'Indisponible pendant une exécution' : "Déroule toute l'automation (image, caméra, sticker, lien) mais s'arrête avant de publier. Gratuit — idéal pour vérifier que le flux marche sur tes téléphones."}
+            title={running ? tr('Indisponible pendant une exécution', 'Unavailable during a run') : tr("Déroule toute l'automation (image, caméra, sticker, lien) mais s'arrête avant de publier. Gratuit — idéal pour vérifier que le flux marche sur tes téléphones.", 'Runs the whole automation (image, camera, sticker, link) but stops before publishing. Free — ideal to check the flow works on your phones.')}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               padding: '8px 13px', borderRadius: 8, cursor: running ? 'not-allowed' : 'pointer',
@@ -942,21 +945,21 @@ export default function StoryLink({ user }: { user: User }) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
             </svg>
-            {dryRun ? 'Mode test ON (ne publie pas)' : 'Mode test'}
+            {dryRun ? tr('Mode test ON (ne publie pas)', 'Test mode ON (does not publish)') : tr('Mode test', 'Test mode')}
           </button>
 
           {/* Schedule button */}
           <button
             onClick={() => { setSchedAt(defaultSchedValue(60)); setSchedErr(''); setShowSchedule(true) }}
             disabled={!canSchedule}
-            title={canSchedule ? 'Programmer la story pour plus tard' : blockReason || undefined}
+            title={canSchedule ? tr('Programmer la story pour plus tard', 'Schedule the story for later') : blockReason || undefined}
             className="sf-btn sf-btn-lg sf-btn-secondary"
             style={{ cursor: canSchedule ? 'pointer' : 'not-allowed', opacity: canSchedule ? 1 : 0.45, gap: 8 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/>
             </svg>
-            Programmer
+            {tr('Programmer', 'Schedule')}
           </button>
 
           {/* Launch / Stop button */}
@@ -967,20 +970,20 @@ export default function StoryLink({ user }: { user: User }) {
               style={{ cursor: 'pointer', gap: 8 }}
             >
               <IconStop />
-              Arrêter
+              {tr('Arrêter', 'Stop')}
             </button>
           ) : (
             <button
               onClick={run}
               disabled={!canRun}
-              title={canRun ? (dryRun ? 'Test — ne publie pas réellement' : `Publie la story sur ${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} (~5 en parallèle · garde l'app ouverte) · ${storyCost} crédits`) : blockReason || undefined}
+              title={canRun ? (dryRun ? tr('Test — ne publie pas réellement', 'Test — does not actually publish') : tr(`Publie la story sur ${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} (~5 en parallèle · garde l'app ouverte) · ${storyCost} crédits`, `Publishes the story to ${selectedIds.length} account${selectedIds.length > 1 ? 's' : ''} (~5 in parallel · keep the app open) · ${storyCost} credits`)) : blockReason || undefined}
               className={`sf-btn sf-btn-lg sf-btn-primary cursor-pointer`}
               style={{ cursor: canRun ? 'pointer' : 'not-allowed', gap: 9, opacity: canRun ? 1 : 0.5 }}
             >
               <IconSend />
               {dryRun
-                ? `Tester${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`
-                : `Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}${storyCost > 0 ? ` · ${storyCost} cr.` : ''}`}
+                ? tr(`Tester${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`, `Test${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`)
+                : tr(`Publier${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}${storyCost > 0 ? ` · ${storyCost} cr.` : ''}`, `Publish${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}${storyCost > 0 ? ` · ${storyCost} cr.` : ''}`)}
             </button>
           )}
         </div>
@@ -995,10 +998,10 @@ export default function StoryLink({ user }: { user: User }) {
           {/* Toolbar */}
           <div style={{ flexShrink: 0, padding: '14px 14px 10px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span className="sf-section-label" style={{ margin: 0 }}>Comptes</span>
+              <span className="sf-section-label" style={{ margin: 0 }}>{tr('Comptes', 'Accounts')}</span>
               {selected.size > 0 && (
                 <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
-                  {selected.size} sélectionné{selected.size > 1 ? 's' : ''}
+                  {tr(`${selected.size} sélectionné${selected.size > 1 ? 's' : ''}`, `${selected.size} selected`)}
                 </span>
               )}
             </div>
@@ -1014,7 +1017,7 @@ export default function StoryLink({ user }: { user: User }) {
                     border: 'none',
                     borderBottom: pickMode === m.k ? '2px solid var(--accent)' : '2px solid transparent',
                     transition: 'all 0.15s',
-                  }}>{m.l}</button>
+                  }}>{tr(m.l, m.k === 'phones' ? 'Phones' : 'Groups')}</button>
                 ))}
               </div>
             )}
@@ -1040,7 +1043,7 @@ export default function StoryLink({ user }: { user: User }) {
                   <input
                     value={phoneSearch}
                     onChange={e => setPhoneSearch(e.target.value)}
-                    placeholder="Rechercher…"
+                    placeholder={tr('Rechercher…', 'Search…')}
                     className="sf-input"
                     style={{ height: 32, paddingLeft: 32, fontSize: 12 }}
                   />
@@ -1049,10 +1052,10 @@ export default function StoryLink({ user }: { user: User }) {
                 {/* Select / Clear */}
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={selectAll} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
-                    Tout sélectionner
+                    {tr('Tout sélectionner', 'Select all')}
                   </button>
                   <button onClick={clearAll} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
-                    Effacer
+                    {tr('Effacer', 'Clear')}
                   </button>
                 </div>
               </>
@@ -1061,10 +1064,10 @@ export default function StoryLink({ user }: { user: User }) {
             {pickMode === 'groups' && (
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={() => setSelected(new Set(phones.map(p => p.id)))} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
-                  Tout sélectionner
+                  {tr('Tout sélectionner', 'Select all')}
                 </button>
                 <button onClick={clearAll} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ flex: 1 }}>
-                  Effacer
+                  {tr('Effacer', 'Clear')}
                 </button>
               </div>
             )}
@@ -1075,8 +1078,8 @@ export default function StoryLink({ user }: { user: User }) {
             {pickMode === 'groups' ? (
               groups.filter(g => g !== 'Tous').length === 0 ? (
                 <div style={{ padding: '28px 16px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 4px' }}>Aucun groupe</p>
-                  <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>Crée des groupes dans l'onglet Téléphones.</p>
+                  <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 4px' }}>{tr('Aucun groupe', 'No group')}</p>
+                  <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>{tr("Crée des groupes dans l'onglet Téléphones.", 'Create groups in the Phones tab.')}</p>
                 </div>
               ) : groups.filter(g => g !== 'Tous').map(g => {
                 const ids = phones.filter(p => (p.group?.name ?? p.groupName ?? null) === g).map(p => p.id)
@@ -1113,7 +1116,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 12.5, fontWeight: selCount > 0 ? 600 : 400, color: selCount > 0 ? 'var(--text-1)' : 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{g}</p>
                       <p style={{ fontSize: 10.5, color: selCount > 0 ? 'var(--accent-l)' : 'var(--text-4)', margin: '2px 0 0' }}>
-                        {selCount > 0 ? `${selCount}/${ids.length} sélectionné${ids.length > 1 ? 's' : ''}` : `${ids.length} compte${ids.length > 1 ? 's' : ''}`}
+                        {selCount > 0 ? tr(`${selCount}/${ids.length} sélectionné${ids.length > 1 ? 's' : ''}`, `${selCount}/${ids.length} selected`) : tr(`${ids.length} compte${ids.length > 1 ? 's' : ''}`, `${ids.length} account${ids.length > 1 ? 's' : ''}`)}
                       </p>
                     </div>
                   </div>
@@ -1122,12 +1125,12 @@ export default function StoryLink({ user }: { user: User }) {
             ) : loadingPhones ? (
               <div style={{ padding: '32px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <div className="sf-spinner" />
-                <p style={{ fontSize: 12, color: 'var(--text-3)' }}>Chargement…</p>
+                <p style={{ fontSize: 12, color: 'var(--text-3)' }}>{tr('Chargement…', 'Loading…')}</p>
               </div>
             ) : visiblePhones.length === 0 ? (
               <div style={{ padding: '28px 16px', textAlign: 'center' }}>
-                <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 4px' }}>Aucun compte</p>
-                <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>Vérifie le filtre de groupe, ou ajoute des téléphones dans l'onglet Téléphones.</p>
+                <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 4px' }}>{tr('Aucun compte', 'No account')}</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>{tr("Vérifie le filtre de groupe, ou ajoute des téléphones dans l'onglet Téléphones.", 'Check the group filter, or add phones in the Phones tab.')}</p>
               </div>
             ) : visiblePhones.map(p => {
               const sel = selected.has(p.id)
@@ -1208,10 +1211,10 @@ export default function StoryLink({ user }: { user: User }) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
                   <span style={{ color: 'var(--accent-l)' }}><IconPhoto /></span>
-                  <span className="sf-section-label" style={{ margin: 0 }}>Pool de photos</span>
+                  <span className="sf-section-label" style={{ margin: 0 }}>{tr('Pool de photos', 'Photo pool')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  Les images seront distribuées automatiquement entre les comptes.
+                  {tr('Les images seront distribuées automatiquement entre les comptes.', 'Images will be automatically distributed across accounts.')}
                 </p>
               </div>
               <button
@@ -1220,7 +1223,7 @@ export default function StoryLink({ user }: { user: User }) {
                 style={{ flexShrink: 0, marginLeft: 12 }}
               >
                 <IconPlus />
-                Ajouter depuis la banque
+                {tr('Ajouter depuis la banque', 'Add from bank')}
               </button>
             </div>
 
@@ -1236,7 +1239,7 @@ export default function StoryLink({ user }: { user: User }) {
                 }}
               >
                 <span style={{ color: 'var(--accent-l)', opacity: 0.6 }}><IconPhoto /></span>
-                <span>Aucune photo — cliquer pour en ajouter depuis la banque</span>
+                <span>{tr('Aucune photo — cliquer pour en ajouter depuis la banque', 'No photo — click to add some from the bank')}</span>
               </button>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -1253,7 +1256,7 @@ export default function StoryLink({ user }: { user: User }) {
                     </span>
                     <button
                       onClick={() => setPhotoPool(prev => prev.filter((_, j) => j !== i))}
-                      aria-label="Retirer la photo"
+                      aria-label={tr('Retirer la photo', 'Remove photo')}
                       className="sf-btn-icon sf-press cursor-pointer"
                       style={{
                         flexShrink: 0, width: 18, height: 18, borderRadius: 5,
@@ -1271,7 +1274,7 @@ export default function StoryLink({ user }: { user: User }) {
                   style={{ border: '1px dashed rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}
                 >
                   <IconPlus />
-                  Ajouter
+                  {tr('Ajouter', 'Add')}
                 </button>
               </div>
             )}
@@ -1283,10 +1286,10 @@ export default function StoryLink({ user }: { user: User }) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
                   <span style={{ color: 'var(--accent-l)' }}><IconText /></span>
-                  <span className="sf-section-label" style={{ margin: 0 }}>Pool de textes sticker</span>
+                  <span className="sf-section-label" style={{ margin: 0 }}>{tr('Pool de textes sticker', 'Sticker text pool')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.
+                  {tr("Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.", 'Text shown on the link sticker. Leave empty to show only the URL.')}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 12 }}>
@@ -1295,7 +1298,7 @@ export default function StoryLink({ user }: { user: User }) {
                   className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
                 >
                   <IconPlus />
-                  Depuis la banque
+                  {tr('Depuis la banque', 'From bank')}
                 </button>
               </div>
             </div>
@@ -1312,7 +1315,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <span style={{ fontSize: 12, color: '#67e8f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txt}</span>
                     <button
                       onClick={() => setTextPool(prev => prev.filter((_, j) => j !== i))}
-                      aria-label="Retirer le texte"
+                      aria-label={tr('Retirer le texte', 'Remove text')}
                       className="sf-press cursor-pointer"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', flexShrink: 0 }}
                     >
@@ -1333,7 +1336,7 @@ export default function StoryLink({ user }: { user: User }) {
                     setEditingText('')
                   }
                 }}
-                placeholder='Ou saisir manuellement puis Entrée…'
+                placeholder={tr('Ou saisir manuellement puis Entrée…', 'Or type manually then Enter…')}
                 className="sf-input"
                 style={{ flex: 1, height: 36 }}
               />
@@ -1343,7 +1346,7 @@ export default function StoryLink({ user }: { user: User }) {
                 className="sf-btn sf-btn-secondary cursor-pointer"
                 style={{ cursor: editingText.trim() ? 'pointer' : 'not-allowed', opacity: editingText.trim() ? 1 : 0.4, color: '#67e8f9', borderColor: 'rgba(99,102,241,0.22)' }}
               >
-                Ajouter
+                {tr('Ajouter', 'Add')}
               </button>
             </div>
           </div>
@@ -1361,10 +1364,10 @@ export default function StoryLink({ user }: { user: User }) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
                   <span style={{ color: 'var(--accent-l)' }}><IconLinkSm /></span>
-                  <span className="sf-section-label" style={{ margin: 0 }}>Liens — 1 lien par compte</span>
+                  <span className="sf-section-label" style={{ margin: 0 }}>{tr('Liens — 1 lien par compte', 'Links — 1 link per account')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  Chaque compte a son propre lien, éditable dans l’aperçu et sauvegardé automatiquement.
+                  {tr('Chaque compte a son propre lien, éditable dans l’aperçu et sauvegardé automatiquement.', 'Each account has its own link, editable in the preview and saved automatically.')}
                 </p>
               </div>
               {selectedIds.length > 0 && (
@@ -1372,7 +1375,7 @@ export default function StoryLink({ user }: { user: User }) {
                   className={`sf-badge ${missingLinkIds.length > 0 ? 'sf-badge-danger' : 'sf-badge-ok'}`}
                   style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
                 >
-                  {selectedIds.length - missingLinkIds.length}/{selectedIds.length} liens
+                  {tr(`${selectedIds.length - missingLinkIds.length}/${selectedIds.length} liens`, `${selectedIds.length - missingLinkIds.length}/${selectedIds.length} links`)}
                 </span>
               )}
             </div>
@@ -1386,7 +1389,7 @@ export default function StoryLink({ user }: { user: User }) {
               }}>
                 <span style={{ flexShrink: 0, marginTop: 1, color: '#fbbf24' }}><IconWarn /></span>
                 <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} dans l’aperçu avant de publier.
+                  {tr(`${missingLinkIds.length} compte${missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-${missingLinkIds.length > 1 ? 'les' : 'le'} dans l’aperçu avant de publier.`, `${missingLinkIds.length} account${missingLinkIds.length > 1 ? 's' : ''} without a link — fill ${missingLinkIds.length > 1 ? 'them' : 'it'} in the preview before publishing.`)}
                 </span>
               </div>
             )}
@@ -1396,8 +1399,8 @@ export default function StoryLink({ user }: { user: User }) {
           <div className="sf-card" style={{ padding: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <span className="sf-section-label" style={{ margin: 0 }}>Ajouter à la une (highlight)</span>
-                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Après la story, l'épingle dans un highlight du profil.</p>
+                <span className="sf-section-label" style={{ margin: 0 }}>{tr('Ajouter à la une (highlight)', 'Add to highlights')}</span>
+                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>{tr("Après la story, l'épingle dans un highlight du profil.", 'After the story, pin it to a profile highlight.')}</p>
               </div>
               <button
                 onClick={() => setAddToHl(v => !v)}
@@ -1418,18 +1421,18 @@ export default function StoryLink({ user }: { user: User }) {
                         border: `1px solid ${hlMode === m ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.08)'}`,
                         color: hlMode === m ? '#c7cbff' : 'var(--text-3)',
                       }}>
-                      {m === 'existing' ? 'Highlight existant' : 'Créer un highlight'}
+                      {m === 'existing' ? tr('Highlight existant', 'Existing highlight') : tr('Créer un highlight', 'Create a highlight')}
                     </button>
                   ))}
                 </div>
                 <input
                   value={hlName} onChange={e => setHlName(e.target.value)}
-                  placeholder={hlMode === 'create' ? 'Nom du nouveau highlight' : 'Nom du highlight existant'}
+                  placeholder={hlMode === 'create' ? tr('Nom du nouveau highlight', 'New highlight name') : tr('Nom du highlight existant', 'Existing highlight name')}
                   className="sf-input" style={{ height: 32, fontSize: 12.5 }} />
                 <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0 }}>
                   {hlMode === 'create'
-                    ? 'Un nouveau highlight portant ce nom sera créé sur chaque compte.'
-                    : 'La story sera ajoutée au highlight portant ce nom (déjà présent sur le profil).'}
+                    ? tr('Un nouveau highlight portant ce nom sera créé sur chaque compte.', 'A new highlight with this name will be created on each account.')
+                    : tr('La story sera ajoutée au highlight portant ce nom (déjà présent sur le profil).', 'The story will be added to the highlight with this name (already on the profile).')}
                 </p>
               </div>
             )}
@@ -1439,13 +1442,13 @@ export default function StoryLink({ user }: { user: User }) {
           <div className="sf-card" style={{ padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
               <span style={{ color: 'var(--accent-l)' }}><IconShuffle /></span>
-              <span className="sf-section-label" style={{ margin: 0 }}>Distribution</span>
+              <span className="sf-section-label" style={{ margin: 0 }}>{tr('Distribution', 'Distribution')}</span>
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
               {([
-                { k: 'rotation' as const, icon: <IconRotate />, label: 'Rotation',   desc: 'A, B, C, A, B, C…' },
-                { k: 'random'   as const, icon: <IconShuffle />, label: 'Aléatoire',  desc: 'Mélangé à chaque lancement' },
+                { k: 'rotation' as const, icon: <IconRotate />, label: tr('Rotation', 'Rotation'),   desc: 'A, B, C, A, B, C…' },
+                { k: 'random'   as const, icon: <IconShuffle />, label: tr('Aléatoire', 'Random'),  desc: tr('Mélangé à chaque lancement', 'Shuffled on each run') },
               ]).map(m => {
                 const active = distribution === m.k
                 return (
@@ -1474,16 +1477,16 @@ export default function StoryLink({ user }: { user: User }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: rotProxy ? 0 : 12 }}>
               <div style={{ flex: 1 }}>
                 <span className="sf-section-label" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  Proxy rotatif
+                  {tr('Proxy rotatif', 'Rotating proxy')}
                   {(() => {
                     const rot = getProxyRotation()
                     const configured = rot.enabled && rot.urls.some(u => /^https?:\/\//i.test(u.trim()))
                     return configured ? null : (
-                      <span title="Rotation d'IP non configurée — risque de ban. Active-la dans Paramètres → Rotation d'IP proxy." style={{ width: 7, height: 7, borderRadius: '50%', background: '#F87171', boxShadow: '0 0 6px rgba(248,113,113,0.9)', flexShrink: 0, animation: 'pulse 1.6s ease-in-out infinite' }} />
+                      <span title={tr("Rotation d'IP non configurée — risque de ban. Active-la dans Paramètres → Rotation d'IP proxy.", 'IP rotation not configured — risk of ban. Enable it in Settings → Proxy IP rotation.')} style={{ width: 7, height: 7, borderRadius: '50%', background: '#F87171', boxShadow: '0 0 6px rgba(248,113,113,0.9)', flexShrink: 0, animation: 'pulse 1.6s ease-in-out infinite' }} />
                     )
                   })()}
                 </span>
-                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>Change l'IP avant chaque téléphone</p>
+                <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>{tr("Change l'IP avant chaque téléphone", 'Change the IP before each phone')}</p>
               </div>
               <button
                 onClick={() => setRotProxy(v => !v)}
@@ -1495,8 +1498,8 @@ export default function StoryLink({ user }: { user: User }) {
             </div>
             {!rotProxy && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Téléphones simultanés</span>
-                <input type="number" min={0} max={200} value={maxConc || ''} placeholder="Tous"
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{tr('Téléphones simultanés', 'Simultaneous phones')}</span>
+                <input type="number" min={0} max={200} value={maxConc || ''} placeholder={tr('Tous', 'All')}
                   onChange={e => setMaxConc(Math.max(0, parseInt(e.target.value) || 0))}
                   className="sf-input" style={{ width: 64, textAlign: 'center', padding: '6px 8px' }} />
               </div>
@@ -1508,16 +1511,16 @@ export default function StoryLink({ user }: { user: User }) {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 12, padding: '9px 12px', borderRadius: 10, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.28)' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
                   <div>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: '#34D399', margin: 0 }}>Rotation d'IP active</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>IP fraîche avant chaque story ✓</p>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#34D399', margin: 0 }}>{tr("Rotation d'IP active", 'IP rotation active')}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>{tr('IP fraîche avant chaque story ✓', 'Fresh IP before each story ✓')}</p>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(248,113,113,0.09)', border: '1px solid rgba(248,113,113,0.35)' }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
                   <div>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: '#F87171', margin: 0 }}>Rotation d'IP non configurée — risque de ban ⚠</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-2)', margin: '3px 0 0', lineHeight: 1.5 }}>Poster plusieurs comptes sur la même IP fait bannir. Active-la dans <strong style={{ color: '#fff' }}>Paramètres → Rotation d'IP proxy</strong>.</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#F87171', margin: 0 }}>{tr("Rotation d'IP non configurée — risque de ban ⚠", 'IP rotation not configured — risk of ban ⚠')}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-2)', margin: '3px 0 0', lineHeight: 1.5 }}>{tr('Poster plusieurs comptes sur la même IP fait bannir. Active-la dans', 'Posting several accounts on the same IP gets you banned. Enable it in')} <strong style={{ color: '#fff' }}>{tr("Paramètres → Rotation d'IP proxy", 'Settings → Proxy IP rotation')}</strong>.</p>
                   </div>
                 </div>
               )
@@ -1532,14 +1535,14 @@ export default function StoryLink({ user }: { user: User }) {
 
           {/* Preview header */}
           <div style={{ flexShrink: 0, padding: '14px 16px 12px', borderBottom: '1px solid var(--border)' }}>
-            <span className="sf-section-label">Aperçu des assignations</span>
+            <span className="sf-section-label">{tr('Aperçu des assignations', 'Assignment preview')}</span>
             {selectedIds.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--text-4)' }}>Sélectionne des comptes</p>
+              <p style={{ fontSize: 12, color: 'var(--text-4)' }}>{tr('Sélectionne des comptes', 'Select accounts')}</p>
             ) : photoPool.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--text-4)' }}>Ajoute des photos dans le pool</p>
+              <p style={{ fontSize: 12, color: 'var(--text-4)' }}>{tr('Ajoute des photos dans le pool', 'Add photos to the pool')}</p>
             ) : (
               <p style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-                {selectedIds.length} compte{selectedIds.length > 1 ? 's' : ''} · {photoPool.length} photo{photoPool.length > 1 ? 's' : ''}{textPool.length > 0 ? ` · ${textPool.length} texte${textPool.length > 1 ? 's' : ''}` : ''}
+                {tr(`${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} · ${photoPool.length} photo${photoPool.length > 1 ? 's' : ''}${textPool.length > 0 ? ` · ${textPool.length} texte${textPool.length > 1 ? 's' : ''}` : ''}`, `${selectedIds.length} account${selectedIds.length > 1 ? 's' : ''} · ${photoPool.length} photo${photoPool.length > 1 ? 's' : ''}${textPool.length > 0 ? ` · ${textPool.length} text${textPool.length > 1 ? 's' : ''}` : ''}`)}
               </p>
             )}
           </div>
@@ -1551,7 +1554,7 @@ export default function StoryLink({ user }: { user: User }) {
                 value={bulkLink}
                 onChange={e => setBulkLink(e.target.value)}
                 disabled={running}
-                placeholder="Appliquer un lien à tous les comptes…"
+                placeholder={tr('Appliquer un lien à tous les comptes…', 'Apply a link to all accounts…')}
                 className="sf-input"
                 style={{ flex: 1, height: 30, fontSize: 11.5, borderRadius: 8 }}
                 onKeyDown={e => { if (e.key === 'Enter') applyLinkToAll() }}
@@ -1561,9 +1564,9 @@ export default function StoryLink({ user }: { user: User }) {
                 disabled={running || !bulkLink.trim()}
                 className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
                 style={{ flexShrink: 0, opacity: (running || !bulkLink.trim()) ? 0.5 : 1 }}
-                title="Renseigne ce lien pour tous les comptes sélectionnés"
+                title={tr('Renseigne ce lien pour tous les comptes sélectionnés', 'Set this link for all selected accounts')}
               >
-                Appliquer à tous
+                {tr('Appliquer à tous', 'Apply to all')}
               </button>
             </div>
           )}
@@ -1575,8 +1578,8 @@ export default function StoryLink({ user }: { user: User }) {
                 <div className="sf-empty-icon" style={{ color: 'var(--text-3)' }}>
                   <IconTarget />
                 </div>
-                <p className="sf-empty-title" style={{ fontSize: 13 }}>Aucune assignation</p>
-                <p className="sf-empty-desc" style={{ fontSize: 12 }}>Sélectionne des comptes et ajoute des photos.</p>
+                <p className="sf-empty-title" style={{ fontSize: 13 }}>{tr('Aucune assignation', 'No assignment')}</p>
+                <p className="sf-empty-desc" style={{ fontSize: 12 }}>{tr('Sélectionne des comptes et ajoute des photos.', 'Select accounts and add photos.')}</p>
               </div>
             ) : previewAssignments.map(a => {
               const p = phoneById(a.phoneId)
@@ -1613,7 +1616,7 @@ export default function StoryLink({ user }: { user: User }) {
                     {hasLog && (
                       <button
                         onClick={() => setOpenLog(openLog === a.phoneId ? null : a.phoneId)}
-                        aria-label={openLog === a.phoneId ? 'Masquer les logs' : 'Afficher les logs'}
+                        aria-label={openLog === a.phoneId ? tr('Masquer les logs', 'Hide logs') : tr('Afficher les logs', 'Show logs')}
                         className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
                         style={{ padding: '2px 6px', height: 22, color: 'var(--text-3)' }}
                       >
@@ -1648,7 +1651,7 @@ export default function StoryLink({ user }: { user: User }) {
                         value={getLink(a.phoneId)}
                         onChange={e => setLink(a.phoneId, e.target.value)}
                         disabled={running}
-                        placeholder="lien de ce compte…"
+                        placeholder={tr('lien de ce compte…', "this account's link…")}
                         className="sf-input"
                         style={{
                           height: 30, paddingLeft: 26, paddingRight: getLink(a.phoneId).trim() ? 28 : 9,
@@ -1660,7 +1663,7 @@ export default function StoryLink({ user }: { user: User }) {
                         <span style={{
                           position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
                           pointerEvents: 'none', display: 'inline-flex', color: 'var(--accent)',
-                        }} title="Enregistré" aria-label="Enregistré">
+                        }} title={tr('Enregistré', 'Saved')} aria-label={tr('Enregistré', 'Saved')}>
                           <IconSave />
                         </span>
                       )}
@@ -1727,14 +1730,14 @@ export default function StoryLink({ user }: { user: User }) {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
               <div>
-                <p style={{ fontSize: 14.5, fontWeight: 700, color: TEXT_1, margin: 0 }}>Programmer les stories</p>
+                <p style={{ fontSize: 14.5, fontWeight: 700, color: TEXT_1, margin: 0 }}>{tr('Programmer les stories', 'Schedule stories')}</p>
                 <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '3px 0 0', fontVariantNumeric: 'tabular-nums' }}>
-                  {selectedIds.length} compte{selectedIds.length > 1 ? 's' : ''} · {photoPool.length} photo{photoPool.length > 1 ? 's' : ''} · assignations figées au moment de la programmation
+                  {tr(`${selectedIds.length} compte${selectedIds.length > 1 ? 's' : ''} · ${photoPool.length} photo${photoPool.length > 1 ? 's' : ''} · assignations figées au moment de la programmation`, `${selectedIds.length} account${selectedIds.length > 1 ? 's' : ''} · ${photoPool.length} photo${photoPool.length > 1 ? 's' : ''} · assignments locked at scheduling time`)}
                 </p>
               </div>
               <button
                 onClick={() => !scheduling && setShowSchedule(false)}
-                aria-label="Fermer"
+                aria-label={tr('Fermer', 'Close')}
                 className="sf-btn-icon cursor-pointer"
                 style={{
                   width: 28, height: 28, borderRadius: 7,
@@ -1751,7 +1754,7 @@ export default function StoryLink({ user }: { user: User }) {
                 </div>
                 <p style={{ fontSize: 13.5, fontWeight: 600, color: TEXT_1, margin: 0 }}>{schedDone}</p>
                 <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '6px 0 0' }}>
-                  Retrouve-la dans l'onglet Programmation.
+                  {tr("Retrouve-la dans l'onglet Programmation.", 'Find it in the Scheduling tab.')}
                 </p>
               </div>
             ) : (
@@ -1762,7 +1765,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <label style={{
                       display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
                       textTransform: 'uppercase', color: ACCENT, marginBottom: 7,
-                    }}>Date et heure</label>
+                    }}>{tr('Date et heure', 'Date and time')}</label>
                     <input
                       type="datetime-local"
                       value={schedAt}
@@ -1777,7 +1780,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <label style={{
                       display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em',
                       textTransform: 'uppercase', color: ACCENT, marginBottom: 7,
-                    }}>Délai entre comptes</label>
+                    }}>{tr('Délai entre comptes', 'Delay between accounts')}</label>
                     <div style={{ display: 'flex', gap: 7 }}>
                       {[0, 2, 5, 10, 15].map(m => (
                         <button
@@ -1792,7 +1795,7 @@ export default function StoryLink({ user }: { user: User }) {
                             color: schedDelay === m ? ACCENT_L : 'var(--text-3)',
                             transition: 'all 0.15s',
                           }}
-                        >{m === 0 ? 'Aucun' : `${m} min`}</button>
+                        >{m === 0 ? tr('Aucun', 'None') : `${m} min`}</button>
                       ))}
                     </div>
                   </div>
@@ -1806,8 +1809,7 @@ export default function StoryLink({ user }: { user: User }) {
                   )}
 
                   <p style={{ fontSize: 11, color: 'var(--text-4)', margin: 0, lineHeight: 1.55 }}>
-                    Les stories utilisent l'automation du téléphone — l'application doit être
-                    ouverte à l'heure programmée pour qu'elles partent.
+                    {tr("Les stories utilisent l'automation du téléphone — l'application doit être ouverte à l'heure programmée pour qu'elles partent.", 'Stories use the phone automation — the app must be open at the scheduled time for them to go out.')}
                   </p>
                 </div>
 
@@ -1818,7 +1820,7 @@ export default function StoryLink({ user }: { user: User }) {
                     disabled={scheduling}
                     className="sf-btn sf-btn-secondary cursor-pointer"
                     style={{ flex: 1, justifyContent: 'center' }}
-                  >Annuler</button>
+                  >{tr('Annuler', 'Cancel')}</button>
                   <button
                     onClick={() => scheduleRun()}
                     disabled={scheduling}
@@ -1830,9 +1832,9 @@ export default function StoryLink({ user }: { user: User }) {
                     }}
                   >
                     {scheduling ? (
-                      <><span className="sf-spinner" style={{ width: 13, height: 13 }} /> Programmation…</>
+                      <><span className="sf-spinner" style={{ width: 13, height: 13 }} /> {tr('Programmation…', 'Scheduling…')}</>
                     ) : (
-                      <>Programmer {selectedIds.length} story{selectedIds.length > 1 ? 's' : ''}</>
+                      <>{tr(`Programmer ${selectedIds.length} story${selectedIds.length > 1 ? 's' : ''}`, `Schedule ${selectedIds.length} story${selectedIds.length > 1 ? 's' : '' }`)}</>
                     )}
                   </button>
                 </div>

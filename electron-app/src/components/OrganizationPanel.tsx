@@ -6,6 +6,7 @@ import { ROLE_LABELS, ALL_TABS, ALL_ACTIONS, TAB_GROUPS, canManageOrg } from '@/
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { Onboarding } from '@/components/Onboarding'
+import { useTr, tr } from '@/lib/i18n'
 
 interface Props { user: User }
 
@@ -65,21 +66,22 @@ function TriState({ value, onChange }: {
   value: 'default' | 'allow' | 'deny'
   onChange: (v: 'default' | 'allow' | 'deny') => void
 }) {
+  const tr = useTr()
   return (
     <div className="flex items-center rounded-lg overflow-hidden border border-border/70 text-[10px] font-bold flex-shrink-0">
       <button
         onClick={() => onChange('default')}
-        title="Par défaut (hérité du rôle)"
+        title={tr('Par défaut (hérité du rôle)', 'Default (inherited from role)')}
         className={`px-2.5 py-1.5 transition-colors ${value === 'default' ? 'bg-surface2 text-text' : 'text-text2/50 hover:text-text2 bg-bg'}`}
       >—</button>
       <button
         onClick={() => onChange('allow')}
-        title="Forcer actif"
+        title={tr('Forcer actif', 'Force enabled')}
         className={`px-2.5 py-1.5 border-x border-border/70 transition-colors ${value === 'allow' ? 'bg-ok/20 text-ok' : 'text-text2/50 hover:text-ok bg-bg'}`}
       >✓</button>
       <button
         onClick={() => onChange('deny')}
-        title="Bloquer"
+        title={tr('Bloquer', 'Block')}
         className={`px-2.5 py-1.5 transition-colors ${value === 'deny' ? 'bg-danger/20 text-danger' : 'text-text2/50 hover:text-danger bg-bg'}`}
       >✗</button>
     </div>
@@ -118,12 +120,13 @@ function DisplayNameEditor({ initial, onSave, onCancel, busy }: {
   initial: string; onSave: (v: string) => void; onCancel: () => void; busy: boolean
 }) {
   const [v, setV] = useState(initial)
+  const tr = useTr()
   return (
     <div className="flex gap-2 items-center bg-surface rounded-lg p-3">
-      <Input value={v} onChange={e => setV(e.target.value)} placeholder="Ton prénom / pseudo (ex: Alex)"
+      <Input value={v} onChange={e => setV(e.target.value)} placeholder={tr('Ton prénom / pseudo (ex: Alex)', 'Your first name / nickname (e.g. Alex)')}
         onKeyDown={e => { if (e.key === 'Enter') onSave(v) }} />
-      <Button size="sm" onClick={() => onSave(v)} loading={busy}>Enregistrer</Button>
-      <Button size="sm" variant="secondary" onClick={onCancel}>Annuler</Button>
+      <Button size="sm" onClick={() => onSave(v)} loading={busy}>{tr('Enregistrer', 'Save')}</Button>
+      <Button size="sm" variant="secondary" onClick={onCancel}>{tr('Annuler', 'Cancel')}</Button>
     </div>
   )
 }
@@ -133,6 +136,7 @@ function MultiSelect({ options, selected, onChange, placeholder }: {
   options: string[]; selected: string[]; onChange: (next: string[]) => void; placeholder: string
 }) {
   const [open, setOpen] = useState(false)
+  const tr = useTr()
   function toggle(opt: string) {
     if (selected.includes(opt)) onChange(selected.filter(x => x !== opt))
     else onChange([...selected, opt])
@@ -152,7 +156,7 @@ function MultiSelect({ options, selected, onChange, placeholder }: {
         // les groupes ». Ici le corps du modal scrolle jusqu'à la liste.
         <div className="mt-1 bg-surface border border-border rounded-xl max-h-48 overflow-auto">
           {options.length === 0 ? (
-            <p className="text-text2 text-xs px-3 py-2 italic">Aucun élément disponible</p>
+            <p className="text-text2 text-xs px-3 py-2 italic">{tr('Aucun élément disponible', 'No item available')}</p>
           ) : options.map(opt => (
             <label key={opt} className="flex items-center gap-2 px-3 py-2 text-sm text-text hover:bg-surface2 cursor-pointer">
               <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggle(opt)} className="accent-accent" />
@@ -170,15 +174,15 @@ function permSummary(p: PermOverrides): string {
   const parts: string[] = []
   const deniedTabs = Object.entries(p.tabs ?? {}).filter(([, v]) => v === false).length
   const allowedTabs = Object.entries(p.tabs ?? {}).filter(([, v]) => v === true).length
-  if (deniedTabs > 0) parts.push(`${deniedTabs} onglet(s) bloqué(s)`)
-  if (allowedTabs > 0) parts.push(`${allowedTabs} onglet(s) forcé(s)`)
-  if (p.bank_folders?.mode === 'allow') parts.push(`banque: ${(p.bank_folders as { list: string[] }).list.length} dossier(s)`)
-  if (p.bank_folders?.mode === 'deny')  parts.push(`banque: sauf ${(p.bank_folders as { list: string[] }).list.length} dossier(s)`)
+  if (deniedTabs > 0) parts.push(tr(`${deniedTabs} onglet(s) bloqué(s)`, `${deniedTabs} tab(s) blocked`))
+  if (allowedTabs > 0) parts.push(tr(`${allowedTabs} onglet(s) forcé(s)`, `${allowedTabs} tab(s) forced`))
+  if (p.bank_folders?.mode === 'allow') parts.push(tr(`banque: ${(p.bank_folders as { list: string[] }).list.length} dossier(s)`, `bank: ${(p.bank_folders as { list: string[] }).list.length} folder(s)`))
+  if (p.bank_folders?.mode === 'deny')  parts.push(tr(`banque: sauf ${(p.bank_folders as { list: string[] }).list.length} dossier(s)`, `bank: except ${(p.bank_folders as { list: string[] }).list.length} folder(s)`))
   const deniedActions = Object.entries(p.actions ?? {}).filter(([, v]) => v === false).length
   const allowedActions = Object.entries(p.actions ?? {}).filter(([, v]) => v === true).length
-  if (deniedActions > 0) parts.push(`${deniedActions} action(s) bloquée(s)`)
-  if (allowedActions > 0) parts.push(`${allowedActions} action(s) activée(s)`)
-  return parts.length > 0 ? parts.join(' · ') : 'Permissions par défaut'
+  if (deniedActions > 0) parts.push(tr(`${deniedActions} action(s) bloquée(s)`, `${deniedActions} action(s) blocked`))
+  if (allowedActions > 0) parts.push(tr(`${allowedActions} action(s) activée(s)`, `${allowedActions} action(s) enabled`))
+  return parts.length > 0 ? parts.join(' · ') : tr('Permissions par défaut', 'Default permissions')
 }
 
 // ── Custom role dropdown ─────────────────────────────────────────────────────
@@ -188,6 +192,7 @@ function RoleDropdown({ value, systemRole, templates, onSystemRole, onTemplate }
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, right: 0 })
+  const tr = useTr()
   const btnRef = useRef<HTMLButtonElement>(null)
   const activeTemplate = templates.find(t => t.id === value)
   const displayRole = activeTemplate ? 'member' as OrgRole : value as OrgRole
@@ -217,7 +222,7 @@ function RoleDropdown({ value, systemRole, templates, onSystemRole, onTemplate }
             className="fixed z-[9991] bg-card border border-border rounded-xl shadow-2xl min-w-[180px] overflow-hidden py-1"
             style={{ top: pos.top, right: pos.right }}
           >
-            <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold text-text2 uppercase tracking-wider">Rôles système</p>
+            <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold text-text2 uppercase tracking-wider">{tr('Rôles système', 'System roles')}</p>
             {(['admin', 'member', 'viewer'] as const).map(r => (
               <button key={r} onClick={() => { onSystemRole(r); setOpen(false) }}
                 className={`w-full flex items-center px-3 py-1.5 text-left hover:bg-surface transition-colors ${value === r && !activeTemplate ? 'bg-surface' : ''}`}>
@@ -226,7 +231,7 @@ function RoleDropdown({ value, systemRole, templates, onSystemRole, onTemplate }
             ))}
             {templates.length > 0 && (
               <div className="border-t border-border mt-1 pt-1">
-                <p className="px-3 pb-1 text-[10px] font-bold text-text2 uppercase tracking-wider">Personnalisés</p>
+                <p className="px-3 pb-1 text-[10px] font-bold text-text2 uppercase tracking-wider">{tr('Personnalisés', 'Custom')}</p>
                 {templates.map(t => (
                   <button key={t.id} onClick={() => { onTemplate(t); setOpen(false) }}
                     className={`w-full flex items-center px-3 py-1.5 text-left hover:bg-surface transition-colors ${value === t.id ? 'bg-surface' : ''}`}>
@@ -262,6 +267,7 @@ function PermBody({ innerTab, tabs, setTabs, actions, setActions, bankMode, setB
   availableFolders: string[]
   availableGroups: string[]
 }) {
+  const tr = useTr()
   function tabState(k: PageKey): 'default' | 'allow' | 'deny' {
     const v = tabs[k]; return v === undefined ? 'default' : v ? 'allow' : 'deny'
   }
@@ -278,9 +284,9 @@ function PermBody({ innerTab, tabs, setTabs, actions, setActions, bankMode, setB
   if (innerTab === 'tabs') return (
     <div className="space-y-5">
       <p className="text-xs text-text2">
-        <strong className="text-text">—</strong> = par défaut du rôle &nbsp;·&nbsp;
-        <strong className="text-ok">✓</strong> = toujours actif &nbsp;·&nbsp;
-        <strong className="text-danger">✗</strong> = toujours bloqué
+        <strong className="text-text">—</strong> {tr('= par défaut du rôle', '= role default')} &nbsp;·&nbsp;
+        <strong className="text-ok">✓</strong> {tr('= toujours actif', '= always enabled')} &nbsp;·&nbsp;
+        <strong className="text-danger">✗</strong> {tr('= toujours bloqué', '= always blocked')}
       </p>
       {TAB_GROUPS.map(group => (
         <div key={group}>
@@ -304,11 +310,11 @@ function PermBody({ innerTab, tabs, setTabs, actions, setActions, bankMode, setB
   if (innerTab === 'actions') return (
     <div className="space-y-5">
       <p className="text-xs text-text2">
-        Contrôle les actions spécifiques que ce membre peut effectuer.
+        {tr('Contrôle les actions spécifiques que ce membre peut effectuer.', 'Controls the specific actions this member can perform.')}
       </p>
-      {['Banque', 'Téléphones', 'Actions'].map(group => (
+      {(['Banque', 'Téléphones', 'Actions'] as const).map(group => (
         <div key={group}>
-          <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-2">{group}</p>
+          <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-2">{tr(group, group === 'Banque' ? 'Bank' : group === 'Téléphones' ? 'Phones' : 'Actions')}</p>
           <div className="space-y-1">
             {ALL_ACTIONS.filter(a => a.group === group).map(a => (
               <div key={a.key} className="flex items-center gap-3 px-3 py-2.5 bg-surface rounded-xl hover:bg-surface2 transition-colors">
@@ -326,31 +332,31 @@ function PermBody({ innerTab, tabs, setTabs, actions, setActions, bankMode, setB
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-semibold text-text mb-1">Dossiers de la banque vidéos</p>
-        <p className="text-xs text-text2 mb-3">Restreint l'accès aux dossiers de la banque de contenu.</p>
+        <p className="text-sm font-semibold text-text mb-1">{tr('Dossiers de la banque vidéos', 'Video bank folders')}</p>
+        <p className="text-xs text-text2 mb-3">{tr("Restreint l'accès aux dossiers de la banque de contenu.", 'Restricts access to content bank folders.')}</p>
         <div className="space-y-2">
           <select value={bankMode} onChange={e => setBankMode(e.target.value as 'all' | 'allow' | 'deny')}
             className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-sm text-text">
-            <option value="all">Tous les dossiers</option>
-            <option value="allow">Uniquement ces dossiers…</option>
-            <option value="deny">Tous sauf ces dossiers…</option>
+            <option value="all">{tr('Tous les dossiers', 'All folders')}</option>
+            <option value="allow">{tr('Uniquement ces dossiers…', 'Only these folders…')}</option>
+            <option value="deny">{tr('Tous sauf ces dossiers…', 'All except these folders…')}</option>
           </select>
           {bankMode !== 'all' && (
-            <MultiSelect options={availableFolders} selected={bankList} onChange={setBankList} placeholder="Sélectionne les dossiers…" />
+            <MultiSelect options={availableFolders} selected={bankList} onChange={setBankList} placeholder={tr('Sélectionne les dossiers…', 'Select folders…')} />
           )}
         </div>
       </div>
       <div>
-        <p className="text-sm font-semibold text-text mb-1">Groupes de téléphones</p>
-        <p className="text-xs text-text2 mb-3">Restreint l'accès aux groupes de téléphones GéeLark.</p>
+        <p className="text-sm font-semibold text-text mb-1">{tr('Groupes de téléphones', 'Phone groups')}</p>
+        <p className="text-xs text-text2 mb-3">{tr("Restreint l'accès aux groupes de téléphones GéeLark.", 'Restricts access to GeeLark phone groups.')}</p>
         <div className="space-y-2">
           <select value={groupMode} onChange={e => setGroupMode(e.target.value as 'all' | 'allow')}
             className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-sm text-text">
-            <option value="all">Tous les groupes</option>
-            <option value="allow">Uniquement ces groupes…</option>
+            <option value="all">{tr('Tous les groupes', 'All groups')}</option>
+            <option value="allow">{tr('Uniquement ces groupes…', 'Only these groups…')}</option>
           </select>
           {groupMode === 'allow' && (
-            <MultiSelect options={availableGroups} selected={groupList} onChange={setGroupList} placeholder="Sélectionne les groupes GéeLark…" />
+            <MultiSelect options={availableGroups} selected={groupList} onChange={setGroupList} placeholder={tr('Sélectionne les groupes GéeLark…', 'Select GeeLark groups…')} />
           )}
         </div>
       </div>
@@ -365,6 +371,7 @@ function MemberEditorModal({ member, templates, availableFolders, availableGroup
   onSave: (role: Exclude<OrgRole, 'owner'>, customRoleId: string | null, p: PermOverrides) => void
   onCancel: () => void
 }) {
+  const tr = useTr()
   const init = member.perm_overrides ?? {}
   const [innerTab, setInnerTab]   = useState<PermInnerTab>('tabs')
   const [role, setRole]           = useState<Exclude<OrgRole, 'owner'>>(member.role === 'owner' ? 'member' : member.role as Exclude<OrgRole, 'owner'>)
@@ -421,7 +428,7 @@ function MemberEditorModal({ member, templates, availableFolders, availableGroup
 
         {/* Role selector */}
         <div className="px-6 pt-4 pb-3 border-b border-border flex-shrink-0 space-y-3">
-          <p className="text-[10px] font-bold text-text2 uppercase tracking-wider">Rôle système</p>
+          <p className="text-[10px] font-bold text-text2 uppercase tracking-wider">{tr('Rôle système', 'System role')}</p>
           <div className="flex flex-wrap gap-2">
             {(['admin', 'member', 'viewer'] as const).map(r => (
               <button key={r} onClick={() => { setRole(r); setCustomRoleId(null) }}
@@ -432,7 +439,7 @@ function MemberEditorModal({ member, templates, availableFolders, availableGroup
           </div>
           {templates.length > 0 && (
             <>
-              <p className="text-[10px] font-bold text-text2 uppercase tracking-wider">Rôle personnalisé</p>
+              <p className="text-[10px] font-bold text-text2 uppercase tracking-wider">{tr('Rôle personnalisé', 'Custom role')}</p>
               <div className="flex flex-wrap gap-1.5">
                 {templates.map(t => (
                   <button key={t.id} onClick={() => applyTemplate(t)}
@@ -445,16 +452,16 @@ function MemberEditorModal({ member, templates, availableFolders, availableGroup
             </>
           )}
           {activeTemplate && (
-            <p className="text-xs text-text2">Permissions pré-remplies depuis <strong className="text-text">{activeTemplate.name}</strong> — modifiables ci-dessous.</p>
+            <p className="text-xs text-text2">{tr('Permissions pré-remplies depuis', 'Permissions pre-filled from')} <strong className="text-text">{activeTemplate.name}</strong> {tr('— modifiables ci-dessous.', '— editable below.')}</p>
           )}
         </div>
 
         {/* Inner tabs */}
         <div className="flex overflow-x-auto border-b border-border px-4 flex-shrink-0 mt-0" style={{ scrollbarWidth: 'none' }}>
           {([
-            { k: 'tabs' as const, label: 'Onglets' },
-            { k: 'actions' as const, label: 'Actions' },
-            { k: 'restrictions' as const, label: 'Restrictions' },
+            { k: 'tabs' as const, label: tr('Onglets', 'Tabs') },
+            { k: 'actions' as const, label: tr('Actions', 'Actions') },
+            { k: 'restrictions' as const, label: tr('Restrictions', 'Restrictions') },
           ]).map(t => (
             <button key={t.k} onClick={() => setInnerTab(t.k)}
               className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text hover:bg-surface/60'}`}
@@ -479,8 +486,8 @@ function MemberEditorModal({ member, templates, availableFolders, availableGroup
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-end gap-3">
-          <Button variant="secondary" onClick={onCancel}>Annuler</Button>
-          <Button onClick={save}>Enregistrer</Button>
+          <Button variant="secondary" onClick={onCancel}>{tr('Annuler', 'Cancel')}</Button>
+          <Button onClick={save}>{tr('Enregistrer', 'Save')}</Button>
         </div>
       </div>
     </div>
@@ -496,6 +503,7 @@ function RoleModal({ initial, availableFolders, availableGroups, onSave, onCance
   onSave: (name: string, color: string, perms: PermOverrides) => void
   onCancel: () => void
 }) {
+  const tr = useTr()
   const init = initial?.perm_overrides ?? {}
   const [name,      setName]      = useState(initial?.name ?? '')
   const [color,     setColor]     = useState(initial?.color ?? TEMPLATE_COLORS[0])
@@ -524,8 +532,8 @@ function RoleModal({ initial, availableFolders, availableGroups, onSave, onCance
         <div className="px-6 py-5 border-b border-border flex-shrink-0">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
-              <h2 className="text-sm font-bold text-text">{initial ? 'Modifier le rôle' : 'Créer un rôle personnalisé'}</h2>
-              <p className="text-xs text-text2 mt-0.5">Ce rôle sera réutilisable pour tous les membres de l'organisation.</p>
+              <h2 className="text-sm font-bold text-text">{initial ? tr('Modifier le rôle', 'Edit role') : tr('Créer un rôle personnalisé', 'Create a custom role')}</h2>
+              <p className="text-xs text-text2 mt-0.5">{tr("Ce rôle sera réutilisable pour tous les membres de l'organisation.", 'This role can be reused for all members of the organization.')}</p>
             </div>
             <button onClick={onCancel} className="p-1.5 rounded-xl hover:bg-surface text-text2 hover:text-text transition-colors flex-shrink-0">
               <Icon name="x" size={18} />
@@ -545,7 +553,7 @@ function RoleModal({ initial, availableFolders, availableGroups, onSave, onCance
               <Input
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="Nom du rôle (ex: Content Manager)"
+                placeholder={tr('Nom du rôle (ex: Content Manager)', 'Role name (e.g. Content Manager)')}
                 onKeyDown={e => { if (e.key === 'Enter') save() }}
                 style={name.trim() ? { borderColor: color + '66', color } : {}}
               />
@@ -554,7 +562,7 @@ function RoleModal({ initial, availableFolders, availableGroups, onSave, onCance
           {/* Preview chip */}
           {name.trim() && (
             <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs text-text2">Aperçu :</span>
+              <span className="text-xs text-text2">{tr('Aperçu :', 'Preview:')}</span>
               <RoleChip role="member" template={{ id: '', org_id: '', name: name.trim(), color, perm_overrides: {}, created_by: '', created_at: '' }} />
             </div>
           )}
@@ -563,9 +571,9 @@ function RoleModal({ initial, availableFolders, availableGroups, onSave, onCance
         {/* Inner tabs */}
         <div className="flex overflow-x-auto border-b border-border px-4 flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
           {([
-            { k: 'tabs' as const, label: 'Onglets' },
-            { k: 'actions' as const, label: 'Actions' },
-            { k: 'restrictions' as const, label: 'Restrictions' },
+            { k: 'tabs' as const, label: tr('Onglets', 'Tabs') },
+            { k: 'actions' as const, label: tr('Actions', 'Actions') },
+            { k: 'restrictions' as const, label: tr('Restrictions', 'Restrictions') },
           ]).map(t => (
             <button key={t.k} onClick={() => setInnerTab(t.k)}
               className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text hover:bg-surface/60'}`}
@@ -590,13 +598,13 @@ function RoleModal({ initial, availableFolders, availableGroups, onSave, onCance
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-end gap-3">
-          <Button variant="secondary" onClick={onCancel}>Annuler</Button>
+          <Button variant="secondary" onClick={onCancel}>{tr('Annuler', 'Cancel')}</Button>
           <Button
             onClick={save}
             disabled={!name.trim()}
             style={name.trim() ? { background: color + '33', color, borderColor: color + '66' } : {}}
           >
-            {initial ? 'Mettre à jour' : 'Créer le rôle'}
+            {initial ? tr('Mettre à jour', 'Update') : tr('Créer le rôle', 'Create role')}
           </Button>
         </div>
       </div>
@@ -609,6 +617,7 @@ function InvitePermModal({ invite, availableFolders, availableGroups, roleTempla
   invite: OrgInvite; availableFolders: string[]; availableGroups: string[]
   roleTemplates: OrgRoleTemplate[]; onSave: (p: PermOverrides) => void; onSkip: () => void
 }) {
+  const tr = useTr()
   const init = invite.perm_overrides ?? {}
   const [innerTab, setInnerTab]   = useState<PermInnerTab>('tabs')
   const [tabs, setTabs]           = useState<Partial<Record<PageKey, boolean>>>(init.tabs ?? {})
@@ -655,9 +664,9 @@ function InvitePermModal({ invite, availableFolders, availableGroups, roleTempla
               <Icon name="ticket" size={20} />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-bold text-text">Code d'invitation généré</h2>
+              <h2 className="text-sm font-bold text-text">{tr("Code d'invitation généré", 'Invitation code generated')}</h2>
               <p className="text-xs text-text2 mt-0.5">
-                {invite.email || 'Nouveau membre'} · <RoleChip role={invite.role as OrgRole} />
+                {invite.email || tr('Nouveau membre', 'New member')} · <RoleChip role={invite.role as OrgRole} />
               </p>
             </div>
           </div>
@@ -667,16 +676,16 @@ function InvitePermModal({ invite, availableFolders, availableGroups, roleTempla
             <button onClick={copyToken}
               className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
               style={{ background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(99,102,241,0.15)', color: copied ? '#4ade80' : '#6366F1' }}>
-              {copied ? '✓ Copié' : 'Copier'}
+              {copied ? tr('✓ Copié', '✓ Copied') : tr('Copier', 'Copy')}
             </button>
           </div>
-          <p className="text-[10px] text-text2 mt-2">Code à <strong className="text-text">usage unique</strong>. Configure les accès avant de le partager.</p>
+          <p className="text-[10px] text-text2 mt-2">{tr('Code à', 'Code for')} <strong className="text-text">{tr('usage unique', 'single use')}</strong>. {tr('Configure les accès avant de le partager.', 'Configure access before sharing it.')}</p>
         </div>
 
         {/* Quick-apply templates */}
         {roleTemplates.length > 0 && (
           <div className="px-6 pt-4 pb-1 flex-shrink-0">
-            <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-2">Appliquer un rôle rapide</p>
+            <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-2">{tr('Appliquer un rôle rapide', 'Apply a quick role')}</p>
             <div className="flex flex-wrap gap-1.5">
               {roleTemplates.map(t => (
                 <button key={t.id} onClick={() => applyTemplate(t)}
@@ -693,9 +702,9 @@ function InvitePermModal({ invite, availableFolders, availableGroups, roleTempla
         {/* Inner tabs */}
         <div className="flex overflow-x-auto border-b border-border px-4 flex-shrink-0 mt-3" style={{ scrollbarWidth: 'none' }}>
           {([
-            { k: 'tabs' as const, label: 'Onglets' },
-            { k: 'actions' as const, label: 'Actions' },
-            { k: 'restrictions' as const, label: 'Restrictions' },
+            { k: 'tabs' as const, label: tr('Onglets', 'Tabs') },
+            { k: 'actions' as const, label: tr('Actions', 'Actions') },
+            { k: 'restrictions' as const, label: tr('Restrictions', 'Restrictions') },
           ]).map(t => (
             <button key={t.k} onClick={() => setInnerTab(t.k)}
               className={`px-4 py-2.5 text-xs font-semibold -mb-px border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${innerTab === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text hover:bg-surface/60'}`}
@@ -721,9 +730,9 @@ function InvitePermModal({ invite, availableFolders, availableGroups, roleTempla
         {/* Footer */}
         <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-between gap-3">
           <button onClick={onSkip} className="text-xs text-text2 hover:text-text transition-colors underline underline-offset-2">
-            Passer (sans configurer)
+            {tr('Passer (sans configurer)', 'Skip (without configuring)')}
           </button>
-          <Button onClick={save}>Enregistrer les permissions</Button>
+          <Button onClick={save}>{tr('Enregistrer les permissions', 'Save permissions')}</Button>
         </div>
       </div>
     </div>
@@ -767,6 +776,8 @@ export function OrganizationPanel({ user }: Props) {
   interface ActivityLog { id: string; user_email: string | null; action: string; details: Record<string, unknown>; created_at: string }
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
   const [logsLoading, setLogsLoading]   = useState(false)
+
+  const tr = useTr()
 
   const myMembership = myOrgs.find(x => x.org.id === currentOrg?.id)?.member
   const myRole       = myMembership?.role ?? null
@@ -834,7 +845,7 @@ export function OrganizationPanel({ user }: Props) {
     }, { onConflict: 'id' })
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    setMyDisplayName(name.trim()); setEditingName(false); flash('Nom mis à jour ✓')
+    setMyDisplayName(name.trim()); setEditingName(false); flash(tr('Nom mis à jour ✓', 'Name updated ✓'))
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
@@ -844,24 +855,24 @@ export function OrganizationPanel({ user }: Props) {
     const { data, error } = await supabase.rpc('create_org', { p_name: newName.trim() })
     setBusy(false)
     if (error) {
-      const msg = /not_authenticated/.test(error.message) ? 'Non authentifié — reconnecte-toi'
-                : /name_required/.test(error.message)     ? 'Le nom est requis'
-                : /org_limit_reached/.test(error.message) ? "Tu ne peux créer qu'une seule organisation"
+      const msg = /not_authenticated/.test(error.message) ? tr('Non authentifié — reconnecte-toi', 'Not authenticated — please sign in again')
+                : /name_required/.test(error.message)     ? tr('Le nom est requis', 'Name is required')
+                : /org_limit_reached/.test(error.message) ? tr("Tu ne peux créer qu'une seule organisation", 'You can only create one organization')
                 : error.message
       flash(msg, true); return
     }
-    flash('Organisation créée ✓'); setNewName(''); setCreating(false)
+    flash(tr('Organisation créée ✓', 'Organization created ✓')); setNewName(''); setCreating(false)
     await refresh()
     if (data) { switchOrg(data as string); setSetupForOrg(data as string) }
   }
 
   async function deleteOrg(org: Organization) {
-    if (!confirm(`Supprimer "${org.name}" ? Cette action est irréversible.`)) return
+    if (!confirm(tr(`Supprimer "${org.name}" ? Cette action est irréversible.`, `Delete "${org.name}"? This action is irreversible.`))) return
     setBusy(true)
     const { error } = await supabase.from('organizations').delete().eq('id', org.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    flash('Organisation supprimée'); switchOrg(null); await refresh()
+    flash(tr('Organisation supprimée', 'Organization deleted')); switchOrg(null); await refresh()
   }
 
   async function renameOrg(org: Organization) {
@@ -871,23 +882,23 @@ export function OrganizationPanel({ user }: Props) {
     const { error } = await supabase.from('organizations').update({ name: trimmed, name_updated_at: new Date().toISOString() }).eq('id', org.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    flash('Nom modifié'); setRenamingOrgId(null); await refresh()
+    flash(tr('Nom modifié', 'Name changed')); setRenamingOrgId(null); await refresh()
   }
 
   async function leaveOrg(orgId: string) {
-    if (!confirm('Quitter cette organisation ?')) return
+    if (!confirm(tr('Quitter cette organisation ?', 'Leave this organization?'))) return
     setBusy(true)
     const { error } = await supabase.from('organization_members').delete().eq('org_id', orgId).eq('user_id', user.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    flash("Tu as quitté l'organisation"); switchOrg(null); await refresh()
+    flash(tr("Tu as quitté l'organisation", 'You left the organization')); switchOrg(null); await refresh()
   }
 
   async function createInvite() {
     if (!currentOrg) return
     setBusy(true)
     const token = genToken()
-    const label = invLabel.trim() || `Invitation ${new Date().toLocaleDateString('fr-FR')}`
+    const label = invLabel.trim() || tr(`Invitation ${new Date().toLocaleDateString('fr-FR')}`, `Invitation ${new Date().toLocaleDateString('en-US')}`)
     const template = invTemplateId ? roleTemplates.find(t => t.id === invTemplateId) : null
     const { data, error } = await supabase.from('organization_invites').insert({
       org_id: currentOrg.id, email: label, token, role: invRole, invited_by: user.id,
@@ -905,7 +916,7 @@ export function OrganizationPanel({ user }: Props) {
 
   async function saveInvitePerms(inv: OrgInvite, perms: PermOverrides) {
     await supabase.from('organization_invites').update({ perm_overrides: perms }).eq('id', inv.id)
-    setInvitePermModal(null); flash('Code généré ✓ — permissions configurées et code copié')
+    setInvitePermModal(null); flash(tr('Code généré ✓ — permissions configurées et code copié', 'Code generated ✓ — permissions configured and code copied'))
   }
 
   async function revokeInvite(inv: OrgInvite) {
@@ -922,9 +933,9 @@ export function OrganizationPanel({ user }: Props) {
     const { data, error } = await supabase.rpc('accept_org_invite', { p_token: token })
     setBusy(false)
     if (error) {
-      const msg = /invite_not_found/.test(error.message)     ? "Code d'invitation invalide"
-                : /invite_already_used/.test(error.message)  ? 'Ce code a déjà été utilisé'
-                : /invite_expired/.test(error.message)       ? 'Code expiré'
+      const msg = /invite_not_found/.test(error.message)     ? tr("Code d'invitation invalide", 'Invalid invitation code')
+                : /invite_already_used/.test(error.message)  ? tr('Ce code a déjà été utilisé', 'This code has already been used')
+                : /invite_expired/.test(error.message)       ? tr('Code expiré', 'Code expired')
                 : error.message
       flash(msg, true); return
     }
@@ -934,9 +945,9 @@ export function OrganizationPanel({ user }: Props) {
       const { data: org } = await supabase.from('organizations').select('owner_id').eq('id', orgId).maybeSingle()
       const { data: ownerKey } = await supabase.from('license_keys').select('expires_at').eq('user_id', org?.owner_id ?? '').eq('is_active', true).maybeSingle()
       const expired = ownerKey?.expires_at ? new Date(ownerKey.expires_at) < new Date() : false
-      if (!ownerKey || expired) { flash("Cette organisation n'a pas d'abonnement actif.", true); await refresh(); return }
+      if (!ownerKey || expired) { flash(tr("Cette organisation n'a pas d'abonnement actif.", 'This organization has no active subscription.'), true); await refresh(); return }
     }
-    flash("Bienvenue dans l'organisation ✓")
+    flash(tr("Bienvenue dans l'organisation ✓", 'Welcome to the organization ✓'))
     if (orgId) {
       const { data: inv } = await supabase.from('organization_invites').select('perm_overrides, custom_role_id').eq('token', token).maybeSingle()
       if (inv && (Object.keys(inv.perm_overrides ?? {}).length > 0 || inv.custom_role_id)) {
@@ -951,13 +962,13 @@ export function OrganizationPanel({ user }: Props) {
   }
 
   async function changeRole(member: MemberRow, newRole: OrgRole) {
-    if (member.role === 'owner') { flash('Le propriétaire ne peut pas changer de rôle', true); return }
+    if (member.role === 'owner') { flash(tr('Le propriétaire ne peut pas changer de rôle', 'The owner cannot change role'), true); return }
     setBusy(true)
     const { data: updated, error } = await supabase.from('organization_members').update({ role: newRole, custom_role_id: null }).eq('id', member.id).select('id')
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    if (!updated || updated.length === 0) { flash('Impossible de changer le rôle (permissions insuffisantes)', true); return }
-    flash('Rôle modifié ✓')
+    if (!updated || updated.length === 0) { flash(tr('Impossible de changer le rôle (permissions insuffisantes)', 'Unable to change role (insufficient permissions)'), true); return }
+    flash(tr('Rôle modifié ✓', 'Role changed ✓'))
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
@@ -966,7 +977,7 @@ export function OrganizationPanel({ user }: Props) {
     const { error } = await supabase.from('organization_members').update({ role: 'member', perm_overrides: template.perm_overrides, custom_role_id: template.id }).eq('id', member.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    flash(`Rôle "${template.name}" assigné ✓`)
+    flash(tr(`Rôle "${template.name}" assigné ✓`, `Role "${template.name}" assigned ✓`))
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
@@ -975,13 +986,13 @@ export function OrganizationPanel({ user }: Props) {
     const { error } = await supabase.from('organization_members').update({ role, custom_role_id: customRoleId, perm_overrides: perms }).eq('id', member.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    flash('Membre mis à jour ✓'); setEditingMember(null)
+    flash(tr('Membre mis à jour ✓', 'Member updated ✓')); setEditingMember(null)
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
   async function removeMember(member: MemberRow) {
-    if (member.role === 'owner') { flash('Impossible de retirer le propriétaire', true); return }
-    if (!confirm(`Retirer ${member.email ?? member.display_name ?? 'ce membre'} ?`)) return
+    if (member.role === 'owner') { flash(tr('Impossible de retirer le propriétaire', 'Cannot remove the owner'), true); return }
+    if (!confirm(tr(`Retirer ${member.email ?? member.display_name ?? 'ce membre'} ?`, `Remove ${member.email ?? member.display_name ?? 'this member'}?`))) return
     setBusy(true)
     const { error } = await supabase.from('organization_members').delete().eq('id', member.id)
     setBusy(false)
@@ -998,7 +1009,7 @@ export function OrganizationPanel({ user }: Props) {
         supabase.removeChannel(ch)
       } catch { /* best-effort — the 15s safety poll will catch it anyway */ }
     }
-    flash('Membre retiré')
+    flash(tr('Membre retiré', 'Member removed'))
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
@@ -1011,14 +1022,14 @@ export function OrganizationPanel({ user }: Props) {
     }
     setEditingTemplate(null); setCreatingTemplate(false)
     await loadOrgDetail(currentOrg.id)
-    flash(id ? 'Rôle mis à jour ✓' : 'Rôle créé ✓')
+    flash(id ? tr('Rôle mis à jour ✓', 'Role updated ✓') : tr('Rôle créé ✓', 'Role created ✓'))
   }
 
   async function deleteTemplate(t: OrgRoleTemplate) {
-    if (!confirm(`Supprimer le rôle "${t.name}" ?`)) return
+    if (!confirm(tr(`Supprimer le rôle "${t.name}" ?`, `Delete the role "${t.name}"?`))) return
     await supabase.from('org_role_templates').delete().eq('id', t.id)
     if (currentOrg) await loadOrgDetail(currentOrg.id)
-    flash('Rôle supprimé')
+    flash(tr('Rôle supprimé', 'Role deleted'))
   }
 
   function memberLabel(m: MemberRow): string {
@@ -1040,12 +1051,12 @@ export function OrganizationPanel({ user }: Props) {
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-border overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         {([
-          { k: 'orgas',   label: 'Organisations', icon: 'building' as const },
+          { k: 'orgas',   label: tr('Organisations', 'Organizations'), icon: 'building' as const },
           // Membres / Rôles / Logs : réservés aux admins & propriétaires.
           // Un membre non-admin ne doit pas voir la liste des autres membres.
-          ...(canManage ? [{ k: 'membres', label: 'Membres', icon: 'users' as const }] : []),
-          ...(canManage ? [{ k: 'roles',   label: 'Rôles',   icon: 'roles' as const }] : []),
-          ...(canManage ? [{ k: 'logs',    label: 'Logs',    icon: 'logs'  as const }] : []),
+          ...(canManage ? [{ k: 'membres', label: tr('Membres', 'Members'), icon: 'users' as const }] : []),
+          ...(canManage ? [{ k: 'roles',   label: tr('Rôles', 'Roles'),   icon: 'roles' as const }] : []),
+          ...(canManage ? [{ k: 'logs',    label: tr('Logs', 'Logs'),    icon: 'logs'  as const }] : []),
         ] as const).map(t => (
           <button key={t.k} onClick={() => setOrgTab(t.k as typeof orgTab)}
             className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
@@ -1058,8 +1069,8 @@ export function OrganizationPanel({ user }: Props) {
       {/* ── Organisations tab ─────────────────────────────────────────────── */}
       {orgTab === 'orgas' && <>
         <section className="bg-card border border-border rounded-xl p-5 space-y-3">
-          <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="user" size={16} />Mon profil</h2>
-          <p className="text-text2 text-xs">Nom visible par les autres membres. Si vide, ton email est affiché.</p>
+          <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="user" size={16} />{tr('Mon profil', 'My profile')}</h2>
+          <p className="text-text2 text-xs">{tr('Nom visible par les autres membres. Si vide, ton email est affiché.', 'Name visible to other members. If empty, your email is shown.')}</p>
           {editingName ? (
             <DisplayNameEditor initial={myDisplayName} onSave={saveDisplayName} onCancel={() => setEditingName(false)} busy={busy} />
           ) : (
@@ -1068,31 +1079,31 @@ export function OrganizationPanel({ user }: Props) {
                 {(myDisplayName || user.email || '?')[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-text text-sm font-medium truncate">{myDisplayName || <span className="text-text2 italic">Aucun nom — {user.email}</span>}</p>
+                <p className="text-text text-sm font-medium truncate">{myDisplayName || <span className="text-text2 italic">{tr('Aucun nom —', 'No name —')} {user.email}</span>}</p>
                 {myDisplayName && <p className="text-text2 text-xs truncate">{user.email}</p>}
               </div>
-              <Button size="sm" variant="secondary" onClick={() => setEditingName(true)}><span className="inline-flex items-center gap-1.5"><Icon name="pencil" size={14} />Modifier</span></Button>
+              <Button size="sm" variant="secondary" onClick={() => setEditingName(true)}><span className="inline-flex items-center gap-1.5"><Icon name="pencil" size={14} />{tr('Modifier', 'Edit')}</span></Button>
             </div>
           )}
         </section>
 
         <section className="bg-card border border-border rounded-xl p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="building" size={16} />Mes organisations</h2>
+            <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="building" size={16} />{tr('Mes organisations', 'My organizations')}</h2>
             {!myOrgs.some(({ member }) => member.role === 'owner') && (
-              <Button size="sm" onClick={() => setCreating(v => !v)}>+ Nouvelle</Button>
+              <Button size="sm" onClick={() => setCreating(v => !v)}>{tr('+ Nouvelle', '+ New')}</Button>
             )}
           </div>
           {creating && (
             <div className="flex gap-2 items-center bg-surface rounded-lg p-3">
-              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nom de l'organisation"
+              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder={tr("Nom de l'organisation", 'Organization name')}
                 onKeyDown={e => { if (e.key === 'Enter') createOrg() }} />
-              <Button size="sm" onClick={createOrg} loading={busy}>Créer</Button>
-              <Button size="sm" variant="secondary" onClick={() => setCreating(false)}>Annuler</Button>
+              <Button size="sm" onClick={createOrg} loading={busy}>{tr('Créer', 'Create')}</Button>
+              <Button size="sm" variant="secondary" onClick={() => setCreating(false)}>{tr('Annuler', 'Cancel')}</Button>
             </div>
           )}
           {myOrgs.length === 0 ? (
-            <p className="text-text2 text-sm">Aucune organisation. Crée-en une ou rejoins-en une avec un code d'invitation.</p>
+            <p className="text-text2 text-sm">{tr("Aucune organisation. Crée-en une ou rejoins-en une avec un code d'invitation.", 'No organization. Create one or join one with an invitation code.')}</p>
           ) : (
             <ul className="space-y-2">
               {myOrgs.map(({ org, member }) => {
@@ -1111,34 +1122,34 @@ export function OrganizationPanel({ user }: Props) {
                         <div className="mt-0.5"><RoleChip role={member.role} /></div>
                       </div>
                       {currentOrg?.id !== org.id && (
-                        <Button size="sm" variant="secondary" onClick={() => { switchOrg(org.id); window.location.reload() }}>Activer</Button>
+                        <Button size="sm" variant="secondary" onClick={() => { switchOrg(org.id); window.location.reload() }}>{tr('Activer', 'Activate')}</Button>
                       )}
                       {isOwner && !isRenaming && (
                         <Button size="sm" variant="secondary"
                           onClick={() => { setRenamingOrgId(org.id); setRenameValue(org.name) }}
-                          disabled={!canRename} aria-label="Renommer"
-                          title={canRename ? 'Renommer' : `Renommage dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`}>
+                          disabled={!canRename} aria-label={tr('Renommer', 'Rename')}
+                          title={canRename ? tr('Renommer', 'Rename') : tr(`Renommage dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`, `Rename available in ${daysLeft} day${daysLeft > 1 ? 's' : ''}`)}>
                           <Icon name="pencil" size={14} />
                         </Button>
                       )}
                       {isOwner ? (
-                        <Button size="sm" variant="danger" onClick={() => deleteOrg(org)}>Supprimer</Button>
+                        <Button size="sm" variant="danger" onClick={() => deleteOrg(org)}>{tr('Supprimer', 'Delete')}</Button>
                       ) : (
-                        <Button size="sm" variant="secondary" onClick={() => leaveOrg(org.id)}>Quitter</Button>
+                        <Button size="sm" variant="secondary" onClick={() => leaveOrg(org.id)}>{tr('Quitter', 'Leave')}</Button>
                       )}
                     </div>
                     {isOwner && !canRename && (
                       <p className="px-3 pb-2 text-[11px] inline-flex items-center gap-1.5" style={{ color: 'rgba(233,234,240,0.4)' }}>
-                        <Icon name="lock" size={12} /><span>Renommage dans <strong>{daysLeft}</strong> jour{daysLeft > 1 ? 's' : ''}</span>
+                        <Icon name="lock" size={12} /><span>{tr('Renommage dans', 'Rename in')} <strong>{daysLeft}</strong> {tr(`jour${daysLeft > 1 ? 's' : ''}`, `day${daysLeft > 1 ? 's' : ''}`)}</span>
                       </p>
                     )}
                     {isRenaming && (
                       <div className="flex gap-2 items-center px-3 pb-3">
                         <Input value={renameValue} onChange={e => setRenameValue(e.target.value)}
-                          placeholder="Nouveau nom…" maxLength={48}
+                          placeholder={tr('Nouveau nom…', 'New name…')} maxLength={48}
                           onKeyDown={e => { if (e.key === 'Enter') renameOrg(org); if (e.key === 'Escape') setRenamingOrgId(null) }} />
                         <Button size="sm" onClick={() => renameOrg(org)} loading={busy}>OK</Button>
-                        <Button size="sm" variant="secondary" onClick={() => setRenamingOrgId(null)}>Annuler</Button>
+                        <Button size="sm" variant="secondary" onClick={() => setRenamingOrgId(null)}>{tr('Annuler', 'Cancel')}</Button>
                       </div>
                     )}
                   </li>
@@ -1149,11 +1160,11 @@ export function OrganizationPanel({ user }: Props) {
         </section>
 
         <section className="bg-card border border-border rounded-xl p-5 space-y-3">
-          <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="ticket" size={16} />Rejoindre une organisation</h2>
+          <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="ticket" size={16} />{tr('Rejoindre une organisation', 'Join an organization')}</h2>
           <div className="flex gap-2">
-            <Input value={joinToken} onChange={e => setJoinToken(e.target.value)} placeholder="Colle ton code d'invitation"
+            <Input value={joinToken} onChange={e => setJoinToken(e.target.value)} placeholder={tr("Colle ton code d'invitation", 'Paste your invitation code')}
               onKeyDown={e => { if (e.key === 'Enter') acceptInvite() }} />
-            <Button onClick={acceptInvite} loading={busy} disabled={!joinToken.trim()}>Rejoindre</Button>
+            <Button onClick={acceptInvite} loading={busy} disabled={!joinToken.trim()}>{tr('Rejoindre', 'Join')}</Button>
           </div>
         </section>
       </>}
@@ -1163,20 +1174,20 @@ export function OrganizationPanel({ user }: Props) {
         !currentOrg ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
             <p className="flex justify-center text-text2"><Icon name="building" size={32} /></p>
-            <p className="text-text font-semibold">Aucune organisation active</p>
-            <p className="text-text2 text-sm">Active une organisation dans l'onglet "Organisations".</p>
+            <p className="text-text font-semibold">{tr('Aucune organisation active', 'No active organization')}</p>
+            <p className="text-text2 text-sm">{tr('Active une organisation dans l\'onglet "Organisations".', 'Activate an organization in the "Organizations" tab.')}</p>
           </div>
         ) : !canManage ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
             <p className="flex justify-center text-text2"><Icon name="lock" size={32} /></p>
-            <p className="text-text font-semibold">Accès réservé aux admins</p>
-            <p className="text-text2 text-sm">Seuls les propriétaires et admins peuvent gérer les membres.</p>
+            <p className="text-text font-semibold">{tr('Accès réservé aux admins', 'Admin-only access')}</p>
+            <p className="text-text2 text-sm">{tr('Seuls les propriétaires et admins peuvent gérer les membres.', 'Only owners and admins can manage members.')}</p>
           </div>
         ) : (
           <section className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
-              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="users" size={16} />Membres · {currentOrg.name}</h2>
-              <p className="text-xs text-text2 mt-0.5">{members.length} membre{members.length > 1 ? 's' : ''}</p>
+              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="users" size={16} />{tr('Membres', 'Members')} · {currentOrg.name}</h2>
+              <p className="text-xs text-text2 mt-0.5">{members.length} {tr(`membre${members.length > 1 ? 's' : ''}`, `member${members.length > 1 ? 's' : ''}`)}</p>
             </div>
 
             <ul className="divide-y divide-border">
@@ -1191,7 +1202,7 @@ export function OrganizationPanel({ user }: Props) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-text text-sm font-medium truncate">
-                        {label} {isMe && <span className="text-text2 text-xs">(toi)</span>}
+                        {label} {isMe && <span className="text-text2 text-xs">{tr('(toi)', '(you)')}</span>}
                       </p>
                       <p className="text-text2 text-xs truncate">
                         {m.email ?? m.user_id} · {new Date(m.joined_at).toLocaleDateString('fr-FR')}
@@ -1205,12 +1216,12 @@ export function OrganizationPanel({ user }: Props) {
                           className="text-xs text-text2 hover:text-accent transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent/10 inline-flex items-center gap-1.5"
                         >
                           <Icon name="pencil" size={13} />
-                          <span className="hidden sm:inline">Modifier</span>
+                          <span className="hidden sm:inline">{tr('Modifier', 'Edit')}</span>
                         </button>
                       )}
                       {m.role !== 'owner' && !isMe && (
                         <button onClick={() => removeMember(m)}
-                          className="text-danger hover:opacity-70 p-1.5 rounded-lg hover:bg-danger/10 transition-colors" title="Retirer ce membre">
+                          className="text-danger hover:opacity-70 p-1.5 rounded-lg hover:bg-danger/10 transition-colors" title={tr('Retirer ce membre', 'Remove this member')}>
                           <Icon name="x" size={15} />
                         </button>
                       )}
@@ -1223,11 +1234,11 @@ export function OrganizationPanel({ user }: Props) {
             {/* Invites section */}
             <div className="px-5 py-4 border-t border-border space-y-4 bg-surface/30">
               <div>
-                <h3 className="text-xs font-bold text-text mb-0.5">Générer un code d'invitation</h3>
-                <p className="text-text2 text-xs mb-3">Chaque code est <strong className="text-text">à usage unique</strong>.</p>
+                <h3 className="text-xs font-bold text-text mb-0.5">{tr("Générer un code d'invitation", 'Generate an invitation code')}</h3>
+                <p className="text-text2 text-xs mb-3">{tr('Chaque code est', 'Each code is')} <strong className="text-text">{tr('à usage unique', 'single-use')}</strong>.</p>
                 <div className="flex gap-2 flex-wrap items-center">
                   <div className="flex-1 min-w-[160px]">
-                    <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder="Note (ex: Pour Pierre) — optionnel" />
+                    <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder={tr('Note (ex: Pour Pierre) — optionnel', 'Note (e.g. For Pierre) — optional')} />
                   </div>
                   <RoleDropdown
                     value={invTemplateId ?? invRole}
@@ -1237,14 +1248,14 @@ export function OrganizationPanel({ user }: Props) {
                     onTemplate={t => { setInvTemplateId(t.id); setInvRole('member') }}
                   />
                   <Button onClick={createInvite} loading={busy}>
-                    <span className="inline-flex items-center gap-1.5"><Icon name="ticket" size={15} />Générer</span>
+                    <span className="inline-flex items-center gap-1.5"><Icon name="ticket" size={15} />{tr('Générer', 'Generate')}</span>
                   </Button>
                 </div>
               </div>
 
               {invites.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-text2 uppercase tracking-wider font-bold mb-2">Codes en attente ({invites.length})</p>
+                  <p className="text-[10px] text-text2 uppercase tracking-wider font-bold mb-2">{tr('Codes en attente', 'Pending codes')} ({invites.length})</p>
                   <ul className="space-y-1.5">
                     {invites.map(inv => (
                       <li key={inv.id} className="flex items-center gap-2 bg-bg border border-border px-3 py-2 rounded-xl text-xs">
@@ -1254,11 +1265,11 @@ export function OrganizationPanel({ user }: Props) {
                           return t ? <RoleChip role="member" template={t} /> : null
                         })() : <RoleChip role={inv.role as OrgRole} />}
                         <code
-                          onClick={() => { navigator.clipboard.writeText(inv.token); flash('Code copié ✓') }}
+                          onClick={() => { navigator.clipboard.writeText(inv.token); flash(tr('Code copié ✓', 'Code copied ✓')) }}
                           className="bg-surface px-2 py-1 rounded-lg font-mono text-[10px] cursor-pointer hover:text-accent transition-colors border border-border"
-                          title="Cliquer pour copier le code complet"
+                          title={tr('Cliquer pour copier le code complet', 'Click to copy the full code')}
                         >{inv.token.slice(0, 12)}…</code>
-                        <button onClick={() => revokeInvite(inv)} className="text-danger hover:opacity-70 p-1 rounded" title="Révoquer" aria-label="Révoquer ce code"><Icon name="x" size={14} /></button>
+                        <button onClick={() => revokeInvite(inv)} className="text-danger hover:opacity-70 p-1 rounded" title={tr('Révoquer', 'Revoke')} aria-label={tr('Révoquer ce code', 'Revoke this code')}><Icon name="x" size={14} /></button>
                       </li>
                     ))}
                   </ul>
@@ -1275,15 +1286,15 @@ export function OrganizationPanel({ user }: Props) {
           {/* System roles */}
           <section className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
-              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="shield" size={16} />Rôles système</h2>
-              <p className="text-xs text-text2 mt-0.5">Rôles prédéfinis — non modifiables</p>
+              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="shield" size={16} />{tr('Rôles système', 'System roles')}</h2>
+              <p className="text-xs text-text2 mt-0.5">{tr('Rôles prédéfinis — non modifiables', 'Predefined roles — not editable')}</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 divide-x divide-y divide-border">
               {([
-                { role: 'owner' as OrgRole, desc: "Accès complet, gestion de l'organisation" },
-                { role: 'admin' as OrgRole, desc: "Comme propriétaire, sans pouvoir supprimer l'orga" },
-                { role: 'member' as OrgRole, desc: 'Posting, banque, outils vidéo (sans sous-titres)' },
-                { role: 'viewer' as OrgRole, desc: 'Lecture seule : banque et captions uniquement' },
+                { role: 'owner' as OrgRole, desc: tr("Accès complet, gestion de l'organisation", 'Full access, organization management') },
+                { role: 'admin' as OrgRole, desc: tr("Comme propriétaire, sans pouvoir supprimer l'orga", 'Like owner, but cannot delete the org') },
+                { role: 'member' as OrgRole, desc: tr('Posting, banque, outils vidéo (sans sous-titres)', 'Posting, bank, video tools (no subtitles)') },
+                { role: 'viewer' as OrgRole, desc: tr('Lecture seule : banque et captions uniquement', 'Read-only: bank and captions only') },
               ]).map(({ role, desc }) => (
                 <div key={role} className="px-4 py-4">
                   <div className="mb-2"><RoleChip role={role} /></div>
@@ -1297,18 +1308,18 @@ export function OrganizationPanel({ user }: Props) {
           <section className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="roles" size={16} />Rôles personnalisés</h2>
-                <p className="text-xs text-text2 mt-0.5">Templates réutilisables pour assigner des permissions en un clic</p>
+                <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="roles" size={16} />{tr('Rôles personnalisés', 'Custom roles')}</h2>
+                <p className="text-xs text-text2 mt-0.5">{tr('Templates réutilisables pour assigner des permissions en un clic', 'Reusable templates to assign permissions in one click')}</p>
               </div>
-              <Button size="sm" onClick={() => setCreatingTemplate(true)}>+ Nouveau rôle</Button>
+              <Button size="sm" onClick={() => setCreatingTemplate(true)}>{tr('+ Nouveau rôle', '+ New role')}</Button>
             </div>
 
             {roleTemplates.length === 0 && (
               <div className="px-5 py-10 text-center">
                 <p className="flex justify-center mb-3 text-text2"><Icon name="roles" size={40} /></p>
-                <p className="text-sm font-semibold text-text mb-1">Aucun rôle personnalisé</p>
-                <p className="text-xs text-text2 mb-5 max-w-xs mx-auto">Crée des rôles comme "Content Manager", "Analyste"… pour configurer des permissions précises et les appliquer en un clic.</p>
-                <Button size="sm" onClick={() => setCreatingTemplate(true)}>Créer mon premier rôle</Button>
+                <p className="text-sm font-semibold text-text mb-1">{tr('Aucun rôle personnalisé', 'No custom role')}</p>
+                <p className="text-xs text-text2 mb-5 max-w-xs mx-auto">{tr('Crée des rôles comme "Content Manager", "Analyste"… pour configurer des permissions précises et les appliquer en un clic.', 'Create roles like "Content Manager", "Analyst"… to configure precise permissions and apply them in one click.')}</p>
+                <Button size="sm" onClick={() => setCreatingTemplate(true)}>{tr('Créer mon premier rôle', 'Create my first role')}</Button>
               </div>
             )}
 
@@ -1327,11 +1338,11 @@ export function OrganizationPanel({ user }: Props) {
                       <button
                         onClick={() => setEditingTemplate(t)}
                         className="text-xs text-text2 hover:text-accent px-3 py-1.5 rounded-lg hover:bg-accent/10 transition-colors inline-flex items-center gap-1.5"
-                      ><Icon name="pencil" size={13} />Éditer</button>
+                      ><Icon name="pencil" size={13} />{tr('Éditer', 'Edit')}</button>
                       <button
                         onClick={() => deleteTemplate(t)}
                         className="text-xs text-text2 hover:text-danger px-2 py-1.5 rounded-lg hover:bg-danger/10 transition-colors"
-                        aria-label="Supprimer"
+                        aria-label={tr('Supprimer', 'Delete')}
                       ><Icon name="x" size={14} /></button>
                     </div>
                   </div>
@@ -1342,7 +1353,7 @@ export function OrganizationPanel({ user }: Props) {
             {roleTemplates.length > 0 && (
               <div className="px-5 py-3 border-t border-border bg-surface/20">
                 <p className="text-[10px] text-text2">
-                  Pour appliquer un rôle à un membre, va dans <strong className="text-text">Membres</strong> et clique sur son badge de rôle.
+                  {tr('Pour appliquer un rôle à un membre, va dans', 'To apply a role to a member, go to')} <strong className="text-text">{tr('Membres', 'Members')}</strong> {tr('et clique sur son badge de rôle.', 'and click on their role badge.')}
                 </p>
               </div>
             )}
@@ -1355,23 +1366,23 @@ export function OrganizationPanel({ user }: Props) {
         <section className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="logs" size={16} />Logs d'activité</h2>
-              <p className="text-xs text-text2 mt-0.5">200 dernières actions des membres</p>
+              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="logs" size={16} />{tr("Logs d'activité", 'Activity logs')}</h2>
+              <p className="text-xs text-text2 mt-0.5">{tr('200 dernières actions des membres', 'Last 200 member actions')}</p>
             </div>
-            <button onClick={loadLogs} className="text-xs text-accent hover:opacity-70 transition-opacity">⟳ Rafraîchir</button>
+            <button onClick={loadLogs} className="text-xs text-accent hover:opacity-70 transition-opacity">{tr('⟳ Rafraîchir', '⟳ Refresh')}</button>
           </div>
           {logsLoading ? (
-            <div className="px-5 py-6 text-center text-xs text-text2">Chargement…</div>
+            <div className="px-5 py-6 text-center text-xs text-text2">{tr('Chargement…', 'Loading…')}</div>
           ) : activityLogs.length === 0 ? (
-            <div className="px-5 py-6 text-center text-xs text-text2">Aucune activité enregistrée.</div>
+            <div className="px-5 py-6 text-center text-xs text-text2">{tr('Aucune activité enregistrée.', 'No activity recorded.')}</div>
           ) : (
             <div className="divide-y divide-border max-h-[600px] overflow-auto">
               {activityLogs.map(log => {
                 const d = new Date(log.created_at)
                 const label: Record<string, string> = {
-                  posting_launched:      '📤 Posting lancé',
-                  mass_posting_launched: '⚡ Mass Posting lancé',
-                  warmup_launched:       '🔥 Warmup lancé',
+                  posting_launched:      tr('📤 Posting lancé', '📤 Posting launched'),
+                  mass_posting_launched: tr('⚡ Mass Posting lancé', '⚡ Mass Posting launched'),
+                  warmup_launched:       tr('🔥 Warmup lancé', '🔥 Warmup launched'),
                 }
                 return (
                   <div key={log.id} className="px-5 py-3 hover:bg-surface/50 transition-colors">
@@ -1383,7 +1394,7 @@ export function OrganizationPanel({ user }: Props) {
                         </div>
                         {log.details && Object.keys(log.details).length > 0 && (
                           <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
-                            {typeof log.details.count === 'number' && <span className="text-[10px] text-text2">{log.details.count} téléphone(s)</span>}
+                            {typeof log.details.count === 'number' && <span className="text-[10px] text-text2">{log.details.count} {tr('téléphone(s)', 'phone(s)')}</span>}
                             {Array.isArray(log.details.phones) && (
                               <span className="text-[10px] text-text2 truncate max-w-xs">
                                 {(log.details.phones as string[]).slice(0, 5).join(', ')}
@@ -1437,7 +1448,7 @@ export function OrganizationPanel({ user }: Props) {
           availableGroups={groups}
           roleTemplates={roleTemplates}
           onSave={perms => saveInvitePerms(invitePermModal, perms)}
-          onSkip={() => { setInvitePermModal(null); flash("Code généré et copié ✓ — partage-le, il ne marche qu'une fois") }}
+          onSkip={() => { setInvitePermModal(null); flash(tr("Code généré et copié ✓ — partage-le, il ne marche qu'une fois", 'Code generated and copied ✓ — share it, it only works once')) }}
         />
       )}
     </div>

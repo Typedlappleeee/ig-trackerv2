@@ -14,6 +14,7 @@ import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import {
   fetchAllPhones, getPhonePublicIp, startPhones, waitForPhoneConnectivity, type GeelarkPhone,
 } from '@/lib/geelark'
+import { useTr } from '@/lib/i18n'
 
 const phoneName = (p: GeelarkPhone) => p.serialName ?? p.name ?? p.serialNo ?? p.id.slice(-6)
 const proxyKey  = (p: GeelarkPhone) => { const px = p.proxy; return px?.server ? `${px.server}:${px.port ?? ''}` : '' }
@@ -28,6 +29,7 @@ async function pLimit<T>(items: T[], limit: number, worker: (item: T) => Promise
 }
 
 export function ProxyHealth({ user }: { user: User }) {
+  const tr = useTr()
   const { bearer } = useConnections(user)
   const [phones, setPhones]   = useState<GeelarkPhone[]>([])
   const [loading, setLoading] = useState(false)
@@ -97,10 +99,10 @@ export function ProxyHealth({ user }: { user: User }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-        <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0 }}>Proxy par téléphone, proxys partagés (risque de ban) et IP en direct.</p>
+        <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0 }}>{tr('Proxy par téléphone, proxys partagés (risque de ban) et IP en direct.', 'Proxy per phone, shared proxies (ban risk) and live IP.')}</p>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={checkIps} disabled={!selected.size || checking} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ opacity: (!selected.size || checking) ? 0.5 : 1 }} title="Allume les téléphones sélectionnés et lit leur IP publique réelle">
-            {checking ? '⏳ Vérification…' : `🌍 Vérifier l'IP (${selected.size})`}
+          <button onClick={checkIps} disabled={!selected.size || checking} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ opacity: (!selected.size || checking) ? 0.5 : 1 }} title={tr('Allume les téléphones sélectionnés et lit leur IP publique réelle', 'Powers on the selected phones and reads their real public IP')}>
+            {checking ? tr('⏳ Vérification…', '⏳ Checking…') : tr(`🌍 Vérifier l'IP (${selected.size})`, `🌍 Check IP (${selected.size})`)}
           </button>
           <button onClick={load} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">↻</button>
         </div>
@@ -109,30 +111,30 @@ export function ProxyHealth({ user }: { user: User }) {
       <div>
         {!bearer ? (
           <div className="sf-card" style={{ padding: 24, maxWidth: 480 }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--warn)', margin: '0 0 6px' }}>Connexion GéeLark manquante</p>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Ajoute ton token GéeLark dans les Réglages.</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--warn)', margin: '0 0 6px' }}>{tr('Connexion GéeLark manquante', 'GeeLark connection missing')}</p>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>{tr('Ajoute ton token GéeLark dans les Réglages.', 'Add your GeeLark token in Settings.')}</p>
           </div>
         ) : (
           <>
             {/* Tuiles */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
-              <Tile icon="📱" label="Téléphones" value={String(phones.length)} />
-              <Tile icon="🌐" label="Proxys uniques" value={String(uniqueProxies)} />
-              <Tile icon="⚠️" label="Proxys partagés" value={String(sharedProxies)} accent={sharedProxies > 0 ? '#fbbf24' : 'var(--ok)'} sub={sharedProxies > 0 ? 'plusieurs comptes / IP' : 'aucun'} />
-              <Tile icon="🚫" label="Sans proxy" value={String(noProxy)} accent={noProxy > 0 ? 'var(--err)' : 'var(--ok)'} />
+              <Tile icon="📱" label={tr('Téléphones', 'Phones')} value={String(phones.length)} />
+              <Tile icon="🌐" label={tr('Proxys uniques', 'Unique proxies')} value={String(uniqueProxies)} />
+              <Tile icon="⚠️" label={tr('Proxys partagés', 'Shared proxies')} value={String(sharedProxies)} accent={sharedProxies > 0 ? '#fbbf24' : 'var(--ok)'} sub={sharedProxies > 0 ? tr('plusieurs comptes / IP', 'multiple accounts / IP') : tr('aucun', 'none')} />
+              <Tile icon="🚫" label={tr('Sans proxy', 'No proxy')} value={String(noProxy)} accent={noProxy > 0 ? 'var(--err)' : 'var(--ok)'} />
             </div>
 
             {/* Filtres */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
               {groups.length > 1 && (
                 <select value={group} onChange={e => setGroup(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }}>
-                  {groups.map(g => <option key={g} value={g}>{g}</option>)}
+                  {groups.map(g => <option key={g} value={g}>{g === 'Tous' ? tr('Tous', 'All') : g}</option>)}
                 </select>
               )}
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (tél, proxy)…" className="sf-input" style={{ flex: 1, minWidth: 180, maxWidth: 320, height: 32, fontSize: 12.5 }} />
-              <button onClick={() => setSelected(new Set(visible.map(p => p.id)))} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">Tout sélectionner</button>
-              <button onClick={() => setSelected(new Set())} disabled={!selected.size} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: selected.size ? 1 : 0.4 }}>Aucun</button>
-              <span style={{ fontSize: 12, color: 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>{visible.length} tél.</span>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher (tél, proxy)…', 'Search (phone, proxy)…')} className="sf-input" style={{ flex: 1, minWidth: 180, maxWidth: 320, height: 32, fontSize: 12.5 }} />
+              <button onClick={() => setSelected(new Set(visible.map(p => p.id)))} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">{tr('Tout sélectionner', 'Select all')}</button>
+              <button onClick={() => setSelected(new Set())} disabled={!selected.size} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: selected.size ? 1 : 0.4 }}>{tr('Aucun', 'None')}</button>
+              <span style={{ fontSize: 12, color: 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>{tr(`${visible.length} tél.`, `${visible.length} phones`)}</span>
             </div>
 
             {loading ? (
@@ -143,7 +145,7 @@ export function ProxyHealth({ user }: { user: User }) {
               <div className="sf-card" style={{ overflow: 'hidden', padding: 0 }}>
                 {/* En-tête */}
                 <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 120px 1fr 150px', gap: 8, padding: '9px 14px', borderBottom: '1px solid var(--border)', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-4)' }}>
-                  <span></span><span>Téléphone</span><span>Groupe</span><span>Proxy</span><span>IP en direct</span>
+                  <span></span><span>{tr('Téléphone', 'Phone')}</span><span>{tr('Groupe', 'Group')}</span><span>{tr('Proxy', 'Proxy')}</span><span>{tr('IP en direct', 'Live IP')}</span>
                 </div>
                 <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
                   {visible.slice(0, 400).map(p => {
@@ -160,24 +162,24 @@ export function ProxyHealth({ user }: { user: User }) {
                         <span style={{ fontFamily: 'monospace', color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneName(p)}</span>
                         <span style={{ color: 'var(--text-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.group?.name ?? p.groupName ?? '—'}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                          <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: k ? 'var(--text-2)' : 'var(--err)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k || 'aucun proxy'}</span>
-                          {shared > 1 && <span title={`${shared} téléphones sur ce proxy`} style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>partagé ×{shared}</span>}
+                          <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: k ? 'var(--text-2)' : 'var(--err)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k || tr('aucun proxy', 'no proxy')}</span>
+                          {shared > 1 && <span title={tr(`${shared} téléphones sur ce proxy`, `${shared} phones on this proxy`)} style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>{tr(`partagé ×${shared}`, `shared ×${shared}`)}</span>}
                         </span>
                         <span style={{ fontFamily: 'monospace', fontSize: 11.5 }}>
                           {ip === 'checking' ? <span style={{ color: 'var(--accent-l)' }}>⧗ …</span>
-                            : ip === 'fail' ? <span style={{ color: 'var(--err)' }}>✕ injoignable</span>
-                            : ip ? <span style={{ color: ipConflict ? '#f87171' : 'var(--ok)' }}>{ip}{ipConflict ? ' ⚠ même IP' : ''}</span>
+                            : ip === 'fail' ? <span style={{ color: 'var(--err)' }}>{tr('✕ injoignable', '✕ unreachable')}</span>
+                            : ip ? <span style={{ color: ipConflict ? '#f87171' : 'var(--ok)' }}>{ip}{ipConflict ? tr(' ⚠ même IP', ' ⚠ same IP') : ''}</span>
                             : <span style={{ color: 'var(--text-4)' }}>—</span>}
                         </span>
                       </div>
                     )
                   })}
-                  {visible.length > 400 && <div style={{ padding: 12, fontSize: 11.5, color: 'var(--text-4)', textAlign: 'center' }}>+{visible.length - 400} autres — affine le filtre.</div>}
+                  {visible.length > 400 && <div style={{ padding: 12, fontSize: 11.5, color: 'var(--text-4)', textAlign: 'center' }}>{tr(`+${visible.length - 400} autres — affine le filtre.`, `+${visible.length - 400} more — refine the filter.`)}</div>}
                 </div>
               </div>
             )}
             <p style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 10 }}>
-              « Partagé » = plusieurs téléphones configurés sur le même proxy. « Même IP » (après vérif) = ils sortent vraiment sur la même IP publique → risque de ban si tu postes dessus en même temps. La vérif d'IP <b>allume</b> les téléphones sélectionnés.
+              {tr('« Partagé » = plusieurs téléphones configurés sur le même proxy. « Même IP » (après vérif) = ils sortent vraiment sur la même IP publique → risque de ban si tu postes dessus en même temps. La vérif d\'IP ', '« Shared » = several phones configured on the same proxy. « Same IP » (after check) = they really exit on the same public IP → ban risk if you post on them at the same time. The IP check ')}<b>{tr('allume', 'powers on')}</b>{tr(' les téléphones sélectionnés.', ' the selected phones.')}
             </p>
           </>
         )}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Page } from '@/components/Layout'
+import { useTr } from '@/lib/i18n'
 
 // ── Studio Vidéo — hub premium (grille uniforme + liseré dégradé animé) ───────
 
@@ -34,24 +35,29 @@ const CSS = `
 `
 
 type PreviewKind = 'remix' | 'spoof' | 'subtitles' | 'mixer'
-interface Tool { id: Page; Icon: IconFn; title: string; tag: string; desc: string; grad: string; glow: string; accent: string; preview: PreviewKind }
+interface Tool { id: Page; Icon: IconFn; title: string; titleEn: string; tag: string; tagEn: string; desc: string; descEn: string; grad: string; glow: string; accent: string; preview: PreviewKind }
 
 const TOOLS: Tool[] = [
-  { id: 'remix', Icon: IconShuffle, title: 'Remix', tag: 'Uniqueness', preview: 'remix',
+  { id: 'remix', Icon: IconShuffle, title: 'Remix', titleEn: 'Remix', tag: 'Uniqueness', tagEn: 'Uniqueness', preview: 'remix',
     desc: 'Une vidéo → des dizaines de variantes uniques (luminosité, zoom, vitesse, recadrage) pour éviter les doublons.',
+    descEn: 'One video → dozens of unique variants (brightness, zoom, speed, cropping) to avoid duplicates.',
     grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', accent: '#818CF8' },
-  { id: 'spoof', Icon: IconShield, title: 'Spoof', tag: 'Anti-détection', preview: 'spoof',
+  { id: 'spoof', Icon: IconShield, title: 'Spoof', titleEn: 'Spoof', tag: 'Anti-détection', tagEn: 'Anti-detection', preview: 'spoof',
     desc: 'Réécrit device, GPS et EXIF et micro-varie l\'image — invisible aux filtres de doublons.',
+    descEn: 'Rewrites device, GPS and EXIF and micro-varies the image — invisible to duplicate filters.',
     grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
-  { id: 'subtitles', Icon: IconCaptions, title: 'Sous-titres', tag: 'IA Whisper', preview: 'subtitles',
+  { id: 'subtitles', Icon: IconCaptions, title: 'Sous-titres', titleEn: 'Subtitles', tag: 'IA Whisper', tagEn: 'Whisper AI', preview: 'subtitles',
     desc: 'Transcription IA (Groq Whisper) et incrustation stylée, mot par mot, en un clic.',
+    descEn: 'AI transcription (Groq Whisper) and styled word-by-word burn-in, in one click.',
     grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
-  { id: 'mixer', Icon: IconOverlay, title: 'Mixer', tag: 'Overlay', preview: 'mixer',
+  { id: 'mixer', Icon: IconOverlay, title: 'Mixer', titleEn: 'Mixer', tag: 'Overlay', tagEn: 'Overlay', preview: 'mixer',
     desc: 'Incruste un hook accrocheur sur la vidéo, avec un rendu propre côté serveur.',
+    descEn: 'Burns a catchy hook onto the video, with clean server-side rendering.',
     grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.45)', accent: '#F472B6' },
 ]
 
 function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
+  const tr = useTr()
   const box: React.CSSProperties = {
     position: 'relative', height: 120, borderRadius: 14, overflow: 'hidden',
     background: 'radial-gradient(130% 130% at 15% 0%, rgba(255,255,255,0.05), rgba(0,0,0,0.3))',
@@ -80,7 +86,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
     )
   }
   if (kind === 'spoof') {
-    const rows = [['Device', 'iPhone 15 Pro'], ['GPS', '34.05, -118.2'], ['EXIF', 'nettoyé']]
+    const rows = [['Device', 'iPhone 15 Pro'], ['GPS', '34.05, -118.2'], ['EXIF', tr('nettoyé', 'cleaned')]]
     return (
       <div style={{ ...box, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 9 }}>
         {rows.map(([k, v], i) => (
@@ -94,7 +100,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
     )
   }
   if (kind === 'subtitles') {
-    const words = ['tu', 'vas', 'ADORER', 'ça']
+    const words = [tr('tu', 'you'), tr('vas', 'will'), tr('ADORER', 'LOVE'), tr('ça', 'it')]
     return (
       <div style={{ ...box, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 18, background: 'radial-gradient(130% 130% at 50% 0%, rgba(245,158,11,0.08), rgba(0,0,0,0.42))' }}>
         <span style={{ position: 'absolute', top: 13, left: 14, fontSize: 8, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.35)' }}>Whisper · live</span>
@@ -112,12 +118,13 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
       <div style={{ padding: '8px 20px', background: 'rgba(0,0,0,0.4)', borderRadius: 7, border: `1px solid ${accent}66`, animation: 'hub-tilt 4s ease-in-out infinite' }}>
         <span style={{ fontSize: 19, fontWeight: 900, letterSpacing: '0.02em', color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>HOOK</span>
       </div>
-      <span style={{ position: 'absolute', bottom: 10, right: 13, fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.4)' }}>texte sur vidéo</span>
+      <span style={{ position: 'absolute', bottom: 10, right: 13, fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.4)' }}>{tr('texte sur vidéo', 'text on video')}</span>
     </div>
   )
 }
 
 function ToolCard({ tool, onOpen }: { tool: Tool; onOpen: () => void }) {
+  const tr = useTr()
   const [hover, setHover] = useState(false)
   const [pos, setPos] = useState({ x: 50, y: 50 })
   return (
@@ -145,8 +152,8 @@ function ToolCard({ tool, onOpen }: { tool: Tool; onOpen: () => void }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
           <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: tool.grad, boxShadow: `0 10px 24px -8px ${tool.glow}, inset 0 1px 0 0 rgba(255,255,255,0.35)`, transform: hover ? 'scale(1.06) rotate(-3deg)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)' }}><tool.Icon size={22} /></div>
           <div>
-            <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{tool.title}</h3>
-            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: tool.accent }}>{tool.tag}</span>
+            <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{tr(tool.title, tool.titleEn)}</h3>
+            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: tool.accent }}>{tr(tool.tag, tool.tagEn)}</span>
           </div>
         </div>
         <span style={{ display: 'inline-flex', width: 30, height: 30, borderRadius: '50%', border: `1px solid ${hover ? tool.accent : 'rgba(255,255,255,0.12)'}`, color: hover ? tool.accent : 'rgba(233,234,240,0.5)', alignItems: 'center', justifyContent: 'center', transform: hover ? 'translateX(2px)' : 'none', transition: 'all 0.25s' }}>
@@ -154,7 +161,7 @@ function ToolCard({ tool, onOpen }: { tool: Tool; onOpen: () => void }) {
         </span>
       </div>
 
-      <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(233,234,240,0.55)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 39 }}>{tool.desc}</p>
+      <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(233,234,240,0.55)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 39 }}>{tr(tool.desc, tool.descEn)}</p>
 
       <div style={{ position: 'relative', zIndex: 2, marginTop: 'auto' }}><Preview kind={tool.preview} accent={tool.accent} /></div>
     </button>
@@ -162,6 +169,7 @@ function ToolCard({ tool, onOpen }: { tool: Tool; onOpen: () => void }) {
 }
 
 export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
+  const tr = useTr()
   return (
     <div style={{ minHeight: '100%', background: 'var(--base)', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
       <style>{CSS}</style>
@@ -174,17 +182,17 @@ export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
         <div style={{ marginBottom: 36 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 16, fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M7 6v12"/><path d="M17 6v12"/></svg>
-            Studio Vidéo
+            {tr('Studio Vidéo', 'Video Studio')}
           </div>
           <h1 style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#f0abfc 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
-            Ton usine à contenu unique
+            {tr('Ton usine à contenu unique', 'Your unique-content factory')}
           </h1>
           <p style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.55)', maxWidth: 600, lineHeight: 1.65 }}>
-            Quatre outils pour transformer une vidéo en dizaines de posts uniques — puis les balancer dans le posting.
+            {tr('Quatre outils pour transformer une vidéo en dizaines de posts uniques — puis les balancer dans le posting.', 'Four tools to turn one video into dozens of unique posts — then push them straight to posting.')}
           </p>
           {/* Mini-flux : 1 vidéo → 4 outils → ∞ variantes → export */}
           <div style={{ display: 'flex', gap: 12, marginTop: 22, flexWrap: 'wrap', alignItems: 'center' }}>
-            {([['1', 'vidéo source', '#818CF8'], ['4', 'outils', '#F472B6'], ['∞', 'variantes uniques', '#34D399'], ['1 clic', 'export', '#FBBF24']] as const).map(([v, l, c], i, arr) => (
+            {([['1', tr('vidéo source', 'source video'), '#818CF8'], ['4', tr('outils', 'tools'), '#F472B6'], ['∞', tr('variantes uniques', 'unique variants'), '#34D399'], [tr('1 clic', '1 click'), 'export', '#FBBF24']] as const).map(([v, l, c], i, arr) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '7px 13px', borderRadius: 99, background: 'rgba(255,255,255,0.035)', border: `1px solid ${c}33` }}>
                   <span style={{ fontSize: 16, fontWeight: 900, color: c, letterSpacing: '-0.02em' }}>{v}</span>

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { BankPicker } from './Bank'
 import { playSuccess, playError } from '@/lib/sounds'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { supabase, fetchAllRows } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
@@ -225,6 +225,7 @@ function VideoSourcePanel({
 
 export function MassRemix({ user }: MassRemixProps) {
   const t = useT()
+  const tr = useTr()
   const { lang } = useLang()
   const STATUS_LABEL: Record<MassJob['status'], string> = {
     pending:    t('massRemixStatusPending'),
@@ -463,7 +464,7 @@ export function MassRemix({ user }: MassRemixProps) {
     if (creditCost > 0) {
       const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
-        alert(`${t('massRemixInsufficientCredits')} — ${creditCost} crédit(s) requis pour ${n} remix. Solde: ${creditRes.balance ?? 0}`)
+        alert(`${t('massRemixInsufficientCredits')} — ${tr(`${creditCost} crédit(s) requis pour ${n} remix. Solde: ${creditRes.balance ?? 0}`, `${creditCost} credit(s) required for ${n} remix. Balance: ${creditRes.balance ?? 0}`)}`)
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
@@ -494,8 +495,8 @@ export function MassRemix({ user }: MassRemixProps) {
 
       try {
         updateJob(job.id, { status: 'detecting' })
-        addLog(job.id, `▶ Vidéo originale : ${fileName(job.originalPath)}`)
-        addLog(job.id, `▶ Vidéo secondaire: ${fileName(job.secondaryPath)}`)
+        addLog(job.id, tr(`▶ Vidéo originale : ${fileName(job.originalPath)}`, `▶ Original video: ${fileName(job.originalPath)}`))
+        addLog(job.id, tr(`▶ Vidéo secondaire: ${fileName(job.secondaryPath)}`, `▶ Secondary video: ${fileName(job.secondaryPath)}`))
 
         // ── 1. Detect / set split time ───────────────────────────────────────
         let splitTime: number | undefined
@@ -503,20 +504,20 @@ export function MassRemix({ user }: MassRemixProps) {
 
         if (job.cutSec != null) {
           splitTime = job.cutSec
-          addLog(job.id, `✂️ Coupe personnalisée (aperçu): ${splitTime}s`)
+          addLog(job.id, tr(`✂️ Coupe personnalisée (aperçu): ${splitTime}s`, `✂️ Custom cut (preview): ${splitTime}s`))
         } else if (splitMode === 'manual') {
           const manualSt = parseFloat(manualSplitSec)
           splitTime = (!isNaN(manualSt) && manualSt > 0) ? manualSt : undefined
-          addLog(job.id, `✂️ Coupe manuelle: ${splitTime != null ? splitTime + 's' : 'désactivée'}`)
+          addLog(job.id, tr(`✂️ Coupe manuelle: ${splitTime != null ? splitTime + 's' : 'désactivée'}`, `✂️ Manual cut: ${splitTime != null ? splitTime + 's' : 'disabled'}`))
         } else {
-          addLog(job.id, '🔍 Détection scène…')
+          addLog(job.id, tr('🔍 Détection scène…', '🔍 Detecting scene…'))
           const det = await withTimeout(
             isWeb
               ? detectSceneChangeWeb({ filePath: job.originalPath })
               : window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
             60_000, 'détection scène'
           )
-          if (!det.ok) addLog(job.id, `❌ Détection de la scène impossible`)
+          if (!det.ok) addLog(job.id, tr(`❌ Détection de la scène impossible`, `❌ Scene detection failed`))
 
           detDuration = det.duration
           // Ignore detected splits that are too early (< 20% of duration, min 2s)
@@ -524,12 +525,12 @@ export function MassRemix({ user }: MassRemixProps) {
           const minSplit = 2.0
           if (det.ok && det.splitTime != null && det.splitTime >= minSplit) {
             splitTime = Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
-            addLog(job.id, `✅ Scène détectée à ${splitTime}s (durée ${det.duration ?? '?'}s)`)
+            addLog(job.id, tr(`✅ Scène détectée à ${splitTime}s (durée ${det.duration ?? '?'}s)`, `✅ Scene detected at ${splitTime}s (duration ${det.duration ?? '?'}s)`))
           } else {
             splitTime = undefined
             addLog(job.id, det.ok && det.splitTime != null
-              ? `⚠️ Scène détectée trop tôt → vidéo secondaire uniquement`
-              : `⚠️ Aucune scène détectée → vidéo secondaire uniquement`)
+              ? tr(`⚠️ Scène détectée trop tôt → vidéo secondaire uniquement`, `⚠️ Scene detected too early → secondary video only`)
+              : tr(`⚠️ Aucune scène détectée → vidéo secondaire uniquement`, `⚠️ No scene detected → secondary video only`))
           }
 
           // Vérif. décor — si le BACKGROUND/LIEU est le même des 2 côtés du cut → annuler
@@ -538,7 +539,7 @@ export function MassRemix({ user }: MassRemixProps) {
             try {
               const totalDur = det.duration ?? 60
               const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
-              addLog(job.id, `🤖 Vérification du décor (coupe à ${splitTime}s)…`)
+              addLog(job.id, tr(`🤖 Vérification du décor (coupe à ${splitTime}s)…`, `🤖 Checking the background (cut at ${splitTime}s)…`))
               const extractFn = (args: { filePath: string; startTime: number; endTime: number }) =>
                 isWeb ? extractFramesWeb(args) : window.electronAPI!.extractFrames!(args)
               const [fr1, fr2] = await Promise.all([
@@ -565,15 +566,15 @@ export function MassRemix({ user }: MassRemixProps) {
                 if (res.ok) {
                   const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
                   if (answer.startsWith('no')) {
-                    addLog(job.id, '⚠️ Même décor → coupe annulée')
+                    addLog(job.id, tr('⚠️ Même décor → coupe annulée', '⚠️ Same background → cut cancelled'))
                     splitTime = undefined
                   } else {
-                    addLog(job.id, '✅ Décor différent → coupe maintenue')
+                    addLog(job.id, tr('✅ Décor différent → coupe maintenue', '✅ Different background → cut kept'))
                   }
                 }
               }
             } catch (e) {
-              addLog(job.id, `⚠️ Vérification du décor ignorée`)
+              addLog(job.id, tr(`⚠️ Vérification du décor ignorée`, `⚠️ Background check skipped`))
             }
           }
         }
@@ -601,10 +602,10 @@ export function MassRemix({ user }: MassRemixProps) {
             startTime: 0,
             endTime: textEndTime,
           })
-          addLog(job.id, `✏️ Texte manuel: "${manualText.trim().slice(0, 60)}"`)
+          addLog(job.id, tr(`✏️ Texte manuel: "${manualText.trim().slice(0, 60)}"`, `✏️ Manual text: "${manualText.trim().slice(0, 60)}"`))
         } else if (aiEnabled && !manualText.trim() && anthropicKey.trim()) {
           updateJob(job.id, { status: 'analyzing' })
-          addLog(job.id, '✨ Analyse texte IA…')
+          addLog(job.id, tr('✨ Analyse texte IA…', '✨ AI text analysis…'))
           const analyzeEnd = splitTime ?? detDuration ?? 30
           const fr = await withTimeout(
             isWeb
@@ -613,7 +614,7 @@ export function MassRemix({ user }: MassRemixProps) {
             180_000, 'extraction frames'
           )
           if (fr.ok && fr.frames?.length) {
-            addLog(job.id, `   ${fr.frames.length} images extraites (jusqu’à ${analyzeEnd.toFixed(1)}s)`)
+            addLog(job.id, tr(`   ${fr.frames.length} images extraites (jusqu’à ${analyzeEnd.toFixed(1)}s)`, `   ${fr.frames.length} frames extracted (up to ${analyzeEnd.toFixed(1)}s)`))
             const interval = analyzeEnd / fr.frames.length
             const imageBlocks = fr.frames.flatMap((f, fi) => [
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
@@ -739,19 +740,19 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     endTime:   item.endTime,
                   })
                 })
-                addLog(job.id, `   ${textOverlays.length} texte(s) ajouté(s) : ${textOverlays.map(o => `"${o.text}"`).join(', ')}`)
+                addLog(job.id, tr(`   ${textOverlays.length} texte(s) ajouté(s) : ${textOverlays.map(o => `"${o.text}"`).join(', ')}`, `   ${textOverlays.length} text(s) added: ${textOverlays.map(o => `"${o.text}"`).join(', ')}`))
               }
             } else {
-              addLog(job.id, `   Analyse du texte par l’IA impossible`)
+              addLog(job.id, tr(`   Analyse du texte par l’IA impossible`, `   AI text analysis failed`))
             }
           } else {
-            addLog(job.id, `   Impossible d’extraire les images de la vidéo`)
+            addLog(job.id, tr(`   Impossible d’extraire les images de la vidéo`, `   Unable to extract frames from the video`))
           }
         }
 
         // ── 3. Generate ──────────────────────────────────────────────────────
         updateJob(job.id, { status: 'generating' })
-        addLog(job.id, `⚙️ Génération de la vidéo en cours…`)
+        addLog(job.id, tr(`⚙️ Génération de la vidéo en cours…`, `⚙️ Generating the video…`))
 
         const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
         let outputPath: string
@@ -762,7 +763,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         } else {
           const tmp = await window.electronAPI!.writeTempFile!({ name: outName, bytes: new ArrayBuffer(0) })
           if (!tmp.ok || !tmp.path) {
-            addLog(job.id, '❌ Impossible de créer le fichier temporaire')
+            addLog(job.id, tr('❌ Impossible de créer le fichier temporaire', '❌ Unable to create the temporary file'))
             updateJob(job.id, { status: 'error', error: 'Unable to create temp file' })
             return
           }
@@ -795,12 +796,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         )
 
         if (!gen.ok) {
-          addLog(job.id, `❌ La génération de la vidéo a échoué`)
-          updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg' })
+          addLog(job.id, tr(`❌ La génération de la vidéo a échoué`, `❌ Video generation failed`))
+          updateJob(job.id, { status: 'error', error: gen.error ?? tr('Erreur FFmpeg', 'FFmpeg error') })
           playError()
           return
         }
-        addLog(job.id, '✅ Vidéo générée')
+        addLog(job.id, tr('✅ Vidéo générée', '✅ Video generated'))
         const finalPath = gen.outputPath ?? outputPath
         updateJob(job.id, { outputPath: finalPath })
 
@@ -809,7 +810,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         // On Electron, upload only when exportMode === 'bank'.
         if (isWeb || exportMode === 'bank') {
           updateJob(job.id, { status: 'uploading' })
-          addLog(job.id, '☁️ Envoi vers la banque…')
+          addLog(job.id, tr('☁️ Envoi vers la banque…', '☁️ Uploading to the bank…'))
           const up = await withTimeout(
             uploadVideoFromPath(finalPath, scope),
             90_000, 'upload'
@@ -821,14 +822,14 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             folder: bankFolder.trim() || null,
             tags: [], notes: '',
           })
-          addLog(job.id, '✅ Vidéo ajoutée à la banque')
+          addLog(job.id, tr('✅ Vidéo ajoutée à la banque', '✅ Video added to the bank'))
         }
 
         updateJob(job.id, { status: 'done' })
         playSuccess()
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
-        addLog(job.id, `❌ Une erreur est survenue pendant le remix`)
+        addLog(job.id, tr(`❌ Une erreur est survenue pendant le remix`, `❌ An error occurred during the remix`))
         updateJob(job.id, { status: 'error', error: msg })
         playError()
       }
@@ -844,8 +845,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       const errors = jobs.filter(j => j.status === 'error').length
       if (done > 0 || errors > 0) {
         pushNotification({
-          title: errors === 0 ? 'Mass Remix terminé ✅' : `Mass Remix: ${errors} erreur${errors > 1 ? 's' : ''}`,
-          body:  `${done} succès · ${errors} erreur${errors > 1 ? 's' : ''} · ${jobs.length} vidéo${jobs.length > 1 ? 's' : ''}`,
+          title: errors === 0 ? tr('Mass Remix terminé ✅', 'Mass Remix done ✅') : tr(`Mass Remix: ${errors} erreur${errors > 1 ? 's' : ''}`, `Mass Remix: ${errors} error${errors > 1 ? 's' : ''}`),
+          body:  tr(`${done} succès · ${errors} erreur${errors > 1 ? 's' : ''} · ${jobs.length} vidéo${jobs.length > 1 ? 's' : ''}`, `${done} success · ${errors} error${errors > 1 ? 's' : ''} · ${jobs.length} video${jobs.length > 1 ? 's' : ''}`),
           level: errors === 0 ? 'ok' : 'warn',
         })
       }
@@ -971,12 +972,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.max(0, v.currentTime - 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Image précédente">
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label={tr('Image précédente', 'Previous frame')}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" strokeWidth="2"/></svg>
                       </button>
                       {/* Play/pause */}
                       <button onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
-                        className="sf-btn sf-btn-secondary cursor-pointer" style={{ width: 36, height: 36, padding: 0 }} aria-label="Lecture/pause">
+                        className="sf-btn sf-btn-secondary cursor-pointer" style={{ width: 36, height: 36, padding: 0 }} aria-label={tr('Lecture/pause', 'Play/pause')}>
                         {isPlaying
                           ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                           : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -987,7 +988,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.min(vidDuration, v.currentTime + 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Image suivante">
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label={tr('Image suivante', 'Next frame')}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" strokeWidth="2"/></svg>
                       </button>
 
@@ -1059,7 +1060,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                               ? <img src={beforeFrameUrl} alt="phase1" className="w-full h-full object-contain" />
                               : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>{t('massRemixLoadingFrame')}</div>}
                             <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
-                              <p style={{ fontSize: 8, fontWeight: 800, color: '#6366F1', letterSpacing: '0.08em' }}>PHASE 1 — SECONDAIRE</p>
+                              <p style={{ fontSize: 8, fontWeight: 800, color: '#6366F1', letterSpacing: '0.08em' }}>{tr('PHASE 1 — SECONDAIRE', 'PHASE 1 — SECONDARY')}</p>
                               <p style={{ fontSize: 7, color: 'rgba(99,102,241,0.7)', fontFamily: 'monospace' }}>up to {selectedPair.cutSec.toFixed(3)}s</p>
                             </div>
                           </div>
@@ -1079,7 +1080,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                               ? <img src={afterFrameUrl} alt="phase2" className="w-full h-full object-contain" />
                               : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>{t('massRemixLoadingFrame')}</div>}
                             <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
-                              <p style={{ fontSize: 8, fontWeight: 800, color: '#818CF8', letterSpacing: '0.08em' }}>PHASE 2 — ORIGINALE</p>
+                              <p style={{ fontSize: 8, fontWeight: 800, color: '#818CF8', letterSpacing: '0.08em' }}>{tr('PHASE 2 — ORIGINALE', 'PHASE 2 — ORIGINAL')}</p>
                               <p style={{ fontSize: 7, color: 'rgba(129,140,248,0.7)', fontFamily: 'monospace' }}>resumes at {selectedPair.cutSec.toFixed(3)}s</p>
                             </div>
                           </div>
@@ -1560,7 +1561,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             {!isMobile && canLaunch && (
               <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, fontVariantNumeric: 'tabular-nums' }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                {copies * CREDIT_COSTS.remix} crédit{copies * CREDIT_COSTS.remix > 1 ? 's' : ''}
+                {copies * CREDIT_COSTS.remix} {tr(`crédit${copies * CREDIT_COSTS.remix > 1 ? 's' : ''}`, `credit${copies * CREDIT_COSTS.remix > 1 ? 's' : ''}`)}
               </span>
             )}
             {!isMobile && (

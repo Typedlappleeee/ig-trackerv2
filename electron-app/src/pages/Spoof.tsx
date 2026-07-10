@@ -5,6 +5,7 @@ import { BankPicker } from '@/pages/Bank'
 import { useOrg } from '@/lib/orgContext'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { useTr } from '@/lib/i18n'
 
 const PRESETS: Record<string, string> = {
   iphone17pro: 'iPhone 17 Pro',
@@ -70,6 +71,7 @@ function todayStr() {
 }
 
 export function Spoof({ user }: { user: User }) {
+  const tr = useTr()
   const credits = useCredits()
   const { currentOrg } = useOrg()
 
@@ -131,7 +133,7 @@ export function Spoof({ user }: { user: User }) {
       tags: ['spoof', ...(job.meta ? [job.meta.model, job.meta.city].filter(Boolean) : [])],
       notes: '',
     })
-    if (error) { alert('Échec de l\'enregistrement : ' + error.message); return false }
+    if (error) { alert(tr('Échec de l\'enregistrement : ', 'Save failed: ') + error.message); return false }
     updateJob(job.id, { savedToBank: true })
     return true
   }
@@ -156,7 +158,7 @@ export function Spoof({ user }: { user: User }) {
       const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
         const balance = creditRes.balance ?? credits.balance
-        alert(`Crédits insuffisants — ${creditCost} crédits requis. Solde: ${balance}`)
+        alert(tr(`Crédits insuffisants — ${creditCost} crédits requis. Solde: ${balance}`, `Insufficient credits — ${creditCost} credits required. Balance: ${balance}`))
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
@@ -167,7 +169,7 @@ export function Spoof({ user }: { user: User }) {
     const initialJobs: SpoofJob[] = selectedVideos.flatMap((v, vi) =>
       Array.from({ length: copies }, (_, c) => ({
         id: `${Date.now()}_${vi}_${c}`,
-        name: copies > 1 ? `${v.name} (copie ${c + 1}/${copies})` : v.name,
+        name: copies > 1 ? tr(`${v.name} (copie ${c + 1}/${copies})`, `${v.name} (copy ${c + 1}/${copies})`) : v.name,
         url: v.url,
         status: 'queued' as JobStatus,
       })),
@@ -196,7 +198,7 @@ export function Spoof({ user }: { user: User }) {
         // spoof est gratuit) ; une tentative qui a timeout n'a rien enregistré en
         // banque côté client, donc on ne crée pas de doublon.
         const MAX_TRIES = 3
-        let lastErr = 'Erreur inconnue'
+        let lastErr = tr('Erreur inconnue', 'Unknown error')
         let succeeded = false
         for (let attempt = 1; attempt <= MAX_TRIES && !succeeded; attempt++) {
           try {
@@ -215,7 +217,7 @@ export function Spoof({ user }: { user: User }) {
                 supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
               }),
             })
-            const data = await res.json().catch(() => ({ ok: false, error: `Réponse serveur invalide (HTTP ${res.status})` }))
+            const data = await res.json().catch(() => ({ ok: false, error: tr(`Réponse serveur invalide (HTTP ${res.status})`, `Invalid server response (HTTP ${res.status})`) }))
             if (data.ok) {
               // Auto-enregistrement dans la banque dès qu'une vidéo est prête
               // (dossier choisi, ou racine si aucun) — plus besoin de cliquer.
@@ -236,13 +238,13 @@ export function Spoof({ user }: { user: User }) {
               updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta, savedToBank: savedOk })
               succeeded = true
             } else {
-              lastErr = data.error ?? 'Erreur inconnue'
+              lastErr = data.error ?? tr('Erreur inconnue', 'Unknown error')
             }
           } catch (err) {
             lastErr = String(err)
           }
           if (!succeeded && attempt < MAX_TRIES) {
-            updateJob(job.id, { status: 'processing', error: `nouvelle tentative ${attempt + 1}/${MAX_TRIES}…` })
+            updateJob(job.id, { status: 'processing', error: tr(`nouvelle tentative ${attempt + 1}/${MAX_TRIES}…`, `retry ${attempt + 1}/${MAX_TRIES}…`) })
             await new Promise(r => setTimeout(r, 2500 * attempt))
           }
         }
@@ -298,11 +300,11 @@ export function Spoof({ user }: { user: User }) {
               {running && (
                 <span className="sf-badge sf-badge-accent" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  Traitement…
+                  {tr('Traitement…', 'Processing…')}
                 </span>
               )}
             </div>
-            <p className="sf-page-sub">Métadonnées iPhone authentiques + GPS multi-pays · chaque export est unique</p>
+            <p className="sf-page-sub">{tr('Métadonnées iPhone authentiques + GPS multi-pays · chaque export est unique', 'Authentic iPhone metadata + multi-country GPS · every export is unique')}</p>
           </div>
         </div>
       </header>
@@ -316,7 +318,7 @@ export function Spoof({ user }: { user: User }) {
 
             {/* Source videos */}
             <div style={{ padding: '16px 16px 0' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>Vidéos source</div>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Vidéos source', 'Source videos')}</div>
 
               <button
                 onClick={() => setShowBank(true)}
@@ -326,8 +328,8 @@ export function Spoof({ user }: { user: User }) {
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M10 12h4"/></svg>
                 {selectedVideos.length
-                  ? `${selectedVideos.length} vidéo${selectedVideos.length > 1 ? 's' : ''} · Ajouter`
-                  : 'Ajouter vidéos'}
+                  ? tr(`${selectedVideos.length} vidéo${selectedVideos.length > 1 ? 's' : ''} · Ajouter`, `${selectedVideos.length} video${selectedVideos.length > 1 ? 's' : ''} · Add`)
+                  : tr('Ajouter vidéos', 'Add videos')}
               </button>
 
               {selectedVideos.length > 0 && (
@@ -355,7 +357,7 @@ export function Spoof({ user }: { user: User }) {
 
             {/* iPhone model */}
             <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>Modèle iPhone</div>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Modèle iPhone', 'iPhone model')}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 {Object.entries(PRESETS).map(([key, label]) => (
                   <button
@@ -381,7 +383,7 @@ export function Spoof({ user }: { user: User }) {
 
             {/* GPS location */}
             <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>🏙 Localisation GPS</div>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('🏙 Localisation GPS', '🏙 GPS location')}</div>
               <select
                 value={gpsCity}
                 onChange={e => setGpsCity(e.target.value)}
@@ -389,8 +391,8 @@ export function Spoof({ user }: { user: User }) {
                 className="sf-input"
                 style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
               >
-                <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>🎲 Aléatoire (tous pays)</option>
-                <option value="random_france" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>🇫🇷 Aléatoire France uniquement</option>
+                <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{tr('🎲 Aléatoire (tous pays)', '🎲 Random (all countries)')}</option>
+                <option value="random_france" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{tr('🇫🇷 Aléatoire France uniquement', '🇫🇷 Random France only')}</option>
                 {GPS_GROUPS.map(group => (
                   <optgroup key={group.country} label={group.country} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
                     {Object.entries(group.cities).map(([key, label]) => (
@@ -405,7 +407,7 @@ export function Spoof({ user }: { user: User }) {
 
             {/* Custom date */}
             <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>Date de création</div>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Date de création', 'Creation date')}</div>
               <input
                 type="date"
                 value={customDate}
@@ -421,8 +423,8 @@ export function Spoof({ user }: { user: User }) {
             {/* Copies per video */}
             <div style={{ padding: '0 16px' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>
-                Copies par vidéo
-                <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>chaque copie = métadonnées uniques</span>
+                {tr('Copies par vidéo', 'Copies per video')}
+                <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>{tr('chaque copie = métadonnées uniques', 'each copy = unique metadata')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
@@ -441,7 +443,7 @@ export function Spoof({ user }: { user: User }) {
               </div>
               {selectedVideos.length > 0 && (
                 <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 6, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                  {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> export{totalOutputs > 1 ? 's' : ''}
+                  {selectedVideos.length} {tr(`vidéo${selectedVideos.length > 1 ? 's' : ''}`, `video${selectedVideos.length > 1 ? 's' : ''}`)} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> {tr(`export${totalOutputs > 1 ? 's' : ''}`, `export${totalOutputs > 1 ? 's' : ''}`)}
                 </div>
               )}
             </div>
@@ -450,7 +452,7 @@ export function Spoof({ user }: { user: User }) {
 
             {/* Bank destination */}
             <div style={{ padding: '0 16px' }}>
-              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de destination" />
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label={tr('Dossier de destination', 'Destination folder')} />
             </div>
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
@@ -470,7 +472,7 @@ export function Spoof({ user }: { user: User }) {
                 }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-                Ajustements visuels
+                {tr('Ajustements visuels', 'Visual adjustments')}
                 <svg
                   width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
                   style={{ marginLeft: 'auto', transform: showAdjustments ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
@@ -485,8 +487,8 @@ export function Spoof({ user }: { user: User }) {
                   <button onClick={() => setAutoMode(v => !v)} disabled={running} className="cursor-pointer"
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 11px', borderRadius: 9, background: autoMode ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)', border: `1px solid ${autoMode ? 'rgba(99,102,241,0.35)' : 'var(--border)'}` }}>
                     <div style={{ textAlign: 'left' }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>⚡ Automatique</p>
-                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>Réglages aléatoires différents pour chaque vidéo</p>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{tr('⚡ Automatique', '⚡ Automatic')}</p>
+                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>{tr('Réglages aléatoires différents pour chaque vidéo', 'Different random settings for each video')}</p>
                     </div>
                     <span style={{ width: 32, height: 18, borderRadius: 99, position: 'relative', background: autoMode ? 'var(--accent)' : 'rgba(255,255,255,0.12)', flexShrink: 0 }}>
                       <span style={{ position: 'absolute', top: 2, left: autoMode ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
@@ -494,17 +496,17 @@ export function Spoof({ user }: { user: User }) {
                   </button>
                   {autoMode && (
                     <p style={{ fontSize: 11, color: 'var(--accent-l)', margin: '0 0 2px', lineHeight: 1.5 }}>
-                      Chaque vidéo reçoit ses propres micro-variations (luminosité, gamma, teinte, saturation, contraste, grain/pixels, netteté, zoom, recadrage, micro-vitesse, vignette). Pas de miroir → le texte à l'écran reste intact. Les réglages manuels ci-dessous sont ignorés.
+                      {tr("Chaque vidéo reçoit ses propres micro-variations (luminosité, gamma, teinte, saturation, contraste, grain/pixels, netteté, zoom, recadrage, micro-vitesse, vignette). Pas de miroir → le texte à l'écran reste intact. Les réglages manuels ci-dessous sont ignorés.", 'Each video gets its own micro-variations (brightness, gamma, hue, saturation, contrast, grain/pixels, sharpness, zoom, crop, micro-speed, vignette). No mirror → on-screen text stays intact. The manual settings below are ignored.')}
                     </p>
                   )}
 
                   {/* Sliders */}
                   {([
-                    { label: 'Luminosité', value: brightness, set: setBrightness, min: -50, max: 50 },
-                    { label: 'Saturation', value: saturation, set: setSaturation, min: -50, max: 50 },
-                    { label: 'Contraste',  value: contrast,   set: setContrast,   min: -50, max: 50 },
-                    { label: 'Grain/Bruit', value: noise,     set: setNoise,      min: 0,   max: 30 },
-                    { label: 'Zoom (%)',   value: zoomPct,    set: setZoomPct,    min: 0,   max: 15 },
+                    { label: tr('Luminosité', 'Brightness'), value: brightness, set: setBrightness, min: -50, max: 50 },
+                    { label: tr('Saturation', 'Saturation'), value: saturation, set: setSaturation, min: -50, max: 50 },
+                    { label: tr('Contraste', 'Contrast'),  value: contrast,   set: setContrast,   min: -50, max: 50 },
+                    { label: tr('Grain/Bruit', 'Grain/Noise'), value: noise,     set: setNoise,      min: 0,   max: 30 },
+                    { label: tr('Zoom (%)', 'Zoom (%)'),   value: zoomPct,    set: setZoomPct,    min: 0,   max: 15 },
                   ] as const).map(({ label, value, set, min, max }) => (
                     <div key={label}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -526,8 +528,8 @@ export function Spoof({ user }: { user: User }) {
                   {/* Toggles */}
                   <div style={{ display: 'flex', gap: 8 }}>
                     {([
-                      { label: 'Flip H', value: flipH, set: setFlipH },
-                      { label: 'Vignette', value: vignette, set: setVignette },
+                      { label: tr('Flip H', 'Flip H'), value: flipH, set: setFlipH },
+                      { label: tr('Vignette', 'Vignette'), value: vignette, set: setVignette },
                     ] as const).map(({ label, value, set }) => (
                       <button
                         key={label}
@@ -555,7 +557,7 @@ export function Spoof({ user }: { user: User }) {
               {selectedVideos.length > 0 && !running && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
-                    {creditCost} crédit{creditCost > 1 ? 's' : ''} · {totalOutputs} export{totalOutputs > 1 ? 's' : ''}
+                    {creditCost} {tr(`crédit${creditCost > 1 ? 's' : ''}`, `credit${creditCost > 1 ? 's' : ''}`)} · {totalOutputs} {tr(`export${totalOutputs > 1 ? 's' : ''}`, `export${totalOutputs > 1 ? 's' : ''}`)}
                   </span>
                 </div>
               )}
@@ -576,12 +578,12 @@ export function Spoof({ user }: { user: User }) {
                 {running ? (
                   <>
                     <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(248,113,113,0.3)', borderTopColor: '#f87171', animation: 'spin 0.9s linear infinite' }} />
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>Traitement {doneCount}/{totalOutputs}…</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{tr(`Traitement ${doneCount}/${totalOutputs}…`, `Processing ${doneCount}/${totalOutputs}…`)}</span>
                   </>
                 ) : (
                   <>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    Spoofing {totalOutputs > 0 ? `(${totalOutputs})` : ''}
+                    {tr('Spoofing', 'Spoofing')} {totalOutputs > 0 ? `(${totalOutputs})` : ''}
                   </>
                 )}
               </button>
@@ -601,10 +603,10 @@ export function Spoof({ user }: { user: User }) {
                     </svg>
                   </div>
                 </div>
-                <p className="sf-empty-title">Aucune vidéo traitée</p>
-                <p className="sf-empty-desc">Sélectionne <b>2 vidéos ou plus</b> depuis la banque pour les spoofer<br />et comparer les métadonnées injectées côte à côte.</p>
+                <p className="sf-empty-title">{tr('Aucune vidéo traitée', 'No video processed')}</p>
+                <p className="sf-empty-desc">{tr('Sélectionne ', 'Select ')}<b>{tr('2 vidéos ou plus', '2 or more videos')}</b>{tr(' depuis la banque pour les spoofer', ' from the bank to spoof them')}<br />{tr('et comparer les métadonnées injectées côte à côte.', 'and compare the injected metadata side by side.')}</p>
                 <div style={{ display: 'flex', gap: 7, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {['Métadonnées iPhone', 'GPS multi-pays', 'Altitude + objectif', 'ID caméra unique'].map(pill => (
+                  {[tr('Métadonnées iPhone', 'iPhone metadata'), tr('GPS multi-pays', 'Multi-country GPS'), tr('Altitude + objectif', 'Altitude + lens'), tr('ID caméra unique', 'Unique camera ID')].map(pill => (
                     <span key={pill} className="sf-badge" style={{ padding: '4px 10px', background: 'rgba(99,102,241,0.05)', color: 'rgba(99,102,241,0.65)', border: '1px solid rgba(99,102,241,0.12)', fontSize: 10 }}>
                       {pill}
                     </span>
@@ -620,7 +622,7 @@ export function Spoof({ user }: { user: User }) {
                     flexWrap: 'wrap', borderColor: 'rgba(99,102,241,0.18)', background: 'rgba(99,102,241,0.04)',
                   }}>
                     <div style={{ flex: 1, fontSize: 11, color: 'var(--text-3)' }}>
-                      Dossier : <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
+                      {tr('Dossier : ', 'Folder: ')}<span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? tr('Racine', 'Root')}</span>
                     </div>
                     <button
                       onClick={saveAllToBank}
@@ -635,8 +637,8 @@ export function Spoof({ user }: { user: User }) {
                       }}
                     >
                       {savingAll
-                        ? <><div style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} /> Enregistrement…</>
-                        : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> Tout enregistrer ({doneCount})</>
+                        ? <><div style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} /> {tr('Enregistrement…', 'Saving…')}</>
+                        : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> {tr(`Tout enregistrer (${doneCount})`, `Save all (${doneCount})`)}</>
                       }
                     </button>
                   </div>
@@ -657,6 +659,7 @@ export function Spoof({ user }: { user: User }) {
 }
 
 function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
+  const tr = useTr()
   const isDone = job.status === 'done'
   const isErr  = job.status === 'error'
   const isProc = job.status === 'processing'
@@ -681,25 +684,25 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
   }
 
   const META_ROWS: { label: string; key: keyof AppliedMeta }[] = [
-    { label: 'Appareil',    key: 'model' },
-    { label: 'Marque',      key: 'make' },
-    { label: 'Logiciel',    key: 'software' },
-    { label: 'Objectif',    key: 'lens' },
-    { label: 'Localisation',key: 'city' },
-    { label: 'GPS',         key: 'gps' },
-    { label: 'Altitude',    key: 'altitude' },
-    { label: 'Date',        key: 'creationDate' },
-    { label: 'Fuseau',      key: 'timezone' },
-    { label: 'ID Caméra',   key: 'cameraId' },
-    { label: 'ISO',         key: 'iso' },
-    { label: 'Exposition',  key: 'exposure' },
-    { label: 'Ouverture',   key: 'aperture' },
-    { label: 'Focale',      key: 'focal' },
-    { label: 'Encodeur',    key: 'encoder' },
-    { label: 'CRF',         key: 'crf' },
-    { label: 'Audio',       key: 'audioBitrate' },
-    { label: 'GOP',         key: 'gopSize' },
-    { label: 'Colorimétrie',key: 'colorSpace' },
+    { label: tr('Appareil', 'Device'),    key: 'model' },
+    { label: tr('Marque', 'Make'),      key: 'make' },
+    { label: tr('Logiciel', 'Software'),    key: 'software' },
+    { label: tr('Objectif', 'Lens'),    key: 'lens' },
+    { label: tr('Localisation', 'Location'),key: 'city' },
+    { label: tr('GPS', 'GPS'),         key: 'gps' },
+    { label: tr('Altitude', 'Altitude'),    key: 'altitude' },
+    { label: tr('Date', 'Date'),        key: 'creationDate' },
+    { label: tr('Fuseau', 'Timezone'),      key: 'timezone' },
+    { label: tr('ID Caméra', 'Camera ID'),   key: 'cameraId' },
+    { label: tr('ISO', 'ISO'),         key: 'iso' },
+    { label: tr('Exposition', 'Exposure'),  key: 'exposure' },
+    { label: tr('Ouverture', 'Aperture'),   key: 'aperture' },
+    { label: tr('Focale', 'Focal length'),      key: 'focal' },
+    { label: tr('Encodeur', 'Encoder'),    key: 'encoder' },
+    { label: tr('CRF', 'CRF'),         key: 'crf' },
+    { label: tr('Audio', 'Audio'),       key: 'audioBitrate' },
+    { label: tr('GOP', 'GOP'),         key: 'gopSize' },
+    { label: tr('Colorimétrie', 'Color space'),key: 'colorSpace' },
   ]
 
   return (
@@ -746,10 +749,10 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
             {job.name}
           </div>
           <div style={{ fontSize: 10, color: isDone ? 'rgba(99,102,241,0.7)' : isErr ? '#f87171' : 'var(--text-4)', marginTop: 2 }}>
-            {isQ && 'En attente…'}
-            {isProc && 'Traitement en cours…'}
-            {isDone && (job.meta ? `📱 ${job.meta.model} · 📍 ${job.meta.city}` : 'Spoofing terminé')}
-            {isErr && (job.error?.slice(0, 60) ?? 'Erreur')}
+            {isQ && tr('En attente…', 'Queued…')}
+            {isProc && tr('Traitement en cours…', 'Processing…')}
+            {isDone && (job.meta ? `📱 ${job.meta.model} · 📍 ${job.meta.city}` : tr('Spoofing terminé', 'Spoofing done'))}
+            {isErr && (job.error?.slice(0, 60) ?? tr('Erreur', 'Error'))}
           </div>
         </div>
 
@@ -762,7 +765,7 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
               style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 7, gap: 5 }}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-              Télécharger
+              {tr('Télécharger', 'Download')}
             </button>
             {job.storagePath && (
               job.savedToBank ? (
@@ -771,7 +774,7 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
                   style={{ height: 30, fontSize: 10, padding: '0 10px', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  Enregistré
+                  {tr('Enregistré', 'Saved')}
                 </span>
               ) : (
                 <button
@@ -780,7 +783,7 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
                   style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                  Enregistrer
+                  {tr('Enregistrer', 'Save')}
                 </button>
               )
             )}
@@ -809,27 +812,28 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
   )
 }
 
-const COMPARE_ROWS: { label: string; key: keyof AppliedMeta; unique?: boolean }[] = [
-  { label: 'Appareil',    key: 'model' },
-  { label: 'Logiciel',    key: 'software' },
-  { label: 'Localisation', key: 'city',        unique: true },
-  { label: 'GPS',         key: 'gps',          unique: true },
-  { label: 'Altitude',    key: 'altitude',     unique: true },
-  { label: 'Date / heure', key: 'creationDate', unique: true },
-  { label: 'Fuseau',      key: 'timezone' },
-  { label: 'Objectif',    key: 'lens' },
-  { label: 'ISO',         key: 'iso',          unique: true },
-  { label: 'Exposition',  key: 'exposure',     unique: true },
-  { label: 'Ouverture',   key: 'aperture' },
-  { label: 'ID Caméra',   key: 'cameraId',     unique: true },
-  { label: 'Encodeur',    key: 'encoder' },
-  { label: 'CRF',         key: 'crf',          unique: true },
-  { label: 'Audio',       key: 'audioBitrate', unique: true },
-  { label: 'GOP',         key: 'gopSize',      unique: true },
-  { label: 'Colorimétrie', key: 'colorSpace' },
+const COMPARE_ROWS: { label: string; en: string; key: keyof AppliedMeta; unique?: boolean }[] = [
+  { label: 'Appareil',    en: 'Device',    key: 'model' },
+  { label: 'Logiciel',    en: 'Software',    key: 'software' },
+  { label: 'Localisation', en: 'Location', key: 'city',        unique: true },
+  { label: 'GPS',         en: 'GPS',         key: 'gps',          unique: true },
+  { label: 'Altitude',    en: 'Altitude',    key: 'altitude',     unique: true },
+  { label: 'Date / heure', en: 'Date / time', key: 'creationDate', unique: true },
+  { label: 'Fuseau',      en: 'Timezone',      key: 'timezone' },
+  { label: 'Objectif',    en: 'Lens',    key: 'lens' },
+  { label: 'ISO',         en: 'ISO',         key: 'iso',          unique: true },
+  { label: 'Exposition',  en: 'Exposure',  key: 'exposure',     unique: true },
+  { label: 'Ouverture',   en: 'Aperture',   key: 'aperture' },
+  { label: 'ID Caméra',   en: 'Camera ID',   key: 'cameraId',     unique: true },
+  { label: 'Encodeur',    en: 'Encoder',    key: 'encoder' },
+  { label: 'CRF',         en: 'CRF',         key: 'crf',          unique: true },
+  { label: 'Audio',       en: 'Audio',       key: 'audioBitrate', unique: true },
+  { label: 'GOP',         en: 'GOP',         key: 'gopSize',      unique: true },
+  { label: 'Colorimétrie', en: 'Color space', key: 'colorSpace' },
 ]
 
 function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
+  const tr = useTr()
   const done = jobs.filter(j => j.status === 'done' && j.meta)
   if (done.length < 2) return null
 
@@ -841,29 +845,29 @@ function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
-          Comparaison — {done.length} vidéos spoofées avec des métadonnées différentes
+          {tr(`Comparaison — ${done.length} vidéos spoofées avec des métadonnées différentes`, `Comparison — ${done.length} videos spoofed with different metadata`)}
         </span>
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', color: 'var(--text-4)', fontWeight: 600, paddingBottom: 8, paddingRight: 12, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Champ</th>
+              <th style={{ textAlign: 'left', color: 'var(--text-4)', fontWeight: 600, paddingBottom: 8, paddingRight: 12, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{tr('Champ', 'Field')}</th>
               {done.map((j, i) => (
                 <th key={j.id} style={{ textAlign: 'left', color: '#6366F1', fontWeight: 700, paddingBottom: 8, paddingLeft: 8, fontSize: 10, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-                  Vidéo {i + 1} — {j.name.slice(0, 18)}{j.name.length > 18 ? '…' : ''}
+                  {tr('Vidéo', 'Video')} {i + 1} — {j.name.slice(0, 18)}{j.name.length > 18 ? '…' : ''}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {COMPARE_ROWS.map(({ label, key, unique }) => {
+            {COMPARE_ROWS.map(({ label, en, key, unique }) => {
               const vals = done.map(j => String(j.meta![key] ?? '—'))
               const allSame = vals.every(v => v === vals[0])
               return (
                 <tr key={key} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                   <td style={{ padding: '5px 12px 5px 0', color: 'var(--text-4)', fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'top' }}>
-                    {label}
+                    {tr(label, en)}
                   </td>
                   {vals.map((val, i) => (
                     <td key={i} style={{
@@ -883,7 +887,7 @@ function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
         </table>
       </div>
       <div style={{ marginTop: 12, fontSize: 10, color: 'var(--text-4)', fontStyle: 'italic' }}>
-        Les champs en vert <span style={{ color: '#22c55e' }}>✓</span> sont différents entre chaque vidéo — GPS, horodatage, ID caméra, encodage vidéo, etc.
+        {tr('Les champs en vert ', 'The fields in green ')}<span style={{ color: '#22c55e' }}>✓</span>{tr(' sont différents entre chaque vidéo — GPS, horodatage, ID caméra, encodage vidéo, etc.', ' differ between each video — GPS, timestamp, camera ID, video encoding, etc.')}
       </div>
     </div>
   )

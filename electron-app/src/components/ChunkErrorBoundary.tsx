@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { tr } from '@/lib/i18n'
 
 interface Props { children: ReactNode }
 interface State { hasError: boolean; chunk: boolean; error?: string }
@@ -73,21 +74,21 @@ export class ChunkErrorBoundary extends Component<Props, State> {
               border: '3px solid rgba(233,234,240,0.15)', borderTopColor: '#6366F1',
               animation: 'sf-cb-spin 0.8s linear infinite',
             }} />
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Mise à jour de l'application…</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>{tr("Mise à jour de l'application…", 'Updating the app…')}</div>
             <button
               onClick={() => { sessionStorage.removeItem('chunk-reload-count'); window.location.reload() }}
               style={{
                 padding: '9px 20px', borderRadius: 8, background: '#6366F1', color: '#fff',
                 border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               }}
-            >Recharger maintenant</button>
+            >{tr('Recharger maintenant', 'Reload now')}</button>
             <style>{'@keyframes sf-cb-spin{to{transform:rotate(360deg)}}'}</style>
           </div>
         )
       }
       return (
         <div style={{ padding: 32, color: '#f87171', fontFamily: 'monospace', fontSize: 13 }}>
-          <strong>Erreur de rendu</strong>
+          <strong>{tr('Erreur de rendu', 'Render error')}</strong>
           {this.state.error && (
             <pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', opacity: 0.8 }}>
               {this.state.error}

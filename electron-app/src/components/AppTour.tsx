@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTr } from '@/lib/i18n'
 
 interface AppTourProps {
   onClose: () => void
@@ -9,7 +10,9 @@ interface AppTourProps {
 
 interface TourStep {
   title:    string
+  titleEn:  string
   desc:     string
+  descEn:   string
   iconName: string
   page?:    string   // if set, navigates to this page when step is shown
   color:    string
@@ -42,74 +45,95 @@ const STEPS: TourStep[] = [
   {
     iconName: 'welcome',
     title: 'Bienvenue sur ScaleFlow',
+    titleEn: 'Welcome to ScaleFlow',
     desc: 'ScaleFlow automatise ta présence sur Instagram — posting, stories, remix, warmup et plus. Ce tour rapide te montre les onglets clés.',
+    descEn: 'ScaleFlow automates your Instagram presence — posting, stories, remix, warmup and more. This quick tour walks you through the key tabs.',
     color: '#6366F1',
   },
   {
     iconName: 'phone',
     title: 'Téléphones',
+    titleEn: 'Phones',
     desc: 'Connecte et gère tous tes cloud phones GeeLark : groupes, comptes Instagram, démarrage. C’est ta base pour tout le reste.',
+    descEn: 'Connect and manage all your GeeLark cloud phones: groups, Instagram accounts, startup. It’s your base for everything else.',
     page: 'phones',
     color: '#6366F1',
   },
   {
     iconName: 'send',
     title: 'Posting',
+    titleEn: 'Posting',
     desc: 'Poste une vidéo sur plusieurs comptes Instagram en même temps. Sélectionne tes téléphones, ta vidéo, et lance.',
+    descEn: 'Post a video to several Instagram accounts at once. Pick your phones, your video, and launch.',
     page: 'posting',
     color: '#6366F1',
   },
   {
     iconName: 'link',
     title: 'Story',
+    titleEn: 'Story',
     desc: 'Publie ou programme des stories avec sticker lien sur tous tes comptes, automatiquement.',
+    descEn: 'Publish or schedule stories with a link sticker across all your accounts, automatically.',
     page: 'storylink',
     color: '#0EA5E9',
   },
   {
     iconName: 'calendar',
     title: 'Scheduler',
+    titleEn: 'Scheduler',
     desc: 'Programme tes posts à l’avance. ScaleFlow publie tout seul à l’heure prévue, même PC éteint.',
+    descEn: 'Schedule your posts in advance. ScaleFlow publishes on its own at the set time, even with your PC off.',
     page: 'scheduler',
     color: '#8B5CF6',
   },
   {
     iconName: 'flame',
     title: 'Warmup',
+    titleEn: 'Warmup',
     desc: 'Chauffe tes comptes (scroll, likes, navigation naturelle) pour un comportement humain et limiter les blocages.',
+    descEn: 'Warm up your accounts (scrolling, likes, natural browsing) for human-like behavior and fewer blocks.',
     page: 'warmup',
     color: '#F97316',
   },
   {
     iconName: 'video',
     title: 'MassRemix',
+    titleEn: 'MassRemix',
     desc: 'Génère des dizaines de remix uniques depuis un pool de vidéos. Chaque remix est différent pour éviter le duplicate content.',
+    descEn: 'Generate dozens of unique remixes from a pool of videos. Each remix is different to avoid duplicate content.',
     page: 'remix',
     color: '#059669',
   },
   {
     iconName: 'shield',
     title: 'Spoof',
+    titleEn: 'Spoof',
     desc: 'Rend chaque vidéo unique (métadonnées, luminosité, grain, zoom, teinte…) sans toucher au texte à l’écran. Anti-ban.',
+    descEn: 'Makes every video unique (metadata, brightness, grain, zoom, hue…) without touching the on-screen text. Anti-ban.',
     page: 'spoof',
     color: '#D97706',
   },
   {
     iconName: 'folder',
     title: 'Banque de contenu',
+    titleEn: 'Content bank',
     desc: 'Stocke et organise toutes tes vidéos par dossiers. Retrouve-les facilement pour tes campagnes de posting.',
+    descEn: 'Store and organize all your videos in folders. Find them easily for your posting campaigns.',
     page: 'bank',
     color: '#DC2626',
   },
   {
     iconName: 'rocket',
     title: 'C’est parti !',
+    titleEn: 'Let’s go!',
     desc: 'Tu es prêt à utiliser ScaleFlow. Si tu as des questions, ouvre un ticket dans la section Support.',
+    descEn: 'You’re ready to use ScaleFlow. If you have questions, open a ticket in the Support section.',
     color: '#6366F1',
   },
 ]
 
 export function AppTour({ onClose, onNavigate, canSeePage }: AppTourProps) {
+  const tr = useTr()
   // Filter steps so pages the user can't access are skipped.
   // Steps without a `page` (welcome / finale) are always included.
   const steps = STEPS.filter(s => !s.page || !canSeePage || canSeePage(s.page))
@@ -171,14 +195,14 @@ export function AppTour({ onClose, onNavigate, canSeePage }: AppTourProps) {
 
           {/* Step counter */}
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'rgba(99,102,241,0.6)', marginBottom: 6, textTransform: 'uppercase' }}>
-            Étape {step + 1} / {steps.length}
+            {tr(`Étape ${step + 1} / ${steps.length}`, `Step ${step + 1} / ${steps.length}`)}
           </div>
 
           <h2 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 10px', lineHeight: 1.2 }}>
-            {current.title}
+            {tr(current.title, current.titleEn)}
           </h2>
           <p style={{ fontSize: 14, color: 'rgba(233,234,240,0.75)', margin: 0, lineHeight: 1.6 }}>
-            {current.desc}
+            {tr(current.desc, current.descEn)}
           </p>
 
           {/* Dot indicators */}
@@ -214,7 +238,7 @@ export function AppTour({ onClose, onNavigate, canSeePage }: AppTourProps) {
               onMouseEnter={e => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.08)' }}
               onMouseLeave={e => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.04)' }}
             >
-              ← Retour
+              {tr('← Retour', '← Back')}
             </button>
           )}
 
@@ -229,7 +253,7 @@ export function AppTour({ onClose, onNavigate, canSeePage }: AppTourProps) {
             onMouseEnter={e => { (e.target as HTMLElement).style.opacity = '0.9' }}
             onMouseLeave={e => { (e.target as HTMLElement).style.opacity = '1' }}
           >
-            {isLast ? 'Commencer →' : 'Suivant →'}
+            {isLast ? tr('Commencer →', 'Get started →') : tr('Suivant →', 'Next →')}
           </button>
 
           {!isLast && (
@@ -241,7 +265,7 @@ export function AppTour({ onClose, onNavigate, canSeePage }: AppTourProps) {
                 fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >
-              Passer
+              {tr('Passer', 'Skip')}
             </button>
           )}
         </div>

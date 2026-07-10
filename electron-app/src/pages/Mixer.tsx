@@ -6,6 +6,7 @@ import { useOrg } from '@/lib/orgContext'
 import { getSignedUrl, uploadVideoFromPath } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { Spinner } from '@/components/ui/Spinner'
+import { useTr } from '@/lib/i18n'
 import type { CaptionItem } from './CaptionBank'
 
 interface MixerProps { user: User }
@@ -105,6 +106,7 @@ function VideoPicker({
   onClose: () => void
 }) {
   const { currentOrg } = useOrg()
+  const tr = useTr()
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -141,25 +143,25 @@ function VideoPicker({
           <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', flexShrink: 0 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
           </div>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, flex: 1 }}>Banque vidéo</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, flex: 1 }}>{tr('Banque vidéo', 'Video bank')}</h2>
           <input
-            type="text" placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
+            type="text" placeholder={tr('Rechercher…', 'Search…')} value={search} onChange={e => setSearch(e.target.value)}
             className="sf-input" style={{ width: 160 }}
           />
           {selected.size > 0 && (
             <button onClick={confirm} className="sf-btn sf-btn-primary" style={{ cursor: 'pointer' }}>
-              Confirmer ({selected.size})
+              {tr('Confirmer', 'Confirm')} ({selected.size})
             </button>
           )}
-          <button onClick={onClose} aria-label="Fermer" className="sf-btn sf-btn-ghost sf-btn-icon" style={{ cursor: 'pointer' }}><IconX size={18} /></button>
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ cursor: 'pointer' }}><IconX size={18} /></button>
         </div>
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <PickerSidebar folders={folders} active={folder} onSelect={setFolder} allCount={items.length} allLabel="Tout" />
+          <PickerSidebar folders={folders} active={folder} onSelect={setFolder} allCount={items.length} allLabel={tr('Tout', 'All')} />
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
             {loading ? (
               <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="lg" /></div>
             ) : visible.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 64, color: TEXT_3, fontSize: 13 }}>Aucune vidéo</div>
+              <div style={{ textAlign: 'center', paddingTop: 64, color: TEXT_3, fontSize: 13 }}>{tr('Aucune vidéo', 'No video')}</div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
                 {visible.map(item => {
@@ -196,6 +198,7 @@ function CaptionPicker({
   onClose: () => void
 }) {
   const { currentOrg } = useOrg()
+  const tr = useTr()
   const [items, setItems] = useState<CaptionItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -228,25 +231,25 @@ function CaptionPicker({
           <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', flexShrink: 0 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </div>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, flex: 1 }}>Banque de captions</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, flex: 1 }}>{tr('Banque de captions', 'Caption bank')}</h2>
           <input
-            type="text" placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
+            type="text" placeholder={tr('Rechercher…', 'Search…')} value={search} onChange={e => setSearch(e.target.value)}
             className="sf-input" style={{ width: 160 }}
           />
           {selected.size > 0 && (
             <button onClick={confirm} className="sf-btn sf-btn-primary" style={{ cursor: 'pointer' }}>
-              Confirmer ({selected.size})
+              {tr('Confirmer', 'Confirm')} ({selected.size})
             </button>
           )}
-          <button onClick={onClose} aria-label="Fermer" className="sf-btn sf-btn-ghost sf-btn-icon" style={{ cursor: 'pointer' }}><IconX size={18} /></button>
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ cursor: 'pointer' }}><IconX size={18} /></button>
         </div>
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <PickerSidebar folders={folders} active={folder} onSelect={setFolder} allCount={items.length} allLabel="Tout" />
+          <PickerSidebar folders={folders} active={folder} onSelect={setFolder} allCount={items.length} allLabel={tr('Tout', 'All')} />
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
             {loading ? (
               <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="lg" /></div>
             ) : visible.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 64, color: TEXT_3, fontSize: 13 }}>Aucune caption</div>
+              <div style={{ textAlign: 'center', paddingTop: 64, color: TEXT_3, fontSize: 13 }}>{tr('Aucune caption', 'No caption')}</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {visible.map(item => {
@@ -280,6 +283,7 @@ function CaptionPicker({
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function Mixer({ user }: MixerProps) {
   const { currentOrg } = useOrg()
+  const tr = useTr()
 
   const [selVideos,   setSelVideos]   = useState<ContentItem[]>([])
   const [selCaptions, setSelCaptions] = useState<CaptionItem[]>([])
@@ -367,10 +371,10 @@ export function Mixer({ user }: MixerProps) {
         const signedUrl = job.videoItem.storage_path
           ? await getSignedUrl(job.videoItem.storage_path)
           : job.videoItem.file_url ?? null
-        if (!signedUrl) throw new Error('URL vidéo introuvable (storage_path et file_url sont vides)')
+        if (!signedUrl) throw new Error(tr('URL vidéo introuvable (storage_path et file_url sont vides)', 'Video URL not found (storage_path and file_url are empty)'))
 
         const api = window.electronAPI
-        if (!api?.runFfmpegMixOverlay) throw new Error('IPC runFfmpegMixOverlay manquant — rebuild l\'app Electron')
+        if (!api?.runFfmpegMixOverlay) throw new Error(tr('IPC runFfmpegMixOverlay manquant — rebuild l\'app Electron', 'IPC runFfmpegMixOverlay missing — rebuild the Electron app'))
 
         const res = await api.runFfmpegMixOverlay({
           sourcePath: signedUrl,
@@ -379,7 +383,7 @@ export function Mixer({ user }: MixerProps) {
           fontSize,
           fontColor,
         })
-        if (!res.ok || !res.outputPath) throw new Error(res.error ?? 'Échec ffmpeg')
+        if (!res.ok || !res.outputPath) throw new Error(res.error ?? tr('Échec ffmpeg', 'ffmpeg failed'))
 
         // Web: outputPath is a Supabase URL → use directly.
         // Electron: outputPath is a local path → wrap in localvideo://.
@@ -441,14 +445,14 @@ export function Mixer({ user }: MixerProps) {
               {running ? (
                 <span className="sf-badge sf-badge-accent" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                   <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#818CF8', display: 'inline-block' }} />
-                  En cours
+                  {tr('En cours', 'Running')}
                 </span>
               ) : (
-                <span className="sf-badge sf-badge-muted">Prêt</span>
+                <span className="sf-badge sf-badge-muted">{tr('Prêt', 'Ready')}</span>
               )}
             </div>
             <p className="sf-page-sub">
-              Superpose tes captions sur tes vidéos de la banque, en lot. · {selVideos.length} vidéo{selVideos.length !== 1 ? 's' : ''} · {selCaptions.length} caption{selCaptions.length !== 1 ? 's' : ''}
+              {tr('Superpose tes captions sur tes vidéos de la banque, en lot.', 'Overlay your captions on your bank videos, in bulk.')} · {selVideos.length} {tr(`vidéo${selVideos.length !== 1 ? 's' : ''}`, `video${selVideos.length !== 1 ? 's' : ''}`)} · {selCaptions.length} caption{selCaptions.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
@@ -456,7 +460,7 @@ export function Mixer({ user }: MixerProps) {
         <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           {/* Mode toggle */}
           <div className="sf-tabs">
-            {([{ k: 'random' as const, label: 'Aléatoire' }, { k: 'all' as const, label: 'Tout combiner' }] as const).map(m => (
+            {([{ k: 'random' as const, label: tr('Aléatoire', 'Random') }, { k: 'all' as const, label: tr('Tout combiner', 'Combine all') }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
                 className={`sf-tab cursor-pointer${mode === m.k ? ' active' : ''}`}>
                 {m.label}
@@ -469,9 +473,9 @@ export function Mixer({ user }: MixerProps) {
             className="sf-btn sf-btn-primary sf-btn-lg"
             style={{ cursor: canStart ? 'pointer' : 'not-allowed', opacity: canStart ? 1 : 0.35 }}>
             {running ? (
-              <><div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />En cours…</>
+              <><div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />{tr('En cours…', 'Running…')}</>
             ) : (
-              <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>Lancer le mix</>
+              <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>{tr('Lancer le mix', 'Start mix')}</>
             )}
           </button>
         </div>
@@ -488,7 +492,7 @@ export function Mixer({ user }: MixerProps) {
               <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
               </div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Vidéos source</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{tr('Vidéos source', 'Source videos')}</span>
             </div>
             {selVideos.length > 0 && (
               <span className="sf-badge sf-badge-accent">{selVideos.length}</span>
@@ -501,7 +505,7 @@ export function Mixer({ user }: MixerProps) {
               className="sf-btn sf-btn-primary cursor-pointer"
               style={{ width: '100%', justifyContent: 'center' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Depuis la Banque
+              {tr('Depuis la Banque', 'From the Bank')}
             </button>
           </div>
 
@@ -512,8 +516,8 @@ export function Mixer({ user }: MixerProps) {
                 <div className="sf-empty-icon">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-glow)" strokeWidth="1.75"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
                 </div>
-                <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>Aucune vidéo</p>
-                <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>Ajoute des vidéos depuis la banque</p>
+                <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>{tr('Aucune vidéo', 'No video')}</p>
+                <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>{tr('Ajoute des vidéos depuis la banque', 'Add videos from the bank')}</p>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -521,7 +525,7 @@ export function Mixer({ user }: MixerProps) {
                   <div key={v.id} style={{ position: 'relative' }}>
                     <VideoThumb item={v} />
                     <p style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '3px 2px', textAlign: 'center' }}>{v.title}</p>
-                    <button onClick={() => removeVideo(v.id)} aria-label="Retirer" className="sf-btn sf-btn-danger cursor-pointer"
+                    <button onClick={() => removeVideo(v.id)} aria-label={tr('Retirer', 'Remove')} className="sf-btn sf-btn-danger cursor-pointer"
                       style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, padding: 0, borderRadius: 5, minWidth: 0 }}>
                       <IconX size={10} strokeWidth={2.25} />
                     </button>
@@ -553,7 +557,7 @@ export function Mixer({ user }: MixerProps) {
               className="sf-btn sf-btn-primary cursor-pointer"
               style={{ width: '100%', justifyContent: 'center' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              Depuis la Banque
+              {tr('Depuis la Banque', 'From the Bank')}
             </button>
           </div>
 
@@ -564,8 +568,8 @@ export function Mixer({ user }: MixerProps) {
                 <div className="sf-empty-icon">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-glow)" strokeWidth="1.75" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 </div>
-                <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>Aucune caption</p>
-                <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>Ajoute des captions depuis la banque</p>
+                <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>{tr('Aucune caption', 'No caption')}</p>
+                <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>{tr('Ajoute des captions depuis la banque', 'Add captions from the bank')}</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -573,7 +577,7 @@ export function Mixer({ user }: MixerProps) {
                   <div key={c.id} className="sf-card" style={{ position: 'relative', padding: '10px 12px' }}>
                     {c.title && <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-1)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 20 }}>{c.title}</p>}
                     <p className="line-clamp-2" style={{ fontSize: 10, color: 'var(--text-3)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{c.content}</p>
-                    <button onClick={() => removeCaption(c.id)} aria-label="Retirer" className="sf-btn sf-btn-danger cursor-pointer"
+                    <button onClick={() => removeCaption(c.id)} aria-label={tr('Retirer', 'Remove')} className="sf-btn sf-btn-danger cursor-pointer"
                       style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, padding: 0, borderRadius: 4, minWidth: 0 }}>
                       <IconX size={9} strokeWidth={2.25} />
                     </button>
@@ -589,16 +593,16 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Config card */}
           <div className="sf-card sf-spotlight" style={{ padding: '20px 22px' }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 20 }}>Configuration du texte</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 20 }}>{tr('Configuration du texte', 'Text configuration')}</p>
 
             {/* Position */}
             <div style={{ marginBottom: 20 }}>
-              <p className="sf-section-label" style={{ marginBottom: 8 }}>Position du texte</p>
+              <p className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Position du texte', 'Text position')}</p>
               <div style={{ display: 'flex', gap: 8 }}>
                 {(['top', 'middle', 'bottom'] as MixPosition[]).map(p => (
                   <button key={p} onClick={() => setPosition(p)} className="cursor-pointer"
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, transition: 'all 0.12s', border: position === p ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', background: position === p ? 'rgba(99,102,241,0.18)' : 'var(--surface)', color: position === p ? ACCENT_L : TEXT_3, cursor: 'pointer' }}>
-                    {p === 'top' ? <><IconChevronUp size={14} /> Haut</> : p === 'middle' ? <><IconAlignCenter size={14} /> Centre</> : <><IconChevronDown size={14} /> Bas</>}
+                    {p === 'top' ? <><IconChevronUp size={14} /> {tr('Haut', 'Top')}</> : p === 'middle' ? <><IconAlignCenter size={14} /> {tr('Centre', 'Center')}</> : <><IconChevronDown size={14} /> {tr('Bas', 'Bottom')}</>}
                   </button>
                 ))}
               </div>
@@ -607,7 +611,7 @@ export function Mixer({ user }: MixerProps) {
             {/* Font size */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <p className="sf-section-label" style={{ margin: 0 }}>Taille de police</p>
+                <p className="sf-section-label" style={{ margin: 0 }}>{tr('Taille de police', 'Font size')}</p>
                 <span className="sf-badge sf-badge-accent" style={{ fontVariantNumeric: 'tabular-nums' }}>{fontSize}px</span>
               </div>
               <input type="range" min={18} max={72} step={2} value={fontSize} onChange={e => setFontSize(Number(e.target.value))}
@@ -616,7 +620,7 @@ export function Mixer({ user }: MixerProps) {
 
             {/* Font color */}
             <div>
-              <p className="sf-section-label" style={{ marginBottom: 8 }}>Couleur du texte</p>
+              <p className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Couleur du texte', 'Text color')}</p>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="color" value={fontColor} onChange={e => setFontColor(e.target.value)}
                   style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${HAIR}`, background: 'transparent', cursor: 'pointer', padding: 2 }} />
@@ -629,7 +633,7 @@ export function Mixer({ user }: MixerProps) {
 
             {/* Bank destination — chosen before launching */}
             <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
-              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de la banque" />
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label={tr('Dossier de la banque', 'Bank folder')} />
             </div>
           </div>
 
@@ -643,11 +647,11 @@ export function Mixer({ user }: MixerProps) {
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: ACCENT_L, fontVariantNumeric: 'tabular-nums' }}>
                     {mode === 'random'
-                      ? `${selVideos.length} vidéo${selVideos.length > 1 ? 's' : ''} × 1 caption = ${selVideos.length} résultat${selVideos.length > 1 ? 's' : ''}`
-                      : `${selVideos.length} × ${selCaptions.length} = ${selVideos.length * selCaptions.length} résultat${selVideos.length * selCaptions.length > 1 ? 's' : ''}`
+                      ? tr(`${selVideos.length} vidéo${selVideos.length > 1 ? 's' : ''} × 1 caption = ${selVideos.length} résultat${selVideos.length > 1 ? 's' : ''}`, `${selVideos.length} video${selVideos.length > 1 ? 's' : ''} × 1 caption = ${selVideos.length} result${selVideos.length > 1 ? 's' : ''}`)
+                      : tr(`${selVideos.length} × ${selCaptions.length} = ${selVideos.length * selCaptions.length} résultat${selVideos.length * selCaptions.length > 1 ? 's' : ''}`, `${selVideos.length} × ${selCaptions.length} = ${selVideos.length * selCaptions.length} result${selVideos.length * selCaptions.length > 1 ? 's' : ''}`)
                     }
                   </p>
-                  <p style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>Mode: {mode === 'random' ? 'Aléatoire — 1 caption par vidéo' : 'Toutes les combinaisons'}</p>
+                  <p style={{ fontSize: 11, color: TEXT_3, marginTop: 2 }}>Mode: {mode === 'random' ? tr('Aléatoire — 1 caption par vidéo', 'Random — 1 caption per video') : tr('Toutes les combinaisons', 'All combinations')}</p>
                 </div>
               </div>
             </div>
@@ -666,13 +670,13 @@ export function Mixer({ user }: MixerProps) {
       {jobs.length > 0 && (
         <div className="sf-anim-slide-up" style={{ flexShrink: 0, height: 250, borderTop: '1px solid var(--border)', padding: '14px 20px 24px', overflowX: 'auto', background: 'var(--surface)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexShrink: 0 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Résultats</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tr('Résultats', 'Results')}</p>
             {running && <div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />}
-            {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok" style={{ fontVariantNumeric: 'tabular-nums' }}>{doneJobs.length}/{jobs.length} terminés</span>}
-            {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger" style={{ fontVariantNumeric: 'tabular-nums' }}>{errorJobs.length} erreur{errorJobs.length > 1 ? 's' : ''}</span>}
+            {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok" style={{ fontVariantNumeric: 'tabular-nums' }}>{tr(`${doneJobs.length}/${jobs.length} terminés`, `${doneJobs.length}/${jobs.length} done`)}</span>}
+            {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger" style={{ fontVariantNumeric: 'tabular-nums' }}>{tr(`${errorJobs.length} erreur${errorJobs.length > 1 ? 's' : ''}`, `${errorJobs.length} error${errorJobs.length > 1 ? 's' : ''}`)}</span>}
             {doneJobs.length > 0 && (
               <div style={{ marginLeft: 'auto', fontSize: 10, color: TEXT_3, whiteSpace: 'nowrap' }}>
-                Dossier : <span style={{ color: ACCENT_L, fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
+                {tr('Dossier :', 'Folder:')} <span style={{ color: ACCENT_L, fontWeight: 600 }}>{saveFolder ?? tr('Racine', 'Root')}</span>
               </div>
             )}
           </div>
@@ -687,7 +691,7 @@ export function Mixer({ user }: MixerProps) {
                   ) : job.status === 'error' ? (
                     <div title={job.error} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, width: '100%', height: '100%' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ERR} strokeWidth="1.75" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                      <span style={{ color: ERR, fontSize: 9, textAlign: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}>{job.error ?? 'Erreur'}</span>
+                      <span style={{ color: ERR, fontSize: 9, textAlign: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}>{job.error ?? tr('Erreur', 'Error')}</span>
                     </div>
                   ) : (
                     <div className="sf-spinner" />
@@ -697,7 +701,7 @@ export function Mixer({ user }: MixerProps) {
                       {/* Save to bank */}
                       {(job.storagePath || job.localPath) && !job.savedToBank && (
                         <button
-                          title="Enregistrer dans la banque"
+                          title={tr('Enregistrer dans la banque', 'Save to bank')}
                           onClick={e => { e.stopPropagation(); void saveJobToBank(job) }}
                           className="sf-press cursor-pointer"
                           style={{ background: ACCENT, borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
@@ -705,13 +709,13 @@ export function Mixer({ user }: MixerProps) {
                         </button>
                       )}
                       {job.savedToBank && (
-                        <div title="Sauvegardé dans la banque" style={{ background: OK, borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div title={tr('Sauvegardé dans la banque', 'Saved to bank')} style={{ background: OK, borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
                       )}
                       {/* Download */}
                       <button
-                        title="Télécharger"
+                        title={tr('Télécharger', 'Download')}
                         onClick={async e => {
                           e.stopPropagation()
                           if (job.localPath && window.electronAPI?.saveFileAs) {

@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { useConnections } from '@/lib/connections'
 import { MetadataChanger } from './MetadataChanger'
 import { TextCopy } from './TextCopy'
-import { useT } from '@/lib/i18n'
+import { useT, useTr } from '@/lib/i18n'
 
 interface AiToolsProps { user: User }
 
@@ -55,6 +55,7 @@ type ActiveTool = 'hub' | 'metadata' | 'textcopy'
 function ToolCard({ icon, title, desc, tags, locked, onClick }: {
   icon: React.ReactNode; title: string; desc: string; tags: string[]; locked?: boolean; onClick: () => void
 }) {
+  const tr = useTr()
   return (
     <button onClick={onClick} className="sf-card cursor-pointer text-left w-full group relative rounded-2xl transition-all card-lift sf-card-lift sf-spotlight overflow-hidden"
       style={{
@@ -78,7 +79,7 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
             <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0 inline-flex items-center gap-1"
               style={{ background: 'rgba(245,158,11,0.08)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.18)' }}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              Clé Anthropic requise
+              {tr('Clé Anthropic requise', 'Anthropic key required')}
             </span>
           )}
         </div>
@@ -123,6 +124,7 @@ function SectionHeader({ label, badge, icon }: { label: string; badge?: string; 
 // ── Main component ────────────────────────────────────────────────────────────
 export function AiTools({ user }: AiToolsProps) {
   const t = useT()
+  const tr = useTr()
   const [active, setActive] = useState<ActiveTool>('hub')
   const conns = useConnections(user)
 
@@ -176,7 +178,7 @@ export function AiTools({ user }: AiToolsProps) {
           {/* Text */}
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
             <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('aiToolsTitle')}</h1>
-            <p className="sf-page-sub">Outils de traitement vidéo et de variation de contenu</p>
+            <p className="sf-page-sub">{tr('Outils de traitement vidéo et de variation de contenu', 'Video processing and content variation tools')}</p>
           </div>
         </div>
 
@@ -187,20 +189,20 @@ export function AiTools({ user }: AiToolsProps) {
         <div className="space-y-6 max-w-6xl">
           {/* ── Outils IA ── */}
           <section>
-            <SectionHeader label="Outils vidéo" badge="FFmpeg" icon={<Icon name="video" size={13} />} />
+            <SectionHeader label={tr('Outils vidéo', 'Video tools')} badge="FFmpeg" icon={<Icon name="video" size={13} />} />
             <div className="grid grid-cols-3 gap-4 anim-stagger">
               <ToolCard
                 icon={<Icon name="tag" />}
-                title="Métadonnées"
-                desc="Supprime toutes les métadonnées et injecte un timestamp aléatoire."
+                title={tr('Métadonnées', 'Metadata')}
+                desc={tr('Supprime toutes les métadonnées et injecte un timestamp aléatoire.', 'Strips all metadata and injects a random timestamp.')}
                 tags={['FFmpeg', 'Stream copy', 'Instant']}
                 onClick={() => setActive('metadata')}
               />
               <ToolCard
                 icon={<Icon name="pen-line" />}
-                title="Texte IA"
-                desc="Ajoute du texte à plusieurs positions pour créer des copies vidéo uniques."
-                tags={['FFmpeg', 'Texte', 'Anti-ban']}
+                title={tr('Texte IA', 'AI Text')}
+                desc={tr('Ajoute du texte à plusieurs positions pour créer des copies vidéo uniques.', 'Adds text at multiple positions to create unique video copies.')}
+                tags={['FFmpeg', tr('Texte', 'Text'), 'Anti-ban']}
                 onClick={() => setActive('textcopy')}
               />
             </div>

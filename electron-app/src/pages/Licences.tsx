@@ -6,7 +6,7 @@ import { Input }  from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/Toast'
 import { useLicense } from '@/lib/license'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 
 interface LicenseKey {
   id: string
@@ -22,12 +22,12 @@ interface LicenseKey {
 }
 
 const DURATIONS = [
-  { label: '24h',       days: 1 },
-  { label: '7 jours',   days: 7 },
-  { label: '30 jours',  days: 30 },
-  { label: '90 jours',  days: 90 },
-  { label: '1 an',      days: 365 },
-  { label: 'À vie',     days: null },
+  { label: '24h',       en: '24h',        days: 1 },
+  { label: '7 jours',   en: '7 days',     days: 7 },
+  { label: '30 jours',  en: '30 days',    days: 30 },
+  { label: '90 jours',  en: '90 days',    days: 90 },
+  { label: '1 an',      en: '1 year',     days: 365 },
+  { label: 'À vie',     en: 'Lifetime',   days: null },
 ]
 
 // Cryptographically secure 4-char hex segment (2 random bytes → 4 hex chars)
@@ -78,6 +78,7 @@ type Filter = 'all' | 'active' | 'used' | 'expired' | 'revoked'
 
 export function Licences({ user: _user }: Props) {
   const t = useT()
+  const tr = useTr()
   const { lang } = useLang()
   const toast = useToast()
   const license = useLicense()
@@ -370,7 +371,7 @@ export function Licences({ user: _user }: Props) {
                     className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
                     style={duration === d.days ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
-                    {d.label}
+                    {tr(d.label, d.en)}
                   </button>
                 ))}
               </div>
@@ -392,7 +393,7 @@ export function Licences({ user: _user }: Props) {
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{t('keyNotes')}</label>
-              <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="ex: Discord @pseudo" />
+              <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder={tr('ex: Discord @pseudo', 'e.g. Discord @handle')} />
             </div>
           </div>
           <Button onClick={createKey} disabled={creating || !genKey.trim()} className="w-full">

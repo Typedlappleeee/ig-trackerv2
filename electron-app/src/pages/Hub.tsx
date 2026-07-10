@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { playNav, playTick } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { useCredits } from '@/lib/credits'
@@ -200,6 +200,7 @@ function SectionHead({ title, action, onAction }: { title: string; action?: stri
 // ── Main Hub page ──────────────────────────────────────────────────────────────
 export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: Page) => void }) {
   const t = useT()
+  const tr = useTr()
   const { balance, loading: credLoading } = useCredits()
   const { currentOrg, role, perms } = useOrg()
   const license = useLicense()
@@ -290,7 +291,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
   const { lang } = useLang()
   const locale = lang === 'en' ? 'en-US' : 'fr-FR'
-  const firstName = displayName ?? (user.email?.split('@')[0] ?? 'créateur').replace(/[._]/g, ' ')
+  const firstName = displayName ?? (user.email?.split('@')[0] ?? tr('créateur', 'creator')).replace(/[._]/g, ' ')
   const greeting = (() => {
     const h = new Date().getHours()
     if (h < 6)  return t('hubGreetingNight')
@@ -493,7 +494,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                       const phones = Array.isArray(item.data.phones) ? item.data.phones : []
                       return `${phones.length} ${t('hubAccounts')}${item.data.caption ? ` · ${item.data.caption.slice(0, 34)}${item.data.caption.length > 34 ? '…' : ''}` : ''}`
                     })()
-                  : `${item.data.ok_count}/${item.data.total} compte${item.data.total > 1 ? 's' : ''} · Direct`
+                  : tr(`${item.data.ok_count}/${item.data.total} compte${item.data.total > 1 ? 's' : ''} · Direct`, `${item.data.ok_count}/${item.data.total} account${item.data.total > 1 ? 's' : ''} · Direct`)
                 const date = item.kind === 'scheduled'
                   ? fmtScheduledTime(item.data.executed_at ?? item.data.created_at)
                   : fmtScheduledTime(item.data.created_at)

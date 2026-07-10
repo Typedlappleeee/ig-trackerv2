@@ -11,7 +11,7 @@ import {
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { logActivity } from '@/lib/activityLog'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
 import { startRun, setRunPhase, finishRun } from '@/lib/activeRuns'
 import { Toggle } from '@/components/ui/Toggle'
@@ -124,6 +124,7 @@ function IconCircle({ size = 14 }: { size?: number }) {
 // Bandeau « Proxy rotatif » : quand activé, l'édition/warmup se fait EN SÉRIE
 // (1 téléphone à la fois) avec rotation d'IP avant chaque démarrage.
 function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) {
+  const tr = useTr()
   const cfg = getProxyRotation()
   const configured = cfg.enabled && cfg.urls.length > 0
   return (
@@ -132,11 +133,11 @@ function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => voi
         on={on}
         onChange={setOn}
         warn={!configured}
-        warnTitle="Rotation non configurée — Réglages → Connexions → Rotation d'IP proxy"
-        label="Proxy rotatif"
+        warnTitle={tr("Rotation non configurée — Réglages → Connexions → Rotation d'IP proxy", 'Rotation not configured — Settings → Connections → Proxy IP rotation')}
+        label={tr('Proxy rotatif', 'Rotating proxy')}
         hint={on
-          ? (configured ? 'Traitement 1 par 1 · nouvelle IP avant chaque téléphone' : '⚠ Aucune URL de rotation — configure-la dans les Réglages')
-          : 'Traitement en parallèle · sans rotation d’IP'}
+          ? (configured ? tr('Traitement 1 par 1 · nouvelle IP avant chaque téléphone', 'One at a time · fresh IP before each phone') : tr('⚠ Aucune URL de rotation — configure-la dans les Réglages', '⚠ No rotation URL — configure it in Settings'))
+          : tr('Traitement en parallèle · sans rotation d’IP', 'Parallel processing · no IP rotation')}
       />
     </div>
   )
@@ -144,6 +145,7 @@ function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => voi
 
 export function Warmup({ user }: WarmupProps) {
   const t = useT()
+  const tr = useTr()
   const { lang } = useLang()
   const conns  = useConnections(user)
   const bearer = conns.bearer
@@ -315,16 +317,16 @@ export function Warmup({ user }: WarmupProps) {
       action: 'login_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets, `Login · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
+    initJobs(targets, tr(`Login · ${targets.length} compte${targets.length > 1 ? 's' : ''}`, `Login · ${targets.length} account${targets.length > 1 ? 's' : ''}`))
 
     await pLimit(targets, MAX_CONCURRENCY, async phone => {
       if (abortRef.current.abort) {
-        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        updateJob(phone.id, { status: 'error', error: tr('Annulé', 'Cancelled') })
         return
       }
       const cred = loginCreds[phone.id]
       if (!cred?.email || !cred?.password) {
-        updateJob(phone.id, { status: 'error', error: 'Identifiants manquants' })
+        updateJob(phone.id, { status: 'error', error: tr('Identifiants manquants', 'Missing credentials') })
         return
       }
       updateJob(phone.id, { status: 'running' })
@@ -335,7 +337,7 @@ export function Warmup({ user }: WarmupProps) {
         cred.totpSecret || undefined,
       )
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-      addLog(phone.id, 'Extinction du téléphone…')
+      addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
     })
 
@@ -351,7 +353,7 @@ export function Warmup({ user }: WarmupProps) {
       action: 'mass_edit_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets, `Édition profil · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
+    initJobs(targets, tr(`Édition profil · ${targets.length} compte${targets.length > 1 ? 's' : ''}`, `Profile edit · ${targets.length} account${targets.length > 1 ? 's' : ''}`))
 
     const config = {
       profileName:   editName.trim()    || undefined,
@@ -366,7 +368,7 @@ export function Warmup({ user }: WarmupProps) {
 
     await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
-        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        updateJob(phone.id, { status: 'error', error: tr('Annulé', 'Cancelled') })
         return
       }
       updateJob(phone.id, { status: 'running' })
@@ -399,7 +401,7 @@ export function Warmup({ user }: WarmupProps) {
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
-      addLog(phone.id, 'Extinction du téléphone…')
+      addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
     })
 
@@ -415,7 +417,7 @@ export function Warmup({ user }: WarmupProps) {
       action: 'warmup_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets, `Warmup · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
+    initJobs(targets, tr(`Warmup · ${targets.length} compte${targets.length > 1 ? 's' : ''}`, `Warmup · ${targets.length} account${targets.length > 1 ? 's' : ''}`))
 
     // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
     const rotationUrls = rotProxy ? activeRotationUrls() : []
@@ -424,7 +426,7 @@ export function Warmup({ user }: WarmupProps) {
 
     await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
-        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        updateJob(phone.id, { status: 'error', error: tr('Annulé', 'Cancelled') })
         return
       }
       updateJob(phone.id, { status: 'running' })
@@ -436,7 +438,7 @@ export function Warmup({ user }: WarmupProps) {
           ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
           : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)), rotationUrls }, msg => addLog(phone.id, msg))
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-      addLog(phone.id, 'Extinction du téléphone…')
+      addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
     })
 
@@ -530,8 +532,8 @@ export function Warmup({ user }: WarmupProps) {
             <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(251,146,60,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: '24px 24px 4px', textAlign: 'center' }}>
               <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(251,146,60,0.8)' }}>Warmup</p>
-              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>Quelle plateforme ?</h2>
-              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>Choisis la plateforme pour cette session.</p>
+              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>{tr('Quelle plateforme ?', 'Which platform?')}</h2>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>{tr('Choisis la plateforme pour cette session.', 'Choose the platform for this session.')}</p>
             </div>
             <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
               {([
@@ -541,7 +543,7 @@ export function Warmup({ user }: WarmupProps) {
                   icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>,
                 },
                 {
-                  k: 'tiktok', label: 'TikTok', desc: 'Mass Edit + Warmup (login bientôt)',
+                  k: 'tiktok', label: 'TikTok', desc: tr('Mass Edit + Warmup (login bientôt)', 'Mass Edit + Warmup (login soon)'),
                   grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.5)', accent: '#22D3EE',
                   icon: <svg width="21" height="21" viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.4 2 4.1 4.5 4.4v3c-1.7.1-3.2-.4-4.6-1.3v6.2c0 3.6-2.7 5.9-6 5.9-3.2 0-5.6-2.5-5.6-5.5 0-3.4 2.9-5.9 6.4-5.3v3.1c-.4-.1-.9-.2-1.3-.2-1.4 0-2.4 1-2.4 2.4 0 1.4 1 2.4 2.5 2.4 1.6 0 2.6-1.1 2.6-2.9V3h3.9z"/></svg>,
                 },
@@ -668,7 +670,7 @@ export function Warmup({ user }: WarmupProps) {
                   <button onClick={deselectAll} disabled={selected.size === 0}
                     className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
                     style={selected.size === 0 ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}>
-                    Tout désélectionner
+                    {tr('Tout désélectionner', 'Deselect all')}
                   </button>
                   <button onClick={loadPhones} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
                     style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -993,9 +995,9 @@ export function Warmup({ user }: WarmupProps) {
                   <div style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--border)' }}>
                     <span style={{ color: 'var(--accent-l)', display: 'flex' }}><IconPaperclip size={13} /></span>
                     <div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>Import en masse</p>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>{tr('Import en masse', 'Bulk import')}</p>
                       <p style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 1 }}>
-                        email:password:2fa par ligne — appliqué aux téléphones sélectionnés dans l'ordre
+                        {tr("email:password:2fa par ligne — appliqué aux téléphones sélectionnés dans l'ordre", 'email:password:2fa per line — applied to the selected phones in order')}
                       </p>
                     </div>
                   </div>
@@ -1018,7 +1020,7 @@ export function Warmup({ user }: WarmupProps) {
                         cursor: !bulkCreds.trim() || selectedPhones.length === 0 ? 'not-allowed' : 'pointer',
                       }}
                     >
-                      Appliquer ({Math.min(bulkCreds.split('\n').filter(l => l.trim()).length, selectedPhones.length)})
+                      {tr('Appliquer', 'Apply')} ({Math.min(bulkCreds.split('\n').filter(l => l.trim()).length, selectedPhones.length)})
                     </button>
                   </div>
                 </div>
@@ -1075,7 +1077,7 @@ export function Warmup({ user }: WarmupProps) {
                             <div>
                               <input
                                 type="text"
-                                placeholder="Secret 2FA optionnel — ex: JBSWY3DPEHPK3PXP"
+                                placeholder={tr('Secret 2FA optionnel — ex: JBSWY3DPEHPK3PXP', 'Optional 2FA secret — e.g. JBSWY3DPEHPK3PXP')}
                                 value={cred.totpSecret}
                                 onChange={e => setLoginCred(phone.id, 'totpSecret', e.target.value)}
                                 className="sf-input"
@@ -1130,7 +1132,7 @@ export function Warmup({ user }: WarmupProps) {
 
                 {/* Note : la photo doit être une URL d'image accessible */}
                 <p style={{ fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.5, padding: '0 2px' }}>
-                  La photo de profil doit être une <b>URL d'image</b> accessible.
+                  {tr('La photo de profil doit être une ', 'The profile picture must be an accessible ')}<b>{tr("URL d'image", 'image URL')}</b>{tr(' accessible.', '.')}
                 </p>
 
                 {/* Profile fields card */}
@@ -1153,7 +1155,7 @@ export function Warmup({ user }: WarmupProps) {
                       <label style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', marginBottom: 6, fontFamily: 'monospace' }}>
                         {t('warmupProfileName')}
                       </label>
-                      <input type="text" placeholder="Ex: Marie Fitness | Coach Minceur"
+                      <input type="text" placeholder={tr('Ex: Marie Fitness | Coach Minceur', 'e.g. Marie Fitness | Weight-loss Coach')}
                         value={editName} onChange={e => setEditName(e.target.value)}
                         className="sf-input" style={{ fontSize: 12 }}
                       />
@@ -1192,14 +1194,14 @@ export function Warmup({ user }: WarmupProps) {
                         {t('warmupProfilePic')}
                       </label>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input type="text" placeholder="Choisir depuis la banque →"
+                        <input type="text" placeholder={tr('Choisir depuis la banque →', 'Pick from the bank →')}
                           value={editPicUrl} onChange={e => { setEditPicUrl(e.target.value); setEditPicFile(null) }}
                           className="sf-input" style={{ flex: 1, fontSize: 12 }}
                         />
                         <button onClick={() => setShowAvatarPicker(true)}
                           className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
                           style={{ flexShrink: 0, gap: 5 }}>
-                          <IconFolderOpen size={14} /> Banque
+                          <IconFolderOpen size={14} /> {tr('Banque', 'Bank')}
                         </button>
                         {!isWeb && (
                           <button onClick={async () => {
@@ -1263,14 +1265,14 @@ export function Warmup({ user }: WarmupProps) {
 
                     {/* Bandeau plateforme + bouton changer */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Plateforme :</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{tr('Plateforme :', 'Platform:')}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
                         {warmupPlatform === 'tiktok' ? '🎵 TikTok' : '📸 Instagram'}
                       </span>
                       <button onClick={() => setWarmupPlatformChosen(false)}
                         className="cursor-pointer"
                         style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.28)', color: 'var(--accent-l)' }}>
-                        Changer
+                        {tr('Changer', 'Change')}
                       </button>
                     </div>
 
@@ -1278,13 +1280,13 @@ export function Warmup({ user }: WarmupProps) {
                     {warmupPlatform === 'tiktok' && (
                       <div>
                         <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
-                          Engagement (optionnel)
+                          {tr('Engagement (optionnel)', 'Engagement (optional)')}
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {([
-                            { v: ttLike,    set: setTtLike,    icon: <IconHeart size={15} />,    label: 'J\'aime aléatoires', desc: 'Like des vidéos parcourues' },
-                            { v: ttFollow,  set: setTtFollow,  icon: <IconUserPlus size={15} />, label: 'Abonnements aléatoires', desc: 'Suit quelques comptes' },
-                            { v: ttComment, set: setTtComment, icon: <IconSparkles size={15} />, label: 'Commentaires IA', desc: 'Commente avec une IA' },
+                            { v: ttLike,    set: setTtLike,    icon: <IconHeart size={15} />,    label: tr('J\'aime aléatoires', 'Random likes'), desc: tr('Like des vidéos parcourues', 'Likes videos it scrolls') },
+                            { v: ttFollow,  set: setTtFollow,  icon: <IconUserPlus size={15} />, label: tr('Abonnements aléatoires', 'Random follows'), desc: tr('Suit quelques comptes', 'Follows a few accounts') },
+                            { v: ttComment, set: setTtComment, icon: <IconSparkles size={15} />, label: tr('Commentaires IA', 'AI comments'), desc: tr('Commente avec une IA', 'Comments using an AI') },
                           ]).map((a, i) => (
                             <button key={i} onClick={() => a.set(!a.v)} className="cursor-pointer"
                               style={{

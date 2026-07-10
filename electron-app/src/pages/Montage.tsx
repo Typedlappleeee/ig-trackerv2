@@ -10,7 +10,7 @@ import { useOrg } from '@/lib/orgContext'
 import { uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
 import { logActivity } from '@/lib/activityLog'
 import { useConnections } from '@/lib/connections'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 
 interface MontageProps { user: User }
 
@@ -33,13 +33,14 @@ const IconZap          = (p: { size?: number } & React.SVGProps<SVGSVGElement>) 
 // Badge "Aperçu uniquement" — affiché sur les options visibles dans la preview
 // mais NON transmises à FFmpeg lors de l'export (vitesse, fade, filtres, textes).
 function PreviewOnlyBadge() {
+  const tr = useTr()
   return (
     <span
       className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0"
       style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}
-      title="Cette option est visible dans l'aperçu mais n'est pas encore appliquée à l'export"
+      title={tr("Cette option est visible dans l'aperçu mais n'est pas encore appliquée à l'export", "This option is visible in the preview but not yet applied to the export")}
     >
-      Aperçu uniquement
+      {tr('Aperçu uniquement', 'Preview only')}
     </span>
   )
 }
@@ -402,6 +403,7 @@ const DRAFT_KEY = 'sf-montage-draft'
 
 export function Montage({ user }: MontageProps) {
   const t = useT()
+  const tr = useTr()
   const toast = useToast()
   const { currentOrg } = useOrg()
   const credits = useCredits()
@@ -552,7 +554,7 @@ export function Montage({ user }: MontageProps) {
     const cutPoint = clip.trimStart + (playhead - offset) * clip.speed
     const clipEnd  = clip.trimEnd > 0 ? clip.trimEnd : raw
     if (cutPoint <= clip.trimStart + 0.5 || cutPoint >= clipEnd - 0.5) {
-      toast.show({ title: 'Impossible de couper ici', body: 'Place le curseur à au moins 0,5 s des bords du clip.', kind: 'warn' })
+      toast.show({ title: tr('Impossible de couper ici', 'Cannot cut here'), body: tr('Place le curseur à au moins 0,5 s des bords du clip.', 'Place the cursor at least 0.5s from the clip edges.'), kind: 'warn' })
       return
     }
     const a: TimelineClip = { ...clip, uid: `${clip.uid}-a`, trimEnd: cutPoint }
@@ -679,7 +681,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
         }],
       })
 
-      if (!res.ok) throw new Error(res.error ?? 'Erreur Anthropic')
+      if (!res.ok) throw new Error(res.error ?? tr('Erreur Anthropic', 'Anthropic error'))
       const raw = res.data as { content?: Array<{ type: string; text?: string }> }
       const text = raw?.content?.find(b => b.type === 'text')?.text?.trim() ?? ''
       if (!text) throw new Error('Empty response')
@@ -1061,7 +1063,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                     <div key={ov.uid} className="flex items-center gap-2 bg-surface2 rounded-lg px-2 py-1.5">
                       <input value={ov.text} onChange={e => setTexts(prev => prev.map(t => t.uid === ov.uid ? { ...t, text: e.target.value } : t))}
                         className="flex-1 bg-transparent text-[11px] text-text focus:outline-none" />
-                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label="Supprimer" className="text-text2 hover:text-danger inline-flex items-center sf-press"><IconX size={13} /></button>
+                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label={tr('Supprimer', 'Delete')} className="text-text2 hover:text-danger inline-flex items-center sf-press"><IconX size={13} /></button>
                     </div>
                   ))}
                 </div>
@@ -1306,7 +1308,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
             {/* Text overlay track */}
             {textOverlays.length > 0 && (
               <div className="px-2 py-0.5 border-t border-border/40">
-                <div className="text-[9px] text-text2/50 mb-1 uppercase tracking-wider">Texte</div>
+                <div className="text-[9px] text-text2/50 mb-1 uppercase tracking-wider">{tr('Texte', 'Text')}</div>
                 <div className="relative h-6" style={{ width: timelineW - 20 }}>
                   {textOverlays.map(ov => (
                     <div key={ov.uid}
@@ -1336,7 +1338,7 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
               </code>
             )}
           </div>
-          <button onClick={() => setExpResult(null)} aria-label="Fermer" className="opacity-60 hover:opacity-100 inline-flex items-center sf-press"><IconX size={14} /></button>
+          <button onClick={() => setExpResult(null)} aria-label={tr('Fermer', 'Close')} className="opacity-60 hover:opacity-100 inline-flex items-center sf-press"><IconX size={14} /></button>
         </div>
       )}
     </div>

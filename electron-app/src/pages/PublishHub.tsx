@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react'
 import type { Page } from '@/components/Layout'
 import { LicenseContext } from '@/lib/license'
+import { useTr } from '@/lib/i18n'
 
 // ── Publication — hub premium (grille uniforme + liseré dégradé animé) ────────
 
@@ -34,24 +35,29 @@ const CSS = `
 `
 
 type PreviewKind = 'reels' | 'story' | 'photo'
-interface Kind { id: Page; Icon: IconFn; title: string; tag: string; desc: string; grad: string; glow: string; accent: string; preview: PreviewKind; soon?: boolean; admin?: boolean }
+interface Kind { id: Page; Icon: IconFn; title: string; tag: string; tagEn: string; desc: string; descEn: string; grad: string; glow: string; accent: string; preview: PreviewKind; soon?: boolean; admin?: boolean }
 
 const KINDS: Kind[] = [
-  { id: 'posting', Icon: IconReels, title: 'Reels', tag: 'Vidéo', preview: 'reels',
+  { id: 'posting', Icon: IconReels, title: 'Reels', tag: 'Vidéo', tagEn: 'Video', preview: 'reels',
     desc: 'Publie un Reels sur tous tes comptes Instagram & TikTok, en parallèle et sans surveillance.',
+    descEn: 'Post a Reel to all your Instagram & TikTok accounts, in parallel and unattended.',
     grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', accent: '#818CF8' },
-  { id: 'storylink', Icon: IconStory, title: 'Story', tag: 'Sticker lien', preview: 'story',
+  { id: 'storylink', Icon: IconStory, title: 'Story', tag: 'Sticker lien', tagEn: 'Link sticker', preview: 'story',
     desc: 'Une story avec un sticker lien propre à chaque compte, publiée en masse.',
+    descEn: 'A story with a link sticker unique to each account, posted in bulk.',
     grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
-  { id: 'photoposting', Icon: IconPhoto, title: 'Photo', tag: 'Feed', preview: 'photo', soon: true,
+  { id: 'photoposting', Icon: IconPhoto, title: 'Photo', tag: 'Feed', tagEn: 'Feed', preview: 'photo', soon: true,
     desc: 'Publie une photo dans le feed sur tous tes comptes.',
+    descEn: 'Post a photo to the feed on all your accounts.',
     grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.4)', accent: '#34D399' },
-  { id: 'crossposting', Icon: IconGlobe, title: 'Cross-posting', tag: 'Multi-plateforme', preview: 'reels', admin: true,
+  { id: 'crossposting', Icon: IconGlobe, title: 'Cross-posting', tag: 'Multi-plateforme', tagEn: 'Multi-platform', preview: 'reels', admin: true,
     desc: 'Publie une vidéo sur Facebook, YouTube Shorts, X, Threads, Reddit & Pinterest en une fois.',
+    descEn: 'Post a video to Facebook, YouTube Shorts, X, Threads, Reddit & Pinterest all at once.',
     grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(6,182,212,0.4)', accent: '#38BDF8' },
 ]
 
 function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
+  const tr = useTr()
   const box: React.CSSProperties = {
     position: 'relative', height: 120, borderRadius: 14, overflow: 'hidden',
     background: 'radial-gradient(130% 130% at 15% 0%, rgba(255,255,255,0.05), rgba(0,0,0,0.3))',
@@ -66,11 +72,11 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
             <span style={{ fontFamily: 'ui-monospace,monospace', color: 'rgba(233,234,240,0.7)', flex: 1 }}>{n}</span>
             {st === 'ok' ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#34D399', fontWeight: 800 }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: 20 }}><path d="M20 6 9 17l-5-5" style={{ animation: `hub-check 3s ease-in-out ${i * 0.4}s infinite` }} /></svg> publié
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: 20 }}><path d="M20 6 9 17l-5-5" style={{ animation: `hub-check 3s ease-in-out ${i * 0.4}s infinite` }} /></svg> {tr('publié', 'posted')}
               </span>
             ) : (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#FBBF24', fontWeight: 800 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FBBF24', animation: 'hub-pulse 1.4s ease-in-out infinite' }} /> en cours
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FBBF24', animation: 'hub-pulse 1.4s ease-in-out infinite' }} /> {tr('en cours', 'running')}
               </span>
             )}
           </div>
@@ -93,7 +99,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
             LIEN
           </span>
         </div>
-        <span style={{ position: 'absolute', bottom: 10, right: 13, fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.4)' }}>par compte</span>
+        <span style={{ position: 'absolute', bottom: 10, right: 13, fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.4)' }}>{tr('par compte', 'per account')}</span>
       </div>
     )
   }
@@ -102,12 +108,13 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
       {Array.from({ length: 8 }, (_, i) => (
         <div key={i} style={{ borderRadius: 6, background: `linear-gradient(160deg, rgba(16,185,129,${0.16 - i * 0.014}), rgba(0,0,0,0.25))`, border: '1px solid rgba(255,255,255,0.06)' }} />
       ))}
-      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: accent, background: 'rgba(8,8,12,0.42)' }}>Bientôt</span>
+      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: accent, background: 'rgba(8,8,12,0.42)' }}>{tr('Bientôt', 'Soon')}</span>
     </div>
   )
 }
 
 function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () => void; disabled?: boolean; badge?: string }) {
+  const tr = useTr()
   const [hover, setHover] = useState(false)
   const [pos, setPos] = useState({ x: 50, y: 50 })
   const active = hover && !disabled
@@ -139,12 +146,12 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
           <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: kind.grad, boxShadow: `0 10px 24px -8px ${kind.glow}, inset 0 1px 0 0 rgba(255,255,255,0.35)`, transform: active ? 'scale(1.06) rotate(-3deg)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)' }}><kind.Icon size={22} /></div>
           <div>
             <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{kind.title}</h3>
-            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: badge ? '#fbbf24' : kind.accent }}>{badge ?? kind.tag}</span>
+            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: badge ? '#fbbf24' : kind.accent }}>{badge ?? tr(kind.tag, kind.tagEn)}</span>
           </div>
         </div>
       </div>
 
-      <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(233,234,240,0.6)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 39 }}>{kind.desc}</p>
+      <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(233,234,240,0.6)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 39 }}>{tr(kind.desc, kind.descEn)}</p>
 
       <div style={{ position: 'relative', zIndex: 2 }}><Preview kind={kind.preview} accent={kind.accent} /></div>
 
@@ -162,11 +169,11 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
         {disabled ? (
           <>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-            Bientôt disponible
+            {tr('Bientôt disponible', 'Coming soon')}
           </>
         ) : (
           <>
-            Ouvrir {kind.title}
+            {tr('Ouvrir', 'Open')} {kind.title}
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: active ? 'translateX(3px)' : 'none', transition: 'transform 0.25s' }}><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </>
         )}
@@ -176,6 +183,7 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
 }
 
 export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
+  const tr = useTr()
   const isSuperAdmin = useContext(LicenseContext)?.isSuperAdmin === true
   const visibleKinds = KINDS.filter(k => !k.admin || isSuperAdmin)
   return (
@@ -190,20 +198,20 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
         <div style={{ marginBottom: 36 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 16, fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
-            Publication
+            {tr('Publication', 'Publishing')}
           </div>
           <h1 style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#6ee7b7 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
-            Publie partout, en un clic
+            {tr('Publie partout, en un clic', 'Publish everywhere, in one click')}
           </h1>
           <p style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.6)', maxWidth: 600, lineHeight: 1.65 }}>
-            Choisis un format ci-dessous, sélectionne tes comptes et ton contenu, puis publie sur des dizaines de comptes Instagram & TikTok en parallèle.
+            {tr('Choisis un format ci-dessous, sélectionne tes comptes et ton contenu, puis publie sur des dizaines de comptes Instagram & TikTok en parallèle.', 'Pick a format below, select your accounts and content, then publish to dozens of Instagram & TikTok accounts in parallel.')}
           </p>
           {/* Comment ça marche — 3 étapes */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
             {[
-              { n: '1', t: 'Choisis un format', s: 'Reels, Story ou Photo', c: '#818CF8' },
-              { n: '2', t: 'Comptes & contenu', s: 'Sélectionne tes téléphones', c: '#FBBF24' },
-              { n: '3', t: 'Publie en 1 clic', s: 'Tout part en parallèle', c: '#34D399' },
+              { n: '1', t: tr('Choisis un format', 'Pick a format'), s: tr('Reels, Story ou Photo', 'Reels, Story or Photo'), c: '#818CF8' },
+              { n: '2', t: tr('Comptes & contenu', 'Accounts & content'), s: tr('Sélectionne tes téléphones', 'Select your phones'), c: '#FBBF24' },
+              { n: '3', t: tr('Publie en 1 clic', 'Publish in 1 click'), s: tr('Tout part en parallèle', 'Everything goes in parallel'), c: '#34D399' },
             ].map((step, i, arr) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px 8px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -230,7 +238,7 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
         {/* Grille uniforme */}
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(visibleKinds.length, 3)}, 1fr)`, gap: 18 }}>
           {visibleKinds.map(kind => (
-            <KindCard key={kind.id} kind={kind} disabled={kind.soon} badge={kind.soon ? 'Bientôt' : kind.admin ? 'Admin' : undefined} onOpen={() => onNavigate(kind.id)} />
+            <KindCard key={kind.id} kind={kind} disabled={kind.soon} badge={kind.soon ? tr('Bientôt', 'Soon') : kind.admin ? 'Admin' : undefined} onOpen={() => onNavigate(kind.id)} />
           ))}
         </div>
       </div>

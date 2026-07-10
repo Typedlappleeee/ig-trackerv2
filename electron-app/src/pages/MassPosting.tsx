@@ -24,7 +24,7 @@ import {
   claimPhones, releaseClaim, type MassRunLive,
 } from '@/lib/massRuns'
 import { playSuccess } from '@/lib/sounds'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { startCreditRun } from '@/lib/withCredits'
 import { ACCENT, ACCENT_L, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR, OK, WARN, ERR, SANS } from '@/lib/theme'
@@ -102,6 +102,7 @@ const PhoneRow = memo(function PhoneRow({ phone, checked, videoIndex, videoTitle
   statusLabel: string
   onToggle: (id: string) => void
 }) {
+  const tr = useTr()
   const initials = (phone.ig_username?.[0] ?? phone.phone_name?.[0] ?? '?').toUpperCase()
   const isActive = ts && (ts.status === 'uploading' || ts.status === 'posting')
   return (
@@ -152,7 +153,7 @@ const PhoneRow = memo(function PhoneRow({ phone, checked, videoIndex, videoTitle
         {(phone.account_state === 'banned' || phone.account_state === 'shadow' || phone.last_post_at) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
             {phone.account_state === 'banned' && (
-              <span style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 5px', borderRadius: 5, background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>⚠ BANNI</span>
+              <span style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 5px', borderRadius: 5, background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>⚠ {tr('BANNI','BANNED')}</span>
             )}
             {phone.account_state === 'shadow' && (
               <span style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 5px', borderRadius: 5, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>⚠ SHADOW?</span>
@@ -195,6 +196,7 @@ const PhoneRow = memo(function PhoneRow({ phone, checked, videoIndex, videoTitle
 
 export function MassPosting({ user }: MassPostingProps) {
   const t = useT()
+  const tr = useTr()
   const { lang } = useLang()
   const STATUS_LABEL: Record<string, string> = {
     idle:      '—',
@@ -203,7 +205,7 @@ export function MassPosting({ user }: MassPostingProps) {
     posting:   t('schedulerStatusInProgress'),
     done:      t('schedulerStatusDone'),
     error:     t('schedulerStatusFailed'),
-    cancelled: 'Annulé',
+    cancelled: tr('Annulé', 'Cancelled'),
   }
   const { currentOrg, role, perms } = useOrg()
   const credits = useCredits()
@@ -310,7 +312,7 @@ export function MassPosting({ user }: MassPostingProps) {
     if (!anyRunning) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      e.returnValue = 'Un posting est en cours. Si tu quittes ou rafraîchis, il sera interrompu.'
+      e.returnValue = tr('Un posting est en cours. Si tu quittes ou rafraîchis, il sera interrompu.', 'A posting is in progress. If you leave or refresh, it will be interrupted.')
       return e.returnValue
     }
     window.addEventListener('beforeunload', onBeforeUnload)
@@ -390,10 +392,10 @@ export function MassPosting({ user }: MassPostingProps) {
     const statuses = new Map<string, TaskStatus>(persisted.taskStatuses)
     setMassPostingState({ posting: true, logs: persisted.logs, taskStatuses: statuses, runPhones: persisted.runPhones, startedAt: persisted.startedAt })
     stopRef.current = false
-    log('🔄 Reprise du suivi du posting en cours (relancé avant refresh)…', 'info')
+    log(tr('🔄 Reprise du suivi du posting en cours (relancé avant refresh)…', '🔄 Resuming tracking of the in-progress posting (relaunched before refresh)…'), 'info')
 
     ;(async () => {
-      const STATUS_B: Record<number, string> = { 3: 'Publié', 4: 'Échec', 7: 'Annulé' }
+      const STATUS_B: Record<number, string> = { 3: tr('Publié', 'Published'), 4: tr('Échec', 'Failed'), 7: tr('Annulé', 'Cancelled') }
       const byTask = new Map<string, RunPhone>()
       for (const rp of persisted.runPhones) {
         const st = statuses.get(rp.phoneId)
@@ -415,12 +417,12 @@ export function MassPosting({ user }: MassPostingProps) {
         return Boolean(rp.token) && !attempted && !finalized
       })
       if (toLaunch.length && !stopRef.current) {
-        log(`↻ Reprise : ${toLaunch.length} téléphone(s) pas encore parti(s) — relance de la publication…`, 'info')
+        log(tr(`↻ Reprise : ${toLaunch.length} téléphone(s) pas encore parti(s) — relance de la publication…`, `↻ Resume: ${toLaunch.length} phone(s) not yet started — relaunching the post…`), 'info')
         const ids = toLaunch.map(rp => rp.geelarkId)
         activePhonesRef.current = [...new Set([...activePhonesRef.current, ...ids])]
         try { await geelark(bearer, '/phone/start', { ids }) } catch { /* watchdog serveur */ }
         registerStartedPhones(ids, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
-        log('Attente du boot (~30s)…')
+        log(tr('Attente du boot (~30s)…', 'Waiting for boot (~30s)…'))
         await new Promise(r => setTimeout(r, 30000))
 
         if (persisted.platform === 'tiktok') {
@@ -434,12 +436,12 @@ export function MassPosting({ user }: MassPostingProps) {
                 const tid = tids[i]
                 if (!tid) { setPhoneStatus(rp.phoneId, { status: 'error', detail: 'no task id' }); return }
                 byTask.set(tid, rp); setPhoneTaskId(rp.geelarkId, tid); setPhoneStatus(rp.phoneId, { status: 'posting', taskId: tid })
-                log(`  Tâche TikTok recréée pour ${rp.phoneName}`, 'ok')
+                log(tr(`  Tâche TikTok recréée pour ${rp.phoneName}`, `  TikTok task recreated for ${rp.phoneName}`), 'ok')
               })
             } else {
-              toLaunch.forEach(rp => setPhoneStatus(rp.phoneId, { status: 'error', detail: String(taskRes['msg'] ?? 'reprise refusée') }))
+              toLaunch.forEach(rp => setPhoneStatus(rp.phoneId, { status: 'error', detail: String(taskRes['msg'] ?? tr('reprise refusée', 'resume rejected')) }))
             }
-          } catch { toLaunch.forEach(rp => setPhoneStatus(rp.phoneId, { status: 'error', detail: 'reprise échouée' })) }
+          } catch { toLaunch.forEach(rp => setPhoneStatus(rp.phoneId, { status: 'error', detail: tr('reprise échouée', 'resume failed') })) }
         } else {
           // Instagram : une tâche instagramPubReels par téléphone (espacée + retry).
           for (const rp of toLaunch) {
@@ -457,17 +459,17 @@ export function MassPosting({ user }: MassPostingProps) {
               outcome = classifyTaskRes(taskRes)
               if (outcome === 'ok') break
               if (outcome === 'unknown') break  // réponse perdue → tâche peut-être créée → pas de retry (anti-double)
-              if (attempt < 2) { log(`  ${rp.phoneName} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
+              if (attempt < 2) { log(tr(`  ${rp.phoneName} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, `  ${rp.phoneName}: ${taskRes['msg'] ?? 'post rejected'} — retrying…`), 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
             }
             if (outcome === 'ok') {
               const tid = (taskRes!['data'] as Record<string, unknown>)?.['id'] as string
               byTask.set(tid, rp); setPhoneTaskId(rp.geelarkId, tid); setPhoneStatus(rp.phoneId, { status: 'posting', taskId: tid })
-              log(`  Tâche recréée pour ${rp.phoneName}`, 'ok')
+              log(tr(`  Tâche recréée pour ${rp.phoneName}`, `  Task recreated for ${rp.phoneName}`), 'ok')
             } else if (outcome === 'unknown') {
-              log(`  ${rp.phoneName} : réponse GeeLark perdue (réseau) — on ne recrée pas (anti-double)`, 'warn')
-              setPhoneStatus(rp.phoneId, { status: 'posting', detail: 'non confirmé (réseau)' })
+              log(tr(`  ${rp.phoneName} : réponse GeeLark perdue (réseau) — on ne recrée pas (anti-double)`, `  ${rp.phoneName}: GeeLark response lost (network) — not recreating (anti-duplicate)`), 'warn')
+              setPhoneStatus(rp.phoneId, { status: 'posting', detail: tr('non confirmé (réseau)', 'unconfirmed (network)') })
             } else {
-              setPhoneStatus(rp.phoneId, { status: 'error', detail: String(taskRes?.['msg'] ?? 'échec reprise') })
+              setPhoneStatus(rp.phoneId, { status: 'error', detail: String(taskRes?.['msg'] ?? tr('échec reprise', 'resume failed')) })
             }
             await new Promise(r => setTimeout(r, 500))
           }
@@ -497,14 +499,14 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       }
       // Ce qui reste non confirmé → publié (non confirmé), et on éteint les tél du run.
-      for (const rp of byTask.values()) setPhoneStatus(rp.phoneId, { status: 'done', detail: 'non confirmé' })
+      for (const rp of byTask.values()) setPhoneStatus(rp.phoneId, { status: 'done', detail: tr('non confirmé', 'unconfirmed') })
       const gids = persisted.runPhones.map(p => p.geelarkId)
       if (gids.length) { try { await geelark(bearer, '/phone/stop', { ids: gids }) } catch { /* watchdog serveur */ } unregisterPhones(gids).catch(() => {}) }
       setPosting(false)
       // Clôture la carte « En cours » adoptée (statut déduit du détail par tél).
       if (activeRunIdRef.current) { finishRun(activeRunIdRef.current); activeRunIdRef.current = null }
       clearPersistedRun()
-      log('✅ Suivi terminé (reprise après refresh)', 'ok')
+      log(tr('✅ Suivi terminé (reprise après refresh)', '✅ Tracking finished (resumed after refresh)'), 'ok')
     })()
   }, [bearer])
 
@@ -609,7 +611,7 @@ export function MassPosting({ user }: MassPostingProps) {
       user_id:        user.id,
       org_id:         null,
       folder:         null,
-      title:          path.split(/[\\/]/).pop() ?? 'Vidéo locale',
+      title:          path.split(/[\\/]/).pop() ?? tr('Vidéo locale', 'Local video'),
       file_url:       null,
       storage_path:   null,
       thumbnail_path: null,
@@ -674,25 +676,25 @@ export function MassPosting({ user }: MassPostingProps) {
     // Clear les auto-stop de 5 min — sinon ils re-déclenchent stop()
     autoStopTimersRef.current.forEach(id => clearTimeout(id))
     autoStopTimersRef.current = []
-    log('Stop — annulation des tâches et extinction des téléphones…', 'warn')
+    log(tr('Stop — annulation des tâches et extinction des téléphones…', 'Stop — cancelling tasks and shutting down phones…'), 'warn')
     const tasks = activeTasksRef.current
     const phones = activePhonesRef.current
     try {
       if (tasks.length > 0) {
         await geelark(bearer, '/rpa/task/cancel', { ids: tasks })
-        log(`  ${tasks.length} tâche(s) annulée(s)`, 'warn')
+        log(tr(`  ${tasks.length} tâche(s) annulée(s)`, `  ${tasks.length} task(s) cancelled`), 'warn')
       }
     } catch (e) {
-      log(`  Impossible d'annuler certaines tâches`, 'warn')
+      log(tr(`  Impossible d'annuler certaines tâches`, `  Could not cancel some tasks`), 'warn')
     }
     try {
       if (phones.length > 0) {
         await geelark(bearer, '/phone/stop', { ids: phones })
         unregisterPhones(phones).catch(() => {})
-        log(`  ${phones.length} téléphone(s) éteint(s)`, 'warn')
+        log(tr(`  ${phones.length} téléphone(s) éteint(s)`, `  ${phones.length} phone(s) shut down`), 'warn')
       }
     } catch (e) {
-      log(`  Impossible d'éteindre certains téléphones`, 'warn')
+      log(tr(`  Impossible d'éteindre certains téléphones`, `  Could not shut down some phones`), 'warn')
     }
     activeTasksRef.current = []
     activePhonesRef.current = []
@@ -707,11 +709,11 @@ export function MassPosting({ user }: MassPostingProps) {
     // Clôture IMMÉDIATE du suivi global → pas de fausse alerte « même proxy »
     // sur un posting relancé juste après l'annulation.
     if (activeRunIdRef.current) { endRun(activeRunIdRef.current); activeRunIdRef.current = null }
-    log('Arrêté.', 'warn')
+    log(tr('Arrêté.', 'Stopped.'), 'warn')
   }
 
   async function generateCaption() {
-    if (!groqKey) { log('Clé Groq manquante — ajoute-la dans les Paramètres', 'error'); return }
+    if (!groqKey) { log(tr('Clé Groq manquante — ajoute-la dans les Paramètres', 'Groq key missing — add it in Settings'), 'error'); return }
     if (!window.electronAPI?.groqRequest) return
     setGenerating(true)
     try {
@@ -734,10 +736,10 @@ export function MassPosting({ user }: MassPostingProps) {
         const choice = (r.data as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content
         if (choice) setCaption(choice.trim())
       } else {
-        log('La génération de la description a échoué. Réessaie.', 'error')
+        log(tr('La génération de la description a échoué. Réessaie.', 'Caption generation failed. Try again.'), 'error')
       }
     } catch (e) {
-      log('La génération de la description a échoué.', 'error')
+      log(tr('La génération de la description a échoué.', 'Caption generation failed.'), 'error')
     }
     setGenerating(false)
   }
@@ -755,12 +757,12 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function scheduleMassPost(scheduledAt: Date) {
-    if (!bearer)                    { log('Connexion GéeLark manquante — ajoute ton token dans les Paramètres', 'error'); return }
-    if (phoneList.length === 0)     { log('Sélectionne au moins un téléphone', 'warn'); return }
-    if (selectedVideos.length === 0){ log('Sélectionne au moins une vidéo', 'warn'); return }
+    if (!bearer)                    { log(tr('Connexion GéeLark manquante — ajoute ton token dans les Paramètres', 'GeeLark connection missing — add your token in Settings'), 'error'); return }
+    if (phoneList.length === 0)     { log(tr('Sélectionne au moins un téléphone', 'Select at least one phone'), 'warn'); return }
+    if (selectedVideos.length === 0){ log(tr('Sélectionne au moins une vidéo', 'Select at least one video'), 'warn'); return }
     // GéeLark expire les fichiers uploadés après 30 jours — bloque au-delà de 25
     if (scheduledAt.getTime() > Date.now() + 25 * 24 * 60 * 60 * 1000) {
-      log('Programmation limitée à 25 jours (les vidéos uploadées chez GéeLark expirent après 30 jours)', 'error')
+      log(tr('Programmation limitée à 25 jours (les vidéos uploadées chez GéeLark expirent après 30 jours)', 'Scheduling limited to 25 days (videos uploaded to GeeLark expire after 30 days)'), 'error')
       return
     }
     setShowScheduleModal(false)
@@ -784,37 +786,37 @@ export function MassPosting({ user }: MassPostingProps) {
       const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
       const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
-        log(`${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost} pour ${phoneList.length} téléphone${phoneList.length > 1 ? 's' : ''})`, 'error')
+        log(tr(`${creditRes.error ?? 'Crédits insuffisants'} (requis : ${creditCost} pour ${phoneList.length} téléphone${phoneList.length > 1 ? 's' : ''})`, `${creditRes.error ?? 'Insufficient credits'} (required: ${creditCost} for ${phoneList.length} phone${phoneList.length > 1 ? 's' : ''})`), 'error')
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
-      log(`${creditCost} crédits débités — remboursés si tu annules avant l'exécution`, 'ok')
+      log(tr(`${creditCost} crédits débités — remboursés si tu annules avant l'exécution`, `${creditCost} credits charged — refunded if you cancel before execution`), 'ok')
 
       // Refund helper: any failure between deduction and creation gives the credits back
       const refundOnFailure = async (reason: string) => {
         const { refundCredits } = await import('@/lib/credits')
         const ok = await refundCredits(credits.ownerId, creditCost)
-        log(`${reason}${ok ? ` — ${creditCost} crédits remboursés` : ''}`, 'error')
+        log(`${reason}${ok ? tr(` — ${creditCost} crédits remboursés`, ` — ${creditCost} credits refunded`) : ''}`, 'error')
         if (ok) credits.refresh()
       }
 
       // Upload chaque vidéo DISTINCTE une seule fois (dédup).
-      log(`Upload de ${distinctIdx.length} vidéo(s) vers GéeLark…`)
+      log(tr(`Upload de ${distinctIdx.length} vidéo(s) vers GéeLark…`, `Uploading ${distinctIdx.length} video(s) to GeeLark…`))
       const tokenByIdx = new Map<number, string>()
       for (let k = 0; k < distinctIdx.length; k++) {
         const vi = distinctIdx[k]
         const sv = selectedVideos[vi]
         const filePath = await resolveVideoPath(sv)
-        if (!filePath) { await refundOnFailure(`Fichier introuvable pour « ${sv.item.title} »`); return }
+        if (!filePath) { await refundOnFailure(tr(`Fichier introuvable pour « ${sv.item.title} »`, `File not found for “${sv.item.title}”`)); return }
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
-        if (!up.ok || !up.token) { await refundOnFailure(`Échec de l'envoi de « ${sv.item.title} » vers GéeLark`); return }
+        if (!up.ok || !up.token) { await refundOnFailure(tr(`Échec de l'envoi de « ${sv.item.title} » vers GéeLark`, `Failed to upload “${sv.item.title}” to GeeLark`)); return }
         tokenByIdx.set(vi, up.token)
-        log(`Vidéo ${k + 1}/${distinctIdx.length} prête`, 'ok')
+        log(tr(`Vidéo ${k + 1}/${distinctIdx.length} prête`, `Video ${k + 1}/${distinctIdx.length} ready`), 'ok')
       }
       try {
         await createScheduledPost({
           userId: user.id, orgId: currentOrg?.id ?? null,
-          createdByName: user.email?.split('@')[0] ?? 'Moi',
+          createdByName: user.email?.split('@')[0] ?? tr('Moi', 'Me'),
           type: 'mass_posting', scheduledAt,
           phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
           // UNE entrée par téléphone : videos[i] = la vidéo du téléphone i (mapping
@@ -829,7 +831,7 @@ export function MassPosting({ user }: MassPostingProps) {
           platform,
         })
       } catch (err: any) {
-        await refundOnFailure('La programmation a échoué.')
+        await refundOnFailure(tr('La programmation a échoué.', 'Scheduling failed.'))
         return
       }
 
@@ -846,21 +848,21 @@ export function MassPosting({ user }: MassPostingProps) {
             deleteStorageObjects(toDelete.flatMap(sv => [sv.item.storage_path, sv.item.thumbnail_path])).catch(() => {})
             const deletedIds = new Set(ids)
             setSelVideos(prev => prev.filter(sv => !deletedIds.has(sv.item.id)))
-            log(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, 'ok')
-          } catch { log('Impossible de retirer certaines vidéos de la banque', 'warn') }
+            log(tr(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, `🗑️ ${toDelete.length} video(s) removed from the bank (single use)`), 'ok')
+          } catch { log(tr('Impossible de retirer certaines vidéos de la banque', 'Could not remove some videos from the bank'), 'warn') }
         }
       }
 
       // Post « maintenant » (≤ 2 min) vs vraiment programmé plus tard.
       const soon = scheduledAt.getTime() <= Date.now() + 2 * 60_000
       if (soon) {
-        log(`✅ Envoyé au serveur — ${phoneList.length} téléphone(s) postent d'ici ~1 min. Tu peux fermer ton PC.`, 'ok')
-        toast.show({ title: 'Posting lancé côté serveur', body: 'Les publications partent dans ~1 min. Tu peux fermer ton PC — suis l\'avancement dans Historique.', kind: 'ok' })
+        log(tr(`✅ Envoyé au serveur — ${phoneList.length} téléphone(s) postent d'ici ~1 min. Tu peux fermer ton PC.`, `✅ Sent to the server — ${phoneList.length} phone(s) will post within ~1 min. You can turn off your PC.`), 'ok')
+        toast.show({ title: tr('Posting lancé côté serveur', 'Posting launched server-side'), body: tr('Les publications partent dans ~1 min. Tu peux fermer ton PC — suis l\'avancement dans Historique.', 'Posts go out in ~1 min. You can turn off your PC — track progress in History.'), kind: 'ok' })
       } else {
-        log(`Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
+        log(tr(`Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, `Scheduled for ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} phone(s)`), 'ok')
       }
     } catch (err: any) {
-      log('Une erreur est survenue pendant la programmation.', 'error')
+      log(tr('Une erreur est survenue pendant la programmation.', 'An error occurred during scheduling.'), 'error')
     } finally {
       setPosting(false)
     }
@@ -870,9 +872,9 @@ export function MassPosting({ user }: MassPostingProps) {
     // ⚠️ Ces gardes s'exécutent AVANT la création du run : elles utilisent `toast`
     // (et non `log`, qui est masqué plus bas par un shadow par-run → TDZ si appelé
     // ici). Feedback utilisateur via toast, pas de journal (aucun run encore).
-    if (!bearer)                  { toast.show({ title: 'GéeLark non connecté', body: 'Ajoute ton token dans les Paramètres', kind: 'error' }); return }
-    if (phoneList.length === 0)   { toast.show({ title: 'Aucun téléphone', body: 'Sélectionne au moins un téléphone', kind: 'warn' }); return }
-    if (selectedVideos.length === 0) { toast.show({ title: 'Aucune vidéo', body: 'Sélectionne au moins une vidéo', kind: 'warn' }); return }
+    if (!bearer)                  { toast.show({ title: tr('GéeLark non connecté', 'GeeLark not connected'), body: tr('Ajoute ton token dans les Paramètres', 'Add your token in Settings'), kind: 'error' }); return }
+    if (phoneList.length === 0)   { toast.show({ title: tr('Aucun téléphone', 'No phone'), body: tr('Sélectionne au moins un téléphone', 'Select at least one phone'), kind: 'warn' }); return }
+    if (selectedVideos.length === 0) { toast.show({ title: tr('Aucune vidéo', 'No video'), body: tr('Sélectionne au moins une vidéo', 'Select at least one video'), kind: 'warn' }); return }
 
     // ⛔ Anti-doublon : un téléphone déjà en cours dans un autre run ne doit PAS
     // repartir ici — sinon il posterait 2× ET serait débité 2× (runs parallèles).
@@ -881,8 +883,8 @@ export function MassPosting({ user }: MassPostingProps) {
     if (clashPhones.length > 0) {
       const names = clashPhones.map(p => p.ig_username ? `@${p.ig_username}` : (p.phone_name ?? p.id.slice(-6)))
       toast.show({
-        title: `${clashPhones.length} téléphone(s) déjà en cours`,
-        body: `${names.slice(0, 5).join(', ')}${names.length > 5 ? '…' : ''} — déjà dans un posting actif. Attends qu'il finisse ou désélectionne-les.`,
+        title: tr(`${clashPhones.length} téléphone(s) déjà en cours`, `${clashPhones.length} phone(s) already running`),
+        body: tr(`${names.slice(0, 5).join(', ')}${names.length > 5 ? '…' : ''} — déjà dans un posting actif. Attends qu'il finisse ou désélectionne-les.`, `${names.slice(0, 5).join(', ')}${names.length > 5 ? '…' : ''} — already in an active posting. Wait for it to finish or deselect them.`),
         kind: 'warn',
       })
       return
@@ -905,7 +907,7 @@ export function MassPosting({ user }: MassPostingProps) {
     const run = await startCreditRun(credits.ownerId, CREDIT_COSTS.mass_posting, phoneList.length)
     if (!run.ok) {
       releaseClaim(runId)  // libère la réservation si le débit échoue
-      toast.show({ title: 'Crédits insuffisants', body: `${run.error} — ${creditCost} crédits requis, solde : ${credits.balance}`, kind: 'error' })
+      toast.show({ title: tr('Crédits insuffisants', 'Insufficient credits'), body: tr(`${run.error} — ${creditCost} crédits requis, solde : ${credits.balance}`, `${run.error} — ${creditCost} credits required, balance: ${credits.balance}`), kind: 'error' })
       return
     }
     if (typeof run.balance === 'number') credits.setBalance(run.balance)
@@ -920,7 +922,7 @@ export function MassPosting({ user }: MassPostingProps) {
     // la boucle de polling, checkPhoneScreen imbriqués) → aucun run ne piétine un
     // autre. La logique de crédits/upload/poll reste inchangée.
     // (runId est déjà déclaré plus haut pour la réservation synchrone.)
-    const runLabel = `Mass posting · ${phoneList.length} compte${phoneList.length > 1 ? 's' : ''}`
+    const runLabel = `Mass posting · ${phoneList.length} ${tr('compte', 'account')}${phoneList.length > 1 ? 's' : ''}`
     const stopRef           = { current: false }
     const activeTasksRef    = { current: [] as string[] }
     const activePhonesRef   = { current: [] as string[] }
@@ -957,20 +959,20 @@ export function MassPosting({ user }: MassPostingProps) {
       stopRef.current = true
       autoStopTimersRef.current.forEach(id => window.clearTimeout(id))
       autoStopTimersRef.current = []
-      log('Stop — annulation des tâches et extinction des téléphones…', 'warn')
+      log(tr('Stop — annulation des tâches et extinction des téléphones…', 'Stop — cancelling tasks and shutting down phones…'), 'warn')
       const tasks = [...activeTasksRef.current]
       const phs   = [...activePhonesRef.current]
-      try { if (tasks.length) { await geelark(bearer, '/rpa/task/cancel', { ids: tasks }); log(`  ${tasks.length} tâche(s) annulée(s)`, 'warn') } }
-      catch { log('  Impossible d\'annuler certaines tâches', 'warn') }
-      try { if (phs.length) { await geelark(bearer, '/phone/stop', { ids: phs }); unregisterPhones(phs).catch(() => {}); log(`  ${phs.length} téléphone(s) éteint(s)`, 'warn') } }
-      catch { log('  Impossible d\'éteindre certains téléphones', 'warn') }
+      try { if (tasks.length) { await geelark(bearer, '/rpa/task/cancel', { ids: tasks }); log(tr(`  ${tasks.length} tâche(s) annulée(s)`, `  ${tasks.length} task(s) cancelled`), 'warn') } }
+      catch { log(tr('  Impossible d\'annuler certaines tâches', '  Could not cancel some tasks'), 'warn') }
+      try { if (phs.length) { await geelark(bearer, '/phone/stop', { ids: phs }); unregisterPhones(phs).catch(() => {}); log(tr(`  ${phs.length} téléphone(s) éteint(s)`, `  ${phs.length} phone(s) shut down`), 'warn') } }
+      catch { log(tr('  Impossible d\'éteindre certains téléphones', '  Could not shut down some phones'), 'warn') }
       activeTasksRef.current = []
       activePhonesRef.current = []
       for (const [phoneId, st] of live.statuses.entries()) {
         if (st.status !== 'done' && st.status !== 'error') setPhoneStatus(phoneId, { status: 'cancelled' })
       }
       if (activeRunIdRef.current) endRun(activeRunIdRef.current)
-      log('Arrêté.', 'warn')
+      log(tr('Arrêté.', 'Stopped.'), 'warn')
     }
     live = createMassRun(runId, runLabel, phoneList.length, () => { void cancelRun() })
     setFocusedRunId(runId)  // affiche ce nouveau run dans le panneau
@@ -979,7 +981,7 @@ export function MassPosting({ user }: MassPostingProps) {
     // Mémorise le run pour reprendre le suivi après un éventuel refresh (dernier run).
     setMassPostingState({ startedAt: Date.now(), runPhones: phoneList.map(p => ({ phoneId: p.id, geelarkId: p.geelark_id, phoneName: p.phone_name })) })
     setLastRun(null)
-    log(`${creditCost} crédits débités — les échecs seront remboursés en fin de run`, 'info')
+    log(tr(`${creditCost} crédits débités — les échecs seront remboursés en fin de run`, `${creditCost} credits charged — failures will be refunded at the end of the run`), 'info')
     const newStatuses = new Map<string, TaskStatus>()
     phoneList.forEach(p => newStatuses.set(p.id, { status: 'pending' }))
     setTaskStatuses(newStatuses)
@@ -1001,11 +1003,11 @@ export function MassPosting({ user }: MassPostingProps) {
       } catch { /* best-effort */ }
       const clash = proxyConflicts(proxyKeys, runId)
       if (clash.length) {
-        log(`⚠️ Un autre posting tourne déjà sur ${clash.length} proxy(s) utilisé(s) ici — mêmes IP en parallèle = risque de ban.`, 'warn')
-        toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — mêmes IP en parallèle, risque de ban.', kind: 'warn' })
+        log(tr(`⚠️ Un autre posting tourne déjà sur ${clash.length} proxy(s) utilisé(s) ici — mêmes IP en parallèle = risque de ban.`, `⚠️ Another posting is already running on ${clash.length} proxy(s) used here — same IPs in parallel = ban risk.`), 'warn')
+        toast.show({ title: tr('⚠️ Même proxy déjà utilisé', '⚠️ Same proxy already in use'), body: tr('Un autre posting tourne sur le même proxy — mêmes IP en parallèle, risque de ban.', 'Another posting is running on the same proxy — same IPs in parallel, ban risk.'), kind: 'warn' })
       }
       startRun({
-        id: runId, type: 'mass', label: `Mass posting · ${phoneList.length} compte${phoneList.length > 1 ? 's' : ''}`,
+        id: runId, type: 'mass', label: `Mass posting · ${phoneList.length} ${tr('compte', 'account')}${phoneList.length > 1 ? 's' : ''}`,
         proxyKeys, done: 0, total: assignments.length, page: 'posting',
         phones: phoneList.map(p => ({ id: p.id, name: p.ig_username ? `@${p.ig_username}` : (p.phone_name ?? p.id.slice(-6)), status: 'idle' as PhaseStatus })),
       })
@@ -1020,7 +1022,7 @@ export function MassPosting({ user }: MassPostingProps) {
     try {
       // ── Step 1: upload only videos actually assigned to a phone ──────────
       const usedIndices = [...new Set(assignments.map(a => a.videoIndex).filter(i => i >= 0))]
-      log(`Upload de ${usedIndices.length} vidéo(s) vers GéeLark…`)
+      log(tr(`Upload de ${usedIndices.length} vidéo(s) vers GéeLark…`, `Uploading ${usedIndices.length} video(s) to GeeLark…`))
       const tokenMap = new Map<number, string>() // videoIndex → token
 
       for (const vi of usedIndices) {
@@ -1033,19 +1035,19 @@ export function MassPosting({ user }: MassPostingProps) {
 
         const fileSource = await resolveVideoPath(sv)
         if (!fileSource) {
-          log(`Vidéo ${vi + 1} sans source — ignorée`, 'warn')
+          log(tr(`Vidéo ${vi + 1} sans source — ignorée`, `Video ${vi + 1} has no source — skipped`), 'warn')
           continue
         }
         // Retry sur l'upload : un timeout/throttle transitoire ne doit pas
         // condamner tous les tels qui utilisent cette vidéo.
         let up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
         for (let attempt = 0; (!up.ok || !up.token) && attempt < 2; attempt++) {
-          log(`Envoi de la vidéo ${vi + 1} raté — nouvel essai…`, 'warn')
+          log(tr(`Envoi de la vidéo ${vi + 1} raté — nouvel essai…`, `Upload of video ${vi + 1} failed — retrying…`), 'warn')
           await new Promise(r => setTimeout(r, 2500 * (attempt + 1)))
           up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
         }
         if (!up.ok || !up.token) {
-          log(`Échec de l'envoi de « ${sv.item.title} » vers GéeLark`, 'error')
+          log(tr(`Échec de l'envoi de « ${sv.item.title} » vers GéeLark`, `Failed to upload “${sv.item.title}” to GeeLark`), 'error')
           assignments.forEach(a => {
             if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'error', detail: up.error })
           })
@@ -1053,7 +1055,7 @@ export function MassPosting({ user }: MassPostingProps) {
         }
 
         tokenMap.set(vi, up.token)
-        log(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
+        log(tr(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, `Video ${vi + 1} uploaded (${sv.item.title.slice(0, 30)}…)`), 'ok')
       }
 
       // Persiste le média + légende PAR téléphone (+ options) : après un refresh,
@@ -1079,9 +1081,9 @@ export function MassPosting({ user }: MassPostingProps) {
       if (platform === 'instagram' && _concurrency < assignments.length) {
         const batches: (typeof assignments)[] = []
         for (let i = 0; i < assignments.length; i += _concurrency) batches.push(assignments.slice(i, i + _concurrency))
-        log(`Concurrence : ${_concurrency} téléphone(s) à la fois — ${batches.length} lot(s)${postingOpts.rotatingProxy ? ' · proxy rotatif' : ''}`, 'info')
+        log(tr(`Concurrence : ${_concurrency} téléphone(s) à la fois — ${batches.length} lot(s)${postingOpts.rotatingProxy ? ' · proxy rotatif' : ''}`, `Concurrency: ${_concurrency} phone(s) at a time — ${batches.length} batch(es)${postingOpts.rotatingProxy ? ' · rotating proxy' : ''}`), 'info')
 
-        const STATUS_B: Record<number, string> = { 1: 'En attente', 2: 'En cours', 3: 'Publié', 4: 'Échec', 7: 'Annulé' }
+        const STATUS_B: Record<number, string> = { 1: tr('En attente', 'Pending'), 2: tr('En cours', 'In progress'), 3: tr('Publié', 'Published'), 4: tr('Échec', 'Failed'), 7: tr('Annulé', 'Cancelled') }
         const pollBatch = async (ids: Record<string, string>) => {
           const list = Object.values(ids)
           if (!list.length) return
@@ -1115,22 +1117,22 @@ export function MassPosting({ user }: MassPostingProps) {
           if (pending.size > 0 && !stopRef.current) {
             for (const tid of pending) {
               const phone = phoneList.find(p => ids[p.geelark_id] === tid)
-              if (phone) setPhoneStatus(phone.id, { status: 'done', detail: 'non confirmé' })
+              if (phone) setPhoneStatus(phone.id, { status: 'done', detail: tr('non confirmé', 'unconfirmed') })
             }
           }
         }
 
         for (let bi = 0; bi < batches.length; bi++) {
-          if (stopRef.current) { log('Run interrompu (stop)', 'warn'); break }
+          if (stopRef.current) { log(tr('Run interrompu (stop)', 'Run interrupted (stop)'), 'warn'); break }
           const batch = batches[bi]
           const ids = batch.map(a => a.phone.geelark_id)
           // Rotation d'IP AVANT d'allumer le(s) téléphone(s) du lot → ils démarrent
           // directement sur la nouvelle IP (ils ne touchent jamais l'ancienne).
           if (rotationUrls.length > 0) {
-            log(`Lot ${bi + 1}/${batches.length} — rotation IP avant démarrage…`)
+            log(tr(`Lot ${bi + 1}/${batches.length} — rotation IP avant démarrage…`, `Batch ${bi + 1}/${batches.length} — IP rotation before start…`))
             await rotateAllProxies(rotationUrls, m => log(`  ${m.trim()}`))
           }
-          log(`Lot ${bi + 1}/${batches.length} — démarrage de ${batch.length} téléphone(s)…`)
+          log(tr(`Lot ${bi + 1}/${batches.length} — démarrage de ${batch.length} téléphone(s)…`, `Batch ${bi + 1}/${batches.length} — starting ${batch.length} phone(s)…`))
           activePhonesRef.current = [...new Set([...activePhonesRef.current, ...ids])]
           const startRes = await geelark(bearer, '/phone/start', { ids })
           // Backstop serveur (PC fermé) : 8 min → laisse le garde-fou client 7 min
@@ -1138,7 +1140,7 @@ export function MassPosting({ user }: MassPostingProps) {
           registerStartedPhones(ids, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting', stopAt: new Date(Date.now() + 8 * 60_000) })
           const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
           if (started === 0) {
-            batch.forEach(a => setPhoneStatus(a.phone.id, { status: 'error', detail: 'démarrage échoué' }))
+            batch.forEach(a => setPhoneStatus(a.phone.id, { status: 'error', detail: tr('démarrage échoué', 'start failed') }))
             activePhonesRef.current = activePhonesRef.current.filter(id => !ids.includes(id))
             continue
           }
@@ -1151,13 +1153,13 @@ export function MassPosting({ user }: MassPostingProps) {
             geelark(bearer, '/phone/stop', { ids }).catch(() => {})
             unregisterPhones(ids).catch(() => {})
             activePhonesRef.current = activePhonesRef.current.filter(id => !ids.includes(id))
-            log(`⏱ Garde-fou 7 min — extinction forcée du lot ${bi + 1}/${batches.length}`, 'warn')
+            log(tr(`⏱ Garde-fou 7 min — extinction forcée du lot ${bi + 1}/${batches.length}`, `⏱ 7 min safeguard — forced shutdown of batch ${bi + 1}/${batches.length}`), 'warn')
           }, 7 * 60_000)
           autoStopTimersRef.current.push(batchSafety)
           if (stopRef.current) { window.clearTimeout(batchSafety); break }
           // Boot réduit : la vérif de connectivité par téléphone (plus bas) sert de
           // filet — on repart dès que le tél répond, pas besoin d'un 30s fixe.
-          log('Attente du boot (~20s)…')
+          log(tr('Attente du boot (~20s)…', 'Waiting for boot (~20s)…'))
           await new Promise(r => setTimeout(r, 20000))
           if (stopRef.current) break
 
@@ -1165,7 +1167,7 @@ export function MassPosting({ user }: MassPostingProps) {
           for (const asgn of batch) {
             if (stopRef.current) break
             const token = tokenMap.get(asgn.videoIndex)
-            if (!token) { log(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, 'warn'); setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'vidéo non préparée' }); continue }
+            if (!token) { log(tr(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, `  ${asgn.phone.phone_name}: video could not be prepared`), 'warn'); setPhoneStatus(asgn.phone.id, { status: 'error', detail: tr('vidéo non préparée', 'video not prepared') }); continue }
             // La rotation d'IP a déjà eu lieu AVANT le démarrage du lot (le tél a
             // booté sur l'IP fraîche). On vérifie juste que la connexion est là.
             // (PRÉ-check seulement — jamais de retry, pour ne pas risquer un double post).
@@ -1183,7 +1185,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 description: capFor(asgn.video), video: [token], ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
               })
               if (taskRes['code'] === 0) break
-              if (attempt < 2) { log(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
+              if (attempt < 2) { log(tr(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, `  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? 'post rejected'} — retrying…`), 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
             }
             if (taskRes && taskRes['code'] === 0) {
               const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
@@ -1191,10 +1193,10 @@ export function MassPosting({ user }: MassPostingProps) {
               activeTasksRef.current = [...activeTasksRef.current, tid]
               setPhoneTaskId(asgn.phone.geelark_id, tid)
               setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
-              log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
+              log(tr(`  Tâche créée pour ${asgn.phone.phone_name}`, `  Task created for ${asgn.phone.phone_name}`), 'ok')
             } else {
-              log(`  ${asgn.phone.phone_name} : ${taskRes?.['msg'] ?? 'la publication a échoué'}`, 'error')
-              setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec') })
+              log(tr(`  ${asgn.phone.phone_name} : ${taskRes?.['msg'] ?? 'la publication a échoué'}`, `  ${asgn.phone.phone_name}: ${taskRes?.['msg'] ?? 'the post failed'}`), 'error')
+              setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes?.['msg'] ?? taskRes?.['code'] ?? tr('échec', 'failed')) })
             }
             await new Promise(r => setTimeout(r, 500))
           }
@@ -1220,7 +1222,7 @@ export function MassPosting({ user }: MassPostingProps) {
             for (const asgn of batch) {
               const st = cur.get(asgn.phone.id)?.status
               if (st === 'posting' || st === 'pending' || st === 'uploading') {
-                setPhoneStatus(asgn.phone.id, { status: 'done', detail: 'non confirmé' })
+                setPhoneStatus(asgn.phone.id, { status: 'done', detail: tr('non confirmé', 'unconfirmed') })
                 activeTasksRef.current = activeTasksRef.current.filter(id => id !== batchTaskIds[asgn.phone.geelark_id])
               }
             }
@@ -1228,13 +1230,13 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       } else {
       // ── Step 2: start phones ──────────────────────────────────────────────
-      if (stopRef.current) { log('Run interrompu avant le démarrage des téléphones', 'warn'); return }
+      if (stopRef.current) { log(tr('Run interrompu avant le démarrage des téléphones', 'Run interrupted before starting phones'), 'warn'); return }
       const geelarkIds = phoneList.map(p => p.geelark_id)
       activePhonesRef.current = geelarkIds
-      log(`Démarrage de ${phoneList.length} téléphone(s)…`)
+      log(tr(`Démarrage de ${phoneList.length} téléphone(s)…`, `Starting ${phoneList.length} phone(s)…`))
       const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
       const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
-      log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
+      log(tr(`  ${started} démarré(s)`, `  ${started} started`), started > 0 ? 'ok' : 'warn')
       // Filet de sécurité serveur : si ScaleFlow se ferme, le watchdog éteint ces
       // téléphones après 5 min (ils ont été démarrés par l'automation, pas à la main).
       registerStartedPhones(geelarkIds, { orgId: currentOrg?.id ?? null, userId: user.id }, { reason: 'mass_posting' })
@@ -1244,24 +1246,24 @@ export function MassPosting({ user }: MassPostingProps) {
         run.abort()
         const cur = live.statuses
         for (const p of phoneList) {
-          if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: 'démarrage échoué' })
+          if (cur.get(p.id)?.status !== 'error') setPhoneStatus(p.id, { status: 'error', detail: tr('démarrage échoué', 'start failed') })
         }
-        log('Aucun téléphone démarré — run annulé', 'error')
+        log(tr('Aucun téléphone démarré — run annulé', 'No phone started — run cancelled'), 'error')
         return
       }
 
-      if (stopRef.current) { log('Run interrompu avant le boot', 'warn'); return }
-      log('Attente 30s (boot)…')
+      if (stopRef.current) { log(tr('Run interrompu avant le boot', 'Run interrupted before boot'), 'warn'); return }
+      log(tr('Attente 30s (boot)…', 'Waiting 30s (boot)…'))
       await new Promise(r => setTimeout(r, 30000))
-      if (stopRef.current) { log('Run interrompu après le boot', 'warn'); return }
+      if (stopRef.current) { log(tr('Run interrompu après le boot', 'Run interrupted after boot'), 'warn'); return }
 
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
-      log('Préparation des publications…')
+      log(tr('Préparation des publications…', 'Preparing posts…'))
       const taskIds: Record<string, string> = {}
       const scheduleTimes = buildScheduleTimes(assignments.length, postingOpts)
       if (postingOpts.intervalMode !== 'none' && assignments.length > 1) {
         const lastMin = Math.round((scheduleTimes[scheduleTimes.length - 1] - scheduleTimes[0]) / 60)
-        log(`Intervalle activé — dernier post dans ~${lastMin} min`, 'info')
+        log(tr(`Intervalle activé — dernier post dans ~${lastMin} min`, `Interval enabled — last post in ~${lastMin} min`), 'info')
       }
 
       // Programme l'auto-stop d'un téléphone (4m30) — partagé IG/TikTok.
@@ -1270,7 +1272,7 @@ export function MassPosting({ user }: MassPostingProps) {
           autoStopTimersRef.current = autoStopTimersRef.current.filter(id => id !== timerId)
           if (activePhonesRef.current.includes(geelarkId)) {
             geelark(bearer, '/phone/stop', { ids: [geelarkId] })
-              .then(() => log(`  ${phoneName} — posting fini`, 'ok'))
+              .then(() => log(tr(`  ${phoneName} — posting fini`, `  ${phoneName} — posting done`), 'ok'))
               .catch(() => {})
             unregisterPhones([geelarkId])
             setPhoneStatus(phoneId, { status: 'done' })
@@ -1287,8 +1289,8 @@ export function MassPosting({ user }: MassPostingProps) {
           const asgn = assignments[ai]
           const token = tokenMap.get(asgn.videoIndex)
           if (!token) {
-            log(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, 'warn')
-            setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'vidéo non préparée' })
+            log(tr(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, `  ${asgn.phone.phone_name}: video could not be prepared`), 'warn')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: tr('vidéo non préparée', 'video not prepared') })
             continue
           }
           setPhoneStatus(asgn.phone.id, { status: 'posting' })
@@ -1311,11 +1313,11 @@ export function MassPosting({ user }: MassPostingProps) {
               activeTasksRef.current = [...activeTasksRef.current, tid]
               setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
               setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
-              log(`  Tâche TikTok créée pour ${asgn.phone.phone_name}`, 'ok')
+              log(tr(`  Tâche TikTok créée pour ${asgn.phone.phone_name}`, `  TikTok task created for ${asgn.phone.phone_name}`), 'ok')
               armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
             })
           } else {
-            log(`  TikTok a refusé la publication${typeof taskRes['msg'] === 'string' ? ` — ${taskRes['msg']}` : ''}`, 'error')
+            log(tr(`  TikTok a refusé la publication${typeof taskRes['msg'] === 'string' ? ` — ${taskRes['msg']}` : ''}`, `  TikTok rejected the post${typeof taskRes['msg'] === 'string' ? ` — ${taskRes['msg']}` : ''}`), 'error')
             list.forEach(item => setPhoneStatus(assignments[item.ai].phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) }))
           }
         }
@@ -1325,12 +1327,12 @@ export function MassPosting({ user }: MassPostingProps) {
         // transitoires GéeLark (throttle/lock) — évite le « ça marche sur certains
         // tels, plus du tout sur d'autres » quand on lance beaucoup de tels d'un coup.
         for (let ai = 0; ai < assignments.length; ai++) {
-          if (stopRef.current) { log('Création des tâches interrompue (stop)', 'warn'); break }
+          if (stopRef.current) { log(tr('Création des tâches interrompue (stop)', 'Task creation interrupted (stop)'), 'warn'); break }
           const asgn = assignments[ai]
           const token = tokenMap.get(asgn.videoIndex)
           if (!token) {
-            log(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, 'warn')
-            setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'vidéo non préparée' })
+            log(tr(`  ${asgn.phone.phone_name} : la vidéo n'a pas pu être préparée`, `  ${asgn.phone.phone_name}: video could not be prepared`), 'warn')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: tr('vidéo non préparée', 'video not prepared') })
             continue
           }
           setPhoneStatus(asgn.phone.id, { status: 'posting' })
@@ -1354,7 +1356,7 @@ export function MassPosting({ user }: MassPostingProps) {
             if (outcome === 'unknown') break
             // 'rejected' = GeeLark a bien refusé (tâche non créée) → retry sûr.
             if (attempt < 2) {
-              log(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, 'warn')
+              log(tr(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, `  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? 'post rejected'} — retrying…`), 'warn')
               await new Promise(r => setTimeout(r, 3000 * (attempt + 1)))
             }
           }
@@ -1364,19 +1366,19 @@ export function MassPosting({ user }: MassPostingProps) {
             activeTasksRef.current = [...activeTasksRef.current, tid]
             setPhoneTaskId(asgn.phone.geelark_id, tid)  // watchdog ↔ webhook
             setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
-            log(`  Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
+            log(tr(`  Tâche créée pour ${asgn.phone.phone_name}`, `  Task created for ${asgn.phone.phone_name}`), 'ok')
             armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
           } else if (outcome === 'unknown') {
             // Ambiguë : pas de taskId à suivre, mais la publication est peut-être
             // partie. On la laisse « posting (non confirmé) » SANS taskId → elle ne
             // sera JAMAIS relancée (ni par le retry, ni par la reprise) → zéro double.
             // On arme quand même l'auto-stop pour éteindre le tél et clore l'UI.
-            log(`  ${asgn.phone.phone_name} : réponse GeeLark perdue (réseau) — publication peut-être partie, on ne retente pas (anti-double)`, 'warn')
-            setPhoneStatus(asgn.phone.id, { status: 'posting', detail: 'non confirmé (réseau)' })
+            log(tr(`  ${asgn.phone.phone_name} : réponse GeeLark perdue (réseau) — publication peut-être partie, on ne retente pas (anti-double)`, `  ${asgn.phone.phone_name}: GeeLark response lost (network) — post may have gone out, not retrying (anti-duplicate)`), 'warn')
+            setPhoneStatus(asgn.phone.id, { status: 'posting', detail: tr('non confirmé (réseau)', 'unconfirmed (network)') })
             armAutoStop(asgn.phone.geelark_id, asgn.phone.id, asgn.phone.phone_name)
           } else {
-            log(`  ${asgn.phone.phone_name}: ${taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec'}`, 'error')
-            setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec') })
+            log(tr(`  ${asgn.phone.phone_name}: ${taskRes?.['msg'] ?? taskRes?.['code'] ?? 'échec'}`, `  ${asgn.phone.phone_name}: ${taskRes?.['msg'] ?? taskRes?.['code'] ?? 'failed'}`), 'error')
+            setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes?.['msg'] ?? taskRes?.['code'] ?? tr('échec', 'failed')) })
           }
           // Espacement entre tels pour ne pas saturer l'API (sauf le dernier).
           if (ai < assignments.length - 1) await new Promise(r => setTimeout(r, 500))
@@ -1385,10 +1387,10 @@ export function MassPosting({ user }: MassPostingProps) {
 
       // ── Step 4: poll until done (max 10 min) ─────────────────────────────
       if (Object.keys(taskIds).length > 0) {
-        log(`Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
+        log(tr(`Suivi de ${Object.keys(taskIds).length} tâche(s)…`, `Tracking ${Object.keys(taskIds).length} task(s)…`))
         const pending = new Set(Object.values(taskIds))
         const deadline = Date.now() + 6 * 60 * 1000
-        const STATUS: Record<number, string> = { 1: 'En attente', 2: 'En cours', 3: 'Publié', 4: 'Échec', 7: 'Annulé' }
+        const STATUS: Record<number, string> = { 1: tr('En attente', 'Pending'), 2: tr('En cours', 'In progress'), 3: tr('Publié', 'Published'), 4: tr('Échec', 'Failed'), 7: tr('Annulé', 'Cancelled') }
 
         // Phrases spécifiques d'un popup login/vérification — des mots isolés
         // ('confirm', 'login') matchaient l'UI normale d'Instagram (faux positifs).
@@ -1421,16 +1423,16 @@ export function MassPosting({ user }: MassPostingProps) {
             }
             const needsAttention = keyword != null
             const msg = needsAttention
-              ? `${phoneName} : fenêtre "${keyword}" détectée — intervention requise`
-              : `${phoneName} : posting long — vérifiez l'écran`
+              ? tr(`${phoneName} : fenêtre "${keyword}" détectée — intervention requise`, `${phoneName}: "${keyword}" window detected — action required`)
+              : tr(`${phoneName} : posting long — vérifiez l'écran`, `${phoneName}: posting is taking long — check the screen`)
             log(msg + ` [screenshot]::${dataUrl}`, needsAttention ? 'warn' : 'warn')
             notifiedRef.current.add(geelarkId)
             // Desktop notification (works in Electron + browser with permission)
             if (Notification.permission === 'granted') {
-              new Notification('ScaleFlow — Intervention requise', {
+              new Notification(tr('ScaleFlow — Intervention requise', 'ScaleFlow — Action required'), {
                 body: needsAttention
-                  ? `${phoneName} : fenêtre de connexion/vérification détectée`
-                  : `${phoneName} prend du temps — ouvrez ScaleFlow pour vérifier`,
+                  ? tr(`${phoneName} : fenêtre de connexion/vérification détectée`, `${phoneName}: login/verification window detected`)
+                  : tr(`${phoneName} prend du temps — ouvrez ScaleFlow pour vérifier`, `${phoneName} is taking a while — open ScaleFlow to check`),
                 icon: '/sf-logo.svg',
               })
             }
@@ -1439,14 +1441,14 @@ export function MassPosting({ user }: MassPostingProps) {
 
         let pollCount = 0
         while (pending.size > 0 && Date.now() < deadline) {
-          if (stopRef.current) { log('Polling interrompu (stop)', 'warn'); break }
+          if (stopRef.current) { log(tr('Polling interrompu (stop)', 'Polling interrupted (stop)'), 'warn'); break }
           await new Promise(r => setTimeout(r, 10000))
-          if (stopRef.current) { log('Polling interrompu (stop)', 'warn'); break }
+          if (stopRef.current) { log(tr('Polling interrompu (stop)', 'Polling interrupted (stop)'), 'warn'); break }
           let qRes: Record<string, unknown>
           try {
             qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
           } catch (pollErr) {
-            log('Vérification du statut échouée — nouvelle tentative…', 'warn')
+            log(tr('Vérification du statut échouée — nouvelle tentative…', 'Status check failed — retrying…'), 'warn')
             continue
           }
           pollCount++
@@ -1471,7 +1473,7 @@ export function MassPosting({ user }: MassPostingProps) {
               postingStartRef.current.delete(phone?.geelark_id ?? '')
               const level = status === 3 ? 'ok' : 'error'
               const fail  = item['failDesc'] ? ` — ${item['failDesc']}` : ''
-              log(`${STATUS[status] ?? status} ${name}${fail}`, level)
+              log(`${STATUS[status] ?? status} ${name}${fail}`, level)  // STATUS values already localized via tr
               if (phone) {
                 setPhoneStatus(phone.id, {
                   status: status === 3 ? 'done' : 'error',
@@ -1479,8 +1481,8 @@ export function MassPosting({ user }: MassPostingProps) {
                 })
                 // Power off this phone immediately now that its task is finished
                 geelark(bearer, '/phone/stop', { ids: [phone.geelark_id] })
-                  .then(() => log(`  ${phone.phone_name} éteint`, 'ok'))
-                  .catch(() => log(`  Extinction de ${phone.phone_name} échouée`, 'warn'))
+                  .then(() => log(tr(`  ${phone.phone_name} éteint`, `  ${phone.phone_name} shut down`), 'ok'))
+                  .catch(() => log(tr(`  Extinction de ${phone.phone_name} échouée`, `  Failed to shut down ${phone.phone_name}`), 'warn'))
                 unregisterPhones([phone.geelark_id])
                 activePhonesRef.current = activePhonesRef.current.filter(id => id !== phone.geelark_id)
                 activeTasksRef.current  = activeTasksRef.current.filter(id => id !== tid)
@@ -1499,12 +1501,12 @@ export function MassPosting({ user }: MassPostingProps) {
           }
         }
         if (pending.size > 0 && !stopRef.current) {
-          log(`${pending.size} tâche(s) sans réponse après le délai — marquées « non confirmé »`, 'warn')
+          log(tr(`${pending.size} tâche(s) sans réponse après le délai — marquées « non confirmé »`, `${pending.size} task(s) unanswered after timeout — marked “unconfirmed”`), 'warn')
           // Le post a probablement abouti, mais GéeLark n'a pas confirmé :
           // statut visuel distinct plutôt qu'un done silencieux.
           for (const tid of pending) {
             const phone = phoneList.find(p => taskIds[p.geelark_id] === tid)
-            if (phone) setPhoneStatus(phone.id, { status: 'done', detail: 'non confirmé' })
+            if (phone) setPhoneStatus(phone.id, { status: 'done', detail: tr('non confirmé', 'unconfirmed') })
           }
         }
       }
@@ -1512,7 +1514,7 @@ export function MassPosting({ user }: MassPostingProps) {
       // ── Step 5: stop any phones still running (timeout / no-response) ────
       const remaining = activePhonesRef.current
       if (remaining.length > 0) {
-        log(`Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
+        log(tr(`Arrêt des ${remaining.length} téléphone(s) restant(s)…`, `Stopping the ${remaining.length} remaining phone(s)…`))
         let stopOk = false
         try {
           const r = await geelark(bearer, '/phone/stop', { ids: remaining })
@@ -1572,19 +1574,19 @@ export function MassPosting({ user }: MassPostingProps) {
             // Retire aussi de la sélection courante pour ne pas les re-proposer.
             const deletedIds = new Set(ids)
             setSelVideos(prev => prev.filter(sv => !deletedIds.has(sv.item.id)))
-            log(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, 'ok')
+            log(tr(`🗑️ ${toDelete.length} vidéo(s) retirée(s) de la banque (usage unique)`, `🗑️ ${toDelete.length} video(s) removed from the bank (single use)`), 'ok')
           } catch (e) {
-            log('Impossible de retirer certaines vidéos de la banque', 'warn')
+            log(tr('Impossible de retirer certaines vidéos de la banque', 'Could not remove some videos from the bank'), 'warn')
           }
         }
       }
 
-      toast.show({ title: errN === 0 ? 'Mass posting terminé ✓' : 'Mass posting terminé avec erreurs', body: `${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`, kind: errN === 0 ? 'ok' : 'error' })
+      toast.show({ title: errN === 0 ? tr('Mass posting terminé ✓', 'Mass posting done ✓') : tr('Mass posting terminé avec erreurs', 'Mass posting finished with errors'), body: tr(`${okN}/${assignments.length} réussi${okN > 1 ? 's' : ''}${errN ? ` · ${errN} échec${errN > 1 ? 's' : ''}` : ''}`, `${okN}/${assignments.length} succeeded${errN ? ` · ${errN} failed` : ''}`), kind: errN === 0 ? 'ok' : 'error' })
       import('@/lib/notify').then(({ sendNotification }) => sendNotification({
         userId: user.id, orgId: currentOrg?.id ?? null,
         event: errN > 0 ? 'post_failed' : 'batch_done',
-        subject: errN === 0 ? '✅ Mass posting terminé' : '⚠️ Mass posting terminé avec erreurs',
-        message: `${okN}/${assignments.length} compte(s) publiés avec succès${errN ? ` · ${errN} échec(s)` : ''}.`,
+        subject: errN === 0 ? tr('✅ Mass posting terminé', '✅ Mass posting done') : tr('⚠️ Mass posting terminé avec erreurs', '⚠️ Mass posting finished with errors'),
+        message: tr(`${okN}/${assignments.length} compte(s) publiés avec succès${errN ? ` · ${errN} échec(s)` : ''}.`, `${okN}/${assignments.length} account(s) published successfully${errN ? ` · ${errN} failure(s)` : ''}.`),
       })).catch(() => {})
 
       // Historique + compteur Hub : on enregistre TOUJOURS le run (même 0 succès)
@@ -1594,7 +1596,7 @@ export function MassPosting({ user }: MassPostingProps) {
         const phoneResults = phoneList.map(p => {
           const st = finalStatuses.get(p.id)
           const ok = st?.status === 'done'
-          return { name: p.ig_username ?? p.phone_name, ok, ...(ok ? {} : { error: st?.detail || 'Échec' }) }
+          return { name: p.ig_username ?? p.phone_name, ok, ...(ok ? {} : { error: st?.detail || tr('Échec', 'Failed') }) }
         })
         const base = {
           user_id:   user.id,
@@ -1636,11 +1638,11 @@ export function MassPosting({ user }: MassPostingProps) {
           }
         } catch (e) { console.error('[MassPosting] account_daily write failed', e) }
       })()
-      log('Terminé ! Ce run se ferme dans 5s — tu peux en lancer d\'autres en parallèle.', 'ok')
+      log(tr('Terminé ! Ce run se ferme dans 5s — tu peux en lancer d\'autres en parallèle.', 'Done! This run closes in 5s — you can launch more in parallel.'), 'ok')
       await new Promise(r => setTimeout(r, 5000))
 
     } catch (e: unknown) {
-      log('Une erreur est survenue pendant le posting.', 'error')
+      log(tr('Une erreur est survenue pendant le posting.', 'An error occurred during posting.'), 'error')
     } finally {
       // Remboursement des crédits : quoi qu'il arrive (crash, sortie anticipée,
       // aucun téléphone démarré, Stop utilisateur), chaque téléphone qui n'a PAS
@@ -1654,7 +1656,7 @@ export function MassPosting({ user }: MassPostingProps) {
         if (failedCount > 0) run.markFailed(failedCount)
         const { refunded } = await run.settle()
         if (refunded > 0) {
-          log(`${refunded} crédit(s) remboursé(s) — ${failedCount} téléphone(s) non publié(s)`, 'info')
+          log(tr(`${refunded} crédit(s) remboursé(s) — ${failedCount} téléphone(s) non publié(s)`, `${refunded} credit(s) refunded — ${failedCount} phone(s) not published`), 'info')
           credits.refresh()
         }
       } catch { /* best-effort — jamais bloquer l'extinction des téléphones */ }
@@ -1664,7 +1666,7 @@ export function MassPosting({ user }: MassPostingProps) {
       // marqués actifs. C'est ce qui règle « les tels restent allumés ».
       const stuck = [...new Set(activePhonesRef.current.filter(Boolean))]
       if (stuck.length > 0) {
-        log(`Extinction de sécurité de ${stuck.length} téléphone(s)…`, 'warn')
+        log(tr(`Extinction de sécurité de ${stuck.length} téléphone(s)…`, `Safety shutdown of ${stuck.length} phone(s)…`), 'warn')
         let stopOk = false
         try {
           const r = await geelark(bearer, '/phone/stop', { ids: stuck })
@@ -1674,7 +1676,7 @@ export function MassPosting({ user }: MassPostingProps) {
         // LAISSE la ligne phone_power_watch : le cron serveur rattrapera le tel
         // (double sécurité — c'est la garantie « les tels ne restent pas allumés »).
         if (stopOk) unregisterPhones(stuck).catch(() => {})
-        else log('  Extinction non confirmée — le garde-fou serveur prendra le relais (≤ 5 min)', 'warn')
+        else log(tr('  Extinction non confirmée — le garde-fou serveur prendra le relais (≤ 5 min)', '  Shutdown not confirmed — the server safeguard will take over (≤ 5 min)'), 'warn')
       }
       // Purge les timers d'auto-stop encore en attente (les tels sont déjà coupés).
       autoStopTimersRef.current.forEach(id => window.clearTimeout(id))
@@ -1752,13 +1754,13 @@ export function MassPosting({ user }: MassPostingProps) {
 
   // Readiness checklist — tells the user exactly what's missing
   const checklist = [
-    { ok: !!bearer,                  label: 'Token GéeLark connecté',  hint: 'Ajoute ton token dans Paramètres → Connexions' },
-    { ok: phoneList.length > 0,      label: `Téléphones ciblés${phoneList.length > 0 ? ` — ${phoneList.length}` : ''}`, hint: 'Coche des téléphones dans le panneau de gauche' },
-    { ok: selectedVideos.length > 0, label: `Vidéos sélectionnées${selectedVideos.length > 0 ? ` — ${selectedVideos.length}` : ''}`, hint: 'Ajoute des vidéos depuis la banque ou un dossier' },
+    { ok: !!bearer,                  label: tr('Token GéeLark connecté', 'GeeLark token connected'),  hint: tr('Ajoute ton token dans Paramètres → Connexions', 'Add your token in Settings → Connections') },
+    { ok: phoneList.length > 0,      label: tr(`Téléphones ciblés${phoneList.length > 0 ? ` — ${phoneList.length}` : ''}`, `Phones targeted${phoneList.length > 0 ? ` — ${phoneList.length}` : ''}`), hint: tr('Coche des téléphones dans le panneau de gauche', 'Check some phones in the left panel') },
+    { ok: selectedVideos.length > 0, label: tr(`Vidéos sélectionnées${selectedVideos.length > 0 ? ` — ${selectedVideos.length}` : ''}`, `Videos selected${selectedVideos.length > 0 ? ` — ${selectedVideos.length}` : ''}`), hint: tr('Ajoute des vidéos depuis la banque ou un dossier', 'Add videos from the bank or a folder') },
     {
       ok:    launchCost > 0 && credits.balance >= launchCost,
-      label: `Crédits suffisants${launchCost > 0 ? ` — ${launchCost} requis` : ''}`,
-      hint:  launchCost > 0 ? `Solde actuel : ${credits.balance}` : 'Sélectionne des téléphones pour estimer le coût',
+      label: tr(`Crédits suffisants${launchCost > 0 ? ` — ${launchCost} requis` : ''}`, `Enough credits${launchCost > 0 ? ` — ${launchCost} required` : ''}`),
+      hint:  launchCost > 0 ? tr(`Solde actuel : ${credits.balance}`, `Current balance: ${credits.balance}`) : tr('Sélectionne des téléphones pour estimer le coût', 'Select phones to estimate the cost'),
     },
   ]
   const readyCount = checklist.filter(c => c.ok).length
@@ -1795,10 +1797,10 @@ export function MassPosting({ user }: MassPostingProps) {
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
               <h1 className="sf-page-title">Mass Posting</h1>
               <p className="sf-page-sub">
-                Instagram · Publication
+                {tr('Instagram · Publication', 'Instagram · Post')}
                 {launchCost > 0 && (
                   <span style={{ marginLeft: 10, color: 'var(--accent-l)', fontWeight: 700 }}>
-                    · {launchCost} crédits
+                    · {launchCost} {tr('crédits', 'credits')}
                   </span>
                 )}
               </p>
@@ -1833,7 +1835,7 @@ export function MassPosting({ user }: MassPostingProps) {
             {/* Reshuffle — random mode only */}
             {mode === 'random' && (
               <button
-                title="Regénérer l'assignation aléatoire"
+                title={tr("Regénérer l'assignation aléatoire", 'Regenerate random assignment')}
                 onClick={() => setRandomSeed(s => s + 1)}
                 className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm"
               >
@@ -1869,15 +1871,15 @@ export function MassPosting({ user }: MassPostingProps) {
             border: `1px solid ${lastRun.err === 0 ? 'rgba(52,211,153,0.2)' : 'rgba(251,191,36,0.25)'}`,
           }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: lastRun.err === 0 ? 'var(--ok)' : 'var(--warn)' }}>
-              {lastRun.err === 0 ? '✓' : '!'} Dernier run : {lastRun.ok}/{lastRun.total} réussi{lastRun.ok > 1 ? 's' : ''}{lastRun.err > 0 ? ` · ${lastRun.err} échec${lastRun.err > 1 ? 's' : ''}` : ''}
+              {lastRun.err === 0 ? '✓' : '!'} {tr(`Dernier run : ${lastRun.ok}/${lastRun.total} réussi${lastRun.ok > 1 ? 's' : ''}${lastRun.err > 0 ? ` · ${lastRun.err} échec${lastRun.err > 1 ? 's' : ''}` : ''}`, `Last run: ${lastRun.ok}/${lastRun.total} succeeded${lastRun.err > 0 ? ` · ${lastRun.err} failed` : ''}`)}
             </span>
             {failedPhoneIds.length > 0 && (
               <button onClick={retryFailed} className="sf-btn sf-btn-primary sf-btn-sm" style={{ marginLeft: 'auto' }}>
-                ↻ Relancer les {failedPhoneIds.length} échec{failedPhoneIds.length > 1 ? 's' : ''}
+                {tr(`↻ Relancer les ${failedPhoneIds.length} échec${failedPhoneIds.length > 1 ? 's' : ''}`, `↻ Retry the ${failedPhoneIds.length} failure${failedPhoneIds.length > 1 ? 's' : ''}`)}
               </button>
             )}
             <button onClick={() => setLastRun(null)} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ marginLeft: failedPhoneIds.length > 0 ? 0 : 'auto' }}>
-              Masquer
+              {tr('Masquer', 'Hide')}
             </button>
           </div>
         )}
@@ -1910,9 +1912,9 @@ export function MassPosting({ user }: MassPostingProps) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, flexWrap: 'wrap' }}>
                 <span style={{ color: IVORY, fontWeight: 700 }}>{doneTasks + errorTasks} / {totalTasks} {t('massPostingTasksProgress')}</span>
-                {activeTasks > 0 && <span className="sf-badge sf-badge-warn" style={{ fontSize: 9 }}>{activeTasks} en cours</span>}
+                {activeTasks > 0 && <span className="sf-badge sf-badge-warn" style={{ fontSize: 9 }}>{activeTasks} {tr('en cours', 'running')}</span>}
                 {doneTasks > 0 && <span className="sf-badge sf-badge-ok" style={{ fontSize: 9 }}>{doneTasks} ok</span>}
-                {errorTasks > 0 && <span className="sf-badge sf-badge-danger" style={{ fontSize: 9 }}>{errorTasks} erreur{errorTasks > 1 ? 's' : ''}</span>}
+                {errorTasks > 0 && <span className="sf-badge sf-badge-danger" style={{ fontSize: 9 }}>{errorTasks} {tr('erreur', 'error')}{errorTasks > 1 ? 's' : ''}</span>}
               </div>
               <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 18, color: progressPct >= 100 ? OK : 'var(--accent)', lineHeight: 1, fontWeight: 800 }}>
                 {progressPct}%
@@ -1999,9 +2001,9 @@ export function MassPosting({ user }: MassPostingProps) {
                   {bannedCount > 0 && (
                     <button onClick={() => setHideBanned(v => !v)}
                       className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
-                      title="Masquer les comptes détectés comme bloqués"
+                      title={tr('Masquer les comptes détectés comme bloqués', 'Hide accounts detected as blocked')}
                       style={{ fontSize: 10, letterSpacing: '0.04em', textTransform: 'uppercase', padding: '2px 6px', color: hideBanned ? 'var(--danger)' : FAINT }}>
-                      {hideBanned ? '✓ ' : ''}Bannis masqués ({bannedCount})
+                      {hideBanned ? '✓ ' : ''}{tr('Bannis masqués', 'Banned hidden')} ({bannedCount})
                     </button>
                   )}
                   <span style={{ marginLeft: bannedCount > 0 ? 0 : 'auto', fontSize: 10.5, color: FAINT, fontVariantNumeric: 'tabular-nums' }}>{visiblePhones.length}</span>
@@ -2106,16 +2108,16 @@ export function MassPosting({ user }: MassPostingProps) {
               !bearer ? (
                 <EmptyState
                   compact
-                  title="GéeLark non connecté"
-                  description="Ajoute ton token GéeLark pour importer tes téléphones."
-                  action={{ label: 'Configurer dans les Réglages', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'settings', tab: 'connexions' } })) }}
+                  title={tr('GéeLark non connecté', 'GeeLark not connected')}
+                  description={tr('Ajoute ton token GéeLark pour importer tes téléphones.', 'Add your GeeLark token to import your phones.')}
+                  action={{ label: tr('Configurer dans les Réglages', 'Configure in Settings'), onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'settings', tab: 'connexions' } })) }}
                 />
               ) : (
                 <EmptyState
                   compact
-                  title="Aucun téléphone"
-                  description="Synchronise tes cloud phones GéeLark depuis l'onglet Téléphones."
-                  action={{ label: 'Aller aux Téléphones', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'phones' } })) }}
+                  title={tr('Aucun téléphone', 'No phone')}
+                  description={tr("Synchronise tes cloud phones GéeLark depuis l'onglet Téléphones.", 'Sync your GeeLark cloud phones from the Phones tab.')}
+                  action={{ label: tr('Aller aux Téléphones', 'Go to Phones'), onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'phones' } })) }}
                 />
               )
             )}
@@ -2191,7 +2193,7 @@ export function MassPosting({ user }: MassPostingProps) {
               {!posting && readyCount < 3 && (
                 <div className="sf-card sf-anim-slide-up">
                   <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(233,234,240,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)' }}>Préparation</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)' }}>{tr('Préparation', 'Setup')}</span>
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{readyCount}/4</span>
                   </div>
                   {checklist.map((c, i) => (
@@ -2306,7 +2308,7 @@ export function MassPosting({ user }: MassPostingProps) {
                         onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'rgba(99,102,241,0.05)' }}
                         onMouseLeave={e => { e.currentTarget.style.color = FAINT; e.currentTarget.style.background = 'transparent' }}>
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Ajouter</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{tr('Ajouter', 'Add')}</span>
                       </button>
                     </div>
                   )}
@@ -2406,7 +2408,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                          {['#', 'Téléphone', 'Vidéo', 'Statut'].map((h, i) => (
+                          {['#', tr('Téléphone', 'Phone'), tr('Vidéo', 'Video'), tr('Statut', 'Status')].map((h, i) => (
                             <th key={h} style={{
                               padding: '9px 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
                               color: FAINT, textAlign: i === 3 ? 'right' : 'left',
@@ -2461,7 +2463,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 <section className="sf-anim-slide-up">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                     <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>·</span>
-                    <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>Journal</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{tr('Journal', 'Log')}</span>
                     <span className="sf-badge sf-badge-muted" style={{ fontSize: 9 }}>{logs.length}</span>
                     <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
                     {!posting && (
@@ -2469,7 +2471,7 @@ export function MassPosting({ user }: MassPostingProps) {
                         style={{ fontSize: 10, color: FAINT }}
                         onMouseEnter={e => { e.currentTarget.style.color = ERR }}
                         onMouseLeave={e => { e.currentTarget.style.color = FAINT }}>
-                        Effacer
+                        {tr('Effacer', 'Clear')}
                       </button>
                     )}
                   </div>
@@ -2544,10 +2546,10 @@ export function MassPosting({ user }: MassPostingProps) {
                 onClick={() => setShowScheduleModal(true)}
                 disabled={!canLaunch}
                 title={canLaunch ? undefined
-                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
-                  : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
-                  : selectedVideos.length === 0 ? 'Sélectionne des vidéos dans la banque'
-                  : 'Publication en cours…'}
+                  : !bearer ? tr('Connecte GéeLark dans les Paramètres', 'Connect GeeLark in Settings')
+                  : phoneList.length === 0 ? tr('Sélectionne au moins un téléphone', 'Select at least one phone')
+                  : selectedVideos.length === 0 ? tr('Sélectionne des vidéos dans la banque', 'Select videos from the bank')
+                  : tr('Publication en cours…', 'Posting in progress…')}
                 className="sf-btn sf-btn-secondary cursor-pointer"
                 style={{ opacity: canLaunch ? 1 : 0.4 }}>
                 {t('schedule')}
@@ -2555,10 +2557,10 @@ export function MassPosting({ user }: MassPostingProps) {
               <button
                 onClick={post}
                 disabled={!canLaunch}
-                title={canLaunch ? 'Poste maintenant (garde l\'app ouverte). Tu peux en lancer plusieurs en parallèle. Pour PC éteint : utilise Programmer.'
-                  : !bearer ? 'Connecte GéeLark dans les Paramètres'
-                  : phoneList.length === 0 ? 'Sélectionne au moins un téléphone'
-                  : 'Sélectionne des vidéos dans la banque'}
+                title={canLaunch ? tr('Poste maintenant (garde l\'app ouverte). Tu peux en lancer plusieurs en parallèle. Pour PC éteint : utilise Programmer.', 'Post now (keep the app open). You can launch several in parallel. For PC off: use Schedule.')
+                  : !bearer ? tr('Connecte GéeLark dans les Paramètres', 'Connect GeeLark in Settings')
+                  : phoneList.length === 0 ? tr('Sélectionne au moins un téléphone', 'Select at least one phone')
+                  : tr('Sélectionne des vidéos dans la banque', 'Select videos from the bank')}
                 className="sf-btn sf-btn-lg cursor-pointer"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff',
@@ -2595,7 +2597,7 @@ export function MassPosting({ user }: MassPostingProps) {
           <div className="sf-card sf-anim-scale-spring" onClick={e => e.stopPropagation()}
             style={{ width: 340, padding: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderBottom: '1px solid rgba(233,234,240,0.07)' }}>
-              <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: IVORY }}>Choisir un dossier</p>
+              <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: IVORY }}>{tr('Choisir un dossier', 'Choose a folder')}</p>
               <button onClick={() => setShowFolderPick(false)} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -2603,10 +2605,10 @@ export function MassPosting({ user }: MassPostingProps) {
             {folderLoading ? (
               <div style={{ padding: '48px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
                 <div className="sf-spinner" />
-                <span style={{ fontSize: 13, color: MUTED }}>Chargement…</span>
+                <span style={{ fontSize: 13, color: MUTED }}>{tr('Chargement…', 'Loading…')}</span>
               </div>
             ) : bankFolders.length === 0 ? (
-              <div style={{ padding: '48px 0', textAlign: 'center', fontSize: 13, color: MUTED }}>Aucun dossier dans la banque</div>
+              <div style={{ padding: '48px 0', textAlign: 'center', fontSize: 13, color: MUTED }}>{tr('Aucun dossier dans la banque', 'No folder in the bank')}</div>
             ) : (
               <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                 {bankFolders.map((f, i) => (
@@ -2677,7 +2679,7 @@ export function MassPosting({ user }: MassPostingProps) {
           type="mass_posting"
           phonesCount={phoneList.length}
           videosCount={selectedVideos.length}
-          videoTitle={selectedVideos.length === 1 ? selectedVideos[0].item.title : `${selectedVideos.length} vidéos`}
+          videoTitle={selectedVideos.length === 1 ? selectedVideos[0].item.title : tr(`${selectedVideos.length} vidéos`, `${selectedVideos.length} videos`)}
           onConfirm={scheduleMassPost}
           onClose={() => setShowScheduleModal(false)}
         />

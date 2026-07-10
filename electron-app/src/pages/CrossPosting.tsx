@@ -13,6 +13,7 @@ import { BankPicker } from '@/pages/Bank'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Toggle } from '@/components/ui/Toggle'
 import { useToast } from '@/components/Toast'
+import { useTr } from '@/lib/i18n'
 
 interface Phone { id: string; geelark_id: string; phone_name: string; ig_username?: string | null; group_name?: string | null }
 // lockedPlatform : quand fourni (ex. 'threads'), la page est verrouillée sur CETTE
@@ -26,6 +27,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
   const { currentOrg } = useOrg()
   const { bearer } = useConnections(user)
   const toast = useToast()
+  const tr = useTr()
 
   const [phones, setPhones]     = useState<Phone[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -97,10 +99,10 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
         proxyKeys = [...new Set(toRun.map(p => { const px = pm.get(p.geelark_id); return px?.server ? `${px.server}:${px.port ?? ''}` : '' }).filter(Boolean))]
       } catch { /* best-effort */ }
       if (proxyConflicts(proxyKeys, runId).length) {
-        toast.show({ title: '⚠️ Même proxy déjà utilisé', body: 'Un autre posting tourne sur le même proxy — risque de ban.', kind: 'warn' })
+        toast.show({ title: tr('⚠️ Même proxy déjà utilisé', '⚠️ Same proxy already in use'), body: tr('Un autre posting tourne sur le même proxy — risque de ban.', 'Another posting is running on the same proxy — risk of ban.'), kind: 'warn' })
       }
       startRun({
-        id: runId, type: 'threads', label: `Threads · ${toRun.length} compte${toRun.length > 1 ? 's' : ''}`,
+        id: runId, type: 'threads', label: tr(`Threads · ${toRun.length} compte${toRun.length > 1 ? 's' : ''}`, `Threads · ${toRun.length} account${toRun.length > 1 ? 's' : ''}`),
         proxyKeys, done: 0, total: toRun.length, page: 'posting',
         phones: toRun.map(p => ({ id: p.id, name: p.ig_username ? `@${p.ig_username}` : p.phone_name, status: 'idle' as PhaseStatus })),
       })
@@ -123,7 +125,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
       if (window.electronAPI?.uploadVideoGeelark) {
         const up = await window.electronAPI.uploadVideoGeelark({ bearer: bearer!, filePath: url })
         if (up?.ok && up.token) out = { resourceUrl: up.token, isImage: isImg(url) }
-        else errMsg = up?.error ?? 'upload échoué'
+        else errMsg = up?.error ?? tr('upload échoué', 'upload failed')
       } else {
         out = await geelarkUploadForRpa(bearer!, url, m => { errMsg = m })
       }
@@ -137,14 +139,14 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
       const vid = pick(videos, i)
       const cap = caps.length ? pick(caps, i) : ''
       const phoneKeys = plats.map(pl => `${phone.id}:${pl.key}`)
-      phoneKeys.forEach(k => setJob(k, { status: 'uploading', detail: 'Envoi de la vidéo au téléphone…' }))
+      phoneKeys.forEach(k => setJob(k, { status: 'uploading', detail: tr('Envoi de la vidéo au téléphone…', 'Sending video to the phone…') }))
       setRunPhase(runId, phone.id, 'running')
       const res = await ensureHosted(vid.url)
       const hosted = res && 'resourceUrl' in res ? res : null
       if (!hosted) {
         err += plats.length
-        const reason = res && 'err' in res && res.err ? res.err : 'upload échoué'
-        phoneKeys.forEach(k => setJob(k, { status: 'error', detail: `Média non envoyé : ${reason}` }))
+        const reason = res && 'err' in res && res.err ? res.err : tr('upload échoué', 'upload failed')
+        phoneKeys.forEach(k => setJob(k, { status: 'error', detail: tr(`Média non envoyé : ${reason}`, `Media not sent: ${reason}`) }))
         setRunPhase(runId, phone.id, 'error')
         continue
       }
@@ -156,8 +158,8 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
           const r = await publishVideoCrossPlatform(bearer!, phone.geelark_id, pl.key,
             { mediaUrl: hosted.resourceUrl, isImage: vid.isImage, caption: cap || undefined, rotationUrls },
             m => setJob(key, { detail: m }))
-          if (r.ok) { ok++; setJob(key, { status: 'done', detail: 'Publié ✓' }) }
-          else { err++; phoneErr = true; setJob(key, { status: 'error', detail: r.error ?? 'Échec' }) }
+          if (r.ok) { ok++; setJob(key, { status: 'done', detail: tr('Publié ✓', 'Published ✓') }) }
+          else { err++; phoneErr = true; setJob(key, { status: 'error', detail: r.error ?? tr('Échec', 'Failed') }) }
         } catch (e) {
           err++; phoneErr = true; setJob(key, { status: 'error', detail: e instanceof Error ? e.message : String(e) })
         }
@@ -168,8 +170,8 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
     endRun(runId, err > 0 ? 'error' : 'done')
     setRunning(false)
     toast.show({
-      title: err === 0 ? 'Publication terminée ✓' : 'Terminé avec erreurs',
-      body: `${ok} publication(s) réussie(s)${err ? ` · ${err} échec(s)` : ''}`,
+      title: err === 0 ? tr('Publication terminée ✓', 'Publishing complete ✓') : tr('Terminé avec erreurs', 'Finished with errors'),
+      body: tr(`${ok} publication(s) réussie(s)${err ? ` · ${err} échec(s)` : ''}`, `${ok} successful publication(s)${err ? ` · ${err} failure(s)` : ''}`),
       kind: err === 0 ? 'ok' : 'error',
     })
   }
@@ -187,8 +189,8 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
           </h1>
           <p className="sf-page-sub">
             {lockedCfg
-              ? `Mass posting ${lockedCfg.label} : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire.`
-              : 'Mass posting Threads & co : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire sur tes comptes.'}
+              ? tr(`Mass posting ${lockedCfg.label} : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire.`, `Mass posting ${lockedCfg.label}: multiple videos + captions from the bank, distributed sequentially or randomly.`)
+              : tr('Mass posting Threads & co : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire sur tes comptes.', 'Mass posting Threads & co: multiple videos + captions from the bank, distributed sequentially or randomly across your accounts.')}
           </p>
         </div>
       </div>
@@ -196,9 +198,9 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
       {!bearer ? (
         <div className="sf-card" style={{ margin: 24 }}>
           <EmptyState
-            title="GéeLark non connecté"
-            description="Ajoute ton token GéeLark pour publier."
-            action={{ label: 'Configurer dans les Réglages', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'settings', tab: 'connexions' } })) }}
+            title={tr('GéeLark non connecté', 'GeeLark not connected')}
+            description={tr('Ajoute ton token GéeLark pour publier.', 'Add your GeeLark token to publish.')}
+            action={{ label: tr('Configurer dans les Réglages', 'Configure in Settings'), onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'settings', tab: 'connexions' } })) }}
           />
         </div>
       ) : (
@@ -209,7 +211,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
             {/* Platforms — masqué quand la page est verrouillée sur une plateforme */}
             {!lockedPlatform && (
               <div className="sf-card" style={{ padding: 16 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 10 }}>Plateformes</p>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 10 }}>{tr('Plateformes', 'Platforms')}</p>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {CROSS_PLATFORMS.map(pl => {
                     const on = platforms.has(pl.key)
@@ -229,7 +231,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
                   })}
                 </div>
                 <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 10 }}>
-                  ⚠ Les templates RPA de ces plateformes dépendent de la version de l’API GéeLark ; en cas d’erreur, le message exact est affiché par téléphone.
+                  {tr('⚠ Les templates RPA de ces plateformes dépendent de la version de l’API GéeLark ; en cas d’erreur, le message exact est affiché par téléphone.', '⚠ The RPA templates for these platforms depend on the GeeLark API version; if an error occurs, the exact message is shown per phone.')}
                 </p>
               </div>
             )}
@@ -237,26 +239,26 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
             {/* Vidéos */}
             <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Vidéos &amp; photos</p>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{tr('Vidéos & photos', 'Videos & photos')}</p>
                 {videos.length > 0 && <span className="sf-badge sf-badge-accent" style={{ fontSize: 10 }}>{videos.length}</span>}
-                {videos.length > 0 && <button onClick={() => setVideos([])} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>Vider</button>}
+                {videos.length > 0 && <button onClick={() => setVideos([])} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>{tr('Vider', 'Clear')}</button>}
               </div>
               <button onClick={() => setShowPicker(true)} className="sf-btn sf-btn-secondary cursor-pointer" style={{ justifyContent: 'flex-start' }}>
-                {videos.length ? `🎬 ${videos.length} vidéo(s) — ajouter d'autres` : '＋ Choisir dans la banque'}
+                {videos.length ? tr(`🎬 ${videos.length} vidéo(s) — ajouter d'autres`, `🎬 ${videos.length} video(s) — add more`) : tr('＋ Choisir dans la banque', '＋ Choose from bank')}
               </button>
 
               {/* Distribution seq/random */}
               <div style={{ display: 'flex', gap: 6 }}>
-                {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
+                {([{ k: 'seq', l: 'Séquentiel', en: 'Sequential' }, { k: 'random', l: 'Aléatoire', en: 'Random' }] as const).map(m => (
                   <button key={m.k} onClick={() => setMode(m.k)} className="cursor-pointer"
                     style={{ flex: 1, padding: '7px 0', borderRadius: 'var(--r-sm)', fontSize: 11.5, fontWeight: 600, border: '1px solid ' + (mode === m.k ? 'var(--border-accent)' : 'var(--border)'),
                       background: mode === m.k ? 'var(--accent-dim)' : 'var(--surface-2)', color: mode === m.k ? 'var(--accent-lt)' : 'var(--text-3)' }}>
-                    {m.l}
+                    {tr(m.l, m.en)}
                   </button>
                 ))}
               </div>
               <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0 }}>
-                {mode === 'seq' ? 'Téléphone 1 → vidéo 1, téléphone 2 → vidéo 2…' : 'Chaque téléphone reçoit une vidéo au hasard.'}
+                {mode === 'seq' ? tr('Téléphone 1 → vidéo 1, téléphone 2 → vidéo 2…', 'Phone 1 → video 1, phone 2 → video 2…') : tr('Chaque téléphone reçoit une vidéo au hasard.', 'Each phone gets a random video.')}
               </p>
             </div>
 
@@ -266,23 +268,23 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
                 <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Captions</p>
                 {captions.length > 0 && <span className="sf-badge sf-badge-accent" style={{ fontSize: 10 }}>{captions.length}</span>}
                 <button onClick={() => setShowCapPicker(true)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>
-                  ＋ Choisir dans la banque
+                  {tr('＋ Choisir dans la banque', '＋ Choose from bank')}
                 </button>
               </div>
               <textarea
                 value={captionsText}
                 onChange={e => setCaptionsText(e.target.value)}
-                placeholder="Une caption par ligne — chaque caption = la description d'un compte…"
+                placeholder={tr("Une caption par ligne — chaque caption = la description d'un compte…", "One caption per line — each caption = one account's description…")}
                 className="sf-input"
                 style={{ minHeight: 90, resize: 'vertical', padding: 10, fontSize: 12.5 }}
               />
               <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0 }}>
-                1 caption = 1 compte ({mode === 'seq' ? 'séquentiel : compte 1 → caption 1…' : 'aléatoire'}). Une ligne par caption.
+                {tr(`1 caption = 1 compte (${mode === 'seq' ? 'séquentiel : compte 1 → caption 1…' : 'aléatoire'}). Une ligne par caption.`, `1 caption = 1 account (${mode === 'seq' ? 'sequential: account 1 → caption 1…' : 'random'}). One line per caption.`)}
               </p>
               <div className="sf-card" style={{ padding: '10px 12px', background: 'var(--surface-2)' }}>
-                <Toggle on={rotProxy} onChange={setRotProxy} label="Proxy rotatif"
-                  warn={!rotConfigured} warnTitle="Rotation non configurée — Réglages → Connexions"
-                  hint={rotProxy ? 'Série · nouvelle IP avant chaque téléphone' : 'Parallèle par téléphone · sans rotation'} />
+                <Toggle on={rotProxy} onChange={setRotProxy} label={tr('Proxy rotatif', 'Rotating proxy')}
+                  warn={!rotConfigured} warnTitle={tr('Rotation non configurée — Réglages → Connexions', 'Rotation not configured — Settings → Connections')}
+                  hint={rotProxy ? tr('Série · nouvelle IP avant chaque téléphone', 'Serial · new IP before each phone') : tr('Parallèle par téléphone · sans rotation', 'Parallel per phone · no rotation')} />
               </div>
             </div>
 
@@ -292,7 +294,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
               className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
               style={{ opacity: canLaunch ? 1 : 0.5 }}
             >
-              {running ? 'Publication en cours…' : `🚀 Publier — ${selected.size} téléphone(s) × ${platforms.size} plateforme(s)`}
+              {running ? tr('Publication en cours…', 'Publishing…') : tr(`🚀 Publier — ${selected.size} téléphone(s) × ${platforms.size} plateforme(s)`, `🚀 Publish — ${selected.size} phone(s) × ${platforms.size} platform(s)`)}
             </button>
           </div>
 
@@ -300,16 +302,16 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
           <div style={{ flex: '1 1 360px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 300 }}>
             <div className="sf-card" style={{ padding: 14 }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un téléphone…"
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher un téléphone…', 'Search a phone…')}
                   className="sf-input" style={{ flex: 1, height: 30, fontSize: 12 }} />
-                <button onClick={() => setSelected(new Set(visible.map(p => p.id)))} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">Tous</button>
-                <button onClick={() => setSelected(new Set())} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">Aucun</button>
+                <button onClick={() => setSelected(new Set(visible.map(p => p.id)))} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{tr('Tous', 'All')}</button>
+                <button onClick={() => setSelected(new Set())} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{tr('Aucun', 'None')}</button>
               </div>
               <div style={{ maxHeight: 260, overflow: 'auto' }}>
                 {visible.length === 0 ? (
-                  <EmptyState compact title="Aucun téléphone"
-                    description="Synchronise tes cloud phones depuis l’onglet Téléphones."
-                    action={{ label: 'Aller aux Téléphones', onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'phones' } })) }} />
+                  <EmptyState compact title={tr('Aucun téléphone', 'No phone')}
+                    description={tr('Synchronise tes cloud phones depuis l’onglet Téléphones.', 'Sync your cloud phones from the Phones tab.')}
+                    action={{ label: tr('Aller aux Téléphones', 'Go to Phones'), onClick: () => window.dispatchEvent(new CustomEvent('sf:navigate', { detail: { page: 'phones' } })) }} />
                 ) : visible.map(p => {
                   const on = selected.has(p.id)
                   return (
@@ -333,7 +335,7 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
             {/* Jobs progress */}
             {jobs.length > 0 && (
               <div className="sf-card" style={{ padding: 14 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 10 }}>Progression</p>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 10 }}>{tr('Progression', 'Progress')}</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 300, overflow: 'auto' }}>
                   {jobs.map(j => {
                     const pl = CROSS_PLATFORMS.find(p => p.key === j.platform)!
@@ -400,6 +402,7 @@ function CaptionPicker({ user, currentOrg, onSelect, onClose }: {
   onSelect: (texts: string[]) => void
   onClose: () => void
 }) {
+  const tr = useTr()
   const [items, setItems]   = useState<{ id: string; title: string; content: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [sel, setSel]       = useState<Set<string>>(new Set())
@@ -426,16 +429,16 @@ function CaptionPicker({ user, currentOrg, onSelect, onClose }: {
     <div className="fixed inset-0 z-[120] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div className="sf-card" style={{ width: '100%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: 18 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Choisir des captions</p>
-          <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{sel.size} sélectionnée(s)</span>
+          <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{tr('Choisir des captions', 'Choose captions')}</p>
+          <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{tr(`${sel.size} sélectionnée(s)`, `${sel.size} selected`)}</span>
           <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto' }}>✕</button>
         </div>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…" className="sf-input" style={{ height: 32, fontSize: 12.5, marginBottom: 10 }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')} className="sf-input" style={{ height: 32, fontSize: 12.5, marginBottom: 10 }} />
         <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {loading ? (
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', textAlign: 'center', padding: 20 }}>Chargement…</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', textAlign: 'center', padding: 20 }}>{tr('Chargement…', 'Loading…')}</p>
           ) : visible.length === 0 ? (
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', textAlign: 'center', padding: 20 }}>Aucune caption dans la banque.</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', textAlign: 'center', padding: 20 }}>{tr('Aucune caption dans la banque.', 'No caption in the bank.')}</p>
           ) : visible.map(i => {
             const on = sel.has(i.id)
             return (
@@ -452,14 +455,14 @@ function CaptionPicker({ user, currentOrg, onSelect, onClose }: {
           })}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={() => setSel(new Set(visible.map(i => i.id)))} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">Tout</button>
+          <button onClick={() => setSel(new Set(visible.map(i => i.id)))} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{tr('Tout', 'All')}</button>
           <button
             onClick={() => onSelect(items.filter(i => sel.has(i.id)).map(i => i.content || i.title))}
             disabled={sel.size === 0}
             className="sf-btn sf-btn-primary cursor-pointer"
             style={{ marginLeft: 'auto', opacity: sel.size === 0 ? 0.5 : 1 }}
           >
-            Ajouter {sel.size > 0 ? `(${sel.size})` : ''}
+            {tr(`Ajouter ${sel.size > 0 ? `(${sel.size})` : ''}`, `Add ${sel.size > 0 ? `(${sel.size})` : ''}`)}
           </button>
         </div>
       </div>

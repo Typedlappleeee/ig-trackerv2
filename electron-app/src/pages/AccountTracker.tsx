@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useTr } from '@/lib/i18n'
 
 // ── Suivi des comptes (tableau partagé équipe) ───────────────────────────────
 // Table public.account_tracker. Chaque ligne = un compte suivi à la main.
@@ -26,6 +27,7 @@ const STATUS_COLOR: Record<string, { bg: string; fg: string; bd: string }> = {
 const MARKETS = ['', 'FR', 'US', 'UK', 'ES', 'DE', 'Autre']
 
 export function AccountTracker({ user, orgId }: { user: User; orgId: string | null }) {
+  const tr = useTr()
   const [rows, setRows] = useState<Row[]>([])
   const [phoneAccounts, setPhoneAccounts] = useState<{ ig_username: string; phone_name: string | null }[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,9 +106,9 @@ export function AccountTracker({ user, orgId }: { user: User; orgId: string | nu
     return (
       <div className="sf-card" style={{ padding: '32px 26px', maxWidth: 640, margin: '20px auto', textAlign: 'center' }}>
         <div style={{ fontSize: 32, marginBottom: 10 }}>🗂️</div>
-        <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 8px' }}>Installe le tableau de suivi (une fois)</p>
+        <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 8px' }}>{tr('Installe le tableau de suivi (une fois)', 'Install the tracking table (one time)')}</p>
         <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
-          Le suivi de comptes a besoin d'une petite table partagée. Colle ce SQL dans <b>Supabase → SQL Editor</b> puis recharge :
+          {tr('Le suivi de comptes a besoin d\'une petite table partagée. Colle ce SQL dans', 'Account tracking needs a small shared table. Paste this SQL into')} <b>Supabase → SQL Editor</b> {tr('puis recharge :', 'then reload:')}
         </p>
         <pre style={{ textAlign: 'left', fontSize: 11.5, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, overflowX: 'auto', color: 'var(--text-2)' }}>{`-- Fichier : supabase/migrations/20260707b_account_tracker.sql
 create table if not exists public.account_tracker (
@@ -127,7 +129,7 @@ create policy "at_all" on public.account_tracker for all using (
   auth.uid() = user_id or (org_id is not null and exists (
     select 1 from organization_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid())));
 notify pgrst, 'reload schema';`}</pre>
-        <button onClick={load} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ marginTop: 14 }}>J'ai lancé le SQL — Recharger</button>
+        <button onClick={load} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ marginTop: 14 }}>{tr('J\'ai lancé le SQL — Recharger', 'I ran the SQL — Reload')}</button>
       </div>
     )
   }
@@ -136,27 +138,27 @@ notify pgrst, 'reload schema';`}</pre>
     <div>
       {/* Barre : filtres + actions */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{rows.length} compte{rows.length > 1 ? 's' : ''} · clique dans une case, ça s'enregistre tout seul</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{rows.length} {tr(rows.length > 1 ? 'comptes' : 'compte', rows.length > 1 ? 'accounts' : 'account')} · {tr('clique dans une case, ça s\'enregistre tout seul', 'click a cell, it saves automatically')}</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={marketFilter} onChange={e => setMarketFilter(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }}>
-            <option value="__all__">Tous les marchés</option>
+            <option value="__all__">{tr('Tous les marchés', 'All markets')}</option>
             {markets.map(m => <option key={m} value={m}>{m}</option>)}
-            <option value="__none__">Non classé</option>
+            <option value="__none__">{tr('Non classé', 'Unclassified')}</option>
           </select>
           {folders.length > 0 && (
             <select value={folderFilter} onChange={e => setFolderFilter(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }}>
-              <option value="__all__">Tous les dossiers</option>
+              <option value="__all__">{tr('Tous les dossiers', 'All folders')}</option>
               {folders.map(f => <option key={f} value={f}>{f}</option>)}
-              <option value="__none__">Non classé</option>
+              <option value="__none__">{tr('Non classé', 'Unclassified')}</option>
             </select>
           )}
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…" className="sf-input" style={{ width: 160, height: 32, fontSize: 12.5 }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')} className="sf-input" style={{ width: 160, height: 32, fontSize: 12.5 }} />
           {importCount > 0 && (
-            <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" title="Crée une ligne pour chaque compte Instagram déjà assigné à un téléphone">
-              ↧ Importer mes comptes ({importCount})
+            <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" title={tr('Crée une ligne pour chaque compte Instagram déjà assigné à un téléphone', 'Creates a row for each Instagram account already assigned to a phone')}>
+              {tr(`↧ Importer mes comptes (${importCount})`, `↧ Import my accounts (${importCount})`)}
             </button>
           )}
-          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">＋ Ajouter une ligne</button>
+          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
         </div>
       </div>
 
@@ -166,9 +168,9 @@ notify pgrst, 'reload schema';`}</pre>
       ) : rows.length === 0 ? (
         <div className="sf-card" style={{ padding: '40px 24px', textAlign: 'center', maxWidth: 520, margin: '10px auto' }}>
           <div style={{ fontSize: 30, marginBottom: 8 }}>📋</div>
-          <p style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>Aucun compte suivi</p>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px' }}>Ajoute ta première ligne pour commencer ton suivi.</p>
-          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">＋ Ajouter une ligne</button>
+          <p style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>{tr('Aucun compte suivi', 'No tracked accounts')}</p>
+          <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px' }}>{tr('Ajoute ta première ligne pour commencer ton suivi.', 'Add your first row to start tracking.')}</p>
+          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
         </div>
       ) : (
         <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -176,7 +178,7 @@ notify pgrst, 'reload schema';`}</pre>
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1280, fontSize: 12.5 }}>
               <thead>
                 <tr style={{ background: 'var(--surface-2)' }}>
-                  {['Compte', 'Marché', 'Dossier', 'Pseudo', 'Insta', 'TikTok', 'Threads', 'YouTube', 'Mail', 'Mot de passe', 'Commentaire', ''].map((h, i) => (
+                  {[tr('Compte', 'Account'), tr('Marché', 'Market'), tr('Dossier', 'Folder'), tr('Pseudo', 'Handle'), 'Insta', 'TikTok', 'Threads', 'YouTube', tr('Mail', 'Email'), tr('Mot de passe', 'Password'), tr('Commentaire', 'Comment'), ''].map((h, i) => (
                     <th key={i} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-4)', borderBottom: '1px solid var(--border-md)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -186,8 +188,8 @@ notify pgrst, 'reload schema';`}</pre>
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     {/* Compte + Modèle */}
                     <td style={{ padding: '6px 10px', minWidth: 170 }}>
-                      <TextCell value={r.name} placeholder="Nom du compte" bold onSave={v => patch(r.id, 'name', v)} />
-                      <TextCell value={r.model} placeholder="Modèle" small onSave={v => patch(r.id, 'model', v)} />
+                      <TextCell value={r.name} placeholder={tr('Nom du compte', 'Account name')} bold onSave={v => patch(r.id, 'name', v)} />
+                      <TextCell value={r.model} placeholder={tr('Modèle', 'Model')} small onSave={v => patch(r.id, 'model', v)} />
                     </td>
                     <td style={{ padding: '6px 8px' }}><SelectCell value={r.market} options={MARKETS} onSave={v => patch(r.id, 'market', v)} /></td>
                     <td style={{ padding: '6px 8px', minWidth: 110 }}><TextCell value={r.folder} placeholder="—" onSave={v => patch(r.id, 'folder', v)} /></td>
@@ -197,10 +199,10 @@ notify pgrst, 'reload schema';`}</pre>
                     <td style={{ padding: '6px 8px' }}><StatusCell value={r.threads} onSave={v => patch(r.id, 'threads', v)} /></td>
                     <td style={{ padding: '6px 8px' }}><StatusCell value={r.youtube} onSave={v => patch(r.id, 'youtube', v)} /></td>
                     <td style={{ padding: '6px 8px', minWidth: 130 }}><TextCell value={r.mail} placeholder="mail@…" onSave={v => patch(r.id, 'mail', v)} /></td>
-                    <td style={{ padding: '6px 8px', minWidth: 120 }}><TextCell value={r.password} placeholder="mot de passe" onSave={v => patch(r.id, 'password', v)} /></td>
-                    <td style={{ padding: '6px 8px', minWidth: 180 }}><TextCell value={r.comment} placeholder="commentaire…" onSave={v => patch(r.id, 'comment', v)} /></td>
+                    <td style={{ padding: '6px 8px', minWidth: 120 }}><TextCell value={r.password} placeholder={tr('mot de passe', 'password')} onSave={v => patch(r.id, 'password', v)} /></td>
+                    <td style={{ padding: '6px 8px', minWidth: 180 }}><TextCell value={r.comment} placeholder={tr('commentaire…', 'comment…')} onSave={v => patch(r.id, 'comment', v)} /></td>
                     <td style={{ padding: '6px 8px' }}>
-                      <button onClick={() => delRow(r.id)} title="Supprimer la ligne" className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 13, padding: 4 }}>🗑️</button>
+                      <button onClick={() => delRow(r.id)} title={tr('Supprimer la ligne', 'Delete row')} className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 13, padding: 4 }}>🗑️</button>
                     </td>
                   </tr>
                 ))}

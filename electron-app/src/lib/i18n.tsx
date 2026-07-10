@@ -5,9 +5,13 @@ export type Lang = 'fr' | 'en'
 const LS_KEY = 'scaleflow-lang'
 
 function detectLang(): Lang {
-  const saved = localStorage.getItem(LS_KEY) as Lang | null
-  if (saved === 'fr' || saved === 'en') return saved
-  return navigator.language?.startsWith('en') ? 'en' : 'fr'
+  // Protégé : appelé aussi au chargement du module (init de _currentLang) → doit
+  // survivre à un environnement sans DOM (tests Node, SSR).
+  try {
+    const saved = localStorage.getItem(LS_KEY) as Lang | null
+    if (saved === 'fr' || saved === 'en') return saved
+    return navigator.language?.startsWith('en') ? 'en' : 'fr'
+  } catch { return 'fr' }
 }
 
 // Miroir module-level de la langue courante, pour les contextes HORS composant

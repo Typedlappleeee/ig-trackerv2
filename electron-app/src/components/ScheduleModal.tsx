@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTr } from '@/lib/i18n'
 
 interface Props {
   type:        'posting' | 'mass_posting'
@@ -41,6 +42,7 @@ function startOfDay(d: Date) {
 }
 
 export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, creditCost, onConfirm, onClose }: Props) {
+  const tr = useTr()
   // Ticker 30 s : garde le countdown et la validation à jour si le modal reste ouvert
   const [nowTs, setNowTs] = useState(() => Date.now())
   useEffect(() => {
@@ -52,10 +54,10 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1)
 
   const QUICK_DATES = [
-    { label: "Aujourd’hui", date: startOfDay(now) },
-    { label: 'Demain',      date: startOfDay(tomorrow) },
-    { label: 'Dans 2 jours', date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 2); return d })() },
-    { label: 'Dans 3 jours', date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 3); return d })() },
+    { label: tr("Aujourd’hui", 'Today'), date: startOfDay(now) },
+    { label: tr('Demain', 'Tomorrow'),      date: startOfDay(tomorrow) },
+    { label: tr('Dans 2 jours', 'In 2 days'), date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 2); return d })() },
+    { label: tr('Dans 3 jours', 'In 3 days'), date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 3); return d })() },
   ]
 
   // Défaut : heure actuelle +1 h ; si on passe minuit (23h+), basculer sur demain
@@ -79,14 +81,14 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
   const invalid  = isInPast || isTooFar
 
   function countdown() {
-    if (isInPast) return 'Heure déjà passée'
-    if (isTooFar) return `Maximum ${MAX_DAYS_AHEAD} jours à l’avance — les tâches GeeLark expirent après 30 jours`
-    if (diffMin < 60) return `dans ${diffMin} min`
+    if (isInPast) return tr('Heure déjà passée', 'Time already passed')
+    if (isTooFar) return tr(`Maximum ${MAX_DAYS_AHEAD} jours à l’avance — les tâches GeeLark expirent après 30 jours`, `Maximum ${MAX_DAYS_AHEAD} days ahead — GeeLark tasks expire after 30 days`)
+    if (diffMin < 60) return tr(`dans ${diffMin} min`, `in ${diffMin} min`)
     const h = Math.floor(diffMin / 60)
     const m = diffMin % 60
-    if (h < 24) return `dans ${h}h${m ? ` ${m}min` : ''}`
+    if (h < 24) return tr(`dans ${h}h${m ? ` ${m}min` : ''}`, `in ${h}h${m ? ` ${m}min` : ''}`)
     const d = Math.floor(h / 24)
-    return `dans ${d}j${h % 24 ? ` ${h % 24}h` : ''}`
+    return tr(`dans ${d}j${h % 24 ? ` ${h % 24}h` : ''}`, `in ${d}d${h % 24 ? ` ${h % 24}h` : ''}`)
   }
 
   function adjustHour(delta: number) {
@@ -130,13 +132,13 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
               <MIcon d={MPATHS.calendar} size={18} color="#818CF8" />
             </div>
             <div>
-              <p className="font-black text-white text-[14px] leading-tight">Programmer ce post</p>
+              <p className="font-black text-white text-[14px] leading-tight">{tr('Programmer ce post', 'Schedule this post')}</p>
               <p className="text-[10px] mt-0.5" style={{ color: 'rgba(233,234,240,0.4)' }}>
-                {type === 'mass_posting' ? 'Mass Posting' : 'Posting'} · {phonesCount} tél. · {videosCount} vidéo{videosCount > 1 ? 's' : ''}
+                {type === 'mass_posting' ? 'Mass Posting' : 'Posting'} · {tr(`${phonesCount} tél.`, `${phonesCount} phones`)} · {tr(`${videosCount} vidéo${videosCount > 1 ? 's' : ''}`, `${videosCount} video${videosCount > 1 ? 's' : ''}`)}
               </p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fermer"
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')}
             className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] transition-all cursor-pointer"
             style={{ color: 'rgba(233,234,240,0.4)' }}><MIcon d={MPATHS.x} size={15} /></button>
         </div>
@@ -155,7 +157,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
           {/* Date selection */}
           <div>
             <p className="text-[10px] uppercase tracking-[0.15em] font-black mb-2.5" style={{ color: 'rgba(79,70,229,0.8)' }}>
-              Jour
+              {tr('Jour', 'Day')}
             </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
               {QUICK_DATES.map(q => {
@@ -179,7 +181,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
               style={useCustom
                 ? { background: 'linear-gradient(130deg,#4F46E5,#6366F1)', color: 'white' }
                 : { background: 'rgba(255,255,255,0.03)', color: 'rgba(233,234,240,0.45)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-              <MIcon d={MPATHS.calendar} size={14} /> Choisir une date précise
+              <MIcon d={MPATHS.calendar} size={14} /> {tr('Choisir une date précise', 'Pick a specific date')}
             </button>
             {useCustom && (
               <input type="date" value={customDate}
@@ -193,7 +195,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
           {/* Time selection */}
           <div>
             <p className="text-[10px] uppercase tracking-[0.15em] font-black mb-2.5" style={{ color: 'rgba(79,70,229,0.8)' }}>
-              Heure locale
+              {tr('Heure locale', 'Local time')}
             </p>
             <div className="flex items-center justify-center gap-4">
               {/* Hour */}
@@ -208,7 +210,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
                 <button onClick={() => adjustHour(-1)}
                   className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
                   style={{ color: 'rgba(233,234,240,0.5)', background: 'rgba(255,255,255,0.04)' }}>▼</button>
-                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(233,234,240,0.3)' }}>heure</span>
+                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(233,234,240,0.3)' }}>{tr('heure', 'hour')}</span>
               </div>
 
               <span className="text-3xl font-black pb-6" style={{ color: 'rgba(233,234,240,0.3)' }}>:</span>
@@ -235,7 +237,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
                 onClick={setNowPlus30}
                 className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
                 style={{ background: 'rgba(79,70,229,0.08)', color: 'rgba(147,197,253,0.7)', border: '1px solid rgba(79,70,229,0.12)' }}>
-                Maintenant +30min
+                {tr('Maintenant +30min', 'Now +30min')}
               </button>
               {[
                 { label: '08:00', h: 8,  m: 0 },
@@ -264,7 +266,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
             </span>
             <div>
               <p className="text-[13px] font-black" style={{ color: invalid ? '#f87171' : 'white' }}>
-                {scheduled.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à {pad(hour)}h{pad(minute)}
+                {scheduled.toLocaleDateString(tr('fr-FR', 'en-US'), { weekday: 'long', day: 'numeric', month: 'long' })} {tr('à', 'at')} {pad(hour)}h{pad(minute)}
               </p>
               <p className="text-[10px] mt-0.5" style={{ color: invalid ? 'rgba(248,113,113,0.7)' : 'rgba(147,197,253,0.6)' }}>
                 {countdown()}
@@ -280,8 +282,8 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
                 <MIcon d={MPATHS.coins} size={15} />
               </span>
               <p className="text-[11px] leading-snug" style={{ color: 'rgba(233,234,240,0.65)', margin: 0 }}>
-                <span style={{ color: '#F59E0B', fontWeight: 700 }}>{creditCost} crédit{creditCost > 1 ? 's' : ''}</span>
-                {' '}seront débités maintenant — remboursés si annulation
+                <span style={{ color: '#F59E0B', fontWeight: 700 }}>{tr(`${creditCost} crédit${creditCost > 1 ? 's' : ''}`, `${creditCost} credit${creditCost > 1 ? 's' : ''}`)}</span>
+                {' '}{tr('seront débités maintenant — remboursés si annulation', 'will be charged now — refunded if cancelled')}
               </p>
             </div>
           )}
@@ -292,14 +294,14 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
           <button onClick={onClose}
             className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
             style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            Annuler
+            {tr('Annuler', 'Cancel')}
           </button>
           <button
             onClick={() => !invalid && onConfirm(scheduled)}
             disabled={invalid || (useCustom && !customDate)}
             className="flex-[2] py-2.5 rounded-xl text-[12px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center gap-1.5"
             style={{ background: 'linear-gradient(130deg,#4F46E5,#6366F1)', boxShadow: '0 4px 20px -4px rgba(79,70,229,0.5)' }}>
-            <MIcon d={MPATHS.calendar} size={15} color="#fff" /> Confirmer — {pad(hour)}h{pad(minute)}
+            <MIcon d={MPATHS.calendar} size={15} color="#fff" /> {tr('Confirmer', 'Confirm')} — {pad(hour)}h{pad(minute)}
           </button>
         </div>
       </div>

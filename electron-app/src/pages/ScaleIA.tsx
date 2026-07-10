@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTr } from '@/lib/i18n'
 
 // ── Inline Lucide-style SVG icons (no emoji UI chrome) ─────────────────────────
 type IconName = 'bot' | 'sparkles' | 'image' | 'trending-up'
@@ -20,6 +21,7 @@ function Icon({ name, size = 15 }: { name: IconName; size?: number }) {
 }
 
 export default function ScaleIA() {
+  const tr = useTr()
   return (
     <div className="anim-page" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#06060e' }}>
 
@@ -82,7 +84,7 @@ export default function ScaleIA() {
           padding: '5px 14px', borderRadius: 100, background: 'rgba(99,102,241,0.1)',
           marginBottom: 20,
         }}>
-          BIENTÔT DISPONIBLE
+          {tr('BIENTÔT DISPONIBLE', 'COMING SOON')}
         </div>
 
         {/* Title */}
@@ -103,17 +105,17 @@ export default function ScaleIA() {
           fontSize: 15, color: 'rgba(226,232,240,0.55)', textAlign: 'center',
           maxWidth: 480, lineHeight: 1.65, marginBottom: 32,
         }}>
-          Crée ta modèle IA, génère du contenu illimité<br />
-          et construis ton empire Instagram.
+          {tr('Crée ta modèle IA, génère du contenu illimité', 'Create your AI model, generate unlimited content')}<br />
+          {tr('et construis ton empire Instagram.', 'and build your Instagram empire.')}
         </p>
 
         {/* Feature pills */}
         <div className="sf-anim-slide-up sf-d200" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 520, marginBottom: 44 }}>
           {[
-            { icon: <Icon name="bot" />, label: 'Modèle IA Custom' },
-            { icon: <Icon name="sparkles" />, label: 'Contenu génératif' },
-            { icon: <Icon name="image" />, label: 'Photos & Vidéos IA' },
-            { icon: <Icon name="trending-up" />, label: 'Empire Instagram' },
+            { icon: <Icon name="bot" />, label: tr('Modèle IA Custom', 'Custom AI Model') },
+            { icon: <Icon name="sparkles" />, label: tr('Contenu génératif', 'Generative Content') },
+            { icon: <Icon name="image" />, label: tr('Photos & Vidéos IA', 'AI Photos & Videos') },
+            { icon: <Icon name="trending-up" />, label: tr('Empire Instagram', 'Instagram Empire') },
           ].map((f, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 7,
@@ -130,7 +132,7 @@ export default function ScaleIA() {
 
         {/* Progress bar */}
         <div className="sf-anim-slide-up sf-d250" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 11, color: 'rgba(129,140,248,0.7)', letterSpacing: '0.1em', fontWeight: 600 }}>EN DÉVELOPPEMENT</span>
+          <span style={{ fontSize: 11, color: 'rgba(129,140,248,0.7)', letterSpacing: '0.1em', fontWeight: 600 }}>{tr('EN DÉVELOPPEMENT', 'IN DEVELOPMENT')}</span>
           <div style={{ width: 240, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{
               width: '10%', height: '100%', borderRadius: 99,
@@ -138,7 +140,7 @@ export default function ScaleIA() {
               boxShadow: '0 0 8px rgba(99,102,241,0.8)',
             }} />
           </div>
-          <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>10% terminé</span>
+          <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>{tr('10% terminé', '10% complete')}</span>
         </div>
       </div>
     </div>

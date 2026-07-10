@@ -13,6 +13,7 @@ import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
 import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
+import { useTr } from '@/lib/i18n'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type PoolPhoto    = { url: string; name: string }
@@ -91,6 +92,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
   onClose:   () => void
 }) {
   const { currentOrg, role, perms } = useOrg()
+  const tr      = useTr()
   const conns   = useConnections(user)
   const bearer  = conns.bearer ?? ''
   const credits = useCredits()
@@ -191,13 +193,13 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
     try {
       const when = new Date(schedAt)
       if (isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
-        setSchedErr('Choisis une date au moins 1 minute dans le futur.')
+        setSchedErr(tr('Choisis une date au moins 1 minute dans le futur.', 'Pick a date at least 1 minute in the future.'))
         return
       }
       const cost = selectedIds.length * CREDIT_COSTS.story
       const cr   = await checkAndDeductCredits(credits.ownerId, cost)
       if (!cr.ok) {
-        setSchedErr(`${cr.error ?? 'Crédits insuffisants'} (requis : ${cost} crédits)`)
+        setSchedErr(`${cr.error ?? tr('Crédits insuffisants', 'Insufficient credits')} ${tr(`(requis : ${cost} crédits)`, `(required: ${cost} credits)`)}`)
         return
       }
       if (typeof cr.balance === 'number') credits.setBalance(cr.balance)
@@ -239,7 +241,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
         throw e
       }
 
-      setSchedDone(`${asgns.length} story${asgns.length > 1 ? 's' : ''} programmée${asgns.length > 1 ? 's' : ''} pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
+      setSchedDone(tr(`${asgns.length} story${asgns.length > 1 ? 's' : ''} programmée${asgns.length > 1 ? 's' : ''} pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`, `${asgns.length} story${asgns.length > 1 ? 's' : ''} scheduled for ${when.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}`))
       setTimeout(() => { if (mountedRef.current) onCreated() }, 2000)
     } catch (e) {
       setSchedErr(e instanceof Error ? e.message : String(e))
@@ -302,12 +304,12 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
           }}>
             <div>
               <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                Programmer une Story
+                {tr('Programmer une Story', 'Schedule a Story')}
                 <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(99,102,241,0.12)', border: `1px solid ${HAIR}`, color: ACCENT_L }}>📸 Instagram</span>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, color: 'rgba(233,234,240,0.3)' }}>🎵 TikTok · bientôt</span>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, color: 'rgba(233,234,240,0.3)' }}>{tr('🎵 TikTok · bientôt', '🎵 TikTok · soon')}</span>
               </p>
               <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'rgba(233,234,240,0.42)' }}>
-                Photos + sticker lien • automation GéeLark • app doit être ouverte à l'heure
+                {tr('Photos + sticker lien • automation GéeLark • app doit être ouverte à l\'heure', 'Photos + link sticker • GeeLark automation • app must be open at the scheduled time')}
               </p>
             </div>
             <button
@@ -329,7 +331,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
               <p style={{ fontSize: 32, margin: '0 0 12px' }}>✅</p>
               <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0 }}>{schedDone}</p>
               <p style={{ fontSize: 12, color: 'rgba(233,234,240,0.42)', margin: '8px 0 0' }}>
-                Retrouve-la dans l'onglet Programmation.
+                {tr('Retrouve-la dans l\'onglet Programmation.', 'Find it in the Schedule tab.')}
               </p>
             </div>
           ) : (
@@ -346,7 +348,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                 <div style={{ flexShrink: 0, padding: '12px 12px 8px', borderBottom: `1px solid ${HAIR}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                      Comptes
+                      {tr('Comptes', 'Accounts')}
                     </span>
                     {selected.size > 0 && (
                       <span style={{
@@ -354,7 +356,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                         border: '1px solid rgba(99,102,241,0.3)',
                         borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700,
                       }}>
-                        {selected.size} sél.
+                        {tr(`${selected.size} sél.`, `${selected.size} sel.`)}
                       </span>
                     )}
                   </div>
@@ -377,7 +379,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                     <input
                       value={phoneSearch}
                       onChange={e => setSearch(e.target.value)}
-                      placeholder="Rechercher…"
+                      placeholder={tr('Rechercher…', 'Search…')}
                       className="sf-input"
                       style={{ height: 28, paddingLeft: 28, fontSize: 11 }}
                     />
@@ -388,12 +390,12 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       onClick={() => setSelected(new Set(visible.map(p => p.id)))}
                       className="sf-btn sf-btn-secondary sf-btn-sm"
                       style={{ flex: 1, cursor: 'pointer', fontSize: 10.5, padding: '4px 0' }}
-                    >Tout</button>
+                    >{tr('Tout', 'All')}</button>
                     <button
                       onClick={() => setSelected(new Set())}
                       className="sf-btn sf-btn-ghost sf-btn-sm"
                       style={{ flex: 1, cursor: 'pointer', fontSize: 10.5, padding: '4px 0' }}
-                    >Aucun</button>
+                    >{tr('Aucun', 'None')}</button>
                   </div>
                 </div>
 
@@ -402,15 +404,15 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                   {loadingPhones ? (
                     <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <div className="sf-spinner" />
-                      <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)' }}>Chargement…</p>
+                      <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)' }}>{tr('Chargement…', 'Loading…')}</p>
                     </div>
                   ) : !bearer ? (
                     <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', padding: '20px 0', textAlign: 'center' }}>
-                      Connecte GéeLark dans les Paramètres
+                      {tr('Connecte GéeLark dans les Paramètres', 'Connect GeeLark in Settings')}
                     </p>
                   ) : visible.length === 0 ? (
                     <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', padding: '20px 0', textAlign: 'center' }}>
-                      Aucun compte
+                      {tr('Aucun compte', 'No accounts')}
                     </p>
                   ) : visible.map(p => {
                     const sel = selected.has(p.id)
@@ -448,7 +450,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                           {grp && <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.25)', margin: '1px 0 0' }}>{grp}</p>}
                         </div>
                         {sel && (
-                          <span title={link ? `Lien: ${link}` : 'Lien manquant'} style={{ flexShrink: 0 }}>
+                          <span title={link ? tr(`Lien: ${link}`, `Link: ${link}`) : tr('Lien manquant', 'Missing link')} style={{ flexShrink: 0 }}>
                             <span style={{ color: link ? '#22c55e' : '#fbbf24', fontSize: 9 }}>
                               {link ? '●' : '○'}
                             </span>
@@ -469,7 +471,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ color: ACCENT_L }}><IcoPhoto /></span>
                       <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                        Pool de photos
+                        {tr('Pool de photos', 'Photo pool')}
                       </span>
                     </div>
                     <button
@@ -477,7 +479,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       className="sf-btn sf-btn-secondary sf-btn-sm"
                       style={{ cursor: 'pointer', fontSize: 11 }}
                     >
-                      <IcoPlus /> Ajouter
+                      <IcoPlus /> {tr('Ajouter', 'Add')}
                     </button>
                   </div>
 
@@ -493,7 +495,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       }}
                     >
                       <IcoPhoto />
-                      Aucune photo — cliquer pour en ajouter depuis la banque
+                      {tr('Aucune photo — cliquer pour en ajouter depuis la banque', 'No photos — click to add from the bank')}
                     </button>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -525,7 +527,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                         className="sf-btn sf-btn-ghost sf-btn-sm"
                         style={{ cursor: 'pointer', border: '1px dashed rgba(99,102,241,0.22)', color: ACCENT_L, fontSize: 11 }}
                       >
-                        <IcoPlus /> Ajouter
+                        <IcoPlus /> {tr('Ajouter', 'Add')}
                       </button>
                     </div>
                   )}
@@ -535,7 +537,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                 <section>
                   <div style={{ marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                      Texte sticker (optionnel)
+                      {tr('Texte sticker (optionnel)', 'Text sticker (optional)')}
                     </span>
                   </div>
                   {textPool.length > 0 && (
@@ -567,7 +569,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                           setEditText('')
                         }
                       }}
-                      placeholder='Ex: "Regarde ici" puis Entrée…'
+                      placeholder={tr('Ex: "Regarde ici" puis Entrée…', 'e.g. "Look here" then Enter…')}
                       className="sf-input"
                       style={{ flex: 1, height: 32, fontSize: 12 }}
                     />
@@ -584,13 +586,13 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                 <section>
                   <div style={{ marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                      Distribution photos
+                      {tr('Distribution photos', 'Photo distribution')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {([
-                      { k: 'rotation' as const, label: 'Rotation', desc: 'A → B → C → A…' },
-                      { k: 'random'   as const, label: 'Aléatoire', desc: 'Mélangé' },
+                      { k: 'rotation' as const, label: tr('Rotation', 'Rotation'), desc: 'A → B → C → A…' },
+                      { k: 'random'   as const, label: tr('Aléatoire', 'Random'), desc: tr('Mélangé', 'Shuffled') },
                     ]).map(m => {
                       const active = distrib === m.k
                       return (
@@ -619,7 +621,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ color: ACCENT_L }}><IcoLink /></span>
                         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                          Liens (1 par compte)
+                          {tr('Liens (1 par compte)', 'Links (1 per account)')}
                         </span>
                       </div>
                       <span style={{
@@ -628,7 +630,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                         color: missingLinks.length > 0 ? '#fbbf24' : '#22c55e',
                         border: `1px solid ${missingLinks.length > 0 ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.2)'}`,
                       }}>
-                        {selectedIds.length - missingLinks.length}/{selectedIds.length} remplis
+                        {tr(`${selectedIds.length - missingLinks.length}/${selectedIds.length} remplis`, `${selectedIds.length - missingLinks.length}/${selectedIds.length} filled`)}
                       </span>
                     </div>
 
@@ -640,7 +642,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                         color: 'rgba(251,191,36,0.9)', fontSize: 11.5,
                       }}>
                         <span style={{ flexShrink: 0, marginTop: 1, color: '#fbbf24' }}><IcoWarn /></span>
-                        {missingLinks.length} compte{missingLinks.length > 1 ? 's' : ''} sans lien — requis pour publier.
+                        {tr(`${missingLinks.length} compte${missingLinks.length > 1 ? 's' : ''} sans lien — requis pour publier.`, `${missingLinks.length} account${missingLinks.length > 1 ? 's' : ''} without a link — required to publish.`)}
                       </div>
                     )}
 
@@ -689,11 +691,11 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                   background: 'rgba(99,102,241,0.05)', border: `1px solid rgba(99,102,241,0.14)`,
                 }}>
                   <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: ACCENT }}>
-                    Programmation
+                    {tr('Programmation', 'Scheduling')}
                   </p>
 
                   <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>Date et heure</label>
+                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>{tr('Date et heure', 'Date and time')}</label>
                     <input
                       type="datetime-local"
                       value={schedAt}
@@ -704,7 +706,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>Délai entre comptes</label>
+                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>{tr('Délai entre comptes', 'Delay between accounts')}</label>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[0, 2, 5, 10, 15].map(m => (
                         <button
@@ -718,25 +720,25 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                             color: delay === m ? ACCENT_L : 'rgba(233,234,240,0.35)',
                             transition: 'all 0.15s',
                           }}
-                        >{m === 0 ? 'Aucun' : `${m} min`}</button>
+                        >{m === 0 ? tr('Aucun', 'None') : `${m} min`}</button>
                       ))}
                     </div>
                   </div>
 
                   <p style={{ margin: '10px 0 0', fontSize: 11, color: 'rgba(233,234,240,0.3)', lineHeight: 1.55 }}>
-                    ⚠ L'automation des stories nécessite que l'app soit ouverte à l'heure programmée.
+                    {tr('⚠ L\'automation des stories nécessite que l\'app soit ouverte à l\'heure programmée.', '⚠ Story automation requires the app to be open at the scheduled time.')}
                   </p>
                 </section>
 
                 {/* ── Cost info ─────────────────────────────────────────────── */}
                 {selectedIds.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(233,234,240,0.42)' }}>
-                    <span>Coût :</span>
+                    <span>{tr('Coût :', 'Cost:')}</span>
                     <span style={{ fontWeight: 700, color: ACCENT_L }}>
-                      {selectedIds.length * CREDIT_COSTS.story} crédit{selectedIds.length * CREDIT_COSTS.story > 1 ? 's' : ''}
+                      {tr(`${selectedIds.length * CREDIT_COSTS.story} crédit${selectedIds.length * CREDIT_COSTS.story > 1 ? 's' : ''}`, `${selectedIds.length * CREDIT_COSTS.story} credit${selectedIds.length * CREDIT_COSTS.story > 1 ? 's' : ''}`)}
                     </span>
                     <span>·</span>
-                    <span>Solde actuel : <strong style={{ color: TEXT_1 }}>{credits.balance}</strong></span>
+                    <span>{tr('Solde actuel :', 'Current balance:')} <strong style={{ color: TEXT_1 }}>{credits.balance}</strong></span>
                   </div>
                 )}
 
@@ -756,7 +758,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                     disabled={submitting}
                     className="sf-btn sf-btn-secondary"
                     style={{ flex: 1, cursor: 'pointer', justifyContent: 'center' }}
-                  >Annuler</button>
+                  >{tr('Annuler', 'Cancel')}</button>
                   <button
                     onClick={submit}
                     disabled={!canSubmit}
@@ -770,9 +772,9 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                     }}
                   >
                     {submitting ? (
-                      <><span className="sf-spinner" style={{ width: 13, height: 13 }} /> Programmation…</>
+                      <><span className="sf-spinner" style={{ width: 13, height: 13 }} /> {tr('Programmation…', 'Scheduling…')}</>
                     ) : (
-                      <>Programmer {selectedIds.length > 0 ? `${selectedIds.length} story${selectedIds.length > 1 ? 's' : ''}` : 'les stories'}</>
+                      <>{tr('Programmer', 'Schedule')} {selectedIds.length > 0 ? tr(`${selectedIds.length} story${selectedIds.length > 1 ? 's' : ''}`, `${selectedIds.length} story${selectedIds.length > 1 ? 's' : ''}`) : tr('les stories', 'the stories')}</>
                     )}
                   </button>
                 </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { useT } from '@/lib/i18n'
+import { useT, useTr } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import { Spinner } from '@/components/ui/Spinner'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -31,6 +31,7 @@ function CaptionModal({
   onClose: () => void
 }) {
   const t = useT()
+  const tr = useTr()
   const [title,        setTitle]        = useState(item?.title   ?? '')
   const [content,      setContent]      = useState(item?.content ?? '')
   const [folder,       setFolder]       = useState<string | null>(item?.folder ?? null)
@@ -110,7 +111,7 @@ function CaptionModal({
                 background: folder === null && !showCustom ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
                 border: `1px solid ${folder === null && !showCustom ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`,
               }}
-            >Sans dossier</button>
+            >{tr('Sans dossier', 'No folder')}</button>
 
             {/* Existing folders */}
             {allFolders.map(f => (
@@ -136,14 +137,14 @@ function CaptionModal({
                 background: showCustom ? 'rgba(99,102,241,0.1)' : 'transparent',
                 border: `1px dashed ${showCustom ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.25)'}`,
               }}
-            >+ Nouveau</button>
+            >{tr('+ Nouveau', '+ New')}</button>
           </div>
 
           {showCustom && (
             <input
               autoFocus
               className="sf-input w-full mt-2"
-              placeholder="Nom du nouveau dossier…"
+              placeholder={tr('Nom du nouveau dossier…', 'New folder name…')}
               value={customFolder}
               onChange={e => setCustomFolder(e.target.value)}
             />
@@ -182,6 +183,7 @@ function CaptionModal({
 // ── Main page ────────────────────────────────────────────────────────────────
 export function CaptionBank({ user }: CaptionBankProps) {
   const t = useT()
+  const tr = useTr()
   const { currentOrg } = useOrg()
   const newFolderRef = useRef<HTMLInputElement>(null)
 
@@ -302,11 +304,11 @@ export function CaptionBank({ user }: CaptionBankProps) {
       <aside className="w-52 flex-shrink-0 border-r border-border flex flex-col bg-surface overflow-hidden">
         {/* Sidebar header */}
         <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-border sf-anim-slide-up sf-d50">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-text3">Dossiers</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-text3">{tr('Dossiers', 'Folders')}</span>
           <button
             onClick={() => { setShowNewFolder(v => !v); setNewFolderInput('') }}
             className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
-            title="Nouveau dossier"
+            title={tr('Nouveau dossier', 'New folder')}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14"/>
@@ -320,7 +322,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
             <input
               ref={newFolderRef}
               autoFocus
-              placeholder="Nom du dossier…"
+              placeholder={tr('Nom du dossier…', 'Folder name…')}
               className="sf-input flex-1 text-[12px]"
               value={newFolderInput}
               onChange={e => setNewFolderInput(e.target.value)}
@@ -343,7 +345,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
-            <span className="flex-1 text-left">Tout</span>
+            <span className="flex-1 text-left">{tr('Tout', 'All')}</span>
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${activeFolder === null ? 'text-accent bg-accent/15' : 'text-text2 bg-surface2'}`}>
               {items.length}
             </span>
@@ -417,7 +419,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
             </div>
             <div className="min-w-0 sf-anim-slide-up sf-d50">
               <div className="flex items-center gap-2.5">
-                <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>Banque de Captions</h1>
+                <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{tr('Banque de Captions', 'Caption Bank')}</h1>
                 <span className="sf-badge sf-badge-accent sf-anim-scale-spring sf-d200">{items.length}</span>
               </div>
             </div>
@@ -430,7 +432,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
             </svg>
             <input
               className="sf-input pl-8 w-52 text-[13px]"
-              placeholder="Rechercher…"
+              placeholder={tr('Rechercher…', 'Search…')}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -447,7 +449,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
                   </svg>
-                  Supprimer ({selected.size})
+                  {tr('Supprimer', 'Delete')} ({selected.size})
                 </>
               )}
             </button>
@@ -460,7 +462,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14"/>
             </svg>
-            Ajouter
+            {tr('Ajouter', 'Add')}
           </button>
         </div>
 
@@ -484,13 +486,13 @@ export function CaptionBank({ user }: CaptionBankProps) {
                 </svg>
               </div>
               <div className="text-center">
-                <p className="text-[14px] font-semibold text-text mb-1">Dossier vide</p>
-                <p className="text-[12px] text-text2">Ajoute une caption dans ce dossier</p>
+                <p className="text-[14px] font-semibold text-text mb-1">{tr('Dossier vide', 'Empty folder')}</p>
+                <p className="text-[12px] text-text2">{tr('Ajoute une caption dans ce dossier', 'Add a caption to this folder')}</p>
               </div>
               <button
                 onClick={() => { setEditItem(undefined); setShowModal(true) }}
                 className="sf-btn sf-btn-primary cursor-pointer"
-              >+ Ajouter une caption</button>
+              >{tr('+ Ajouter une caption', '+ Add a caption')}</button>
             </div>
           ) : filtered.length === 0 ? (
             <div className="sf-empty flex-col gap-4 h-full">
@@ -500,13 +502,13 @@ export function CaptionBank({ user }: CaptionBankProps) {
                 </svg>
               </div>
               <div className="text-center">
-                <p className="text-[15px] font-bold text-text mb-1">Aucune caption</p>
-                <p className="text-[13px] text-text2">Ajoute ta première caption pour commencer</p>
+                <p className="text-[15px] font-bold text-text mb-1">{tr('Aucune caption', 'No captions')}</p>
+                <p className="text-[13px] text-text2">{tr('Ajoute ta première caption pour commencer', 'Add your first caption to get started')}</p>
               </div>
               <button
                 onClick={() => { setEditItem(undefined); setShowModal(true) }}
                 className="sf-btn sf-btn-primary cursor-pointer"
-              >+ Ajouter une caption</button>
+              >{tr('+ Ajouter une caption', '+ Add a caption')}</button>
             </div>
           ) : (
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
@@ -570,11 +572,11 @@ export function CaptionBank({ user }: CaptionBankProps) {
                         <button
                           onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true) }}
                           className="sf-btn sf-btn-ghost text-[10px] px-2 py-1 cursor-pointer"
-                        >Modifier</button>
+                        >{tr('Modifier', 'Edit')}</button>
                         <button
                           onClick={e => { e.stopPropagation(); setConfirmIds([item.id]) }}
                           className="sf-btn sf-btn-danger text-[10px] px-2 py-1 cursor-pointer"
-                        >Suppr.</button>
+                        >{tr('Suppr.', 'Delete')}</button>
                       </div>
                     </div>
                   </div>
@@ -598,9 +600,9 @@ export function CaptionBank({ user }: CaptionBankProps) {
         open={confirmIds !== null}
         danger
         busy={deleting}
-        title={confirmIds && confirmIds.length > 1 ? `Supprimer ${confirmIds.length} captions ?` : 'Supprimer cette caption ?'}
-        message="Cette action est définitive."
-        confirmLabel="Supprimer"
+        title={confirmIds && confirmIds.length > 1 ? tr(`Supprimer ${confirmIds.length} captions ?`, `Delete ${confirmIds.length} captions?`) : tr('Supprimer cette caption ?', 'Delete this caption?')}
+        message={tr('Cette action est définitive.', 'This action is permanent.')}
+        confirmLabel={tr('Supprimer', 'Delete')}
         onConfirm={() => confirmIds && handleDelete(confirmIds)}
         onCancel={() => setConfirmIds(null)}
       />

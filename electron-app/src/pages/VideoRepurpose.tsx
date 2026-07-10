@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { runFfmpegRepurposeBatch, runRepurposeViaServer, runRepurposeNative } from '@/lib/ffmpeg-web'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import { BankPicker } from '@/pages/Bank'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
@@ -82,6 +82,7 @@ async function downloadVariant(job: VariantJob, filename: string) {
 
 function VariantCard({ job, index }: { job: VariantJob; index: number }) {
   const t = useT()
+  const tr = useTr()
   const isDone = job.status === 'done'
   const isErr  = job.status === 'error'
   const isProc = job.status === 'processing'
@@ -148,7 +149,7 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
               style={{ flex: 1, height: 28, fontSize: 9, background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 6 }}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-              Télécharger
+              {tr('Télécharger', 'Download')}
             </button>
             {job.uploading && <span style={{ fontSize: 9, color: 'var(--text-3)', display: 'flex', alignItems: 'center', paddingRight: 2 }}>
               <div className="sf-spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
@@ -161,8 +162,8 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
           </div>
         )}
         {isErr && <div style={{ fontSize: 9, color: '#f87171' }}>{job.error?.slice(0, 45)}</div>}
-        {isQ   && <div style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center' }}>En attente…</div>}
-        {isProc && <div style={{ fontSize: 9, color: 'rgba(99,102,241,0.6)', textAlign: 'center' }}>Traitement {job.progress}%</div>}
+        {isQ   && <div style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center' }}>{tr('En attente…', 'Queued…')}</div>}
+        {isProc && <div style={{ fontSize: 9, color: 'rgba(99,102,241,0.6)', textAlign: 'center' }}>{tr(`Traitement ${job.progress}%`, `Processing ${job.progress}%`)}</div>}
       </div>
     </div>
   )
@@ -212,6 +213,7 @@ function RatioCard({ ratio, label, selected, onClick, disabled }: {
 
 export function VideoRepurpose({ user }: VideoRepurposeProps) {
   const t = useT()
+  const tr = useTr()
   const { currentOrg } = useOrg()
   const credits = useCredits()
   const { isSuperAdmin } = useLicense()
@@ -288,7 +290,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       if (!creditRes.ok) {
         const balanceDisplay = creditRes.balance ?? credits.balance
         const errDetail = creditRes.error ? ` (${creditRes.error})` : ''
-        alert(`Crédits insuffisants — ${creditCost} crédits requis pour ${totalJobs} vidéos. Solde: ${balanceDisplay}${errDetail}`)
+        alert(tr(`Crédits insuffisants — ${creditCost} crédits requis pour ${totalJobs} vidéos. Solde: ${balanceDisplay}${errDetail}`, `Insufficient credits — ${creditCost} credits required for ${totalJobs} videos. Balance: ${balanceDisplay}${errDetail}`))
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
@@ -473,16 +475,16 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               {running ? (
                 <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  Génération…
+                  {tr('Génération…', 'Generating…')}
                 </span>
               ) : (
-                <span className="sf-badge">Prêt</span>
+                <span className="sf-badge">{tr('Prêt', 'Ready')}</span>
               )}
             </div>
             <p className="sf-page-sub">
               {sources.length > 1
-                ? `${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`
-                : `1 vidéo → N variantes uniques · transformations perceptibles pour contourner la détection`}
+                ? tr(`${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`, `${sources.length} videos × ${count} variants = ${totalJobs} total`)
+                : tr(`1 vidéo → N variantes uniques · transformations perceptibles pour contourner la détection`, `1 video → N unique variants · perceptible transforms to bypass detection`)}
             </p>
           </div>
         </div>
@@ -558,10 +560,10 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 </div>
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, color: sources.length ? '#6366F1' : 'var(--text-1)', marginBottom: 4 }}>
-                {sources.length ? `${sources.length} vidéo${sources.length > 1 ? 's' : ''} sélectionnée${sources.length > 1 ? 's' : ''}` : t('repurposeDropVideo')}
+                {sources.length ? tr(`${sources.length} vidéo${sources.length > 1 ? 's' : ''} sélectionnée${sources.length > 1 ? 's' : ''}`, `${sources.length} video${sources.length > 1 ? 's' : ''} selected`) : t('repurposeDropVideo')}
               </div>
               <div style={{ fontSize: 10, color: 'var(--muted)' }}>
-                {sources.length ? "Cliquer pour en ajouter d'autres" : 'MP4, MOV, WebM — glisser-déposer ou cliquer'}
+                {sources.length ? tr("Cliquer pour en ajouter d'autres", 'Click to add more') : tr('MP4, MOV, WebM — glisser-déposer ou cliquer', 'MP4, MOV, WebM — drag-and-drop or click')}
               </div>
             </div>
 
@@ -603,7 +605,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           <div style={{ padding: '0 14px' }}>
             <div className="sf-section-label" style={{ marginBottom: 8 }}>
               {t('repurposeVariantsSection')}
-              {sources.length > 1 && <span style={{ marginLeft: 6, color: 'rgba(99,102,241,0.6)', fontWeight: 600, fontSize: 9 }}>par vidéo</span>}
+              {sources.length > 1 && <span style={{ marginLeft: 6, color: 'rgba(99,102,241,0.6)', fontWeight: 600, fontSize: 9 }}>{tr('par vidéo', 'per video')}</span>}
             </div>
             <div style={{ display: 'flex', gap: 5 }}>
               {[3, 5, 10, 25].map(n => (
@@ -618,7 +620,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             />
             <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
               {sources.length > 1
-                ? <span><span style={{ color: '#6366F1', fontWeight: 700 }}>{count}</span> /vidéo · <span style={{ color: '#6366F1', fontWeight: 700 }}>{totalJobs}</span> total</span>
+                ? <span><span style={{ color: '#6366F1', fontWeight: 700 }}>{count}</span> {tr('/vidéo', '/video')} · <span style={{ color: '#6366F1', fontWeight: 700 }}>{totalJobs}</span> total</span>
                 : `${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
             </div>
           </div>
@@ -630,9 +632,9 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div className="sf-section-label" style={{ marginBottom: 8 }}>{t('repurposeIntensitySection')}</div>
             {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(lv => {
               const meta = {
-                subtle:     { label: t('repurposeSubtle'),     desc: '~75-90% · couleur + zoom léger',    color: '#6366F1', bars: 1 },
-                medium:     { label: t('repurposeMedium'),     desc: '~60-80% · temp. couleur + teinte',  color: '#fbbf24', bars: 2 },
-                aggressive: { label: t('repurposeAggressive'), desc: '~42-65% · fort changement visuel',  color: '#f87171', bars: 3 },
+                subtle:     { label: t('repurposeSubtle'),     desc: tr('~75-90% · couleur + zoom léger', '~75-90% · color + light zoom'),    color: '#6366F1', bars: 1 },
+                medium:     { label: t('repurposeMedium'),     desc: tr('~60-80% · temp. couleur + teinte', '~60-80% · color temp + hue'),  color: '#fbbf24', bars: 2 },
+                aggressive: { label: t('repurposeAggressive'), desc: tr('~42-65% · fort changement visuel', '~42-65% · strong visual change'),  color: '#f87171', bars: 3 },
               }[lv]
               const active = intensity === lv
               return (
@@ -710,7 +712,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {bankFolder || 'Choisir un dossier…'}
+                    {bankFolder || tr('Choisir un dossier…', 'Choose a folder…')}
                   </span>
                   {bankFolder && (
                     <span
@@ -734,7 +736,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(129,140,248,0.7)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                 <span className="sf-badge sf-badge-violet" style={{ fontSize: 10 }}>
-                  {creditCost} crédit{creditCost > 1 ? 's' : ''} · {totalJobs} vidéo{totalJobs > 1 ? 's' : ''}
+                  {creditCost} {tr(`crédit${creditCost > 1 ? 's' : ''}`, `credit${creditCost > 1 ? 's' : ''}`)} · {totalJobs} {tr(`vidéo${totalJobs > 1 ? 's' : ''}`, `video${totalJobs > 1 ? 's' : ''}`)}
                 </span>
               </div>
             )}
@@ -761,7 +763,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 <>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                   {sources.length > 1
-                    ? `Générer ${totalJobs} variantes (${sources.length}×${count})`
+                    ? tr(`Générer ${totalJobs} variantes (${sources.length}×${count})`, `Generate ${totalJobs} variants (${sources.length}×${count})`)
                     : `${t('repurposeGenerateBtn')} ${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
                 </>
               )}
@@ -794,7 +796,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   { label: 'Zoom crop', icon: 'M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0zM10 7v3m0 0v3m0-3h3m-3 0H7' },
                   { label: 'Grain', icon: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z' },
                   { label: 'Encoding', icon: 'M2 12h2m16 0h2M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41' },
-                  { label: 'Hash unique', icon: 'M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18' },
+                  { label: tr('Hash unique', 'Unique hash'), icon: 'M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18' },
                 ].map(pill => (
                   <span key={pill.label} className="sf-badge" style={{ padding: '4px 10px', background: 'rgba(99,102,241,0.05)', color: 'rgba(99,102,241,0.65)', border: '1px solid rgba(99,102,241,0.12)', fontSize: 10, gap: 5 }}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d={pill.icon}/></svg>
@@ -839,7 +841,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 </div>
-                <span className="sf-modal-title">Dossier de destination</span>
+                <span className="sf-modal-title">{tr('Dossier de destination', 'Destination folder')}</span>
               </div>
               <button onClick={() => setShowFolderModal(false)}
                 className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer">
@@ -850,7 +852,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div className="sf-modal-body" style={{ paddingBottom: 12 }}>
               <input
                 autoFocus
-                placeholder="Nom du dossier (existant ou nouveau)…"
+                placeholder={tr('Nom du dossier (existant ou nouveau)…', 'Folder name (existing or new)…')}
                 value={folderInput}
                 onChange={e => setFolderInput(e.target.value)}
                 className="sf-input"
@@ -875,7 +877,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   className="sf-btn sf-btn-secondary cursor-pointer"
                   style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  Utiliser «{folderInput.trim()}»
+                  {tr(`Utiliser «${folderInput.trim()}»`, `Use «${folderInput.trim()}»`)}
                 </button>
               )}
             </div>

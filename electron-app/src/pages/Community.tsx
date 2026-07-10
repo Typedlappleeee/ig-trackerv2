@@ -80,7 +80,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Page } from '@/components/Layout'
 import { supabase }   from '@/lib/supabase'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { useToast }   from '@/components/Toast'
 import { useOrg }     from '@/lib/orgContext'
 import { useLicense } from '@/lib/license'
@@ -216,6 +216,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
   onDelete: (id: string) => void; onMute?: (uid: string, name: string) => void
 }) {
   const t = useT()
+  const tr = useTr()
   return (
     <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'}`}>
       <div style={{ width: 34, flexShrink: 0 }}>
@@ -268,7 +269,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             {isAdmin && !isOwn && onMute && (
               <button onClick={() => onMute(msg.user_id, msg.display_name)}
                 className="w-5 h-5 flex items-center justify-center rounded sf-press"
-                style={{ color: 'rgba(251,191,36,0.6)' }} title="Masquer" aria-label="Masquer">
+                style={{ color: 'rgba(251,191,36,0.6)' }} title={tr('Masquer', 'Mute')} aria-label={tr('Masquer', 'Mute')}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
                 </svg>
@@ -277,7 +278,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
                 className="sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
-                aria-label="Supprimer">
+                aria-label={tr('Supprimer', 'Delete')}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
@@ -296,6 +297,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
   msg: Message; isAdmin: boolean; compact: boolean; onDelete: (id: string) => void
 }) {
   const t = useT()
+  const tr = useTr()
   const isAdminMsg = msg.is_admin
   return (
     <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'} ${isAdminMsg ? 'flex-row-reverse' : ''}`}>
@@ -319,7 +321,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
                 className="opacity-0 group-hover:opacity-100 transition-opacity sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
-                aria-label="Supprimer">
+                aria-label={tr('Supprimer', 'Delete')}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
@@ -348,6 +350,7 @@ function MuteModal({ targetName, onMute, onClose }: {
   targetName: string; onMute: (minutes: number) => void; onClose: () => void
 }) {
   const t = useT()
+  const tr = useTr()
   const [custom, setCustom] = useState('')
   const DURATIONS = [
     { label: t('communityMute30min'), minutes: 30 },
@@ -368,7 +371,7 @@ function MuteModal({ targetName, onMute, onClose }: {
             <p className="font-black text-white text-[14px]">{t('communityMuteTitle')} {targetName}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>{t('communityMuteDuration')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -401,6 +404,7 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
   profile: Profile; userId: string; isAdmin: boolean; onClose: () => void; onSaved: (p: Profile) => void
 }) {
   const t = useT()
+  const tr = useTr()
   const [name, setName]        = useState(profile.display_name)
   const [avatarUrl, setAUrl]   = useState(profile.avatar_url)
   const [uploading, setUpload]   = useState(false)
@@ -459,7 +463,7 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
             <p className="font-black text-white text-[15px]">{t('communityProfileTitle')}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(233,234,240,0.45)' }}>{t('communityProfileVisible')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -535,6 +539,7 @@ function CreateTopicModal({ onClose, onCreate }: {
   onCreate: (topic: { name: string; description: string; emoji: string }) => Promise<void>
 }) {
   const t = useT()
+  const tr = useTr()
   const [name, setName]     = useState('')
   const [desc, setDesc]     = useState('')
   const [emoji, setEmoji]   = useState('💬')
@@ -559,7 +564,7 @@ function CreateTopicModal({ onClose, onCreate }: {
             <p className="font-black text-white text-[15px]">{t('communityCreateTitle')}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(233,234,240,0.45)' }}>{t('communityCreateVisible')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -800,6 +805,7 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
 
 export function Community({ user, onNavigate }: CommunityProps) {
   const t = useT()
+  const tr = useTr()
   const { currentOrg } = useOrg()
   useLicense()
   const toast = useToast()
@@ -1035,7 +1041,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url }).select().single()
     if (error) {
       setMessages(prev => prev.filter(m => m.id !== optId))
-      toast.show({ title: 'Erreur publication', body: error.message, kind: 'error' })
+      toast.show({ title: tr('Erreur publication', 'Publishing error'), body: error.message, kind: 'error' })
       setNewsSend(false)
       return
     }
@@ -1404,7 +1410,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       className="sf-btn sf-btn-ghost w-full cursor-pointer"
                       style={{ opacity: loadingMore ? 0.5 : 1 }}
                     >
-                      {loadingMore ? 'Chargement…' : '↑ Charger les messages plus anciens'}
+                      {loadingMore ? tr('Chargement…', 'Loading…') : tr('↑ Charger les messages plus anciens', '↑ Load older messages')}
                     </button>
                   )}
 
@@ -1463,7 +1469,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             </button>
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); setConfirmDeleteMsg(featuredMsg.id) }}
-                                className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label="Supprimer">
+                                className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label={tr('Supprimer', 'Delete')}>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                 </svg>
@@ -1593,7 +1599,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); setConfirmDeleteMsg(msg.id) }}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1 sf-btn sf-btn-danger sf-btn-sm cursor-pointer"
-                                aria-label="Supprimer">
+                                aria-label={tr('Supprimer', 'Delete')}>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                 </svg>
@@ -1805,7 +1811,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           {canDelete && (
                             <button onClick={e => { e.stopPropagation(); setConfirmDeleteTopic(topic.id) }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
-                              aria-label="Supprimer">
+                              aria-label={tr('Supprimer', 'Delete')}>
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                               </svg>
@@ -1961,7 +1967,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                   {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'var(--muted)' }}>{timeAgo(msg.created_at)}</span>}
                                   <button onClick={() => setConfirmDeleteTopicMsg(msg.id)}
                                     className="sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
-                                    aria-label="Supprimer">
+                                    aria-label={tr('Supprimer', 'Delete')}>
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                       <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                     </svg>
@@ -2299,7 +2305,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div className="flex items-center gap-2">
                 {isAdmin && (
                   <button onClick={() => setConfirmDeleteMsg(selectedPost.id)}
-                    className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label="Supprimer">
+                    className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label={tr('Supprimer', 'Delete')}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                     </svg>
@@ -2357,9 +2363,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Confirm: delete message ───────────────────────────────────────────── */}
       <ConfirmDialog
         open={confirmDeleteMsg !== null}
-        title="Supprimer ce message ?"
-        message="Cette action est irréversible."
-        confirmLabel="Supprimer"
+        title={tr('Supprimer ce message ?', 'Delete this message?')}
+        message={tr('Cette action est irréversible.', 'This action cannot be undone.')}
+        confirmLabel={tr('Supprimer', 'Delete')}
         danger
         onConfirm={() => {
           if (confirmDeleteMsg) {
@@ -2374,9 +2380,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Confirm: delete topic ─────────────────────────────────────────────── */}
       <ConfirmDialog
         open={confirmDeleteTopic !== null}
-        title="Supprimer ce topic ?"
-        message="Le topic et tous ses messages seront définitivement supprimés."
-        confirmLabel="Supprimer"
+        title={tr('Supprimer ce topic ?', 'Delete this topic?')}
+        message={tr('Le topic et tous ses messages seront définitivement supprimés.', 'The topic and all its messages will be permanently deleted.')}
+        confirmLabel={tr('Supprimer', 'Delete')}
         danger
         onConfirm={() => {
           if (confirmDeleteTopic) deleteTopic(confirmDeleteTopic)
@@ -2388,9 +2394,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Confirm: delete topic message ────────────────────────────────────── */}
       <ConfirmDialog
         open={confirmDeleteTopicMsg !== null}
-        title="Supprimer ce message ?"
-        message="Cette action est irréversible."
-        confirmLabel="Supprimer"
+        title={tr('Supprimer ce message ?', 'Delete this message?')}
+        message={tr('Cette action est irréversible.', 'This action cannot be undone.')}
+        confirmLabel={tr('Supprimer', 'Delete')}
         danger
         onConfirm={() => {
           if (confirmDeleteTopicMsg) deleteTopicMessage(confirmDeleteTopicMsg)

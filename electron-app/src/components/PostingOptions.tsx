@@ -1,6 +1,7 @@
 import { type PostingOpts, type IntervalMode, savePostingOpts } from '@/lib/postingOpts'
 import { getProxyRotation } from '@/lib/proxyRotation'
 import { ProxyPicker } from '@/components/ProxyPicker'
+import { useTr } from '@/lib/i18n'
 
 interface Props {
   opts: PostingOpts
@@ -52,6 +53,7 @@ function IconNetwork({ size = 14, color = 'currentColor' }: { size?: number; col
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
 export function PostingOptions({ opts, onChange, phonesCount }: Props) {
+  const tr = useTr()
   function set(patch: Partial<PostingOpts>) {
     const next = { ...opts, ...patch }
     // Clamp croisé : en mode aléatoire, min ne doit jamais dépasser max
@@ -90,7 +92,7 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         </span>
         <div className="flex-1 min-w-0">
           <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Reels Trial</span>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Montré uniquement aux non-abonnés</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{tr('Montré uniquement aux non-abonnés', 'Shown only to non-followers')}</p>
         </div>
         <button
           onClick={() => set({ reelsTrial: !opts.reelsTrial })}
@@ -107,8 +109,8 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           <IconTrash size={14} />
         </span>
         <div className="flex-1 min-w-0">
-          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Usage unique</span>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Supprime la vidéo de la banque une fois publiée</p>
+          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>{tr('Usage unique', 'Single use')}</span>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{tr('Supprime la vidéo de la banque une fois publiée', 'Removes the video from the bank once posted')}</p>
         </div>
         <button
           onClick={() => set({ deleteAfterPost: !opts.deleteAfterPost })}
@@ -127,7 +129,7 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           <IconTimer size={14} />
         </span>
         <span className="flex-1 text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>
-          Intervalle entre posts
+          {tr('Intervalle entre posts', 'Interval between posts')}
         </span>
         <button
           onClick={() => onChange({ ...opts, intervalMode: on ? 'none' : 'fixed' })}
@@ -139,8 +141,8 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
       </div>
       {on && (
         <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)', margin: 0, paddingLeft: 26 }}>
-          1er post immédiat, puis +{intervalLabel} min par téléphone
-          {lastPostEstimate ? ` — dernier post vers ~${lastPostEstimate}` : ''}
+          {tr(`1er post immédiat, puis +${intervalLabel} min par téléphone`, `First post immediate, then +${intervalLabel} min per phone`)}
+          {lastPostEstimate ? tr(` — dernier post vers ~${lastPostEstimate}`, ` — last post around ~${lastPostEstimate}`) : ''}
         </p>
       )}
       {on && (
@@ -154,7 +156,7 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
                 style={opts.intervalMode === m
                   ? { background: 'linear-gradient(130deg,#6366F1,#818CF8)', color: '#fff' }
                   : { color: 'rgba(148,163,184,0.5)' }}>
-                {m === 'fixed' ? 'Fixe' : 'Aléatoire'}
+                {m === 'fixed' ? tr('Fixe', 'Fixed') : tr('Aléatoire', 'Random')}
               </button>
             ))}
           </div>
@@ -193,11 +195,11 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="7" y="3" width="10" height="14" rx="2"/><path d="M4 7v12a2 2 0 0 0 2 2h9"/></svg>
           </span>
           <div className="flex-1 min-w-0">
-            <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Téléphones simultanés</span>
-            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Combien de téléphones postent en même temps · « Tous » par défaut</p>
+            <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>{tr('Téléphones simultanés', 'Simultaneous phones')}</span>
+            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{tr('Combien de téléphones postent en même temps · « Tous » par défaut', 'How many phones post at the same time · "All" by default')}</p>
           </div>
           <input type="number" min={0} max={200} value={opts.maxConcurrent || ''}
-            placeholder="Tous"
+            placeholder={tr('Tous', 'All')}
             onChange={e => set({ maxConcurrent: Math.max(0, parseInt(e.target.value) || 0) })}
             className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none flex-shrink-0"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
@@ -211,16 +213,16 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
         </span>
         <div className="flex-1 min-w-0">
           <span className="text-[13px] font-medium inline-flex items-center gap-1.5" style={{ color: 'rgba(226,232,240,0.7)' }}>
-            Proxy rotatif
+            {tr('Proxy rotatif', 'Rotating proxy')}
             {(() => {
               const rot = getProxyRotation()
               const configured = rot.enabled && rot.urls.some(u => /^https?:\/\//i.test(u.trim()))
               return configured ? null : (
-                <span title="Rotation d'IP non configurée — risque de ban. Active-la dans Paramètres → Rotation d'IP proxy." style={{ width: 7, height: 7, borderRadius: '50%', background: '#F87171', boxShadow: '0 0 6px rgba(248,113,113,0.9)', flexShrink: 0, animation: 'pulse 1.6s ease-in-out infinite' }} />
+                <span title={tr("Rotation d'IP non configurée — risque de ban. Active-la dans Paramètres → Rotation d'IP proxy.", 'IP rotation not configured — ban risk. Enable it in Settings → Proxy IP rotation.')} style={{ width: 7, height: 7, borderRadius: '50%', background: '#F87171', boxShadow: '0 0 6px rgba(248,113,113,0.9)', flexShrink: 0, animation: 'pulse 1.6s ease-in-out infinite' }} />
               )
             })()}
           </span>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Change l'IP avant chaque téléphone</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{tr("Change l'IP avant chaque téléphone", 'Changes the IP before each phone')}</p>
         </div>
         <button
           onClick={() => set({ rotatingProxy: !opts.rotatingProxy, ...(!opts.rotatingProxy ? { intervalMode: 'none' as IntervalMode } : {}) })}
@@ -242,8 +244,8 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
             <div>
-              <p className="text-[12px] font-semibold" style={{ color: '#34D399', margin: 0 }}>Rotation d'IP active</p>
-              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.65)', margin: '2px 0 0' }}>Une IP fraîche est déclenchée avant chaque post ✓</p>
+              <p className="text-[12px] font-semibold" style={{ color: '#34D399', margin: 0 }}>{tr("Rotation d'IP active", 'IP rotation active')}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.65)', margin: '2px 0 0' }}>{tr('Une IP fraîche est déclenchée avant chaque post ✓', 'A fresh IP is triggered before each post ✓')}</p>
             </div>
           </div>
         ) : (
@@ -253,9 +255,9 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
           }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
             <div>
-              <p className="text-[12px] font-bold" style={{ color: '#F87171', margin: 0 }}>Rotation d'IP non configurée — risque de ban ⚠</p>
+              <p className="text-[12px] font-bold" style={{ color: '#F87171', margin: 0 }}>{tr("Rotation d'IP non configurée — risque de ban ⚠", 'IP rotation not configured — ban risk ⚠')}</p>
               <p className="text-[11px] mt-0.5" style={{ color: 'rgba(226,232,240,0.7)', margin: '3px 0 0', lineHeight: 1.5 }}>
-                Poster plusieurs comptes sur la même IP fait bannir. Active la rotation dans <strong style={{ color: '#fff' }}>Paramètres → Connexions → Rotation d'IP proxy</strong> et colle ton lien de changement d'IP.
+                {tr('Poster plusieurs comptes sur la même IP fait bannir. Active la rotation dans ', 'Posting several accounts on the same IP gets you banned. Enable rotation in ')}<strong style={{ color: '#fff' }}>{tr("Paramètres → Connexions → Rotation d'IP proxy", 'Settings → Connections → Proxy IP rotation')}</strong>{tr(" et colle ton lien de changement d'IP.", ' and paste your IP-change link.')}
               </p>
             </div>
           </div>

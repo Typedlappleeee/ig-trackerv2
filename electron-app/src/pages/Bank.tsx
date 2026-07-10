@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { zipSync } from 'fflate'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessBankFolder, canDoAction } from '@/lib/permissions'
 import { uploadVideoFromPath, uploadVideoFromBlob, deleteStorageObjects, type UploadScope } from '@/lib/storage'
@@ -238,12 +238,13 @@ function DescriptionModal({ item, onSave, onClose }: {
   onClose: () => void
 }) {
   const t = useT()
+  const tr = useTr()
   const [val, setVal] = useState(getItemDesc(item))
   return (
     <div className="sf-modal-bg" onClick={onClose}>
       <div className="sf-modal w-96 anim-scale-in" onClick={e => e.stopPropagation()}>
         <div className="sf-modal-header">
-          <h3 className="sf-modal-title">Description de la vidéo</h3>
+          <h3 className="sf-modal-title">{tr('Description de la vidéo', 'Video description')}</h3>
           <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label={t('cancel')}>
             <IconX size={15} />
           </button>
@@ -252,7 +253,7 @@ function DescriptionModal({ item, onSave, onClose }: {
           <textarea
             autoFocus
             rows={5}
-            placeholder="Légende qui sera pré-remplie quand tu postes cette vidéo… (facultatif)"
+            placeholder={tr('Légende qui sera pré-remplie quand tu postes cette vidéo… (facultatif)', 'Caption that will be pre-filled when you post this video… (optional)')}
             className="sf-input w-full resize-none"
             value={val}
             maxLength={2200}
@@ -260,7 +261,7 @@ function DescriptionModal({ item, onSave, onClose }: {
             onKeyDown={e => { if (e.key === 'Escape') onClose() }}
           />
           <div className="flex items-center justify-between">
-            <p className="text-[11px] text-text3">Facultatif — sert de légende par défaut au post.</p>
+            <p className="text-[11px] text-text3">{tr('Facultatif — sert de légende par défaut au post.', 'Optional — used as the default caption for the post.')}</p>
             <span className="text-[11px] text-text3" style={{ fontVariantNumeric: 'tabular-nums' }}>{val.length}/2200</span>
           </div>
           <div className="flex gap-2 justify-end">
@@ -374,6 +375,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
 
 export function Bank({ user }: BankProps) {
   const t = useT()
+  const tr = useTr()
   const toast = useToast()
   const { currentOrg, role, perms } = useOrg()
   const [personalMode, setPersonalMode] = useState(false)
@@ -462,13 +464,13 @@ export function Bank({ user }: BankProps) {
     setDeleteBusy(false)
     setConfirmBulkDelete(false)
     if (err) {
-      toast.show({ title: 'Suppression échouée', body: err.message, kind: 'error' })
+      toast.show({ title: tr('Suppression échouée', 'Deletion failed'), body: err.message, kind: 'error' })
       return
     }
     deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
     setItems(prev => prev.filter(i => !ids.includes(i.id)))
     exitSelection()
-    toast.show({ title: `${ids.length} média${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`, kind: 'ok' })
+    toast.show({ title: tr(`${ids.length} média${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`, `${ids.length} media deleted`), kind: 'ok' })
   }
 
   async function moveSelected(folder: string | null) {
@@ -476,7 +478,7 @@ export function Bank({ user }: BankProps) {
     const ids = [...selectedIds]
     const { error: err } = await supabase.from('content_bank').update({ folder }).in('id', ids)
     if (err) {
-      toast.show({ title: 'Déplacement échoué', body: err.message, kind: 'error' })
+      toast.show({ title: tr('Déplacement échoué', 'Move failed'), body: err.message, kind: 'error' })
       return
     }
     setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, folder: folder as unknown as string } : i))
@@ -513,7 +515,7 @@ export function Bank({ user }: BankProps) {
       let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, from + PAGE - 1)
       q = scopeQ(q)
       const { data, error: err } = await q
-      if (err) { setError('Erreur lors du chargement.'); setLoading(false); return }
+      if (err) { setError(tr('Erreur lors du chargement.', 'Error while loading.')); setLoading(false); return }
       const rows = (data ?? []) as ContentItem[]
       if (rows.length > 0 && !hasMigrationIssue && !('folder' in rows[0])) hasMigrationIssue = true
       allRows = allRows.concat(rows)
@@ -587,7 +589,7 @@ export function Bank({ user }: BankProps) {
     }
 
     if (res.error) {
-      setError("Erreur lors de l’ajout : " + res.error.message)
+      setError(tr("Erreur lors de l’ajout : ", "Error while adding: ") + res.error.message)
       await deleteStorageObjects([opts.storagePath, opts.thumbnailPath])
       return
     }
@@ -596,10 +598,10 @@ export function Bank({ user }: BankProps) {
 
   function uploadProgressLabels(phase: string): string {
     const labels: Record<string, string> = {
-      'reading':          'Lecture du fichier…',
-      'uploading-video':  'Envoi du fichier…',
-      'thumbnail':        'Génération de la miniature…',
-      'uploading-thumb':  'Envoi de la miniature…',
+      'reading':          tr('Lecture du fichier…', 'Reading file…'),
+      'uploading-video':  tr('Envoi du fichier…', 'Uploading file…'),
+      'thumbnail':        tr('Génération de la miniature…', 'Generating thumbnail…'),
+      'uploading-thumb':  tr('Envoi de la miniature…', 'Uploading thumbnail…'),
     }
     return labels[phase] ?? ''
   }
@@ -609,7 +611,7 @@ export function Bank({ user }: BankProps) {
     const title = nameWithoutExt(filePath)
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
-    setAdding(true); setUploadStatus(`Lecture de ${basename(filePath)}…`)
+    setAdding(true); setUploadStatus(tr(`Lecture de ${basename(filePath)}…`, `Reading ${basename(filePath)}…`))
     try {
       const { storagePath, thumbnailPath } = await uploadVideoFromPath(filePath, scope, phase => setUploadStatus(uploadProgressLabels(phase)))
       await insertBankRow({ title, storagePath, thumbnailPath })
@@ -641,14 +643,14 @@ export function Bank({ user }: BankProps) {
   async function reuploadItem(item: ContentItem) {
     if (!item.file_url) return
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
-    setUploadStatus(`Migration de ${item.title}…`)
+    setUploadStatus(tr(`Migration de ${item.title}…`, `Migrating ${item.title}…`))
     try {
       const { storagePath, thumbnailPath } = await uploadVideoFromPath(item.file_url, scope, phase => {
         const labels: Record<string, string> = {
-          'reading':          'Lecture du fichier local…',
-          'uploading-video':  'Envoi du fichier…',
-          'thumbnail':        'Génération de la miniature…',
-          'uploading-thumb':  'Envoi de la miniature…',
+          'reading':          tr('Lecture du fichier local…', 'Reading local file…'),
+          'uploading-video':  tr('Envoi du fichier…', 'Uploading file…'),
+          'thumbnail':        tr('Génération de la miniature…', 'Generating thumbnail…'),
+          'uploading-thumb':  tr('Envoi de la miniature…', 'Uploading thumbnail…'),
         }
         setUploadStatus(`${item.title} : ${labels[phase] ?? ''}`)
       })
@@ -674,7 +676,7 @@ export function Bank({ user }: BankProps) {
     const picker = api.pickAnyFile ?? api.pickVideoFile
     if (!picker) return
     const p = await (api.pickAnyFile
-      ? api.pickAnyFile({ filters: [{ name: 'Médias', extensions: ['mp4','mov','avi','mkv','webm','m4v','jpg','jpeg','png','webp','gif','bmp','heic'] }] })
+      ? api.pickAnyFile({ filters: [{ name: tr('Médias', 'Media'), extensions: ['mp4','mov','avi','mkv','webm','m4v','jpg','jpeg','png','webp','gif','bmp','heic'] }] })
       : api.pickVideoFile())
     if (!p) return
     // blob: URL from web mode — get the File object from in-memory store
@@ -716,20 +718,20 @@ export function Bank({ user }: BankProps) {
     setDeleteBusy(false)
     setConfirmDeleteItem(null)
     if (err) {
-      toast.show({ title: 'Suppression échouée', body: err.message, kind: 'error' })
+      toast.show({ title: tr('Suppression échouée', 'Deletion failed'), body: err.message, kind: 'error' })
       return
     }
     setItems(prev => prev.filter(i => i.id !== item.id))
     deleteStorageObjects([item.storage_path, item.thumbnail_path])
     logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_delete', details: { title: item.title, folder: item.folder } })
-    toast.show({ title: 'Média supprimé', kind: 'ok' })
+    toast.show({ title: tr('Média supprimé', 'Media deleted'), kind: 'ok' })
   }
 
   async function renameItemSave(id: string, newTitle: string) {
     if (!newTitle) return
     const { error: err } = await supabase.from('content_bank').update({ title: newTitle }).eq('id', id)
     if (err) {
-      toast.show({ title: 'Renommage échoué', body: err.message, kind: 'error' })
+      toast.show({ title: tr('Renommage échoué', 'Rename failed'), body: err.message, kind: 'error' })
       return
     }
     setItems(prev => prev.map(i => i.id === id ? { ...i, title: newTitle } : i))
@@ -744,7 +746,7 @@ export function Bank({ user }: BankProps) {
       ({ error: err } = await supabase.from('content_bank').update({ notes: description }).eq('id', id))
     }
     if (err) {
-      toast.show({ title: 'Description échouée', body: err.message, kind: 'error' })
+      toast.show({ title: tr('Description échouée', 'Description update failed'), body: err.message, kind: 'error' })
       return
     }
     setItems(prev => prev.map(i => i.id === id ? { ...i, description, notes: description } : i))
@@ -753,7 +755,7 @@ export function Bank({ user }: BankProps) {
   async function moveItemSave(id: string, folder: string | null) {
     const { error: err } = await supabase.from('content_bank').update({ folder }).eq('id', id)
     if (err) {
-      toast.show({ title: 'Déplacement échoué', body: err.message, kind: 'error' })
+      toast.show({ title: tr('Déplacement échoué', 'Move failed'), body: err.message, kind: 'error' })
       return
     }
     setItems(prev => prev.map(i => i.id === id ? { ...i, folder: folder as unknown as string } : i))
@@ -762,7 +764,7 @@ export function Bank({ user }: BankProps) {
   async function saveTagsSave(id: string, newTags: string[]) {
     const { error: err } = await supabase.from('content_bank').update({ tags: newTags }).eq('id', id)
     if (err) {
-      toast.show({ title: 'Mise à jour des tags échouée', body: err.message, kind: 'error' })
+      toast.show({ title: tr('Mise à jour des tags échouée', 'Tag update failed'), body: err.message, kind: 'error' })
       return
     }
     setItems(prev => prev.map(i => i.id === id ? { ...i, tags: newTags } : i))
@@ -951,14 +953,14 @@ export function Bank({ user }: BankProps) {
                 className={`sf-tab cursor-pointer flex items-center gap-1.5 ${!personalMode ? 'active' : ''}`}
               >
                 <IconUsers size={11} />
-                Orga
+                {tr('Orga', 'Org')}
               </button>
               <button
                 onClick={() => { setPersonalMode(true); setSelectedFolder(null) }}
                 className={`sf-tab cursor-pointer flex items-center gap-1.5 ${personalMode ? 'active' : ''}`}
               >
                 <IconUser size={11} />
-                Perso
+                {tr('Perso', 'Personal')}
               </button>
             </div>
           )}
@@ -1079,20 +1081,20 @@ export function Bank({ user }: BankProps) {
           onChange={e => setSortBy(e.target.value as typeof sortBy)}
           className="sf-input cursor-pointer"
           style={{ height: 28, fontSize: 11, padding: '0 8px', width: 'auto' }}
-          title="Trier"
+          title={tr('Trier', 'Sort')}
         >
-          <option value="date-desc">Récent → ancien</option>
-          <option value="date-asc">Ancien → récent</option>
-          <option value="name">Nom (A→Z)</option>
-          <option value="duration">Durée</option>
+          <option value="date-desc">{tr('Récent → ancien', 'Newest → oldest')}</option>
+          <option value="date-asc">{tr('Ancien → récent', 'Oldest → newest')}</option>
+          <option value="name">{tr('Nom (A→Z)', 'Name (A→Z)')}</option>
+          <option value="duration">{tr('Durée', 'Duration')}</option>
         </select>
         <button
           onClick={() => setHideUsed(v => !v)}
           className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer px-3 py-1 rounded-lg text-[11px] font-semibold"
           style={hideUsed ? { background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.35)', color: 'var(--accent-lt)' } : {}}
-          title="Masquer les vidéos déjà utilisées (usage unique)"
+          title={tr('Masquer les vidéos déjà utilisées (usage unique)', 'Hide already-used videos (single use)')}
         >
-          {hideUsed ? '✓ ' : ''}Masquer utilisées
+          {hideUsed ? '✓ ' : ''}{tr('Masquer utilisées', 'Hide used')}
         </button>
 
         <div className="flex-1" />
@@ -1263,10 +1265,10 @@ export function Bank({ user }: BankProps) {
                       setZipProgress(null)
                     }
                     if (!Object.keys(files).length) {
-                      toast.show({ title: 'Téléchargement impossible', body: 'Aucune vidéo n\u2019a pu être récupérée.', kind: 'error' })
+                      toast.show({ title: tr('Téléchargement impossible', 'Download failed'), body: tr('Aucune vidéo n\u2019a pu être récupérée.', 'No video could be retrieved.'), kind: 'error' })
                       return
                     }
-                    if (failed > 0) toast.show({ title: 'ZIP incomplet', body: `${failed} vidéo${failed > 1 ? 's' : ''} n\u2019a pas pu être incluse dans le ZIP.`, kind: 'warn' })
+                    if (failed > 0) toast.show({ title: tr('ZIP incomplet', 'Incomplete ZIP'), body: tr(`${failed} vidéo${failed > 1 ? 's' : ''} n\u2019a pas pu être incluse dans le ZIP.`, `${failed} video${failed > 1 ? 's' : ''} could not be added to the ZIP.`), kind: 'warn' })
                     const zipped = zipSync(files, { level: 0 })
                     const blob = new Blob([zipped], { type: 'application/zip' })
                     const url = URL.createObjectURL(blob)
@@ -1284,7 +1286,7 @@ export function Bank({ user }: BankProps) {
                 {zipProgress ? <span className="sf-spinner" /> : <IconDownload size={11} />}
                 {zipProgress
                   ? `ZIP ${zipProgress.done}/${zipProgress.total}…`
-                  : selectedIds.size > 5 ? `ZIP (${selectedIds.size})` : `Télécharger (${selectedIds.size})`}
+                  : selectedIds.size > 5 ? `ZIP (${selectedIds.size})` : tr(`Télécharger (${selectedIds.size})`, `Download (${selectedIds.size})`)}
               </button>
 
               <button
@@ -1314,8 +1316,8 @@ export function Bank({ user }: BankProps) {
             >
               <span className="flex-shrink-0 mt-0.5 text-warn"><IconAlertTriangle size={16} /></span>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-warn">Migration requise — colonne "folder" manquante</p>
-                <p className="text-[11px] mt-0.5 text-text2">Colle ce SQL dans Supabase → SQL Editor → Run :</p>
+                <p className="text-[13px] font-semibold text-warn">{tr('Migration requise — colonne "folder" manquante', 'Migration required — "folder" column missing')}</p>
+                <p className="text-[11px] mt-0.5 text-text2">{tr('Colle ce SQL dans Supabase → SQL Editor → Run :', 'Paste this SQL into Supabase → SQL Editor → Run:')}</p>
                 <code className="text-[11px] font-mono block mt-1 text-text2">{MIGRATION_SQL.trim()}</code>
               </div>
               <button
@@ -1415,7 +1417,7 @@ export function Bank({ user }: BankProps) {
                       onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
                       className="sf-btn sf-btn-secondary cursor-pointer"
                     >
-                      Voir plus ({visible.length - visibleCount} restants)
+                      {tr(`Voir plus (${visible.length - visibleCount} restants)`, `Show more (${visible.length - visibleCount} left)`)}
                     </button>
                   </div>
                 )}
@@ -1499,7 +1501,7 @@ export function Bank({ user }: BankProps) {
                     onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
                     className="sf-btn sf-btn-secondary cursor-pointer"
                   >
-                    Voir plus ({visible.length - visibleCount} restants)
+                    {tr(`Voir plus (${visible.length - visibleCount} restants)`, `Show more (${visible.length - visibleCount} left)`)}
                   </button>
                 </div>
               )}
@@ -1550,12 +1552,12 @@ export function Bank({ user }: BankProps) {
             },
             {
               icon: <IconPencil size={12} />,
-              label: 'Description',
+              label: tr('Description', 'Description'),
               action: () => { setDescItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
               icon: <IconDownload size={12} />,
-              label: 'Télécharger',
+              label: tr('Télécharger', 'Download'),
               action: async () => {
                 const it = ctxMenu.item
                 setCtxMenu(null)
@@ -1734,7 +1736,7 @@ export function Bank({ user }: BankProps) {
       <ConfirmDialog
         open={!!confirmDeleteItem}
         title={t('bankCtxDelete')}
-        message={confirmDeleteItem ? `« ${confirmDeleteItem.title} » sera définitivement supprimé.` : ''}
+        message={confirmDeleteItem ? tr(`« ${confirmDeleteItem.title} » sera définitivement supprimé.`, `“${confirmDeleteItem.title}” will be permanently deleted.`) : ''}
         confirmLabel={t('bankCtxDelete')}
         danger
         busy={deleteBusy}
@@ -1746,7 +1748,7 @@ export function Bank({ user }: BankProps) {
       <ConfirmDialog
         open={confirmBulkDelete}
         title={`${t('bankDeleteSelected')} (${selectedIds.size})`}
-        message={`${selectedIds.size} éléments seront définitivement supprimés.`}
+        message={tr(`${selectedIds.size} éléments seront définitivement supprimés.`, `${selectedIds.size} items will be permanently deleted.`)}
         confirmLabel={t('bankDeleteSelected')}
         danger
         busy={deleteBusy}
@@ -2113,6 +2115,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
   onToggleSelect?: (e?: React.MouseEvent) => void
 }) {
   const t = useT()
+  const tr = useTr()
   return (
     <div
       draggable={!selectionMode}
@@ -2220,7 +2223,7 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
           <button
             className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-text2 hover:text-text hover:bg-surface2 transition-colors"
             onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
-            title="Options"
+            title={tr('Options', 'Options')}
           >
             <IconMoreVert size={13} />
           </button>
@@ -2255,6 +2258,7 @@ export interface BankPickerProps {
 
 export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full' }: BankPickerProps) {
   const t = useT()
+  const tr = useTr()
   const { currentOrg, role, perms } = useOrg()
   const [items, setItems]           = useState<ContentItem[]>([])
   const [loading, setLoading]       = useState(true)
@@ -2461,7 +2465,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                           return next
                         })
                       }}
-                      title={allSel ? `Retirer le dossier "${f}"` : `Sélectionner tout le dossier "${f}"`}
+                      title={allSel ? tr(`Retirer le dossier "${f}"`, `Deselect folder "${f}"`) : tr(`Sélectionner tout le dossier "${f}"`, `Select entire folder "${f}"`)}
                       className="flex-shrink-0 flex items-center justify-center cursor-pointer rounded"
                       style={{
                         width: 15, height: 15,
@@ -2535,7 +2539,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
             {visible.length > shownCount && (
               <div className="flex justify-center py-4">
                 <button onClick={() => setShownCount(c => c + 120)} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">
-                  Voir plus ({visible.length - shownCount})
+                  {tr(`Voir plus (${visible.length - shownCount})`, `Show more (${visible.length - shownCount})`)}
                 </button>
               </div>
             )}

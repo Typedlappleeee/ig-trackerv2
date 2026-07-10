@@ -15,11 +15,13 @@
  * Ne s'affiche que s'il y a au moins 2 proxys configurés (sinon rien à choisir).
  */
 import { listRotationProxies } from '@/lib/proxyRotation'
+import { useTr } from '@/lib/i18n'
 
 export function ProxyPicker({ selected, onChange }: {
   selected: string[]
   onChange: (urls: string[]) => void
 }) {
+  const tr = useTr()
   const proxies = listRotationProxies()
   if (proxies.length < 2) return null   // 0-1 proxy → aucun choix à faire
 
@@ -62,20 +64,20 @@ export function ProxyPicker({ selected, onChange }: {
     <div className="pl-[26px]" style={{ marginTop: 4 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
         <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.7)', fontWeight: 600 }}>
-          Proxys de ce lancement
+          {tr('Proxys de ce lancement', 'Proxies for this run')}
         </span>
         <span className="text-[10.5px]" style={{ color: 'rgba(148,163,184,0.45)' }}>
-          {allMode ? `tous (${proxies.length})` : `${sel.length}/${proxies.length}`}
+          {allMode ? tr(`tous (${proxies.length})`, `all (${proxies.length})`) : `${sel.length}/${proxies.length}`}
         </span>
       </div>
       <p className="text-[10.5px]" style={{ color: 'rgba(148,163,184,0.45)', margin: '0 0 8px', lineHeight: 1.5 }}>
-        Choisis le(s) proxy sur le(s)quel(s) sont ces téléphones. Seule leur IP sera changée — tu peux lancer un autre post sur un autre proxy en parallèle.
+        {tr('Choisis le(s) proxy sur le(s)quel(s) sont ces téléphones. Seule leur IP sera changée — tu peux lancer un autre post sur un autre proxy en parallèle.', 'Choose which proxy(ies) these phones are on. Only their IP will be rotated — you can launch another post on a different proxy in parallel.')}
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {/* Puce « Tous » */}
         <button onClick={selectAll} className="text-[11.5px] font-semibold transition-all" style={chip(allMode)}>
           <span style={box(allMode)}>{allMode && check}</span>
-          Tous
+          {tr('Tous', 'All')}
         </button>
         {proxies.map(p => (
           <button

@@ -13,6 +13,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, fetchAllRows, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { useTr } from '@/lib/i18n'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { pollAllNow } from '@/lib/igStatsPoller'
 import { useToast } from '@/components/Toast'
@@ -89,11 +90,12 @@ function buildSeries(
 function LineChart({ data, color, height = 120 }: {
   data: { date: string; value: number }[]; color: string; height?: number
 }) {
+  const tr = useTr()
   const W = 600, H = height, PAD = 6
   if (data.length < 2 || data.every(d => d.value === 0)) {
     return (
       <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: FAINT, fontSize: 12, textAlign: 'center', padding: '0 20px' }}>
-        Pas encore assez de données — les courbes apparaissent après quelques jours de collecte.
+        {tr('Pas encore assez de données — les courbes apparaissent après quelques jours de collecte.', 'Not enough data yet — charts appear after a few days of collection.')}
       </div>
     )
   }
@@ -136,6 +138,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 function Kpi({ label, value, delta, sub, accent }: {
   label: string; value: string; delta?: number | null; sub?: string; accent?: boolean
 }) {
+  const tr = useTr()
   const up = (delta ?? 0) >= 0
   return (
     <div style={{ flex: 1, minWidth: 150, padding: '16px 20px', background: BG2, border: `1px solid ${accent ? 'rgba(99,102,241,0.22)' : HAIR}`, borderRadius: 12 }}>
@@ -143,7 +146,7 @@ function Kpi({ label, value, delta, sub, accent }: {
       <p style={{ fontSize: 26, fontWeight: 800, color: IVORY, marginTop: 6, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</p>
       {delta !== undefined && delta !== null && (
         <p style={{ fontSize: 12, fontWeight: 600, color: delta === 0 ? FAINT : up ? OK : ERR, marginTop: 8 }}>
-          {up && delta !== 0 ? '▲' : delta !== 0 ? '▼' : '•'} {fmtSigned(delta)} <span style={{ color: FAINT, fontWeight: 500 }}>sur la période</span>
+          {up && delta !== 0 ? '▲' : delta !== 0 ? '▼' : '•'} {fmtSigned(delta)} <span style={{ color: FAINT, fontWeight: 500 }}>{tr('sur la période', 'over the period')}</span>
         </p>
       )}
       {sub && <p style={{ fontSize: 11.5, color: FAINT, marginTop: 8 }}>{sub}</p>}
@@ -155,6 +158,7 @@ interface Row { phone: Phone; spark: number[]; growth: number | null; growthPct:
 
 export function Stats({ user }: StatsProps) {
   const { currentOrg, role, perms } = useOrg()
+  const tr = useTr()
   const toast = useToast()
   const [phones, setPhones]       = useState<Phone[]>([])
   const [snaps, setSnaps]         = useState<Snapshot[]>([])
@@ -280,9 +284,9 @@ export function Stats({ user }: StatsProps) {
     try {
       const n = await pollAllNow()
       await Promise.all([loadPhones(), loadHistory()])
-      toast.show({ title: 'Actualisé', body: `${n} compte(s) rafraîchi(s)`, kind: 'ok' })
+      toast.show({ title: tr('Actualisé', 'Refreshed'), body: tr(`${n} compte(s) rafraîchi(s)`, `${n} account(s) refreshed`), kind: 'ok' })
     } catch {
-      toast.show({ title: 'Erreur', body: 'Actualisation échouée', kind: 'error' })
+      toast.show({ title: tr('Erreur', 'Error'), body: tr('Actualisation échouée', 'Refresh failed'), kind: 'error' })
     } finally { setRefreshing(false) }
   }
 
@@ -300,7 +304,7 @@ export function Stats({ user }: StatsProps) {
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: IVORY }}>Analytics</h1>
             <p style={{ fontSize: 13, color: MUTED, marginTop: 3 }}>
-              {filtered.length} compte{filtered.length > 1 ? 's' : ''}{groupFilter !== 'all' ? ` · ${groupFilter}` : ''} · collecte automatique
+              {filtered.length} {tr(filtered.length > 1 ? 'comptes' : 'compte', filtered.length > 1 ? 'accounts' : 'account')}{groupFilter !== 'all' ? ` · ${groupFilter}` : ''} · {tr('collecte automatique', 'automatic collection')}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -310,26 +314,26 @@ export function Stats({ user }: StatsProps) {
                   padding: '6px 12px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, border: 'none',
                   background: period === p ? 'rgba(99,102,241,0.16)' : 'transparent',
                   color: period === p ? ACCENT_L : MUTED, transition: 'all 0.15s',
-                }}>{p}j</button>
+                }}>{tr(`${p}j`, `${p}d`)}</button>
               ))}
             </div>
             <button onClick={refresh} disabled={refreshing} className="cursor-pointer" style={{
               padding: '7px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 600,
               background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.32)',
               color: ACCENT_L, opacity: refreshing ? 0.6 : 1,
-            }}>{refreshing ? 'Actualisation…' : '↻ Actualiser'}</button>
+            }}>{refreshing ? tr('Actualisation…', 'Refreshing…') : tr('↻ Actualiser', '↻ Refresh')}</button>
           </div>
         </div>
 
         {/* Filters */}
         {phones.length > 0 && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un compte…"
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher un compte…', 'Search an account…')}
               style={{ flex: 1, minWidth: 180, height: 34, padding: '0 12px', fontSize: 13, color: IVORY, background: BG2, border: `1px solid ${HAIR}`, borderRadius: 9, outline: 'none' }} />
             {groups.length > 0 && (
               <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="cursor-pointer"
                 style={{ height: 34, padding: '0 10px', fontSize: 12.5, color: groupFilter === 'all' ? MUTED : ACCENT_L, background: BG2, border: `1px solid ${HAIR}`, borderRadius: 9, outline: 'none' }}>
-                <option value="all">Tous les groupes</option>
+                <option value="all">{tr('Tous les groupes', 'All groups')}</option>
                 {groups.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             )}
@@ -337,30 +341,30 @@ export function Stats({ user }: StatsProps) {
         )}
 
         {loading ? (
-          <div style={{ padding: 80, textAlign: 'center', color: FAINT }}>Chargement…</div>
+          <div style={{ padding: 80, textAlign: 'center', color: FAINT }}>{tr('Chargement…', 'Loading…')}</div>
         ) : phones.length === 0 ? (
           <div style={{ padding: 60, textAlign: 'center', color: MUTED, ...card }}>
-            Aucun compte avec un pseudo Instagram. Ajoute le pseudo IG de tes téléphones pour démarrer le suivi.
+            {tr('Aucun compte avec un pseudo Instagram. Ajoute le pseudo IG de tes téléphones pour démarrer le suivi.', 'No account with an Instagram handle. Add your phones\' IG handles to start tracking.')}
           </div>
         ) : (
           <>
             {/* KPI row */}
             <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-              <Kpi label="Followers"  value={fmtCompact(totals.followers)} delta={followersDelta} sub={followersPct !== null ? `${fmtPct(followersPct)} sur la période` : undefined} accent />
-              <Kpi label="Vues totales" value={fmtCompact(totals.views)}   delta={viewsDelta} />
+              <Kpi label="Followers"  value={fmtCompact(totals.followers)} delta={followersDelta} sub={followersPct !== null ? tr(`${fmtPct(followersPct)} sur la période`, `${fmtPct(followersPct)} over the period`) : undefined} accent />
+              <Kpi label={tr('Vues totales', 'Total views')} value={fmtCompact(totals.views)}   delta={viewsDelta} />
               <Kpi label="Posts"       value={fmtCompact(totals.posts)} />
-              <Kpi label="Vues / post" value={avgViewsPerPost !== null ? fmtCompact(avgViewsPerPost) : '—'} sub="moyenne" />
+              <Kpi label={tr('Vues / post', 'Views / post')} value={avgViewsPerPost !== null ? fmtCompact(avgViewsPerPost) : '—'} sub={tr('moyenne', 'average')} />
             </div>
 
             {/* Santé de la flotte */}
             <div style={{ ...card, padding: '14px 18px', marginBottom: 18, display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: IVORY }}>Santé de la flotte</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: IVORY }}>{tr('Santé de la flotte', 'Fleet health')}</span>
               {[
-                { label: 'Comptes', val: fleet.total, color: IVORY },
-                { label: 'Sains', val: fleet.healthy, color: '#22C55E' },
+                { label: tr('Comptes', 'Accounts'), val: fleet.total, color: IVORY },
+                { label: tr('Sains', 'Healthy'), val: fleet.healthy, color: '#22C55E' },
                 { label: 'Shadowban', val: fleet.shadow, color: '#F59E0B' },
-                { label: 'Bloqués', val: fleet.banned, color: '#EF4444' },
-                { label: 'Silencieux 3j+', val: fleet.silent, color: '#94A3B8' },
+                { label: tr('Bloqués', 'Blocked'), val: fleet.banned, color: '#EF4444' },
+                { label: tr('Silencieux 3j+', 'Silent 3d+'), val: fleet.silent, color: '#94A3B8' },
               ].map(m => (
                 <div key={m.label} style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: 18, fontWeight: 800, color: m.color, fontVariantNumeric: 'tabular-nums' }}>{m.val}</span>
@@ -372,39 +376,39 @@ export function Stats({ user }: StatsProps) {
             {/* Charts */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
               <div style={{ ...card, padding: '16px 18px' }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>Followers · {period}j</p>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>Followers · {tr(`${period}j`, `${period}d`)}</p>
                 <LineChart data={followersSeries} color={ACCENT} />
               </div>
               <div style={{ ...card, padding: '16px 18px' }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>Vues · {period}j</p>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>{tr('Vues', 'Views')} · {tr(`${period}j`, `${period}d`)}</p>
                 <LineChart data={viewsSeries} color={OK} />
               </div>
             </div>
             <div style={{ ...card, padding: '16px 18px', marginBottom: 18 }}>
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>Posts · {period}j</p>
+              <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>Posts · {tr(`${period}j`, `${period}d`)}</p>
               <LineChart data={postsSeries} color={ACCENT_L} height={90} />
             </div>
 
             {/* Top movers */}
             {(movers.up.length > 0 || movers.down.length > 0) && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
-                <MoversCard title="📈 Meilleures progressions" rows={movers.up} positive onPick={setDetail} />
-                <MoversCard title="📉 Régressions" rows={movers.down} positive={false} onPick={setDetail} />
+                <MoversCard title={tr('📈 Meilleures progressions', '📈 Top gainers')} rows={movers.up} positive onPick={setDetail} />
+                <MoversCard title={tr('📉 Régressions', '📉 Decliners')} rows={movers.down} positive={false} onPick={setDetail} />
               </div>
             )}
 
             {/* Leaderboard */}
             <div style={{ ...card, overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: IVORY }}>Classement par compte <span style={{ color: FAINT, fontWeight: 500 }}>· clique un compte pour le détail</span></p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: IVORY }}>{tr('Classement par compte', 'Account leaderboard')} <span style={{ color: FAINT, fontWeight: 500 }}>{tr('· clique un compte pour le détail', '· click an account for details')}</span></p>
                 <button
                   onClick={() => exportCsv(`scaleflow-comptes-${new Date().toISOString().slice(0, 10)}`,
                     [
-                      { key: 'account', label: 'Compte' },
+                      { key: 'account', label: tr('Compte', 'Account') },
                       { key: 'followers', label: 'Followers' },
-                      { key: 'views', label: 'Vues' },
+                      { key: 'views', label: tr('Vues', 'Views') },
                       { key: 'posts', label: 'Posts' },
-                      { key: 'growth', label: 'Croissance' },
+                      { key: 'growth', label: tr('Croissance', 'Growth') },
                     ],
                     leaderboard.map(r => ({
                       account: r.phone.ig_username ?? r.phone.phone_name ?? '',
@@ -415,17 +419,17 @@ export function Stats({ user }: StatsProps) {
                     })))}
                   className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
                   style={{ marginLeft: 'auto', fontSize: 11 }}
-                  title="Exporter le classement en CSV"
+                  title={tr('Exporter le classement en CSV', 'Export leaderboard as CSV')}
                 >
                   ⬇ Export CSV
                 </button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 90px 90px 70px 90px', padding: '8px 18px', fontSize: 10.5, fontWeight: 600, color: FAINT, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${HAIR}` }}>
-                <span>#</span><span>Compte</span>
+                <span>#</span><span>{tr('Compte', 'Account')}</span>
                 <span style={{ textAlign: 'right' }}>Followers</span>
-                <span style={{ textAlign: 'right' }}>Vues</span>
+                <span style={{ textAlign: 'right' }}>{tr('Vues', 'Views')}</span>
                 <span style={{ textAlign: 'right' }}>Posts</span>
-                <span style={{ textAlign: 'right' }}>Croissance</span>
+                <span style={{ textAlign: 'right' }}>{tr('Croissance', 'Growth')}</span>
               </div>
               {leaderboard.map((row, i) => {
                 const up = (row.growth ?? 0) >= 0
@@ -463,11 +467,12 @@ export function Stats({ user }: StatsProps) {
 function MoversCard({ title, rows, positive, onPick }: {
   title: string; rows: Row[]; positive: boolean; onPick: (p: Phone) => void
 }) {
+  const tr = useTr()
   return (
     <div style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 12, padding: '14px 16px' }}>
       <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 10 }}>{title}</p>
       {rows.length === 0 ? (
-        <p style={{ fontSize: 12, color: FAINT }}>Pas encore de données.</p>
+        <p style={{ fontSize: 12, color: FAINT }}>{tr('Pas encore de données.', 'No data yet.')}</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map(r => (
@@ -491,6 +496,7 @@ function MoversCard({ title, rows, positive, onPick }: {
 function DetailModal({ phone, snaps, period, onClose }: {
   phone: Phone; snaps: Snapshot[]; period: Period; onClose: () => void
 }) {
+  const tr = useTr()
   const fSeries = useMemo(() => buildSeries(snaps, [phone.id], period, 'followers'), [snaps, phone.id, period])
   const vSeries = useMemo(() => buildSeries(snaps, [phone.id], period, 'total_views'), [snaps, phone.id, period])
   const pSeries = useMemo(() => buildSeries(snaps, [phone.id], period, 'posts'), [snaps, phone.id, period])
@@ -504,14 +510,14 @@ function DetailModal({ phone, snaps, period, onClose }: {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: `1px solid ${HAIR}` }}>
           <div>
             <p style={{ fontSize: 16, fontWeight: 800, color: IVORY }}>@{phone.ig_username ?? phone.phone_name}</p>
-            <p style={{ fontSize: 12, color: FAINT, marginTop: 2 }}>{phone.phone_name}{phone.group_name ? ` · ${phone.group_name}` : ''} · {period}j</p>
+            <p style={{ fontSize: 12, color: FAINT, marginTop: 2 }}>{phone.phone_name}{phone.group_name ? ` · ${phone.group_name}` : ''} · {tr(`${period}j`, `${period}d`)}</p>
           </div>
           <button onClick={onClose} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED, fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
         <div style={{ padding: 22 }}>
           <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
             <Kpi label="Followers" value={fmtCompact(phone.followers ?? 0)} delta={fGrowth} sub={fPct !== null ? fmtPct(fPct) : undefined} accent />
-            <Kpi label="Vues" value={fmtCompact(phone.total_views ?? 0)} />
+            <Kpi label={tr('Vues', 'Views')} value={fmtCompact(phone.total_views ?? 0)} />
             <Kpi label="Posts" value={fmtCompact(phone.video_count ?? 0)} />
           </div>
           <div style={{ marginBottom: 16 }}>
@@ -519,7 +525,7 @@ function DetailModal({ phone, snaps, period, onClose }: {
             <LineChart data={fSeries} color={ACCENT} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 10 }}>Vues</p>
+            <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 10 }}>{tr('Vues', 'Views')}</p>
             <LineChart data={vSeries} color={OK} />
           </div>
           <div>

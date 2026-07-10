@@ -7,6 +7,7 @@ import { useOrg } from '@/lib/orgContext'
 import { supabase } from '@/lib/supabase'
 import { postTikTokVideoAdb } from '@/lib/geelark'
 import { BankPicker, VideoThumbnail } from '@/pages/Bank'
+import { useTr } from '@/lib/i18n'
 
 // ── Selected video (from the content bank) ──────────────────────────────────
 interface SelectedVideo {
@@ -57,12 +58,13 @@ const ICONS = {
 
 // ── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: PhoneStatus }) {
+  const tr = useTr()
   const cfg: Record<PhoneStatus, { label: string; color: string; bg: string }> = {
-    idle:    { label: 'En attente', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
-    booting: { label: 'Démarrage',  color: '#f59e0b', bg: 'rgba(245,158,11,0.1)'  },
-    running: { label: 'En cours…',  color: '#6366F1', bg: 'rgba(99,102,241,0.1)'  },
-    done:    { label: 'Publié',     color: '#059669', bg: 'rgba(5,150,105,0.1)'   },
-    error:   { label: 'Erreur',     color: '#DC2626', bg: 'rgba(220,38,38,0.1)'   },
+    idle:    { label: tr('En attente', 'Waiting'), color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
+    booting: { label: tr('Démarrage', 'Booting'),  color: '#f59e0b', bg: 'rgba(245,158,11,0.1)'  },
+    running: { label: tr('En cours…', 'Running…'),  color: '#6366F1', bg: 'rgba(99,102,241,0.1)'  },
+    done:    { label: tr('Publié', 'Posted'),     color: '#059669', bg: 'rgba(5,150,105,0.1)'   },
+    error:   { label: tr('Erreur', 'Error'),     color: '#DC2626', bg: 'rgba(220,38,38,0.1)'   },
   }
   const { label, color, bg } = cfg[status]
   return (
@@ -85,6 +87,7 @@ function StatusBadge({ status }: { status: PhoneStatus }) {
 
 // ── Log panel (collapsible) ───────────────────────────────────────────────────
 function LogPanel({ logs }: { logs: string[] }) {
+  const tr = useTr()
   const [open, setOpen] = useState(false)
   if (logs.length === 0) return null
   return (
@@ -104,7 +107,7 @@ function LogPanel({ logs }: { logs: string[] }) {
         }}>
           <Icon d={ICONS.chevron} size={12} />
         </span>
-        {open ? 'Masquer les logs' : `Voir les logs (${logs.length})`}
+        {open ? tr('Masquer les logs', 'Hide logs') : tr(`Voir les logs (${logs.length})`, `Show logs (${logs.length})`)}
       </button>
       {open && (
         <div style={{
@@ -122,6 +125,7 @@ function LogPanel({ logs }: { logs: string[] }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function TikTokPosting({ user }: TikTokPostingProps) {
+  const tr = useTr()
   const { currentOrg } = useOrg()
   const { bearer } = useConnections(user)
 
@@ -229,14 +233,14 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
         )
 
         if (ok) {
-          updateJob(phone.id, { status: 'done', result: 'Publié avec succès' })
+          updateJob(phone.id, { status: 'done', result: tr('Publié avec succès', 'Posted successfully') })
         } else {
-          updateJob(phone.id, { status: 'error', result: error ?? 'Erreur inconnue' })
+          updateJob(phone.id, { status: 'error', result: error ?? tr('Erreur inconnue', 'Unknown error') })
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         if (msg === 'Annulé') {
-          updateJob(phone.id, { status: 'idle', result: 'Annulé' })
+          updateJob(phone.id, { status: 'idle', result: tr('Annulé', 'Cancelled') })
         } else {
           updateJob(phone.id, { status: 'error', result: msg })
         }
@@ -273,7 +277,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
             TikTok Mass Posting
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>
-            Publie une vidéo sur plusieurs comptes TikTok en séquence
+            {tr('Publie une vidéo sur plusieurs comptes TikTok en séquence', 'Post one video to multiple TikTok accounts in sequence')}
           </p>
         </div>
       </div>
@@ -287,7 +291,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-              Téléphones ({phones.length})
+              {tr('Téléphones', 'Phones')} ({phones.length})
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
@@ -298,12 +302,12 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                   color: 'var(--text2)', cursor: 'pointer',
                 }}
               >
-                {allSelected ? 'Tout désélect.' : 'Tout sélect.'}
+                {allSelected ? tr('Tout désélect.', 'Deselect all') : tr('Tout sélect.', 'Select all')}
               </button>
               <button
                 onClick={loadPhones}
                 disabled={phonesLoading}
-                title="Actualiser"
+                title={tr('Actualiser', 'Refresh')}
                 style={{
                   background: 'transparent', border: '1px solid var(--border)',
                   borderRadius: 8, padding: '3px 7px', cursor: 'pointer',
@@ -317,7 +321,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
 
           {phonesLoading && (
             <div style={{ padding: 20, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
-              Chargement…
+              {tr('Chargement…', 'Loading…')}
             </div>
           )}
           {phonesError && (
@@ -327,7 +331,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
           )}
           {!phonesLoading && !phonesError && phones.length === 0 && (
             <div style={{ padding: 20, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
-              Aucun téléphone trouvé
+              {tr('Aucun téléphone trouvé', 'No phone found')}
             </div>
           )}
 
@@ -395,7 +399,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
             padding: '10px 14px', borderTop: '1px solid var(--border)',
             fontSize: 11, color: 'var(--text2)',
           }}>
-            {selected.size} sélectionné{selected.size > 1 ? 's' : ''}
+            {tr(`${selected.size} sélectionné${selected.size > 1 ? 's' : ''}`, `${selected.size} selected`)}
           </div>
         </div>
 
@@ -405,12 +409,12 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
           {/* Form */}
           <div className="glass-card" style={{ borderRadius: 16, padding: 20 }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16, marginTop: 0 }}>
-              Contenu à publier
+              {tr('Contenu à publier', 'Content to post')}
             </h2>
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 6 }}>
-                Vidéo
+                {tr('Vidéo', 'Video')}
               </label>
 
               {!video ? (
@@ -432,10 +436,10 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                     <Icon d={ICONS.video} size={18} />
                   </div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '0 0 3px' }}>
-                    Choisir depuis la banque
+                    {tr('Choisir depuis la banque', 'Pick from the bank')}
                   </p>
                   <p style={{ fontSize: 11.5, color: 'var(--text2)', margin: 0 }}>
-                    Sélectionnez une vidéo de votre banque de contenu
+                    {tr('Sélectionnez une vidéo de votre banque de contenu', 'Select a video from your content bank')}
                   </p>
                 </button>
               ) : (
@@ -464,12 +468,12 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                         color: 'var(--text2)', cursor: 'pointer',
                       }}
                     >
-                      Changer
+                      {tr('Changer', 'Change')}
                     </button>
                   </div>
                   <button
                     onClick={() => setVideo(null)}
-                    title="Retirer"
+                    title={tr('Retirer', 'Remove')}
                     style={{
                       background: 'transparent', border: 'none', cursor: 'pointer',
                       color: 'var(--text2)', padding: 4, display: 'flex',
@@ -483,12 +487,12 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 6 }}>
-                Légende
+                {tr('Légende', 'Caption')}
               </label>
               <textarea
                 value={caption}
                 onChange={e => setCaption(e.target.value)}
-                placeholder="Ajouter une description…"
+                placeholder={tr('Ajouter une description…', 'Add a description…')}
                 rows={3}
                 style={{
                   width: '100%', resize: 'vertical', padding: '8px 12px', borderRadius: 10,
@@ -501,7 +505,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
 
             <div style={{ marginBottom: 20 }}>
               <Input
-                label="Hashtags (séparés par des espaces)"
+                label={tr('Hashtags (séparés par des espaces)', 'Hashtags (space-separated)')}
                 placeholder="#fyp #viral #tiktok"
                 value={hashtags}
                 onChange={e => setHashtags(e.target.value)}
@@ -514,7 +518,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                 background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
                 color: '#f59e0b', fontSize: 12,
               }}>
-                ⚠️ Clé API GéeLark non configurée — allez dans les paramètres.
+                {tr('⚠️ Clé API GéeLark non configurée — allez dans les paramètres.', '⚠️ GeeLark API key not configured — go to Settings.')}
               </div>
             )}
 
@@ -527,7 +531,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                 >
                   <Icon d={ICONS.play} size={14} />
-                  Lancer ({selected.size} téléphone{selected.size > 1 ? 's' : ''})
+                  {tr(`Lancer (${selected.size} téléphone${selected.size > 1 ? 's' : ''})`, `Launch (${selected.size} phone${selected.size > 1 ? 's' : ''})`)}
                 </Button>
               ) : (
                 <Button
@@ -539,7 +543,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                   }}
                 >
                   <Icon d={ICONS.stop} size={14} />
-                  Arrêter
+                  {tr('Arrêter', 'Stop')}
                 </Button>
               )}
             </div>
@@ -552,7 +556,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                 padding: '12px 16px', borderBottom: '1px solid var(--border)',
                 fontSize: 13, fontWeight: 600, color: 'var(--text)',
               }}>
-                Progression
+                {tr('Progression', 'Progress')}
               </div>
               {jobs.map(job => (
                 <div key={job.phone.id} style={{
@@ -598,11 +602,11 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                   fontSize: 12, color: 'var(--text2)', display: 'flex', gap: 16,
                 }}>
                   <span style={{ color: '#059669' }}>
-                    ✓ {jobs.filter(j => j.status === 'done').length} réussi{jobs.filter(j => j.status === 'done').length > 1 ? 's' : ''}
+                    ✓ {tr(`${jobs.filter(j => j.status === 'done').length} réussi${jobs.filter(j => j.status === 'done').length > 1 ? 's' : ''}`, `${jobs.filter(j => j.status === 'done').length} succeeded`)}
                   </span>
                   {jobs.filter(j => j.status === 'error').length > 0 && (
                     <span style={{ color: '#DC2626' }}>
-                      ✗ {jobs.filter(j => j.status === 'error').length} échoué{jobs.filter(j => j.status === 'error').length > 1 ? 's' : ''}
+                      ✗ {tr(`${jobs.filter(j => j.status === 'error').length} échoué${jobs.filter(j => j.status === 'error').length > 1 ? 's' : ''}`, `${jobs.filter(j => j.status === 'error').length} failed`)}
                     </span>
                   )}
                 </div>
@@ -623,7 +627,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
             if (url) {
               setVideo({
                 url,
-                title: titles?.[0] ?? url.split('/').pop()?.split('?')[0] ?? 'Vidéo',
+                title: titles?.[0] ?? url.split('/').pop()?.split('?')[0] ?? tr('Vidéo', 'Video'),
               })
             }
             setShowBankPicker(false)

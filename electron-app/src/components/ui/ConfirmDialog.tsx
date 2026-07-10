@@ -11,6 +11,7 @@
 //     onCancel={() => setConfirmDelete(null)}
 //   />
 import { Modal } from './Modal'
+import { useTr } from '@/lib/i18n'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -28,10 +29,13 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({
   open, title, message,
-  confirmLabel = 'Confirmer', cancelLabel = 'Annuler',
+  confirmLabel, cancelLabel,
   danger = false, busy = false,
   onConfirm, onCancel,
 }: ConfirmDialogProps) {
+  const tr = useTr()
+  const confirmText = confirmLabel ?? tr('Confirmer', 'Confirm')
+  const cancelText  = cancelLabel ?? tr('Annuler', 'Cancel')
   return (
     <Modal open={open} onClose={onCancel} width={420} locked={busy}>
       <div style={{ padding: 24 }}>
@@ -73,7 +77,7 @@ export function ConfirmDialog({
             className="sf-btn sf-btn-secondary"
             style={{ padding: '8px 16px', fontSize: 13 }}
           >
-            {cancelLabel}
+            {cancelText}
           </button>
           <button
             onClick={onConfirm}
@@ -88,7 +92,7 @@ export function ConfirmDialog({
               opacity: busy ? 0.6 : 1,
             }}
           >
-            {busy ? '…' : confirmLabel}
+            {busy ? '…' : confirmText}
           </button>
         </div>
       </div>

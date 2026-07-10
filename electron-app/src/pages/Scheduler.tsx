@@ -34,7 +34,7 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr, tr } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import {
   loadScheduledPosts, cancelScheduledPost, claimScheduledPost,
@@ -397,7 +397,6 @@ function startOfWeek(d: Date): Date {
   x.setDate(x.getDate() - day)
   return x
 }
-const CAL_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const CAL_ROW_H = 46 // px par heure
 
 // Date → valeur d'un <input type="datetime-local"> local (YYYY-MM-DDTHH:MM)
@@ -414,6 +413,8 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
   onDuplicate: (post: ScheduledPost) => void
   onDelete: (post: ScheduledPost) => void
 }) {
+  const tr = useTr()
+  const CAL_DAYS_L = [tr('Lun', 'Mon'), tr('Mar', 'Tue'), tr('Mer', 'Wed'), tr('Jeu', 'Thu'), tr('Ven', 'Fri'), tr('Sam', 'Sat'), tr('Dim', 'Sun')]
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const dragId = useRef<string | null>(null)
   const [, force] = useState(0)
@@ -453,17 +454,18 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
     onMove(post, nd)
   }
 
-  const weekLabel = `${days[0].toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
+  const _wl = tr('fr-FR', 'en-US')
+  const weekLabel = `${days[0].toLocaleDateString(_wl, { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString(_wl, { day: 'numeric', month: 'short' })}`
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Barre de navigation semaine */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <button onClick={() => shiftWeek(-1)} className="sf-btn sf-btn-ghost sf-btn-sm">‹</button>
-        <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="sf-btn sf-btn-ghost sf-btn-sm">Aujourd'hui</button>
+        <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="sf-btn sf-btn-ghost sf-btn-sm">{tr("Aujourd'hui", 'Today')}</button>
         <button onClick={() => shiftWeek(1)} className="sf-btn sf-btn-ghost sf-btn-sm">›</button>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ivory)', marginLeft: 4 }}>{weekLabel}</span>
-        <span style={{ fontSize: 11.5, color: 'var(--muted)', marginLeft: 'auto' }}>Glisse un post pour le reprogrammer</span>
+        <span style={{ fontSize: 11.5, color: 'var(--muted)', marginLeft: 'auto' }}>{tr('Glisse un post pour le reprogrammer', 'Drag a post to reschedule it')}</span>
       </div>
 
       {/* En-têtes des jours */}
@@ -473,7 +475,7 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
           const isToday = d.getTime() === today.getTime()
           return (
             <div key={i} style={{ textAlign: 'center', padding: '6px 0' }}>
-              <div style={{ fontSize: 10.5, color: 'rgba(148,163,184,0.55)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{CAL_DAYS[i]}</div>
+              <div style={{ fontSize: 10.5, color: 'rgba(148,163,184,0.55)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{CAL_DAYS_L[i]}</div>
               <div style={{
                 fontSize: 15, fontWeight: 700, marginTop: 2,
                 color: isToday ? '#fff' : 'var(--ivory)',
@@ -518,7 +520,7 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                   if (nd.getTime() < Date.now()) return // pas dans le passé
                   onSlotClick(nd)
                 }}
-                title="Clic droit sur un créneau vide pour programmer un post"
+                title={tr('Clic droit sur un créneau vide pour programmer un post', 'Right-click an empty slot to schedule a post')}
                 style={{ position: 'relative', borderLeft: '1px solid rgba(255,255,255,0.05)', height: 24 * CAL_ROW_H }}
               >
                 {/* Lignes horaires (transparentes aux clics → le créneau reçoit le clic) */}
@@ -541,6 +543,7 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                   const top = (dt.getHours() + dt.getMinutes() / 60) * CAL_ROW_H
                   const canDrag = p.status === 'pending'
                   const typeLabel = p.type === 'story' ? 'Story' : p.type === 'mass_posting' ? 'Mass' : 'Reel'
+                  const _loc = tr('fr-FR', 'en-US')
                   // Couleur par statut : à venir (violet), en cours (ambre),
                   // publié (vert), échec (rouge), annulé (gris).
                   const col = p.status === 'pending'   ? { bg: 'rgba(99,102,241,0.22)',  bd: 'rgba(99,102,241,0.55)' }
@@ -561,8 +564,8 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                         setMenu({ x: e.clientX, y: e.clientY, post: p })
                       }}
                       title={isManualRun(p)
-                        ? `${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · Mass Posting manuel · ${p.phones.length} compte(s)`
-                        : `${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s) — clic droit pour dupliquer`}
+                        ? tr(`${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · Mass Posting manuel · ${p.phones.length} compte(s)`, `${dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} · Manual Mass Posting · ${p.phones.length} account(s)`)
+                        : tr(`${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} compte(s) — clic droit pour dupliquer`, `${dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} · ${p.phones.length} account(s) — right-click to duplicate`)}
                       style={{
                         position: 'absolute', left: 3, right: 3, top: top + 1, minHeight: 34,
                         background: col.bg, border: `1px solid ${col.bd}`,
@@ -572,10 +575,10 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                       }}
                     >
                       <div style={{ fontSize: 10.5, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
-                        {dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · {typeLabel}
+                        {dt.toLocaleTimeString(_loc, { hour: '2-digit', minute: '2-digit' })} · {typeLabel}
                       </div>
                       <div style={{ fontSize: 10, color: 'rgba(226,232,240,0.75)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {p.phones.length} compte{p.phones.length > 1 ? 's' : ''}{p.caption ? ` · ${p.caption.slice(0, 24)}` : ''}
+                        {p.phones.length} {tr('compte', 'account')}{p.phones.length > 1 ? 's' : ''}{p.caption ? ` · ${p.caption.slice(0, 24)}` : ''}
                       </div>
                     </div>
                   )
@@ -597,10 +600,10 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
             padding: 4, minWidth: 190, boxShadow: '0 12px 40px rgba(0,0,0,0.55)',
           }}>
             {([
-              { label: 'Dupliquer', fn: () => onDuplicate(menu.post) },
+              { label: tr('Dupliquer', 'Duplicate'), fn: () => onDuplicate(menu.post) },
               ...(menu.post.status === 'pending' || menu.post.status === 'running' ? [
-                { label: 'Reprogrammer (heure précise)', fn: () => onOpen(menu.post) },
-                { label: 'Supprimer', danger: true, fn: () => onDelete(menu.post) },
+                { label: tr('Reprogrammer (heure précise)', 'Reschedule (exact time)'), fn: () => onOpen(menu.post) },
+                { label: tr('Supprimer', 'Delete'), danger: true, fn: () => onDelete(menu.post) },
               ] : []),
             ] as { label: string; danger?: boolean; fn: () => void }[]).map((it, i) => (
               <button key={i}
@@ -628,13 +631,14 @@ function SchedDetailModal({ post, onClose, onReschedule, onDuplicate }: {
   onReschedule?: () => void
   onDuplicate: () => void
 }) {
+  const tr = useTr()
   const phones = Array.isArray(post.phones) ? post.phones : []
   const results = post.result?.phone_results ?? []
   const okList = results.filter(r => r.ok)
   const koList = results.filter(r => !r.ok)
   const typeLabel = post.type === 'story' ? 'Story' : post.type === 'mass_posting' ? 'Mass Posting' : 'Reel'
-  const statusLabel = post.status === 'pending' ? 'À venir' : post.status === 'running' ? 'En cours'
-    : post.status === 'done' ? 'Publié' : post.status === 'failed' ? 'Échec' : 'Annulé'
+  const statusLabel = post.status === 'pending' ? tr('À venir', 'Upcoming') : post.status === 'running' ? tr('En cours', 'In progress')
+    : post.status === 'done' ? tr('Publié', 'Published') : post.status === 'failed' ? tr('Échec', 'Failed') : tr('Annulé', 'Cancelled')
   const Chip = ({ children }: { children: ReactNode }) => (
     <span style={{ fontSize: 11.5, fontWeight: 600, color: 'rgba(233,234,240,0.6)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 20, padding: '3px 10px' }}>{children}</span>
   )
@@ -642,26 +646,26 @@ function SchedDetailModal({ post, onClose, onReschedule, onDuplicate }: {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#12131a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: 'min(540px,100%)', maxHeight: '82vh', overflowY: 'auto', padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#E9EAF0' }}>Détail du post</h2>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#E9EAF0' }}>{tr('Détail du post', 'Post details')}</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'rgba(233,234,240,0.5)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
         <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'rgba(233,234,240,0.5)' }}>
           {typeLabel} · {fmtScheduledTime(post.executed_at ?? post.scheduled_at)}
-          {results.length > 0 && <> · <span style={{ color: '#34D399' }}>{okList.length} réussi{okList.length > 1 ? 's' : ''}</span> · <span style={{ color: '#f87171' }}>{koList.length} échoué{koList.length > 1 ? 's' : ''}</span></>}
+          {results.length > 0 && <> · <span style={{ color: '#34D399' }}>{tr(`${okList.length} réussi${okList.length > 1 ? 's' : ''}`, `${okList.length} succeeded`)}</span> · <span style={{ color: '#f87171' }}>{tr(`${koList.length} échoué${koList.length > 1 ? 's' : ''}`, `${koList.length} failed`)}</span></>}
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
           <Chip>{statusLabel}</Chip>
-          <Chip>{phones.length} compte{phones.length > 1 ? 's' : ''}</Chip>
-          {Array.isArray(post.videos) && <Chip>{post.videos.length} vidéo{post.videos.length > 1 ? 's' : ''}</Chip>}
+          <Chip>{phones.length} {tr('compte', 'account')}{phones.length > 1 ? 's' : ''}</Chip>
+          {Array.isArray(post.videos) && <Chip>{post.videos.length} {tr('vidéo', 'video')}{post.videos.length > 1 ? 's' : ''}</Chip>}
         </div>
         {post.caption && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.32)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Légende</div>
+            <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.32)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{tr('Légende', 'Caption')}</div>
             <div style={{ fontSize: 12.5, color: '#E9EAF0', lineHeight: 1.5, whiteSpace: 'pre-wrap', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px' }}>{post.caption}</div>
           </div>
         )}
         <div style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.32)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Comptes</div>
+          <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.32)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{tr('Comptes', 'Accounts')}</div>
           {results.length > 0 ? (
             [...koList, ...okList].map((r, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -678,8 +682,8 @@ function SchedDetailModal({ post, onClose, onReschedule, onDuplicate }: {
         </div>
         {!isManualRun(post) && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={onDuplicate} className="sf-btn sf-btn-primary" style={{ flex: 1 }}>Dupliquer</button>
-            {onReschedule && <button onClick={onReschedule} className="sf-btn sf-btn-ghost" style={{ flex: 1 }}>Reprogrammer</button>}
+            <button onClick={onDuplicate} className="sf-btn sf-btn-primary" style={{ flex: 1 }}>{tr('Dupliquer', 'Duplicate')}</button>
+            {onReschedule && <button onClick={onReschedule} className="sf-btn sf-btn-ghost" style={{ flex: 1 }}>{tr('Reprogrammer', 'Reschedule')}</button>}
           </div>
         )}
       </div>
@@ -689,6 +693,7 @@ function SchedDetailModal({ post, onClose, onReschedule, onDuplicate }: {
 
 export function Scheduler({ user, onNavigate }: Props) {
   const t                         = useT()
+  const tr                        = useTr()
   const { role }                  = useOrg()
   const credits                   = useCredits()
   const toast                     = useToast()
@@ -770,24 +775,24 @@ export function Scheduler({ user, onNavigate }: Props) {
       await finishScheduledPost(post.id, ok, msgs, ok ? undefined : msgs[msgs.length - 1])
       setRunningPost(null)
       runningRef.current.delete(post.id)
-      const typeLabel = post.type === 'story' ? 'Story programmée' : post.type === 'mass_posting' ? 'Mass posting programmé' : 'Publication programmée'
+      const typeLabel = post.type === 'story' ? tr('Story programmée', 'Scheduled story') : post.type === 'mass_posting' ? tr('Mass posting programmé', 'Scheduled mass posting') : tr('Publication programmée', 'Scheduled post')
       const n = post.phones.length
       // In-page toast
       toast.show({
-        title: ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`,
-        body: `${n} compte${n > 1 ? 's' : ''}`,
+        title: ok ? tr(`${typeLabel} terminé ✓`, `${typeLabel} done ✓`) : tr(`${typeLabel} échoué`, `${typeLabel} failed`),
+        body: tr(`${n} compte${n > 1 ? 's' : ''}`, `${n} account${n > 1 ? 's' : ''}`),
         kind: ok ? 'ok' : 'error',
       })
       // Persistent bell notification
       pushNotification({
-        title: ok ? `${typeLabel} terminée ✓` : `${typeLabel} échouée`,
-        body:  `${n} compte${n > 1 ? 's' : ''}${post.created_by_name ? ' · ' + post.created_by_name : ''}`,
+        title: ok ? tr(`${typeLabel} terminée ✓`, `${typeLabel} done ✓`) : tr(`${typeLabel} échouée`, `${typeLabel} failed`),
+        body:  tr(`${n} compte${n > 1 ? 's' : ''}${post.created_by_name ? ' · ' + post.created_by_name : ''}`, `${n} account${n > 1 ? 's' : ''}${post.created_by_name ? ' · ' + post.created_by_name : ''}`),
         level: ok ? 'ok' : 'error',
         page:  'scheduler',
       })
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification(ok ? `${typeLabel} terminée ✓` : `${typeLabel} échouée`, {
-          body: `${n} compte${n > 1 ? 's' : ''} — ScaleFlow`,
+        new Notification(ok ? tr(`${typeLabel} terminée ✓`, `${typeLabel} done ✓`) : tr(`${typeLabel} échouée`, `${typeLabel} failed`), {
+          body: tr(`${n} compte${n > 1 ? 's' : ''} — ScaleFlow`, `${n} account${n > 1 ? 's' : ''} — ScaleFlow`),
         })
       }
       reload()
@@ -811,7 +816,7 @@ export function Scheduler({ user, onNavigate }: Props) {
     }
 
     arm()
-  }, [reload, toast])
+  }, [reload, toast, tr])
 
   useEffect(() => {
     reload().then(() => {
@@ -874,21 +879,21 @@ export function Scheduler({ user, onNavigate }: Props) {
       const { data, error } = await supabase.from('scheduled_posts')
         .select('status').eq('id', id).maybeSingle()
       if (error || (data && data.status !== 'cancelled')) {
-        toast.show({ title: 'Annulation échouée', body: `Le post n'a pas pu être annulé — statut rechargé.`, kind: 'error' })
+        toast.show({ title: tr('Annulation échouée', 'Cancellation failed'), body: tr(`Le post n'a pas pu être annulé — statut rechargé.`, 'The post could not be cancelled — status reloaded.'), kind: 'error' })
         await reload()
         return
       }
       setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p))
       if (refunded > 0) {
         credits.refresh()
-        toast.show({ title: 'Post annulé', body: `${refunded} crédits remboursés`, kind: 'ok' })
+        toast.show({ title: tr('Post annulé', 'Post cancelled'), body: tr(`${refunded} crédits remboursés`, `${refunded} credits refunded`), kind: 'ok' })
       } else {
-        toast.show({ title: 'Post annulé', kind: 'ok' })
+        toast.show({ title: tr('Post annulé', 'Post cancelled'), kind: 'ok' })
       }
     } catch (e) {
       toast.show({
-        title: 'Annulation échouée',
-        body: e instanceof Error ? e.message : 'Erreur réseau — réessaie.',
+        title: tr('Annulation échouée', 'Cancellation failed'),
+        body: e instanceof Error ? e.message : tr('Erreur réseau — réessaie.', 'Network error — try again.'),
         kind: 'error',
       })
       await reload()
@@ -909,19 +914,19 @@ export function Scheduler({ user, onNavigate }: Props) {
         .eq('id', post.id).eq('status', 'pending')
         .select('id')
       if (error || !data?.length) {
-        toast.show({ title: 'Report échoué', body: `Le post n'est plus en attente — statut rechargé.`, kind: 'error' })
+        toast.show({ title: tr('Report échoué', 'Reschedule failed'), body: tr(`Le post n'est plus en attente — statut rechargé.`, 'The post is no longer pending — status reloaded.'), kind: 'error' })
         setReschedule(null)
         await reload()
         return
       }
       setPosts(prev => prev.map(p => p.id === post.id ? { ...p, scheduled_at: date.toISOString() } : p))
       setReschedule(null)
-      toast.show({ title: 'Post reporté', body: `Nouveau départ : ${fmtScheduledTime(date.toISOString())}`, kind: 'ok' })
+      toast.show({ title: tr('Post reporté', 'Post rescheduled'), body: tr(`Nouveau départ : ${fmtScheduledTime(date.toISOString())}`, `New start: ${fmtScheduledTime(date.toISOString())}`), kind: 'ok' })
     } catch (e) {
       setReschedule(null)
       toast.show({
-        title: 'Report échoué',
-        body: e instanceof Error ? e.message : 'Erreur réseau — réessaie.',
+        title: tr('Report échoué', 'Reschedule failed'),
+        body: e instanceof Error ? e.message : tr('Erreur réseau — réessaie.', 'Network error — try again.'),
         kind: 'error',
       })
       await reload()
@@ -936,15 +941,15 @@ export function Scheduler({ user, onNavigate }: Props) {
       const base = new Date(post.scheduled_at).getTime()
       const when = new Date(Math.max(Date.now() + 5 * 60_000, base + 60 * 60_000))
       const created = await createScheduledPost({
-        userId: user.id, orgId: post.org_id, createdByName: post.created_by_name || (user.email ?? 'Moi'),
+        userId: user.id, orgId: post.org_id, createdByName: post.created_by_name || (user.email ?? tr('Moi', 'Me')),
         type: post.type, scheduledAt: when, phones: post.phones, videos: post.videos,
         caption: post.caption, delayMinutes: post.delay_minutes, mode: post.mode,
         bearerToken: '', reelsTrial: post.reels_trial, platform: post.platform,
       })
       setPosts(prev => [created, ...prev])
-      toast.show({ title: 'Post dupliqué ✓', body: `Copie programmée le ${fmtScheduledTime(when.toISOString())}.`, kind: 'ok' })
+      toast.show({ title: tr('Post dupliqué ✓', 'Post duplicated ✓'), body: tr(`Copie programmée le ${fmtScheduledTime(when.toISOString())}.`, `Copy scheduled for ${fmtScheduledTime(when.toISOString())}.`), kind: 'ok' })
     } catch (e) {
-      toast.show({ title: 'Duplication échouée', body: e instanceof Error ? e.message : String(e), kind: 'error' })
+      toast.show({ title: tr('Duplication échouée', 'Duplication failed'), body: e instanceof Error ? e.message : String(e), kind: 'error' })
     }
   }
 
@@ -962,9 +967,9 @@ export function Scheduler({ user, onNavigate }: Props) {
 
   const doneCount = history.filter(p => p.status === 'done').length
   const headStats: Array<[string, number, string]> = [
-    ['En attente', pending.length, '#818CF8'],
-    ['Publiés', doneCount, '#34D399'],
-    ['Total', posts.length, '#94A3B8'],
+    [tr('En attente', 'Pending'), pending.length, '#818CF8'],
+    [tr('Publiés', 'Published'), doneCount, '#34D399'],
+    [tr('Total', 'Total'), posts.length, '#94A3B8'],
   ]
 
   return (
@@ -991,7 +996,7 @@ export function Scheduler({ user, onNavigate }: Props) {
 
             {/* Text */}
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)', marginBottom: 3 }}>Programmation</div>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)', marginBottom: 3 }}>{tr('Programmation', 'Scheduling')}</div>
               <h1 style={{
                 margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0,
                 background: 'linear-gradient(100deg,#fff 20%,#a5b4fc 55%,#6ee7b7 90%)', backgroundSize: '200% auto',
@@ -1014,7 +1019,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-              Programmer
+              {tr('Programmer', 'Schedule')}
             </button>
           </div>
         </div>
@@ -1027,7 +1032,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <button
                   onClick={clickable ? () => onNavigate?.('history') : undefined}
-                  title={clickable ? "Voir l'historique complet" : undefined}
+                  title={clickable ? tr("Voir l'historique complet", 'View full history') : undefined}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 9, padding: '9px 15px 9px 11px', borderRadius: 12,
                     background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
@@ -1060,7 +1065,7 @@ export function Scheduler({ user, onNavigate }: Props) {
         }}>
           {([
             { id: 'pending' as TabFilter, label: t('schedulerTabPending'), count: pending.length },
-            { id: 'calendar' as TabFilter, label: 'Calendrier', count: 0 },
+            { id: 'calendar' as TabFilter, label: tr('Calendrier', 'Calendar'), count: 0 },
           ]).map(tabItem => (
             <button
               key={tabItem.id}
@@ -1115,7 +1120,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             className="sf-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher (légende, compte)…"
+            placeholder={tr('Rechercher (légende, compte)…', 'Search (caption, account)…')}
             style={{ paddingLeft: 32, height: 32, fontSize: 12.5 }}
           />
         </div>
@@ -1155,7 +1160,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '9px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.16)', fontSize: 12, color: 'var(--muted)' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-l)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-              <span>Clique un créneau vide pour programmer un post · glisse un post en attente pour le déplacer.</span>
+              <span>{tr('Clique un créneau vide pour programmer un post · glisse un post en attente pour le déplacer.', 'Click an empty slot to schedule a post · drag a pending post to move it.')}</span>
             </div>
             <CalendarWeek
               posts={posts.filter(p => p.status !== 'cancelled')}
@@ -1196,7 +1201,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                 onClick={() => { setPresetSchedAt(undefined); setShowTypeChoice(true) }}
               >
                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                {posts.length === 0 ? 'Programmer ton premier post' : t('schedulerSchedulePost')}
+                {posts.length === 0 ? tr('Programmer ton premier post', 'Schedule your first post') : t('schedulerSchedulePost')}
               </button>
             )}
           </div>
@@ -1231,10 +1236,10 @@ export function Scheduler({ user, onNavigate }: Props) {
       {/* ── Confirm cancel ───────────────────────────────────────────────────── */}
       <ConfirmDialog
         open={!!confirmCancel}
-        title="Annuler ce post programmé ?"
-        message="Les crédits seront remboursés, mais tu devras tout reconfigurer (téléphones, vidéos, légende) pour le reprogrammer."
-        confirmLabel="Annuler le post"
-        cancelLabel="Garder"
+        title={tr('Annuler ce post programmé ?', 'Cancel this scheduled post?')}
+        message={tr('Les crédits seront remboursés, mais tu devras tout reconfigurer (téléphones, vidéos, légende) pour le reprogrammer.', 'Credits will be refunded, but you will have to reconfigure everything (phones, videos, caption) to reschedule it.')}
+        confirmLabel={tr('Annuler le post', 'Cancel post')}
+        cancelLabel={tr('Garder', 'Keep')}
         danger
         busy={!!confirmCancel && cancelling === confirmCancel.id}
         onConfirm={async () => {
@@ -1297,20 +1302,20 @@ export function Scheduler({ user, onNavigate }: Props) {
           }}>
             <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(236,72,153,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: '22px 24px 4px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)' }}>Reel programmé</p>
+              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)' }}>{tr('Reel programmé', 'Scheduled Reel')}</p>
               <p style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
-                Où veux-tu publier ?
+                {tr('Où veux-tu publier ?', 'Where do you want to post?')}
               </p>
             </div>
             <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
               {([
                 {
-                  k: 'instagram' as const, label: 'Instagram', desc: 'Reels — publication native',
+                  k: 'instagram' as const, label: 'Instagram', desc: tr('Reels — publication native', 'Reels — native posting'),
                   grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6',
                   icon: <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>,
                 },
                 {
-                  k: 'tiktok' as const, label: 'TikTok', desc: 'Vidéos — publication native',
+                  k: 'tiktok' as const, label: 'TikTok', desc: tr('Vidéos — publication native', 'Videos — native posting'),
                   grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.5)', accent: '#22D3EE',
                   icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.4 2 4.1 4.5 4.4v3c-1.7.1-3.2-.4-4.6-1.3v6.2c0 3.6-2.7 5.9-6 5.9-3.2 0-5.6-2.5-5.6-5.5 0-3.4 2.9-5.9 6.4-5.3v3.1c-.4-.1-.9-.2-1.3-.2-1.4 0-2.4 1-2.4 2.4 0 1.4 1 2.4 2.5 2.4 1.6 0 2.6-1.1 2.6-2.9V3h3.9z"/></svg>,
                 },
@@ -1348,14 +1353,14 @@ export function Scheduler({ user, onNavigate }: Props) {
                 className="sf-btn sf-btn-ghost cursor-pointer"
                 style={{ flex: 1 }}
               >
-                Retour
+                {tr('Retour', 'Back')}
               </button>
               <button
                 onClick={() => setShowPlatformChoice(false)}
                 className="sf-btn sf-btn-ghost cursor-pointer"
                 style={{ flex: 1 }}
               >
-                Annuler
+                {tr('Annuler', 'Cancel')}
               </button>
             </div>
           </div>
@@ -1391,25 +1396,25 @@ export function Scheduler({ user, onNavigate }: Props) {
           }}>
             <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(99,102,241,0.18), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: '22px 24px 4px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)' }}>Nouvelle programmation</p>
+              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)' }}>{tr('Nouvelle programmation', 'New schedule')}</p>
               <p style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
-                Que veux-tu programmer ?
+                {tr('Que veux-tu programmer ?', 'What do you want to schedule?')}
               </p>
             </div>
             <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
               {([
                 {
                   onClick: () => { setShowTypeChoice(false); setShowPlatformChoice(true) },
-                  title: 'Reel', tag: 'Vidéo', accent: '#818CF8',
+                  title: 'Reel', tag: tr('Vidéo', 'Video'), accent: '#818CF8',
                   grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)',
-                  desc: 'Vidéos de la banque, légende, mode séquentiel ou aléatoire. Part même app fermée.',
+                  desc: tr('Vidéos de la banque, légende, mode séquentiel ou aléatoire. Part même app fermée.', 'Videos from the bank, caption, sequential or random mode. Runs even when the app is closed.'),
                   icon: <IconVideo size={21} color="#fff" />,
                 },
                 {
                   onClick: () => { setShowTypeChoice(false); setShowStoryCreate(true) },
-                  title: 'Story avec lien', tag: 'Sticker lien', accent: '#FBBF24',
+                  title: tr('Story avec lien', 'Story with link'), tag: tr('Sticker lien', 'Link sticker'), accent: '#FBBF24',
                   grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)',
-                  desc: 'Photos + sticker lien par compte. Configure et programme directement ici.',
+                  desc: tr('Photos + sticker lien par compte. Configure et programme directement ici.', 'Photos + link sticker per account. Configure and schedule right here.'),
                   icon: (
                     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
@@ -1447,7 +1452,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                 className="sf-btn sf-btn-ghost cursor-pointer"
                 style={{ width: '100%' }}
               >
-                Annuler
+                {tr('Annuler', 'Cancel')}
               </button>
             </div>
           </div>
@@ -1471,6 +1476,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
   onReschedule?: () => void
 }) {
   const t = useT()
+  const tr = useTr()
   // Logs dépliés d'office quand le post a échoué → on voit tout de suite pourquoi.
   const [showLogs, setShowLogs] = useState(post.status === 'failed')
   const [hovered, setHovered]   = useState(false)
@@ -1547,7 +1553,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             }}
           >
             <IconX size={11} color="var(--err)" />
-            {cancelling ? t('schedulerCancelling') : isStuckRunning ? 'Arrêter' : t('cancel')}
+            {cancelling ? t('schedulerCancelling') : isStuckRunning ? tr('Arrêter', 'Stop') : t('cancel')}
           </button>
         )}
       </div>
@@ -1595,7 +1601,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               {allOk
                 ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 : <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 8v5"/><path d="M12 16h.01"/></svg>}
-              {okN}/{prs.length} réussi{okN > 1 ? 's' : ''}
+              {tr(`${okN}/${prs.length} réussi${okN > 1 ? 's' : ''}`, `${okN}/${prs.length} succeeded`)}
             </span>
           )
         })()}

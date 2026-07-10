@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { Bank } from '@/pages/Bank'
 import { CaptionBank } from '@/pages/CaptionBank'
 import { playNav } from '@/lib/sounds'
+import { useTr } from '@/lib/i18n'
 import { BG_0, BG_2, TEXT_1, TEXT_2, HAIR } from '@/lib/theme'
 
 type Tab = 'videos' | 'captions'
@@ -10,11 +11,12 @@ type Tab = 'videos' | 'captions'
 // ── Banque : onglet unifié vidéos + captions ─────────────────────────────────
 export function BankHub({ user, initialTab = 'videos' }: { user: User; initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab)
+  const tr = useTr()
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode; accent: string; accentRgb: string }[] = [
     {
       id:        'videos',
-      label:     'Vidéos & médias',
+      label:     tr('Vidéos & médias', 'Videos & media'),
       accentRgb: '34,211,238',
       accent:    '#6366F1',
       icon: (

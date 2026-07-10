@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr, tr as trStatic } from '@/lib/i18n'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -270,6 +270,7 @@ function SettingToggle({ label, sub, checked, onChange, first }: {
 
 export function Settings({ user, initialPanel, initialTab, onNavigate }: SettingsProps) {
   const t = useT()
+  const tr = useTr()
   const { lang, setLang: setAppLang } = useLang()
   const { role, perms, currentOrg, myOrgs } = useOrg()
   const license = useLicense()
@@ -347,7 +348,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   const [webhookBusy, setWebhookBusy]   = useState(false)
 
   async function registerWebhook() {
-    if (!bearer) { setWebhookMsg({ ok: false, text: 'Renseigne d\'abord ton token GéeLark.' }); return }
+    if (!bearer) { setWebhookMsg({ ok: false, text: tr('Renseigne d\'abord ton token GéeLark.', 'Enter your GeeLark token first.') }); return }
     setWebhookBusy(true); setWebhookMsg(null)
     try {
       const callbackUrl = `${window.location.origin}/api/geelark-callback`
@@ -363,10 +364,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       })
       const j = await r.json()
       const code = j?.data?.code ?? j?.code
-      if (j.ok && (code === 0 || code === undefined)) setWebhookMsg({ ok: true, text: `Webhook activé → ${callbackUrl}` })
-      else setWebhookMsg({ ok: false, text: `Échec : ${j?.data?.msg ?? j?.error ?? 'erreur inconnue'}` })
+      if (j.ok && (code === 0 || code === undefined)) setWebhookMsg({ ok: true, text: tr(`Webhook activé → ${callbackUrl}`, `Webhook enabled → ${callbackUrl}`) })
+      else setWebhookMsg({ ok: false, text: tr(`Échec : ${j?.data?.msg ?? j?.error ?? 'erreur inconnue'}`, `Failed: ${j?.data?.msg ?? j?.error ?? 'unknown error'}`) })
     } catch (e) {
-      setWebhookMsg({ ok: false, text: `Erreur réseau : ${e instanceof Error ? e.message : String(e)}` })
+      setWebhookMsg({ ok: false, text: tr(`Erreur réseau : ${e instanceof Error ? e.message : String(e)}`, `Network error: ${e instanceof Error ? e.message : String(e)}`) })
     } finally {
       setWebhookBusy(false)
     }
@@ -1351,7 +1352,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       if (!url) return
                       setRotTest(p => ({ ...p, [i]: { busy: true } }))
                       const r = await rotateProxyIp(url)
-                      setRotTest(p => ({ ...p, [i]: { ok: r.ok, msg: r.ok ? 'Connexion au proxy réussie, l’IP peut être changée ✓' : `Le proxy n’a pas répondu correctement : ${r.detail}` } }))
+                      setRotTest(p => ({ ...p, [i]: { ok: r.ok, msg: r.ok ? tr('Connexion au proxy réussie, l’IP peut être changée ✓', 'Proxy connection successful, the IP can be rotated ✓') : tr(`Le proxy n’a pas répondu correctement : ${r.detail}`, `The proxy did not respond correctly: ${r.detail}`) } }))
                     }
                     const saveRot = async () => {
                       setRotSaving(true)
@@ -1361,12 +1362,12 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     return (
                     <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                        <h3 className="text-[11px] font-semibold uppercase" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid #FB923C', paddingLeft: 8, margin: 0 }}>Rotation d'IP proxy</h3>
+                        <h3 className="text-[11px] font-semibold uppercase" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid #FB923C', paddingLeft: 8, margin: 0 }}>{tr("Rotation d'IP proxy", 'Proxy IP rotation')}</h3>
                         {/* Toggle */}
                         <button
                           onClick={() => canEdit && proxyRot.setCfg({ ...cfg, enabled: !cfg.enabled })}
                           disabled={!canEdit}
-                          aria-label="Activer la rotation d'IP"
+                          aria-label={tr("Activer la rotation d'IP", 'Enable IP rotation')}
                           style={{ position: 'relative', width: 42, height: 24, borderRadius: 99, border: 'none', cursor: canEdit ? 'pointer' : 'default', flexShrink: 0, background: cfg.enabled ? 'linear-gradient(135deg,#EA580C,#FB923C)' : 'rgba(255,255,255,0.14)', transition: 'background 0.2s' }}
                         >
                           <span style={{ position: 'absolute', top: 3, left: cfg.enabled ? 21 : 3, width: 18, height: 18, borderRadius: 99, background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.4)', transition: 'left 0.2s' }} />
@@ -1374,9 +1375,9 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       </div>
 
                       <p style={{ fontSize: 12.5, color: S.text3, lineHeight: 1.6, margin: 0 }}>
-                        Quand c'est activé, ScaleFlow <strong style={{ color: S.text }}>change l'IP de ton proxy avant chaque post</strong> (mass posting, story, reels Instagram & TikTok, et programmation) → une IP fraîche à chaque publication, comme si chaque post venait d'un appareil différent.
+                        {tr("Quand c'est activé, ScaleFlow ", 'When enabled, ScaleFlow ')}<strong style={{ color: S.text }}>{tr("change l'IP de ton proxy avant chaque post", 'rotates your proxy IP before every post')}</strong>{tr(" (mass posting, story, reels Instagram & TikTok, et programmation) → une IP fraîche à chaque publication, comme si chaque post venait d'un appareil différent.", ' (mass posting, story, Instagram & TikTok reels, and scheduling) → a fresh IP for every post, as if each one came from a different device.')}
                         <br /><br />
-                        Colle ici le <strong style={{ color: S.text }}>« Change IP URL »</strong> de ton fournisseur (ex. Prox'Easy → onglet <em>IP Management</em>). Tu peux en ajouter plusieurs si tu as plusieurs proxies. <strong style={{ color: S.text }}>Configuré une seule fois</strong> — c'est mémorisé pour toute l'organisation.
+                        {tr('Colle ici le ', "Paste your provider's ")}<strong style={{ color: S.text }}>{tr('« Change IP URL »', '"Change IP URL"')}</strong>{tr(" de ton fournisseur (ex. Prox'Easy → onglet ", " here (e.g. Prox'Easy → ")}<em>IP Management</em>{tr('). Tu peux en ajouter plusieurs si tu as plusieurs proxies. ', ' tab). You can add several if you have multiple proxies. ')}<strong style={{ color: S.text }}>{tr('Configuré une seule fois', 'Set up once')}</strong>{tr(" — c'est mémorisé pour toute l'organisation.", ' — it is saved for the whole organization.')}
                       </p>
 
                       {cfg.enabled && (
@@ -1385,7 +1386,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                 <input
-                                  className="sf-input" placeholder={`Nom (ex. Dongle ${i + 1})`} value={cfg.names?.[i] ?? ''}
+                                  className="sf-input" placeholder={tr(`Nom (ex. Dongle ${i + 1})`, `Name (e.g. Dongle ${i + 1})`)} value={cfg.names?.[i] ?? ''}
                                   disabled={!canEdit}
                                   onChange={e => setName(i, e.target.value)}
                                   style={{ width: 180, flexShrink: 0, fontSize: 12 }}
@@ -1397,10 +1398,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                                   style={{ flex: 1, fontFamily: 'ui-monospace, monospace', fontSize: 12 }}
                                 />
                                 <button onClick={() => testUrl(i)} disabled={!canEdit || !url.trim() || rotTest[i]?.busy} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flexShrink: 0, opacity: (!url.trim() || rotTest[i]?.busy) ? 0.5 : 1 }}>
-                                  {rotTest[i]?.busy ? 'Test…' : 'Tester'}
+                                  {rotTest[i]?.busy ? tr('Test…', 'Testing…') : tr('Tester', 'Test')}
                                 </button>
                                 {canEdit && (cfg.urls.length > 1) && (
-                                  <button onClick={() => removeRow(i)} title="Retirer" className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" style={{ flexShrink: 0, color: '#F87171' }}>
+                                  <button onClick={() => removeRow(i)} title={tr('Retirer', 'Remove')} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" style={{ flexShrink: 0, color: '#F87171' }}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                                   </button>
                                 )}
@@ -1413,7 +1414,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                           {canEdit && (
                             <button onClick={addRow} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-                              Ajouter un proxy
+                              {tr('Ajouter un proxy', 'Add a proxy')}
                             </button>
                           )}
                         </div>
@@ -1422,10 +1423,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       {canEdit && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${S.border}`, paddingTop: 14 }}>
                           <button onClick={saveRot} disabled={rotSaving} className="sf-btn sf-btn-primary sf-btn-sm" style={{ opacity: rotSaving ? 0.6 : 1 }}>
-                            {rotSaving ? 'Enregistrement…' : 'Enregistrer la rotation'}
+                            {rotSaving ? tr('Enregistrement…', 'Saving…') : tr('Enregistrer la rotation', 'Save rotation')}
                           </button>
-                          {rotSaved && <span style={{ fontSize: 12, fontWeight: 600, color: '#34D399' }}>Enregistré ✓</span>}
-                          <span style={{ fontSize: 11.5, color: S.text3, marginLeft: 'auto' }}>⚡ Poste 1 tél. à la fois quand activé</span>
+                          {rotSaved && <span style={{ fontSize: 12, fontWeight: 600, color: '#34D399' }}>{tr('Enregistré ✓', 'Saved ✓')}</span>}
+                          <span style={{ fontSize: 11.5, color: S.text3, marginLeft: 'auto' }}>{tr('⚡ Poste 1 tél. à la fois quand activé', '⚡ Posts 1 phone at a time when enabled')}</span>
                         </div>
                       )}
                     </div>
@@ -1437,11 +1438,11 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>Webhooks GéeLark</h3>
                       <p style={{ fontSize: 12.5, color: S.text3, lineHeight: 1.5, margin: 0 }}>
-                        Quand une tâche se termine, GéeLark prévient ScaleFlow instantanément → les téléphones s'éteignent plus vite (le garde-fou serveur reste actif en secours).
+                        {tr("Quand une tâche se termine, GéeLark prévient ScaleFlow instantanément → les téléphones s'éteignent plus vite (le garde-fou serveur reste actif en secours).", 'When a task finishes, GeeLark notifies ScaleFlow instantly → phones shut down faster (the server safeguard stays active as a backup).')}
                       </p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <button onClick={registerWebhook} disabled={webhookBusy} className="sf-btn sf-btn-primary sf-btn-sm" style={{ opacity: webhookBusy ? 0.6 : 1 }}>
-                          {webhookBusy ? 'Activation…' : 'Activer les webhooks'}
+                          {webhookBusy ? tr('Activation…', 'Enabling…') : tr('Activer les webhooks', 'Enable webhooks')}
                         </button>
                         {webhookMsg && (
                           <span style={{ fontSize: 12, fontWeight: 600, color: webhookMsg.ok ? '#34D399' : '#F87171' }}>{webhookMsg.text}</span>
@@ -1480,10 +1481,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     <div style={{ fontSize: 30, marginBottom: 10 }}>🏢</div>
                     <p style={{ fontSize: 15, fontWeight: 700, margin: '0 0 6px' }}>{t('navOrganization')}</p>
                     <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.5 }}>
-                      La gestion de l'équipe (membres, invitations, rôles & permissions) a désormais son propre onglet dans le menu.
+                      {tr("La gestion de l'équipe (membres, invitations, rôles & permissions) a désormais son propre onglet dans le menu.", 'Team management (members, invitations, roles & permissions) now has its own tab in the menu.')}
                     </p>
                     <button onClick={() => onNavigate?.('organization')} className="sf-btn sf-btn-primary cursor-pointer">
-                      Ouvrir « {t('navOrganization')} »
+                      {tr(`Ouvrir « ${t('navOrganization')} »`, `Open "${t('navOrganization')}"`)}
                     </button>
                   </div>
                 </div>
@@ -1605,11 +1606,11 @@ interface LicenseKey {
 }
 
 const DURATIONS = [
-  { label: '7j',   days: 7 },
-  { label: '30j',  days: 30 },
-  { label: '90j',  days: 90 },
-  { label: '1 an', days: 365 },
-  { label: '∞ vie', days: null },
+  { label: '7j',   en: '7d',        days: 7 },
+  { label: '30j',  en: '30d',       days: 30 },
+  { label: '90j',  en: '90d',       days: 90 },
+  { label: '1 an', en: '1 year',    days: 365 },
+  { label: '∞ vie', en: '∞ lifetime', days: null },
 ]
 
 function genKey() {
@@ -1619,9 +1620,9 @@ function genKey() {
 }
 
 function daysLeft(exp: string | null) {
-  if (!exp) return '∞ vie'
+  if (!exp) return trStatic('∞ vie', '∞ lifetime')
   const d = Math.ceil((new Date(exp).getTime() - Date.now()) / 86_400_000)
-  return d < 0 ? 'Expiré' : d === 0 ? 'Expire auj.' : `${d}j`
+  return d < 0 ? trStatic('Expiré', 'Expired') : d === 0 ? trStatic('Expire auj.', 'Expires today') : trStatic(`${d}j`, `${d}d`)
 }
 
 function daysColor(exp: string | null) {
@@ -1632,6 +1633,7 @@ function daysColor(exp: string | null) {
 
 function AdminPanel({ user: _user }: { user: User }) {
   const t = useT()
+  const tr = useTr()
   const [keys, setKeys]       = useState<LicenseKey[]>([])
   const [loading, setLoading] = useState(true)
   const [newKey, setNewKey]   = useState(genKey)
@@ -1725,7 +1727,7 @@ function AdminPanel({ user: _user }: { user: User }) {
           {DURATIONS.map(d => (
             <button key={d.label} onClick={() => setDuration(d.days)}
               className={`sf-btn sf-btn-sm ${duration === d.days ? 'sf-btn-primary' : 'sf-btn-secondary'}`}>
-              {d.label}
+              {tr(d.label, d.en)}
             </button>
           ))}
         </div>
