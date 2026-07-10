@@ -74,7 +74,17 @@ export interface RotationResult { ok: boolean; detail: string }
 // type {"result":"1","message":"Success"}) en un message clair pour l'utilisateur.
 // Les logs sont vus par des clients : jamais de JSON ni de jargon.
 function friendlyRotation(ok: boolean, rawBody?: string, status?: number, error?: string): { ok: boolean; msg: string } {
-  if (error) return { ok: false, msg: `impossible de joindre le proxy` }
+  if (error) {
+    // Raison lisible plutôt qu'un code technique. Le serveur retente déjà en
+    // ignorant les certificats auto-signés + repli http:// ; si on arrive ici,
+    // c'est un vrai échec réseau.
+    const e = String(error).toLowerCase()
+    if (/timeout|délai/.test(e)) return { ok: false, msg: 'le proxy n’a pas répondu (délai dépassé) — vérifie qu’il est allumé' }
+    if (/enotfound|getaddrinfo|dns/.test(e)) return { ok: false, msg: 'adresse introuvable (DNS) — vérifie l’URL du proxy' }
+    if (/econnrefused|refus/.test(e)) return { ok: false, msg: 'connexion refusée par le proxy — vérifie le port/l’URL' }
+    if (/cert|ssl|tls/.test(e)) return { ok: false, msg: 'certificat SSL du proxy invalide (réessaie, on l’ignore désormais)' }
+    return { ok: false, msg: `impossible de joindre le proxy (${e.slice(0, 60)})` }
+  }
   const body = (rawBody ?? '').trim()
   let parsed: Record<string, unknown> | null = null
   try { parsed = JSON.parse(body) } catch { /* réponse en texte simple */ }
