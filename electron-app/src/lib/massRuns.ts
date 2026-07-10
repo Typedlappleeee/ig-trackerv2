@@ -25,6 +25,10 @@ export interface MassRunLive {
 
 const runs = new Map<string, MassRunLive>()
 const subs = new Set<() => void>()
+// Réservations SYNCHRONES de téléphones, posées AVANT le débit crédits (qui est
+// async). Sans ça, un double-clic sur « Lancer » passe deux fois la garde
+// anti-doublon pendant l'await du débit → double-post + double-débit (TOCTOU).
+const claims = new Map<string, Set<string>>()
 
 function notify() { subs.forEach(cb => { try { cb() } catch { /* ignore */ } }) }
 
@@ -60,17 +64,27 @@ export function massRunSetStatus(id: string, phoneId: string, status: TaskStatus
 
 // Termine un run : garde la carte ~10s pour montrer le bilan, puis la retire.
 export function endMassRun(id: string): void {
+  claims.delete(id)  // libère la réservation synchrone si encore présente
   const r = runs.get(id); if (!r) return
   r.running = false
   notify()
   setTimeout(() => { runs.delete(id); notify() }, 10_000)
 }
 
-// Téléphones actuellement « occupés » : présents dans un run EN COURS et pas
-// encore dans un état final. Sert à empêcher qu'un même téléphone parte dans deux
-// runs en parallèle (sinon il posterait 2× et serait débité 2×).
+// Réserve SYNCHRONEMENT des téléphones pour un run à venir (avant tout await).
+export function claimPhones(runId: string, phoneIds: string[]): void {
+  claims.set(runId, new Set(phoneIds))
+}
+export function releaseClaim(runId: string): void {
+  if (claims.delete(runId)) notify()
+}
+
+// Téléphones actuellement « occupés » : réservés (claim synchrone) OU présents
+// dans un run EN COURS et pas encore dans un état final. Sert à empêcher qu'un
+// même téléphone parte dans deux runs en parallèle (double-post + double-débit).
 export function busyPhoneIds(): Set<string> {
   const s = new Set<string>()
+  for (const set of claims.values()) for (const id of set) s.add(id)
   for (const r of runs.values()) {
     if (!r.running) continue
     for (const [phoneId, st] of r.statuses) {

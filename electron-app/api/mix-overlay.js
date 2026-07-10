@@ -9,7 +9,7 @@ const sharp      = require('sharp')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { createClient } = require('@supabase/supabase-js')
-const { assertAllowedMediaUrl } = require('./_ssrf')
+const { assertAllowedMediaUrl, safeMediaFetchOpts } = require('./_ssrf')
 const fs   = require('fs')
 const path = require('path')
 const os   = require('os')
@@ -165,7 +165,7 @@ module.exports = async (req, res) => {
     // ── Download source video ────────────────────────────────────────────────
     if (videoUrl) {
       assertAllowedMediaUrl(videoUrl)  // anti-SSRF : uniquement une URL de la banque Supabase
-      const resp = await fetch(videoUrl, { signal: AbortSignal.timeout(30000) })
+      const resp = await fetch(videoUrl, safeMediaFetchOpts())  // pas de redirect-follow (anti-SSRF)
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch video: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {

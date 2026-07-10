@@ -42,10 +42,20 @@ function assertAllowedMediaUrl(raw) {
   if (u.protocol !== 'https:') throw new Error('URL média : https requis')
   const host = u.hostname.toLowerCase()
   if (hostIsPrivate(host)) throw new Error('hôte non autorisé')
+  // UNIQUEMENT l'hôte Supabase de CETTE app (pas *.supabase.co : un attaquant
+  // pourrait créer son propre projet Supabase et y héberger une Edge Function qui
+  // redirige vers 169.254.169.254). Les médias légitimes viennent tous de la
+  // banque, donc du même hôte que SUPABASE_URL.
   const allow = allowedSupabaseHosts()
-  const ok = allow.has(host) || /\.supabase\.co$/.test(host) || /\.supabase\.in$/.test(host)
-  if (!ok) throw new Error('source média non autorisée (doit être un fichier de la banque)')
+  if (!allow.has(host)) throw new Error('source média non autorisée (doit être un fichier de la banque)')
   return String(raw)
 }
 
-module.exports = { assertAllowedMediaUrl, hostIsPrivate }
+// Options fetch sûres pour aller chercher un média : pas de suivi de redirection
+// (une 3xx vers un hôte interne contournerait l'allowlist qui ne valide que l'URL
+// initiale) + timeout. L'appelant traite un statut 3xx comme un échec (!resp.ok).
+function safeMediaFetchOpts(timeoutMs = 30000) {
+  return { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) }
+}
+
+module.exports = { assertAllowedMediaUrl, hostIsPrivate, safeMediaFetchOpts }

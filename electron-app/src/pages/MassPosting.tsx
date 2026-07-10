@@ -20,7 +20,8 @@ import {
 } from '@/lib/massPostingStore'
 import {
   createMassRun, massRunLog, massRunSetStatus, endMassRun,
-  listMassRuns, subscribeMassRuns, hasRunningMassRun, busyPhoneIds, type MassRunLive,
+  listMassRuns, subscribeMassRuns, hasRunningMassRun, busyPhoneIds,
+  claimPhones, releaseClaim, type MassRunLive,
 } from '@/lib/massRuns'
 import { playSuccess } from '@/lib/sounds'
 import { useT, useLang } from '@/lib/i18n'
@@ -887,6 +888,12 @@ export function MassPosting({ user }: MassPostingProps) {
       return
     }
 
+    // Réservation SYNCHRONE des téléphones AVANT tout await (débit crédits) : ferme
+    // la fenêtre TOCTOU où un double-clic sur « Lancer » passerait deux fois la garde
+    // anti-doublon pendant le débit → double-post + double-débit.
+    const runId = `mass-${Date.now()}-${phoneList.length}`
+    claimPhones(runId, phoneList.map(p => p.id))
+
     // Légende à poster pour une vidéo donnée : sa description de banque si elle
     // en a une, sinon la légende globale saisie. Corrige le cas où chaque vidéo
     // a sa propre description mais toutes recevaient la même légende globale.
@@ -897,6 +904,7 @@ export function MassPosting({ user }: MassPostingProps) {
     const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
     const run = await startCreditRun(credits.ownerId, CREDIT_COSTS.mass_posting, phoneList.length)
     if (!run.ok) {
+      releaseClaim(runId)  // libère la réservation si le débit échoue
       toast.show({ title: 'Crédits insuffisants', body: `${run.error} — ${creditCost} crédits requis, solde : ${credits.balance}`, kind: 'error' })
       return
     }
@@ -911,7 +919,7 @@ export function MassPosting({ user }: MassPostingProps) {
     // composant partagées pour TOUT le corps de la fonction (y compris armAutoStop,
     // la boucle de polling, checkPhoneScreen imbriqués) → aucun run ne piétine un
     // autre. La logique de crédits/upload/poll reste inchangée.
-    const runId = `mass-${Date.now()}-${phoneList.length}`
+    // (runId est déjà déclaré plus haut pour la réservation synchrone.)
     const runLabel = `Mass posting · ${phoneList.length} compte${phoneList.length > 1 ? 's' : ''}`
     const stopRef           = { current: false }
     const activeTasksRef    = { current: [] as string[] }
@@ -921,6 +929,11 @@ export function MassPosting({ user }: MassPostingProps) {
     const autoStopTimersRef = { current: [] as number[] }
     const activeRunIdRef    = { current: runId as string | null }
     const log = (message: string, level: TaskLog['level'] = 'info') => massRunLog(runId, message, level)
+    // ⚠️ Miroir vers le store PERSISTANT (massPostingStore) : la reprise après
+    // refresh lit `persisted.taskStatuses` pour savoir quels téléphones ont déjà
+    // démarré. Sans ce miroir, elle voit un état vide et RELANCE tous les tél munis
+    // d'un token → DOUBLE-POST sur les comptes déjà publiés. Le run live reste piloté
+    // par massRuns ; ceci ne sert QU'À la persistance de reprise.
     const setPhoneStatus = (phoneId: string, status: TaskStatus) => {
       massRunSetStatus(runId, phoneId, status)
       const s = status.status
@@ -928,8 +941,14 @@ export function MassPosting({ user }: MassPostingProps) {
         : (s === 'error' || s === 'cancelled') ? 'error'
         : s === 'idle' ? 'idle' : 'running'
       setRunPhase(runId, phoneId, phase)
+      setMassPostingState({ taskStatuses: new Map(getMassPostingState().taskStatuses).set(phoneId, status) })
     }
-    const setTaskStatuses = (map: Map<string, TaskStatus>) => { map.forEach((st, id) => massRunSetStatus(runId, id, st)) }
+    const setTaskStatuses = (map: Map<string, TaskStatus>) => {
+      map.forEach((st, id) => massRunSetStatus(runId, id, st))
+      const merged = new Map(getMassPostingState().taskStatuses)
+      map.forEach((st, id) => merged.set(id, st))
+      setMassPostingState({ taskStatuses: merged })
+    }
 
     // Annulation propre de CE run uniquement (bouton Stop du run).
     let live: MassRunLive
