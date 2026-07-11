@@ -4,6 +4,10 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type Organization, type OrgMember, type OrgRole, type PermOverrides } from './supabase'
 
 const LS_KEY = 'ig-tracker-current-org'
+// Référence STABLE pour l'absence de permissions : `?? {}` créerait un nouvel objet
+// à chaque render → `perms` changerait d'identité et casserait les useEffect/useMemo
+// qui en dépendent (boucle de re-fetch). On réutilise donc toujours le même objet.
+const EMPTY_PERMS: PermOverrides = {}
 
 interface OrgContextValue {
   myOrgs:        { org: Organization; member: OrgMember }[]
@@ -146,7 +150,7 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
     currentOrg:   current?.org ?? null,
     myMembership: current?.member ?? null,
     role:         current?.member.role ?? null,
-    perms:        current?.member.perm_overrides ?? {},
+    perms:        current?.member.perm_overrides ?? EMPTY_PERMS,
     loading,
     loadError,
     switchOrg,

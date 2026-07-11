@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
+import { filterAccessiblePhones } from '@/lib/permissions'
 import { supabase } from '@/lib/supabase'
 import {
   publishVideoCrossPlatform, geelarkUploadForRpa, fetchPhoneProxies, CROSS_PLATFORMS,
@@ -24,7 +25,7 @@ type JobStatus = 'idle' | 'uploading' | 'running' | 'done' | 'error'
 interface Job { key: string; phone: Phone; platform: CrossPlatform; status: JobStatus; detail?: string }
 
 export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
-  const { currentOrg } = useOrg()
+  const { currentOrg, role, perms } = useOrg()
   const { bearer } = useConnections(user)
   const toast = useToast()
   const tr = useTr()
@@ -51,8 +52,9 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
     let q = supabase.from('phones').select('id, geelark_id, phone_name, ig_username, group_name').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id)
     const { data } = await q
-    setPhones((data ?? []) as Phone[])
-  }, [currentOrg, user.id])
+    // 🔒 Filtre à la source : le membre ne voit/poste que sur ses groupes autorisés.
+    setPhones(filterAccessiblePhones((data ?? []) as Phone[], role, perms))
+  }, [currentOrg, user.id, role, perms])
   useEffect(() => { loadPhones() }, [loadPhones])
 
   const visible = phones.filter(p => {

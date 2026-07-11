@@ -431,7 +431,10 @@ export default function StoryLink({ user }: { user: User }) {
     if (!bearer) return
     setLoading(true)
     try {
-      const list = await fetchAllPhones(bearer)
+      const raw = await fetchAllPhones(bearer)
+      // 🔒 Filtre À LA SOURCE : un membre ne voit QUE les groupes autorisés → ni le
+      // sélecteur, ni le filtre, ni la sélection ne peuvent toucher un autre groupe.
+      const list = role ? raw.filter(p => canAccessPhoneGroup(role, perms, p.group?.name ?? p.groupName ?? null)) : raw
       setPhones(list)
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])

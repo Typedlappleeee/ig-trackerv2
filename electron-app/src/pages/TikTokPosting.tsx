@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
+import { filterAccessiblePhones } from '@/lib/permissions'
 import { supabase } from '@/lib/supabase'
 import { postTikTokVideoAdb } from '@/lib/geelark'
 import { BankPicker, VideoThumbnail } from '@/pages/Bank'
@@ -126,7 +127,7 @@ function LogPanel({ logs }: { logs: string[] }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function TikTokPosting({ user }: TikTokPostingProps) {
   const tr = useTr()
-  const { currentOrg } = useOrg()
+  const { currentOrg, role, perms } = useOrg()
   const { bearer } = useConnections(user)
 
   // ── Phones state ─────────────────────────────────────────────────────────
@@ -160,13 +161,14 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
       }
       const { data, error } = await q
       if (error) throw error
-      setPhones((data ?? []) as Phone[])
+      // 🔒 Filtre à la source : le membre ne voit/poste que sur ses groupes autorisés.
+      setPhones(filterAccessiblePhones((data ?? []) as Phone[], role, perms))
     } catch (e) {
       setPhonesError(e instanceof Error ? e.message : String(e))
     } finally {
       setPhonesLoading(false)
     }
-  }, [currentOrg, user.id])
+  }, [currentOrg, user.id, role, perms])
 
   // Load on mount
   useState(() => { loadPhones() })

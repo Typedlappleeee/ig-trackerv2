@@ -8,7 +8,7 @@ import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
-import { canAccessPhoneGroup } from '@/lib/permissions'
+import { canAccessPhoneGroup, filterAccessiblePhones, accessibleGroupNames } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { createScheduledPost, defaultSchedValue, type ScheduledVideoRecord } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
@@ -59,9 +59,10 @@ export function CreateScheduleModal({ user, onCreated, onClose, initialPlatform,
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ data }) => {
-      const ps = (data ?? []) as Phone[]
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      const ps = filterAccessiblePhones((data ?? []) as Phone[], role, perms)
       setPhones(ps)
-      const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
+      const grps = accessibleGroupNames(ps, role, perms)
       setGroups(['Tous', ...grps])
       // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
       if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')

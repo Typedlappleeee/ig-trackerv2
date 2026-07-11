@@ -6,7 +6,7 @@ import { supabase, fetchAllRows, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { useT, useLang, useTr } from '@/lib/i18n'
-import { canAccessPhoneGroup, canDoAction } from '@/lib/permissions'
+import { canAccessPhoneGroup, canDoAction, filterAccessiblePhones } from '@/lib/permissions'
 import { fetchAllPhones, geelarkStatusLabel, stopPhones } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
@@ -791,13 +791,15 @@ export function Phones({ user }: PhonesProps) {
         q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
         return q
       })
-      setPhones(data)
+      // 🔒 Filtre à la source : le membre ne voit que les téléphones des groupes
+      // auxquels il a accès — aucun autre groupe ne peut apparaître, quoi qu'il arrive.
+      setPhones(filterAccessiblePhones(data, role, perms))
     } catch {
       setError(fr('Erreur de chargement des téléphones.', 'Error loading phones.'))
     }
     setLoading(false)
     poller.pollNow()
-  }, [bearer, currentOrg, user.id, fr])
+  }, [bearer, currentOrg, user.id, role, perms, fr])
 
   useEffect(() => {
     if (conns.loading) return

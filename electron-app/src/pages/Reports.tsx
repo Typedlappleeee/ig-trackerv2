@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { filterAccessiblePhones } from '@/lib/permissions'
 import { useLicense } from '@/lib/license'
 import { useConnections } from '@/lib/connections'
 import { syncGeelarkAnalytics } from '@/lib/geelarkAnalytics'
@@ -63,7 +64,7 @@ function agoLabel(iso: string | null): string {
 
 export function Reports({ user }: { user: User }) {
   const trh = useTr()
-  const { currentOrg, role } = useOrg()
+  const { currentOrg, role, perms } = useOrg()
   const isSuperAdmin = useLicense()?.isSuperAdmin === true
   // Stats réservées à l'agence (owner/admin/superadmin, ou solo) — « bientôt » pour les autres.
   const canStats = isSuperAdmin || !currentOrg || role === 'owner' || role === 'admin'
@@ -144,7 +145,8 @@ export function Reports({ user }: { user: User }) {
       if (!!a.ig_username !== !!b.ig_username) return a.ig_username ? -1 : 1
       return (b.followers ?? 0) - (a.followers ?? 0) || (a.ig_username ?? a.phone_name ?? '').localeCompare(b.ig_username ?? b.phone_name ?? '')
     })
-    setAccounts(list)
+    // 🔒 Filtre à la source : le membre ne voit que les comptes des groupes autorisés.
+    setAccounts(filterAccessiblePhones(list, role, perms))
 
     const byDay = new Map<string, number>()
     for (const r of (tData ?? []) as { day: string; views: number | null }[]) byDay.set(r.day, (byDay.get(r.day) ?? 0) + (r.views ?? 0))
@@ -155,7 +157,7 @@ export function Reports({ user }: { user: User }) {
     }
     setTrend(series)
     setLoading(false)
-  }, [table, keyCol, keyVal, currentOrg?.id, user.id, day])
+  }, [table, keyCol, keyVal, currentOrg?.id, user.id, day, role, perms])
 
   useEffect(() => { load() }, [load])
 

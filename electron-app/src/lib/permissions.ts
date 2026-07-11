@@ -41,6 +41,31 @@ export function canSeeTab(role: OrgRole, overrides: PermOverrides | undefined, t
   return ROLE_TABS[role][tab]
 }
 
+// Filtre une liste de téléphones aux SEULS groupes auxquels le membre a accès.
+// En mode perso (role null/undefined) : tout est accessible. owner/admin : tout.
+// À appliquer À LA SOURCE (juste après le chargement / en useMemo) pour qu'aucune
+// liste dérivée (filtres de groupe, sélecteurs) ne fuite un groupe interdit.
+export function filterAccessiblePhones<T extends { group_name?: string | null }>(
+  phones: T[],
+  role: OrgRole | null | undefined,
+  overrides: PermOverrides | undefined,
+): T[] {
+  if (!role) return phones
+  return phones.filter(p => canAccessPhoneGroup(role, overrides, p.group_name ?? null))
+}
+
+// Liste triée des noms de groupes VISIBLES par le membre (déduits de ses téléphones
+// accessibles). '(sans groupe)' n'est PAS renvoyé (les téléphones sans groupe ne
+// forment pas un groupe nommé sélectionnable).
+export function accessibleGroupNames(
+  phones: { group_name?: string | null }[],
+  role: OrgRole | null | undefined,
+  overrides: PermOverrides | undefined,
+): string[] {
+  const accessible = filterAccessiblePhones(phones, role, overrides)
+  return [...new Set(accessible.map(p => p.group_name).filter((g): g is string => Boolean(g)))].sort()
+}
+
 export function canAccessBankFolder(
   role: OrgRole,
   overrides: PermOverrides | undefined,

@@ -10,6 +10,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useConnections } from '@/lib/connections'
+import { useOrg } from '@/lib/orgContext'
+import { canAccessPhoneGroup } from '@/lib/permissions'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import {
   fetchAllPhones, getPhonePublicIp, startPhones, waitForPhoneConnectivity, type GeelarkPhone,
@@ -31,6 +33,7 @@ async function pLimit<T>(items: T[], limit: number, worker: (item: T) => Promise
 export function ProxyHealth({ user }: { user: User }) {
   const tr = useTr()
   const { bearer } = useConnections(user)
+  const { role, perms } = useOrg()
   const [phones, setPhones]   = useState<GeelarkPhone[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr]         = useState<string | null>(null)
@@ -44,7 +47,11 @@ export function ProxyHealth({ user }: { user: User }) {
   async function load() {
     if (!bearer) return
     setLoading(true); setErr(null)
-    try { setPhones(await fetchAllPhones(bearer)) }
+    try {
+      const raw = await fetchAllPhones(bearer)
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      setPhones(role ? raw.filter(p => canAccessPhoneGroup(role, perms, p.group?.name ?? p.groupName ?? null)) : raw)
+    }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
     setLoading(false)
   }

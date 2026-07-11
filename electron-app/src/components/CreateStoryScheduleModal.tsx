@@ -142,8 +142,10 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
   useEffect(() => {
     if (!bearer || conns.loading) return
     setLoading(true)
-    fetchAllPhones(bearer).then(list => {
+    fetchAllPhones(bearer).then(raw => {
       if (!mountedRef.current) return
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      const list = role ? raw.filter(p => canAccessPhoneGroup(role, perms, p.group?.name ?? p.groupName ?? null)) : raw
       setPhones(list)
       const gs = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...gs])

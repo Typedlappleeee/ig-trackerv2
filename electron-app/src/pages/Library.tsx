@@ -9,6 +9,8 @@ import {
   getPhonePublicIp, waitForPhoneConnectivity, shellExec, type GeelarkPhone,
 } from '@/lib/geelark'
 import { startRun, setRunPhase, finishRun } from '@/lib/activeRuns'
+import { useOrg } from '@/lib/orgContext'
+import { canAccessPhoneGroup } from '@/lib/permissions'
 import { useTr, tr } from '@/lib/i18n'
 import { BankPicker } from './Bank'
 import type { ContentItem } from '@/lib/supabase'
@@ -213,6 +215,7 @@ function ComingSoon() {
 // ── Lanceur (superadmin) ─────────────────────────────────────────────────────
 function GeelarkLauncher({ user }: { user: User }) {
   const { bearer } = useConnections(user)
+  const { role, perms } = useOrg()
   const isSuper = useLicense()?.isSuperAdmin === true
   const tr = useTr()
 
@@ -234,7 +237,11 @@ function GeelarkLauncher({ user }: { user: User }) {
   async function loadPhones() {
     if (!bearer) return
     setLoading(true); setErr(null)
-    try { setPhones(await fetchAllPhones(bearer)) }
+    try {
+      const raw = await fetchAllPhones(bearer)
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      setPhones(role ? raw.filter(p => canAccessPhoneGroup(role, perms, p.group?.name ?? p.groupName ?? null)) : raw)
+    }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
     setLoading(false)
   }

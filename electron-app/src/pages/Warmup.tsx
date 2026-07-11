@@ -222,7 +222,9 @@ export function Warmup({ user }: WarmupProps) {
     if (!bearer) return
     setLoadingPhones(true); setPhonesError(null)
     try {
-      const list = await fetchAllPhones(bearer)
+      const raw = await fetchAllPhones(bearer)
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      const list = role ? raw.filter(p => canAccessPhoneGroup(role, perms, p.group?.name ?? p.groupName ?? null)) : raw
       setPhones(list)
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])

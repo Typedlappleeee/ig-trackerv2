@@ -35,7 +35,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
-import { canAccessPhoneGroup } from '@/lib/permissions'
+import { canAccessPhoneGroup, filterAccessiblePhones, accessibleGroupNames } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { postInstagramStory, stopPhone } from '@/lib/geelark'
 import { registerStartedPhones } from '@/lib/phoneWatch'
@@ -1198,9 +1198,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       ? q.eq('org_id', currentOrg.id)
       : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ data }) => {
-      const ps = (data ?? []) as Phone[]
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      const ps = filterAccessiblePhones((data ?? []) as Phone[], role, perms)
       setPhones(ps)
-      const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
+      const grps = accessibleGroupNames(ps, role, perms)
       setGroups(['Tous', ...grps])
       // Auto-fill phone links from DB (phones.link column), unless already set by the editTask
       setPhoneLinks(prev => {

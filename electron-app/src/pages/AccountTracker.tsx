@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useOrg } from '@/lib/orgContext'
+import { canAccessPhoneGroup } from '@/lib/permissions'
 import { useTr } from '@/lib/i18n'
 
 // ── Suivi des comptes (tableau partagé équipe) ───────────────────────────────
@@ -27,6 +29,7 @@ const STATUS_COLOR: Record<string, { bg: string; fg: string; bd: string }> = {
 const MARKETS = ['', 'FR', 'US', 'UK', 'ES', 'DE', 'Autre']
 
 export function AccountTracker({ user, orgId }: { user: User; orgId: string | null }) {
+  const { role, perms } = useOrg()
   const tr = useTr()
   const [rows, setRows] = useState<Row[]>([])
   const [phoneAccounts, setPhoneAccounts] = useState<{ ig_username: string; phone_name: string | null }[]>([])
@@ -49,12 +52,15 @@ export function AccountTracker({ user, orgId }: { user: User; orgId: string | nu
     }
     setRows((data ?? []) as Row[])
     // Comptes IG déjà assignés aux téléphones → suggestions + import.
-    let pq = supabase.from('phones').select('ig_username, phone_name').not('ig_username', 'is', null)
+    let pq = supabase.from('phones').select('ig_username, phone_name, group_name').not('ig_username', 'is', null)
     pq = orgId ? pq.eq('org_id', orgId) : pq.eq('user_id', user.id).is('org_id', null)
     const { data: pd } = await pq
-    setPhoneAccounts((pd ?? []) as { ig_username: string; phone_name: string | null }[])
+    // 🔒 Le membre ne voit que les comptes des groupes autorisés.
+    const accessible = ((pd ?? []) as { ig_username: string; phone_name: string | null; group_name: string | null }[])
+      .filter(p => !role || canAccessPhoneGroup(role, perms, p.group_name ?? null))
+    setPhoneAccounts(accessible)
     setLoading(false)
-  }, [orgId, user.id])
+  }, [orgId, user.id, role, perms])
   useEffect(() => { load() }, [load])
 
   // Crée une ligne pour chaque compte IG des téléphones pas encore dans le tableau.

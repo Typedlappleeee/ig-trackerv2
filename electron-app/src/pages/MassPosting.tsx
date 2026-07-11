@@ -5,7 +5,7 @@ import { igImg, timeAgo } from '@/lib/igimg'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
-import { canAccessPhoneGroup } from '@/lib/permissions'
+import { canAccessPhoneGroup, filterAccessiblePhones, accessibleGroupNames } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
@@ -330,14 +330,17 @@ export function MassPosting({ user }: MassPostingProps) {
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(ph => {
-      const ps = ph.data ?? []
+      // 🔒 Filtre À LA SOURCE : un membre ne récupère QUE les téléphones des groupes
+      // auxquels il a accès → impossible de voir/poster sur un autre groupe, quoi
+      // qu'il arrive (le filtre de groupe et le sélecteur en dérivent).
+      const ps = filterAccessiblePhones(ph.data ?? [], role, perms)
       setPhones(ps)
-      const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
+      const grps = accessibleGroupNames(ps, role, perms)
       setGroups(['Tous', ...grps])
-      // Groupe mémorisé disparu (renommé/supprimé) → retour à « Tous »
+      // Groupe mémorisé disparu (renommé/supprimé/interdit) → retour à « Tous »
       if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
     })
-  }, [currentOrg?.id, user.id, conns.bearer])
+  }, [currentOrg?.id, user.id, conns.bearer, role, perms])
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [logs])
 

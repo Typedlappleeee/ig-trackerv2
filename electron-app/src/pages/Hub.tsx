@@ -218,9 +218,15 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const load = useCallback(async () => {
     setLoading(true)
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const phonesQ = currentOrg
+    // 🔒 KPI téléphones : si le membre est restreint à certains groupes, on ne
+    // compte QUE ceux-là (sinon le compteur laisse deviner l'existence des autres).
+    const restrictedGroups = (role && role !== 'owner' && role !== 'admin' && perms?.phone_groups?.mode === 'allow')
+      ? (perms.phone_groups.list ?? [])
+      : null
+    let phonesQ = currentOrg
       ? supabase.from('phones').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
       : supabase.from('phones').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
+    if (restrictedGroups) phonesQ = phonesQ.in('group_name', restrictedGroups)
     const bankQ = currentOrg
       ? supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
       : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
@@ -261,7 +267,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     const merged = [...recentScheduled, ...recentRuns].sort((a, b) => b._date.localeCompare(a._date)).slice(0, 5)
     setRecent(merged.map(({ kind, data }) => ({ kind, data } as typeof merged[number])))
     setLoading(false)
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, role, perms])
 
   useEffect(() => { load() }, [load])
 
