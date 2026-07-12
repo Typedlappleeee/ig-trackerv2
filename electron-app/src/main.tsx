@@ -4,6 +4,26 @@ import App from './App'
 import { ToastProvider } from './components/Toast'
 import './index.css'
 
+// ── Anti-crash « traduction du navigateur » ──────────────────────────────────
+// Google Translate (et Edge/DeepL) remplacent les nœuds texte du DOM. React, qui
+// gère son propre arbre, plante alors avec « Failed to execute 'insertBefore' /
+// 'removeChild' … not a child of this node » (écran blanc pour l'utilisateur, vu
+// surtout chez des invités dont le navigateur auto-traduit). On rend ces deux
+// opérations DÉFENSIVES : si le nœud de référence a changé de parent (déplacé par
+// le traducteur), on ne jette plus — l'app continue de tourner.
+if (typeof Node === 'function' && Node.prototype) {
+  const origRemoveChild = Node.prototype.removeChild
+  Node.prototype.removeChild = function <T extends Node>(child: T): T {
+    if (child.parentNode !== this) return child
+    return origRemoveChild.call(this, child) as T
+  }
+  const origInsertBefore = Node.prototype.insertBefore
+  Node.prototype.insertBefore = function <T extends Node>(newNode: T, referenceNode: Node | null): T {
+    if (referenceNode && referenceNode.parentNode !== this) return newNode
+    return origInsertBefore.call(this, newNode, referenceNode) as T
+  }
+}
+
 // When running in a browser (Vercel/web), window.electronAPI doesn't exist.
 // Inject the polyfill synchronously so it's ready before any component renders.
 import { buildWebAPI } from './lib/webAPI'
