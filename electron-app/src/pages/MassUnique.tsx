@@ -9,7 +9,7 @@
  * Réutilise l'infra testée : runRepurposeViaServer / runRepurposeNative (variantes),
  * window.electronAPI.runFfmpegMixOverlay (incrustation texte), groqRequest (spin).
  */
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -39,6 +39,14 @@ interface VariantJob {
 }
 
 const IS_WEB = (window as unknown as { __IS_WEB?: boolean }).__IS_WEB === true
+
+// Exécute `worker(i)` pour i∈[0,n[ avec au plus `limit` en parallèle.
+async function runPool(n: number, limit: number, worker: (i: number) => Promise<void>): Promise<void> {
+  let idx = 0
+  await Promise.all(Array.from({ length: Math.min(limit, n) }, async () => {
+    while (idx < n) { const i = idx++; await worker(i) }
+  }))
+}
 
 // Décline N textes courts d'incrustation à partir d'un thème (Groq).
 async function spinTexts(apiKey: string, theme: string, n: number, lang: 'fr' | 'en'): Promise<string[]> {
@@ -80,6 +88,7 @@ export function MassUnique({ user }: { user: User }) {
   const [saveFolder, setFolder] = useState<string | null>(null)
   const [running, setRunning]   = useState(false)
   const [jobs, setJobs]         = useState<VariantJob[]>([])
+  const abortRef = useRef(false)
 
   const groqKey = conns.groq || (import.meta as unknown as { env?: { VITE_DEFAULT_GROQ_KEY?: string } }).env?.VITE_DEFAULT_GROQ_KEY || ''
   const lang: 'fr' | 'en' = tr('fr', 'en') as 'fr' | 'en'
@@ -109,6 +118,7 @@ export function MassUnique({ user }: { user: User }) {
     if (useText && !theme.trim()) { toast.show({ title: tr('Thème manquant', 'Missing theme'), body: tr('Entre un thème pour générer les textes.', 'Enter a theme to generate the texts.'), kind: 'warn' }); return }
     if (useText && !groqKey) { toast.show({ title: tr('Clé Groq manquante', 'Groq key missing'), body: tr('Ajoute-la dans les Paramètres.', 'Add it in Settings.'), kind: 'error' }); return }
 
+    abortRef.current = false
     setRunning(true)
     // Prépare la liste des jobs (source × count)
     const initial: VariantJob[] = []
@@ -147,23 +157,25 @@ export function MassUnique({ user }: { user: User }) {
           continue
         }
 
-        for (let i = 0; i < count; i++) {
+        // Traitement des variantes EN PARALLÈLE (pool borné à 4) — sinon les N
+        // incrustations texte s'enchaînent une par une = très lent (15 min+).
+        await runPool(count, 4, async (i) => {
+          if (abortRef.current) return
           const key = `${s.id}-${i}`
           const v = variants[i]
-          if (!v?.ok || !v.outputPath) { setJob(key, { status: 'error', error: v?.error ?? tr('Variante échouée', 'Variant failed') }); continue }
+          if (!v?.ok || !v.outputPath) { setJob(key, { status: 'error', error: v?.error ?? tr('Variante échouée', 'Variant failed') }); return }
 
           let finalStorage = v.storagePath
           let finalThumb   = v.thumbnailPath ?? null
           const text = useText && texts.length ? texts[i % texts.length] : null
 
           // Incrustation texte (optionnelle) → nouvel MP4.
-          if (text) {
+          if (text && !abortRef.current) {
             setJob(key, { status: 'text', text })
             const ov = await window.electronAPI?.runFfmpegMixOverlay?.({
               sourcePath: v.outputPath, caption: text, position, fontSize, fontColor,
             })
             if (ov?.ok && ov.storagePath) {
-              // On garde la version avec texte ; on nettoie la variante intermédiaire.
               if (v.storagePath && v.storagePath !== ov.storagePath) supabase.storage.from('content').remove([v.storagePath]).catch(() => {})
               finalStorage = ov.storagePath
               finalThumb = null
@@ -171,7 +183,8 @@ export function MassUnique({ user }: { user: User }) {
             // Si l'overlay échoue, on garde la variante visuelle (pas de texte).
           }
 
-          if (!finalStorage) { setJob(key, { status: 'error', error: tr('Pas de fichier de sortie', 'No output file') }); continue }
+          if (abortRef.current) { setJob(key, { status: 'error', error: tr('Annulé', 'Cancelled') }); return }
+          if (!finalStorage) { setJob(key, { status: 'error', error: tr('Pas de fichier de sortie', 'No output file') }); return }
 
           // Enregistrement en banque.
           setJob(key, { status: 'saving', text })
@@ -185,7 +198,8 @@ export function MassUnique({ user }: { user: User }) {
           }
           const { error } = await supabase.from('content_bank').insert(base)
           setJob(key, error ? { status: 'error', error: error.message } : { status: 'done', text })
-        }
+        })
+        if (abortRef.current) break
       }
       toast.show({ title: tr('Génération terminée', 'Generation complete'), body: tr('Vidéos enregistrées dans la banque.', 'Videos saved to the bank.'), kind: 'ok' })
     } catch (e) {
@@ -304,10 +318,19 @@ export function MassUnique({ user }: { user: User }) {
 
       {/* Action + progression */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <button onClick={generate} disabled={running || sources.length === 0} className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
-          style={{ opacity: running || sources.length === 0 ? 0.5 : 1 }}>
-          {running ? tr('Génération…', 'Generating…') : tr(`Générer ${sources.length * count} vidéo(s)`, `Generate ${sources.length * count} video(s)`)}
-        </button>
+        {running ? (
+          <button onClick={() => { abortRef.current = true }} className="sf-btn sf-btn-danger sf-btn-lg cursor-pointer">
+            {tr('Arrêter', 'Stop')}
+          </button>
+        ) : (
+          <button onClick={generate} disabled={sources.length === 0} className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+            style={{ opacity: sources.length === 0 ? 0.5 : 1 }}>
+            {tr(`Générer ${sources.length * count} vidéo(s)`, `Generate ${sources.length * count} video(s)`)}
+          </button>
+        )}
+        {running && (
+          <span style={{ fontSize: 11.5, color: FAINT }}>{tr('~4 en parallèle · garde l\'onglet ouvert', '~4 in parallel · keep the tab open')}</span>
+        )}
         {total > 0 && (
           <span style={{ fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>
             <span style={{ color: OK }}>{done}</span> / {total} {tr('terminées', 'done')}{errored > 0 && <span style={{ color: ERR }}> · {errored} {tr('échec', 'failed')}</span>}
