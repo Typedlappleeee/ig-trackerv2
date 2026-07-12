@@ -935,8 +935,18 @@ Deno.serve(async (req) => {
           } catch (e) {
             log(`   ❌ ${name} : ${e instanceof Error ? e.message : String(e)}`)
           } finally {
-            await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] }).catch(() => {})
-            await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+            // On ne supprime la ligne de surveillance QUE si l'extinction a réussi.
+            // Sinon (stop en échec / réseau) on la GARDE → le watchdog réessaiera
+            // d'éteindre le téléphone (au lieu de le laisser allumé ~30 min jusqu'à
+            // l'arrêt auto GeeLark, comme observé).
+            let stopped = false
+            try {
+              const sr = await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] })
+              stopped = !!sr && (sr.code === 0 || sr.code === undefined)
+            } catch { /* garde la ligne pour réessai */ }
+            if (stopped) {
+              await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+            }
           }
           doneSet.add(phone.geelark_id)
           processedThisRun++
@@ -1286,8 +1296,18 @@ Deno.serve(async (req) => {
           } catch (e) {
             log(`❌ ${name} : ${e instanceof Error ? e.message : String(e)}`)
           } finally {
-            await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] }).catch(() => {})
-            await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+            // On ne supprime la ligne de surveillance QUE si l'extinction a réussi.
+            // Sinon (stop en échec / réseau) on la GARDE → le watchdog réessaiera
+            // d'éteindre le téléphone (au lieu de le laisser allumé ~30 min jusqu'à
+            // l'arrêt auto GeeLark, comme observé).
+            let stopped = false
+            try {
+              const sr = await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] })
+              stopped = !!sr && (sr.code === 0 || sr.code === undefined)
+            } catch { /* garde la ligne pour réessai */ }
+            if (stopped) {
+              await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+            }
           }
           doneSet.add(phone.geelark_id)
         }
