@@ -42,12 +42,15 @@ function assertAllowedMediaUrl(raw) {
   if (u.protocol !== 'https:') throw new Error('URL média : https requis')
   const host = u.hostname.toLowerCase()
   if (hostIsPrivate(host)) throw new Error('hôte non autorisé')
-  // UNIQUEMENT l'hôte Supabase de CETTE app (pas *.supabase.co : un attaquant
-  // pourrait créer son propre projet Supabase et y héberger une Edge Function qui
-  // redirige vers 169.254.169.254). Les médias légitimes viennent tous de la
-  // banque, donc du même hôte que SUPABASE_URL.
+  // On accepte l'hôte Supabase de l'app (SUPABASE_URL) OU tout *.supabase.co /
+  // *.supabase.in. C'est robuste même si SUPABASE_URL n'est pas configuré côté
+  // serveur (sinon les URLs signées légitimes seraient rejetées → le spoof casse).
+  // La protection anti-SSRF-interne repose sur hostIsPrivate + safeMediaFetchOpts
+  // (redirect: 'manual', donc une 3xx vers une IP interne n'est jamais suivie) :
+  // même un projet Supabase tiers ne peut pas nous faire atteindre un hôte interne.
   const allow = allowedSupabaseHosts()
-  if (!allow.has(host)) throw new Error('source média non autorisée (doit être un fichier de la banque)')
+  const ok = allow.has(host) || /\.supabase\.(co|in)$/.test(host)
+  if (!ok) throw new Error('source média non autorisée (doit être un fichier de la banque)')
   return String(raw)
 }
 
