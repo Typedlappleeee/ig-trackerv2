@@ -594,6 +594,7 @@ const Scheduler      = lazyWithReload(() => import('@/pages/Scheduler').then(m =
 const Tasks          = lazyWithReload(() => import('@/pages/Tasks').then(m => ({ default: m.Tasks })))
 const Warmup         = lazyWithReload(() => import('@/pages/Warmup').then(m => ({ default: m.Warmup })))
 const VideoRepurpose = lazyWithReload(() => import('@/pages/VideoRepurpose').then(m => ({ default: m.VideoRepurpose })))
+const MassUnique     = lazyWithReload(() => import('@/pages/MassUnique').then(m => ({ default: m.MassUnique })))
 const Mixer          = lazyWithReload(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
 const Spoof          = lazyWithReload(() => import('@/pages/Spoof').then(m => ({ default: m.Spoof })))
 const Licences       = lazyWithReload(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
@@ -913,6 +914,7 @@ function AppContent({ user }: { user: User }) {
       case 'mixer':        return <Mixer        user={user} />
       case 'subtitles':    return <Subtitles    user={user} />
       case 'spoof':        return <Spoof        user={user} />
+      case 'massunique':   return <MassUnique   user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />

@@ -62,7 +62,7 @@ export type Page =
   | 'stats'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
   | 'publishhub' | 'photoposting'
-  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof' | 'videostudio'
+  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof' | 'videostudio' | 'massunique'
   | 'community' | 'support'
   | 'library'
   | 'settings' | 'licences'
@@ -994,6 +994,18 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             >
               <span className="sf-sidebar-icon"><NavIcon d={ICONS.shield} size={17} /></span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
+            </button>
+          )}
+
+          {license.isSuperAdmin && (
+            <button
+              className={`sf-sidebar-item${page === 'massunique' ? ' is-active' : ''}`}
+              onClick={() => { playNav(); onNavigate('massunique') }}
+              title={tr('Générateur de masse (superadmin)', 'Mass generator (superadmin)')}
+              style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+            >
+              <span className="sf-sidebar-icon"><NavIcon d={ICONS.sparkles} size={17} /></span>
+              {!collapsed && <span style={{ flex: 1 }}>{tr('Générateur de masse', 'Mass generator')}</span>}
             </button>
           )}
 
