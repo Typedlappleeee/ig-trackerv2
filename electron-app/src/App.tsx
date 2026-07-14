@@ -20,6 +20,7 @@ import {
   executeScheduledPost, finishScheduledPost,
   type ScheduledPost,
 } from '@/lib/schedulerService'
+import { loadProxyRotation } from '@/lib/proxyRotation'
 
 // ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
 function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
@@ -745,6 +746,20 @@ function AppContent({ user }: { user: User }) {
     const run = async (post: ScheduledPost) => {
       if (running.has(post.id)) return
       running.add(post.id)
+      // ⚠️ Si la rotation d'IP est configurée, on LAISSE le serveur exécuter ce post.
+      // Le rotatif est SÉRIEL (1 tél à la fois, ~2 min/tél) : si le daemon client le
+      // pilote et que l'utilisateur ferme l'app en cours, le posting s'arrête et les
+      // téléphones restants ne postent jamais. Le serveur (edge function) fait le
+      // rotatif 1 tél/invocation et survit au PC éteint → c'est le but de « Programmer ».
+      // Concerne les types exécutables serveur (mass_posting + story « plate »).
+      const serverCapable = post.type === 'mass_posting'
+        || (post.type === 'story' && !((post.result as { steps?: unknown } | null)?.steps))
+      if (serverCapable) {
+        const rotEnabled = await loadProxyRotation(post.org_id ?? null, post.user_id)
+          .then(c => c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim())))
+          .catch(() => false)
+        if (rotEnabled) { running.delete(post.id); return }  // le serveur s'en charge
+      }
       const claimed = await claimScheduledPost(post.id)
       if (!claimed) { running.delete(post.id); return }
       const logs: string[] = []
