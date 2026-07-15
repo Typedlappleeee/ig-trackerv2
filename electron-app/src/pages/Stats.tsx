@@ -200,11 +200,19 @@ export function Stats({ user }: StatsProps) {
   }, [loadPhones, loadHistory])
 
   useEffect(() => {
+    // Filtre par org/user + COALESCE : le poller de stats écrit en continu sur des
+    // centaines de lignes `phones` ; sans filtre ni debounce, chaque écriture
+    // relançait un loadPhones() complet → tempête de rechargements = interface qui rame.
+    const filter = currentOrg ? `org_id=eq.${currentOrg.id}` : `user_id=eq.${user.id}`
+    let t: ReturnType<typeof setTimeout> | null = null
     const ch = supabase.channel('stats-phones')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'phones' }, () => { loadPhones() })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'phones', filter }, () => {
+        if (t) clearTimeout(t)
+        t = setTimeout(() => { loadPhones() }, 4000)  // regroupe les rafales d'updates
+      })
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [loadPhones])
+    return () => { if (t) clearTimeout(t); supabase.removeChannel(ch) }
+  }, [loadPhones, currentOrg, user.id])
 
   const groups = useMemo(() => [...new Set(phones.map(p => p.group_name).filter(Boolean))].sort() as string[], [phones])
 

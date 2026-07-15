@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { useConnections } from '@/lib/connections'
@@ -807,7 +807,9 @@ export default function StoryLink({ user }: { user: User }) {
   }
 
   // ── Job status helpers ────────────────────────────────────────────────────
-  const jobFor = (id: string) => jobs.find(j => j.phoneId === id)
+  // Lookup O(1) — évite un jobs.find() O(n) dans le .map de la liste (rendu O(n²)).
+  const jobByPhone = useMemo(() => new Map(jobs.map(j => [j.phoneId, j])), [jobs])
+  const jobFor = (id: string) => jobByPhone.get(id)
   const statusColor = (s?: JobStatus) =>
     s === 'ok' ? 'var(--ok)' : s === 'error' ? 'var(--err)' : s === 'running' ? 'var(--accent-l)' : 'rgba(148,163,184,0.28)'
 

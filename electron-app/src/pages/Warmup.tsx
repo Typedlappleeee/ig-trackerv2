@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { Button } from '@/components/ui/Button'
@@ -246,6 +246,9 @@ export function Warmup({ user }: WarmupProps) {
     }
     return true
   })
+
+  // Lookup O(1) — évite un jobs.find() O(n) dans le .map de la liste (rendu O(n²)).
+  const jobByPhone = useMemo(() => new Map(jobs.map(j => [j.phone.id, j])), [jobs])
 
   function togglePhone(id: string) {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -746,7 +749,7 @@ export function Warmup({ user }: WarmupProps) {
                 {visiblePhones.map(phone => {
                   const online = isOnline(phone)
                   const sel    = selected.has(phone.id)
-                  const job    = jobs.find(j => j.phone.id === phone.id)
+                  const job    = jobByPhone.get(phone.id)
                   const grp    = phone.group?.name ?? phone.groupName
                   return (
                     <div key={phone.id}

@@ -661,6 +661,10 @@ export function MassPosting({ user }: MassPostingProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phoneList.map(p => p.id).join(','), selectedVideos.map(v => v.item.id).join(','), mode, randomSeed])
 
+  // Lookup O(1) par téléphone — évite un `assignments.find(...)` O(n) DANS le .map
+  // de la liste (rendu O(n²) = liste qui rame à des centaines de téléphones).
+  const assignmentByPhone = useMemo(() => new Map(assignments.map(a => [a.phone.id, a])), [assignments])
+
   // Arrête le run affiché dans le panneau (chaque run porte sa propre annulation).
   // Repli sur l'ancien chemin singleton si c'est une reprise après refresh (aucun
   // run vivant en mémoire).
@@ -2041,7 +2045,7 @@ export function MassPosting({ user }: MassPostingProps) {
           <div className="anim-stagger" style={{ flex: 1, overflow: 'auto', scrollbarWidth: 'thin' }}>
             {phonePickMode === 'phones' && visiblePhones.map(phone => {
               const checked = selectedPhones.has(phone.id)
-              const asgn = assignments.find(a => a.phone.id === phone.id)
+              const asgn = assignmentByPhone.get(phone.id)
               const ts = taskStatuses.get(phone.id)
               const isActive = ts && (ts.status === 'uploading' || ts.status === 'posting')
               const initials = (phone.ig_username?.[0] ?? phone.phone_name?.[0] ?? '?').toUpperCase()
