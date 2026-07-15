@@ -70,19 +70,24 @@ function nameWithoutExt(p: string): string {
 const DOWNLOAD_BUCKET = 'content'
 async function downloadItem(item: ContentItem) {
   const filename = getDownloadName(item)
-  if (item.storage_path) {
-    const { data, error } = await supabase.storage.from(DOWNLOAD_BUCKET).download(item.storage_path)
-    if (!error && data) {
-      const blobUrl = URL.createObjectURL(data)
-      const a = document.createElement('a')
-      a.href = blobUrl; a.download = filename
-      document.body.appendChild(a); a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 15000)
-      return
-    }
+  const triggerBlob = (blob: Blob) => {
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl; a.download = filename
+    document.body.appendChild(a); a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 15000)
   }
-  // fallback: file_url (legacy)
+  // URL signée + fetch d'abord (robuste pour un membre d'org : le token autorise
+  // sans re-vérifier la RLS de session), puis repli .download(), puis file_url.
+  if (item.storage_path) {
+    try {
+      const signed = await getSignedUrl(item.storage_path)
+      if (signed) { triggerBlob(await (await fetch(signed)).blob()); return }
+    } catch { /* on tente les replis */ }
+    const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(item.storage_path)
+    if (data) { triggerBlob(data); return }
+  }
   if (item.file_url) {
     const a = document.createElement('a')
     a.href = item.file_url; a.download = filename
@@ -1233,16 +1238,22 @@ export function Bank({ user }: BankProps) {
                     let nextIdx = 0
                     let done = 0
                     setZipProgress({ done: 0, total: sel.length })
+                    let firstErr = ''
                     const worker = async () => {
                       while (nextIdx < sel.length) {
                         const it = sel[nextIdx++]
                         let buf: ArrayBuffer | null = null
-                        if (it.storage_path) {
-                          const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(it.storage_path)
-                          if (data) buf = await data.arrayBuffer()
-                        } else if (it.file_url) {
-                          try { buf = await (await fetch(it.file_url)).arrayBuffer() } catch (_) { /* compté ci-dessous */ }
-                        }
+                        try {
+                          // URL signée + fetch : plus robuste que .download() pour un
+                          // membre d'org (le token de l'URL signée autorise l'accès sans
+                          // re-vérifier la RLS de session au moment du téléchargement).
+                          const src = it.storage_path ?? it.file_url
+                          if (src) {
+                            const signed = it.storage_path ? await getSignedUrl(it.storage_path).catch(() => null) : it.file_url
+                            const url = signed ?? it.file_url
+                            if (url) buf = await (await fetch(url)).arrayBuffer()
+                          }
+                        } catch (e) { if (!firstErr) firstErr = e instanceof Error ? e.message : String(e) }
                         done++
                         setZipProgress({ done, total: sel.length })
                         if (!buf) { failed++; continue }
@@ -1265,7 +1276,7 @@ export function Bank({ user }: BankProps) {
                       setZipProgress(null)
                     }
                     if (!Object.keys(files).length) {
-                      toast.show({ title: tr('Téléchargement impossible', 'Download failed'), body: tr('Aucune vidéo n\u2019a pu être récupérée.', 'No video could be retrieved.'), kind: 'error' })
+                      toast.show({ title: tr('Téléchargement impossible', 'Download failed'), body: tr('Aucune vidéo n\u2019a pu être récupérée.', 'No video could be retrieved.') + (firstErr ? ` (${firstErr.slice(0, 80)})` : ''), kind: 'error' })
                       return
                     }
                     if (failed > 0) toast.show({ title: tr('ZIP incomplet', 'Incomplete ZIP'), body: tr(`${failed} vidéo${failed > 1 ? 's' : ''} n\u2019a pas pu être incluse dans le ZIP.`, `${failed} video${failed > 1 ? 's' : ''} could not be added to the ZIP.`), kind: 'warn' })
