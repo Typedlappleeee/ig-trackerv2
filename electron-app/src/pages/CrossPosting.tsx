@@ -185,15 +185,32 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
   return (
     <div className="sf-page anim-page">
       <div className="sf-page-header">
-        <div>
-          <h1 className="sf-page-title" style={{ fontSize: 22 }}>
-            {lockedCfg ? `${lockedCfg.emoji} ${lockedCfg.label}` : 'Cross-posting'}
-          </h1>
-          <p className="sf-page-sub">
-            {lockedCfg
-              ? tr(`Mass posting ${lockedCfg.label} : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire.`, `Mass posting ${lockedCfg.label}: multiple videos + captions from the bank, distributed sequentially or randomly.`)
-              : tr('Mass posting Threads & co : plusieurs vidéos + captions de la banque, distribuées en séquentiel ou aléatoire sur tes comptes.', 'Mass posting Threads & co: multiple videos + captions from the bank, distributed sequentially or randomly across your accounts.')}
-          </p>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" aria-hidden style={{ fontSize: 22 }}>
+            {lockedCfg ? lockedCfg.emoji : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4Z" />
+              </svg>
+            )}
+          </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">
+              {lockedCfg ? lockedCfg.label : 'Cross-posting'}
+            </h1>
+            <p className="sf-page-sub">
+              {lockedCfg
+                ? tr(`Mass posting ${lockedCfg.label} · vidéos + captions de la banque · 2 crédits / téléphone`, `Mass posting ${lockedCfg.label} · videos + captions from the bank · 2 credits / phone`)
+                : tr('Mass posting Threads & co · vidéos + captions de la banque, distribuées en séquentiel ou aléatoire · 2 crédits / téléphone', 'Mass posting Threads & co · videos + captions from the bank, distributed sequentially or randomly · 2 credits / phone')}
+            </p>
+          </div>
+        </div>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          <span className={`sf-status-chip ${running ? 'is-live' : 'is-idle'}`}>
+            {running ? <span className="sf-status-dot" /> : null}
+            {running
+              ? tr('Publication en cours', 'Publishing')
+              : tr(`${selected.size} sélectionné(s)`, `${selected.size} selected`)}
+          </span>
         </div>
       </div>
 
@@ -212,19 +229,19 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
           <div style={{ flex: '1 1 420px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 320 }}>
             {/* Platforms — masqué quand la page est verrouillée sur une plateforme */}
             {!lockedPlatform && (
-              <div className="sf-card" style={{ padding: 16 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 10 }}>{tr('Plateformes', 'Platforms')}</p>
+              <div className="sf-card" style={{ padding: 'var(--sp-5)' }}>
+                <p className="sf-section-label" style={{ marginBottom: 12 }}>{tr('Plateformes', 'Platforms')}</p>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {CROSS_PLATFORMS.map(pl => {
                     const on = platforms.has(pl.key)
                     return (
                       <button key={pl.key} onClick={() => togglePlatform(pl.key)}
-                        className="cursor-pointer"
+                        className="sf-press cursor-pointer"
                         style={{
                           display: 'flex', alignItems: 'center', gap: 7, padding: '8px 13px', borderRadius: 'var(--r-md)',
-                          fontSize: 12.5, fontWeight: 600, transition: 'all .15s',
+                          fontSize: 12.5, fontWeight: 600, transition: 'background var(--t-fast), border-color var(--t-fast), color var(--t-fast)',
                           background: on ? 'var(--accent-dim)' : 'var(--surface-2)',
-                          border: `1px solid ${on ? 'var(--border-accent)' : 'var(--border)'}`,
+                          border: `1px solid ${on ? 'var(--border-accent)' : 'var(--border-md)'}`,
                           color: on ? 'var(--accent-lt)' : 'var(--text-3)',
                         }}>
                         <span>{pl.emoji}</span>{pl.label}
@@ -232,16 +249,16 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
                     )
                   })}
                 </div>
-                <p style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 10 }}>
-                  {tr('⚠ Les templates RPA de ces plateformes dépendent de la version de l’API GéeLark ; en cas d’erreur, le message exact est affiché par téléphone.', '⚠ The RPA templates for these platforms depend on the GeeLark API version; if an error occurs, the exact message is shown per phone.')}
-                </p>
+                <div className="sf-banner is-warn" style={{ marginTop: 12, fontSize: 11.5 }}>
+                  <span>{tr('Les templates RPA de ces plateformes dépendent de la version de l’API GéeLark ; en cas d’erreur, le message exact est affiché par téléphone.', 'The RPA templates for these platforms depend on the GeeLark API version; if an error occurs, the exact message is shown per phone.')}</span>
+                </div>
               </div>
             )}
 
             {/* Vidéos */}
-            <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="sf-card" style={{ padding: 'var(--sp-5)', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{tr('Vidéos & photos', 'Videos & photos')}</p>
+                <p className="sf-section-label" style={{ margin: 0 }}>{tr('Vidéos & photos', 'Videos & photos')}</p>
                 {videos.length > 0 && <span className="sf-badge sf-badge-accent" style={{ fontSize: 10 }}>{videos.length}</span>}
                 {videos.length > 0 && <button onClick={() => setVideos([])} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>{tr('Vider', 'Clear')}</button>}
               </div>
@@ -250,24 +267,23 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
               </button>
 
               {/* Distribution seq/random */}
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="sf-segment" style={{ width: '100%' }}>
                 {([{ k: 'seq', l: 'Séquentiel', en: 'Sequential' }, { k: 'random', l: 'Aléatoire', en: 'Random' }] as const).map(m => (
-                  <button key={m.k} onClick={() => setMode(m.k)} className="cursor-pointer"
-                    style={{ flex: 1, padding: '7px 0', borderRadius: 'var(--r-sm)', fontSize: 11.5, fontWeight: 600, border: '1px solid ' + (mode === m.k ? 'var(--border-accent)' : 'var(--border)'),
-                      background: mode === m.k ? 'var(--accent-dim)' : 'var(--surface-2)', color: mode === m.k ? 'var(--accent-lt)' : 'var(--text-3)' }}>
+                  <button key={m.k} onClick={() => setMode(m.k)}
+                    className={`sf-segment-item ${mode === m.k ? 'is-active' : ''}`} style={{ flex: 1 }}>
                     {tr(m.l, m.en)}
                   </button>
                 ))}
               </div>
-              <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0 }}>
+              <p className="sf-hint" style={{ margin: 0 }}>
                 {mode === 'seq' ? tr('Téléphone 1 → vidéo 1, téléphone 2 → vidéo 2…', 'Phone 1 → video 1, phone 2 → video 2…') : tr('Chaque téléphone reçoit une vidéo au hasard.', 'Each phone gets a random video.')}
               </p>
             </div>
 
             {/* Captions (description Threads = champ title) */}
-            <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="sf-card" style={{ padding: 'var(--sp-5)', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Captions</p>
+                <p className="sf-section-label" style={{ margin: 0 }}>Captions</p>
                 {captions.length > 0 && <span className="sf-badge sf-badge-accent" style={{ fontSize: 10 }}>{captions.length}</span>}
                 <button onClick={() => setShowCapPicker(true)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ marginLeft: 'auto', fontSize: 11 }}>
                   {tr('＋ Choisir dans la banque', '＋ Choose from bank')}
@@ -277,10 +293,10 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
                 value={captionsText}
                 onChange={e => setCaptionsText(e.target.value)}
                 placeholder={tr("Une caption par ligne — chaque caption = la description d'un compte…", "One caption per line — each caption = one account's description…")}
-                className="sf-input"
+                className="sf-input sf-textarea"
                 style={{ minHeight: 90, resize: 'vertical', padding: 10, fontSize: 12.5 }}
               />
-              <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0 }}>
+              <p className="sf-hint" style={{ margin: 0 }}>
                 {tr(`1 caption = 1 compte (${mode === 'seq' ? 'séquentiel : compte 1 → caption 1…' : 'aléatoire'}). Une ligne par caption.`, `1 caption = 1 account (${mode === 'seq' ? 'sequential: account 1 → caption 1…' : 'random'}). One line per caption.`)}
               </p>
               <div className="sf-card" style={{ padding: '10px 12px', background: 'var(--surface-2)' }}>
@@ -302,7 +318,11 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
 
           {/* Right : phones + jobs */}
           <div style={{ flex: '1 1 360px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 300 }}>
-            <div className="sf-card" style={{ padding: 14 }}>
+            <div className="sf-card" style={{ padding: 'var(--sp-5)' }}>
+              <div className="sf-cluster" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
+                <p className="sf-section-label" style={{ margin: 0 }}>{tr('Téléphones', 'Phones')}</p>
+                <span className="sf-badge sf-badge-muted sf-tabular" style={{ fontSize: 10 }}>{tr(`${selected.size}/${visible.length}`, `${selected.size}/${visible.length}`)}</span>
+              </div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher un téléphone…', 'Search a phone…')}
                   className="sf-input" style={{ flex: 1, height: 30, fontSize: 12 }} />
@@ -317,9 +337,10 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
                 ) : visible.map(p => {
                   const on = selected.has(p.id)
                   return (
-                    <button key={p.id} onClick={() => togglePhone(p.id)} className="cursor-pointer"
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: 'none', textAlign: 'left',
+                    <button key={p.id} onClick={() => togglePhone(p.id)} className="sf-press cursor-pointer"
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px', border: 'none', textAlign: 'left',
                         borderLeft: on ? '2px solid var(--accent)' : '2px solid transparent',
+                        transition: 'background var(--t-fast)',
                         background: on ? 'var(--accent-dim2)' : 'transparent', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0, border: on ? 'none' : '1px solid var(--border-strong)', background: on ? 'var(--accent)' : 'transparent',
                         display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -336,14 +357,20 @@ export function CrossPosting({ user, lockedPlatform }: CrossPostingProps) {
 
             {/* Jobs progress */}
             {jobs.length > 0 && (
-              <div className="sf-card" style={{ padding: 14 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 10 }}>{tr('Progression', 'Progress')}</p>
+              <div className="sf-card" style={{ padding: 'var(--sp-5)' }}>
+                <div className="sf-cluster" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
+                  <p className="sf-section-label" style={{ margin: 0 }}>{tr('Progression', 'Progress')}</p>
+                  <span className="sf-tabular" style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                    {jobs.filter(j => j.status === 'done').length}/{jobs.length}
+                  </span>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 300, overflow: 'auto' }}>
                   {jobs.map(j => {
                     const pl = CROSS_PLATFORMS.find(p => p.key === j.platform)!
+                    const live = j.status === 'running' || j.status === 'uploading'
                     return (
-                      <div key={j.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor[j.status], flexShrink: 0 }} />
+                      <div key={j.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, padding: '3px 0' }}>
+                        <span className={live ? 'sf-status-dot' : ''} style={{ width: 7, height: 7, borderRadius: '50%', color: statusColor[j.status], background: statusColor[j.status], flexShrink: 0 }} />
                         <span style={{ color: 'var(--text-3)', flexShrink: 0 }}>{pl.emoji}</span>
                         <span style={{ color: 'var(--text-2)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {j.phone.ig_username ? `@${j.phone.ig_username}` : j.phone.phone_name}
@@ -438,13 +465,16 @@ function CaptionPicker({ user, currentOrg, onSelect, onClose }: {
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')} className="sf-input" style={{ height: 32, fontSize: 12.5, marginBottom: 10 }} />
         <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {loading ? (
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', textAlign: 'center', padding: 20 }}>{tr('Chargement…', 'Loading…')}</p>
+            <>
+              {[0, 1, 2, 3].map(k => <div key={k} className="sf-skeleton-line" style={{ height: 54, borderRadius: 'var(--r-sm)' }} />)}
+            </>
           ) : visible.length === 0 ? (
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', textAlign: 'center', padding: 20 }}>{tr('Aucune caption dans la banque.', 'No caption in the bank.')}</p>
+            <EmptyState compact title={tr('Aucune caption', 'No caption')}
+              description={tr('Ajoute des captions dans la banque pour les distribuer ici.', 'Add captions to the bank to distribute them here.')} />
           ) : visible.map(i => {
             const on = sel.has(i.id)
             return (
-              <button key={i.id} onClick={() => toggle(i.id)} className="cursor-pointer"
+              <button key={i.id} onClick={() => toggle(i.id)} className="sf-press cursor-pointer"
                 style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 11px', borderRadius: 'var(--r-sm)', textAlign: 'left', border: '1px solid ' + (on ? 'var(--border-accent)' : 'var(--border)'), background: on ? 'var(--accent-dim)' : 'var(--surface-2)' }}>
                 <span style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0, marginTop: 1, border: on ? 'none' : '1px solid var(--border-strong)', background: on ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {on && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1.5 4L3 5.5L6.5 2" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}

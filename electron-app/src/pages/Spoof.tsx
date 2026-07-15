@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
@@ -282,31 +282,26 @@ export function Spoof({ user }: { user: User }) {
       )}
 
       {/* ── Header ── */}
-      <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
-        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg,#10B981,#059669)',
-            boxShadow: '0 10px 24px -8px rgba(16,185,129,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-          }}>
+      <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'var(--blur-md)' }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ '--icon-grad': 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 10px 24px -8px rgba(16,185,129,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)' } as CSSProperties}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h1 className="sf-page-title">Spoof</h1>
-              {running && (
-                <span className="sf-badge sf-badge-accent" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  {tr('Traitement…', 'Processing…')}
-                </span>
-              )}
-            </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">Spoof</h1>
             <p className="sf-page-sub">{tr('Métadonnées iPhone authentiques + GPS multi-pays · chaque export est unique', 'Authentic iPhone metadata + multi-country GPS · every export is unique')}</p>
           </div>
         </div>
+        {running && (
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+            <span className="sf-status-chip">
+              <span className="sf-status-dot" />
+              {tr('Traitement…', 'Processing…')}
+            </span>
+          </div>
+        )}
       </header>
 
       {/* ── Spoof body ── */}
@@ -358,20 +353,13 @@ export function Spoof({ user }: { user: User }) {
             {/* iPhone model */}
             <div style={{ padding: '0 16px' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Modèle iPhone', 'iPhone model')}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
                 {Object.entries(PRESETS).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => setPreset(key)}
                     disabled={running}
-                    className="cursor-pointer"
-                    style={{
-                      padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
-                      background: preset === key ? 'rgba(99,102,241,0.15)' : 'var(--surface-2)',
-                      color: preset === key ? '#6366F1' : 'var(--text-3)',
-                      outline: preset === key ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-                      transition: 'all 0.15s',
-                    }}
+                    className={`sf-segment-item cursor-pointer${preset === key ? ' is-active' : ''}`}
                   >
                     {label}
                   </button>
@@ -490,14 +478,14 @@ export function Spoof({ user }: { user: User }) {
                       <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{tr('⚡ Automatique', '⚡ Automatic')}</p>
                       <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>{tr('Réglages aléatoires différents pour chaque vidéo', 'Different random settings for each video')}</p>
                     </div>
-                    <span style={{ width: 32, height: 18, borderRadius: 99, position: 'relative', background: autoMode ? 'var(--accent)' : 'rgba(255,255,255,0.12)', flexShrink: 0 }}>
-                      <span style={{ position: 'absolute', top: 2, left: autoMode ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
+                    <span className={`sf-toggle-track ${autoMode ? 'on' : 'off'}`} style={{ flexShrink: 0 }}>
+                      <span className="sf-toggle-thumb" />
                     </span>
                   </button>
                   {autoMode && (
-                    <p style={{ fontSize: 11, color: 'var(--accent-l)', margin: '0 0 2px', lineHeight: 1.5 }}>
+                    <div className="sf-banner is-accent" style={{ fontSize: 11, lineHeight: 1.5 }}>
                       {tr("Chaque vidéo reçoit ses propres micro-variations (luminosité, gamma, teinte, saturation, contraste, grain/pixels, netteté, zoom, recadrage, micro-vitesse, vignette). Pas de miroir → le texte à l'écran reste intact. Les réglages manuels ci-dessous sont ignorés.", 'Each video gets its own micro-variations (brightness, gamma, hue, saturation, contrast, grain/pixels, sharpness, zoom, crop, micro-speed, vignette). No mirror → on-screen text stays intact. The manual settings below are ignored.')}
-                    </p>
+                    </div>
                   )}
 
                   {/* Sliders */}
@@ -535,14 +523,8 @@ export function Spoof({ user }: { user: User }) {
                         key={label}
                         onClick={() => (set as (v: boolean) => void)(!value)}
                         disabled={running || autoMode}
-                        className="cursor-pointer"
-                        style={{
-                          flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
-                          background: value ? 'rgba(99,102,241,0.15)' : 'var(--surface-2)',
-                          color: value ? '#6366F1' : 'var(--text-3)',
-                          outline: value ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-                          transition: 'all 0.15s',
-                        }}
+                        className={`sf-btn sf-btn-sm cursor-pointer ${value ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
+                        style={{ flex: 1, justifyContent: 'center' }}
                       >
                         {label}
                       </button>
@@ -564,21 +546,13 @@ export function Spoof({ user }: { user: User }) {
               <button
                 onClick={runSpoof}
                 disabled={!selectedVideos.length || running}
-                className="sf-btn sf-btn-lg cursor-pointer"
-                style={{
-                  width: '100%',
-                  background: !selectedVideos.length ? 'var(--surface-2)' : running ? 'rgba(239,68,68,0.12)' : 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
-                  color: !selectedVideos.length ? 'var(--text-4)' : running ? '#f87171' : '#6366F1',
-                  border: selectedVideos.length ? `1px solid ${running ? 'rgba(239,68,68,0.28)' : 'rgba(99,102,241,0.32)'}` : '1px solid var(--border)',
-                  boxShadow: selectedVideos.length && !running ? '0 0 24px rgba(99,102,241,0.14)' : 'none',
-                  cursor: selectedVideos.length ? 'pointer' : 'not-allowed',
-                  justifyContent: 'center',
-                }}
+                className={`sf-btn sf-btn-lg cursor-pointer ${running ? 'sf-btn-danger' : 'sf-btn-primary'}`}
+                style={{ width: '100%', justifyContent: 'center' }}
               >
                 {running ? (
                   <>
-                    <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(248,113,113,0.3)', borderTopColor: '#f87171', animation: 'spin 0.9s linear infinite' }} />
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{tr(`Traitement ${doneCount}/${totalOutputs}…`, `Processing ${doneCount}/${totalOutputs}…`)}</span>
+                    <span className="sf-spinner" />
+                    <span className="sf-tabular">{tr(`Traitement ${doneCount}/${totalOutputs}…`, `Processing ${doneCount}/${totalOutputs}…`)}</span>
                   </>
                 ) : (
                   <>
@@ -617,27 +591,17 @@ export function Spoof({ user }: { user: User }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {/* Save-to-bank bar */}
                 {doneCount > 0 && (
-                  <div className="sf-card" style={{
-                    padding: '10px 14px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10,
-                    flexWrap: 'wrap', borderColor: 'rgba(99,102,241,0.18)', background: 'rgba(99,102,241,0.04)',
-                  }}>
-                    <div style={{ flex: 1, fontSize: 11, color: 'var(--text-3)' }}>
-                      {tr('Dossier : ', 'Folder: ')}<span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? tr('Racine', 'Root')}</span>
+                  <div className="sf-banner is-accent">
+                    <div style={{ flex: 1, fontSize: 12, color: 'var(--text-3)' }}>
+                      {tr('Dossier : ', 'Folder: ')}<span style={{ color: 'var(--accent-lt)', fontWeight: 600 }}>{saveFolder ?? tr('Racine', 'Root')}</span>
                     </div>
                     <button
                       onClick={saveAllToBank}
                       disabled={savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')}
-                      className="sf-btn cursor-pointer"
-                      style={{
-                        height: 32, padding: '0 14px', fontSize: 11, fontWeight: 700, borderRadius: 8,
-                        background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
-                        color: '#818CF8', border: '1px solid rgba(99,102,241,0.32)',
-                        display: 'inline-flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums',
-                        opacity: (savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')) ? 0.5 : 1,
-                      }}
+                      className="sf-btn sf-btn-sm sf-btn-primary sf-banner-action cursor-pointer sf-tabular"
                     >
                       {savingAll
-                        ? <><div style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} /> {tr('Enregistrement…', 'Saving…')}</>
+                        ? <><span className="sf-spinner" /> {tr('Enregistrement…', 'Saving…')}</>
                         : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> {tr(`Tout enregistrer (${doneCount})`, `Save all (${doneCount})`)}</>
                       }
                     </button>

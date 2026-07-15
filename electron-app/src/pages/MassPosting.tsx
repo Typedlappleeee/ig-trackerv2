@@ -1780,22 +1780,12 @@ export function MassPosting({ user }: MassPostingProps) {
     <div className="anim-page h-full flex flex-col overflow-hidden" style={{ background: 'var(--surface)' }}>
 
       {/* ── Page header ──────────────────────────────────────────────────────── */}
-      <header style={{
-        flexShrink: 0,
-        padding: '18px 28px 0',
-        borderBottom: '1px solid rgba(233,234,240,0.07)',
-        background: 'var(--surface-2)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingBottom: 16 }}>
+      <header style={{ flexShrink: 0, background: 'var(--surface-2)' }}>
+        <div className="sf-page-header">
 
           {/* Left: icon + title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-              boxShadow: '0 10px 24px -8px rgba(99,102,241,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-            }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-page-icon sf-anim-scale-spring">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 22-7z"/>
               </svg>
@@ -1815,25 +1805,15 @@ export function MassPosting({ user }: MassPostingProps) {
           </div>
 
           {/* Right: controls */}
-          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
 
             {/* Mode toggle */}
-            <div style={{
-              display: 'flex',
-              border: '1px solid rgba(233,234,240,0.1)',
-              borderRadius: 8,
-              overflow: 'hidden',
-              background: 'rgba(255,255,255,0.03)',
-            }}>
+            <div className="sf-segment" role="tablist" aria-label={tr('Mode de répartition', 'Distribution mode')}>
               {([{ k: 'seq', label: t('schedulerSequential') }, { k: 'random', label: t('schedulerRandom') }] as const).map(m => (
                 <button key={m.k} onClick={() => setMode(m.k)}
-                  className="cursor-pointer"
-                  style={{
-                    padding: '7px 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
-                    background: mode === m.k ? 'var(--accent)' : 'transparent',
-                    color: mode === m.k ? '#fff' : MUTED,
-                    border: 'none', transition: 'all 0.18s',
-                  }}>
+                  className={`sf-segment-item${mode === m.k ? ' is-active' : ''}`}
+                  role="tab" aria-selected={mode === m.k}
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 10.5 }}>
                   {m.label}
                 </button>
               ))}
@@ -1856,26 +1836,23 @@ export function MassPosting({ user }: MassPostingProps) {
             )}
 
             {/* Status chip */}
-            <div className={posting ? 'sf-badge sf-badge-accent' : 'sf-badge sf-badge-muted'} style={{ gap: 7, padding: '5px 12px' }}>
-              <span style={{
-                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                background: posting ? 'var(--accent)' : 'rgba(233,234,240,0.25)',
-                animation: posting ? 'pulse-soft 1.6s ease-in-out infinite' : 'none',
-              }} />
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <div className={`sf-status-chip ${posting ? 'is-accent' : 'is-idle'}`}>
+              {posting
+                ? <span className="sf-status-dot" style={{ color: 'var(--accent)' }} />
+                : <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: 'var(--text-4)' }} />}
+              <span style={{ letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                 {posting ? t('running') : t('idle')}
               </span>
             </div>
           </div>
         </div>
 
+        <div style={{ padding: '2px 28px 0' }}>
         {/* Last run recap */}
         {!posting && lastRun && (
-          <div style={{
-            marginBottom: 14, padding: '10px 16px', borderRadius: 9,
-            display: 'flex', alignItems: 'center', gap: 12,
-            background: lastRun.err === 0 ? 'rgba(52,211,153,0.07)' : 'rgba(251,191,36,0.07)',
-            border: `1px solid ${lastRun.err === 0 ? 'rgba(52,211,153,0.2)' : 'rgba(251,191,36,0.25)'}`,
+          <div className={`sf-banner ${lastRun.err === 0 ? 'is-accent' : 'is-warn'}`} style={{
+            marginBottom: 14,
+            ...(lastRun.err === 0 ? { background: 'var(--ok-dim)', borderColor: 'rgba(34,197,94,0.22)', color: 'var(--ok)' } : {}),
           }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: lastRun.err === 0 ? 'var(--ok)' : 'var(--warn)' }}>
               {lastRun.err === 0 ? '✓' : '!'} {tr(`Dernier run : ${lastRun.ok}/${lastRun.total} réussi${lastRun.ok > 1 ? 's' : ''}${lastRun.err > 0 ? ` · ${lastRun.err} échec${lastRun.err > 1 ? 's' : ''}` : ''}`, `Last run: ${lastRun.ok}/${lastRun.total} succeeded${lastRun.err > 0 ? ` · ${lastRun.err} failed` : ''}`)}
@@ -1937,6 +1914,7 @@ export function MassPosting({ user }: MassPostingProps) {
             </div>
           </div>
         )}
+        </div>
       </header>
 
       {/* ── 2-column body ────────────────────────────────────────────────────── */}
@@ -2253,7 +2231,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 </div>
 
                 {addingFolder && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 10, borderRadius: 8, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', fontSize: 12, color: 'var(--accent)' }}>
+                  <div className="sf-banner is-accent" style={{ marginBottom: 10, fontSize: 12 }}>
                     <div className="sf-spinner" style={{ width: 12, height: 12 }} />
                     {t('massPostingAddingFolder')} «{addingFolder}»…
                   </div>
@@ -2610,9 +2588,14 @@ export function MassPosting({ user }: MassPostingProps) {
               </button>
             </div>
             {folderLoading ? (
-              <div style={{ padding: '48px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <div className="sf-spinner" />
-                <span style={{ fontSize: 13, color: MUTED }}>{tr('Chargement…', 'Loading…')}</span>
+              <div style={{ padding: '8px 0' }}>
+                {[0, 1, 2, 3, 4].map(i => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px' }}>
+                    <div className="sf-skeleton" style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0 }} />
+                    <div className="sf-skeleton sf-skeleton-text" style={{ width: `${70 - i * 8}%` }} />
+                    <div className="sf-skeleton" style={{ width: 22, height: 15, borderRadius: 6, flexShrink: 0, marginLeft: 'auto' }} />
+                  </div>
+                ))}
               </div>
             ) : bankFolders.length === 0 ? (
               <div style={{ padding: '48px 0', textAlign: 'center', fontSize: 13, color: MUTED }}>{tr('Aucun dossier dans la banque', 'No folder in the bank')}</div>

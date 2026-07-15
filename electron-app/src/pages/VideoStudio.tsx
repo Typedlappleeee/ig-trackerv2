@@ -123,13 +123,13 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
   )
 }
 
-function ToolCard({ tool, onOpen }: { tool: Tool; onOpen: () => void }) {
+function ToolCard({ tool, onOpen, delayClass }: { tool: Tool; onOpen: () => void; delayClass?: string }) {
   const tr = useTr()
   const [hover, setHover] = useState(false)
   const [pos, setPos] = useState({ x: 50, y: 50 })
   return (
     <button
-      className="hubcard"
+      className={`hubcard sf-anim-slide-up ${delayClass || ''}`}
       onClick={onOpen}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -140,9 +140,9 @@ function ToolCard({ tool, onOpen }: { tool: Tool; onOpen: () => void }) {
         padding: 22, borderRadius: 22,
         background: 'linear-gradient(160deg, rgba(255,255,255,0.06), rgba(255,255,255,0.014))',
         border: '1px solid rgba(255,255,255,0.08)',
-        transform: hover ? 'translateY(-6px)' : 'translateY(0)',
-        boxShadow: hover ? `0 34px 70px -26px ${tool.glow}, inset 0 1px 0 0 rgba(255,255,255,0.1)` : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 8px 30px -18px rgba(0,0,0,0.6)',
-        transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s',
+        transform: hover ? 'translateY(-2px)' : 'translateY(0)',
+        boxShadow: hover ? `0 24px 60px -24px ${tool.glow}, inset 0 1px 0 0 rgba(255,255,255,0.1)` : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 8px 30px -18px rgba(0,0,0,0.6)',
+        transition: 'transform var(--t-smooth, 0.3s cubic-bezier(.22,1,.36,1)), box-shadow var(--t-base, 0.22s cubic-bezier(.22,1,.36,1))',
         display: 'flex', flexDirection: 'column', gap: 15, isolation: 'isolate', minHeight: 268,
       }}
     >
@@ -171,7 +171,7 @@ function ToolCard({ tool, onOpen }: { tool: Tool; onOpen: () => void }) {
 export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const tr = useTr()
   return (
-    <div style={{ minHeight: '100%', background: 'var(--base)', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
+    <div className="anim-page" style={{ minHeight: '100%', background: 'var(--base)', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
       <style>{CSS}</style>
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{ position: 'absolute', top: -140, left: '8%', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.16), transparent 70%)', filter: 'blur(46px)', animation: 'vs-float-a 18s ease-in-out infinite' }} />
@@ -180,18 +180,18 @@ export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 980, margin: '0 auto' }}>
         <div style={{ marginBottom: 36 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 16, fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
+          <div className="sf-anim-slide-up" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 16, fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M7 6v12"/><path d="M17 6v12"/></svg>
             {tr('Studio Vidéo', 'Video Studio')}
           </div>
-          <h1 style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#f0abfc 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
+          <h1 className="sf-anim-slide-up sf-d50" style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#f0abfc 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
             {tr('Ton usine à contenu unique', 'Your unique-content factory')}
           </h1>
-          <p style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.55)', maxWidth: 600, lineHeight: 1.65 }}>
+          <p className="sf-anim-slide-up sf-d100" style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.55)', maxWidth: 600, lineHeight: 1.65 }}>
             {tr('Quatre outils pour transformer une vidéo en dizaines de posts uniques — puis les balancer dans le posting.', 'Four tools to turn one video into dozens of unique posts — then push them straight to posting.')}
           </p>
           {/* Mini-flux : 1 vidéo → 4 outils → ∞ variantes → export */}
-          <div style={{ display: 'flex', gap: 12, marginTop: 22, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', gap: 12, marginTop: 22, flexWrap: 'wrap', alignItems: 'center' }}>
             {([['1', tr('vidéo source', 'source video'), '#818CF8'], ['4', tr('outils', 'tools'), '#F472B6'], ['∞', tr('variantes uniques', 'unique variants'), '#34D399'], [tr('1 clic', '1 click'), 'export', '#FBBF24']] as const).map(([v, l, c], i, arr) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '7px 13px', borderRadius: 99, background: 'rgba(255,255,255,0.035)', border: `1px solid ${c}33` }}>
@@ -214,7 +214,7 @@ export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
         {/* Grille uniforme 2 colonnes */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18 }}>
-          {TOOLS.map(tool => <ToolCard key={tool.id} tool={tool} onOpen={() => onNavigate(tool.id)} />)}
+          {TOOLS.map((tool, i) => <ToolCard key={tool.id} tool={tool} delayClass={`sf-d${Math.min(200 + i * 50, 400)}`} onOpen={() => onNavigate(tool.id)} />)}
         </div>
       </div>
     </div>

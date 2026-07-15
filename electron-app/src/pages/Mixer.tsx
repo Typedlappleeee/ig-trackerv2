@@ -5,7 +5,6 @@ import { supabase, fetchAllRows, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { getSignedUrl, uploadVideoFromPath } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
-import { Spinner } from '@/components/ui/Spinner'
 import { useTr } from '@/lib/i18n'
 import type { CaptionItem } from './CaptionBank'
 
@@ -159,9 +158,19 @@ function VideoPicker({
           <PickerSidebar folders={folders} active={folder} onSelect={setFolder} allCount={items.length} allLabel={tr('Tout', 'All')} />
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
             {loading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="lg" /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="sf-skeleton-card" style={{ height: 124 }} />
+                ))}
+              </div>
             ) : visible.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 64, color: TEXT_3, fontSize: 13 }}>{tr('Aucune vidéo', 'No video')}</div>
+              <div className="sf-empty" style={{ padding: '48px 16px' }}>
+                <div className="sf-empty-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-glow)" strokeWidth="1.75"><rect x="2" y="3" width="14" height="9" rx="1.5"/><path d="M16 6.5L22 4v7l-6-2.5V6.5Z"/></svg>
+                </div>
+                <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>{tr('Aucune vidéo', 'No video')}</p>
+                <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>{search ? tr('Aucun résultat pour cette recherche', 'No result for this search') : tr('Importe des vidéos dans la banque', 'Import videos into the bank')}</p>
+              </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
                 {visible.map(item => {
@@ -247,9 +256,19 @@ function CaptionPicker({
           <PickerSidebar folders={folders} active={folder} onSelect={setFolder} allCount={items.length} allLabel={tr('Tout', 'All')} />
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
             {loading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="lg" /></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="sf-skeleton-card" style={{ height: 68 }} />
+                ))}
+              </div>
             ) : visible.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 64, color: TEXT_3, fontSize: 13 }}>{tr('Aucune caption', 'No caption')}</div>
+              <div className="sf-empty" style={{ padding: '48px 16px' }}>
+                <div className="sf-empty-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-glow)" strokeWidth="1.75" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>{tr('Aucune caption', 'No caption')}</p>
+                <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>{search ? tr('Aucun résultat pour cette recherche', 'No result for this search') : tr('Crée des captions dans la banque', 'Create captions in the bank')}</p>
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {visible.map(item => {
@@ -421,12 +440,7 @@ export function Mixer({ user }: MixerProps) {
       <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
         <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {/* Icon badge */}
-          <div style={{
-            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-            boxShadow: '0 10px 24px -8px rgba(236,72,153,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-          }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#EC4899,#8B5CF6)' }}>
             {/* Edit + merge icon */}
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -443,12 +457,12 @@ export function Mixer({ user }: MixerProps) {
                 Mixer
               </h1>
               {running ? (
-                <span className="sf-badge sf-badge-accent" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#818CF8', display: 'inline-block' }} />
+                <span className="sf-status-chip is-accent">
+                  <span className="sf-status-dot" />
                   {tr('En cours', 'Running')}
                 </span>
               ) : (
-                <span className="sf-badge sf-badge-muted">{tr('Prêt', 'Ready')}</span>
+                <span className="sf-status-chip">{tr('Prêt', 'Ready')}</span>
               )}
             </div>
             <p className="sf-page-sub">
@@ -459,10 +473,10 @@ export function Mixer({ user }: MixerProps) {
 
         <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           {/* Mode toggle */}
-          <div className="sf-tabs">
+          <div className="sf-segment">
             {([{ k: 'random' as const, label: tr('Aléatoire', 'Random') }, { k: 'all' as const, label: tr('Tout combiner', 'Combine all') }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
-                className={`sf-tab cursor-pointer${mode === m.k ? ' active' : ''}`}>
+                className={`sf-segment-item${mode === m.k ? ' is-active' : ''}`}>
                 {m.label}
               </button>
             ))}
@@ -518,6 +532,10 @@ export function Mixer({ user }: MixerProps) {
                 </div>
                 <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>{tr('Aucune vidéo', 'No video')}</p>
                 <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>{tr('Ajoute des vidéos depuis la banque', 'Add videos from the bank')}</p>
+                <button onClick={() => setShowVideoPicker(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ marginTop: 12 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  {tr('Ajouter des vidéos', 'Add videos')}
+                </button>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -570,6 +588,10 @@ export function Mixer({ user }: MixerProps) {
                 </div>
                 <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700 }}>{tr('Aucune caption', 'No caption')}</p>
                 <p className="sf-empty-desc" style={{ fontSize: 12.5 }}>{tr('Ajoute des captions depuis la banque', 'Add captions from the bank')}</p>
+                <button onClick={() => setShowCaptionPicker(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ marginTop: 12 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  {tr('Ajouter des captions', 'Add captions')}
+                </button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -593,15 +615,16 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Config card */}
           <div className="sf-card sf-spotlight" style={{ padding: '20px 22px' }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 20 }}>{tr('Configuration du texte', 'Text configuration')}</p>
+            <p className="sf-section-label" style={{ marginBottom: 20 }}>{tr('Configuration du texte', 'Text configuration')}</p>
 
             {/* Position */}
             <div style={{ marginBottom: 20 }}>
               <p className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Position du texte', 'Text position')}</p>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
                 {(['top', 'middle', 'bottom'] as MixPosition[]).map(p => (
-                  <button key={p} onClick={() => setPosition(p)} className="cursor-pointer"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, transition: 'all 0.12s', border: position === p ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', background: position === p ? 'rgba(99,102,241,0.18)' : 'var(--surface)', color: position === p ? ACCENT_L : TEXT_3, cursor: 'pointer' }}>
+                  <button key={p} onClick={() => setPosition(p)}
+                    className={`sf-segment-item${position === p ? ' is-active' : ''}`}
+                    style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     {p === 'top' ? <><IconChevronUp size={14} /> {tr('Haut', 'Top')}</> : p === 'middle' ? <><IconAlignCenter size={14} /> {tr('Centre', 'Center')}</> : <><IconChevronDown size={14} /> {tr('Bas', 'Bottom')}</>}
                   </button>
                 ))}
@@ -659,8 +682,9 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Error */}
           {error && (
-            <div className="sf-card" style={{ padding: '12px 16px', borderColor: 'rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.06)' }}>
-              <p style={{ fontSize: 12, color: ERR }}>{error}</p>
+            <div className="sf-banner is-danger sf-anim-slide-up" role="alert">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>{error}</span>
             </div>
           )}
         </div>
@@ -670,7 +694,7 @@ export function Mixer({ user }: MixerProps) {
       {jobs.length > 0 && (
         <div className="sf-anim-slide-up" style={{ flexShrink: 0, height: 250, borderTop: '1px solid var(--border)', padding: '14px 20px 24px', overflowX: 'auto', background: 'var(--surface)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexShrink: 0 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: TEXT_2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tr('Résultats', 'Results')}</p>
+            <p className="sf-section-label" style={{ margin: 0 }}>{tr('Résultats', 'Results')}</p>
             {running && <div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />}
             {!running && doneJobs.length > 0 && <span className="sf-badge sf-badge-ok" style={{ fontVariantNumeric: 'tabular-nums' }}>{tr(`${doneJobs.length}/${jobs.length} terminés`, `${doneJobs.length}/${jobs.length} done`)}</span>}
             {errorJobs.length > 0 && <span className="sf-badge sf-badge-danger" style={{ fontVariantNumeric: 'tabular-nums' }}>{tr(`${errorJobs.length} erreur${errorJobs.length > 1 ? 's' : ''}`, `${errorJobs.length} error${errorJobs.length > 1 ? 's' : ''}`)}</span>}

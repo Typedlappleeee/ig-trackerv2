@@ -70,6 +70,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
 
   // Comptes
   const [phones, setPhones]     = useState<Phone[]>([])
+  const [phonesLoading, setPhonesLoading] = useState(true)
   const [selPhones, setSel]     = useState<Set<string>>(new Set())
   const [search, setSearch]     = useState('')
 
@@ -219,6 +220,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
     q.then(({ data }) => {
       const ps = (data ?? []).filter(p => !role || canAccessPhoneGroup(role, perms, p.group_name)) as Phone[]
       setPhones(ps)
+      setPhonesLoading(false)
       // Auto-remplissage du lien CTA par compte : on prend le lien déjà
       // enregistré sur le téléphone (colonne phones.link), sinon celui défini
       // depuis l'onglet Story (localStorage sf-story-link-<geelark_id|uuid>).
@@ -326,7 +328,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
   const STEPS = [tr('Type', 'Type'), tr('Comptes', 'Accounts'), tr('Contenu', 'Content'), tr('Récurrence', 'Recurrence'), tr('Finalisation', 'Finalization')]
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(6,6,8,0.9)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(2,2,6,0.82)', backdropFilter: 'var(--blur-md, blur(20px) saturate(1.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
       onClick={() => !saving && onClose()}>
       {showPicker && (
         <BankPicker user={user} mode="multi" resolveMode="signed-url"
@@ -346,19 +348,25 @@ export function TaskWizard({ user, onSaved, onClose }: {
           onClose={() => setStepPickerId(null)} />
       )}
       <div className="anim-scale-in" onClick={e => e.stopPropagation()}
-        style={{ width: '100%', maxWidth: 600, maxHeight: 'calc(100vh - 48px)', background: '#0F1014', border: `1px solid ${HAIR}`, borderRadius: 16, display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.65)' }}>
+        style={{ width: '100%', maxWidth: 600, maxHeight: 'calc(100vh - 48px)', background: 'linear-gradient(180deg, var(--surface-2, #13141A), var(--surface, #0F1014))', border: `1px solid ${HAIR}`, borderRadius: 20, display: 'flex', flexDirection: 'column', boxShadow: 'var(--elev-3, 0 24px 80px -16px rgba(0,0,0,.8))' }}>
 
         {/* Header + steps */}
         <div style={{ padding: '18px 22px 14px', borderBottom: `1px solid ${HAIR}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <span style={{ fontSize: 15, fontWeight: 800, color: IVORY }}>{tr('Nouvelle tâche automatique', 'New automatic task')}</span>
-            <button onClick={() => !saving && onClose()} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED, fontSize: 18, lineHeight: 1 }}>×</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div className="sf-page-icon sf-page-icon-sm sf-anim-scale-spring" style={{ flexShrink: 0 }} aria-hidden>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ display: 'block', fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em', color: IVORY }}>{tr('Nouvelle tâche automatique', 'New automatic task')}</span>
+              <span style={{ display: 'block', fontSize: 12, color: MUTED, marginTop: 1 }}>{tr('Étape', 'Step')} {step + 1} / {STEPS.length} · {STEPS[step]}</span>
+            </div>
+            <button onClick={() => !saving && onClose()} className="sf-btn sf-btn-ghost sf-btn-icon cursor-pointer" aria-label={tr('Fermer', 'Close')} style={{ flexShrink: 0 }}>×</button>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {STEPS.map((s, i) => (
               <div key={s} style={{ flex: 1 }}>
-                <div style={{ height: 3, borderRadius: 2, background: i <= step ? ACCENT : 'rgba(255,255,255,0.08)', transition: 'background 0.2s' }} />
-                <p style={{ fontSize: 10, fontWeight: 600, marginTop: 5, color: i === step ? ACCENT_L : i < step ? MUTED : FAINT }}>{i + 1}. {s}</p>
+                <div style={{ height: 3, borderRadius: 2, background: i <= step ? 'linear-gradient(90deg, #818CF8, #6366F1)' : 'rgba(255,255,255,0.08)', transition: 'background var(--t-base, 220ms cubic-bezier(.22,1,.36,1))' }} />
+                <p style={{ fontSize: 10, fontWeight: 600, marginTop: 5, color: i === step ? ACCENT_L : i < step ? MUTED : FAINT, transition: 'color var(--t-fast, 150ms)' }}>{i + 1}. {s}</p>
               </div>
             ))}
           </div>
@@ -377,7 +385,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
                     { k: 'publication', emoji: '🎬', label: tr('Reels / Vidéo', 'Reels / Video'), desc: tr('Publication vidéo récurrente', 'Recurring video post') },
                     { k: 'story',       emoji: '🔗', label: tr('Story + lien', 'Story + link'),  desc: tr('Story avec sticker lien (Instagram)', 'Story with link sticker (Instagram)') },
                   ] as const).map(o => (
-                    <button key={o.k} onClick={() => pickType(o.k)} className="cursor-pointer"
+                    <button key={o.k} onClick={() => pickType(o.k)} className="cursor-pointer sf-press"
                       style={card(type === o.k)}>
                       <div style={{ fontSize: 30 }}>{o.emoji}</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: IVORY, marginTop: 8 }}>{o.label}</div>
@@ -396,8 +404,8 @@ export function TaskWizard({ user, onSaved, onClose }: {
                     const disabled = isStory && o.k === 'tiktok'
                     return (
                       <button key={o.k} disabled={disabled} onClick={() => !disabled && setPlatform(o.k)}
-                        className={disabled ? '' : 'cursor-pointer'}
-                        style={{ ...card(platform === o.k), opacity: disabled ? 0.4 : 1 }}>
+                        className={disabled ? '' : 'cursor-pointer sf-press'}
+                        style={{ ...card(platform === o.k), opacity: disabled ? 0.4 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}>
                         <div style={{ fontSize: 26 }}>{o.emoji}</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: IVORY, marginTop: 6 }}>{o.label}</div>
                         {disabled && <div style={{ fontSize: 10, color: FAINT, marginTop: 2 }}>{tr('Story IG uniquement', 'IG Story only')}</div>}
@@ -416,15 +424,30 @@ export function TaskWizard({ user, onSaved, onClose }: {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')}
                 style={input} />
               <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '8px 0' }}>
-                <button onClick={() => setSel(new Set(visible.map(p => p.id)))} className="cursor-pointer" style={{ fontSize: 11, color: ACCENT_L, background: 'none', border: 'none' }}>{tr('Tout sélectionner', 'Select all')}</button>
+                <button onClick={() => setSel(new Set(visible.map(p => p.id)))} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{tr('Tout sélectionner', 'Select all')}</button>
               </div>
+              {phonesLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="sf-skeleton" style={{ height: 46, borderRadius: 9 }} />
+                  ))}
+                </div>
+              ) : visible.length === 0 ? (
+                <div className="sf-empty" style={{ padding: '28px 12px' }}>
+                  <div className="sf-empty-icon" aria-hidden>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2" width="12" height="20" rx="2" /><path d="M11 18h2" /></svg>
+                  </div>
+                  <p className="sf-empty-title">{search ? tr('Aucun résultat', 'No results') : tr('Aucun compte disponible', 'No accounts available')}</p>
+                  <p className="sf-empty-desc">{search ? tr('Aucun compte ne correspond à ta recherche.', 'No account matches your search.') : tr('Ajoute des téléphones dans l\'onglet Comptes pour créer une tâche.', 'Add phones in the Accounts tab to create a task.')}</p>
+                </div>
+              ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 280, overflowY: 'auto' }}>
                 {visible.map(p => {
                   const on = selPhones.has(p.id)
                   return (
                     <button key={p.id} onClick={() => setSel(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
-                      className="cursor-pointer"
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 9, textAlign: 'left', background: on ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${on ? 'rgba(99,102,241,0.3)' : HAIR}` }}>
+                      className="cursor-pointer sf-press"
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 'var(--r-md, 11px)', textAlign: 'left', background: on ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${on ? 'var(--border-accent-strong, rgba(99,102,241,0.28))' : HAIR}`, transition: 'background var(--t-fast, 150ms), border-color var(--t-fast, 150ms)' }}>
                       <span style={{ width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? ACCENT : 'transparent', border: on ? 'none' : `1px solid ${MUTED}` }} />
                       <div style={{ minWidth: 0 }}>
                         <p style={{ fontSize: 12.5, fontWeight: 600, color: IVORY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.phone_name}</p>
@@ -434,6 +457,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
                   )
                 })}
               </div>
+              )}
             </div>
           )}
 
@@ -470,7 +494,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
                       </div>
                     ))}
                   </div>
-                  {!linksOk && <p style={{ fontSize: 11, color: '#FBBF24', marginTop: 6 }}>{tr('Chaque compte doit avoir un lien.', 'Each account must have a link.')}</p>}
+                  {!linksOk && <p className="sf-field-error" style={{ fontSize: 12, color: 'var(--warn, #FBBF24)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}><span aria-hidden>⚠</span>{tr('Chaque compte doit avoir un lien.', 'Each account must have a link.')}</p>}
                 </div>
               )}
             </div>
@@ -593,7 +617,12 @@ export function TaskWizard({ user, onSaved, onClose }: {
             </div>
           )}
 
-          {error && <p style={{ fontSize: 12, color: '#F87171', marginTop: 14 }}>{error}</p>}
+          {error && (
+            <div className="sf-banner is-danger sf-anim-slide-up" role="alert" style={{ marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '11px 13px', borderRadius: 'var(--r-md, 11px)', background: 'var(--danger-dim, rgba(239,68,68,0.10))', border: '1px solid rgba(239,68,68,0.28)', color: 'var(--danger, #F87171)', fontSize: 12, lineHeight: 1.45 }}>
+              <span aria-hidden style={{ flexShrink: 0, marginTop: 1 }}>⚠</span>
+              <span>{error}</span>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -602,7 +631,7 @@ export function TaskWizard({ user, onSaved, onClose }: {
           <div style={{ flex: 1 }} />
           {step < 4
             ? <button onClick={() => canNext && setStep(s => s + 1)} disabled={!canNext} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: canNext ? 1 : 0.4 }}>{tr('Continuer', 'Continue')}</button>
-            : <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ opacity: saving ? 0.6 : 1 }}>{saving ? tr('Création…', 'Creating…') : tr('Terminer et lancer la tâche', 'Finish and launch task')}</button>}
+            : <button onClick={save} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{saving && <span className="sf-spinner" aria-hidden />}{saving ? tr('Création…', 'Creating…') : tr('Terminer et lancer la tâche', 'Finish and launch task')}</button>}
         </div>
       </div>
     </div>
@@ -612,5 +641,5 @@ export function TaskWizard({ user, onSaved, onClose }: {
 const lbl: React.CSSProperties = { fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: ACCENT, marginBottom: 10 }
 const input: React.CSSProperties = { width: '100%', padding: '9px 12px', fontSize: 13, color: IVORY, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, borderRadius: 9, outline: 'none' }
 function card(active: boolean): React.CSSProperties {
-  return { flex: 1, padding: '18px 12px', borderRadius: 12, textAlign: 'center', background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${active ? 'rgba(99,102,241,0.4)' : HAIR}` }
+  return { flex: 1, padding: '18px 12px', borderRadius: 'var(--r-lg, 15px)', textAlign: 'center', background: active ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${active ? 'var(--border-accent-strong, rgba(99,102,241,0.4))' : HAIR}`, boxShadow: active ? 'var(--glow-accent, 0 0 28px -6px rgba(99,102,241,.45))' : 'none', transition: 'background var(--t-fast, 150ms), border-color var(--t-fast, 150ms), box-shadow var(--t-base, 220ms)' }
 }

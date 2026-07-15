@@ -1489,9 +1489,13 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             </div>
 
             {folderLoading ? (
-              <div className="py-10 text-center text-text2 text-[13px] flex items-center justify-center gap-2">
-                <span className="sf-spinner" />
-                {t('massRemixLoadingSource')}
+              <div className="flex flex-col gap-1.5 px-4 py-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="sf-skeleton" style={{ width: 16, height: 16, borderRadius: 4 }} />
+                    <span className="sf-skeleton sf-skeleton-text" style={{ width: `${70 - i * 8}%` }} />
+                  </div>
+                ))}
               </div>
             ) : folderList.length === 0 ? (
               <div className="sf-empty py-10 text-[13px]">{t('massRemixNoFolders')}</div>
@@ -1518,24 +1522,17 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       <div className="anim-page flex flex-col overflow-hidden" style={{ height: '100%' }}>
 
         {/* ── Page header ── */}
-        <div className="flex-shrink-0 flex items-center justify-between border-b border-border"
-          style={{ padding: isMobile ? '10px 14px' : '14px 24px' }}>
+        <div className="sf-page-header"
+          style={{ padding: isMobile ? '12px 14px' : undefined }}>
           {/* Left: icon + title */}
-          <div className="flex items-center gap-3.5 min-w-0">
+          <div className="sf-cluster min-w-0" style={{ gap: 14 }}>
             {!isMobile && (
-              <div
-                className="sf-anim-scale-spring"
-                style={{
-                  width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-                  background: 'linear-gradient(135deg,#6366F1,#818CF8)',
-                  boxShadow: '0 10px 24px -8px rgba(129,140,248,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-                }}>
+              <div className="sf-page-icon sf-anim-scale-spring">
                 <IconZap size={22} />
               </div>
             )}
             <div className="min-w-0 sf-anim-slide-up sf-d50">
-              <h1 className="sf-page-title" style={{ fontSize: isMobile ? 16 : 22, letterSpacing: '-0.03em' }}>
+              <h1 className="sf-page-title" style={{ fontSize: isMobile ? 16 : undefined }}>
                 {t('massRemixTitle')}
               </h1>
               {!isMobile && (
@@ -1545,38 +1542,38 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           </div>
 
           {/* Right: stats + credit cost + actions */}
-          <div className="flex items-center gap-2 sf-anim-slide-up sf-d100">
-            {/* Live stats badges */}
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+            {/* Live source counts */}
             {!isMobile && originals.length > 0 && (
-              <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              <span className="sf-status-chip is-accent sf-tabular">
                 {originals.length} orig.
               </span>
             )}
             {!isMobile && secondaries.length > 0 && (
-              <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              <span className="sf-status-chip is-accent sf-tabular">
                 {secondaries.length} phase 1
               </span>
             )}
             {/* Credit cost indicator */}
             {!isMobile && canLaunch && (
-              <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, fontVariantNumeric: 'tabular-nums' }}>
+              <span className="sf-status-chip sf-tabular" style={{ gap: 5 }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                 {copies * CREDIT_COSTS.remix} {tr(`crédit${copies * CREDIT_COSTS.remix > 1 ? 's' : ''}`, `credit${copies * CREDIT_COSTS.remix > 1 ? 's' : ''}`)}
               </span>
             )}
             {!isMobile && (
               <button onClick={openPreview} disabled={!canLaunch}
-                className="sf-btn sf-btn-ghost cursor-pointer transition-all"
-                style={{ fontSize: 12, opacity: canLaunch ? 1 : 0.4, cursor: canLaunch ? 'pointer' : 'not-allowed' }}>
+                className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+                style={{ opacity: canLaunch ? 1 : 0.45, cursor: canLaunch ? 'pointer' : 'not-allowed' }}>
                 <IconClapperboard size={13} />
                 {t('massRemixPlanBtn')}
               </button>
             )}
             <button
               onClick={() => launch()} disabled={!canLaunch}
-              className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer transition-all"
+              className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
               style={{
-                fontSize: isMobile ? 12 : 13,
+                fontSize: isMobile ? 12 : undefined,
                 opacity: canLaunch ? 1 : 0.45,
                 cursor: canLaunch ? 'pointer' : 'not-allowed',
               }}>
@@ -1625,14 +1622,14 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             style={{ width: isMobile ? '100%' : 248, flexShrink: 0, overflowY: isMobile ? undefined : 'auto' }}>
 
             {!isMobile && (
-              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-40 px-0.5">
+              <p className="sf-section-label px-0.5" style={{ marginBottom: 2 }}>
                 {t('massRemixConfiguration')}
               </p>
             )}
 
             {/* ── Copies card ── */}
             <div className="sf-card p-3 flex flex-col gap-2">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-50">
+              <p className="sf-section-label" style={{ marginBottom: 0 }}>
                 {t('massRemixCopies')}
               </p>
               <div className="flex items-center gap-2">
@@ -1715,9 +1712,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             {/* AI manual text */}
             {aiEnabled && (
               <div className="sf-card p-3 flex flex-col gap-2"
-                style={{ borderColor: 'rgba(99,102,241,0.22)' }}>
-                <p className="text-[9px] font-bold tracking-widest uppercase"
-                  style={{ color: 'rgba(99,102,241,0.6)' }}>
+                style={{ borderColor: 'var(--border-accent)' }}>
+                <p className="sf-section-label" style={{ marginBottom: 0, color: 'var(--accent-lt)' }}>
                   {t('massRemixManualTextLabel')}
                 </p>
                 <textarea
@@ -1732,46 +1728,34 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
             {/* ── Cut point card ── */}
             <div className="sf-card p-3 flex flex-col gap-2.5">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-50">
+              <p className="sf-section-label" style={{ marginBottom: 0 }}>
                 {t('massRemixCutPoint')}
               </p>
-              <div className="flex gap-1.5">
+              <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
                 {(['auto', 'manual'] as const).map(m => (
                   <button key={m}
                     onClick={() => { setSplitMode(m); if (m === 'manual' && canLaunch) openPreview() }}
-                    className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
-                    style={{
-                      border: 'none',
-                      background: splitMode === m ? 'linear-gradient(130deg,#6366F1,#6366F1)' : 'rgba(255,255,255,0.05)',
-                      color: splitMode === m ? '#fff' : 'rgba(233,234,240,0.4)',
-                      boxShadow: splitMode === m ? '0 2px 10px rgba(99,102,241,0.3)' : 'none',
-                      outline: splitMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                    }}>
+                    className={`sf-segment-item${splitMode === m ? ' is-active' : ''}`}
+                    style={{ flex: 1 }}>
                     {m === 'auto' ? t('massRemixAutoMode') : t('massRemixManualMode')}
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-text3 leading-snug">
+              <p className="sf-hint" style={{ fontSize: 10 }}>
                 {splitMode === 'auto' ? t('massRemixAutoDesc') : t('massRemixManualDesc')}
               </p>
             </div>
 
             {/* ── Format card ── */}
             <div className="sf-card p-3 flex flex-col gap-2.5">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-50">
+              <p className="sf-section-label" style={{ marginBottom: 0 }}>
                 {t('massRemixFormat')}
               </p>
-              <div className="flex gap-1.5">
+              <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
                 {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
                   <button key={p} onClick={() => setPreset(p)}
-                    className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
-                    style={{
-                      border: 'none',
-                      background: preset === p ? 'linear-gradient(130deg,#6366F1,#6366F1)' : 'rgba(255,255,255,0.05)',
-                      color: preset === p ? '#fff' : 'rgba(233,234,240,0.4)',
-                      boxShadow: preset === p ? '0 2px 10px rgba(99,102,241,0.3)' : 'none',
-                      outline: preset === p ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                    }}>
+                    className={`sf-segment-item sf-tabular${preset === p ? ' is-active' : ''}`}
+                    style={{ flex: 1 }}>
                     {p}
                   </button>
                 ))}
@@ -1780,20 +1764,14 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
             {/* ── Destination card ── */}
             <div className="sf-card p-3 flex flex-col gap-2.5">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-50">
+              <p className="sf-section-label" style={{ marginBottom: 0 }}>
                 {t('massRemixDestination')}
               </p>
-              <div className="flex gap-1.5">
+              <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
                 {(['bank', 'folder'] as ExportMode[]).map(m => (
                   <button key={m} onClick={() => setExportMode(m)}
-                    className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
-                    style={{
-                      border: 'none',
-                      background: exportMode === m ? 'linear-gradient(130deg,#6366F1,#6366F1)' : 'rgba(255,255,255,0.05)',
-                      color: exportMode === m ? '#fff' : 'rgba(233,234,240,0.4)',
-                      boxShadow: exportMode === m ? '0 2px 10px rgba(99,102,241,0.3)' : 'none',
-                      outline: exportMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                    }}>
+                    className={`sf-segment-item${exportMode === m ? ' is-active' : ''}`}
+                    style={{ flex: 1 }}>
                     {m === 'bank' ? t('massRemixBankDest') : t('massRemixFolderDest')}
                   </button>
                 ))}

@@ -161,8 +161,12 @@ const CSS = `
 @keyframes lib-pulse { 0%,100%{opacity:.45} 50%{opacity:1} }
 @keyframes lib-float-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(38px,26px)} }
 @keyframes lib-float-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-30px,36px)} }
-.libtask { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s, border-color .25s; }
-.libtask:hover:not(:disabled) { transform: translateY(-3px); }
+.libtask { transition: transform var(--t-smooth), box-shadow var(--t-base), border-color var(--t-base); box-shadow: var(--elev-1); }
+.libtask:hover:not(:disabled) { transform: translateY(-2px); box-shadow: var(--elev-2); border-color: var(--border-accent-strong) !important; }
+.libtask:active:not(:disabled) { transform: scale(.985); }
+.libphone-row { transition: background var(--t-fast); }
+.libphone-row:hover { background: rgba(99,102,241,0.05) !important; }
+@media (prefers-reduced-motion: reduce) { .libtask, .libphone-row { transition-duration: .001ms !important; } }
 `
 
 type JobStatus = 'idle' | 'running' | 'done' | 'error'
@@ -322,21 +326,30 @@ function GeelarkLauncher({ user }: { user: User }) {
 
   return (
     <div style={{ position: 'relative', zIndex: 1, maxWidth: 1120, margin: '0 auto' }}>
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 12, fontSize: 11, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399' }} />
-          {tr("Bibliothèque d'automatisations", 'Automation library')}
+      <div className="sf-page-header" style={{ marginBottom: 22 }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#10B981,#059669)' }} aria-hidden>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+          </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">{tr('Lance une tâche sur tes téléphones', 'Run a task on your phones')}</h1>
+            <p className="sf-page-sub">{tr("Sélectionne des téléphones, choisis une action — elle s'exécute sur chacun, suivi en direct.", 'Select phones, choose an action — it runs on each one, tracked live.')}</p>
+          </div>
         </div>
-        <h1 style={{ margin: '0 0 8px', fontSize: 'clamp(28px, 4.4vw, 42px)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>{tr('Lance une tâche sur tes téléphones', 'Run a task on your phones')}</h1>
-        <p style={{ margin: 0, fontSize: 14.5, color: 'rgba(233,234,240,0.55)', maxWidth: 640, lineHeight: 1.6 }}>
-          {tr("Sélectionne des téléphones, choisis une action, et elle s'exécute sur chacun. Le suivi apparaît en direct (et dans le widget « en cours »).", 'Select phones, choose an action, and it runs on each one. Progress shows live (and in the "running" widget).')}
-        </p>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          {selected.size > 0 && (
+            <span className="sf-status-chip"><span className="sf-status-dot" />{tr(`${selected.size} sélectionné${selected.size > 1 ? 's' : ''}`, `${selected.size} selected`)}</span>
+          )}
+          <button onClick={loadPhones} disabled={loading} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">{loading ? tr('Chargement…', 'Loading…') : tr('Rafraîchir', 'Refresh')}</button>
+        </div>
       </div>
 
       {!bearer ? (
-        <div className="sf-card" style={{ padding: 24, maxWidth: 480 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--warn)', margin: '0 0 6px' }}>{tr('Connexion GéeLark manquante', 'GeeLark connection missing')}</p>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>{tr('Ajoute ton token GéeLark dans les Réglages pour lancer des tâches.', 'Add your GeeLark token in Settings to run tasks.')}</p>
+        <div className="sf-banner is-warn" style={{ maxWidth: 560 }}>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 3 }}>{tr('Connexion GéeLark manquante', 'GeeLark connection missing')}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{tr('Ajoute ton token GéeLark dans les Réglages pour lancer des tâches.', 'Add your GeeLark token in Settings to run tasks.')}</div>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 380px) 1fr', gap: 20, alignItems: 'start' }}>
@@ -359,15 +372,36 @@ function GeelarkLauncher({ user }: { user: User }) {
               )}
             </div>
             <div style={{ maxHeight: '52vh', overflowY: 'auto' }}>
-              {loading ? <div style={{ padding: 16, fontSize: 12.5, color: 'var(--text-3)' }}>{tr('Chargement…', 'Loading…')}</div>
-                : err ? <div style={{ padding: 16, fontSize: 12.5, color: 'var(--err)' }}>{err}</div>
-                : visible.length === 0 ? <div style={{ padding: 16, fontSize: 12.5, color: 'var(--text-4)' }}>{tr('Aucun téléphone.', 'No phones.')}</div>
-                : visible.map(p => {
+              {loading ? (
+                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="sf-skeleton" style={{ width: 16, height: 16, borderRadius: 'var(--r-xs)', flexShrink: 0 }} />
+                      <div className="sf-skeleton" style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0 }} />
+                      <div className="sf-skeleton sf-skeleton-text" style={{ flex: 1, width: `${55 + (i % 3) * 12}%` }} />
+                    </div>
+                  ))}
+                </div>
+              ) : err ? (
+                <div className="sf-banner is-danger" style={{ margin: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{tr('Erreur de chargement', 'Failed to load')}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', wordBreak: 'break-word' }}>{err}</div>
+                  </div>
+                  <button onClick={loadPhones} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ flexShrink: 0 }}>{tr('Réessayer', 'Retry')}</button>
+                </div>
+              ) : visible.length === 0 ? (
+                <div className="sf-empty" style={{ padding: '28px 16px' }}>
+                  <div className="sf-empty-icon" style={{ fontSize: 26 }}>📱</div>
+                  <div className="sf-empty-title">{tr('Aucun téléphone', 'No phones')}</div>
+                  <div className="sf-empty-desc">{search || groupFilter !== 'Tous' ? tr('Aucun résultat pour ce filtre.', 'No result for this filter.') : tr('Ajoute des cloud phones dans GéeLark pour commencer.', 'Add cloud phones in GeeLark to get started.')}</div>
+                </div>
+              ) : visible.map(p => {
                   const sel = selected.has(p.id)
                   const online = p.status === 0 || p.status === 2
                   const job = jobs[p.id]
                   return (
-                    <div key={p.id} onClick={() => toggle(p.id)} className="cursor-pointer" style={{ padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)', background: sel ? 'rgba(99,102,241,0.09)' : 'transparent' }}>
+                    <div key={p.id} onClick={() => toggle(p.id)} className="cursor-pointer libphone-row" style={{ padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)', background: sel ? 'rgba(99,102,241,0.09)' : 'transparent' }}>
                       <div style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, border: `1.5px solid ${sel ? 'var(--accent)' : 'rgba(99,102,241,0.3)'}`, background: sel ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2"><path d="M20 6 9 17l-5-5" /></svg>}
                       </div>
@@ -387,22 +421,22 @@ function GeelarkLauncher({ user }: { user: User }) {
           {/* Colonne droite : actions + suivi */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {selected.size === 0 && (
-              <div className="sf-card" style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-3)' }}>
-                {tr('👈 Sélectionne un ou plusieurs téléphones pour activer les actions.', '👈 Select one or more phones to enable the actions.')}
+              <div className="sf-banner is-accent">
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{tr('Sélectionne un ou plusieurs téléphones à gauche pour activer les actions.', 'Select one or more phones on the left to enable the actions.')}</div>
               </div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 12 }}>
               {tasks.map(t => (
                 <button key={t.key} onClick={() => openTask(t)} disabled={!selected.size || running} className="libtask cursor-pointer" style={{
-                  textAlign: 'left', padding: 16, borderRadius: 16, minHeight: 128,
+                  textAlign: 'left', padding: 'var(--sp-4)', borderRadius: 'var(--r-lg)', minHeight: 128,
                   background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
-                  border: `1px solid ${t.danger ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.09)'}`,
+                  border: `1px solid ${t.danger ? 'rgba(239,68,68,0.28)' : 'var(--border-md)'}`,
                   opacity: (!selected.size || running) ? 0.5 : 1, cursor: (!selected.size || running) ? 'not-allowed' : 'pointer',
                   display: 'flex', flexDirection: 'column', gap: 9,
                 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, background: t.grad, boxShadow: `0 10px 22px -8px ${t.glow}` }}>{t.emoji}</div>
-                  <div style={{ fontSize: 14.5, fontWeight: 800, color: '#fff' }}>{tr(t.title, t.titleEn)}</div>
-                  <div style={{ fontSize: 12, lineHeight: 1.45, color: 'rgba(233,234,240,0.55)', flex: 1 }}>{tr(t.desc, t.descEn)}</div>
+                  <div style={{ width: 42, height: 42, borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, background: t.grad, boxShadow: `0 10px 22px -8px ${t.glow}` }}>{t.emoji}</div>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--text-1)' }}>{tr(t.title, t.titleEn)}</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--text-3)', flex: 1 }}>{tr(t.desc, t.descEn)}</div>
                   {selected.size > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: t.accent }}>{tr(`Lancer sur ${selected.size} tél. →`, `Run on ${selected.size} phone(s) →`)}</div>}
                 </button>
               ))}
@@ -410,13 +444,17 @@ function GeelarkLauncher({ user }: { user: User }) {
 
             {/* Suivi */}
             {(running || totalJobs > 0) && (
-              <div className="sf-card" style={{ padding: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{running ? tr('En cours…', 'Running…') : tr('Terminé', 'Done')}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>✓ {doneN} · ✕ {errN} · {totalJobs} {tr('total', 'total')}</span>
+              <div className="sf-card" style={{ padding: 'var(--sp-4)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+                  {running
+                    ? <span className="sf-status-chip"><span className="sf-status-dot" />{tr('En cours…', 'Running…')}</span>
+                    : <span className="sf-badge sf-badge-ok">{tr('Terminé', 'Done')}</span>}
+                  <span className="sf-tabular" style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    <span style={{ color: 'var(--ok)' }}>✓ {doneN}</span> · <span style={{ color: 'var(--danger)' }}>✕ {errN}</span> · {totalJobs} {tr('total', 'total')}
+                  </span>
                 </div>
-                <div style={{ maxHeight: 200, overflowY: 'auto', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {logs.length === 0 ? <span style={{ color: 'var(--text-4)' }}>…</span> : logs.map((l, i) => <div key={i}>{l}</div>)}
+                <div style={{ maxHeight: 200, overflowY: 'auto', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', display: 'flex', flexDirection: 'column', gap: 2, background: 'var(--surface)', borderRadius: 'var(--r-md)', padding: '10px 12px', border: '1px solid var(--border)' }}>
+                  {logs.length === 0 ? <span style={{ color: 'var(--text-4)' }}>{tr('En attente des premières lignes…', 'Waiting for first output…')}</span> : logs.map((l, i) => <div key={i}>{l}</div>)}
                 </div>
               </div>
             )}
@@ -458,8 +496,12 @@ function GeelarkLauncher({ user }: { user: User }) {
                   <input type={f.type} value={cfgVals[f.key] ?? ''} onChange={e => setCfgVals(v => ({ ...v, [f.key]: e.target.value }))} placeholder={f.placeholder ? tr(f.placeholder, f.placeholderEn ?? f.placeholder) : undefined} className="sf-input" style={{ width: '100%', height: 36 }} />
                 </div>
               ))}
-              {modalTask.danger && <p style={{ fontSize: 11.5, color: 'var(--warn)', margin: 0 }}>{tr('⚠ Commande brute exécutée telle quelle sur chaque téléphone.', '⚠ Raw command executed as-is on each phone.')}</p>}
-              {!modalTask.fields?.length && <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0 }}>{tr('Aucun réglage — clique pour lancer.', 'No settings — click to run.')}</p>}
+              {modalTask.danger && (
+                <div className="sf-banner is-danger" style={{ margin: 0 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{tr('Commande brute exécutée telle quelle sur chaque téléphone.', 'Raw command executed as-is on each phone.')}</div>
+                </div>
+              )}
+              {!modalTask.fields?.length && !modalTask.danger && <p className="sf-hint" style={{ margin: 0 }}>{tr('Aucun réglage — clique pour lancer.', 'No settings — click to run.')}</p>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
                 <button onClick={() => setModalTask(null)} className="sf-btn sf-btn-ghost cursor-pointer">{tr('Annuler', 'Cancel')}</button>
                 <button onClick={launch} className="sf-btn sf-btn-primary cursor-pointer">{tr(`Lancer sur ${selected.size} tél.`, `Run on ${selected.size} phone(s)`)}</button>

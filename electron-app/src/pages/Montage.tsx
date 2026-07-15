@@ -836,17 +836,11 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
 
           {/* Right controls: format selector + export */}
           <div className="flex items-center gap-2 px-4 flex-shrink-0 border-l border-border sf-anim-slide-up sf-d150">
-            <div className="sf-card" style={{ display: 'flex', gap: 3, padding: '3px', borderRadius: 9 }}>
+            <div className="sf-segment">
               {(['9:16','1:1','16:9'] as Preset[]).map(p => (
                 <button key={p} onClick={() => setPreset(p)}
-                  className="cursor-pointer"
-                  style={{
-                    padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700,
-                    fontFamily: 'monospace', transition: 'all 0.15s',
-                    background: preset === p ? 'rgba(99,102,241,0.2)' : 'transparent',
-                    color: preset === p ? '#818CF8' : 'var(--text-3)',
-                    border: preset === p ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-                  }}>
+                  className={`sf-segment-item cursor-pointer ${preset === p ? 'is-active' : ''}`}
+                  style={{ fontFamily: 'monospace', fontWeight: 700 }}>
                   {p}
                 </button>
               ))}
@@ -861,6 +855,17 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
           </div>
         </div>
       </div>
+
+      {/* Draft restored notice */}
+      {draftRestored && (
+        <div className="flex-shrink-0" style={{ padding: '10px 20px 0' }}>
+          <div className="sf-banner is-accent sf-anim-slide-up">
+            <span style={{ color: 'var(--accent-lt)', flexShrink: 0 }}><IconClapperboard size={16} /></span>
+            <p style={{ flex: 1, minWidth: 0, color: 'var(--text-2)' }}>{tr('Brouillon restauré depuis la dernière session.', 'Draft restored from your last session.')}</p>
+            <button onClick={() => setDraftRestored(false)} aria-label={tr('Fermer', 'Close')} className="sf-banner-action opacity-60 hover:opacity-100 inline-flex items-center sf-press"><IconX size={14} /></button>
+          </div>
+        </div>
+      )}
 
       {/* ── MIDDLE: left panel + preview + properties ───────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0 overflow-hidden anim-stagger">
@@ -910,13 +915,25 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
               />
             </div>
             <div className="flex-1 overflow-auto py-1">
-              {bankLoading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+              {bankLoading ? (
+                <div className="py-1">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2">
+                      <div className="sf-skeleton" style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
+                      <div className="sf-skeleton" style={{ width: 40, height: 56, borderRadius: 4, flexShrink: 0 }} />
+                      <div className="flex-1 min-w-0" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div className="sf-skeleton-text" style={{ width: `${70 - i * 4}%` }} />
+                        <div className="sf-skeleton-text" style={{ width: '32%', height: 8 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
               : filteredBank.length === 0 ? (
-                <div className="px-4 py-8 text-center space-y-2 flex flex-col items-center sf-anim-scale-in">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818CF8' }}>
-                    <IconClapperboard size={22} />
-                  </div>
-                  <p className="text-[12.5px]" style={{ color: 'var(--text-3)' }}>{bankItems.length === 0 ? t('montageBankEmpty') : t('montageBankNoResults')}</p>
+                <div className="sf-empty sf-anim-scale-in" style={{ padding: '32px 16px' }}>
+                  <div className="sf-empty-icon"><IconClapperboard size={24} /></div>
+                  <p className="sf-empty-title">{bankItems.length === 0 ? t('montageBankEmpty') : t('montageBankNoResults')}</p>
+                  <p className="sf-empty-desc">{bankItems.length === 0 ? t('montageOrDragVideo') : ''}</p>
                 </div>
               ) : filteredBank.map((item, idx) => (
                 <button key={item.id} onClick={() => addClip(item)}
@@ -980,7 +997,12 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
                     {!selectedClip && conns.anthropic && (
                       <p className="text-[9px] text-text2/60">{t('montageSelectClipFirst')}</p>
                     )}
-                    {aiCapError && <p className="text-[9px] text-danger">{aiCapError}</p>}
+                    {aiCapError && (
+                      <p className="sf-field-error" style={{ fontSize: 10, marginTop: 2 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        {aiCapError}
+                      </p>
+                    )}
 
                     {/* Text input */}
                     <textarea
@@ -1140,21 +1162,19 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
           {clips.length > 0 && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
               {playingIndex === null ? (
-                <button
-                  onClick={playAll}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-accent rounded-lg text-white text-xs font-semibold hover:bg-accent/80 transition-colors cursor-pointer"
-                >
+                <button onClick={playAll} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                  Play all ({clips.length} clips)
+                  {tr('Tout lire', 'Play all')} ({clips.length})
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <button onClick={stopAll} className="px-3 py-1.5 bg-surface/80 rounded-lg text-text text-xs hover:bg-surface transition-colors cursor-pointer flex items-center gap-1.5">
+                  <button onClick={stopAll} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                    Stop
+                    {tr('Arrêter', 'Stop')}
                   </button>
-                  <span className="text-xs text-white/70 bg-black/40 px-2 py-1 rounded" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    Clip {playingIndex + 1}/{clips.length}
+                  <span className="sf-status-chip is-live sf-tabular">
+                    <span className="sf-status-dot" />
+                    {tr('Clip', 'Clip')} {playingIndex + 1}/{clips.length}
                   </span>
                 </div>
               )}
@@ -1327,18 +1347,23 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
 
       {/* Export result */}
       {expResult && (
-        <div className={`flex-shrink-0 px-5 py-2.5 text-xs flex items-start gap-3 ${expResult.ok ? 'bg-ok/10 border-t border-ok/20 text-ok' : 'bg-danger/10 border-t border-danger/20 text-danger'}`}>
-          <div className="flex-1 min-w-0">
-            <p>{expResult.msg}</p>
-            {expResult.command && (
-              <code className="block mt-1 text-[10px] bg-surface px-2 py-1 rounded text-text2 truncate cursor-pointer hover:whitespace-normal"
-                onClick={() => navigator.clipboard.writeText(expResult.command!)}
-                title="Click to copy the command">
-                {expResult.command}
-              </code>
-            )}
+        <div className="flex-shrink-0" style={{ padding: '10px 20px' }}>
+          <div className={`sf-banner sf-anim-slide-up ${expResult.ok ? 'is-accent' : 'is-danger'}`} style={{ alignItems: 'flex-start' }}>
+            <span style={{ color: expResult.ok ? 'var(--ok)' : 'var(--danger)', flexShrink: 0, marginTop: 1 }}>
+              {expResult.ok ? <IconCheck size={16} /> : <IconX size={16} />}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p style={{ color: expResult.ok ? 'var(--ok)' : 'var(--danger)', fontWeight: 600 }}>{expResult.msg}</p>
+              {expResult.command && (
+                <code className="block sf-tabular" style={{ marginTop: 4, fontSize: 10, background: 'var(--surface)', padding: '4px 8px', borderRadius: 'var(--r-sm)', color: 'var(--text-2)', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  onClick={() => navigator.clipboard.writeText(expResult.command!)}
+                  title={tr('Cliquer pour copier la commande', 'Click to copy the command')}>
+                  {expResult.command}
+                </code>
+              )}
+            </div>
+            <button onClick={() => setExpResult(null)} aria-label={tr('Fermer', 'Close')} className="sf-banner-action opacity-60 hover:opacity-100 inline-flex items-center sf-press"><IconX size={14} /></button>
           </div>
-          <button onClick={() => setExpResult(null)} aria-label={tr('Fermer', 'Close')} className="opacity-60 hover:opacity-100 inline-flex items-center sf-press"><IconX size={14} /></button>
         </div>
       )}
     </div>

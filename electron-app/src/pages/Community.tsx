@@ -1291,23 +1291,17 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 sf-topbar">
         <div className="flex items-center gap-3.5" style={{ minWidth: 0 }}>
-          <div className="sf-anim-scale-spring" style={{
-            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)',
-            border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1',
-          }}>
+          <div className="sf-page-icon sf-anim-scale-spring">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
             <div className="flex items-center gap-2.5">
-              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('communityTitle')}</h1>
+              <h1 className="sf-page-title">{t('communityTitle')}</h1>
               {uniqueUserCount > 0 && (
-                <span className="sf-badge sf-badge-accent flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+                <span className="sf-status-chip is-live sf-tabular">
+                  <span className="sf-status-dot" />
                   {uniqueUserCount}
                 </span>
               )}
@@ -1317,8 +1311,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
             </p>
           </div>
         </div>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
         <button onClick={() => setShowProfile(true)}
-          className="sf-btn sf-btn-ghost flex items-center gap-2.5 cursor-pointer sf-anim-slide-up sf-d100"
+          className="sf-btn sf-btn-ghost flex items-center gap-2.5 cursor-pointer"
           style={{ height: 'auto', padding: '7px 12px 7px 8px' }}>
           <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
           <div className="text-left">
@@ -1334,12 +1329,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
             </svg>
           </span>
         </button>
+        </div>
       </div>
 
       {/* ── Muted banner ─────────────────────────────────────────────────────── */}
       {isMuted && (
-        <div className="flex-shrink-0 mx-5 mt-3 px-4 py-2.5 rounded-xl flex items-center gap-2.5 sf-anim-slide-up"
-          style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', boxShadow: '0 0 0 1px rgba(245,158,11,0.06)' }}>
+        <div className="sf-banner is-warn flex-shrink-0 mx-5 mt-3 sf-anim-slide-up">
           <span className="flex items-center flex-shrink-0 text-warn" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
           </span>
@@ -1397,8 +1392,18 @@ export function Community({ user, onNavigate }: CommunityProps) {
           <div ref={listRef} className="flex-1 overflow-y-auto">
             <div className="p-5 space-y-4 max-w-3xl anim-stagger">
               {loading ? (
-                <div className="flex items-center justify-center py-20">
-                  <Spinner size="lg" />
+                <div className="space-y-4">
+                  <div className="sf-skeleton sf-skeleton-card" style={{ height: 220 }} />
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="sf-card flex items-start gap-3 p-4">
+                      <div className="sf-skeleton" style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0 }} />
+                      <div className="flex-1 space-y-2 py-0.5">
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: '45%' }} />
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: '85%' }} />
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: '30%' }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <>
@@ -2053,7 +2058,19 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     style={{ color: 'rgba(99,102,241,0.5)' }}>
                     {t('communityAdminTickets')} ({threadList.length})
                   </p>
-                  {loading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+                  {loading ? (
+                    <div className="space-y-1.5">
+                      {[0, 1, 2, 3].map(i => (
+                        <div key={i} className="flex items-center gap-2.5 px-2.5 py-2.5">
+                          <div className="sf-skeleton" style={{ width: 28, height: 28, borderRadius: 9, flexShrink: 0 }} />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="sf-skeleton sf-skeleton-text" style={{ width: '60%', height: 9 }} />
+                            <div className="sf-skeleton sf-skeleton-text" style={{ width: '85%', height: 8 }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
                   : threadList.length === 0 ? (
                     <div className="flex flex-col items-center py-8 gap-2 text-center">
                       <span style={{ color: 'var(--accent-l)' }} aria-hidden="true">
@@ -2187,7 +2204,16 @@ export function Community({ user, onNavigate }: CommunityProps) {
             /* User view */
             <div className="flex-1 flex flex-col overflow-hidden">
               <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
-                {loading ? <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
+                {loading ? (
+                  <div className="space-y-4 pt-2">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className={`flex gap-3 ${i % 2 ? 'flex-row-reverse' : ''}`}>
+                        <div className="sf-skeleton" style={{ width: 34, height: 34, borderRadius: 11, flexShrink: 0 }} />
+                        <div className="sf-skeleton" style={{ height: 40, width: i % 2 ? '55%' : '68%', borderRadius: 12 }} />
+                      </div>
+                    ))}
+                  </div>
+                )
                 : myThreadMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
                     <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"

@@ -65,24 +65,20 @@ export default function ScaleIA() {
         gap: 0,
       }}>
         {/* Header icon */}
-        <div className="sf-anim-scale-spring" style={{
-          width: 56, height: 56, borderRadius: 16, marginBottom: 20,
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(129,140,248,0.1))',
-          border: '1px solid rgba(99,102,241,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 32px rgba(99,102,241,0.3)',
+        <div className="sf-page-icon sf-anim-scale-spring" style={{
+          width: 56, height: 56, borderRadius: 'var(--r-lg, 15px)', marginBottom: 'var(--sp-5, 20px)',
+          boxShadow: '0 12px 30px -8px rgba(99,102,241,0.6), 0 0 32px rgba(99,102,241,0.3), inset 0 1px 0 rgba(255,255,255,0.35)',
         }}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M9.94 14.34A2 2 0 0 0 8.66 13l-6.13-1.9a.5.5 0 0 1 0-.95l6.13-1.9a2 2 0 0 0 1.28-1.28l1.9-6.13a.5.5 0 0 1 .95 0l1.9 6.13a2 2 0 0 0 1.28 1.28l6.13 1.9a.5.5 0 0 1 0 .95l-6.13 1.9a2 2 0 0 0-1.28 1.28l-1.9 6.13a.5.5 0 0 1-.95 0z"/>
           </svg>
         </div>
 
         {/* BIENTÔT chip */}
-        <div className="sf-anim-slide-up sf-d50" style={{
+        <div className="sf-badge sf-badge-accent sf-anim-slide-up sf-d50" style={{
           fontSize: 10, fontWeight: 800, letterSpacing: '0.3em', textTransform: 'uppercase',
-          color: '#818CF8', border: '1px solid rgba(99,102,241,0.45)',
-          padding: '5px 14px', borderRadius: 100, background: 'rgba(99,102,241,0.1)',
-          marginBottom: 20,
+          padding: '5px 14px', borderRadius: 100,
+          marginBottom: 'var(--sp-5, 20px)',
         }}>
           {tr('BIENTÔT DISPONIBLE', 'COMING SOON')}
         </div>
@@ -110,20 +106,24 @@ export default function ScaleIA() {
         </p>
 
         {/* Feature pills */}
-        <div className="sf-anim-slide-up sf-d200" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 520, marginBottom: 44 }}>
+        <div className="sf-anim-slide-up sf-d200" style={{ display: 'flex', gap: 'var(--sp-2, 10px)', flexWrap: 'wrap', justifyContent: 'center', maxWidth: 520, marginBottom: 'var(--sp-8, 44px)' }}>
           {[
             { icon: <Icon name="bot" />, label: tr('Modèle IA Custom', 'Custom AI Model') },
             { icon: <Icon name="sparkles" />, label: tr('Contenu génératif', 'Generative Content') },
             { icon: <Icon name="image" />, label: tr('Photos & Vidéos IA', 'AI Photos & Videos') },
             { icon: <Icon name="trending-up" />, label: tr('Empire Instagram', 'Instagram Empire') },
           ].map((f, i) => (
-            <div key={i} style={{
+            <div key={i} className="sf-press" style={{
               display: 'flex', alignItems: 'center', gap: 7,
               padding: '8px 16px', borderRadius: 100,
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.09)',
               fontSize: 12, color: 'rgba(226,232,240,0.7)',
-            }}>
+              transition: 'transform var(--t-fast, 150ms) cubic-bezier(.22,1,.36,1), border-color var(--t-fast, 150ms), background var(--t-fast, 150ms)',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.28)'; e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = 'none' }}
+            >
               <span style={{ display: 'flex', color: '#818CF8' }}>{f.icon}</span>
               <span style={{ fontWeight: 500 }}>{f.label}</span>
             </div>
@@ -131,8 +131,11 @@ export default function ScaleIA() {
         </div>
 
         {/* Progress bar */}
-        <div className="sf-anim-slide-up sf-d250" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 11, color: 'rgba(129,140,248,0.7)', letterSpacing: '0.1em', fontWeight: 600 }}>{tr('EN DÉVELOPPEMENT', 'IN DEVELOPMENT')}</span>
+        <div className="sf-anim-slide-up sf-d250" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-2, 10px)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, color: 'rgba(129,140,248,0.7)', letterSpacing: '0.1em', fontWeight: 600 }}>
+            <span className="sf-status-dot" style={{ background: '#818CF8' }} aria-hidden="true" />
+            {tr('EN DÉVELOPPEMENT', 'IN DEVELOPMENT')}
+          </span>
           <div style={{ width: 240, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{
               width: '10%', height: '100%', borderRadius: 99,

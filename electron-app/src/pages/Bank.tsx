@@ -923,17 +923,12 @@ export function Bank({ user }: BankProps) {
       )}
 
       {/* ── Page header ── */}
-      <header className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between gap-4" style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
+      <header className="sf-page-header flex-shrink-0" style={{ padding: '24px 32px 20px' }}>
         {/* Icon + title */}
-        <div className="flex items-center gap-3.5 min-w-0">
+        <div className="sf-cluster min-w-0" style={{ gap: 14 }}>
           <div
-            className="sf-anim-scale-spring"
-            style={{
-              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-              boxShadow: '0 10px 24px -8px rgba(236,72,153,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-            }}
+            className="sf-page-icon sf-anim-scale-spring"
+            style={{ ['--icon-grad' as any]: 'linear-gradient(135deg,#EC4899,#8B5CF6)', boxShadow: '0 10px 24px -8px rgba(236,72,153,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)' }}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
@@ -941,15 +936,15 @@ export function Bank({ user }: BankProps) {
           </div>
           <div className="min-w-0 sf-anim-slide-up sf-d50">
             <div className="flex items-center gap-2.5">
-              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('bankTitle')}</h1>
-              <span className="sf-badge sf-badge-accent text-[11px]">{items.length}</span>
+              <h1 className="sf-page-title">{t('bankTitle')}</h1>
+              <span className="sf-badge sf-badge-accent sf-tabular text-[11px]">{items.length}</span>
             </div>
             <p className="sf-page-sub">{t('bankSubtitle')}</p>
           </div>
         </div>
 
         {/* Right controls */}
-        <div className="flex items-center gap-2 flex-shrink-0 sf-anim-slide-up sf-d100">
+        <div className="sf-page-header-actions flex-shrink-0 sf-anim-slide-up sf-d100">
           {/* Personal / Org toggle — only when in an org */}
           {currentOrg && (
             <div className="sf-tabs">
@@ -1321,19 +1316,16 @@ export function Bank({ user }: BankProps) {
 
           {/* ── Notices ── */}
           {needsMigration && (
-            <div
-              className="mx-6 mt-4 rounded-xl p-4 flex items-start gap-3 flex-shrink-0"
-              style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.22)' }}
-            >
-              <span className="flex-shrink-0 mt-0.5 text-warn"><IconAlertTriangle size={16} /></span>
-              <div className="flex-1 min-w-0">
+            <div className="sf-banner is-warn mx-6 mt-4 flex-shrink-0" style={{ alignItems: 'flex-start' }}>
+              <span className="flex-shrink-0 mt-0.5"><IconAlertTriangle size={16} /></span>
+              <div className="flex-1 min-w-0" style={{ color: 'var(--text-2)' }}>
                 <p className="text-[13px] font-semibold text-warn">{tr('Migration requise — colonne "folder" manquante', 'Migration required — "folder" column missing')}</p>
-                <p className="text-[11px] mt-0.5 text-text2">{tr('Colle ce SQL dans Supabase → SQL Editor → Run :', 'Paste this SQL into Supabase → SQL Editor → Run:')}</p>
-                <code className="text-[11px] font-mono block mt-1 text-text2">{MIGRATION_SQL.trim()}</code>
+                <p className="text-[11px] mt-0.5">{tr('Colle ce SQL dans Supabase → SQL Editor → Run :', 'Paste this SQL into Supabase → SQL Editor → Run:')}</p>
+                <code className="text-[11px] font-mono block mt-1">{MIGRATION_SQL.trim()}</code>
               </div>
               <button
                 onClick={() => { navigator.clipboard.writeText(MIGRATION_SQL); setSqlCopied(true); setTimeout(() => setSqlCopied(false), 2000) }}
-                className="sf-btn sf-btn-sm cursor-pointer flex-shrink-0"
+                className="sf-btn sf-btn-sm cursor-pointer sf-banner-action"
                 style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.28)' }}
               >
                 {sqlCopied ? t('bankSqlCopied') : t('copy')}
@@ -1342,58 +1334,56 @@ export function Bank({ user }: BankProps) {
           )}
 
           {error && (
-            <div
-              className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3 flex-shrink-0"
-              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}
-            >
-              <span className="text-danger flex-shrink-0">
+            <div className="sf-banner is-danger mx-6 mt-4 flex-shrink-0">
+              <span className="flex-shrink-0">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               </span>
-              <span className="text-[13px] flex-1 text-danger">{error}</span>
-              <button onClick={() => setError(null)} aria-label={t('cancel')} className="text-danger hover:opacity-70 transition-opacity cursor-pointer"><IconX size={14} /></button>
+              <span className="text-[13px] flex-1">{error}</span>
+              <button onClick={() => setError(null)} aria-label={t('cancel')} className="sf-banner-action hover:opacity-70 transition-opacity cursor-pointer"><IconX size={14} /></button>
             </div>
           )}
 
           {uploadStatus && (
-            <div
-              className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3 flex-shrink-0"
-              style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)' }}
-            >
+            <div className="sf-banner is-accent mx-6 mt-4 flex-shrink-0">
               <span className="sf-spinner flex-shrink-0" />
-              <span className="text-[13px] text-accent">{uploadStatus}</span>
+              <span className="text-[13px]">{uploadStatus}</span>
             </div>
           )}
 
           {/* ── Scrollable content ── */}
           <div className="flex-1 px-6 py-5">
             {loading ? (
-              <div className="flex justify-center py-20"><Spinner size="lg" /></div>
+              /* Skeleton — same geometry as the media grid */
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="sf-card overflow-hidden" style={{ padding: 0 }}>
+                    <div className="sf-skeleton-card" style={{ borderRadius: 0, aspectRatio: '9 / 16', height: 'auto' }} />
+                    <div className="p-2.5 flex flex-col gap-2">
+                      <div className="sf-skeleton-text" style={{ width: '75%' }} />
+                      <div className="sf-skeleton-text" style={{ width: '40%', height: 9 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
 
             ) : items.length === 0 ? (
               /* Empty state — upload CTA centered */
-              <div className="flex flex-col items-center justify-center py-24 gap-6">
-                <div
-                  className="w-24 h-24 rounded-3xl flex items-center justify-center sf-anim-scale-spring"
-                  style={{
-                    background: 'rgba(99,102,241,0.08)',
-                    border: '2px dashed rgba(99,102,241,0.3)',
-                    color: 'var(--accent)',
-                    boxShadow: '0 0 40px -10px rgba(99,102,241,0.3)',
-                  }}
-                >
-                  <IconUpload size={36} />
+              <div className="sf-empty py-24">
+                <div className="sf-empty-icon sf-anim-scale-spring" style={{ borderStyle: 'dashed' }}>
+                  <IconUpload size={30} />
                 </div>
-                <div className="text-center max-w-sm">
-                  <p className="text-[17px] font-bold text-text">{t('bankEmptyTitle')}</p>
-                  <p className="text-[13px] text-text2 mt-1.5 leading-relaxed">{t('bankEmptyDesc')}</p>
-                </div>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
-                >
-                  <IconPlus size={14} />
-                  {t('bankAddMediaBtn')}
-                </button>
+                <p className="sf-empty-title">{t('bankEmptyTitle')}</p>
+                <p className="sf-empty-desc">{t('bankEmptyDesc')}</p>
+                {canUpload && (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+                    style={{ marginTop: 20 }}
+                  >
+                    <IconPlus size={14} />
+                    {t('bankAddMediaBtn')}
+                  </button>
+                )}
               </div>
 
             ) : visible.length === 0 ? (

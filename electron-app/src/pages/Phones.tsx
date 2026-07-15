@@ -1168,13 +1168,8 @@ export function Phones({ user }: PhonesProps) {
         {/* ── Page header ─────────────────────────────────────────────────── */}
         <div className="sf-page-header">
           {/* Left: icon + title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-              boxShadow: '0 10px 24px -8px rgba(99,102,241,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-            }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-page-icon sf-anim-scale-spring">
               <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="6" y="2" width="12" height="20" rx="3"/>
                 <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>
@@ -1187,7 +1182,7 @@ export function Phones({ user }: PhonesProps) {
           </div>
 
           {/* Right: auto-refresh + sync */}
-          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
 
             {/* Auto-refresh toggle pill */}
             <div style={{
@@ -1197,31 +1192,19 @@ export function Phones({ user }: PhonesProps) {
             }}>
               <button
                 onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
-                style={{
-                  position: 'relative', width: 28, height: 15, borderRadius: 99,
-                  background: autoRefresh ? 'var(--ok)' : 'rgba(233,234,240,0.2)',
-                  border: 'none', cursor: 'pointer', padding: 0, transition: 'background 0.2s', flexShrink: 0,
-                }}
+                className={`sf-toggle-track ${autoRefresh ? 'on' : 'off'}`}
+                style={{ width: 28, height: 15 }}
                 aria-label={fr(`Activer/désactiver l'actualisation automatique`, 'Toggle auto-refresh')}
               >
-                <span style={{
-                  position: 'absolute', top: 2.5, width: 10, height: 10,
-                  background: 'var(--ivory)', borderRadius: 99, boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-                  transition: 'left 0.2s', left: autoRefresh ? 15 : 2.5,
-                }} />
+                <span className="sf-toggle-thumb" style={{ width: 10, height: 10, left: autoRefresh ? 15 : 2.5 }} />
               </button>
               <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(233,234,240,0.52)', whiteSpace: 'nowrap' }}>{t('phonesAutoLabel')}</span>
               {autoRefresh && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '2px 3px' }}>
+                <div className="sf-segment" style={{ padding: 2 }}>
                   {INTERVALS.map(({ label, value }) => (
                     <button key={value} onClick={() => changeInterval(value)}
-                      style={{
-                        padding: '3px 7px', borderRadius: 5, fontSize: 10, border: 'none', cursor: 'pointer',
-                        background: intervalSec === value ? 'var(--ivory)' : 'transparent',
-                        color: intervalSec === value ? '#0F1014' : 'rgba(233,234,240,0.52)',
-                        fontWeight: intervalSec === value ? 700 : 400,
-                        transition: 'all 0.15s', whiteSpace: 'nowrap',
-                      }}>{label}</button>
+                      className={`sf-segment-item ${intervalSec === value ? 'is-active' : ''}`}
+                      style={{ height: 22, padding: '0 8px', fontSize: 10 }}>{label}</button>
                   ))}
                 </div>
               )}
@@ -1340,11 +1323,7 @@ export function Phones({ user }: PhonesProps) {
           {(!bearer || error || pollError) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
               {!bearer && (
-                <div className="sf-anim-slide-up" style={{
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)',
-                  color: 'var(--warn)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                }}>
+                <div className="sf-banner is-warn sf-anim-slide-up">
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
                     <path d="M7.5 1L14 13.5H1L7.5 1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
                     <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -1354,25 +1333,17 @@ export function Phones({ user }: PhonesProps) {
                 </div>
               )}
               {error && (
-                <div className="sf-anim-slide-up" style={{
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.2)',
-                  color: 'var(--err)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                }}>
+                <div className="sf-banner is-danger sf-anim-slide-up">
                   <span>{error}</span>
-                  <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
+                  <button className="sf-banner-action" onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   </button>
                 </div>
               )}
               {pollError && (
-                <div className="sf-anim-slide-up" style={{
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)',
-                  color: 'var(--warn)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                }}>
+                <div className="sf-banner is-warn sf-anim-slide-up">
                   <span>{pollError}</span>
-                  <button onClick={() => setPollError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
+                  <button className="sf-banner-action" onClick={() => setPollError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   </button>
                 </div>
@@ -1445,18 +1416,13 @@ export function Phones({ user }: PhonesProps) {
                 </select>
 
                 {/* Status filter pills */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
+                <div className="sf-segment" style={{ flexShrink: 0 }}>
                   {(['all', 'online', 'offline'] as const).map(v => (
                     <button
                       key={v}
                       onClick={() => setFilter(v)}
-                      style={{
-                        padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                        border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                        background: filter === v ? 'var(--ivory)' : 'transparent',
-                        color: filter === v ? '#0F1014' : 'rgba(233,234,240,0.52)',
-                        letterSpacing: '0.06em', textTransform: 'uppercase',
-                      }}
+                      className={`sf-segment-item ${filter === v ? 'is-active' : ''}`}
+                      style={{ padding: '0 12px', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase' }}
                     >
                       {v === 'all' ? t('phonesFilterAll') : v === 'online' ? t('phonesFilterOnline') : t('phonesFilterOffline')}
                     </button>
@@ -1464,7 +1430,7 @@ export function Phones({ user }: PhonesProps) {
                 </div>
 
                 {/* View mode toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
+                <div className="sf-segment" style={{ flexShrink: 0 }}>
                   {([
                     { mode: 'table' as const, title: fr('Vue tableau', 'Table view'), icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M1.5 5.5h11M1.5 8.5h11M5 5.5V12" stroke="currentColor" strokeWidth="1.3"/></svg> },
                     { mode: 'grid' as const,  title: fr('Vue grille', 'Grid view'),  icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="8" y="1.5" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="1.5" y="8" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="8" y="8" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/></svg> },
@@ -1473,12 +1439,8 @@ export function Phones({ user }: PhonesProps) {
                       key={mode}
                       onClick={() => changeViewMode(mode)}
                       title={title}
-                      style={{
-                        width: 30, height: 24, borderRadius: 6, border: 'none', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
-                        background: viewMode === mode ? 'rgba(99,102,241,0.18)' : 'transparent',
-                        color: viewMode === mode ? 'var(--accent-l)' : 'rgba(233,234,240,0.45)',
-                      }}
+                      className={`sf-segment-item ${viewMode === mode ? 'is-active' : ''}`}
+                      style={{ width: 34, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >{icon}</button>
                   ))}
                 </div>

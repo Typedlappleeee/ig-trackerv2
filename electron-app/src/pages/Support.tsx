@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useLicense } from '@/lib/license'
@@ -147,6 +148,55 @@ function IconChevronRight() {
   )
 }
 
+// Tuile-icône d'en-tête (support / lifebuoy)
+function IconHeaderSupport() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
+      <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/>
+      <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="14.83" y1="9.17" x2="18.36" y2="5.64"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>
+    </svg>
+  )
+}
+
+// En-tête de page v2 réutilisable (tuile-icône dégradée + titre + sous-titre + actions)
+function SupportPageHeader({ title, sub, actions }: { title: string; sub: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="sf-page-header">
+      <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+        <div className="sf-page-icon sf-anim-scale-spring"><IconHeaderSupport /></div>
+        <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+          <h1 className="sf-page-title">{title}</h1>
+          <p className="sf-page-sub">{sub}</p>
+        </div>
+      </div>
+      {actions && <div className="sf-page-header-actions sf-anim-slide-up sf-d100">{actions}</div>}
+    </div>
+  )
+}
+
+// Squelette de liste de tickets — même géométrie que les cartes réelles
+function TicketListSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} className="sf-card overflow-hidden flex" aria-hidden="true">
+          <div className="w-1 shrink-0 self-stretch sf-skeleton" style={{ borderRadius: 0 }} />
+          <div className="flex-1 min-w-0 px-5 py-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="sf-skeleton" style={{ width: 64, height: 18, borderRadius: 7 }} />
+              <div className="sf-skeleton" style={{ width: 54, height: 18, borderRadius: 7 }} />
+            </div>
+            <div className="sf-skeleton-text" style={{ width: '55%' }} />
+            <div className="sf-skeleton-text" style={{ width: '80%' }} />
+            <div className="sf-skeleton-text" style={{ width: '30%' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── StatusBadge ───────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TicketStatus }) {
   const t = useT()
@@ -228,7 +278,7 @@ function CreateTicketForm({
       <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
         <button
           onClick={onCancel}
-          className="sf-btn sf-btn-ghost cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-1.5"
+          className="sf-btn sf-btn-ghost sf-press cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-1.5"
         >
           <IconBack />
           {t('supportBackBtn')}
@@ -244,9 +294,9 @@ function CreateTicketForm({
             <input
               name="subject"
               value={subject}
-              onChange={e => setSubject(e.target.value)}
+              onChange={e => { setSubject(e.target.value); if (error) setError(null) }}
               placeholder={t('supportSubjectPlaceholder')}
-              className="sf-input w-full cursor-text focus-visible:ring-2 focus-visible:ring-accent/60"
+              className={`sf-input w-full cursor-text focus-visible:ring-2 focus-visible:ring-accent/60 ${error && !subject.trim() ? 'is-invalid' : ''}`}
             />
           </div>
 
@@ -286,32 +336,32 @@ function CreateTicketForm({
             <textarea
               name="description"
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={e => { setDescription(e.target.value); if (error) setError(null) }}
               placeholder={t('supportDescPlaceholder')}
               rows={5}
-              className="sf-input w-full resize-none cursor-text focus-visible:ring-2 focus-visible:ring-accent/60"
+              className={`sf-input w-full resize-none cursor-text focus-visible:ring-2 focus-visible:ring-accent/60 ${error && !description.trim() ? 'is-invalid' : ''}`}
             />
           </div>
         </div>
 
         {error && (
-          <p className="text-[13px] text-danger flex items-center gap-1.5">
+          <div className="sf-field-error">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             {error}
-          </p>
+          </div>
         )}
 
         <div className="flex justify-end gap-3 pt-1">
           <button
             onClick={onCancel}
-            className="sf-btn sf-btn-secondary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="sf-btn sf-btn-secondary sf-press cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             {t('cancel')}
           </button>
           <button
             onClick={submit}
             disabled={saving}
-            className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
+            className="sf-btn sf-btn-primary sf-press cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
           >
             {saving ? (
               <span className="sf-spinner" />
@@ -442,7 +492,7 @@ function ThreadView({
       <div className="flex items-start gap-4 sf-anim-slide-up sf-d50">
         <button
           onClick={onBack}
-          className="sf-btn sf-btn-ghost cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 mt-0.5 flex items-center gap-1.5 shrink-0"
+          className="sf-btn sf-btn-ghost sf-press cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 mt-0.5 flex items-center gap-1.5 shrink-0"
         >
           <IconBack />
           {t('supportBackBtn')}
@@ -492,9 +542,16 @@ function ThreadView({
       <div className="sf-card overflow-hidden sf-anim-slide-up sf-d150">
         <div className="max-h-80 overflow-y-auto p-5 space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-6 text-text3">
-              <span className="sf-spinner" />
-              <span className="text-[13px]">{t('supportLoading')}</span>
+            <div className="space-y-4" aria-hidden="true">
+              {[0, 1, 2].map(i => (
+                <div key={i} className={`flex gap-3 ${i % 2 ? 'flex-row-reverse' : ''}`}>
+                  <div className="sf-skeleton w-8 h-8 rounded-full shrink-0" />
+                  <div className={`flex flex-col gap-1.5 ${i % 2 ? 'items-end' : 'items-start'}`}>
+                    <div className="sf-skeleton-text" style={{ width: 120 }} />
+                    <div className="sf-skeleton" style={{ width: i % 2 ? 180 : 240, height: 44, borderRadius: 14 }} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : messages.length === 0 ? (
             <p className="text-[13px] text-text3 text-center py-6">{t('supportNoMessages')}</p>
@@ -556,7 +613,7 @@ function ThreadView({
             <button
               onClick={sendReply}
               disabled={sending || !reply.trim()}
-              className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
+              className="sf-btn sf-btn-primary sf-press cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
             >
               {sending ? <span className="sf-spinner" /> : <IconSend />}
               {t('supportReplyBtn')}
@@ -602,12 +659,7 @@ function UserSupport({ user }: { user: User }) {
   if (view === 'create') {
     return (
       <div className="sf-page anim-page">
-        <div className="sf-page-header">
-          <div className="sf-anim-slide-up sf-d50">
-            <h1 className="sf-page-title">{t('supportTitle')}</h1>
-            <p className="sf-page-subtitle">{t('supportHelp')}</p>
-          </div>
-        </div>
+        <SupportPageHeader title={t('supportTitle')} sub={t('supportHelp')} />
         <div className="sf-page-body">
           <CreateTicketForm
             user={user}
@@ -624,12 +676,7 @@ function UserSupport({ user }: { user: User }) {
   if (view === 'thread' && active) {
     return (
       <div className="sf-page anim-page">
-        <div className="sf-page-header">
-          <div className="sf-anim-slide-up sf-d50">
-            <h1 className="sf-page-title">{t('supportTitle')}</h1>
-            <p className="sf-page-subtitle">{t('supportHelp')}</p>
-          </div>
-        </div>
+        <SupportPageHeader title={t('supportTitle')} sub={t('supportHelp')} />
         <div className="sf-page-body">
           <ThreadView
             ticket={active}
@@ -653,38 +700,35 @@ function UserSupport({ user }: { user: User }) {
   return (
     <div className="sf-page anim-page">
       {/* Page header */}
-      <div className="sf-page-header">
-        <div className="sf-anim-slide-up sf-d50">
-          <h1 className="sf-page-title">{t('supportTitle')}</h1>
-          <p className="sf-page-subtitle">{t('supportHelp')}</p>
-        </div>
-        <button
-          onClick={() => setView('create')}
-          className="sf-btn sf-btn-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2 sf-anim-slide-up sf-d100"
-        >
-          <IconPlus />
-          {t('supportNewTicketBtn')}
-        </button>
-      </div>
+      <SupportPageHeader
+        title={t('supportTitle')}
+        sub={t('supportHelp')}
+        actions={
+          <button
+            onClick={() => setView('create')}
+            className="sf-btn sf-btn-primary sf-press cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
+          >
+            <IconPlus />
+            {t('supportNewTicketBtn')}
+          </button>
+        }
+      />
 
       {/* Scrollable content */}
       <div className="sf-page-body">
         <div className="space-y-3 anim-stagger">
           {loading ? (
-            <div className="sf-card p-10 flex items-center justify-center gap-3 text-text3">
-              <span className="sf-spinner" />
-              <span className="text-[13px]">{t('loading')}</span>
-            </div>
+            <TicketListSkeleton />
           ) : tickets.length === 0 ? (
             <div className="sf-empty">
-              <div className="text-accent/60 sf-anim-scale-spring">
+              <div className="sf-empty-icon sf-anim-scale-spring">
                 <IconTicket />
               </div>
-              <p className="text-[14px] font-bold text-text mt-2">{t('supportNoTicketsYet')}</p>
-              <p className="text-[12.5px] text-text3">{t('supportNoTicketsHint')}</p>
+              <p className="sf-empty-title mt-2">{t('supportNoTicketsYet')}</p>
+              <p className="sf-empty-desc">{t('supportNoTicketsHint')}</p>
               <button
                 onClick={() => setView('create')}
-                className="sf-btn sf-btn-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2 mt-2"
+                className="sf-btn sf-btn-primary sf-press cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2 mt-2"
               >
                 <IconPlus />
                 {t('supportCreateTicket')}
@@ -780,12 +824,10 @@ function AdminSupport({ user }: { user: User }) {
   if (active) {
     return (
       <div className="sf-page anim-page">
-        <div className="sf-page-header">
-          <div className="sf-anim-slide-up sf-d50">
-            <h1 className="sf-page-title">{t('supportAdminPanel')}</h1>
-            <p className="sf-page-subtitle"><span className="tabular-nums">{tickets.length}</span> {t('supportAdminTotal')}</p>
-          </div>
-        </div>
+        <SupportPageHeader
+          title={t('supportAdminPanel')}
+          sub={<><span className="sf-tabular">{tickets.length}</span> {t('supportAdminTotal')}</>}
+        />
         <div className="sf-page-body">
           <ThreadView
             ticket={active}
@@ -802,19 +844,19 @@ function AdminSupport({ user }: { user: User }) {
   return (
     <div className="sf-page anim-page">
       {/* Page header */}
-      <div className="sf-page-header">
-        <div className="sf-anim-slide-up sf-d50">
-          <h1 className="sf-page-title">{t('supportAdminTickets')}</h1>
-          <p className="sf-page-subtitle"><span className="tabular-nums">{tickets.length}</span> {t('supportAdminTotal')}</p>
-        </div>
-        <button
-          onClick={load}
-          className="sf-btn sf-btn-secondary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2 sf-anim-slide-up sf-d100"
-        >
-          <IconRefresh />
-          {t('supportAdminRefresh')}
-        </button>
-      </div>
+      <SupportPageHeader
+        title={t('supportAdminTickets')}
+        sub={<><span className="sf-tabular">{tickets.length}</span> {t('supportAdminTotal')}</>}
+        actions={
+          <button
+            onClick={load}
+            className="sf-btn sf-btn-secondary sf-press cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
+          >
+            <IconRefresh />
+            {t('supportAdminRefresh')}
+          </button>
+        }
+      />
 
       {/* Scrollable content */}
       <div className="sf-page-body space-y-5">
@@ -846,14 +888,11 @@ function AdminSupport({ user }: { user: User }) {
 
         {/* Table / states */}
         {loading ? (
-          <div className="sf-card p-10 flex items-center justify-center gap-3 text-text3">
-            <span className="sf-spinner" />
-            <span className="text-[13px]">{t('supportAdminLoading')}</span>
-          </div>
+          <TicketListSkeleton />
         ) : shown.length === 0 ? (
           <div className="sf-empty">
-            <div className="text-accent/60 sf-anim-scale-spring"><IconTicket /></div>
-            <p className="text-[14px] font-bold text-text mt-2">{t('supportAdminNoTickets')}</p>
+            <div className="sf-empty-icon sf-anim-scale-spring"><IconTicket /></div>
+            <p className="sf-empty-title mt-2">{t('supportAdminNoTickets')}</p>
           </div>
         ) : (
           <div className="sf-table-wrap sf-card overflow-hidden sf-anim-slide-up sf-d200">

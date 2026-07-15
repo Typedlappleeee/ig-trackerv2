@@ -57,27 +57,25 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
 }) {
   const tr = useTr()
   return (
-    <button onClick={onClick} className="sf-card cursor-pointer text-left w-full group relative rounded-2xl transition-all card-lift sf-card-lift sf-spotlight overflow-hidden"
+    <button onClick={onClick} className="sf-card sf-card-lift sf-spotlight sf-press cursor-pointer text-left w-full group relative overflow-hidden"
       style={{
-        background: 'var(--bg-2, #13141A)',
-        border: '1px solid rgba(99,102,241,0.12)',
-        padding: 16,
+        borderColor: 'var(--border-accent)',
+        padding: 'var(--sp-5)',
         opacity: locked ? 0.6 : 1,
       }}>
       {/* Hover glow overlay */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-        style={{ background: 'radial-gradient(ellipse 160px 100px at 20% 30%, rgba(99,102,241,0.08), transparent)' }} />
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse 160px 100px at 20% 30%, rgba(99,102,241,0.08), transparent)', transition: 'opacity var(--t-smooth)' }} />
 
-      <div className="relative space-y-3">
+      <div className="relative" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
         {/* Icon row */}
         <div className="flex items-start justify-between gap-2">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
-            style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}>
+          <div className="sf-page-icon-sm group-hover:scale-110"
+            style={{ transition: 'transform var(--t-base)' }}>
             {icon}
           </div>
           {locked && (
-            <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0 inline-flex items-center gap-1"
-              style={{ background: 'rgba(245,158,11,0.08)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.18)' }}>
+            <span className="sf-badge sf-badge-warn inline-flex items-center gap-1">
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               {tr('Clé Anthropic requise', 'Anthropic key required')}
             </span>
@@ -86,14 +84,14 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
 
         {/* Text */}
         <div>
-          <p className="text-[13px] font-bold text-text group-hover:text-accent transition-colors duration-200">{title}</p>
-          <p className="text-[11px] mt-1 leading-relaxed text-text2">{desc}</p>
+          <p className="text-[13px] font-bold text-text1 group-hover:text-accent" style={{ transition: 'color var(--t-fast)' }}>{title}</p>
+          <p className="text-[12px] mt-1 leading-relaxed text-text2">{desc}</p>
         </div>
 
         {/* Tags */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap" style={{ gap: 'var(--sp-2)' }}>
           {tags.map(tag => (
-            <span key={tag} className="sf-badge sf-badge-muted text-[9px] px-2 py-0.5 rounded-full font-bold font-mono uppercase tracking-wider">
+            <span key={tag} className="sf-badge sf-badge-muted">
               {tag}
             </span>
           ))}
@@ -103,20 +101,17 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
   )
 }
 
-// ── Section header with divider line ──────────────────────────────────────────
+// ── Section header (v2 section label) ─────────────────────────────────────────
 function SectionHeader({ label, badge, icon }: { label: string; badge?: string; icon?: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 mb-4 sf-anim-slide-up">
+    <div className="sf-cluster mb-4 sf-anim-slide-up" style={{ gap: 'var(--sp-3)' }}>
       {icon && (
-        <span className="text-text3" style={{ opacity: 0.7 }}>{icon}</span>
+        <span className="text-text3" style={{ opacity: 0.7, display: 'inline-flex' }}>{icon}</span>
       )}
-      <p className="text-[10px] uppercase tracking-widest font-black text-text3 font-mono whitespace-nowrap">{label}</p>
+      <p className="sf-section-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>{label}</p>
       {badge && (
-        <span className="sf-badge sf-badge-warn text-[9px] font-bold font-mono px-2 py-0.5 rounded-md uppercase tracking-wider">
-          {badge}
-        </span>
+        <span className="sf-badge sf-badge-warn">{badge}</span>
       )}
-      <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(99,102,241,0.2), transparent)' }} />
     </div>
   )
 }
@@ -128,21 +123,28 @@ export function AiTools({ user }: AiToolsProps) {
   const [active, setActive] = useState<ActiveTool>('hub')
   const conns = useConnections(user)
 
-  // Loading state
+  // Loading state — skeleton mirroring the hub geometry
   if (conns.loading) {
     return (
       <div className="sf-page anim-page">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-5">
-            <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.08))', border: '1px solid rgba(99,102,241,0.2)' }}>
-              <span className="relative z-10 text-accent"><Icon name="sparkles" size={24} /></span>
-              <div className="absolute inset-0 animate-pulse rounded-2xl"
-                style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.06))' }} />
+        <div className="sf-page-header">
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-skeleton" style={{ width: 46, height: 46, borderRadius: 'var(--r-md)', flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div className="sf-skeleton sf-skeleton-text" style={{ width: 180, height: 18 }} />
+              <div className="sf-skeleton sf-skeleton-text" style={{ width: 260, height: 12, marginTop: 8 }} />
             </div>
-            <div className="text-center">
-              <p className="text-[13px] font-bold text-text2">{t('loading')}</p>
-              <p className="text-[11px] text-text3 font-mono mt-1 tracking-wider">Connecting to studio</p>
+          </div>
+        </div>
+        <div className="sf-page-body">
+          <div className="space-y-6 max-w-6xl">
+            <div>
+              <div className="sf-skeleton sf-skeleton-text" style={{ width: 140, height: 11, marginBottom: 16 }} />
+              <div className="grid grid-cols-3 gap-4">
+                {[0, 1].map(i => (
+                  <div key={i} className="sf-skeleton sf-skeleton-card" style={{ height: 148 }} />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -162,22 +164,15 @@ export function AiTools({ user }: AiToolsProps) {
 
       {/* ── Page header ── */}
       <div className="sf-page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
           {/* Sparkle/AI icon in header tile */}
-          <div className="sf-anim-scale-spring" style={{
-            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.10))',
-            border: '1px solid rgba(99,102,241,0.28)',
-            color: 'var(--accent)',
-            boxShadow: '0 0 20px -6px rgba(99,102,241,0.4)',
-          }}>
+          <div className="sf-page-icon sf-anim-scale-spring">
             <Icon name="sparkles" size={22} />
           </div>
 
           {/* Text */}
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('aiToolsTitle')}</h1>
+            <h1 className="sf-page-title">{t('aiToolsTitle')}</h1>
             <p className="sf-page-sub">{tr('Outils de traitement vidéo et de variation de contenu', 'Video processing and content variation tools')}</p>
           </div>
         </div>

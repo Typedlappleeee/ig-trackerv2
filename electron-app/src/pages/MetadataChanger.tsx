@@ -39,18 +39,18 @@ function MetaRow({ field, before, after }: { field: string; before?: string; aft
   const changed = before !== after
   return (
     <div className="grid grid-cols-[140px_1fr_1fr] gap-2 text-[11px] py-1.5 border-b border-border/40">
-      <span className="font-mono font-bold truncate text-accent/50">{field}</span>
-      <span className="truncate font-mono" style={{ color: before ? 'rgba(251,191,36,0.8)' : 'rgba(255,255,255,0.2)' }}>
+      <span className="font-mono font-bold truncate" style={{ color: 'var(--accent)', opacity: 0.6 }}>{field}</span>
+      <span className="truncate font-mono sf-tabular" style={{ color: before ? 'var(--warn)' : 'var(--text-4)' }}>
         {before || '—'}
       </span>
-      <span className="truncate font-mono flex items-center gap-1.5"
-        style={{ color: after ? (changed ? '#34d399' : 'rgba(255,255,255,0.3)') : 'rgba(52,211,153,0.4)' }}>
+      <span className="truncate font-mono sf-tabular flex items-center gap-1.5"
+        style={{ color: after ? (changed ? 'var(--ok)' : 'var(--text-3)') : 'var(--ok-dim)' }}>
         {changed && before && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="20 6 9 17 4 12"/>
           </svg>
         )}
-        {after || <span style={{ color: 'rgba(52,211,153,0.5)' }}>removed</span>}
+        {after || <span style={{ color: 'var(--ok-dim)' }}>removed</span>}
       </span>
     </div>
   )
@@ -204,27 +204,26 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
       <div className="h-full flex flex-col overflow-y-auto anim-page">
         {/* ── Header ────────────────────────────────────────────────────────── */}
-        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4 border-b border-border">
-          <button
-            onClick={onBack}
-            className="sf-btn sf-btn-ghost cursor-pointer flex items-center gap-1.5 text-[13px] sf-anim-slide-up sf-d50"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m15 18-6-6 6-6"/>
-            </svg>
-            {tr('Retour', 'Back')}
-          </button>
-          <div className="w-px h-6 bg-border" />
-          <div className="flex items-center gap-3 sf-anim-slide-up sf-d100">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(6,182,212,0.1))', border: '1px solid rgba(99,102,241,0.25)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <div className="sf-page-header flex-shrink-0">
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <button
+              onClick={onBack}
+              className="sf-btn sf-btn-ghost sf-btn-icon cursor-pointer sf-anim-slide-up sf-d50"
+              aria-label={tr('Retour', 'Back')}
+              title={tr('Retour', 'Back')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m15 18-6-6 6-6"/>
+              </svg>
+            </button>
+            <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#6366F1,#06B6D4)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>
               </svg>
             </div>
-            <div>
-              <h1 className="text-[20px] font-black text-text leading-none">{tr('Changeur de Métadonnées', 'Metadata Changer')}</h1>
-              <p className="text-[13px] text-text2 mt-0.5">
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+              <h1 className="sf-page-title">{tr('Changeur de Métadonnées', 'Metadata Changer')}</h1>
+              <p className="sf-page-sub">
                 {tr('Supprime toutes les métadonnées · Nouveau timestamp aléatoire · Copie sans ré-encodage', 'Strips all metadata · New random timestamp · Copy without re-encoding')}
               </p>
             </div>
@@ -236,12 +235,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
             {/* Video selection */}
             <div className="sf-card sf-spotlight p-6 space-y-4">
-              <div className="flex items-center gap-2 mb-1">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="m15 10 5 5-5 5"/><rect x="2" y="7" width="13" height="10" rx="2"/>
-                </svg>
-                <p className="text-[14px] font-bold text-text">{tr('Vidéo source', 'Source video')}</p>
-              </div>
+              <div className="sf-section-label">{tr('Vidéo source', 'Source video')}</div>
               <div className="flex gap-3 flex-wrap">
                 <button
                   onClick={() => { setShowBank(true); playWhoosh() }}
@@ -274,7 +268,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                   {phase === 'reading' && <Spinner size="sm" />}
                   {fileName(videoPath)}
                   {duration && (
-                    <span className="ml-auto flex-shrink-0 text-text2">
+                    <span className="ml-auto flex-shrink-0 sf-tabular text-text2">
                       {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}
                     </span>
                   )}
@@ -282,14 +276,32 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
               )}
             </div>
 
+            {/* Reading skeleton */}
+            {phase === 'reading' && (
+              <div className="sf-card overflow-hidden" aria-busy="true">
+                <div className="px-5 py-3 border-b border-border">
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: '30%' }} />
+                </div>
+                <div className="px-5 py-3 space-y-2.5">
+                  {[70, 55, 62, 48, 66, 52].map((w, i) => (
+                    <div key={i} className="grid grid-cols-[140px_1fr_1fr] gap-2 items-center">
+                      <div className="sf-skeleton sf-skeleton-text" style={{ width: '80%' }} />
+                      <div className="sf-skeleton sf-skeleton-text" style={{ width: `${w}%` }} />
+                      <div className="sf-skeleton sf-skeleton-text" style={{ width: `${Math.max(30, w - 20)}%` }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Metadata table */}
             {(phase === 'ready' || phase === 'done') && (
               <div className="sf-card overflow-hidden">
                 <div className="px-5 py-3 border-b border-border">
                   <div className="grid grid-cols-[140px_1fr_1fr] gap-2 text-[9px] uppercase tracking-wider font-black text-text2">
                     <span>{tr('Champ', 'Field')}</span>
-                    <span style={{ color: 'rgba(251,191,36,0.6)' }}>{tr('Avant', 'Before')}</span>
-                    <span className="text-ok/60">{tr('Après', 'After')}</span>
+                    <span style={{ color: 'var(--warn)', opacity: 0.7 }}>{tr('Avant', 'Before')}</span>
+                    <span style={{ color: 'var(--ok)', opacity: 0.7 }}>{tr('Après', 'After')}</span>
                   </div>
                 </div>
                 <div className="px-5 pb-3">
@@ -326,9 +338,9 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
             {/* Error */}
             {phase === 'error' && error && (
-              <div className="sf-card p-5 space-y-3 border-danger/25 bg-danger/5">
+              <div className="sf-card p-5 space-y-3 border-danger/25 bg-danger/5" role="alert">
                 <div className="flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-shrink-0">
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                   </svg>
                   <p className="text-sm font-bold text-danger">{error}</p>
@@ -403,7 +415,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                 <div className="sf-card p-6 space-y-4 border-ok/20 bg-ok/5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-ok/10 border border-ok/20 sf-anim-scale-spring">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
                     </div>
@@ -426,7 +438,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           {showCmd ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
                         </svg>
-                        Commande FFmpeg
+                        {tr('Commande FFmpeg', 'FFmpeg command')}
                       </button>
                       {showCmd && <p className="text-[9px] font-mono break-all mt-1 text-text2">{command}</p>}
                     </>
@@ -436,12 +448,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                 {/* Bank export */}
                 {!uploadDone ? (
                   <div className="sf-card p-6 space-y-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M12 13v8m-4-4l4 4 4-4M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/>
-                      </svg>
-                      <p className="text-[14px] font-bold text-text">{tr('Ajouter à la banque', 'Add to bank')}</p>
-                    </div>
+                    <div className="sf-section-label">{tr('Ajouter à la banque', 'Add to bank')}</div>
                     <div className="flex gap-3">
                       <button
                         onClick={() => uploadToBank(false)}
@@ -473,7 +480,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                   </div>
                 ) : (
                   <div className="sf-card p-4 flex items-center justify-center gap-2">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>
                     <p className="text-[13px] font-semibold text-ok">{tr('Ajouté à la banque !', 'Added to bank!')}</p>

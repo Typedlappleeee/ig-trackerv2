@@ -12,7 +12,7 @@ import { getActiveRuns, subscribeActiveRuns, type ActiveRun } from '@/lib/active
 import { useTr } from '@/lib/i18n'
 import {
   TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR,
-  BG_0 as BG, BG_2 as BG2, ACCENT, ACCENT_L, OK, ERR, SANS,
+  BG_0 as BG, BG_2 as BG2, OK, ERR, SANS,
 } from '@/lib/theme'
 
 interface PhoneResult { name: string; ok: boolean; error?: string }
@@ -258,28 +258,16 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
 
   const filterBtn = (f: typeof filter, label: string) => (
     <button
+      className={`sf-segment-item${filter === f ? ' is-active' : ''}`}
       onClick={() => setFilter(f)}
-      style={{
-        padding: '6px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
-        cursor: 'pointer', transition: 'all 0.15s',
-        background: filter === f ? 'rgba(99,102,241,0.18)' : 'transparent',
-        color: filter === f ? ACCENT_L : MUTED,
-        border: filter === f ? '1px solid rgba(99,102,241,0.35)' : `1px solid ${HAIR}`,
-      }}
     >{label}</button>
   )
 
   const statusBtn = (f: typeof statusFilter, label: string, dot?: string) => (
     <button
+      className={`sf-segment-item${statusFilter === f ? ' is-active' : ''}`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
       onClick={() => setStatusFilter(f)}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
-        cursor: 'pointer', transition: 'all 0.15s',
-        background: statusFilter === f ? 'rgba(255,255,255,0.06)' : 'transparent',
-        color: statusFilter === f ? IVORY : MUTED,
-        border: statusFilter === f ? '1px solid rgba(255,255,255,0.16)' : `1px solid ${HAIR}`,
-      }}
     >{dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />}{label}</button>
   )
 
@@ -298,85 +286,68 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
     <div style={{ minHeight: '100%', background: BG, padding: '24px 28px 80px', boxSizing: 'border-box', overflowY: 'auto' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
-      <div className="sf-anim-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-        <div style={{
-          width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-          background: 'linear-gradient(135deg,#64748B,#475569)',
-          boxShadow: '0 10px 24px -8px rgba(100,116,139,0.5), inset 0 1px 0 0 rgba(255,255,255,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
-          </svg>
-        </div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: IVORY, fontFamily: SANS, letterSpacing: '-0.01em' }}>{tr('Historique', 'History')}</h1>
-          <p style={{ margin: 0, fontSize: 13, color: MUTED, fontFamily: SANS, marginTop: 2 }}>{tr('Tous vos posts — programmés et directs', 'All your posts — scheduled and direct')}</p>
+      <div className="sf-page-header">
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#64748B,#475569)' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
+            </svg>
+          </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">{tr('Historique', 'History')}</h1>
+            <p className="sf-page-sub">{tr('Tous vos posts — programmés et directs', 'All your posts — scheduled and direct')}</p>
+          </div>
         </div>
 
-        {canClear && items.length > 0 && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {confirming ? (
-              <>
-                <span style={{ fontSize: 12, color: MUTED, fontFamily: SANS }}>{tr("Effacer tout l'historique ?", 'Clear the entire history?')}</span>
-                <button
-                  onClick={clearHistory}
-                  disabled={clearing}
-                  style={{
-                    padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: SANS,
-                    cursor: clearing ? 'default' : 'pointer', opacity: clearing ? 0.6 : 1,
-                    background: 'rgba(248,113,113,0.16)', color: ERR,
-                    border: '1px solid rgba(248,113,113,0.4)',
-                  }}
-                >{clearing ? tr('Suppression…', 'Deleting…') : tr('Oui, effacer', 'Yes, clear')}</button>
-                <button
-                  onClick={() => setConfirming(false)}
-                  disabled={clearing}
-                  style={{
-                    padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
-                    cursor: 'pointer', background: 'transparent', color: MUTED, border: `1px solid ${HAIR}`,
-                  }}
-                >{tr('Annuler', 'Cancel')}</button>
-              </>
-            ) : (
-              <button
-                onClick={() => setConfirming(true)}
-                style={{
-                  marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7,
-                  padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: SANS,
-                  cursor: 'pointer', background: 'transparent', color: MUTED, border: `1px solid ${HAIR}`,
-                  transition: 'all 0.15s',
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
-                {tr("Vider l'historique", 'Clear history')}
-              </button>
-            )}
+        {canClear && items.length > 0 && !confirming && (
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+            <button className="sf-btn sf-btn-secondary sf-btn-sm" onClick={() => setConfirming(true)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              {tr("Vider l'historique", 'Clear history')}
+            </button>
           </div>
         )}
       </div>
+
+      {canClear && items.length > 0 && confirming && (
+        <div className="sf-banner is-danger sf-anim-slide-up" style={{ marginBottom: 16 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{tr("Effacer tout l'historique ? Cette action est irréversible.", 'Clear the entire history? This action cannot be undone.')}</span>
+          <div className="sf-banner-action" style={{ display: 'flex', gap: 8 }}>
+            <button className="sf-btn sf-btn-danger sf-btn-sm" onClick={clearHistory} disabled={clearing}>
+              {clearing && <span className="sf-spinner" style={{ width: 12, height: 12 }} />}
+              {clearing ? tr('Suppression…', 'Deleting…') : tr('Oui, effacer', 'Yes, clear')}
+            </button>
+            <button className="sf-btn sf-btn-ghost sf-btn-sm" onClick={() => setConfirming(false)} disabled={clearing}>{tr('Annuler', 'Cancel')}</button>
+          </div>
+        </div>
+      )}
 
       {/* Postings en cours (live) */}
       <ActiveRunsSection onNavigate={onNavigate} />
 
       {/* Filters: source tabs + status + search */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        {filterBtn('all', tr('Tout', 'All'))}
-        {filterBtn('scheduled', tr('Programmé', 'Scheduled'))}
-        {filterBtn('direct', tr('Direct', 'Direct'))}
-        <div style={{ width: 1, height: 22, background: HAIR, margin: '0 2px' }} />
-        {statusBtn('all', tr('Tous statuts', 'All statuses'))}
-        {statusBtn('ok', tr('Publiés', 'Published'), OK)}
-        {statusBtn('failed', tr('Échecs', 'Failures'), ERR)}
-        <div style={{ position: 'relative', marginLeft: 'auto', minWidth: 220 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="sf-segment">
+          {filterBtn('all', tr('Tout', 'All'))}
+          {filterBtn('scheduled', tr('Programmé', 'Scheduled'))}
+          {filterBtn('direct', tr('Direct', 'Direct'))}
+        </div>
+        <div className="sf-segment">
+          {statusBtn('all', tr('Tous statuts', 'All statuses'))}
+          {statusBtn('ok', tr('Publiés', 'Published'), OK)}
+          {statusBtn('failed', tr('Échecs', 'Failures'), ERR)}
+        </div>
+        <div style={{ position: 'relative', marginLeft: 'auto', minWidth: 220, flex: '1 1 220px', maxWidth: 320 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', zIndex: 1 }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           <input
+            className="sf-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={tr('Rechercher (compte, légende, type)…', 'Search (account, caption, type)…')}
-            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px 8px 32px', borderRadius: 8, fontSize: 12.5, fontFamily: SANS, color: IVORY, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, outline: 'none' }}
+            style={{ width: '100%', boxSizing: 'border-box', paddingLeft: 32 }}
           />
         </div>
       </div>
@@ -393,28 +364,36 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
       {/* List */}
       <div className="sf-card sf-anim-slide-up" style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 14, overflow: 'hidden', padding: 0 }}>
         {loading && items.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center', color: MUTED, fontSize: 13, fontFamily: SANS }}>
-            {tr('Chargement…', 'Loading…')}
+          <div>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ padding: '14px 20px', borderBottom: i < 5 ? `1px solid ${HAIR}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="sf-skeleton" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: `${55 + (i % 3) * 12}%` }} />
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: `${32 + (i % 4) * 8}%`, height: 10 }} />
+                </div>
+                <div className="sf-skeleton" style={{ width: 64, height: 20, borderRadius: 7, flexShrink: 0 }} />
+              </div>
+            ))}
           </div>
         ) : items.length > 0 && visible.length === 0 ? (
-          <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: IVORY, fontFamily: SANS }}>{tr('Aucun résultat', 'No results')}</p>
-            <p style={{ margin: 0, fontSize: 12.5, color: FAINT, fontFamily: SANS }}>{tr('Aucune entrée ne correspond à ces filtres.', 'No entry matches these filters.')}</p>
-            <button className="sf-btn sf-btn-ghost sf-btn-sm" style={{ marginTop: 4 }} onClick={() => { setSearch(''); setStatusFilter('all') }}>{tr('Réinitialiser les filtres', 'Reset filters')}</button>
+          <div className="sf-empty" style={{ padding: '48px 24px' }}>
+            <div className="sf-empty-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </div>
+            <p className="sf-empty-title">{tr('Aucun résultat', 'No results')}</p>
+            <p className="sf-empty-desc">{tr('Aucune entrée ne correspond à ces filtres.', 'No entry matches these filters.')}</p>
+            <button className="sf-btn sf-btn-secondary sf-btn-sm" style={{ marginTop: 6 }} onClick={() => { setSearch(''); setStatusFilter('all') }}>{tr('Réinitialiser les filtres', 'Reset filters')}</button>
           </div>
         ) : items.length === 0 ? (
-          <div style={{ padding: '56px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 12,
-              background: 'rgba(99,102,241,0.06)', border: `1px solid ${HAIR}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4,
-            }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <div className="sf-empty" style={{ padding: '56px 24px' }}>
+            <div className="sf-empty-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
               </svg>
             </div>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: IVORY, fontFamily: SANS }}>{tr("Aucun historique pour l'instant", 'No history yet')}</p>
-            <p style={{ margin: 0, fontSize: 12.5, color: FAINT, fontFamily: SANS }}>{tr('Vos posts programmés et directs apparaîtront ici.', 'Your scheduled and direct posts will appear here.')}</p>
+            <p className="sf-empty-title">{tr("Aucun historique pour l'instant", 'No history yet')}</p>
+            <p className="sf-empty-desc">{tr('Vos posts programmés et directs apparaîtront ici.', 'Your scheduled and direct posts will appear here.')}</p>
             {onNavigate && (
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button className="sf-btn sf-btn-primary sf-btn-sm" onClick={() => onNavigate('publishhub')}>{tr('Publier maintenant', 'Publish now')}</button>
@@ -520,7 +499,8 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
         )}
 
         {loading && items.length > 0 && (
-          <div style={{ padding: '14px 20px', textAlign: 'center', color: MUTED, fontSize: 12, fontFamily: SANS }}>
+          <div style={{ padding: '14px 20px', textAlign: 'center', color: MUTED, fontSize: 12, fontFamily: SANS, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <span className="sf-spinner" style={{ width: 13, height: 13 }} />
             {tr('Chargement…', 'Loading…')}
           </div>
         )}
@@ -713,10 +693,9 @@ function ActiveRunsSection({ onNavigate }: { onNavigate?: (p: Page) => void }) {
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
-        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)' }}>{tr('En cours', 'In progress')}</span>
-        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{tr(`${runs.filter(r => r.status === 'running').length} posting(s)`, `${runs.filter(r => r.status === 'running').length} posting(s)`)}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <span className="sf-status-chip is-live"><span className="sf-status-dot" />{tr('En cours', 'In progress')}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{tr(`${runs.filter(r => r.status === 'running').length} posting(s)`, `${runs.filter(r => r.status === 'running').length} posting(s)`)}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {runs.map(r => {

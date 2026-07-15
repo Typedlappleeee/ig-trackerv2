@@ -2974,8 +2974,8 @@ function TaskSkeleton() {
       {[0, 1, 2, 3].map(i => (
         <div
           key={i}
-          className="sf-skeleton"
-          style={{ height: 148, borderRadius: 14, opacity: 1 - i * 0.15 }}
+          className="sf-skeleton sf-skeleton-card"
+          style={{ height: 148, opacity: 1 - i * 0.15 }}
         />
       ))}
     </div>
@@ -3069,7 +3069,7 @@ function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
   const effInterval = nextSeg ? nextSeg.recur_hours : task.recur_hours
   const diff = new Date(effNextRun).getTime() - Date.now()
   const imminent = diff <= 60 * 60 * 1000 // within 1h
-  const accent = imminent ? '#34d399' : '#818CF8'
+  const accent = imminent ? 'var(--ok)' : 'var(--accent-lt)'
 
   return (
     <div
@@ -3151,12 +3151,12 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
   const logs = run.result?.logs ?? []
 
   const cfg = {
-    done:      { color: '#34d399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.25)', label: tr('Réussi', 'Succeeded') },
-    failed:    { color: '#F87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)', label: tr('Échoué', 'Failed') },
-    running:   { color: '#818CF8', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.25)', label: tr('En cours', 'In progress') },
-    pending:   { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', label: tr('En attente', 'Pending') },
-    cancelled: { color: 'rgba(148,163,184,0.7)', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)', label: tr('Annulé', 'Cancelled') },
-  }[run.status] ?? { color: 'var(--muted)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)', label: run.status }
+    done:      { color: 'var(--ok)',     bg: 'var(--ok-dim)',     border: 'rgba(34,197,94,0.25)',  label: tr('Réussi', 'Succeeded') },
+    failed:    { color: 'var(--danger)', bg: 'var(--danger-dim)', border: 'rgba(239,68,68,0.25)',   label: tr('Échoué', 'Failed') },
+    running:   { color: 'var(--accent-lt)', bg: 'var(--accent-dim)', border: 'var(--border-accent)', label: tr('En cours', 'In progress') },
+    pending:   { color: 'var(--warn)',   bg: 'var(--warn-dim)',   border: 'rgba(245,158,11,0.25)', label: tr('En attente', 'Pending') },
+    cancelled: { color: 'var(--text-3)', bg: 'rgba(255,255,255,0.04)', border: 'var(--border-md)', label: tr('Annulé', 'Cancelled') },
+  }[run.status] ?? { color: 'var(--text-3)', bg: 'rgba(255,255,255,0.04)', border: 'var(--border-md)', label: run.status }
 
   const when = run.executed_at ?? run.scheduled_at
 
@@ -3224,7 +3224,7 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
       {run.error_msg && run.status === 'failed' && !showLogs && (
         <p style={{
           margin: 0, padding: '0 16px 12px 60px',
-          fontSize: 11.5, color: '#F0A0AB', fontFamily: 'ui-monospace, monospace',
+          fontSize: 11.5, color: 'var(--danger)', fontFamily: 'ui-monospace, monospace',
         }}>
           {run.error_msg}
         </p>
@@ -3240,7 +3240,7 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
           {logs.map((l, i) => (
             <div key={i} style={{
               fontFamily: 'ui-monospace, monospace', fontSize: 11.5, lineHeight: 1.7,
-              color: l.startsWith('❌') ? '#F0A0AB' : l.startsWith('✅') ? '#34d399' : 'rgba(148,163,184,0.7)',
+              color: l.startsWith('❌') ? 'var(--danger)' : l.startsWith('✅') ? 'var(--ok)' : 'var(--text-3)',
               whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             }}>
               {l}
@@ -3526,44 +3526,23 @@ export function Tasks({ user }: { user: User }) {
         flexDirection: 'column', alignItems: 'stretch', gap: 0,
         padding: '24px 28px 0', borderBottom: 'none',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-            <div className="sf-anim-scale-spring" style={{
-              width: 52, height: 52, borderRadius: 15, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-              boxShadow: '0 12px 28px -8px rgba(99,102,241,0.6), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-            }}>
-              <IconBolt size={25} color="#fff" />
+        <div className="sf-cluster" style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, gap: 16 }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-page-icon sf-anim-scale-spring">
+              <IconBolt size={24} color="#fff" />
             </div>
-            <div className="sf-anim-slide-up sf-d50">
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)', marginBottom: 3 }}>{tr('Automatisation', 'Automation')}</div>
-              <h1 style={{
-                margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0,
-                background: 'linear-gradient(100deg,#fff 18%,#a5b4fc 52%,#c4b5fd 86%)', backgroundSize: '200% auto',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'wf-shimmer 7s linear infinite',
-              }}>
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+              <div className="sf-eyebrow" style={{ marginBottom: 4 }}>{tr('Automatisation', 'Automation')}</div>
+              <h1 className="sf-page-title">
                 {tr("Workflows d'automatisation", 'Automation workflows')}
               </h1>
-              <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(233,234,240,0.5)' }}>
+              <p className="sf-page-sub">
                 {tr('Tes chaînes de publication tournent toutes seules, en boucle.', 'Your posting chains run on their own, on a loop.')}
               </p>
             </div>
           </div>
 
-          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={() => { setEditTask(null); setShowWizard(true) }}
-              className="sf-btn sf-btn-lg cursor-pointer"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff',
-                background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-                boxShadow: '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 0 rgba(255,255,255,0.3)',
-              }}
-            >
-              <IconPlus />
-              {tr('Nouveau workflow', 'New workflow')}
-            </button>
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
             <button
               onClick={() => { setEditTask(null); setShowCreate(true) }}
               className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
@@ -3571,15 +3550,23 @@ export function Tasks({ user }: { user: User }) {
             >
               {tr('Avancé', 'Advanced')}
             </button>
+            <button
+              onClick={() => { setEditTask(null); setShowWizard(true) }}
+              className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            >
+              <IconPlus />
+              {tr('Nouveau workflow', 'New workflow')}
+            </button>
           </div>
         </div>
 
         {/* ── Stats strip — pills premium ─────────────────────────────────── */}
         <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
           {[
-            { label: tr('workflows actifs', 'active workflows'), value: activeTasks.length, color: '#34D399', pulse: activeTasks.length > 0 },
-            { label: tr('en pause', 'paused'), value: pausedTasks.length, color: '#94A3B8', pulse: false },
-            { label: tr('publications', 'posts'), value: totalRuns, color: '#818CF8', pulse: false },
+            { label: tr('workflows actifs', 'active workflows'), value: activeTasks.length, color: 'var(--ok)', pulse: activeTasks.length > 0 },
+            { label: tr('en pause', 'paused'), value: pausedTasks.length, color: 'var(--text-3)', pulse: false },
+            { label: tr('publications', 'posts'), value: totalRuns, color: 'var(--accent-lt)', pulse: false },
           ].map(stat => (
             <div key={stat.label} style={{
               display: 'inline-flex', alignItems: 'center', gap: 9, height: 36, padding: '0 15px 0 12px',
@@ -3613,29 +3600,21 @@ export function Tasks({ user }: { user: User }) {
         </div>
 
         {/* ── Tabs ────────────────────────────────────────────────────────── */}
-        <div className="sf-anim-slide-up sf-d200" style={{
-          display: 'flex', gap: 0, borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}>
+        <div className="sf-tabs sf-anim-slide-up sf-d200">
           {TABS.map(tabItem => (
             <button
               key={tabItem.id}
               onClick={() => setTab(tabItem.id)}
-              className="cursor-pointer"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '10px 18px', background: 'transparent', border: 'none',
-                borderBottom: tab === tabItem.id ? '2px solid var(--accent)' : '2px solid transparent',
-                color: tab === tabItem.id ? 'var(--ivory)' : 'rgba(148,163,184,0.45)',
-                fontSize: 13, fontWeight: tab === tabItem.id ? 600 : 500,
-                transition: 'color 0.15s, border-color 0.15s', marginBottom: -1, outline: 'none',
-              }}
+              className={`sf-tab cursor-pointer${tab === tabItem.id ? ' active' : ''}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               {tabItem.label}
               {tabItem.count > 0 && (
                 <span style={{
-                  background: tab === tabItem.id ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)',
-                  color: tab === tabItem.id ? 'var(--accent)' : 'rgba(148,163,184,0.4)',
+                  background: tab === tabItem.id ? 'var(--accent-dim)' : 'rgba(255,255,255,0.05)',
+                  color: tab === tabItem.id ? 'var(--accent-lt)' : 'var(--text-4)',
                   borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+                  fontVariantNumeric: 'tabular-nums',
                 }}>
                   {tabItem.count}
                 </span>
@@ -3727,18 +3706,12 @@ export function Tasks({ user }: { user: User }) {
         )}
 
         {/* Info banner */}
-        <div className="sf-reveal sf-d300" style={{
-          marginTop: 28,
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-          padding: '12px 16px',
-          background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.14)',
-          borderRadius: 11,
-        }}>
-          <span style={{ flexShrink: 0, marginTop: 1 }}>
-            <IconRepeat size={14} color="rgba(52,211,153,0.7)" />
+        <div className="sf-banner is-accent sf-reveal sf-d300" style={{ marginTop: 28, alignItems: 'flex-start' }}>
+          <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex' }}>
+            <IconRepeat size={14} color="currentColor" />
           </span>
-          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
-            {tr('Les tâches s\'exécutent automatiquement sur le serveur, ', 'Tasks run automatically on the server, ')}<strong style={{ color: 'rgba(233,234,240,0.7)' }}>{tr('même ScaleFlow fermé', 'even when ScaleFlow is closed')}</strong>{tr('. Chaque publication apparaît dans l\'historique.', '. Every post appears in the history.')}
+          <p style={{ fontSize: 12.5, lineHeight: 1.6, margin: 0, fontWeight: 500 }}>
+            {tr('Les tâches s\'exécutent automatiquement sur le serveur, ', 'Tasks run automatically on the server, ')}<strong style={{ color: 'var(--text-1)' }}>{tr('même ScaleFlow fermé', 'even when ScaleFlow is closed')}</strong>{tr('. Chaque publication apparaît dans l\'historique.', '. Every post appears in the history.')}
           </p>
         </div>
       </div>

@@ -30,40 +30,42 @@ export function useToast() {
   return ctx
 }
 
+// Palette v2 : chaque variante mappe sur les tokens d'état (--ok/--danger/--warn
+// + accent indigo pour info). Plus aucune couleur de statut codée en dur.
 const KIND: Record<ToastKind, {
   border: string; glow: string; icon: ReactNode; iconBg: string; iconColor: string; barColor: string
 }> = {
   ok: {
-    border:    'rgba(52,211,153,0.3)',
-    glow:      '0 0 24px -6px rgba(52,211,153,0.35)',
+    border:    'rgba(34,197,94,0.3)',
+    glow:      '0 0 24px -6px rgba(34,197,94,0.35)',
     icon:      ti('M20 6 9 17l-5-5'),
-    iconBg:    'rgba(52,211,153,0.12)',
-    iconColor: '#34d399',
-    barColor:  '#34d399',
+    iconBg:    'var(--ok-dim)',
+    iconColor: 'var(--ok)',
+    barColor:  'var(--ok)',
   },
   error: {
-    border:    'rgba(240,61,85,0.3)',
-    glow:      '0 0 24px -6px rgba(240,61,85,0.35)',
+    border:    'rgba(239,68,68,0.3)',
+    glow:      '0 0 24px -6px rgba(239,68,68,0.35)',
     icon:      ti('M18 6 6 18M6 6l12 12'),
-    iconBg:    'rgba(240,61,85,0.12)',
-    iconColor: '#f87171',
-    barColor:  '#f87171',
+    iconBg:    'var(--danger-dim)',
+    iconColor: 'var(--danger)',
+    barColor:  'var(--danger)',
   },
   warn: {
-    border:    'rgba(251,191,36,0.3)',
-    glow:      '0 0 24px -6px rgba(251,191,36,0.3)',
+    border:    'rgba(245,158,11,0.3)',
+    glow:      '0 0 24px -6px rgba(245,158,11,0.3)',
     icon:      ti('M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01'),
-    iconBg:    'rgba(251,191,36,0.1)',
-    iconColor: '#fbbf24',
-    barColor:  '#fbbf24',
+    iconBg:    'var(--warn-dim)',
+    iconColor: 'var(--warn)',
+    barColor:  'var(--warn)',
   },
   info: {
-    border:    'rgba(99,102,241,0.35)',
-    glow:      '0 0 24px -6px rgba(99,102,241,0.4)',
+    border:    'var(--border-accent-strong)',
+    glow:      'var(--glow-accent)',
     icon:      ti('M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01'),
-    iconBg:    'rgba(99,102,241,0.12)',
-    iconColor: '#6366F1',
-    barColor:  'linear-gradient(90deg, #6366F1, #818CF8)',
+    iconBg:    'var(--accent-dim)',
+    iconColor: 'var(--accent-lt)',
+    barColor:  'linear-gradient(90deg, var(--accent), var(--accent-lt))',
   },
 }
 
@@ -81,11 +83,11 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
       onClick={dismiss}
       className={`pointer-events-auto cursor-pointer min-w-[300px] max-w-[360px] rounded-2xl overflow-hidden relative ${exiting ? 'anim-toast-out' : 'anim-toast-in'}`}
       style={{
-        background: 'rgba(15,16,20,0.92)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        background: 'var(--surface-2)',
+        backdropFilter: 'var(--blur-md)',
+        WebkitBackdropFilter: 'var(--blur-md)',
         border: `1px solid ${c.border}`,
-        boxShadow: `${c.glow}, 0 16px 48px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04)`,
+        boxShadow: `${c.glow}, var(--elev-3)`,
       }}
     >
       {/* Colored left accent bar */}
@@ -118,11 +120,11 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
 
         {/* Text */}
         <div className="flex-1 min-w-0 py-0.5">
-          <p className="text-[13px] font-semibold leading-snug" style={{ color: '#e2d9f3' }}>
+          <p className="text-[13px] font-semibold leading-snug" style={{ color: 'var(--text-1)' }}>
             {toast.title}
           </p>
           {toast.body && (
-            <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'rgba(233,234,240,0.5)' }}>
+            <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'var(--text-3)' }}>
               {toast.body}
             </p>
           )}
@@ -133,9 +135,9 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
           onClick={e => { e.stopPropagation(); dismiss() }}
           aria-label="Fermer"
           className="mt-0.5 flex-shrink-0 transition-colors cursor-pointer"
-          style={{ color: 'rgba(233,234,240,0.3)' }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(233,234,240,0.7)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(233,234,240,0.3)')}
+          style={{ color: 'var(--text-4)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-2)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-4)')}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>

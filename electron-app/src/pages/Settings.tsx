@@ -627,33 +627,37 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   ]
 
   if (loading) return (
-    <div className="flex flex-col h-full anim-page" style={{ background: S.base }}>
-      {/* Loading header — mirrors real header */}
-      <div className="flex items-center gap-4 px-8 py-5 border-b border-border flex-shrink-0"
-        style={{ background: 'linear-gradient(90deg,rgba(99,102,241,0.06) 0%,transparent 55%)' }}>
-        <div className="sf-anim-scale-spring" style={{
-          width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(99,102,241,0.08)',
-          border: '1px solid rgba(99,102,241,0.28)',
-          color: '#6366F1',
-        }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </div>
-        <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-          <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
-            {t('settingsTitle')}
-          </h1>
-          <p className="sf-page-sub">{user.email}</p>
+    <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: S.base }}>
+      {/* Loading header — mirrors real header (v2 pattern) */}
+      <div className="sf-page-header">
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">{t('settingsTitle')}</h1>
+            <p className="sf-page-sub">{user.email}</p>
+          </div>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center gap-3">
-        <span className="sf-spinner" />
-        <p className="text-[13px] m-0" style={{ color: S.text3 }}>{t('settingsLoading')}</p>
+      {/* Skeleton body — same geometry as the settings cards */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+        <div className="sf-anim-slide-up sf-d100" style={{ width: 204, flexShrink: 0, borderRight: `1px solid ${S.border}`, padding: '14px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="sf-skeleton-line" style={{ height: 34, borderRadius: 8, opacity: 1 - i * 0.06 }} />)}
+        </div>
+        <div className="sf-anim-slide-up sf-d150" style={{ flex: 1, padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="sf-skeleton-text" style={{ height: 18, width: '38%' }} />
+            <div className="sf-skeleton-text" style={{ width: '62%' }} />
+          </div>
+          <div className="sf-skeleton-card" style={{ height: 150 }} />
+          <div className="sf-skeleton-card" style={{ height: 220 }} />
+        </div>
       </div>
+      <span className="sr-only">{t('settingsLoading')}</span>
     </div>
   )
 
@@ -661,26 +665,11 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   return (
     <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: S.base }}>
 
-      {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div style={{
-        flexShrink: 0, padding: '18px 28px 16px',
-        borderBottom: `1px solid ${S.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'linear-gradient(90deg,rgba(99,102,241,0.06) 0%,transparent 55%)',
-        position: 'relative',
-      }}>
-        {/* Subtle top-edge glow line */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg,transparent,rgba(99,102,241,0.35),transparent)', pointerEvents: 'none' }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          {/* Gear icon */}
-          <div className="sf-anim-scale-spring" style={{
-            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)',
-            border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1',
-          }}>
+      {/* ── Page header (v2 pattern) ─────────────────────────────────────── */}
+      <div className="sf-page-header">
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          {/* Gear icon tile */}
+          <div className="sf-page-icon sf-anim-scale-spring">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
               <circle cx="12" cy="12" r="3"/>
@@ -688,16 +677,16 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
           </div>
 
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('settingsTitle')}</h1>
+            <h1 className="sf-page-title">{t('settingsTitle')}</h1>
             <p className="sf-page-sub">{user.email}</p>
           </div>
         </div>
 
         {/* Right — saved indicator + save button */}
-        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
           {saved && (
-            <span className="sf-badge sf-badge-ok anim-scale-in" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span className="sf-status-chip is-live anim-scale-in">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               {t('settingsSaved')}
             </span>
           )}
@@ -1088,10 +1077,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                           </button>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px', borderRadius: 10, background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
-                            <input type="password" className="sf-input" placeholder={t('newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
-                            <input type="password" className="sf-input" placeholder={t('confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
-                            {pwError && <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>{pwError}</p>}
-                            {pwOk && <p style={{ fontSize: 12, color: '#22c55e', margin: 0 }}>{t('passwordChanged')}</p>}
+                            <input type="password" className={`sf-input ${pwError ? 'is-invalid' : ''}`} placeholder={t('newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
+                            <input type="password" className={`sf-input ${pwError ? 'is-invalid' : ''}`} placeholder={t('confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
+                            {pwError && <p className="sf-field-error" style={{ margin: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>{pwError}</p>}
+                            {pwOk && <p className="sf-field-error" style={{ margin: 0, color: 'var(--ok)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{t('passwordChanged')}</p>}
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button onClick={() => { setPwChangeOpen(false); setNewPw(''); setConfirmPw(''); setPwError(null); setPwOk(false) }} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1 }}>{t('cancel')}</button>
                               <button onClick={async () => {
@@ -1276,7 +1265,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     </button>
                   </div>
 
-                  {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
+                  {error && <div className="sf-banner is-danger anim-scale-in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>{error}</span></div>}
                 </div>
               )}
 
@@ -1289,17 +1278,12 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                   </div>
 
                   {/* Org / solo mode banner */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, fontSize: 12,
-                    ...(currentOrg
-                      ? { background: 'rgba(99,102,241,0.09)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
-                      : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
-                  }}>
+                  <div className={`sf-banner ${currentOrg ? 'is-accent' : ''}`} style={{ fontSize: 12 }}>
                     {currentOrg ? (
                       <>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
                         <span>{t('orgMode')} — <strong style={{ color: S.text }}>{currentOrg.name}</strong>
-                          {!canEditOrgConnexions && <span style={{ color: '#F59E0B' }}> · {t('readOnly')}</span>}
+                          {!canEditOrgConnexions && <span style={{ color: 'var(--warn)' }}> · {t('readOnly')}</span>}
                         </span>
                       </>
                     ) : (
@@ -1407,7 +1391,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                                 )}
                               </div>
                               {rotTest[i]?.msg && (
-                                <span style={{ fontSize: 11.5, fontWeight: 600, color: rotTest[i]?.ok ? '#34D399' : '#F87171' }}>{rotTest[i]?.msg}</span>
+                                <span style={{ fontSize: 11.5, fontWeight: 600, color: rotTest[i]?.ok ? 'var(--ok)' : 'var(--danger)' }}>{rotTest[i]?.msg}</span>
                               )}
                             </div>
                           ))}
@@ -1425,7 +1409,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                           <button onClick={saveRot} disabled={rotSaving} className="sf-btn sf-btn-primary sf-btn-sm" style={{ opacity: rotSaving ? 0.6 : 1 }}>
                             {rotSaving ? tr('Enregistrement…', 'Saving…') : tr('Enregistrer la rotation', 'Save rotation')}
                           </button>
-                          {rotSaved && <span style={{ fontSize: 12, fontWeight: 600, color: '#34D399' }}>{tr('Enregistré ✓', 'Saved ✓')}</span>}
+                          {rotSaved && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ok)' }}>{tr('Enregistré ✓', 'Saved ✓')}</span>}
                           <span style={{ fontSize: 11.5, color: S.text3, marginLeft: 'auto' }}>{tr('⚡ Poste 1 tél. à la fois quand activé', '⚡ Posts 1 phone at a time when enabled')}</span>
                         </div>
                       )}
@@ -1445,7 +1429,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                           {webhookBusy ? tr('Activation…', 'Enabling…') : tr('Activer les webhooks', 'Enable webhooks')}
                         </button>
                         {webhookMsg && (
-                          <span style={{ fontSize: 12, fontWeight: 600, color: webhookMsg.ok ? '#34D399' : '#F87171' }}>{webhookMsg.text}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: webhookMsg.ok ? 'var(--ok)' : 'var(--danger)' }}>{webhookMsg.text}</span>
                         )}
                       </div>
                     </div>
@@ -1469,7 +1453,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     </div>
                   </div>
 
-                  {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
+                  {error && <div className="sf-banner is-danger anim-scale-in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>{error}</span></div>}
                 </div>
               )}
 
@@ -1508,9 +1492,9 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {panel === 'desktop' && <DesktopDownloadPanel S={S} />}
 
               {error && panel !== 'profile' && panel !== 'connexions' && (
-                <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 10, fontSize: 12, color: '#EF4444', maxWidth: 540,
-                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                  {error}
+                <div className="sf-banner is-danger anim-scale-in" style={{ marginTop: 16, maxWidth: 540 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <span>{error}</span>
                 </div>
               )}
             </div>

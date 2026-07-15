@@ -1168,18 +1168,15 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             ))}
           </div>
 
-          {/* Middle: active task pill */}
+          {/* Middle: active task pill — canonical live status chip */}
           {activeTask && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-              background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
-              color: '#6366F1', flexShrink: 0,
-            }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse flex-shrink-0" />
-              {activeTask.kind === 'mass'
-                ? `${activeTask.done}/${activeTask.total} • ${activeTask.progress}%`
-                : `${activeTask.progress}%`}
+            <div className="sf-status-chip is-accent" style={{ flexShrink: 0 }}>
+              <span className="sf-status-dot" />
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {activeTask.kind === 'mass'
+                  ? `${activeTask.done}/${activeTask.total} · ${activeTask.progress}%`
+                  : `${activeTask.progress}%`}
+              </span>
             </div>
           )}
 

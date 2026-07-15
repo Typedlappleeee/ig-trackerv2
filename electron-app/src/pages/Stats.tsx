@@ -20,7 +20,7 @@ import { useToast } from '@/components/Toast'
 import { exportCsv } from '@/lib/exportCsv'
 import {
   ACCENT, ACCENT_L, TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT,
-  HAIR, BG_1 as BG, BG_2 as BG2, OK, ERR, SANS,
+  HAIR, BG_1 as BG, OK, ERR, SANS,
 } from '@/lib/theme'
 
 interface StatsProps { user: User }
@@ -140,21 +140,65 @@ function Kpi({ label, value, delta, sub, accent }: {
 }) {
   const tr = useTr()
   const up = (delta ?? 0) >= 0
+  const hasDelta = delta !== undefined && delta !== null
   return (
-    <div style={{ flex: 1, minWidth: 150, padding: '16px 20px', background: BG2, border: `1px solid ${accent ? 'rgba(99,102,241,0.22)' : HAIR}`, borderRadius: 12 }}>
-      <p style={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</p>
-      <p style={{ fontSize: 26, fontWeight: 800, color: IVORY, marginTop: 6, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</p>
-      {delta !== undefined && delta !== null && (
-        <p style={{ fontSize: 12, fontWeight: 600, color: delta === 0 ? FAINT : up ? OK : ERR, marginTop: 8 }}>
-          {up && delta !== 0 ? '▲' : delta !== 0 ? '▼' : '•'} {fmtSigned(delta)} <span style={{ color: FAINT, fontWeight: 500 }}>{tr('sur la période', 'over the period')}</span>
-        </p>
-      )}
-      {sub && <p style={{ fontSize: 11.5, color: FAINT, marginTop: 8 }}>{sub}</p>}
+    <div className="sf-card sf-stat-card" style={{ flex: 1, minWidth: 150, padding: '16px 20px', borderColor: accent ? 'rgba(99,102,241,0.22)' : undefined }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <p className="sf-section-label" style={{ margin: 0, letterSpacing: '0.04em' }}>{label}</p>
+        {hasDelta && (
+          <span className={`sf-stat-delta ${delta === 0 ? 'flat' : up ? 'up' : 'down'}`}>
+            {up && delta !== 0 ? '▲' : delta !== 0 ? '▼' : '•'} {fmtSigned(delta)}
+          </span>
+        )}
+      </div>
+      <p className="sf-tabular" style={{ fontSize: 26, fontWeight: 800, color: IVORY, marginTop: 8, lineHeight: 1 }}>{value}</p>
+      {sub
+        ? <p style={{ fontSize: 11.5, color: FAINT, marginTop: 8 }}>{sub}</p>
+        : hasDelta && <p style={{ fontSize: 11.5, color: FAINT, marginTop: 8 }}>{tr('sur la période', 'over the period')}</p>}
     </div>
   )
 }
 
 interface Row { phone: Phone; spark: number[]; growth: number | null; growthPct: number | null }
+
+// ── Loading skeleton (same geometry as the real content) ─────────────────────
+function StatsSkeleton() {
+  return (
+    <div aria-hidden>
+      {/* KPI row */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="sf-card" style={{ flex: 1, minWidth: 150, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="sf-skeleton-text" style={{ width: '55%', height: 10 }} />
+            <div className="sf-skeleton-text" style={{ width: '70%', height: 22 }} />
+            <div className="sf-skeleton-text" style={{ width: '40%', height: 10 }} />
+          </div>
+        ))}
+      </div>
+      {/* Fleet health */}
+      <div className="sf-card" style={{ padding: '14px 18px', marginBottom: 18 }}>
+        <div className="sf-skeleton-text" style={{ width: 220, height: 14 }} />
+      </div>
+      {/* Charts */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+        {[0, 1].map(i => (
+          <div key={i} className="sf-card" style={{ padding: '16px 18px' }}>
+            <div className="sf-skeleton-text" style={{ width: 120, height: 12, marginBottom: 14 }} />
+            <div className="sf-skeleton-card" style={{ height: 120 }} />
+          </div>
+        ))}
+      </div>
+      <div className="sf-card" style={{ padding: '16px 18px', marginBottom: 18 }}>
+        <div className="sf-skeleton-text" style={{ width: 100, height: 12, marginBottom: 14 }} />
+        <div className="sf-skeleton-card" style={{ height: 90 }} />
+      </div>
+      {/* Leaderboard */}
+      <div className="sf-card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {[0, 1, 2, 3, 4].map(i => <div key={i} className="sf-skeleton-line" style={{ height: 28 }} />)}
+      </div>
+    </div>
+  )
+}
 
 export function Stats({ user }: StatsProps) {
   const { currentOrg, role, perms } = useOrg()
@@ -298,8 +342,6 @@ export function Stats({ user }: StatsProps) {
     } finally { setRefreshing(false) }
   }
 
-  const card: React.CSSProperties = { background: BG2, border: `1px solid ${HAIR}`, borderRadius: 12 }
-
   return (
     <div style={{ height: '100%', overflow: 'auto', fontFamily: SANS, background: BG }}>
       {detail && (
@@ -307,40 +349,47 @@ export function Stats({ user }: StatsProps) {
       )}
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 28px 60px' }}>
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: IVORY }}>Analytics</h1>
-            <p style={{ fontSize: 13, color: MUTED, marginTop: 3 }}>
-              {filtered.length} {tr(filtered.length > 1 ? 'comptes' : 'compte', filtered.length > 1 ? 'accounts' : 'account')}{groupFilter !== 'all' ? ` · ${groupFilter}` : ''} · {tr('collecte automatique', 'automatic collection')}
-            </p>
+        {/* Header — pattern v2 */}
+        <div className="sf-page-header sf-anim-slide-up" style={{ padding: '0 0 18px', marginBottom: 18 }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-page-icon sf-anim-scale-spring" aria-hidden>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v18h18" />
+                <path d="M7 14l3.5-4 3 3L21 6" />
+              </svg>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <h1 className="sf-page-title">Analytics</h1>
+              <p className="sf-page-sub">
+                {filtered.length} {tr(filtered.length > 1 ? 'comptes' : 'compte', filtered.length > 1 ? 'accounts' : 'account')}{groupFilter !== 'all' ? ` · ${groupFilter}` : ''} · {tr('collecte automatique', 'automatic collection')}
+              </p>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ display: 'inline-flex', background: BG2, border: `1px solid ${HAIR}`, borderRadius: 9, padding: 3 }}>
+          <div className="sf-page-header-actions">
+            <span className="sf-status-chip is-live" title={tr('Collecte automatique active', 'Automatic collection active')}>
+              <span className="sf-status-dot" />{tr('En direct', 'Live')}
+            </span>
+            <div className="sf-segment" role="group" aria-label={tr('Période', 'Period')}>
               {([7, 30, 90] as Period[]).map(p => (
-                <button key={p} onClick={() => setPeriod(p)} className="cursor-pointer" style={{
-                  padding: '6px 12px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, border: 'none',
-                  background: period === p ? 'rgba(99,102,241,0.16)' : 'transparent',
-                  color: period === p ? ACCENT_L : MUTED, transition: 'all 0.15s',
-                }}>{tr(`${p}j`, `${p}d`)}</button>
+                <button key={p} onClick={() => setPeriod(p)}
+                  className={`sf-segment-item${period === p ? ' is-active' : ''} sf-tabular`}>{tr(`${p}j`, `${p}d`)}</button>
               ))}
             </div>
-            <button onClick={refresh} disabled={refreshing} className="cursor-pointer" style={{
-              padding: '7px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 600,
-              background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.32)',
-              color: ACCENT_L, opacity: refreshing ? 0.6 : 1,
-            }}>{refreshing ? tr('Actualisation…', 'Refreshing…') : tr('↻ Actualiser', '↻ Refresh')}</button>
+            <button onClick={refresh} disabled={refreshing} className="sf-btn sf-btn-secondary cursor-pointer">
+              {refreshing && <span className="sf-spinner" style={{ width: 13, height: 13 }} />}
+              {refreshing ? tr('Actualisation…', 'Refreshing…') : tr('↻ Actualiser', '↻ Refresh')}
+            </button>
           </div>
         </div>
 
         {/* Filters */}
         {phones.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+          <div className="sf-cluster sf-anim-slide-up sf-d50" style={{ gap: 8, marginBottom: 18, flexWrap: 'nowrap' }}>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher un compte…', 'Search an account…')}
-              style={{ flex: 1, minWidth: 180, height: 34, padding: '0 12px', fontSize: 13, color: IVORY, background: BG2, border: `1px solid ${HAIR}`, borderRadius: 9, outline: 'none' }} />
+              className="sf-input" style={{ flex: 1, minWidth: 180 }} />
             {groups.length > 0 && (
-              <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="cursor-pointer"
-                style={{ height: 34, padding: '0 10px', fontSize: 12.5, color: groupFilter === 'all' ? MUTED : ACCENT_L, background: BG2, border: `1px solid ${HAIR}`, borderRadius: 9, outline: 'none' }}>
+              <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="sf-input cursor-pointer"
+                style={{ width: 'auto', minWidth: 150, color: groupFilter === 'all' ? MUTED : ACCENT_L }}>
                 <option value="all">{tr('Tous les groupes', 'All groups')}</option>
                 {groups.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
@@ -349,15 +398,23 @@ export function Stats({ user }: StatsProps) {
         )}
 
         {loading ? (
-          <div style={{ padding: 80, textAlign: 'center', color: FAINT }}>{tr('Chargement…', 'Loading…')}</div>
+          <StatsSkeleton />
         ) : phones.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: MUTED, ...card }}>
-            {tr('Aucun compte avec un pseudo Instagram. Ajoute le pseudo IG de tes téléphones pour démarrer le suivi.', 'No account with an Instagram handle. Add your phones\' IG handles to start tracking.')}
+          <div className="sf-card sf-empty sf-anim-slide-up">
+            <div className="sf-empty-icon" aria-hidden>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v18h18" /><path d="M7 14l3.5-4 3 3L21 6" />
+              </svg>
+            </div>
+            <p className="sf-empty-title" style={{ color: IVORY }}>{tr('Aucun compte suivi', 'No tracked account')}</p>
+            <p className="sf-empty-desc" style={{ maxWidth: 320 }}>
+              {tr('Ajoute le pseudo Instagram de tes téléphones pour démarrer le suivi des statistiques.', 'Add your phones’ Instagram handles to start tracking analytics.')}
+            </p>
           </div>
         ) : (
           <>
             {/* KPI row */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+            <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
               <Kpi label="Followers"  value={fmtCompact(totals.followers)} delta={followersDelta} sub={followersPct !== null ? tr(`${fmtPct(followersPct)} sur la période`, `${fmtPct(followersPct)} over the period`) : undefined} accent />
               <Kpi label={tr('Vues totales', 'Total views')} value={fmtCompact(totals.views)}   delta={viewsDelta} />
               <Kpi label="Posts"       value={fmtCompact(totals.posts)} />
@@ -365,35 +422,35 @@ export function Stats({ user }: StatsProps) {
             </div>
 
             {/* Santé de la flotte */}
-            <div style={{ ...card, padding: '14px 18px', marginBottom: 18, display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: IVORY }}>{tr('Santé de la flotte', 'Fleet health')}</span>
+            <div className="sf-card sf-anim-slide-up sf-d150" style={{ padding: '14px 18px', marginBottom: 18, display: 'flex', gap: 26, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="sf-section-label" style={{ margin: 0, letterSpacing: '0.12em' }}>{tr('Santé de la flotte', 'Fleet health')}</span>
               {[
                 { label: tr('Comptes', 'Accounts'), val: fleet.total, color: IVORY },
-                { label: tr('Sains', 'Healthy'), val: fleet.healthy, color: '#22C55E' },
-                { label: 'Shadowban', val: fleet.shadow, color: '#F59E0B' },
-                { label: tr('Bloqués', 'Blocked'), val: fleet.banned, color: '#EF4444' },
-                { label: tr('Silencieux 3j+', 'Silent 3d+'), val: fleet.silent, color: '#94A3B8' },
+                { label: tr('Sains', 'Healthy'), val: fleet.healthy, color: 'var(--ok)' },
+                { label: 'Shadowban', val: fleet.shadow, color: 'var(--warn)' },
+                { label: tr('Bloqués', 'Blocked'), val: fleet.banned, color: 'var(--danger)' },
+                { label: tr('Silencieux 3j+', 'Silent 3d+'), val: fleet.silent, color: FAINT },
               ].map(m => (
-                <div key={m.label} style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: 18, fontWeight: 800, color: m.color, fontVariantNumeric: 'tabular-nums' }}>{m.val}</span>
-                  <span style={{ fontSize: 10.5, color: FAINT, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{m.label}</span>
+                <div key={m.label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="sf-tabular" style={{ fontSize: 18, fontWeight: 800, color: m.color }}>{m.val}</span>
+                  <span style={{ fontSize: 10.5, color: FAINT, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{m.label}</span>
                 </div>
               ))}
             </div>
 
             {/* Charts */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
-              <div style={{ ...card, padding: '16px 18px' }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>Followers · {tr(`${period}j`, `${period}d`)}</p>
+            <div className="sf-anim-slide-up sf-d150" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+              <div className="sf-card" style={{ padding: '16px 18px' }}>
+                <p className="sf-section-label" style={{ margin: '0 0 12px' }}>Followers · {tr(`${period}j`, `${period}d`)}</p>
                 <LineChart data={followersSeries} color={ACCENT} />
               </div>
-              <div style={{ ...card, padding: '16px 18px' }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>{tr('Vues', 'Views')} · {tr(`${period}j`, `${period}d`)}</p>
+              <div className="sf-card" style={{ padding: '16px 18px' }}>
+                <p className="sf-section-label" style={{ margin: '0 0 12px' }}>{tr('Vues', 'Views')} · {tr(`${period}j`, `${period}d`)}</p>
                 <LineChart data={viewsSeries} color={OK} />
               </div>
             </div>
-            <div style={{ ...card, padding: '16px 18px', marginBottom: 18 }}>
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 12 }}>Posts · {tr(`${period}j`, `${period}d`)}</p>
+            <div className="sf-card sf-anim-slide-up sf-d150" style={{ padding: '16px 18px', marginBottom: 18 }}>
+              <p className="sf-section-label" style={{ margin: '0 0 12px' }}>Posts · {tr(`${period}j`, `${period}d`)}</p>
               <LineChart data={postsSeries} color={ACCENT_L} height={90} />
             </div>
 
@@ -406,7 +463,7 @@ export function Stats({ user }: StatsProps) {
             )}
 
             {/* Leaderboard */}
-            <div style={{ ...card, overflow: 'hidden' }}>
+            <div className="sf-card sf-anim-slide-up sf-d150" style={{ overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: IVORY }}>{tr('Classement par compte', 'Account leaderboard')} <span style={{ color: FAINT, fontWeight: 500 }}>{tr('· clique un compte pour le détail', '· click an account for details')}</span></p>
                 <button
@@ -442,8 +499,10 @@ export function Stats({ user }: StatsProps) {
               {leaderboard.map((row, i) => {
                 const up = (row.growth ?? 0) >= 0
                 return (
-                  <button key={row.phone.id} onClick={() => setDetail(row.phone)} className="cursor-pointer"
-                    style={{ width: '100%', display: 'grid', gridTemplateColumns: '28px 1fr 90px 90px 70px 90px', padding: '11px 18px', alignItems: 'center', fontSize: 13, textAlign: 'left', background: 'none', border: 'none', borderBottom: i < leaderboard.length - 1 ? `1px solid rgba(233,234,240,0.04)` : 'none' }}>
+                  <button key={row.phone.id} onClick={() => setDetail(row.phone)} className="cursor-pointer sf-press"
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.05)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                    style={{ width: '100%', display: 'grid', gridTemplateColumns: '28px 1fr 90px 90px 70px 90px', padding: '11px 18px', alignItems: 'center', fontSize: 13, textAlign: 'left', background: 'none', border: 'none', borderBottom: i < leaderboard.length - 1 ? `1px solid rgba(233,234,240,0.04)` : 'none', transition: 'background var(--t-fast)' }}>
                     <span style={{ color: FAINT, fontWeight: 700, fontSize: 12 }}>{i + 1}</span>
                     <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Sparkline data={row.spark} color={up ? OK : ERR} />
@@ -477,15 +536,17 @@ function MoversCard({ title, rows, positive, onPick }: {
 }) {
   const tr = useTr()
   return (
-    <div style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 12, padding: '14px 16px' }}>
-      <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 10 }}>{title}</p>
+    <div className="sf-card" style={{ padding: '14px 16px' }}>
+      <p className="sf-section-label" style={{ margin: '0 0 10px', letterSpacing: '0.06em' }}>{title}</p>
       {rows.length === 0 ? (
         <p style={{ fontSize: 12, color: FAINT }}>{tr('Pas encore de données.', 'No data yet.')}</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map(r => (
-            <button key={r.phone.id} onClick={() => onPick(r.phone)} className="cursor-pointer"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: `1px solid ${HAIR}`, textAlign: 'left' }}>
+            <button key={r.phone.id} onClick={() => onPick(r.phone)} className="cursor-pointer sf-press"
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-accent-strong)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = HAIR }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '7px 10px', borderRadius: 'var(--r-sm)', background: 'rgba(255,255,255,0.02)', border: `1px solid ${HAIR}`, textAlign: 'left', transition: 'border-color var(--t-fast)' }}>
               <span style={{ fontSize: 12.5, fontWeight: 600, color: IVORY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
                 @{r.phone.ig_username ?? r.phone.phone_name}
               </span>
@@ -513,31 +574,31 @@ function DetailModal({ phone, snaps, period, onClose }: {
   const fPct = fFirst && fGrowth !== null ? (fGrowth / fFirst) * 100 : null
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div onClick={e => e.stopPropagation()} className="anim-scale-in" style={{ width: '100%', maxWidth: 640, maxHeight: 'calc(100vh - 48px)', overflowY: 'auto', background: BG2, border: `1px solid ${HAIR}`, borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.6)' }}>
+    <div onClick={onClose} className="sf-modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} className="sf-modal" style={{ width: '100%', maxWidth: 640, maxHeight: 'calc(100vh - 48px)', overflowY: 'auto', background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%)', border: `1px solid ${HAIR}`, borderRadius: 'var(--r-xl)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: `1px solid ${HAIR}` }}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p style={{ fontSize: 16, fontWeight: 800, color: IVORY }}>@{phone.ig_username ?? phone.phone_name}</p>
             <p style={{ fontSize: 12, color: FAINT, marginTop: 2 }}>{phone.phone_name}{phone.group_name ? ` · ${phone.group_name}` : ''} · {tr(`${period}j`, `${period}d`)}</p>
           </div>
-          <button onClick={onClose} className="cursor-pointer" style={{ background: 'none', border: 'none', color: MUTED, fontSize: 20, lineHeight: 1 }}>×</button>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon cursor-pointer" aria-label={tr('Fermer', 'Close')} style={{ fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
         <div style={{ padding: 22 }}>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
             <Kpi label="Followers" value={fmtCompact(phone.followers ?? 0)} delta={fGrowth} sub={fPct !== null ? fmtPct(fPct) : undefined} accent />
             <Kpi label={tr('Vues', 'Views')} value={fmtCompact(phone.total_views ?? 0)} />
             <Kpi label="Posts" value={fmtCompact(phone.video_count ?? 0)} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 10 }}>Followers</p>
+            <p className="sf-section-label" style={{ margin: '0 0 10px' }}>Followers</p>
             <LineChart data={fSeries} color={ACCENT} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 10 }}>{tr('Vues', 'Views')}</p>
+            <p className="sf-section-label" style={{ margin: '0 0 10px' }}>{tr('Vues', 'Views')}</p>
             <LineChart data={vSeries} color={OK} />
           </div>
           <div>
-            <p style={{ fontSize: 12.5, fontWeight: 700, color: IVORY, marginBottom: 10 }}>Posts</p>
+            <p className="sf-section-label" style={{ margin: '0 0 10px' }}>Posts</p>
             <LineChart data={pSeries} color={ACCENT_L} height={90} />
           </div>
         </div>

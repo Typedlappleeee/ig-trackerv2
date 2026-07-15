@@ -234,14 +234,14 @@ export function Reports({ user }: { user: User }) {
   return (
     <div className="sf-page">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="sf-toolbar" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 13, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: 'linear-gradient(135deg,#8B5CF6,#6366F1)', boxShadow: '0 10px 24px -8px rgba(139,92,246,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)' }}>
+      <div className="sf-page-header">
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as any]: 'linear-gradient(135deg,#8B5CF6,#6366F1)' }}>
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
-          <div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
             <h1 className="sf-page-title">{view === 'tracker' ? trh('Suivi des comptes', 'Account tracking') : view === 'proxy' ? trh('Suivi des proxys', 'Proxy tracking') : trh('Gestion & Stats', 'Management & Stats')}</h1>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>
+            <p className="sf-page-sub">
               {view === 'tracker'
                 ? trh('Tableau partagé — le suivi de tous vos comptes par plateforme', 'Shared board — tracking of all your accounts by platform')
                 : trh('Gestion des comptes & statistiques — bientôt disponible', 'Account management & statistics — coming soon')}
@@ -249,7 +249,7 @@ export function Reports({ user }: { user: User }) {
           </div>
         </div>
         {view === 'tracker' && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
             <button onClick={() => setLinkOpen(true)} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ position: 'relative' }} title={trh('Associer tes téléphones à un compte Instagram (1 téléphone = 1 compte)', 'Link your phones to an Instagram account (1 phone = 1 account)')}>
               {trh('🔗 Lier des comptes', '🔗 Link accounts')}
               {unlinked.length > 0 && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: 'rgba(255,255,255,0.22)' }}>{unlinked.length}</span>}
@@ -259,17 +259,13 @@ export function Reports({ user }: { user: User }) {
       </div>
 
       {/* Onglets : Suivi comptes · Suivi proxys (admin) · Gestion & Stats (bientôt) */}
-      <div style={{ display: 'flex', gap: 6, padding: '0 28px', borderBottom: '1px solid var(--border)' }}>
+      <div className="sf-tabs" style={{ margin: '0 28px' }}>
         {([
           ['tracker', trh('🗂️ Suivi des comptes', '🗂️ Account tracking')],
           ['proxy', trh('🌐 Suivi des proxys', '🌐 Proxy tracking')],
           ['soon', trh('📊 Gestion & Stats', '📊 Management & Stats')],
         ] as const).map(([v, lbl]) => (
-          <button key={v} onClick={() => setView(v)} className="cursor-pointer" style={{
-            padding: '10px 16px', fontSize: 13, fontWeight: 700, background: 'transparent', border: 'none',
-            color: view === v ? 'var(--text-1)' : 'var(--text-4)',
-            borderBottom: `2px solid ${view === v ? 'var(--accent)' : 'transparent'}`, marginBottom: -1,
-          }}>{lbl}</button>
+          <button key={v} onClick={() => setView(v)} className={`sf-tab cursor-pointer${view === v ? ' is-active' : ''}`}>{lbl}</button>
         ))}
       </div>
 
@@ -283,13 +279,14 @@ export function Reports({ user }: { user: User }) {
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 28px 60px' }}>
-          <div className="sf-card" style={{ padding: '48px 28px', textAlign: 'center', maxWidth: 540, margin: '30px auto' }}>
-            <div style={{ fontSize: 38, marginBottom: 12 }}>📊</div>
-            <p style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 8px' }}>{trh('Bientôt disponible', 'Coming soon')}</p>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0, lineHeight: 1.6 }}>
+          <div className="sf-empty sf-anim-slide-up" style={{ maxWidth: 540, margin: '30px auto' }}>
+            <div className="sf-empty-icon">📊</div>
+            <p className="sf-empty-title">{trh('Bientôt disponible', 'Coming soon')}</p>
+            <p className="sf-empty-desc" style={{ maxWidth: 420 }}>
               {trh('La gestion des comptes et les statistiques (followers, vues, croissance) arrivent très bientôt.', 'Account management and statistics (followers, views, growth) are coming very soon.')}
               {' '}{trh('En attendant, retrouve tous tes comptes dans l\'onglet « Suivi des comptes » et lie tes téléphones à un Instagram avec le bouton « Lier des comptes ».', 'In the meantime, find all your accounts in the « Account tracking » tab and link your phones to an Instagram with the « Link accounts » button.')}
             </p>
+            <button onClick={() => setView('tracker')} className="sf-btn sf-btn-primary cursor-pointer" style={{ marginTop: 16 }}>{trh('🗂️ Voir mes comptes', '🗂️ View my accounts')}</button>
           </div>
         </div>
       )}
@@ -408,7 +405,11 @@ function LinkModal({ phones, geeGroups, onClose, onBulkLink }: {
         {/* Liste des tels à lier */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px' }}>
           {list.length === 0 ? (
-            <p style={{ textAlign: 'center', color: 'var(--text-4)', fontSize: 13, padding: '30px 0' }}>{trh('Aucun téléphone à lier dans ce filtre. 🎉', 'No phone to link in this filter. 🎉')}</p>
+            <div className="sf-empty" style={{ padding: '30px 0' }}>
+              <div className="sf-empty-icon">🎉</div>
+              <p className="sf-empty-title">{trh('Tout est lié', 'All linked')}</p>
+              <p className="sf-empty-desc">{trh('Aucun téléphone à lier dans ce filtre.', 'No phone to link in this filter.')}</p>
+            </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {capped.map(p => (

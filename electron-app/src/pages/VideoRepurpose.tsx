@@ -90,10 +90,10 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
 
   return (
     <div className="sf-card" style={{
-      borderRadius: 14, overflow: 'hidden', position: 'relative',
-      borderColor: isDone ? 'rgba(99,102,241,0.3)' : isErr ? 'rgba(239,68,68,0.25)' : 'var(--border)',
-      boxShadow: isDone ? '0 0 24px -6px rgba(99,102,241,0.15)' : 'none',
-      transition: 'border-color 0.3s, box-shadow 0.3s',
+      borderRadius: 'var(--r-lg)', overflow: 'hidden', position: 'relative',
+      borderColor: isDone ? 'var(--border-accent-strong)' : isErr ? 'rgba(239,68,68,0.25)' : 'var(--border)',
+      boxShadow: isDone ? 'var(--glow-accent)' : 'var(--elev-1)',
+      transition: 'border-color var(--t-smooth), box-shadow var(--t-smooth)',
     }}>
       {/* Thumbnail */}
       <div style={{ width: '100%', aspectRatio: '9/16', background: '#0a0a14', position: 'relative', overflow: 'hidden', maxHeight: 160 }}>
@@ -103,8 +103,8 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isProc && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1', animation: 'spin 0.9s linear infinite', margin: '0 auto 6px' }} />
-                <div style={{ fontSize: 10, color: 'rgba(99,102,241,0.6)' }}>{job.progress}%</div>
+                <div className="sf-spinner" style={{ width: 28, height: 28, borderWidth: 2, margin: '0 auto 6px' }} />
+                <div className="sf-tabular" style={{ fontSize: 10, color: 'var(--accent)' }}>{job.progress}%</div>
               </div>
             )}
             {isQ && (
@@ -125,7 +125,7 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
           </div>
         )}
         {isDone && (
-          <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(10,10,20,0.82)', backdropFilter: 'blur(4px)', borderRadius: 5, padding: '2px 6px', fontSize: 9, fontWeight: 700, color: '#6366F1', border: '1px solid rgba(99,102,241,0.22)' }}>
+          <div className="sf-tabular" style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(10,10,20,0.82)', backdropFilter: 'var(--blur-sm)', borderRadius: 'var(--r-sm)', padding: '2px 6px', fontSize: 9, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--border-accent)' }}>
             #{String(index + 1).padStart(2, '0')}
           </div>
         )}
@@ -135,7 +135,7 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
       {isDone && job.transforms && job.transforms.length > 0 && (
         <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: 3, borderBottom: '1px solid var(--border)' }}>
           {job.transforms.map((tr, i) => (
-            <span key={i} className="sf-badge sf-badge-violet" style={{ fontSize: 8, padding: '2px 5px', borderRadius: 4 }}>{tr}</span>
+            <span key={i} className="sf-badge sf-badge-accent" style={{ fontSize: 8, padding: '2px 5px', borderRadius: 'var(--r-xs)' }}>{tr}</span>
           ))}
         </div>
       )}
@@ -145,8 +145,8 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
         {isDone && (
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={() => downloadVariant(job, `clonevid_${index + 1}.mp4`)}
-              className="sf-btn cursor-pointer"
-              style={{ flex: 1, height: 28, fontSize: 9, background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 6 }}
+              className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+              style={{ flex: 1, height: 28, fontSize: 9, gap: 4 }}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               {tr('Télécharger', 'Download')}
@@ -155,15 +155,15 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
               <div className="sf-spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
             </span>}
             {job.uploadError && (
-              <span title={job.uploadError} style={{ fontSize: 9, color: '#f87171', cursor: 'help', display: 'flex', alignItems: 'center' }}>
+              <span title={job.uploadError} style={{ fontSize: 9, color: 'var(--danger)', cursor: 'help', display: 'flex', alignItems: 'center' }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               </span>
             )}
           </div>
         )}
-        {isErr && <div style={{ fontSize: 9, color: '#f87171' }}>{job.error?.slice(0, 45)}</div>}
+        {isErr && <div className="sf-field-error" style={{ fontSize: 9, marginTop: 0 }}>{job.error?.slice(0, 45)}</div>}
         {isQ   && <div style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center' }}>{tr('En attente…', 'Queued…')}</div>}
-        {isProc && <div style={{ fontSize: 9, color: 'rgba(99,102,241,0.6)', textAlign: 'center' }}>{tr(`Traitement ${job.progress}%`, `Processing ${job.progress}%`)}</div>}
+        {isProc && <div className="sf-tabular" style={{ fontSize: 9, color: 'var(--accent)', textAlign: 'center' }}>{tr(`Traitement ${job.progress}%`, `Processing ${job.progress}%`)}</div>}
       </div>
     </div>
   )
@@ -185,14 +185,14 @@ function RatioCard({ ratio, label, selected, onClick, disabled }: {
     <button
       onClick={onClick}
       disabled={disabled}
-      className="cursor-pointer"
+      className="cursor-pointer sf-press"
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-        padding: '10px 8px', borderRadius: 10, flex: 1,
-        background: selected ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.03)',
-        border: `1px solid ${selected ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
-        boxShadow: selected ? '0 0 12px rgba(99,102,241,0.12)' : 'none',
-        transition: 'all 0.15s',
+        padding: '10px 8px', borderRadius: 'var(--r-md)', flex: 1,
+        background: selected ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)',
+        border: `1px solid ${selected ? 'var(--border-accent-strong)' : 'var(--border)'}`,
+        boxShadow: selected ? 'var(--glow-accent)' : 'none',
+        transition: 'background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
       }}
@@ -200,11 +200,11 @@ function RatioCard({ ratio, label, selected, onClick, disabled }: {
       <div style={{
         width: d.w, height: d.h,
         borderRadius: 3,
-        border: `2px solid ${selected ? '#6366F1' : 'rgba(255,255,255,0.2)'}`,
+        border: `2px solid ${selected ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
         background: selected ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.05)',
-        transition: 'border-color 0.15s, background 0.15s',
+        transition: 'border-color var(--t-fast), background var(--t-fast)',
       }} />
-      <span style={{ fontSize: 10, fontWeight: 700, color: selected ? '#6366F1' : 'var(--muted)', letterSpacing: '-0.01em' }}>{label}</span>
+      <span style={{ fontSize: 10, fontWeight: 700, color: selected ? 'var(--accent)' : 'var(--muted)', letterSpacing: '-0.01em' }}>{label}</span>
     </button>
   )
 }
@@ -456,31 +456,15 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       )}
 
       {/* ── Header ── */}
-      <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
-        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(99,102,241,0.06))',
-            border: '1px solid rgba(99,102,241,0.28)',
-            boxShadow: '0 0 24px -6px rgba(99,102,241,0.4)',
-          }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.92)', backdropFilter: 'var(--blur-md)' }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" aria-hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
             </svg>
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h1 className="sf-page-title">CloneVid</h1>
-              {running ? (
-                <span className="sf-badge sf-badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  {tr('Génération…', 'Generating…')}
-                </span>
-              ) : (
-                <span className="sf-badge">{tr('Prêt', 'Ready')}</span>
-              )}
-            </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">CloneVid</h1>
             <p className="sf-page-sub">
               {sources.length > 1
                 ? tr(`${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`, `${sources.length} videos × ${count} variants = ${totalJobs} total`)
@@ -489,21 +473,28 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           </div>
         </div>
 
-        {/* Stats when running */}
-        {jobs.length > 0 && (
-          <div className="anim-stagger" style={{ display: 'flex', gap: 10 }}>
-            {[
-              { label: t('repurposeGeneratedHeader'), value: `${totalDone}/${jobs.length}` },
-              { label: t('repurposeSimilarityHeader'), value: avgSimVal != null ? `${avgSimVal}%` : '—' },
-              { label: t('repurposeTimeHeader'), value: elapsedStr },
-            ].map(s => (
-              <div key={s.label} className="sf-card" style={{ padding: '8px 16px', textAlign: 'center', minWidth: 72 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#6366F1', lineHeight: 1, letterSpacing: '-0.03em' }}>{s.value}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-4)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          {/* Stats when running */}
+          {jobs.length > 0 && (
+            <div className="sf-cluster" style={{ gap: 8 }}>
+              {[
+                { label: t('repurposeGeneratedHeader'), value: `${totalDone}/${jobs.length}` },
+                { label: t('repurposeSimilarityHeader'), value: avgSimVal != null ? `${avgSimVal}%` : '—' },
+                { label: t('repurposeTimeHeader'), value: elapsedStr },
+              ].map(s => (
+                <div key={s.label} className="sf-card" style={{ padding: '8px 16px', textAlign: 'center', minWidth: 72 }}>
+                  <div className="sf-tabular" style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)', lineHeight: 1, letterSpacing: '-0.03em' }}>{s.value}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-4)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {running ? (
+            <span className="sf-status-chip"><span className="sf-status-dot" />{tr('Génération…', 'Generating…')}</span>
+          ) : (
+            <span className="sf-badge sf-badge-muted">{tr('Prêt', 'Ready')}</span>
+          )}
+        </div>
       </header>
 
       {/* Global progress bar */}
@@ -607,10 +598,11 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               {t('repurposeVariantsSection')}
               {sources.length > 1 && <span style={{ marginLeft: 6, color: 'rgba(99,102,241,0.6)', fontWeight: 600, fontSize: 9 }}>{tr('par vidéo', 'per video')}</span>}
             </div>
-            <div style={{ display: 'flex', gap: 5 }}>
+            <div className="sf-segment">
               {[3, 5, 10, 25].map(n => (
-                <button key={n} onClick={() => setCount(n)} disabled={running} className="cursor-pointer"
-                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: count === n ? 'rgba(99,102,241,0.15)' : 'var(--surface-2)', color: count === n ? '#6366F1' : 'var(--text-3)', outline: count === n ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent' }}
+                <button key={n} onClick={() => setCount(n)} disabled={running}
+                  className={`sf-segment-item sf-tabular${count === n ? ' is-active' : ''} cursor-pointer`}
+                  style={{ flex: 1 }}
                 >{n}</button>
               ))}
             </div>
@@ -620,7 +612,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             />
             <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>
               {sources.length > 1
-                ? <span><span style={{ color: '#6366F1', fontWeight: 700 }}>{count}</span> {tr('/vidéo', '/video')} · <span style={{ color: '#6366F1', fontWeight: 700 }}>{totalJobs}</span> total</span>
+                ? <span><span className="sf-tabular" style={{ color: 'var(--accent)', fontWeight: 700 }}>{count}</span> {tr('/vidéo', '/video')} · <span className="sf-tabular" style={{ color: 'var(--accent)', fontWeight: 700 }}>{totalJobs}</span> total</span>
                 : `${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
             </div>
           </div>
@@ -689,13 +681,13 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   {isWeb ? t('repurposeAutoExport') : t('repurposeSaveToBank')}
                 </span>
                 {!isWeb && (
-                  <button onClick={() => setSaveToBank(v => !v)} disabled={running} className="cursor-pointer"
-                    style={{ position: 'relative', width: 36, height: 20, borderRadius: 99, background: saveToBank ? 'linear-gradient(130deg,#6366F1,#818cf8)' : 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s' }}
-                  >
-                    <span style={{ position: 'absolute', top: 2, left: saveToBank ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', display: 'block' }} />
+                  <button onClick={() => setSaveToBank(v => !v)} disabled={running}
+                    aria-pressed={saveToBank}
+                    className={`sf-toggle-track cursor-pointer ${saveToBank ? 'on' : 'off'}`}>
+                    <span className="sf-toggle-thumb" />
                   </button>
                 )}
-                {isWeb && <span className="sf-badge sf-badge-violet" style={{ fontSize: 9, padding: '1px 6px' }}>ON</span>}
+                {isWeb && <span className="sf-badge sf-badge-accent" style={{ fontSize: 9, padding: '1px 6px' }}>ON</span>}
               </div>
 
               {(isWeb || saveToBank) && (
@@ -734,8 +726,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             {/* Credit cost badge */}
             {sources.length > 0 && !running && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(129,140,248,0.7)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                <span className="sf-badge sf-badge-violet" style={{ fontSize: 10 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <span className="sf-badge sf-badge-accent sf-tabular" style={{ fontSize: 10 }}>
                   {creditCost} {tr(`crédit${creditCost > 1 ? 's' : ''}`, `credit${creditCost > 1 ? 's' : ''}`)} · {totalJobs} {tr(`vidéo${totalJobs > 1 ? 's' : ''}`, `video${totalJobs > 1 ? 's' : ''}`)}
                 </span>
               </div>
@@ -743,16 +735,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <button
               onClick={running ? stop : startGeneration}
               disabled={!sources.length}
-              className="sf-btn sf-btn-lg cursor-pointer"
-              style={{
-                width: '100%',
-                background: !sources.length ? 'var(--surface-2)' : running ? 'rgba(239,68,68,0.12)' : 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
-                color: !sources.length ? 'var(--text-4)' : running ? '#f87171' : '#6366F1',
-                border: sources.length ? `1px solid ${running ? 'rgba(239,68,68,0.28)' : 'rgba(99,102,241,0.32)'}` : '1px solid var(--border)',
-                boxShadow: sources.length && !running ? '0 0 24px rgba(99,102,241,0.14)' : 'none',
-                cursor: sources.length ? 'pointer' : 'not-allowed',
-                justifyContent: 'center',
-              }}
+              className={`sf-btn sf-btn-lg cursor-pointer ${running ? 'sf-btn-danger' : 'sf-btn-primary'}`}
+              style={{ width: '100%', justifyContent: 'center' }}
             >
               {running ? (
                 <>

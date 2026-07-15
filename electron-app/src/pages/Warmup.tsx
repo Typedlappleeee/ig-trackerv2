@@ -465,12 +465,27 @@ export function Warmup({ user }: WarmupProps) {
   if (conns.loading) {
     return (
       <div className="sf-page anim-page">
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div className="sf-card" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 16 }}>
-              <div className="sf-spinner" />
+        <div className="sf-page-header">
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-skeleton sf-skeleton-card" style={{ width: 46, height: 46, borderRadius: 13 }} />
+            <div className="sf-stack" style={{ gap: 8 }}>
+              <div className="sf-skeleton sf-skeleton-text" style={{ width: 180, height: 20 }} />
+              <div className="sf-skeleton sf-skeleton-text" style={{ width: 240 }} />
             </div>
-            <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 500 }}>{t('loading')}</span>
+          </div>
+        </div>
+        <div className="sf-page-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 20, maxWidth: 1140 }}>
+            <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="sf-skeleton sf-skeleton-line" style={{ height: 48 }} />
+              ))}
+            </div>
+            <div className="sf-stack" style={{ gap: 12 }}>
+              <div className="sf-skeleton sf-skeleton-line" />
+              <div className="sf-skeleton sf-skeleton-card" style={{ height: 220 }} />
+              <div className="sf-skeleton sf-skeleton-card" style={{ height: 44 }} />
+            </div>
           </div>
         </div>
       </div>
@@ -483,12 +498,8 @@ export function Warmup({ user }: WarmupProps) {
     return (
       <div className="sf-page anim-page">
         <div className="sf-page-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            <div style={{
-              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)', color: 'var(--accent)',
-            }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as any]: 'linear-gradient(135deg,#EA580C,#FB923C)', boxShadow: '0 10px 24px -8px rgba(251,146,60,0.55), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
               <IconBolt size={22} />
             </div>
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
@@ -498,14 +509,12 @@ export function Warmup({ user }: WarmupProps) {
           </div>
         </div>
         <div className="sf-page-body">
-          <div className="sf-card" style={{ maxWidth: 480, padding: '20px 24px', borderColor: 'rgba(245,158,11,0.22)', background: 'rgba(245,158,11,0.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--warn)' }}>
-                <IconAlertTriangle size={15} />
-              </div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--warn)' }}>{t('warmupMissingToken')}</p>
+          <div className="sf-banner is-warn sf-anim-slide-up sf-d50" style={{ maxWidth: 480, alignItems: 'flex-start' }}>
+            <span style={{ flexShrink: 0, marginTop: 1, display: 'flex' }}><IconAlertTriangle size={16} /></span>
+            <div>
+              <p style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>{t('warmupMissingToken')}</p>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.6, fontWeight: 500 }}>{t('warmupMissingTokenDesc')}</p>
             </div>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6 }}>{t('warmupMissingTokenDesc')}</p>
           </div>
         </div>
       </div>
@@ -598,18 +607,16 @@ export function Warmup({ user }: WarmupProps) {
 
       {/* ── Page header ───────────────────────────────────────────────────────── */}
       <div className="sf-page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          <div style={{
-            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-            background: 'linear-gradient(135deg,#EA580C,#FB923C)',
-            boxShadow: '0 10px 24px -8px rgba(251,146,60,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{
+            ['--icon-grad' as any]: 'linear-gradient(135deg,#EA580C,#FB923C)',
+            boxShadow: '0 10px 24px -8px rgba(251,146,60,0.55), inset 0 1px 0 rgba(255,255,255,0.35)',
             position: 'relative', overflow: 'hidden',
           }}>
             <IconBolt size={22} />
             {running && (
               <div style={{
-                position: 'absolute', inset: 0, borderRadius: 13,
+                position: 'absolute', inset: 0, borderRadius: 'inherit',
                 background: 'linear-gradient(135deg,#fff,#FDBA74)',
                 opacity: 0.25, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
               }} />
@@ -621,32 +628,22 @@ export function Warmup({ user }: WarmupProps) {
           </div>
         </div>
 
-        {/* Header right: status pills */}
-        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="sf-card" style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 10 }}>
-            {onlineCount > 0
-              ? <span className="sf-ping-dot" />
-              : <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />}
-            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-              <span style={{ color: onlineCount > 0 ? 'var(--ok)' : 'var(--text-4)', fontWeight: 700 }}>{onlineCount}</span>
-              /{phones.length} {t('warmupOnline')}
-            </span>
-          </div>
+        {/* Header right: status chips */}
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          <span className={`sf-status-chip ${onlineCount > 0 ? 'is-live' : 'is-idle'}`} style={{ fontFamily: 'monospace' }}>
+            <span className="sf-status-dot" style={onlineCount > 0 ? undefined : { animation: 'none' }} />
+            <span className="sf-tabular"><span style={{ fontWeight: 700 }}>{onlineCount}</span>/{phones.length}</span> {t('warmupOnline')}
+          </span>
           {selected.size > 0 && (
-            <span className="sf-badge sf-badge-accent" style={{ fontSize: 12, padding: '4px 10px', fontVariantNumeric: 'tabular-nums' }}>
+            <span className="sf-badge sf-badge-accent sf-tabular" style={{ fontSize: 12, padding: '4px 10px' }}>
               {selected.size} {t('warmupSelected')}{lang === 'fr' && selected.size !== 1 ? 's' : ''}
             </span>
           )}
           {running && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', borderRadius: 10,
-              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-            }}>
-              <div className="sf-spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} />
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--accent-l)', fontWeight: 600 }}>
-                {activeTab === 'login' ? t('warmupLoginRunning') : activeTab === 'massEdit' ? t('warmupMassEditRunning') : t('warmupWarmupRunning')}
-              </span>
-            </div>
+            <span className="sf-status-chip is-accent" style={{ fontFamily: 'monospace', padding: '4px 10px' }}>
+              <div className="sf-spinner" style={{ width: 11, height: 11, borderWidth: 1.5 }} />
+              {activeTab === 'login' ? t('warmupLoginRunning') : activeTab === 'massEdit' ? t('warmupMassEditRunning') : t('warmupWarmupRunning')}
+            </span>
           )}
         </div>
       </div>
@@ -717,13 +714,9 @@ export function Warmup({ user }: WarmupProps) {
 
               {/* Error state */}
               {phonesError && (
-                <div style={{
-                  margin: '10px 14px', padding: '10px 14px', borderRadius: 8,
-                  background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.18)',
-                  display: 'flex', alignItems: 'center', gap: 8,
-                }}>
-                  <span style={{ color: 'var(--err)', display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={14} /></span>
-                  <p style={{ fontSize: 12, color: 'var(--err)', fontFamily: 'monospace' }}>{phonesError}</p>
+                <div className="sf-banner is-danger" style={{ margin: '10px 14px' }}>
+                  <span style={{ display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={15} /></span>
+                  <p style={{ fontSize: 12.5, fontFamily: 'monospace', fontWeight: 500 }}>{phonesError}</p>
                 </div>
               )}
 
@@ -736,11 +729,19 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
               )}
 
-              {/* Loading */}
-              {loadingPhones && (
-                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className="sf-spinner" />
-                  <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)' }}>{t('warmupScanning')}</span>
+              {/* Loading — skeleton rows matching phone-row geometry */}
+              {loadingPhones && phones.length === 0 && (
+                <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0' }}>
+                      <div className="sf-skeleton" style={{ width: 8, height: 8, borderRadius: '50%' }} />
+                      <div className="sf-skeleton" style={{ width: 17, height: 17, borderRadius: 4 }} />
+                      <div className="sf-stack" style={{ gap: 6, flex: 1 }}>
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: `${50 + (i % 3) * 15}%`, height: 11 }} />
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: 70, height: 9 }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -962,33 +963,17 @@ export function Warmup({ user }: WarmupProps) {
               </div>
             )}
 
-            {/* ── Pill tab switcher ── */}
-            <div style={{
-              display: 'flex', gap: 4, padding: 4,
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-            }}>
-              {TABS.map(tab => {
-                const active = activeTab === tab.id
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className="cursor-pointer"
-                    style={{
-                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      height: 34, borderRadius: 9, fontSize: 12, fontWeight: 600,
-                      border: 'none', cursor: 'pointer',
-                      transition: 'all 160ms',
-                      background: active ? 'var(--accent)' : 'transparent',
-                      color: active ? '#fff' : 'var(--text-3)',
-                      boxShadow: active ? '0 2px 12px rgba(99,102,241,0.35)' : 'none',
-                    }}>
-                    {tab.icon} {tab.label}
-                  </button>
-                )
-              })}
+            {/* ── Segmented tab switcher ── */}
+            <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`sf-segment-item cursor-pointer ${activeTab === tab.id ? 'is-active' : ''}`}
+                  style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
             </div>
 
             {/* ── LOG IN tab ── */}
@@ -1107,13 +1092,9 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
 
                 {/* Warning */}
-                <div style={{
-                  padding: '12px 16px', borderRadius: 10,
-                  background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)',
-                  display: 'flex', alignItems: 'flex-start', gap: 10,
-                }}>
-                  <span style={{ color: 'var(--warn)', flexShrink: 0, marginTop: 1, display: 'flex' }}><IconAlertTriangle size={14} /></span>
-                  <p style={{ fontSize: 11, fontFamily: 'monospace', lineHeight: 1.6, color: 'rgba(245,158,11,0.8)' }}>{t('warmupLoginWarning')}</p>
+                <div className="sf-banner is-warn" style={{ alignItems: 'flex-start' }}>
+                  <span style={{ flexShrink: 0, marginTop: 1, display: 'flex' }}><IconAlertTriangle size={15} /></span>
+                  <p style={{ fontSize: 11.5, fontFamily: 'monospace', lineHeight: 1.6, fontWeight: 500 }}>{t('warmupLoginWarning')}</p>
                 </div>
 
                 <Button
@@ -1370,13 +1351,9 @@ export function Warmup({ user }: WarmupProps) {
 
                     {/* Duration zero warning */}
                     {browseMinutes === 0 && (
-                      <div style={{
-                        padding: '10px 12px', borderRadius: 8,
-                        background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)',
-                        display: 'flex', alignItems: 'center', gap: 8,
-                      }}>
-                        <span style={{ color: 'var(--warn)', display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={14} /></span>
-                        <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(245,158,11,0.78)' }}>{t('warmupDurationZero')}</p>
+                      <div className="sf-banner is-warn">
+                        <span style={{ display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={15} /></span>
+                        <p style={{ fontSize: 11.5, fontFamily: 'monospace', fontWeight: 500 }}>{t('warmupDurationZero')}</p>
                       </div>
                     )}
                   </div>

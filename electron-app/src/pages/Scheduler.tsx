@@ -43,7 +43,6 @@ import {
   loadManualRuns, isManualRun,
   type ScheduledPost, type ScheduleStatus,
 } from '@/lib/schedulerService'
-import { Spinner } from '@/components/ui/Spinner'
 import { CreateScheduleModal } from '@/components/CreateScheduleModal'
 import { CreateStoryScheduleModal } from '@/components/CreateStoryScheduleModal'
 import { ScheduleModal } from '@/components/ScheduleModal'
@@ -981,42 +980,33 @@ export function Scheduler({ user, onNavigate }: Props) {
       {/* ── Page header ─────────────────────────────────────────────────────────── */}
       <div className="sf-page-header" style={{ position: 'relative', zIndex: 1, flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '24px 28px 0', borderBottom: 'none' }}>
 
-        {/* Title row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 15, minWidth: 0 }}>
+        {/* Title row — canonical v2 header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--sp-5)', gap: 'var(--sp-4)', flexWrap: 'wrap' }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
             {/* Icon */}
-            <div className="sf-anim-scale-spring" style={{
-              width: 52, height: 52, borderRadius: 15, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-              boxShadow: '0 12px 28px -8px rgba(99,102,241,0.6), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-            }}>
-              <IconCalendarSm size={25} color="#fff" />
+            <div className="sf-page-icon sf-anim-scale-spring">
+              <IconCalendarSm size={24} color="#fff" />
             </div>
 
             {/* Text */}
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)', marginBottom: 3 }}>{tr('Programmation', 'Scheduling')}</div>
-              <h1 style={{
-                margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0,
-                background: 'linear-gradient(100deg,#fff 20%,#a5b4fc 55%,#6ee7b7 90%)', backgroundSize: '200% auto',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'sch-shimmer 7s linear infinite',
-              }}>
-                {t('schedulerTitle')}
-              </h1>
+              <div className="sf-eyebrow" style={{ marginBottom: 3 }}>{tr('Programmation', 'Scheduling')}</div>
+              <h1 className="sf-page-title">{t('schedulerTitle')}</h1>
+              <p className="sf-page-sub">
+                {tr(
+                  `${pending.length} en attente · ${doneCount} publié${doneCount > 1 ? 's' : ''} · part même app fermée`,
+                  `${pending.length} pending · ${doneCount} published · runs even when the app is closed`,
+                )}
+              </p>
             </div>
           </div>
 
           {/* Right: schedule button */}
-          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
             <button
               onClick={() => { setPresetSchedAt(undefined); setShowTypeChoice(true) }}
-              className="sf-btn sf-btn-lg cursor-pointer"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff',
-                background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-                boxShadow: '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 0 rgba(255,255,255,0.3)',
-              }}
+              className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
               {tr('Programmer', 'Schedule')}
@@ -1142,24 +1132,34 @@ export function Scheduler({ user, onNavigate }: Props) {
       {/* ── Page body ─────────────────────────────────────────────────────────────── */}
       <div className="sf-page-body">
         {loading ? (
-          /* ── Skeleton loading ─────────────────────────────────────────────────── */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          /* ── Skeleton loading (matches PostCard geometry) ─────────────────────── */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[0, 1, 2, 3].map(i => (
               <div
                 key={i}
-                className="sf-skeleton"
+                className="sf-card"
                 style={{
-                  height: 88,
-                  borderRadius: 14,
-                  opacity: 1 - i * 0.18,
+                  borderLeft: '3px solid var(--border-md)',
+                  padding: '16px 20px',
+                  opacity: 1 - i * 0.16,
                 }}
-              />
+              >
+                <div className="sf-cluster" style={{ gap: 8 }}>
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: 84, height: 18, borderRadius: 7 }} />
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: 60, height: 18, borderRadius: 7 }} />
+                </div>
+                <div className="sf-skeleton sf-skeleton-text" style={{ width: 150, height: 24, borderRadius: 8, marginTop: 12 }} />
+                <div className="sf-cluster" style={{ gap: 6, marginTop: 10 }}>
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: 90, height: 20, borderRadius: 7 }} />
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: 76, height: 20, borderRadius: 7 }} />
+                </div>
+              </div>
             ))}
           </div>
         ) : tab === 'calendar' ? (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '9px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.16)', fontSize: 12, color: 'var(--muted)' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-l)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            <div className="sf-banner is-accent" style={{ marginBottom: 12 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-l)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
               <span>{tr('Clique un créneau vide pour programmer un post · glisse un post en attente pour le déplacer.', 'Click an empty slot to schedule a post · drag a pending post to move it.')}</span>
             </div>
             <CalendarWeek
@@ -1173,25 +1173,14 @@ export function Scheduler({ user, onNavigate }: Props) {
           </div>
         ) : shown.length === 0 ? (
           /* ── Empty state ──────────────────────────────────────────────────────── */
-          <div className="sf-card" style={{
-            marginTop: 8,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '56px 32px', textAlign: 'center',
-          }}>
-            {/* Illustration area */}
-            <div style={{
-              width: 80, height: 80, borderRadius: 20, marginBottom: 20,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.18)',
-              boxShadow: '0 0 40px -12px rgba(99,102,241,0.35)',
-            }}>
-              <IconCalendar size={36} color="rgba(99,102,241,0.6)" />
+          <div className="sf-empty sf-card sf-anim-slide-up" style={{ marginTop: 8 }}>
+            <div className="sf-empty-icon" style={{ width: 64, height: 64 }}>
+              <IconCalendar size={32} color="var(--accent-l)" />
             </div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--ivory)', marginBottom: 8 }}>
+            <p className="sf-empty-title">
               {tab === 'pending' ? t('schedulerEmptyPending') : t('schedulerEmptyHistory')}
             </p>
-            <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--muted)', marginBottom: 20, maxWidth: 320 }}>
+            <p className="sf-empty-desc">
               {tab === 'pending' ? t('schedulerEmptyPendingHint') : t('schedulerEmptyHistoryHint')}
             </p>
             {tab === 'pending' && (
@@ -1533,8 +1522,9 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           )}
 
           {isRunning && (
-            <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-              <Spinner size="sm" />
+            <span className="sf-status-chip" style={{ color: 'var(--accent-l)', borderColor: 'var(--border-accent)', background: 'var(--accent-dim2)' }}>
+              <span className="sf-status-dot" style={{ boxShadow: '0 0 6px currentColor', animation: 'pulse 1.4s ease-in-out infinite' }} />
+              {tr('En cours', 'Running')}
             </span>
           )}
         </div>
@@ -1691,16 +1681,12 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
 
       {/* ── Error message ─────────────────────────────────────────────────── */}
       {post.error_msg && post.status === 'failed' && (
-        <p style={{
-          marginTop: 10, marginBottom: 0,
-          fontSize: 12, lineHeight: 1.6,
-          padding: '8px 12px',
-          background: 'rgba(248,113,113,0.07)', color: 'var(--err)',
-          border: '1px solid rgba(248,113,113,0.18)', borderRadius: 8,
-          fontFamily: 'ui-monospace, monospace',
-        }}>
-          {post.error_msg}
-        </p>
+        <div className="sf-banner is-danger" style={{ marginTop: 10, alignItems: 'flex-start' }}>
+          <IconX size={13} color="var(--danger)" />
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, lineHeight: 1.6, minWidth: 0, wordBreak: 'break-word' }}>
+            {post.error_msg}
+          </span>
+        </div>
       )}
     </div>
   )

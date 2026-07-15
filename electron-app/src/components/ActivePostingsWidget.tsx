@@ -22,10 +22,10 @@ const PHASE_COLOR: Record<PhaseStatus, string> = {
 function PhaseList({ run }: { run: ActiveRun }) {
   if (!run.phones?.length) return null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, maxHeight: 160, overflow: 'auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 'var(--sp-1)', paddingLeft: 2, maxHeight: 160, overflow: 'auto' }}>
       {run.phones.map(p => (
-        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-          <span style={{ color: PHASE_COLOR[p.status], width: 12, textAlign: 'center', ...(p.status === 'running' ? { animation: 'spin 1.2s linear infinite' } : {}) }}>{PHASE_ICON[p.status]}</span>
+        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 11, padding: '2px 4px', borderRadius: 'var(--r-xs)' }}>
+          <span style={{ color: PHASE_COLOR[p.status], width: 12, textAlign: 'center', flexShrink: 0, ...(p.status === 'running' ? { animation: 'spin 1.2s linear infinite' } : {}) }}>{PHASE_ICON[p.status]}</span>
           <span style={{ color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
         </div>
       ))}
@@ -133,33 +133,31 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
     : { bottom: 18, right: 18 }
 
   return (
-    <div data-widget style={{ position: 'fixed', ...posStyle, zIndex: 90, width: open ? 320 : 'auto', maxWidth: 'calc(100vw - 36px)' }}>
-      <div className="sf-card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--shadow-lg)', border: anyClash ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--border-md)' }}>
+    <div data-widget className="sf-anim-slide-up" style={{ position: 'fixed', ...posStyle, zIndex: 90, width: open ? 320 : 'auto', maxWidth: 'calc(100vw - 36px)' }}>
+      <div className="sf-card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--elev-3)', border: anyClash ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--border-md)' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', background: anyClash ? 'rgba(239,68,68,0.10)' : 'var(--surface-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', background: anyClash ? 'var(--danger-dim)' : 'var(--surface-2)', borderBottom: open ? '1px solid var(--border)' : 'none' }}>
           {/* Poignée de déplacement */}
           <span onPointerDown={onDragStart} title={tr('Glisser pour déplacer', 'Drag to move')} className="cursor-pointer"
-            style={{ padding: '10px 4px 10px 10px', color: 'var(--text-4)', fontSize: 13, cursor: 'grab', touchAction: 'none', userSelect: 'none' }}>⠿</span>
+            style={{ padding: '10px 4px 10px var(--sp-3)', color: 'var(--text-4)', fontSize: 13, cursor: 'grab', touchAction: 'none', userSelect: 'none' }}>⠿</span>
           <button onClick={() => setOpen(o => !o)} className="cursor-pointer"
-            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px 10px 4px', border: 'none', background: 'transparent', textAlign: 'left' }}>
-            <span style={{ position: 'relative', display: 'flex' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: runningCount ? 'var(--ok)' : 'var(--text-4)' }} />
-              {runningCount > 0 && <span style={{ position: 'absolute', inset: -3, borderRadius: '50%', border: '2px solid var(--ok)', opacity: 0.5, animation: 'sf-pulse 1.6s ease-out infinite' }} />}
-            </span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)' }}>
+            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', padding: '10px 12px 10px 4px', border: 'none', background: 'transparent', textAlign: 'left', transition: 'color var(--t-fast)' }}>
+            <span className={runningCount > 0 ? 'sf-status-dot' : ''} style={{ color: runningCount ? 'var(--ok)' : 'var(--text-4)', background: runningCount ? undefined : 'var(--text-4)', width: 8, height: 8, borderRadius: '50%', flexShrink: 0 }} />
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>
               {runningCount > 0 ? tr(`${runningCount} posting${runningCount > 1 ? 's' : ''} en cours`, `${runningCount} posting${runningCount > 1 ? 's' : ''} running`) : 'Postings'}
             </span>
             {anyClash && <span title={tr('Deux postings sur le même proxy — risque de ban', 'Two postings on the same proxy — ban risk')} style={{ fontSize: 11 }}>⚠️</span>}
             <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)' }}>{open ? '▾' : '▸'}</span>
           </button>
-          {pos && <button onClick={resetPos} title={tr('Remettre en bas à droite', 'Reset to bottom-right')} className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, padding: '10px 10px 10px 4px' }}>⟲</button>}
+          {pos && <button onClick={resetPos} title={tr('Remettre en bas à droite', 'Reset to bottom-right')} className="cursor-pointer sf-press" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, padding: '10px var(--sp-3) 10px 4px', transition: 'color var(--t-fast)' }}>⟲</button>}
         </div>
 
         {open && (
           <div style={{ maxHeight: 320, overflow: 'auto' }}>
             {anyClash && (
-              <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--danger)', background: 'rgba(239,68,68,0.06)', borderBottom: '1px solid var(--border)' }}>
-                ⚠️ {tr('Deux postings tournent sur le ', 'Two postings are running on the ')}<b>{tr('même proxy', 'same proxy')}</b>{tr(' → mêmes IP en parallèle, ', ' → same IPs in parallel, ')}<b>{tr('risque de ban', 'ban risk')}</b>{tr(". Attends la fin de l'un ou utilise un autre proxy.", '. Wait for one to finish or use a different proxy.')}
+              <div className="sf-banner is-danger" style={{ margin: 'var(--sp-2)', padding: '10px 12px', fontSize: 11, fontWeight: 500, borderRadius: 'var(--r-sm)' }}>
+                <span style={{ flexShrink: 0 }}>⚠️</span>
+                <span>{tr('Deux postings tournent sur le ', 'Two postings are running on the ')}<b>{tr('même proxy', 'same proxy')}</b>{tr(' → mêmes IP en parallèle, ', ' → same IPs in parallel, ')}<b>{tr('risque de ban', 'ban risk')}</b>{tr(". Attends la fin de l'un ou utilise un autre proxy.", '. Wait for one to finish or use a different proxy.')}</span>
               </div>
             )}
             {runs.map(r => {
@@ -172,22 +170,22 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
               return (
                 <div key={r.id}
                   onClick={() => hasPhases ? toggleExpand(r.id) : r.page && onOpen?.(r.page)}
-                  className={hasPhases || r.page ? 'cursor-pointer' : ''}
-                  style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <span>{m.emoji}</span>
+                  className={hasPhases || r.page ? 'cursor-pointer sf-widget-row' : 'sf-widget-row'}
+                  style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', transition: 'background var(--t-fast)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                    <span style={{ flexShrink: 0 }}>{m.emoji}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
-                    {clash && <span title={tr("Même proxy qu'un autre run", 'Same proxy as another run')} style={{ fontSize: 10 }}>⚠️</span>}
-                    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
+                    {clash && <span title={tr("Même proxy qu'un autre run", 'Same proxy as another run')} style={{ fontSize: 10, flexShrink: 0 }}>⚠️</span>}
+                    <span className="sf-tabular" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color, flexShrink: 0 }}>
                       {r.status === 'running' ? `${r.done}/${r.total}` : r.status === 'done' ? tr('✓ terminé', '✓ done') : tr('✕ échec', '✕ failed')}
                     </span>
-                    {hasPhases && <span style={{ fontSize: 10, color: 'var(--text-4)' }}>{isExp ? '▾' : '▸'}</span>}
+                    {hasPhases && <span style={{ fontSize: 10, color: 'var(--text-4)', flexShrink: 0 }}>{isExp ? '▾' : '▸'}</span>}
                     {r.status !== 'running' && (
-                      <button onClick={e => { e.stopPropagation(); removeRun(r.id) }} className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12 }}>✕</button>
+                      <button onClick={e => { e.stopPropagation(); removeRun(r.id) }} title={tr('Retirer', 'Dismiss')} className="cursor-pointer sf-press" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, flexShrink: 0, transition: 'color var(--t-fast)' }}>✕</button>
                     )}
                   </div>
-                  <div style={{ height: 4, borderRadius: 4, background: 'var(--surface-3)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${r.status === 'done' ? 100 : pct}%`, background: color, transition: 'width .3s' }} />
+                  <div style={{ height: 4, borderRadius: 'var(--r-xs)', background: 'var(--surface-3)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${r.status === 'done' ? 100 : pct}%`, background: color, borderRadius: 'var(--r-xs)', transition: 'width var(--t-smooth)' }} />
                   </div>
                   {hasPhases && isExp && <PhaseList run={r} />}
                 </div>
@@ -199,18 +197,18 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
               const m = SRV_META[s.type] ?? { emoji: '🖥️', label: s.type }
               const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0
               return (
-                <div key={`srv-${s.id}`} onClick={() => onOpen?.('history')} className="cursor-pointer"
-                  style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <span>{m.emoji}</span>
+                <div key={`srv-${s.id}`} onClick={() => onOpen?.('history')} className="cursor-pointer sf-widget-row"
+                  style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', transition: 'background var(--t-fast)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                    <span style={{ flexShrink: 0 }}>{m.emoji}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                    <span style={{ fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 5, background: 'rgba(52,211,153,0.14)', color: 'var(--ok)', border: '1px solid rgba(52,211,153,0.3)', flexShrink: 0 }}>{tr('SERVEUR', 'SERVER')}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span className="sf-badge sf-badge-ok" style={{ fontSize: 8.5, padding: '1px 5px', flexShrink: 0 }}>{tr('SERVEUR', 'SERVER')}</span>
+                    <span className="sf-tabular" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
                       {s.total > 0 ? `${s.done}/${s.total}` : tr('en cours', 'running')}
                     </span>
                   </div>
-                  <div style={{ height: 4, borderRadius: 4, background: 'var(--surface-3)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${s.total > 0 ? pct : 30}%`, background: 'var(--accent)', transition: 'width .3s', ...(s.total === 0 ? { animation: 'sf-pulse 1.6s ease-in-out infinite' } : {}) }} />
+                  <div style={{ height: 4, borderRadius: 'var(--r-xs)', background: 'var(--surface-3)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${s.total > 0 ? pct : 30}%`, background: 'var(--accent)', borderRadius: 'var(--r-xs)', transition: 'width var(--t-smooth)', ...(s.total === 0 ? { animation: 'sf-pulse 1.6s ease-in-out infinite' } : {}) }} />
                   </div>
                 </div>
               )

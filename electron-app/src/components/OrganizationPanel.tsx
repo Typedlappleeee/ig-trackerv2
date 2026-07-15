@@ -1041,15 +1041,45 @@ export function OrganizationPanel({ user }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 anim-page">
+      {/* Page header (pattern v2) */}
+      <div className="sf-page-header" style={{ margin: '-24px -28px 4px' }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring"><Icon name="building" size={22} /></div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">{tr('Mon organisation', 'My organization')}</h1>
+            <p className="sf-page-sub">
+              {currentOrg
+                ? tr(`Équipe, invitations, rôles & permissions · ${currentOrg.name}`, `Team, invites, roles & permissions · ${currentOrg.name}`)
+                : tr('Gère ton équipe, les invitations et les rôles', 'Manage your team, invites and roles')}
+            </p>
+          </div>
+        </div>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          {currentOrg ? (
+            <>
+              {myRole && <RoleChip role={myRole} />}
+              <span className="sf-status-chip is-live"><span className="sf-status-dot" />{tr('Active', 'Active')}</span>
+            </>
+          ) : (
+            <span className="sf-status-chip is-idle">{tr('Aucune organisation', 'No organization')}</span>
+          )}
+        </div>
+      </div>
+
       {(msg || err) && (
-        <div className={`px-4 py-2.5 rounded-lg text-sm ${err ? 'bg-danger/10 text-danger border border-danger/30' : 'bg-ok/10 text-ok border border-ok/30'}`}>
-          {err ?? msg}
+        <div
+          className={`sf-banner sf-anim-slide-up ${err ? 'is-danger' : ''}`}
+          style={err ? undefined : { background: 'var(--ok-dim)', borderColor: 'rgba(34,197,94,0.22)', color: 'var(--ok)' }}
+          role="status"
+        >
+          {err && <Icon name="x" size={15} />}
+          <span>{err ?? msg}</span>
         </div>
       )}
 
       {/* Sub-tabs */}
-      <div className="flex gap-1 border-b border-border overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      <div className="sf-tabs sf-scroll-x" style={{ scrollbarWidth: 'none' }}>
         {([
           { k: 'orgas',   label: tr('Organisations', 'Organizations'), icon: 'building' as const },
           // Membres / Rôles / Logs : réservés aux admins & propriétaires.
@@ -1059,10 +1089,8 @@ export function OrganizationPanel({ user }: Props) {
           ...(canManage ? [{ k: 'logs',    label: tr('Logs', 'Logs'),    icon: 'logs'  as const }] : []),
         ] as const).map(t => (
           <button key={t.k} onClick={() => setOrgTab(t.k as typeof orgTab)}
-            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
-              orgTab === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
-            }`}
-          ><Icon name={t.icon} size={15} />{t.label}</button>
+            className={`sf-tab inline-flex items-center gap-1.5 flex-shrink-0 ${orgTab === t.k ? 'active' : ''}`}
+          ><Icon name={t.icon} size={14} />{t.label}</button>
         ))}
       </div>
 
@@ -1369,12 +1397,26 @@ export function OrganizationPanel({ user }: Props) {
               <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="logs" size={16} />{tr("Logs d'activité", 'Activity logs')}</h2>
               <p className="text-xs text-text2 mt-0.5">{tr('200 dernières actions des membres', 'Last 200 member actions')}</p>
             </div>
-            <button onClick={loadLogs} className="text-xs text-accent hover:opacity-70 transition-opacity">{tr('⟳ Rafraîchir', '⟳ Refresh')}</button>
+            <button onClick={loadLogs} disabled={logsLoading} className="sf-btn sf-btn-secondary sf-btn-sm">{logsLoading ? tr('⟳ Chargement…', '⟳ Loading…') : tr('⟳ Rafraîchir', '⟳ Refresh')}</button>
           </div>
           {logsLoading ? (
-            <div className="px-5 py-6 text-center text-xs text-text2">{tr('Chargement…', 'Loading…')}</div>
+            <div className="divide-y divide-border">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="px-5 py-3 flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="sf-skeleton-text" style={{ width: `${45 + (i % 3) * 15}%` }} />
+                    <div className="sf-skeleton-text" style={{ width: `${25 + (i % 2) * 12}%`, height: 10 }} />
+                  </div>
+                  <div className="sf-skeleton-text flex-shrink-0" style={{ width: 72, height: 10 }} />
+                </div>
+              ))}
+            </div>
           ) : activityLogs.length === 0 ? (
-            <div className="px-5 py-6 text-center text-xs text-text2">{tr('Aucune activité enregistrée.', 'No activity recorded.')}</div>
+            <div className="px-5 py-12 text-center">
+              <p className="flex justify-center mb-3 text-text2"><Icon name="logs" size={40} /></p>
+              <p className="text-sm font-semibold text-text mb-1">{tr('Aucune activité', 'No activity')}</p>
+              <p className="text-xs text-text2 max-w-xs mx-auto">{tr('Les postings et actions des membres apparaîtront ici.', 'Member postings and actions will appear here.')}</p>
+            </div>
           ) : (
             <div className="divide-y divide-border max-h-[600px] overflow-auto">
               {activityLogs.map(log => {

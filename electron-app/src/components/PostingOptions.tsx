@@ -1,3 +1,4 @@
+import type React from 'react'
 import { type PostingOpts, type IntervalMode, savePostingOpts } from '@/lib/postingOpts'
 import { getProxyRotation } from '@/lib/proxyRotation'
 import { ProxyPicker } from '@/components/ProxyPicker'
@@ -52,6 +53,38 @@ function IconNetwork({ size = 14, color = 'currentColor' }: { size?: number; col
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
+// ── Toggle row v2 : icône + libellé/sous-titre + switch .sf-toggle-track ──────
+function ToggleRow({ icon, title, desc, on, onToggle, topBorder = true, badge }: {
+  icon: React.ReactNode
+  title: React.ReactNode
+  desc?: React.ReactNode
+  on: boolean
+  onToggle: () => void
+  topBorder?: boolean
+  badge?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-3" style={topBorder ? { borderTop: '1px solid var(--border)', paddingTop: 'var(--sp-3)' } : undefined}>
+      <span style={{ color: 'var(--text-4)', display: 'inline-flex' }}>{icon}</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-[13px] font-medium inline-flex items-center gap-1.5" style={{ color: 'var(--text-2)' }}>
+          {title}
+          {badge}
+        </span>
+        {desc && <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-4)', margin: '2px 0 0' }}>{desc}</p>}
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={on}
+        className={`sf-toggle-track sf-focus-ring ${on ? 'on' : 'off'}`}
+      >
+        <span className="sf-toggle-thumb" />
+      </button>
+    </div>
+  )
+}
+
 export function PostingOptions({ opts, onChange, phonesCount }: Props) {
   const tr = useTr()
   function set(patch: Partial<PostingOpts>) {
@@ -81,81 +114,55 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
     lastPostEstimate = `${pad2(last.getHours())}:${pad2(last.getMinutes())}`
   }
 
+  const numInputStyle: React.CSSProperties = { height: 32, width: 56, textAlign: 'center' }
+
   return (
-    <div className="rounded-2xl p-4 space-y-3"
-      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="sf-card space-y-3" style={{ padding: 'var(--sp-4)' }}>
 
       {/* Reels Trial toggle */}
-      <div className="flex items-center gap-3">
-        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
-          <IconFlask size={14} />
-        </span>
-        <div className="flex-1 min-w-0">
-          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Reels Trial</span>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{tr('Montré uniquement aux non-abonnés', 'Shown only to non-followers')}</p>
-        </div>
-        <button
-          onClick={() => set({ reelsTrial: !opts.reelsTrial })}
-          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-          style={{ background: opts.reelsTrial ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
-        >
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.reelsTrial ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
-      </div>
+      <ToggleRow
+        icon={<IconFlask size={14} />}
+        title="Reels Trial"
+        desc={tr('Montré uniquement aux non-abonnés', 'Shown only to non-followers')}
+        on={opts.reelsTrial}
+        onToggle={() => set({ reelsTrial: !opts.reelsTrial })}
+        topBorder={false}
+      />
 
       {/* ── Usage unique : supprime la vidéo de la banque après publication ──── */}
-      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
-          <IconTrash size={14} />
-        </span>
-        <div className="flex-1 min-w-0">
-          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>{tr('Usage unique', 'Single use')}</span>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{tr('Supprime la vidéo de la banque une fois publiée', 'Removes the video from the bank once posted')}</p>
-        </div>
-        <button
-          onClick={() => set({ deleteAfterPost: !opts.deleteAfterPost })}
-          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-          style={{ background: opts.deleteAfterPost ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
-        >
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.deleteAfterPost ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
-      </div>
+      <ToggleRow
+        icon={<IconTrash size={14} />}
+        title={tr('Usage unique', 'Single use')}
+        desc={tr('Supprime la vidéo de la banque une fois publiée', 'Removes the video from the bank once posted')}
+        on={opts.deleteAfterPost}
+        onToggle={() => set({ deleteAfterPost: !opts.deleteAfterPost })}
+      />
 
       {/* ── Intervalle entre posts — masqué en proxy rotatif (inutile : chaque
            téléphone poste déjà sur une IP fraîche) ──────────────────────────── */}
       {!opts.rotatingProxy && (<>
-      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
-          <IconTimer size={14} />
-        </span>
-        <span className="flex-1 text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>
-          {tr('Intervalle entre posts', 'Interval between posts')}
-        </span>
-        <button
-          onClick={() => onChange({ ...opts, intervalMode: on ? 'none' : 'fixed' })}
-          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-          style={{ background: on ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
-        >
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
-      </div>
+      <ToggleRow
+        icon={<IconTimer size={14} />}
+        title={tr('Intervalle entre posts', 'Interval between posts')}
+        on={on}
+        onToggle={() => onChange({ ...opts, intervalMode: on ? 'none' : 'fixed' })}
+      />
       {on && (
-        <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)', margin: 0, paddingLeft: 26 }}>
-          {tr(`1er post immédiat, puis +${intervalLabel} min par téléphone`, `First post immediate, then +${intervalLabel} min per phone`)}
-          {lastPostEstimate ? tr(` — dernier post vers ~${lastPostEstimate}`, ` — last post around ~${lastPostEstimate}`) : ''}
-        </p>
+        <div className="sf-banner is-accent" style={{ marginLeft: 26, fontSize: 11.5, fontWeight: 500 }}>
+          <IconTimer size={13} />
+          <span>
+            {tr(`1er post immédiat, puis +${intervalLabel} min par téléphone`, `First post immediate, then +${intervalLabel} min per phone`)}
+            {lastPostEstimate ? tr(` — dernier post vers ~${lastPostEstimate}`, ` — last post around ~${lastPostEstimate}`) : ''}
+          </span>
+        </div>
       )}
       {on && (
-        <div className="flex items-center gap-2 pt-1">
-          <div className="flex rounded-lg overflow-hidden flex-shrink-0"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="flex items-center gap-2 pt-1" style={{ paddingLeft: 26 }}>
+          <div className="sf-segment flex-shrink-0">
             {(['fixed', 'random'] as IntervalMode[]).map(m => (
-              <button key={m}
+              <button key={m} type="button"
                 onClick={() => set({ intervalMode: m })}
-                className="px-2.5 py-1.5 text-[11px] font-semibold transition-all"
-                style={opts.intervalMode === m
-                  ? { background: 'linear-gradient(130deg,#6366F1,#818CF8)', color: '#fff' }
-                  : { color: 'rgba(148,163,184,0.5)' }}>
+                className={`sf-segment-item ${opts.intervalMode === m ? 'is-active' : ''}`}>
                 {m === 'fixed' ? tr('Fixe', 'Fixed') : tr('Aléatoire', 'Random')}
               </button>
             ))}
@@ -165,22 +172,19 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
               <>
                 <input type="number" min={1} max={120} value={opts.intervalMin}
                   onChange={e => set({ intervalMin: Math.max(1, parseInt(e.target.value) || 1) })}
-                  className="w-14 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
-                <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>min</span>
+                  className="sf-input sf-tabular" style={numInputStyle} />
+                <span className="text-[11px]" style={{ color: 'var(--text-3)' }}>min</span>
               </>
             ) : (
               <>
                 <input type="number" min={1} max={120} value={opts.intervalMin}
                   onChange={e => set({ intervalMin: Math.max(1, parseInt(e.target.value) || 1) })}
-                  className="w-12 rounded-lg px-1.5 py-1.5 text-[12px] text-center focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
-                <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>→</span>
+                  className="sf-input sf-tabular" style={{ ...numInputStyle, width: 48 }} />
+                <span className="text-[11px]" style={{ color: 'var(--text-3)' }}>→</span>
                 <input type="number" min={1} max={120} value={opts.intervalMax}
                   onChange={e => set({ intervalMax: Math.max(1, parseInt(e.target.value) || 1) })}
-                  className="w-12 rounded-lg px-1.5 py-1.5 text-[12px] text-center focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
-                <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>min</span>
+                  className="sf-input sf-tabular" style={{ ...numInputStyle, width: 48 }} />
+                <span className="text-[11px]" style={{ color: 'var(--text-3)' }}>min</span>
               </>
             )}
           </div>
@@ -190,74 +194,62 @@ export function PostingOptions({ opts, onChange, phonesCount }: Props) {
 
       {/* ── Téléphones simultanés — réglage indépendant (« Tous » par défaut) ── */}
       {!opts.rotatingProxy && (
-        <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-          <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
+        <div className="flex items-center gap-3" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--sp-3)' }}>
+          <span style={{ color: 'var(--text-4)', display: 'inline-flex' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="7" y="3" width="10" height="14" rx="2"/><path d="M4 7v12a2 2 0 0 0 2 2h9"/></svg>
           </span>
           <div className="flex-1 min-w-0">
-            <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>{tr('Téléphones simultanés', 'Simultaneous phones')}</span>
-            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{tr('Combien de téléphones postent en même temps · « Tous » par défaut', 'How many phones post at the same time · "All" by default')}</p>
+            <span className="text-[13px] font-medium" style={{ color: 'var(--text-2)' }}>{tr('Téléphones simultanés', 'Simultaneous phones')}</span>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-4)', margin: '2px 0 0' }}>{tr('Combien de téléphones postent en même temps · « Tous » par défaut', 'How many phones post at the same time · "All" by default')}</p>
           </div>
           <input type="number" min={0} max={200} value={opts.maxConcurrent || ''}
             placeholder={tr('Tous', 'All')}
             onChange={e => set({ maxConcurrent: Math.max(0, parseInt(e.target.value) || 0) })}
-            className="w-16 rounded-lg px-2 py-1.5 text-[12px] text-center focus:outline-none flex-shrink-0"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }} />
+            className="sf-input sf-tabular flex-shrink-0" style={{ height: 32, width: 64, textAlign: 'center' }} />
         </div>
       )}
 
       {/* ── Proxy rotatif ───────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-        <span style={{ color: 'rgba(148,163,184,0.4)', display: 'inline-flex' }}>
-          <IconNetwork size={14} />
-        </span>
-        <div className="flex-1 min-w-0">
-          <span className="text-[13px] font-medium inline-flex items-center gap-1.5" style={{ color: 'rgba(226,232,240,0.7)' }}>
-            {tr('Proxy rotatif', 'Rotating proxy')}
-            {(() => {
-              const rot = getProxyRotation()
-              const configured = rot.enabled && rot.urls.some(u => /^https?:\/\//i.test(u.trim()))
-              return configured ? null : (
-                <span title={tr("Rotation d'IP non configurée — risque de ban. Active-la dans Paramètres → Rotation d'IP proxy.", 'IP rotation not configured — ban risk. Enable it in Settings → Proxy IP rotation.')} style={{ width: 7, height: 7, borderRadius: '50%', background: '#F87171', boxShadow: '0 0 6px rgba(248,113,113,0.9)', flexShrink: 0, animation: 'pulse 1.6s ease-in-out infinite' }} />
-              )
-            })()}
-          </span>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{tr("Change l'IP avant chaque téléphone", 'Changes the IP before each phone')}</p>
-        </div>
-        <button
-          onClick={() => set({ rotatingProxy: !opts.rotatingProxy, ...(!opts.rotatingProxy ? { intervalMode: 'none' as IntervalMode } : {}) })}
-          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-          style={{ background: opts.rotatingProxy ? 'linear-gradient(130deg,#6366F1,#818CF8)' : 'rgba(255,255,255,0.08)' }}
-        >
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.rotatingProxy ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
-      </div>
+      {(() => {
+        const rot = getProxyRotation()
+        const configured = rot.enabled && rot.urls.some(u => /^https?:\/\//i.test(u.trim()))
+        return (
+          <ToggleRow
+            icon={<IconNetwork size={14} />}
+            title={tr('Proxy rotatif', 'Rotating proxy')}
+            desc={tr("Change l'IP avant chaque téléphone", 'Changes the IP before each phone')}
+            on={opts.rotatingProxy}
+            onToggle={() => set({ rotatingProxy: !opts.rotatingProxy, ...(!opts.rotatingProxy ? { intervalMode: 'none' as IntervalMode } : {}) })}
+            badge={configured ? null : (
+              <span
+                title={tr("Rotation d'IP non configurée — risque de ban. Active-la dans Paramètres → Rotation d'IP proxy.", 'IP rotation not configured — ban risk. Enable it in Settings → Proxy IP rotation.')}
+                className="sf-status-dot"
+                style={{ color: 'var(--danger)' }}
+              />
+            )}
+          />
+        )
+      })()}
 
       {/* Statut rotation d'IP — visible dès que "Proxy rotatif" est coché */}
       {opts.rotatingProxy && (() => {
         const rot = getProxyRotation()
         const active = rot.enabled && rot.urls.some(u => /^https?:\/\//i.test(u.trim()))
         return active ? (
-          <div className="flex items-start gap-2.5 pl-[26px]" style={{
-            padding: '9px 12px', borderRadius: 10, marginLeft: 26,
-            background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.28)',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <div className="sf-banner is-accent" style={{ marginLeft: 26, alignItems: 'flex-start' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
             <div>
-              <p className="text-[12px] font-semibold" style={{ color: '#34D399', margin: 0 }}>{tr("Rotation d'IP active", 'IP rotation active')}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.65)', margin: '2px 0 0' }}>{tr('Une IP fraîche est déclenchée avant chaque post ✓', 'A fresh IP is triggered before each post ✓')}</p>
+              <p className="text-[12px] font-semibold" style={{ margin: 0 }}>{tr("Rotation d'IP active", 'IP rotation active')}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-3)', margin: '2px 0 0', fontWeight: 400 }}>{tr('Une IP fraîche est déclenchée avant chaque post ✓', 'A fresh IP is triggered before each post ✓')}</p>
             </div>
           </div>
         ) : (
-          <div className="flex items-start gap-2.5" style={{
-            padding: '10px 12px', borderRadius: 10, marginLeft: 26,
-            background: 'rgba(248,113,113,0.09)', border: '1px solid rgba(248,113,113,0.35)',
-          }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <div className="sf-banner is-danger" style={{ marginLeft: 26, alignItems: 'flex-start' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
             <div>
-              <p className="text-[12px] font-bold" style={{ color: '#F87171', margin: 0 }}>{tr("Rotation d'IP non configurée — risque de ban ⚠", 'IP rotation not configured — ban risk ⚠')}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(226,232,240,0.7)', margin: '3px 0 0', lineHeight: 1.5 }}>
-                {tr('Poster plusieurs comptes sur la même IP fait bannir. Active la rotation dans ', 'Posting several accounts on the same IP gets you banned. Enable rotation in ')}<strong style={{ color: '#fff' }}>{tr("Paramètres → Connexions → Rotation d'IP proxy", 'Settings → Connections → Proxy IP rotation')}</strong>{tr(" et colle ton lien de changement d'IP.", ' and paste your IP-change link.')}
+              <p className="text-[12px] font-bold" style={{ margin: 0 }}>{tr("Rotation d'IP non configurée — risque de ban ⚠", 'IP rotation not configured — ban risk ⚠')}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-2)', margin: '3px 0 0', lineHeight: 1.5, fontWeight: 400 }}>
+                {tr('Poster plusieurs comptes sur la même IP fait bannir. Active la rotation dans ', 'Posting several accounts on the same IP gets you banned. Enable rotation in ')}<strong style={{ color: 'var(--text-1)' }}>{tr("Paramètres → Connexions → Rotation d'IP proxy", 'Settings → Connections → Proxy IP rotation')}</strong>{tr(" et colle ton lien de changement d'IP.", ' and paste your IP-change link.')}
               </p>
             </div>
           </div>

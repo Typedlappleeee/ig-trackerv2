@@ -160,24 +160,14 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
         >
           {/* Tabs — hidden on forgot/reset */}
           {!isForgotOrReset && (
-            <div
-              className="flex rounded-xl p-1 mb-6"
-              style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}
-            >
+            <div className="sf-segment mb-6" style={{ display: 'flex', width: '100%' }}>
               {(['login', 'register'] as Tab[]).map(t => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => switchTab(t)}
-                  className="flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200"
-                  style={
-                    tab === t
-                      ? {
-                          background: 'linear-gradient(130deg, #6366F1, #818CF8)',
-                          color: '#fff',
-                          boxShadow: '0 2px 12px -2px rgba(99,102,241,0.5)',
-                        }
-                      : { color: 'rgba(233,234,240,0.6)' }
-                  }
+                  className={`sf-segment-item${tab === t ? ' is-active' : ''}`}
+                  style={{ flex: 1, height: 36 }}
                 >
                   {t === 'login' ? tr('Se connecter', 'Sign in') : tr('Créer un compte', 'Create account')}
                 </button>
@@ -189,16 +179,17 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
           {isForgotOrReset && (
             <div className="mb-6">
               <button
+                type="button"
                 onClick={() => switchTab('login')}
-                className="flex items-center gap-1.5 text-xs mb-4 transition-opacity hover:opacity-100 opacity-60"
-                style={{ color: 'rgba(233,234,240,0.8)' }}
+                className="sf-press flex items-center gap-1.5 text-xs mb-4 transition-opacity hover:opacity-100 opacity-60"
+                style={{ color: 'var(--text-2)' }}
               >
                 {tr('← Retour à la connexion', '← Back to sign in')}
               </button>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>
                 {tab === 'forgot' ? tr('Mot de passe oublié', 'Forgot password') : tr('Nouveau mot de passe', 'New password')}
               </p>
-              <p className="text-xs mt-1" style={{ color: 'rgba(233,234,240,0.45)' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>
                 {tab === 'forgot'
                   ? tr('Entre ton email — on t\'envoie un lien de réinitialisation.', 'Enter your email — we\'ll send you a reset link.')
                   : tr('Choisis un nouveau mot de passe pour ton compte.', 'Choose a new password for your account.')}
@@ -275,8 +266,8 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
                 <button
                   type="button"
                   onClick={() => switchTab('forgot')}
-                  className="text-xs transition-opacity hover:opacity-100 opacity-60"
-                  style={{ color: 'rgba(99,102,241,0.9)' }}
+                  className="text-xs transition-opacity hover:opacity-100 opacity-70"
+                  style={{ color: 'var(--accent-lt)' }}
                 >
                   {tr('Mot de passe oublié ?', 'Forgot password?')}
                 </button>
@@ -285,27 +276,26 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
 
             {error && (
               <div
-                className="px-4 py-3 rounded-xl text-sm anim-slide-down flex items-start gap-2"
-                style={{
-                  background: 'rgba(240,61,85,0.08)',
-                  border: '1px solid rgba(240,61,85,0.25)',
-                  color: '#f87171',
-                }}
+                className="sf-banner is-danger anim-slide-down"
+                style={{ alignItems: 'flex-start' }}
+                role="alert"
               >
-                <span className="flex-shrink-0 mt-0.5">⚠</span>
+                <span className="flex-shrink-0" style={{ marginTop: 1 }} aria-hidden>⚠</span>
                 <span>{error}</span>
               </div>
             )}
             {success && (
               <div
-                className="px-4 py-3 rounded-xl text-sm anim-slide-down flex items-start gap-2"
+                className="sf-banner anim-slide-down"
                 style={{
-                  background: 'rgba(52,211,153,0.08)',
-                  border: '1px solid rgba(52,211,153,0.25)',
-                  color: '#34d399',
+                  alignItems: 'flex-start',
+                  background: 'var(--ok-dim)',
+                  borderColor: 'rgba(34,197,94,0.22)',
+                  color: 'var(--ok)',
                 }}
+                role="status"
               >
-                <span className="flex-shrink-0 mt-0.5">✓</span>
+                <span className="flex-shrink-0" style={{ marginTop: 1 }} aria-hidden>✓</span>
                 <span>{success}</span>
               </div>
             )}

@@ -12,7 +12,7 @@ import { fetchAllPhones, type GeelarkPhone } from '@/lib/geelark'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
-import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
+import { ACCENT, ACCENT_L, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
 import { useTr } from '@/lib/i18n'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
       <div
         style={{
           position: 'fixed', inset: 0, zIndex: 9000,
-          background: 'rgba(6,6,8,0.88)', backdropFilter: 'blur(12px)',
+          background: 'rgba(2,2,6,0.82)', backdropFilter: 'var(--blur-md)', WebkitBackdropFilter: 'var(--blur-md)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
         }}
         onClick={e => { if (e.target === e.currentTarget && !submitting) onClose() }}
@@ -293,38 +293,47 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
           style={{
             width: '100%', maxWidth: 740, maxHeight: '90vh',
             background: BG_2, border: `1px solid ${HAIR}`,
-            borderRadius: 14, overflow: 'hidden',
-            boxShadow: '0 40px 100px rgba(0,0,0,0.7)',
+            borderRadius: 'var(--r-xl)', overflow: 'hidden',
+            boxShadow: 'var(--elev-3)',
             display: 'flex', flexDirection: 'column',
           }}
         >
-          {/* ── Header ─────────────────────────────────────────────────────── */}
-          <div style={{
-            flexShrink: 0, padding: '16px 22px',
-            borderBottom: `1px solid ${HAIR}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                {tr('Programmer une Story', 'Schedule a Story')}
-                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(99,102,241,0.12)', border: `1px solid ${HAIR}`, color: ACCENT_L }}>📸 Instagram</span>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, color: 'rgba(233,234,240,0.3)' }}>{tr('🎵 TikTok · bientôt', '🎵 TikTok · soon')}</span>
-              </p>
-              <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'rgba(233,234,240,0.42)' }}>
-                {tr('Photos + sticker lien • automation GéeLark • app doit être ouverte à l\'heure', 'Photos + link sticker • GeeLark automation • app must be open at the scheduled time')}
-              </p>
+          {/* ── Header (pattern v2 : tuile-icône + titre + sous-titre + actions) ── */}
+          <div
+            className="sf-page-header"
+            style={{
+              flexShrink: 0, padding: '18px 22px 16px', margin: 0,
+              borderRadius: 0, borderBottom: `1px solid ${HAIR}`,
+              // @ts-expect-error CSS custom prop — teinte ambre « Story »
+              '--icon-grad': 'linear-gradient(135deg,#F59E0B,#F97316)',
+            }}
+          >
+            <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+              <div className="sf-page-icon sf-page-icon-sm sf-anim-scale-spring">
+                <IcoPhoto />
+              </div>
+              <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+                <h1 className="sf-page-title" style={{ fontSize: 17, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {tr('Programmer une Story', 'Schedule a Story')}
+                  <span className="sf-badge sf-badge-accent">📸 Instagram</span>
+                  <span className="sf-badge sf-badge-muted">{tr('🎵 TikTok · bientôt', '🎵 TikTok · soon')}</span>
+                </h1>
+                <p className="sf-page-sub" style={{ marginTop: 3 }}>
+                  {tr('Photos + sticker lien · automation GéeLark · app ouverte à l\'heure', 'Photos + link sticker · GeeLark automation · app open at scheduled time')}
+                </p>
+              </div>
             </div>
-            <button
-              onClick={onClose}
-              disabled={submitting}
-              style={{
-                width: 30, height: 30, borderRadius: 8, cursor: 'pointer',
-                background: 'transparent', border: 'none', color: 'rgba(233,234,240,0.42)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <IcoClose size={12} />
-            </button>
+            <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+              <button
+                onClick={onClose}
+                disabled={submitting}
+                className="sf-btn sf-btn-ghost sf-btn-icon"
+                aria-label={tr('Fermer', 'Close')}
+                style={{ width: 30, height: 30 }}
+              >
+                <IcoClose size={12} />
+              </button>
+            </div>
           </div>
 
           {/* ── Success state ──────────────────────────────────────────────── */}
@@ -353,11 +362,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       {tr('Comptes', 'Accounts')}
                     </span>
                     {selected.size > 0 && (
-                      <span style={{
-                        background: 'rgba(99,102,241,0.15)', color: ACCENT,
-                        border: '1px solid rgba(99,102,241,0.3)',
-                        borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700,
-                      }}>
+                      <span className="sf-badge sf-badge-accent">
                         {tr(`${selected.size} sél.`, `${selected.size} sel.`)}
                       </span>
                     )}
@@ -404,18 +409,23 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                 {/* Phone list */}
                 <div className="sf-scroll" style={{ flex: 1, padding: '5px 7px' }}>
                   {loadingPhones ? (
-                    <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                      <div className="sf-spinner" />
-                      <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)' }}>{tr('Chargement…', 'Loading…')}</p>
+                    <div style={{ padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {Array.from({ length: 7 }).map((_, i) => (
+                        <div key={i} className="sf-skeleton sf-skeleton-line" style={{ height: 34, borderRadius: 8, opacity: 1 - i * 0.1 }} />
+                      ))}
                     </div>
                   ) : !bearer ? (
-                    <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', padding: '20px 0', textAlign: 'center' }}>
-                      {tr('Connecte GéeLark dans les Paramètres', 'Connect GeeLark in Settings')}
-                    </p>
+                    <div style={{ padding: '28px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: 'rgba(148,163,184,0.5)' }}><IcoSearch /></span>
+                      <p style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-3)', margin: 0 }}>{tr('GéeLark non connecté', 'GeeLark not connected')}</p>
+                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0, lineHeight: 1.4 }}>{tr('Connecte-le dans les Paramètres.', 'Connect it in Settings.')}</p>
+                    </div>
                   ) : visible.length === 0 ? (
-                    <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', padding: '20px 0', textAlign: 'center' }}>
-                      {tr('Aucun compte', 'No accounts')}
-                    </p>
+                    <div style={{ padding: '28px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: 'rgba(148,163,184,0.5)' }}><IcoSearch /></span>
+                      <p style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-3)', margin: 0 }}>{tr('Aucun compte', 'No accounts')}</p>
+                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0, lineHeight: 1.4 }}>{phoneSearch ? tr('Aucun résultat pour cette recherche.', 'No match for this search.') : tr('Aucun compte dans ce groupe.', 'No account in this group.')}</p>
+                    </div>
                   ) : visible.map(p => {
                     const sel = selected.has(p.id)
                     const link = getLink(p.id).trim()
@@ -424,13 +434,14 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       <button
                         key={p.id}
                         onClick={() => setSelected(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
+                        className="sf-press"
                         style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
+                          padding: '7px 9px', borderRadius: 'var(--r-sm)', cursor: 'pointer',
                           textAlign: 'left', marginBottom: 1,
-                          background: sel ? 'rgba(99,102,241,0.1)' : 'transparent',
-                          border: `1px solid ${sel ? 'rgba(99,102,241,0.3)' : 'transparent'}`,
-                          transition: 'all 0.14s',
+                          background: sel ? 'var(--accent-dim)' : 'transparent',
+                          border: `1px solid ${sel ? 'var(--border-accent-strong)' : 'transparent'}`,
+                          transition: 'background var(--t-fast), border-color var(--t-fast)',
                         }}
                       >
                         <span style={{
@@ -601,11 +612,12 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                         <button
                           key={m.k}
                           onClick={() => setDistrib(m.k)}
+                          className="sf-press"
                           style={{
-                            flex: 1, padding: '10px 12px', borderRadius: 9, textAlign: 'left', cursor: 'pointer',
-                            background: active ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
-                            border: `1px solid ${active ? 'rgba(99,102,241,0.35)' : HAIR}`,
-                            transition: 'all 0.15s',
+                            flex: 1, padding: '10px 12px', borderRadius: 'var(--r-md)', textAlign: 'left', cursor: 'pointer',
+                            background: active ? 'var(--accent-dim)' : 'rgba(255,255,255,0.02)',
+                            border: `1px solid ${active ? 'var(--border-accent-strong)' : HAIR}`,
+                            transition: 'background var(--t-fast), border-color var(--t-fast)',
                           }}
                         >
                           <p style={{ fontSize: 12.5, fontWeight: 700, color: active ? ACCENT_L : 'rgba(233,234,240,0.5)', margin: '0 0 2px' }}>{m.label}</p>
@@ -626,24 +638,14 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                           {tr('Liens (1 par compte)', 'Links (1 per account)')}
                         </span>
                       </div>
-                      <span style={{
-                        borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700,
-                        background: missingLinks.length > 0 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.1)',
-                        color: missingLinks.length > 0 ? '#fbbf24' : '#22c55e',
-                        border: `1px solid ${missingLinks.length > 0 ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.2)'}`,
-                      }}>
+                      <span className={`sf-badge ${missingLinks.length > 0 ? 'sf-badge-warn' : 'sf-badge-ok'}`}>
                         {tr(`${selectedIds.length - missingLinks.length}/${selectedIds.length} remplis`, `${selectedIds.length - missingLinks.length}/${selectedIds.length} filled`)}
                       </span>
                     </div>
 
                     {missingLinks.length > 0 && (
-                      <div style={{
-                        marginBottom: 10, padding: '8px 11px', borderRadius: 8,
-                        background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)',
-                        display: 'flex', alignItems: 'flex-start', gap: 7,
-                        color: 'rgba(251,191,36,0.9)', fontSize: 11.5,
-                      }}>
-                        <span style={{ flexShrink: 0, marginTop: 1, color: '#fbbf24' }}><IcoWarn /></span>
+                      <div className="sf-banner is-warn" style={{ marginBottom: 10, alignItems: 'flex-start', fontSize: 11.5 }}>
+                        <span style={{ flexShrink: 0, marginTop: 1 }}><IcoWarn /></span>
                         {tr(`${missingLinks.length} compte${missingLinks.length > 1 ? 's' : ''} sans lien — requis pour publier.`, `${missingLinks.length} account${missingLinks.length > 1 ? 's' : ''} without a link — required to publish.`)}
                       </div>
                     )}
@@ -673,11 +675,8 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                                 value={link}
                                 onChange={e => setLink(id, e.target.value)}
                                 placeholder="https://…"
-                                className="sf-input"
-                                style={{
-                                  height: 30, paddingLeft: 26, fontSize: 11.5, borderRadius: 8,
-                                  borderColor: hasLink ? 'rgba(99,102,241,0.28)' : 'rgba(245,158,11,0.28)',
-                                }}
+                                className={`sf-input${hasLink ? '' : ' is-invalid'}`}
+                                style={{ height: 30, paddingLeft: 26, fontSize: 11.5, borderRadius: 'var(--r-sm)' }}
                               />
                             </div>
                           </div>
@@ -709,19 +708,13 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
 
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>{tr('Délai entre comptes', 'Delay between accounts')}</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
                       {[0, 2, 5, 10, 15].map(m => (
                         <button
                           key={m}
                           onClick={() => setDelay(m)}
-                          style={{
-                            flex: 1, height: 32, borderRadius: 7, cursor: 'pointer',
-                            fontSize: 12, fontWeight: 600,
-                            background: delay === m ? 'rgba(99,102,241,0.15)' : 'transparent',
-                            border: `1px solid ${delay === m ? 'rgba(99,102,241,0.4)' : HAIR}`,
-                            color: delay === m ? ACCENT_L : 'rgba(233,234,240,0.35)',
-                            transition: 'all 0.15s',
-                          }}
+                          className={`sf-segment-item sf-press${delay === m ? ' is-active' : ''}`}
+                          style={{ flex: 1, textAlign: 'center', justifyContent: 'center' }}
                         >{m === 0 ? tr('Aucun', 'None') : `${m} min`}</button>
                       ))}
                     </div>
@@ -746,11 +739,10 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
 
                 {/* ── Error ─────────────────────────────────────────────────── */}
                 {schedErr && (
-                  <p style={{
-                    fontSize: 12, color: '#f87171', margin: 0, padding: '9px 12px',
-                    background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
-                    borderRadius: 8,
-                  }}>{schedErr}</p>
+                  <div className="sf-banner is-danger sf-anim-slide-up" style={{ alignItems: 'flex-start', fontSize: 12 }}>
+                    <span style={{ flexShrink: 0, marginTop: 1 }}><IcoWarn /></span>
+                    <span>{schedErr}</span>
+                  </div>
                 )}
 
                 {/* ── Footer buttons ────────────────────────────────────────── */}
@@ -764,14 +756,8 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                   <button
                     onClick={submit}
                     disabled={!canSubmit}
-                    className="sf-btn"
-                    style={{
-                      flex: 2, cursor: canSubmit ? 'pointer' : 'not-allowed', justifyContent: 'center',
-                      background: canSubmit ? (submitting ? ACCENT_D : ACCENT) : 'rgba(99,102,241,0.2)',
-                      color: canSubmit ? '#fff' : 'rgba(233,234,240,0.3)',
-                      border: 'none', gap: 8,
-                      opacity: canSubmit ? 1 : 0.6,
-                    }}
+                    className="sf-btn sf-btn-primary"
+                    style={{ flex: 2, justifyContent: 'center', gap: 8 }}
                   >
                     {submitting ? (
                       <><span className="sf-spinner" style={{ width: 13, height: 13 }} /> {tr('Programmation…', 'Scheduling…')}</>

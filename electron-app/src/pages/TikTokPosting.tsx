@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
@@ -60,20 +59,18 @@ const ICONS = {
 // ── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: PhoneStatus }) {
   const tr = useTr()
-  const cfg: Record<PhoneStatus, { label: string; color: string; bg: string }> = {
-    idle:    { label: tr('En attente', 'Waiting'), color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
-    booting: { label: tr('Démarrage', 'Booting'),  color: '#f59e0b', bg: 'rgba(245,158,11,0.1)'  },
-    running: { label: tr('En cours…', 'Running…'),  color: '#6366F1', bg: 'rgba(99,102,241,0.1)'  },
-    done:    { label: tr('Publié', 'Posted'),     color: '#059669', bg: 'rgba(5,150,105,0.1)'   },
-    error:   { label: tr('Erreur', 'Error'),     color: '#DC2626', bg: 'rgba(220,38,38,0.1)'   },
+  const cfg: Record<PhoneStatus, { label: string; cls: string }> = {
+    idle:    { label: tr('En attente', 'Waiting'), cls: 'sf-badge-muted'  },
+    booting: { label: tr('Démarrage', 'Booting'),  cls: 'sf-badge-warn'   },
+    running: { label: tr('En cours…', 'Running…'),  cls: 'sf-badge-accent' },
+    done:    { label: tr('Publié', 'Posted'),      cls: 'sf-badge-ok'     },
+    error:   { label: tr('Erreur', 'Error'),       cls: 'sf-badge-danger' },
   }
-  const { label, color, bg } = cfg[status]
+  const { label, cls } = cfg[status]
+  const spinning = status === 'booting' || status === 'running'
   return (
-    <span style={{
-      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
-      color, background: bg, border: `1px solid ${color}33`, whiteSpace: 'nowrap',
-    }}>
-      {(status === 'booting' || status === 'running') ? (
+    <span className={`sf-badge ${cls}`} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+      {spinning ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <svg className="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -261,79 +258,94 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
   const canLaunch = !running && !!bearer && !!video && selected.size > 0
 
   // ── Render ───────────────────────────────────────────────────────────────
+  const doneCount = jobs.filter(j => j.status === 'done').length
+  const errCount  = jobs.filter(j => j.status === 'error').length
+
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
+    <div className="sf-page anim-page" style={{ maxWidth: 900, margin: '0 auto', padding: '24px 28px 40px' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-          background: 'rgba(0,0,0,0.35)', border: '1.5px solid rgba(255,255,255,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff',
-        }}>
-          <Icon d={ICONS.tiktok} size={22} />
+      <div className="sf-page-header" style={{ marginBottom: 20 }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring">
+            <Icon d={ICONS.tiktok} size={22} />
+          </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">TikTok Mass Posting</h1>
+            <p className="sf-page-sub">
+              {tr('Publie une vidéo sur plusieurs comptes TikTok en séquence', 'Post one video to multiple TikTok accounts in sequence')}
+              {' · '}
+              {tr('2 crédits / téléphone', '2 credits / phone')}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-            TikTok Mass Posting
-          </h1>
-          <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>
-            {tr('Publie une vidéo sur plusieurs comptes TikTok en séquence', 'Post one video to multiple TikTok accounts in sequence')}
-          </p>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          <span className={`sf-status-chip ${running ? 'is-live' : 'is-idle'}`}>
+            <span className="sf-status-dot" />
+            {running
+              ? tr('En cours', 'Running')
+              : tr(`${selected.size} sélectionné${selected.size > 1 ? 's' : ''}`, `${selected.size} selected`)}
+          </span>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, alignItems: 'start' }}>
 
         {/* Left: phone list */}
-        <div className="glass-card" style={{ borderRadius: 16, overflow: 'hidden' }}>
+        <div className="sf-card sf-anim-slide-up sf-d100" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{
             padding: '14px 16px', borderBottom: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+            <span className="sf-section-label" style={{ margin: 0 }}>
               {tr('Téléphones', 'Phones')} ({phones.length})
             </span>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="sf-cluster" style={{ gap: 8 }}>
               <button
+                className="sf-btn sf-btn-ghost sf-btn-sm"
                 onClick={toggleAll}
-                style={{
-                  fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 8,
-                  border: '1px solid var(--border)', background: 'transparent',
-                  color: 'var(--text2)', cursor: 'pointer',
-                }}
+                disabled={phones.length === 0}
               >
                 {allSelected ? tr('Tout désélect.', 'Deselect all') : tr('Tout sélect.', 'Select all')}
               </button>
               <button
+                className="sf-btn sf-btn-secondary sf-btn-icon sf-btn-sm"
                 onClick={loadPhones}
                 disabled={phonesLoading}
                 title={tr('Actualiser', 'Refresh')}
-                style={{
-                  background: 'transparent', border: '1px solid var(--border)',
-                  borderRadius: 8, padding: '3px 7px', cursor: 'pointer',
-                  color: 'var(--text2)', display: 'flex', alignItems: 'center',
-                }}
               >
-                <Icon d={ICONS.refresh} size={13} />
+                <span className={phonesLoading ? 'animate-spin' : ''} style={{ display: 'flex' }}>
+                  <Icon d={ICONS.refresh} size={13} />
+                </span>
               </button>
             </div>
           </div>
 
           {phonesLoading && (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
-              {tr('Chargement…', 'Loading…')}
+            <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="sf-skeleton sf-skeleton-line" style={{ height: 34 }} />
+              ))}
             </div>
           )}
-          {phonesError && (
-            <div style={{ padding: 16, color: '#DC2626', fontSize: 13 }}>
-              ❌ {phonesError}
+          {!phonesLoading && phonesError && (
+            <div style={{ padding: 16 }}>
+              <div className="sf-banner is-danger">
+                <Icon d={ICONS.x} size={15} />
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{phonesError}</span>
+                <button className="sf-btn sf-btn-secondary sf-btn-sm sf-banner-action" onClick={loadPhones}>
+                  {tr('Réessayer', 'Retry')}
+                </button>
+              </div>
             </div>
           )}
           {!phonesLoading && !phonesError && phones.length === 0 && (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
-              {tr('Aucun téléphone trouvé', 'No phone found')}
+            <div className="sf-empty" style={{ padding: '32px 20px' }}>
+              <div className="sf-empty-icon"><Icon d={ICONS.tiktok} size={24} /></div>
+              <div className="sf-empty-title">{tr('Aucun téléphone', 'No phone')}</div>
+              <div className="sf-empty-desc">
+                {tr('Ajoutez un téléphone GeeLark pour publier sur TikTok.', 'Add a GeeLark phone to post on TikTok.')}
+              </div>
             </div>
           )}
 
@@ -406,16 +418,16 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
         </div>
 
         {/* Right: form + results */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="sf-stack sf-anim-slide-up sf-d150" style={{ gap: 16 }}>
 
           {/* Form */}
-          <div className="glass-card" style={{ borderRadius: 16, padding: 20 }}>
-            <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16, marginTop: 0 }}>
+          <div className="sf-card" style={{ padding: 20 }}>
+            <div className="sf-section-label" style={{ marginBottom: 16 }}>
               {tr('Contenu à publier', 'Content to post')}
-            </h2>
+            </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 6 }}>
+              <label className="sf-field-label" style={{ display: 'block', marginBottom: 6 }}>
                 {tr('Vidéo', 'Video')}
               </label>
 
@@ -462,14 +474,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                     }}>
                       {video.title}
                     </p>
-                    <button
-                      onClick={() => setShowBankPicker(true)}
-                      style={{
-                        fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 8,
-                        border: '1px solid var(--border)', background: 'transparent',
-                        color: 'var(--text2)', cursor: 'pointer',
-                      }}
-                    >
+                    <button className="sf-btn sf-btn-secondary sf-btn-sm" onClick={() => setShowBankPicker(true)}>
                       {tr('Changer', 'Change')}
                     </button>
                   </div>
@@ -488,20 +493,16 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 6 }}>
+              <label className="sf-field-label" style={{ display: 'block', marginBottom: 6 }}>
                 {tr('Légende', 'Caption')}
               </label>
               <textarea
+                className="sf-textarea"
                 value={caption}
                 onChange={e => setCaption(e.target.value)}
                 placeholder={tr('Ajouter une description…', 'Add a description…')}
                 rows={3}
-                style={{
-                  width: '100%', resize: 'vertical', padding: '8px 12px', borderRadius: 10,
-                  border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)',
-                  color: 'var(--text)', fontSize: 13, fontFamily: 'inherit',
-                  outline: 'none', boxSizing: 'border-box',
-                }}
+                style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box' }}
               />
             </div>
 
@@ -515,50 +516,43 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
             </div>
 
             {!bearer && (
-              <div style={{
-                padding: '10px 14px', borderRadius: 10, marginBottom: 14,
-                background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
-                color: '#f59e0b', fontSize: 12,
-              }}>
-                {tr('⚠️ Clé API GéeLark non configurée — allez dans les paramètres.', '⚠️ GeeLark API key not configured — go to Settings.')}
+              <div className="sf-banner is-warn" style={{ marginBottom: 14 }}>
+                <Icon d={ICONS.refresh} size={15} />
+                <span>{tr('Clé API GéeLark non configurée — allez dans les paramètres.', 'GeeLark API key not configured — go to Settings.')}</span>
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 10 }}>
               {!running ? (
-                <Button
+                <button
+                  className="sf-btn sf-btn-primary"
                   onClick={handleLaunch}
                   disabled={!canLaunch}
-                  className="flex-1"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                 >
                   <Icon d={ICONS.play} size={14} />
                   {tr(`Lancer (${selected.size} téléphone${selected.size > 1 ? 's' : ''})`, `Launch (${selected.size} phone${selected.size > 1 ? 's' : ''})`)}
-                </Button>
+                </button>
               ) : (
-                <Button
+                <button
+                  className="sf-btn sf-btn-danger"
                   onClick={handleStop}
-                  className="flex-1"
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    background: 'rgba(220,38,38,0.12)', borderColor: 'rgba(220,38,38,0.3)', color: '#DC2626',
-                  }}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                 >
                   <Icon d={ICONS.stop} size={14} />
                   {tr('Arrêter', 'Stop')}
-                </Button>
+                </button>
               )}
             </div>
           </div>
 
           {/* Results */}
           {jobs.length > 0 && (
-            <div className="glass-card" style={{ borderRadius: 16, overflow: 'hidden' }}>
+            <div className="sf-card sf-anim-slide-up" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{
                 padding: '12px 16px', borderBottom: '1px solid var(--border)',
-                fontSize: 13, fontWeight: 600, color: 'var(--text)',
               }}>
-                {tr('Progression', 'Progress')}
+                <span className="sf-section-label" style={{ margin: 0 }}>{tr('Progression', 'Progress')}</span>
               </div>
               {jobs.map(job => (
                 <div key={job.phone.id} style={{
@@ -585,7 +579,7 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
                     {/* Result */}
                     {job.result && (
                       <span style={{
-                        fontSize: 11, color: job.status === 'error' ? '#DC2626' : 'var(--text2)',
+                        fontSize: 11, color: job.status === 'error' ? 'var(--danger)' : 'var(--text2)',
                         maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       }}>
                         {job.result}
@@ -601,14 +595,14 @@ export default function TikTokPosting({ user }: TikTokPostingProps) {
               {!running && jobs.length > 0 && (
                 <div style={{
                   padding: '10px 16px', borderTop: '1px solid var(--border)',
-                  fontSize: 12, color: 'var(--text2)', display: 'flex', gap: 16,
+                  fontSize: 12, display: 'flex', gap: 8,
                 }}>
-                  <span style={{ color: '#059669' }}>
-                    ✓ {tr(`${jobs.filter(j => j.status === 'done').length} réussi${jobs.filter(j => j.status === 'done').length > 1 ? 's' : ''}`, `${jobs.filter(j => j.status === 'done').length} succeeded`)}
+                  <span className="sf-badge sf-badge-ok sf-tabular">
+                    {tr(`${doneCount} réussi${doneCount > 1 ? 's' : ''}`, `${doneCount} succeeded`)}
                   </span>
-                  {jobs.filter(j => j.status === 'error').length > 0 && (
-                    <span style={{ color: '#DC2626' }}>
-                      ✗ {tr(`${jobs.filter(j => j.status === 'error').length} échoué${jobs.filter(j => j.status === 'error').length > 1 ? 's' : ''}`, `${jobs.filter(j => j.status === 'error').length} failed`)}
+                  {errCount > 0 && (
+                    <span className="sf-badge sf-badge-danger sf-tabular">
+                      {tr(`${errCount} échoué${errCount > 1 ? 's' : ''}`, `${errCount} failed`)}
                     </span>
                   )}
                 </div>

@@ -110,13 +110,13 @@ export function AccountTracker({ user, orgId }: { user: User; orgId: string | nu
 
   if (needsSetup) {
     return (
-      <div className="sf-card" style={{ padding: '32px 26px', maxWidth: 640, margin: '20px auto', textAlign: 'center' }}>
-        <div style={{ fontSize: 32, marginBottom: 10 }}>🗂️</div>
-        <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: '0 0 8px' }}>{tr('Installe le tableau de suivi (une fois)', 'Install the tracking table (one time)')}</p>
-        <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+      <div className="sf-card sf-elev-1 sf-anim-slide-up" style={{ padding: 'var(--sp-7) var(--sp-6)', maxWidth: 640, margin: '20px auto', textAlign: 'center' }}>
+        <div className="sf-empty-icon sf-anim-scale-spring" style={{ margin: '0 auto var(--sp-4)' }}>🗂️</div>
+        <p className="sf-empty-title" style={{ margin: '0 0 var(--sp-2)' }}>{tr('Installe le tableau de suivi (une fois)', 'Install the tracking table (one time)')}</p>
+        <p className="sf-empty-desc" style={{ margin: '0 auto var(--sp-4)', maxWidth: 420 }}>
           {tr('Le suivi de comptes a besoin d\'une petite table partagée. Colle ce SQL dans', 'Account tracking needs a small shared table. Paste this SQL into')} <b>Supabase → SQL Editor</b> {tr('puis recharge :', 'then reload:')}
         </p>
-        <pre style={{ textAlign: 'left', fontSize: 11.5, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, overflowX: 'auto', color: 'var(--text-2)' }}>{`-- Fichier : supabase/migrations/20260707b_account_tracker.sql
+        <pre className="sf-scroll-x" style={{ textAlign: 'left', fontSize: 11.5, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: 'var(--sp-4)', overflowX: 'auto', color: 'var(--text-2)' }}>{`-- Fichier : supabase/migrations/20260707b_account_tracker.sql
 create table if not exists public.account_tracker (
   id uuid primary key default gen_random_uuid(),
   org_id uuid, user_id uuid not null,
@@ -135,53 +135,86 @@ create policy "at_all" on public.account_tracker for all using (
   auth.uid() = user_id or (org_id is not null and exists (
     select 1 from organization_members m where m.org_id = account_tracker.org_id and m.user_id = auth.uid())));
 notify pgrst, 'reload schema';`}</pre>
-        <button onClick={load} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" style={{ marginTop: 14 }}>{tr('J\'ai lancé le SQL — Recharger', 'I ran the SQL — Reload')}</button>
+        <button onClick={load} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer" style={{ marginTop: 'var(--sp-4)' }}>{tr('J\'ai lancé le SQL — Recharger', 'I ran the SQL — Reload')}</button>
       </div>
     )
   }
 
   return (
-    <div>
-      {/* Barre : filtres + actions */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{rows.length} {tr(rows.length > 1 ? 'comptes' : 'compte', rows.length > 1 ? 'accounts' : 'account')} · {tr('clique dans une case, ça s\'enregistre tout seul', 'click a cell, it saves automatically')}</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select value={marketFilter} onChange={e => setMarketFilter(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }}>
+    <div className="sf-page anim-page">
+      {/* En-tête de page v2 */}
+      <div className="sf-page-header">
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" aria-hidden style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#6366F1,#8B5CF6)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg>
+          </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">{tr('Suivi des comptes', 'Account tracking')}</h1>
+            <p className="sf-page-sub">
+              <span className="sf-tabular">{rows.length}</span> {tr(rows.length > 1 ? 'comptes' : 'compte', rows.length > 1 ? 'accounts' : 'account')} · {tr('clique dans une case, ça s\'enregistre tout seul', 'click a cell, it saves automatically')}
+            </p>
+          </div>
+        </div>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          <select value={marketFilter} onChange={e => setMarketFilter(e.target.value)} className="sf-input sf-btn-sm cursor-pointer" style={{ width: 'auto', height: 34, fontSize: 12.5 }}>
             <option value="__all__">{tr('Tous les marchés', 'All markets')}</option>
             {markets.map(m => <option key={m} value={m}>{m}</option>)}
             <option value="__none__">{tr('Non classé', 'Unclassified')}</option>
           </select>
           {folders.length > 0 && (
-            <select value={folderFilter} onChange={e => setFolderFilter(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 32, fontSize: 12.5 }}>
+            <select value={folderFilter} onChange={e => setFolderFilter(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 34, fontSize: 12.5 }}>
               <option value="__all__">{tr('Tous les dossiers', 'All folders')}</option>
               {folders.map(f => <option key={f} value={f}>{f}</option>)}
               <option value="__none__">{tr('Non classé', 'Unclassified')}</option>
             </select>
           )}
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')} className="sf-input" style={{ width: 160, height: 32, fontSize: 12.5 }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')} className="sf-input" style={{ width: 170, height: 34, fontSize: 12.5 }} />
           {importCount > 0 && (
-            <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" title={tr('Crée une ligne pour chaque compte Instagram déjà assigné à un téléphone', 'Creates a row for each Instagram account already assigned to a phone')}>
+            <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm sf-press cursor-pointer" title={tr('Crée une ligne pour chaque compte Instagram déjà assigné à un téléphone', 'Creates a row for each Instagram account already assigned to a phone')}>
               {tr(`↧ Importer mes comptes (${importCount})`, `↧ Import my accounts (${importCount})`)}
             </button>
           )}
-          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
+          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
         </div>
       </div>
 
       {/* Tableau */}
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{[0, 1, 2, 3].map(i => <div key={i} className="sf-card sf-skeleton" style={{ height: 44 }} />)}</div>
+        <div className="sf-card sf-elev-1" style={{ padding: 0, overflow: 'hidden' }}>
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="sf-cluster" style={{ gap: 'var(--sp-4)', padding: '12px var(--sp-4)', borderBottom: i < 5 ? '1px solid var(--border)' : 'none' }}>
+              <div className="sf-skeleton sf-skeleton-line" style={{ width: '18%' }} />
+              <div className="sf-skeleton sf-skeleton-line" style={{ width: '10%' }} />
+              <div className="sf-skeleton sf-skeleton-line" style={{ width: '12%' }} />
+              <div className="sf-skeleton sf-skeleton-line" style={{ width: '14%' }} />
+              <div className="sf-skeleton sf-skeleton-line" style={{ width: '10%' }} />
+              <div className="sf-skeleton sf-skeleton-line" style={{ width: '18%' }} />
+            </div>
+          ))}
+        </div>
       ) : rows.length === 0 ? (
-        <div className="sf-card" style={{ padding: '40px 24px', textAlign: 'center', maxWidth: 520, margin: '10px auto' }}>
-          <div style={{ fontSize: 30, marginBottom: 8 }}>📋</div>
-          <p style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-1)', margin: '0 0 6px' }}>{tr('Aucun compte suivi', 'No tracked accounts')}</p>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px' }}>{tr('Ajoute ta première ligne pour commencer ton suivi.', 'Add your first row to start tracking.')}</p>
-          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
+        <div className="sf-empty sf-anim-slide-up" style={{ margin: '10px auto', maxWidth: 520 }}>
+          <div className="sf-empty-icon">📋</div>
+          <p className="sf-empty-title">{tr('Aucun compte suivi', 'No tracked accounts')}</p>
+          <p className="sf-empty-desc">{tr('Ajoute ta première ligne pour commencer ton suivi, ou importe les comptes déjà assignés à tes téléphones.', 'Add your first row to start tracking, or import the accounts already assigned to your phones.')}</p>
+          <div className="sf-cluster" style={{ justifyContent: 'center', marginTop: 'var(--sp-4)' }}>
+            {importCount > 0 && (
+              <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm sf-press cursor-pointer">{tr(`↧ Importer mes comptes (${importCount})`, `↧ Import my accounts (${importCount})`)}</button>
+            )}
+            <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
+          </div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="sf-empty sf-anim-slide-up" style={{ margin: '10px auto', maxWidth: 480 }}>
+          <div className="sf-empty-icon">🔍</div>
+          <p className="sf-empty-title">{tr('Aucun résultat', 'No results')}</p>
+          <p className="sf-empty-desc">{tr('Aucun compte ne correspond à ces filtres.', 'No account matches these filters.')}</p>
+          <button onClick={() => { setSearch(''); setMarketFilter('__all__'); setFolderFilter('__all__') }} className="sf-btn sf-btn-ghost sf-btn-sm sf-press cursor-pointer" style={{ marginTop: 'var(--sp-3)' }}>{tr('Réinitialiser les filtres', 'Reset filters')}</button>
         </div>
       ) : (
-        <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1280, fontSize: 12.5 }}>
+        <div className="sf-card sf-elev-1 sf-anim-slide-up sf-d150" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="sf-scroll-x" style={{ overflowX: 'auto' }}>
+            <table className="sf-table" style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1280, fontSize: 12.5 }}>
               <thead>
                 <tr style={{ background: 'var(--surface-2)' }}>
                   {[tr('Compte', 'Account'), tr('Marché', 'Market'), tr('Dossier', 'Folder'), tr('Pseudo', 'Handle'), 'Insta', 'TikTok', 'Threads', 'YouTube', tr('Mail', 'Email'), tr('Mot de passe', 'Password'), tr('Commentaire', 'Comment'), ''].map((h, i) => (
@@ -208,7 +241,7 @@ notify pgrst, 'reload schema';`}</pre>
                     <td style={{ padding: '6px 8px', minWidth: 120 }}><TextCell value={r.password} placeholder={tr('mot de passe', 'password')} onSave={v => patch(r.id, 'password', v)} /></td>
                     <td style={{ padding: '6px 8px', minWidth: 180 }}><TextCell value={r.comment} placeholder={tr('commentaire…', 'comment…')} onSave={v => patch(r.id, 'comment', v)} /></td>
                     <td style={{ padding: '6px 8px' }}>
-                      <button onClick={() => delRow(r.id)} title={tr('Supprimer la ligne', 'Delete row')} className="cursor-pointer" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 13, padding: 4 }}>🗑️</button>
+                      <button onClick={() => delRow(r.id)} title={tr('Supprimer la ligne', 'Delete row')} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm sf-press cursor-pointer" style={{ color: 'var(--text-4)', fontSize: 13 }}>🗑️</button>
                     </td>
                   </tr>
                 ))}

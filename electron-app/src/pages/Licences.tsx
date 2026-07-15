@@ -289,24 +289,22 @@ export function Licences({ user: _user }: Props) {
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="sf-page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          <div className="sf-anim-scale-spring" style={{
-            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)',
-            border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1',
-          }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
-              Admin — {t('licencesTitle')}
-            </h1>
+            <h1 className="sf-page-title">Admin — {t('licencesTitle')}</h1>
             <p className="sf-page-sub">{t('licencesSub')}</p>
           </div>
+        </div>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          <span className="sf-status-chip">
+            <span className="sf-status-dot" />
+            {loading ? t('loading') : `${stats.total} ${lang === 'en' ? 'keys' : 'clés'}`}
+          </span>
         </div>
       </div>
 
@@ -321,26 +319,29 @@ export function Licences({ user: _user }: Props) {
             { label: lang === 'en' ? 'Used' : 'Utilisées', value: stats.used, color: 'text-accent',  icon: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
             { label: t('expiredKeys'),   value: stats.expired, color: 'text-danger',  icon: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></> },
           ].map(s => (
-            <div key={s.label} className="sf-card p-5 text-center">
-              <div className="flex justify-center mb-2">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={s.color}>
+            loading ? (
+              <div key={s.label} className="sf-stat-card">
+                <div className="sf-skeleton sf-skeleton-line" style={{ width: 36, height: 36, borderRadius: 'var(--r-md)' }} />
+                <div className="sf-skeleton sf-skeleton-text" style={{ width: '50%', height: 26, marginTop: 12 }} />
+                <div className="sf-skeleton sf-skeleton-text" style={{ width: '70%', marginTop: 8 }} />
+              </div>
+            ) : (
+            <div key={s.label} className="sf-stat-card sf-card-lift">
+              <div className="sf-stat-icon" style={{ marginBottom: 10 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={s.color}>
                   {s.icon}
                 </svg>
               </div>
-              <p className={`text-3xl font-black ${s.color}`} style={{ fontVariantNumeric: 'tabular-nums' }}>{s.value}</p>
+              <p className={`text-3xl font-black sf-tabular ${s.color}`}>{s.value}</p>
               <p className="text-[11px] font-semibold text-text2 mt-1 uppercase" style={{ letterSpacing: '0.04em' }}>{s.label}</p>
             </div>
+            )
           ))}
         </div>
 
         {/* Create key */}
         <div className="sf-card p-6 space-y-5 mt-6 sf-anim-slide-up sf-d150">
-          <div className="flex items-center gap-2 mb-1">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 5v14M5 12h14"/>
-            </svg>
-            <p className="text-[13px] font-bold text-text">{t('createKey')}</p>
-          </div>
+          <p className="sf-section-label">{t('createKey')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{lang === 'en' ? 'Generated key' : 'Clé générée'}</label>
@@ -352,7 +353,7 @@ export function Licences({ user: _user }: Props) {
                 />
                 <button
                   onClick={() => setGenKey(generateKey())}
-                  className="sf-btn sf-btn-ghost cursor-pointer px-3"
+                  className="sf-btn sf-btn-secondary sf-btn-icon cursor-pointer"
                   title={lang === 'en' ? 'Regenerate' : 'Régénérer'}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -363,13 +364,12 @@ export function Licences({ user: _user }: Props) {
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{t('keyDuration')}</label>
-              <div className="flex gap-2 flex-wrap">
+              <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
                 {DURATIONS.map(d => (
                   <button
                     key={d.label}
                     onClick={() => setDuration(d.days)}
-                    className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
-                    style={duration === d.days ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    className={`sf-segment-item${duration === d.days ? ' is-active' : ''}`}
                   >
                     {tr(d.label, d.en)}
                   </button>
@@ -378,13 +378,12 @@ export function Licences({ user: _user }: Props) {
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{t('keyPlan')}</label>
-              <div className="flex gap-2">
+              <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
                 {['standard', 'pro', 'organisation'].map(p => (
                   <button
                     key={p}
                     onClick={() => setPlan(p)}
-                    className={`px-3 py-1.5 rounded-lg text-[13px] font-medium capitalize transition-all cursor-pointer ${plan === p ? 'text-white' : 'text-text2 hover:text-text'}`}
-                    style={plan === p ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    className={`sf-segment-item capitalize${plan === p ? ' is-active' : ''}`}
                   >
                     {p}
                   </button>
@@ -410,26 +409,32 @@ export function Licences({ user: _user }: Props) {
               placeholder={t('searchKeyOrEmail')}
               className="flex-1 min-w-[200px]"
             />
-            {(['all', 'active', 'used', 'expired', 'revoked'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg text-[13px] font-medium capitalize transition-all cursor-pointer ${filter === f ? 'text-white' : 'text-text2 hover:text-text'}`}
-                style={filter === f ? { background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.4)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
-                {f === 'all' ? (lang === 'en' ? 'All' : 'Toutes')
-                  : f === 'active' ? t('keyAvailable')
-                  : f === 'used' ? t('keyActivated')
-                  : f === 'expired' ? t('keyExpired')
-                  : t('keyRevoked')}
-              </button>
-            ))}
+            <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
+              {(['all', 'active', 'used', 'expired', 'revoked'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`sf-segment-item capitalize${filter === f ? ' is-active' : ''}`}
+                >
+                  {f === 'all' ? (lang === 'en' ? 'All' : 'Toutes')
+                    : f === 'active' ? t('keyAvailable')
+                    : f === 'used' ? t('keyActivated')
+                    : f === 'expired' ? t('keyExpired')
+                    : t('keyRevoked')}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading ? (
-            <div className="sf-card p-10 text-center">
-              <div className="sf-spinner mx-auto" />
-              <p className="text-[13px] text-text2 mt-3">{t('loading')}</p>
+            <div className="space-y-2">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="sf-card px-5 py-3.5 flex items-center gap-3">
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: 150 }} />
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: 60, height: 18 }} />
+                  <div className="sf-skeleton sf-skeleton-text" style={{ width: 70, marginLeft: 'auto' }} />
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="sf-empty">
@@ -439,6 +444,7 @@ export function Licences({ user: _user }: Props) {
                 </svg>
               </div>
               <p className="sf-empty-title">{t('noKeys')}</p>
+              <p className="sf-empty-desc">{lang === 'en' ? 'Generate a license key above to get started.' : 'Génère une clé de licence ci-dessus pour commencer.'}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -566,14 +572,13 @@ export function Licences({ user: _user }: Props) {
 
         {/* ── Credit Codes ──────────────────────────────────────────────────── */}
         <div className="mt-10 space-y-5 sf-reveal">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(6,182,212,0.1))', border: '1px solid rgba(99,102,241,0.2)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <div className="sf-cluster" style={{ gap: 12 }}>
+            <div className="sf-page-icon sf-page-icon-sm" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>
               </svg>
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <h2 className="text-[16px] font-black text-text leading-none">{lang === 'en' ? 'Credit codes' : 'Codes de crédits'}</h2>
               <p className="text-[13px] text-text2 mt-0.5">{lang === 'en' ? 'Generate codes that users can redeem for credits' : 'Génère des codes que les utilisateurs peuvent échanger contre des crédits'}</p>
             </div>
@@ -581,7 +586,7 @@ export function Licences({ user: _user }: Props) {
 
           {/* Create form */}
           <div className="sf-card p-6 space-y-5">
-            <p className="text-[13px] font-bold text-text mb-1">{lang === 'en' ? 'New code' : 'Nouveau code'}</p>
+            <p className="sf-section-label">{lang === 'en' ? 'New code' : 'Nouveau code'}</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>Code</p>
@@ -598,9 +603,9 @@ export function Licences({ user: _user }: Props) {
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{lang === 'en' ? 'Amount (credits)' : 'Montant (crédits)'}</p>
                 <Input type="number" value={ccAmount} onChange={e => setCcAmount(Number(e.target.value))}
-                  min={1} step={1} className="text-[13px]" style={{ fontVariantNumeric: 'tabular-nums' }} />
+                  min={1} step={1} className={`text-[13px] sf-tabular${!ccAmountValid ? ' is-invalid' : ''}`} />
                 {!ccAmountValid && (
-                  <p className="text-[12px] text-danger">{lang === 'en' ? 'Enter a whole number ≥ 1.' : 'Saisis un nombre entier ≥ 1.'}</p>
+                  <p className="sf-field-error">{lang === 'en' ? 'Enter a whole number ≥ 1.' : 'Saisis un nombre entier ≥ 1.'}</p>
                 )}
               </div>
               <div className="space-y-2">
@@ -613,16 +618,26 @@ export function Licences({ user: _user }: Props) {
               {ccCreating ? t('loading') : (lang === 'en' ? '+ Create code' : '+ Créer le code')}
             </Button>
             {ccCreateErr && (
-              <p className="text-[13px] text-danger mt-2">{t('error')} : {ccCreateErr}</p>
+              <div className="sf-banner is-danger" role="alert">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span>{t('error')} : {ccCreateErr}</span>
+              </div>
             )}
           </div>
 
           {/* Code list */}
           <div className="sf-card overflow-hidden">
             {ccLoading ? (
-              <div className="p-10 text-center">
-                <div className="sf-spinner mx-auto" />
-                <p className="text-[13px] text-text2 mt-3">{t('loading')}</p>
+              <div className="divide-y divide-border">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="sf-skeleton sf-skeleton-text" style={{ width: 120 }} />
+                    <div className="sf-skeleton sf-skeleton-text" style={{ width: 80, marginLeft: 'auto' }} />
+                    <div className="sf-skeleton sf-skeleton-text" style={{ width: 50, height: 18 }} />
+                  </div>
+                ))}
               </div>
             ) : creditCodes.length === 0 ? (
               <div className="sf-empty">
@@ -632,6 +647,7 @@ export function Licences({ user: _user }: Props) {
                   </svg>
                 </div>
                 <p className="sf-empty-title">{lang === 'en' ? 'No codes created.' : 'Aucun code créé.'}</p>
+                <p className="sf-empty-desc">{lang === 'en' ? 'Create a credit code above to let users redeem credits.' : 'Crée un code de crédits ci-dessus pour permettre aux utilisateurs de les échanger.'}</p>
               </div>
             ) : (
               <div className="divide-y divide-border">

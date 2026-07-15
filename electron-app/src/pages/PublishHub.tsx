@@ -120,7 +120,7 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
   const active = hover && !disabled
   return (
     <button
-      className="hubcard"
+      className={disabled ? 'hubcard' : 'hubcard sf-press'}
       onClick={disabled ? undefined : onOpen}
       disabled={disabled}
       onMouseEnter={() => setHover(true)}
@@ -129,13 +129,13 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
       style={{
         ['--ring' as any]: kind.accent,
         position: 'relative', textAlign: 'left', overflow: 'hidden',
-        padding: 22, borderRadius: 22,
+        padding: 'var(--sp-5)', borderRadius: 'var(--r-xl)',
         background: 'linear-gradient(160deg, rgba(255,255,255,0.06), rgba(255,255,255,0.014))',
-        border: '1px solid rgba(255,255,255,0.08)',
-        transform: active ? 'translateY(-6px)' : 'translateY(0)',
-        boxShadow: active ? `0 34px 70px -26px ${kind.glow}, inset 0 1px 0 0 rgba(255,255,255,0.1)` : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 8px 30px -18px rgba(0,0,0,0.6)',
-        transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s',
-        display: 'flex', flexDirection: 'column', gap: 15, isolation: 'isolate', minHeight: 328,
+        border: `1px solid ${active ? 'var(--border-accent-strong)' : 'var(--border-md)'}`,
+        transform: active ? 'translateY(-2px)' : 'translateY(0)',
+        boxShadow: active ? `var(--elev-2), 0 34px 70px -30px ${kind.glow}` : 'var(--elev-1)',
+        transition: 'transform var(--t-smooth), box-shadow var(--t-smooth), border-color var(--t-base)',
+        display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)', isolation: 'isolate', minHeight: 328,
         opacity: disabled ? 0.7 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
       }}
     >
@@ -143,15 +143,15 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
 
       <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: kind.grad, boxShadow: `0 10px 24px -8px ${kind.glow}, inset 0 1px 0 0 rgba(255,255,255,0.35)`, transform: active ? 'scale(1.06) rotate(-3deg)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)' }}><kind.Icon size={22} /></div>
+          <div className="sf-page-icon" style={{ ['--icon-grad' as any]: kind.grad, width: 46, height: 46, borderRadius: 'var(--r-md)', boxShadow: `0 10px 24px -8px ${kind.glow}, inset 0 1px 0 0 rgba(255,255,255,0.35)`, transform: active ? 'scale(1.06) rotate(-3deg)' : 'scale(1)', transition: 'transform var(--t-smooth)' }}><kind.Icon size={22} /></div>
           <div>
-            <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{kind.title}</h3>
-            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: badge ? '#fbbf24' : kind.accent }}>{badge ?? tr(kind.tag, kind.tagEn)}</span>
+            <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>{kind.title}</h3>
+            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: badge ? 'var(--warn)' : kind.accent }}>{badge ?? tr(kind.tag, kind.tagEn)}</span>
           </div>
         </div>
       </div>
 
-      <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(233,234,240,0.6)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 39 }}>{tr(kind.desc, kind.descEn)}</p>
+      <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 39 }}>{tr(kind.desc, kind.descEn)}</p>
 
       <div style={{ position: 'relative', zIndex: 2 }}><Preview kind={kind.preview} accent={kind.accent} /></div>
 
@@ -159,12 +159,12 @@ function KindCard({ kind, onOpen, disabled, badge }: { kind: Kind; onOpen: () =>
       <div style={{
         position: 'relative', zIndex: 2, marginTop: 'auto',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        height: 40, borderRadius: 11, fontSize: 13, fontWeight: 800, letterSpacing: '0.01em',
-        color: disabled ? 'rgba(233,234,240,0.5)' : '#fff',
-        background: disabled ? 'rgba(255,255,255,0.05)' : kind.grad,
-        border: disabled ? '1px solid rgba(255,255,255,0.08)' : 'none',
+        height: 40, borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 800, letterSpacing: '0.01em',
+        color: disabled ? 'var(--text-3)' : '#fff',
+        background: disabled ? 'var(--surface-2)' : kind.grad,
+        border: disabled ? '1px solid var(--border-md)' : 'none',
         boxShadow: disabled ? 'none' : (active ? `0 12px 26px -10px ${kind.glow}, inset 0 1px 0 0 rgba(255,255,255,0.3)` : 'inset 0 1px 0 0 rgba(255,255,255,0.2)'),
-        transition: 'box-shadow 0.3s',
+        transition: 'box-shadow var(--t-smooth)',
       }}>
         {disabled ? (
           <>
@@ -187,7 +187,7 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const isSuperAdmin = useContext(LicenseContext)?.isSuperAdmin === true
   const visibleKinds = KINDS.filter(k => !k.admin || isSuperAdmin)
   return (
-    <div style={{ minHeight: '100%', background: 'var(--base)', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
+    <div className="anim-page" style={{ minHeight: '100%', background: 'var(--base)', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
       <style>{CSS}</style>
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{ position: 'absolute', top: -140, left: '8%', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.16), transparent 70%)', filter: 'blur(46px)', animation: 'ph-float-a 18s ease-in-out infinite' }} />
@@ -196,29 +196,29 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 980, margin: '0 auto' }}>
         <div style={{ marginBottom: 36 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 16, fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
+          <div className="sf-eyebrow sf-anim-slide-up" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 'var(--sp-4)', letterSpacing: '0.24em' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
             {tr('Publication', 'Publishing')}
           </div>
-          <h1 style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#6ee7b7 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
+          <h1 className="sf-anim-slide-up sf-d50" style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#6ee7b7 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
             {tr('Publie partout, en un clic', 'Publish everywhere, in one click')}
           </h1>
-          <p style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.6)', maxWidth: 600, lineHeight: 1.65 }}>
+          <p className="sf-anim-slide-up sf-d100" style={{ margin: 0, fontSize: 15, color: 'var(--text-2)', maxWidth: 600, lineHeight: 1.65 }}>
             {tr('Choisis un format ci-dessous, sélectionne tes comptes et ton contenu, puis publie sur des dizaines de comptes Instagram & TikTok en parallèle.', 'Pick a format below, select your accounts and content, then publish to dozens of Instagram & TikTok accounts in parallel.')}
           </p>
           {/* Comment ça marche — 3 étapes */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
+          <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 'var(--sp-6)', flexWrap: 'wrap' }}>
             {[
               { n: '1', t: tr('Choisis un format', 'Pick a format'), s: tr('Reels, Story ou Photo', 'Reels, Story or Photo'), c: '#818CF8' },
               { n: '2', t: tr('Comptes & contenu', 'Accounts & content'), s: tr('Sélectionne tes téléphones', 'Select your phones'), c: '#FBBF24' },
               { n: '3', t: tr('Publie en 1 clic', 'Publish in 1 click'), s: tr('Tout part en parallèle', 'Everything goes in parallel'), c: '#34D399' },
             ].map((step, i, arr) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px 8px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#0A0B0E', background: step.c }}>{step.n}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px 8px 8px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border-md)' }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 'var(--r-sm)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#0A0B0E', background: step.c }}>{step.n}</span>
                   <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff' }}>{step.t}</span>
-                    <span style={{ fontSize: 10.5, color: 'rgba(233,234,240,0.42)' }}>{step.s}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text-1)' }}>{step.t}</span>
+                    <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{step.s}</span>
                   </div>
                 </div>
                 {i < arr.length - 1 && (
@@ -236,7 +236,7 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </div>
 
         {/* Grille uniforme */}
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(visibleKinds.length, 3)}, 1fr)`, gap: 18 }}>
+        <div className="sf-anim-slide-up sf-d200" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(visibleKinds.length, 3)}, 1fr)`, gap: 'var(--sp-4)' }}>
           {visibleKinds.map(kind => (
             <KindCard key={kind.id} kind={kind} disabled={kind.soon} badge={kind.soon ? tr('Bientôt', 'Soon') : kind.admin ? 'Admin' : undefined} onOpen={() => onNavigate(kind.id)} />
           ))}
