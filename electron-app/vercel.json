@@ -2,8 +2,12 @@
   "functions": {
     "api/geelark.js": { "maxDuration": 30 },
     "api/gx.js":      { "maxDuration": 30 },
-    "api/rotate.js":  { "maxDuration": 15 }
+    "api/rotate.js":  { "maxDuration": 15 },
+    "api/cron.js":    { "maxDuration": 60 }
   },
+  "crons": [
+    { "path": "/api/cron", "schedule": "* * * * *" }
+  ],
   "buildCommand": "npm run build:web",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
