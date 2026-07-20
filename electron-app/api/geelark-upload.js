@@ -7,7 +7,7 @@
 module.exports.config = { maxDuration: 60 }
 
 const { createClient } = require('@supabase/supabase-js')
-const { assertAllowedMediaUrl } = require('./_ssrf')
+const { assertAllowedMediaUrl, fetchMediaFollow } = require('./_ssrf')
 
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
@@ -88,7 +88,18 @@ module.exports = async (req, res) => {
       try { assertAllowedMediaUrl(signedUrl) }
       catch (e) { return res.status(400).json({ ok: false, error: `${SV}[SV-E002s] ${e.message}` }) }
       console.log(`${SV} [SV-A] fetch signedUrl (${String(signedUrl).slice(0, 80)})`)
-      const dlRes = await fetchRetry('SV-A:download', signedUrl, { redirect: 'manual' }, { tries: 3, timeoutMs: 30000 })
+      // SUIT les redirections (Supabase peut renvoyer une 3xx vers son CDN de
+      // stockage) tout en re-validant chaque saut (anti-SSRF). Le retry/timeout
+      // réseau reste géré par fetchRetry, réutilisé via `doFetch`.
+      let dlRes
+      try {
+        dlRes = await fetchMediaFollow(signedUrl, {
+          timeoutMs: 30000,
+          doFetch: (u, init) => fetchRetry('SV-A:download', u, init, { tries: 3, timeoutMs: 30000 }),
+        })
+      } catch (e) {
+        return res.status(200).json({ ok: false, error: `${SV}[SV-E002] Fetch vidéo échoué: ${e?.message ?? e}` })
+      }
       if (!dlRes.ok) {
         return res.status(200).json({ ok: false, error: `${SV}[SV-E002] Fetch vidéo échoué: ${dlRes.status}` })
       }

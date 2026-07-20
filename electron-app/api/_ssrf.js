@@ -61,6 +61,33 @@ function safeMediaFetchOpts(timeoutMs = 30000) {
   return { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) }
 }
 
+// Fetch d'un média en SUIVANT les redirections MAIS en validant chaque saut
+// (anti-SSRF). Nécessaire car les URLs signées Supabase peuvent renvoyer une 3xx
+// vers un CDN de stockage : avec redirect:'manual' brut, le téléchargement échoue
+// (« Fetch vidéo échoué: 302 »). Ici on suit la redirection uniquement si la
+// nouvelle URL passe assertAllowedMediaUrl (hôte Supabase/allowlist, pas d'IP
+// interne). `doFetch` est optionnel : permet de réutiliser un wrapper retry/timeout
+// de l'appelant ; signature (url, init) => Promise<Response>. Défaut = fetch global.
+async function fetchMediaFollow(rawUrl, { maxHops = 5, timeoutMs = 30000, doFetch } = {}) {
+  const fetcher = doFetch || ((u, init) => fetch(u, init))
+  let url = assertAllowedMediaUrl(rawUrl)
+  for (let hop = 0; hop <= maxHops; hop++) {
+    const resp = await fetcher(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) })
+    const status = resp.status
+    if (status >= 300 && status < 400) {
+      const loc = resp.headers.get('location')
+      if (!loc) return resp // 3xx sans Location : laisse l'appelant gérer (!ok)
+      // Résout les Location relatifs sur l'URL courante, puis re-valide l'hôte.
+      let next
+      try { next = new URL(loc, url).toString() } catch { throw new Error('redirection média invalide') }
+      url = assertAllowedMediaUrl(next) // jette si hôte interne / non autorisé
+      continue
+    }
+    return resp
+  }
+  throw new Error('trop de redirections média')
+}
+
 // Un storagePath fourni par le client doit rester dans l'arborescence de l'app
 // (videos/users/<id>/… ou videos/orgs/<id>/…) et sans traversée : sinon la clé
 // service-role permettrait de lire/supprimer le fichier d'un autre tenant.
@@ -70,4 +97,4 @@ function isOwnStoragePath(p) {
   return /^videos\/(users|orgs)\/[^/]+\//.test(s) && !s.includes('..')
 }
 
-module.exports = { assertAllowedMediaUrl, hostIsPrivate, safeMediaFetchOpts, isOwnStoragePath }
+module.exports = { assertAllowedMediaUrl, hostIsPrivate, safeMediaFetchOpts, fetchMediaFollow, isOwnStoragePath }
