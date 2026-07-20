@@ -1216,11 +1216,14 @@ Deno.serve(async (req) => {
   // restent gérées côté client). filterUserId limite au client authentifié.
   // ───────────────────────────────────────────────────────────────────────────
   try {
+    // ⚠️ On traite TOUTES les stories « plates » programmées (avec OU sans task_id).
+    // Avant, le filtre `.not('task_id', is null)` excluait les stories programmées à
+    // l'UNITÉ (via l'onglet Story) → PC éteint, elles ne partaient JAMAIS côté serveur.
+    // Le claim atomique + le skip client des stories rotatif évitent le double-post.
     let storyQuery = db.from('scheduled_posts')
       .select('*')
       .eq('status', 'pending')
       .eq('type', 'story')
-      .not('task_id', 'is', null)
       .lte('scheduled_at', nowIso)
       .order('scheduled_at', { ascending: true })
       .limit(3)
@@ -1267,7 +1270,12 @@ Deno.serve(async (req) => {
         const storyTexts: string[] = Array.isArray(existingResult?.story_texts) ? existingResult!.story_texts : []
         const mode: string = post.mode ?? 'seq'
 
-        if (!images.length) throw new Error('Aucune image dans la story')
+        // Deux formats de story supportés :
+        //  - TÂCHE récurrente : `post.videos` = pool d'images partagé + `phones[].link`.
+        //  - StoryLink (à l'unité) : chaque `phones[]` porte story_photo/story_link/story_text
+        //    et `post.videos` est vide.
+        const hasPerPhoneImg = phones.some(p => Boolean((p as { story_photo?: string }).story_photo))
+        if (!images.length && !hasPerPhoneImg) throw new Error('Aucune image dans la story')
 
         // Proxy rotatif : URLs de rotation (org/user) → nouvelle IP avant chaque
         // boot de téléphone, comme le fait l'app côté client.
@@ -1275,15 +1283,24 @@ Deno.serve(async (req) => {
         if (rotationUrls.length) log(`🔄 Proxy rotatif serveur : ${rotationUrls.length} URL(s) de rotation`)
 
         // Traite un téléphone : image → watchdog → automation story → extinction.
-        const processPhone = async (phone: PhoneRec & { link?: string }, i: number) => {
+        const processPhone = async (phone: PhoneRec & { link?: string; story_link?: string; story_photo?: string; story_text?: string }, i: number) => {
           const name = phone.ig_username ?? phone.phone_name
-          const link = (phone.link ?? '').trim()
+          // Lien : par-compte (story_link, format StoryLink) sinon `link` (format tâche).
+          const link = (phone.link ?? phone.story_link ?? '').trim()
           if (!link) { log(`❌ ${name} : aucun lien configuré`); doneSet.add(phone.geelark_id); return }
-          const imgIdx = mode === 'random' ? Math.floor(Math.random() * images.length) : i % images.length
-          const imageUrl = await resolveImageUrl(db, images[imgIdx])
-          const linkText = storyTexts.length
+          // Image : par-compte (story_photo) sinon pool partagé (post.videos).
+          let imageUrl: string
+          if (phone.story_photo) {
+            imageUrl = await resolveImageUrl(db, { token: phone.story_photo, title: phone.story_photo } as VideoRec)
+          } else {
+            if (!images.length) { log(`❌ ${name} : aucune image`); doneSet.add(phone.geelark_id); return }
+            const imgIdx = mode === 'random' ? Math.floor(Math.random() * images.length) : i % images.length
+            imageUrl = await resolveImageUrl(db, images[imgIdx])
+          }
+          // Texte sticker : par-compte (story_text) sinon pool distribué.
+          const linkText = phone.story_text ?? (storyTexts.length
             ? (mode === 'random' ? storyTexts[Math.floor(Math.random() * storyTexts.length)] : storyTexts[i % storyTexts.length])
-            : undefined
+            : undefined)
           log(`▶ [serveur] Story ${name}…`)
           await db.from('phone_power_watch').upsert(
             [{ geelark_id: phone.geelark_id, org_id: post.org_id, user_id: post.user_id, reason: 'server_story', stop_at: new Date(Date.now() + 5 * 60_000).toISOString() }],
