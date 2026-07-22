@@ -229,6 +229,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const [phoneCount, setPhoneCount]   = useState(0)
   const [videoCount, setVideoCount]   = useState(0)
   const [weekPosts,  setWeekPosts]    = useState(0)
+  const [runningCount, setRunningCount] = useState(0)   // posts programmés en cours
+  const [failedCount,  setFailedCount]  = useState(0)   // échecs des dernières 24 h (à traiter)
   const [upcoming,   setUpcoming]     = useState<ScheduledPost[]>([])
   const [recent,     setRecent]       = useState<Array<{ kind: 'scheduled'; data: ScheduledPost } | { kind: 'run'; data: { id: string; type: string; ok_count: number; err_count: number; total: number; created_at: string } }>>([])
 
@@ -236,6 +238,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const load = useCallback(async () => {
     setLoading(true)
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const dayAgo  = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     // 🔒 KPI téléphones : si le membre est restreint à certains groupes, on ne
     // compte QUE ceux-là (sinon le compteur laisse deviner l'existence des autres).
     const restrictedGroups = (role && role !== 'owner' && role !== 'admin' && perms?.phone_groups?.mode === 'allow')
@@ -250,7 +253,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
       : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
     const spQ  = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const prQ  = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes, directRunsRes] = await Promise.all([
+    const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes, directRunsRes, runningRes, failed24Res] = await Promise.all([
       phonesQ,
       bankQ,
       spQ(supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }))
@@ -271,12 +274,21 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
       prQ(supabase.from('post_runs').select('*'))
         .order('created_at', { ascending: false })
         .limit(8),
+      // Santé : posts programmés en cours d'exécution (running)
+      spQ(supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }))
+        .in('status', ['running']),
+      // Santé : échecs des dernières 24 h (à traiter)
+      spQ(supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }))
+        .eq('status', 'failed')
+        .gte('created_at', dayAgo),
     ])
     setPhoneCount(phonesRes.count ?? 0)
     setVideoCount(videosRes.count ?? 0)
     const runPosts = ((runsRes.data ?? []) as Array<{ ok_count: number | null }>)
       .reduce((sum, r) => sum + (r.ok_count ?? 0), 0)
     setWeekPosts((weekRes.count ?? 0) + runPosts)
+    setRunningCount(runningRes.count ?? 0)
+    setFailedCount(failed24Res.count ?? 0)
     setUpcoming((upcomingRes.data ?? []) as ScheduledPost[])
 
     // Merge scheduled posts + direct runs, sort by date, keep 5 most recent
@@ -397,6 +409,35 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             </button>
           </div>
         </div>
+
+        {/* ── Centre de santé : compteurs "en cours" + "à traiter" ───────── */}
+        {!loading && (runningCount > 0 || failedCount > 0) && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.02s both' }}>
+            {runningCount > 0 && (
+              <button
+                onClick={() => { playNav(); onNavigate('history') }}
+                className="sf-card"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderRadius: 12, cursor: 'pointer', border: '1px solid rgba(52,211,153,0.28)', background: 'rgba(52,211,153,0.06)' }}
+              >
+                <span className="sf-status-dot" style={{ background: '#34D399' }} />
+                <span style={{ fontSize: 15, fontWeight: 900, color: '#34D399', fontVariantNumeric: 'tabular-nums' }}>{runningCount}</span>
+                <span style={{ fontSize: 12.5, color: IVORY, fontFamily: SANS }}>{tr('en cours', 'running')}</span>
+              </button>
+            )}
+            {failedCount > 0 && (
+              <button
+                onClick={() => { playNav(); onNavigate('history') }}
+                className="sf-card"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderRadius: 12, cursor: 'pointer', border: '1px solid rgba(248,113,113,0.32)', background: 'rgba(248,113,113,0.07)' }}
+              >
+                <SvgIcon d={ICONS.x} size={15} color="#F87171" strokeWidth={2.6} />
+                <span style={{ fontSize: 15, fontWeight: 900, color: '#F87171', fontVariantNumeric: 'tabular-nums' }}>{failedCount}</span>
+                <span style={{ fontSize: 12.5, color: IVORY, fontFamily: SANS }}>{tr('échec(s) à traiter · 24 h', 'failure(s) to handle · 24h')}</span>
+                <span style={{ fontSize: 11.5, color: '#F87171', fontWeight: 700, marginLeft: 2 }}>{tr('Voir →', 'View →')}</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── KPI row — reliée par un flux lumineux ───────────────────────── */}
         <div style={{ display: 'flex', gap: 0, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
