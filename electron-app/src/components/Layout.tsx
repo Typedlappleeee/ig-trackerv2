@@ -73,6 +73,7 @@ export type Page =
   | 'tiktokposting'
   | 'crossposting'
   | 'proxyhealth'
+  | 'blowsome'
 
 interface LayoutProps {
   user:      User
@@ -107,6 +108,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
+      { id: 'blowsome',    label: 'navBlowsome',     icon: '✦', isNew: true },
     ],
   },
   {
@@ -177,6 +179,7 @@ type IconKey = keyof typeof ICONS
 // Map page id -> icon key
 const PAGE_ICON: Record<string, IconKey> = {
   phones:          'phone',
+  blowsome:        'sparkles',
   proxyhealth:     'refresh',
   stats:           'monitor',
   monitor:         'monitor',
@@ -750,6 +753,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const hasContentCreation = effectiveSuperAdmin || planNow === 'pro' || planNow === 'organisation'
 
   const isVisibleTab = (id: Page): boolean => {
+    // Onglet Blowsome (agence VIP) : visible UNIQUEMENT si la clé porte l'add-on
+    // blowsome (ou superadmin, qui l'a d'office).
+    if (id === 'blowsome') return license?.blowsome === true || effectiveSuperAdmin
     // Pages internes / superadmin ScaleFlow uniquement (Tâches inclus).
     if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).

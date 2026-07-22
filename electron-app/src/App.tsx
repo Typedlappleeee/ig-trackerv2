@@ -602,6 +602,7 @@ const Licences       = lazyWithReload(() => import('@/pages/Licences').then(m =>
 const Support        = lazyWithReload(() => import('@/pages/Support').then(m => ({ default: m.Support })))
 const History        = lazyWithReload(() => import('@/pages/History').then(m => ({ default: m.History })))
 const Reports        = lazyWithReload(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
+const Blowsome       = lazyWithReload(() => import('@/pages/Blowsome').then(m => ({ default: m.Blowsome })))
 const Library        = lazyWithReload(() => import('@/pages/Library').then(m => ({ default: m.Library })))
 const Organization   = lazyWithReload(() => import('@/pages/Organization').then(m => ({ default: m.Organization })))
 const Community      = lazyWithReload(() => import('@/pages/Community').then(m => ({ default: m.Community })))
@@ -694,7 +695,7 @@ function AppContent({ user }: { user: User }) {
     let cancelled = false
     // 8s timeout — if checkLicense hangs, fail open so the user isn't locked out
     const fallback = setTimeout(() => {
-      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }); setCreditLoading(false) }
     }, 8000)
     Promise.resolve(checkLicense(user.id, currentOrg?.id ?? null)).then(async l => {
       clearTimeout(fallback)
@@ -714,7 +715,7 @@ function AppContent({ user }: { user: User }) {
       if (!cancelled) { setCreditBalance(bal); setCreditLoading(false) }
     }).catch(() => {
       clearTimeout(fallback)
-      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }); setCreditLoading(false) }
     })
     return () => { cancelled = true; clearTimeout(fallback) }
   }, [user.id, currentOrg?.id, currentOrg?.owner_id])
@@ -940,6 +941,7 @@ function AppContent({ user }: { user: User }) {
       case 'licences':     return <Licences    user={user} />
       case 'history':      return <History     user={user} onNavigate={handleNavigate} />
       case 'reports':      return <Reports     user={user} />
+      case 'blowsome':     return <Blowsome    />
       case 'library':      return <Library     user={user} />
       case 'organization': return <Organization user={user} />
 

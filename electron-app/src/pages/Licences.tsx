@@ -17,6 +17,7 @@ interface LicenseKey {
   expires_at: string | null
   is_active: boolean
   plan: string
+  blowsome?: boolean
   notes: string | null
   user_email?: string
 }
@@ -88,6 +89,7 @@ export function Licences({ user: _user }: Props) {
   const [genKey, setGenKey]   = useState(generateKey)
   const [duration, setDuration] = useState<number | null>(30)
   const [plan, setPlan]       = useState('standard')
+  const [blowsome, setBlowsome] = useState(false)   // add-on VIP Blowsome
   const [notes, setNotes]     = useState('')
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState<Filter>('all')
@@ -180,12 +182,19 @@ export function Licences({ user: _user }: Props) {
     const expiresAt = duration !== null
       ? new Date(Date.now() + duration * 86_400_000).toISOString()
       : null
-    const baseRow = { key: genKey, expires_at: expiresAt, plan, notes: notes || null }
-    // duration_days permet le cumul des durées à l'activation. Si la migration
-    // n'a pas encore été lancée (colonne absente), on réessaie sans → pas de blocage.
-    let { error } = await supabase.from('license_keys').insert({ ...baseRow, duration_days: duration })
-    if (error && /duration_days/.test(error.message)) {
-      ({ error } = await supabase.from('license_keys').insert(baseRow))
+    // On tente avec toutes les colonnes optionnelles (duration_days pour le cumul
+    // de durée, blowsome pour l'add-on VIP). Si une migration n'est pas encore
+    // passée (colonne absente), on retire la colonne fautive et on réessaie → pas
+    // de blocage de la création de clé.
+    const row: Record<string, unknown> = { key: genKey, expires_at: expiresAt, plan, notes: notes || null, duration_days: duration, blowsome }
+    let error: { message: string } | null = null
+    for (let i = 0; i < 3; i++) {
+      const res = await supabase.from('license_keys').insert(row)
+      error = res.error
+      if (!error) break
+      const m = error.message.match(/(duration_days|blowsome)/)
+      if (m && m[1] in row) { delete row[m[1]]; continue }
+      break
     }
     setCreating(false)
     if (error) {
@@ -391,6 +400,23 @@ export function Licences({ user: _user }: Props) {
               </div>
             </div>
             <div className="space-y-2">
+              <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{tr('Add-on', 'Add-on')}</label>
+              <button
+                type="button"
+                onClick={() => setBlowsome(v => !v)}
+                className="w-full flex items-center justify-between cursor-pointer"
+                style={{ padding: '10px 13px', borderRadius: 11, background: blowsome ? 'rgba(236,72,153,0.12)' : 'var(--surface-2)', border: `1px solid ${blowsome ? 'rgba(236,72,153,0.4)' : 'var(--border)'}` }}
+              >
+                <span style={{ textAlign: 'left' }}>
+                  <span style={{ display: 'block', fontSize: 12.5, fontWeight: 800, background: 'linear-gradient(90deg,#EC4899,#8B5CF6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>✦ Blowsome</span>
+                  <span style={{ display: 'block', fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{tr('Débloque l\'onglet Blowsome (agence VIP)', 'Unlocks the Blowsome tab (VIP agency)')}</span>
+                </span>
+                <span className={`sf-toggle-track ${blowsome ? 'on' : 'off'}`} style={{ flexShrink: 0 }}>
+                  <span className="sf-toggle-thumb" />
+                </span>
+              </button>
+            </div>
+            <div className="space-y-2">
               <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{t('keyNotes')}</label>
               <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder={tr('ex: Discord @pseudo', 'e.g. Discord @handle')} />
             </div>
@@ -472,6 +498,9 @@ export function Licences({ user: _user }: Props) {
 
                   {/* Plan badge */}
                   <span className="sf-badge sf-badge-accent capitalize">{k.plan}</span>
+                  {k.blowsome && (
+                    <span className="sf-badge" style={{ background: 'linear-gradient(90deg,rgba(236,72,153,0.18),rgba(139,92,246,0.18))', border: '1px solid rgba(236,72,153,0.4)', color: '#F472B6', fontWeight: 700 }}>✦ Blowsome</span>
+                  )}
 
                   {/* Status */}
                   {!k.is_active ? (

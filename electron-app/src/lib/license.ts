@@ -16,9 +16,11 @@ export interface LicenseStatus {
   // Org owner's plan — used for phone limits so a Pro member doesn't bypass a Standard org's limit.
   // null when not in org mode or when the user IS the org owner.
   orgOwnerPlan: Plan | null
+  // Add-on VIP "Blowsome" : true si la clé active du user porte le flag → débloque l'onglet Blowsome.
+  blowsome: boolean
 }
 
-const FAIL_OPEN: LicenseStatus = { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+const FAIL_OPEN: LicenseStatus = { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }
 
 const HARDCODED_SUPER_ADMINS = ['tintin.aunea@gmail.com']
 
@@ -39,7 +41,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       HARDCODED_SUPER_ADMINS.includes((await supabase.auth.getUser()).data.user?.email ?? '')
 
     if (isSuperAdmin) {
-      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null }
+      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null, blowsome: true }
     }
 
     // Helper: resolve org owner plan (null if not in org mode or user is the owner).
@@ -93,12 +95,22 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       }
     }
 
-    // Check own active keys — pick the highest-plan valid key if multiple exist
-    const { data: ownKeys, error: ownErr } = await supabase
+    // Check own active keys — pick the highest-plan valid key if multiple exist.
+    // `blowsome` peut ne pas exister si la migration n'est pas passée → on retente
+    // sans la colonne pour ne rien casser (blowsome sera simplement false).
+    let ownKeysRes = await supabase
       .from('license_keys')
-      .select('expires_at, plan')
+      .select('expires_at, plan, blowsome')
       .eq('user_id', userId)
       .eq('is_active', true)
+    if (ownKeysRes.error && /blowsome/.test(ownKeysRes.error.message)) {
+      ownKeysRes = await supabase
+        .from('license_keys')
+        .select('expires_at, plan')
+        .eq('user_id', userId)
+        .eq('is_active', true) as typeof ownKeysRes
+    }
+    const { data: ownKeys, error: ownErr } = ownKeysRes
 
     if (ownErr) return FAIL_OPEN
 
@@ -116,15 +128,17 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
         const expiresAt = bestKey.expires_at ? new Date(bestKey.expires_at) : null
         const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
         const plan = (bestKey.plan as Plan) ?? 'standard'
-        return { valid: true, expired: false, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan, orgOwnerPlan }
+        // blowsome : true si AU MOINS une clé valide porte le flag.
+        const blowsome = validKeys.some(k => (k as { blowsome?: boolean }).blowsome === true)
+        return { valid: true, expired: false, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan, orgOwnerPlan, blowsome }
       }
       // All keys are expired
-      return { valid: false, expired: true, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+      return { valid: false, expired: true, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }
     }
 
     // Org owner has an active key → member gets access via org
     if (orgOwnerPlan) {
-      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan }
+      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan, blowsome: false }
     }
 
     // No active key found — check if user ever had one (active or deactivated) to distinguish
@@ -138,7 +152,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       .maybeSingle()
 
     const hadKey = !!anyKey
-    return { valid: false, expired: hadKey, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+    return { valid: false, expired: hadKey, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }
   } catch {
     return FAIL_OPEN
   }
@@ -173,7 +187,7 @@ export function effectivePlan(license: LicenseStatus): Plan | null {
 }
 
 export const LicenseContext = createContext<LicenseStatus>({
-  valid: false, expired: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null,
+  valid: false, expired: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false,
 })
 
 export function useLicense() {
