@@ -713,6 +713,7 @@ export function Scheduler({ user, onNavigate }: Props) {
     (localStorage.getItem('sf-mp-platform') as 'instagram' | 'tiktok' | null) ?? 'instagram')
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]     = useState<{ id: string; msgs: string[] } | null>(null)
+  const [warnDismissed, setWarnDismissed] = useState(false)
   const timersRef                 = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const runningRef                = useRef<Set<string>>(new Set())
 
@@ -971,9 +972,46 @@ export function Scheduler({ user, onNavigate }: Props) {
     [tr('Total', 'Total'), posts.length, '#94A3B8'],
   ]
 
+  // ── Détection de problèmes → popup d'avertissement ────────────────────────
+  // On repère les posts « à surveiller » : bloqués (running depuis > 15 min,
+  // repris automatiquement), en retard (pending dont l'heure est passée de
+  // > 5 min → en attente du serveur), et les échecs récents.
+  const nowMs = Date.now()
+  const stuck   = posts.filter(p => p.status === 'running' && p.executed_at && nowMs - new Date(p.executed_at).getTime() > 15 * 60 * 1000 && !isManualRun(p))
+  const late    = posts.filter(p => p.status === 'pending' && new Date(p.scheduled_at).getTime() < nowMs - 5 * 60 * 1000 && !isManualRun(p))
+  const problemCount = stuck.length + late.length
+  const showWarn = !loading && problemCount > 0 && !warnDismissed
+
   return (
     <div className="sf-page anim-page" style={{ position: 'relative' }}>
-      <style>{`@keyframes sch-shimmer{0%{background-position:-160% 0}100%{background-position:260% 0}}@keyframes sch-float{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,22px)}}@keyframes sch-flow{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:calc(100% - 16px);opacity:0}}`}</style>
+      <style>{`@keyframes sch-shimmer{0%{background-position:-160% 0}100%{background-position:260% 0}}@keyframes sch-float{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,22px)}}@keyframes sch-flow{0%{left:0;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:calc(100% - 16px);opacity:0}}@keyframes sch-warn-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}`}</style>
+
+      {/* ── Popup d'avertissement : problèmes détectés (résolution auto) ──────── */}
+      {showWarn && (
+        <div style={{ position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 40, width: 'min(560px, calc(100% - 40px))', animation: 'sch-warn-in 0.3s cubic-bezier(0.16,1,0.3,1) both' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 15px', borderRadius: 13, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)', boxShadow: '0 20px 44px -20px rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}>
+            <span style={{ fontSize: 17, lineHeight: 1.2, flexShrink: 0 }}>⚠️</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#FBBF24' }}>
+                {tr(`${problemCount} programmation${problemCount > 1 ? 's' : ''} à surveiller`, `${problemCount} scheduled post${problemCount > 1 ? 's' : ''} to watch`)}
+              </p>
+              <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.45 }}>
+                {stuck.length > 0 && tr(`${stuck.length} bloqué${stuck.length > 1 ? 's' : ''} (reprise automatique en cours). `, `${stuck.length} stuck (auto-recovery in progress). `)}
+                {late.length > 0 && tr(`${late.length} en retard (en attente du serveur). `, `${late.length} late (waiting for the server). `)}
+                {tr('Le système tente de les résoudre tout seul.', 'The system is trying to resolve them on its own.')}
+              </p>
+            </div>
+            <button
+              onClick={() => setWarnDismissed(true)}
+              className="sf-btn sf-btn-ghost sf-btn-icon cursor-pointer"
+              style={{ width: 24, height: 24, minWidth: 0, flexShrink: 0 }}
+              aria-label={tr('Fermer', 'Close')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+      )}
       {/* Ambient glow */}
       <div aria-hidden style={{ position: 'absolute', top: -110, left: '14%', width: 520, height: 340, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(99,102,241,0.12), transparent 68%)', filter: 'blur(60px)', pointerEvents: 'none', animation: 'sch-float 22s ease-in-out infinite', zIndex: 0 }} />
 
