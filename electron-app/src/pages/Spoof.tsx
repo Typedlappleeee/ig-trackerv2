@@ -117,8 +117,9 @@ export function Spoof({ user }: { user: User }) {
   const [saveFolder, setSaveFolder]       = useState<string | null>(null)
   const [savingAll, setSavingAll]         = useState(false)
   const [selectedVideos, setSelectedVideos] = useState<SelectedVideo[]>([])
-  const [preset, setPreset]               = useState('iphone17pro')
+  const [preset, setPreset]               = useState('random')
   const [gpsCity, setGpsCity]             = useState('random')
+  const [showCustomize, setShowCustomize] = useState(false)
   const [customDate, setCustomDate]       = useState(todayStr)
   const [showAdjustments, setShowAdjustments] = useState(false)
   const [brightness, setBrightness]       = useState(0)
@@ -131,7 +132,7 @@ export function Spoof({ user }: { user: User }) {
   const [copies, setCopies]               = useState(1)
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
-  const [autoMode, setAutoMode]           = useState(false)
+  const [autoMode, setAutoMode]           = useState(true)
   const [randomDate, setRandomDate]       = useState(false)
   const [randomDateDays, setRandomDateDays] = useState(30) // fenêtre (jours) pour la date aléatoire
   const [showDebug, setShowDebug]         = useState(false)
@@ -471,9 +472,56 @@ export function Spoof({ user }: { user: User }) {
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
 
-            {/* iPhone model */}
+            {/* Mode automatique — contrôle principal, tout le reste est optionnel */}
             <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Modèle iPhone', 'iPhone model')}</div>
+              <button onClick={() => setAutoMode(v => !v)} disabled={running} className="cursor-pointer"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: 11, background: autoMode ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)', border: `1px solid ${autoMode ? 'rgba(99,102,241,0.35)' : 'var(--border)'}` }}>
+                <div style={{ textAlign: 'left' }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{tr('⚡ Automatique', '⚡ Automatic')}</p>
+                  <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>{tr('Recommandé · chaque vidéo unique, réglé pour toi', 'Recommended · every video unique, tuned for you')}</p>
+                </div>
+                <span className={`sf-toggle-track ${autoMode ? 'on' : 'off'}`} style={{ flexShrink: 0 }}>
+                  <span className="sf-toggle-thumb" />
+                </span>
+              </button>
+            </div>
+
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
+
+            {/* Personnaliser (device, lieu, date) — replié par défaut pour rester épuré */}
+            <div style={{ padding: '0 16px' }}>
+              <button
+                onClick={() => setShowCustomize(v => !v)}
+                className="cursor-pointer"
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                  borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', textAlign: 'left',
+                  background: showCustomize ? 'rgba(99,102,241,0.1)' : 'var(--surface-2)',
+                  color: showCustomize ? '#6366F1' : 'var(--text-2)',
+                  outline: showCustomize ? '1px solid rgba(99,102,241,0.25)' : '1px solid var(--border)',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                {tr('Personnaliser (appareil, lieu, date)', 'Customize (device, location, date)')}
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                  style={{ marginLeft: 'auto', transform: showCustomize ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              {!showCustomize && (
+                <p style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 2px 0' }}>
+                  {tr('Par défaut : appareil + lieu aléatoires. Ouvre pour fixer un modèle précis.', 'Default: random device + location. Open to pin a specific one.')}
+                </p>
+              )}
+            </div>
+
+            {showCustomize && (<>
+
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
+
+            {/* Device model */}
+            <div style={{ padding: '0 16px' }}>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Appareil', 'Device')}</div>
               <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setPreset('random')}
@@ -566,6 +614,8 @@ export function Spoof({ user }: { user: User }) {
               )}
             </div>
 
+            </>)}
+
             <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* Copies per video */}
@@ -620,7 +670,7 @@ export function Spoof({ user }: { user: User }) {
                 }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-                {tr('Ajustements visuels', 'Visual adjustments')}
+                {tr('Réglages manuels (avancé)', 'Manual settings (advanced)')}
                 <svg
                   width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
                   style={{ marginLeft: 'auto', transform: showAdjustments ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
@@ -631,20 +681,9 @@ export function Spoof({ user }: { user: User }) {
 
               {showAdjustments && (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {/* Mode automatique : réglages aléatoires par vidéo */}
-                  <button onClick={() => setAutoMode(v => !v)} disabled={running} className="cursor-pointer"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 11px', borderRadius: 9, background: autoMode ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)', border: `1px solid ${autoMode ? 'rgba(99,102,241,0.35)' : 'var(--border)'}` }}>
-                    <div style={{ textAlign: 'left' }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{tr('⚡ Automatique', '⚡ Automatic')}</p>
-                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>{tr('Réglages aléatoires différents pour chaque vidéo', 'Different random settings for each video')}</p>
-                    </div>
-                    <span className={`sf-toggle-track ${autoMode ? 'on' : 'off'}`} style={{ flexShrink: 0 }}>
-                      <span className="sf-toggle-thumb" />
-                    </span>
-                  </button>
                   {autoMode && (
                     <div className="sf-banner is-accent" style={{ fontSize: 11, lineHeight: 1.5 }}>
-                      {tr("Chaque vidéo reçoit ses propres micro-variations (luminosité, gamma, teinte, saturation, contraste, grain/pixels, netteté, zoom, recadrage, micro-vitesse, vignette). Pas de miroir → le texte à l'écran reste intact. Les réglages manuels ci-dessous sont ignorés.", 'Each video gets its own micro-variations (brightness, gamma, hue, saturation, contrast, grain/pixels, sharpness, zoom, crop, micro-speed, vignette). No mirror → on-screen text stays intact. The manual settings below are ignored.')}
+                      {tr("Mode Automatique actif → ces réglages manuels sont ignorés. Désactive l'Automatique en haut pour les utiliser.", 'Automatic mode is on → these manual settings are ignored. Turn off Automatic at the top to use them.')}
                     </div>
                   )}
 
