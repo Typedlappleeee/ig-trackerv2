@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useState, useEffect, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
@@ -13,6 +13,10 @@ const PRESETS: Record<string, string> = {
   iphone16:    'iPhone 16',
   iphone15pro: 'iPhone 15 Pro',
   iphone15:    'iPhone 15',
+  s24ultra:    'Galaxy S24 Ultra',
+  s23ultra:    'Galaxy S23 Ultra',
+  pixel8pro:   'Pixel 8 Pro',
+  pixel9pro:   'Pixel 9 Pro',
 }
 
 // International locations grouped by country (label includes a flag).
@@ -128,6 +132,30 @@ export function Spoof({ user }: { user: User }) {
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
   const [autoMode, setAutoMode]           = useState(false)
+  const [concurrency, setConcurrency]     = useState(3)   // vidéos traitées en parallèle
+  const [randomDate, setRandomDate]       = useState(false)
+  const [randomDateDays, setRandomDateDays] = useState(30) // fenêtre (jours) pour la date aléatoire
+  const [showDebug, setShowDebug]         = useState(false)
+  const [debugLogs, setDebugLogs]         = useState<unknown[]>([])
+
+  // Panneau debug caché : Ctrl+Shift+D affiche les logs discrets (aucune trace UI).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault()
+        try { setDebugLogs(JSON.parse(localStorage.getItem('sf-spoof-log') || '[]')) } catch { setDebugLogs([]) }
+        setShowDebug(v => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Tire une date aléatoire dans les `days` derniers jours, au format YYYY-MM-DD.
+  const randomDateStr = (days: number) => {
+    const d = new Date(Date.now() - Math.floor(Math.random() * days) * 86400000)
+    return d.toISOString().slice(0, 10)
+  }
 
   // Réglages aléatoires (modérés) générés PAR VIDÉO en mode automatique.
   // Objectif : un max de petits détails uniques entre chaque vidéo SANS jamais
@@ -224,7 +252,9 @@ export function Spoof({ user }: { user: User }) {
       // sortie a un device et une localisation différents (empreinte plus variée).
       const resolvedPreset = preset === 'random' ? pickRandom(PRESET_KEYS) : preset
       const resolvedCity   = resolveCity(gpsCity)
-      spoofLog('job:start', { id: job.id, name: job.name, resolvedPreset, resolvedCity })
+      // Date : fixe (customDate) ou aléatoire dans les N derniers jours, PAR job.
+      const resolvedDate   = randomDate ? randomDateStr(randomDateDays) : customDate
+      spoofLog('job:start', { id: job.id, name: job.name, resolvedPreset, resolvedCity, resolvedDate })
 
       // Auto-retry : les échecs du spoof sont surtout transitoires (timeout 60s
       // Vercel + cold start, hoquet réseau) → re-tenter suffit presque toujours.
@@ -245,7 +275,7 @@ export function Spoof({ user }: { user: User }) {
               mode: 'spoof',
               preset: resolvedPreset,
               gpsCity: resolvedCity,
-              customDate: customDate.replace(/-/g, ':'),
+              customDate: resolvedDate.replace(/-/g, ':'),
               adjustments: adj,
               supabaseToken: session?.access_token,
               supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -292,7 +322,7 @@ export function Spoof({ user }: { user: User }) {
       // serverless Vercel séparée (pas de contention CPU entre elles). On lance un
       // pool borné (3) pour aller bien plus vite sans saturer. Chaque sortie reste
       // 100 % indépendante → aucun risque de "tout casser".
-      const CONCURRENCY = Math.min(3, initialJobs.length)
+      const CONCURRENCY = Math.min(Math.max(1, concurrency), initialJobs.length)
       let cursor = 0
       const worker = async () => {
         while (cursor < initialJobs.length) {
@@ -331,6 +361,46 @@ export function Spoof({ user }: { user: User }) {
           }}
           onClose={() => setShowBank(false)}
         />
+      )}
+
+      {/* ── Panneau debug caché (Ctrl+Shift+D) — diagnostic des erreurs de spoof ── */}
+      {showDebug && (
+        <div
+          onClick={() => setShowDebug(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="sf-card"
+            style={{ width: 'min(720px, 92vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: 16, gap: 10 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <strong style={{ fontSize: 13, color: 'var(--ivory)' }}>{tr('🕵️ Journal spoof (debug)', '🕵️ Spoof log (debug)')}</strong>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="sf-btn sf-btn-secondary cursor-pointer" style={{ fontSize: 11 }}
+                  onClick={() => { try { navigator.clipboard?.writeText(JSON.stringify(debugLogs, null, 2)) } catch { /* noop */ } }}
+                >{tr('Copier', 'Copy')}</button>
+                <button
+                  className="sf-btn sf-btn-secondary cursor-pointer" style={{ fontSize: 11 }}
+                  onClick={() => { localStorage.removeItem('sf-spoof-log'); setDebugLogs([]) }}
+                >{tr('Vider', 'Clear')}</button>
+                <button className="sf-btn sf-btn-ghost cursor-pointer" style={{ fontSize: 11 }} onClick={() => setShowDebug(false)}>✕</button>
+              </div>
+            </div>
+            <div style={{ overflow: 'auto', background: '#0b0b12', borderRadius: 8, padding: 10, fontFamily: 'monospace', fontSize: 11, color: '#c8c8e0', whiteSpace: 'pre-wrap', flex: 1 }}>
+              {debugLogs.length === 0
+                ? tr('Aucun log pour le moment.', 'No logs yet.')
+                : (debugLogs as { t: string; evt: string; data?: unknown }[]).slice().reverse().map((l, i) => (
+                    <div key={i} style={{ marginBottom: 4 }}>
+                      <span style={{ color: '#6b7280' }}>{(l.t || '').slice(11, 19)}</span>{' '}
+                      <span style={{ color: l.evt?.includes('error') ? '#f87171' : l.evt?.includes('done') ? '#34d399' : '#818cf8' }}>{l.evt}</span>{' '}
+                      {l.data ? JSON.stringify(l.data) : ''}
+                    </div>
+                  ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Header ── */}
@@ -426,7 +496,7 @@ export function Spoof({ user }: { user: User }) {
               </div>
               {preset === 'random' && (
                 <p style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 2px 0' }}>
-                  {tr('Chaque vidéo reçoit un modèle iPhone différent au hasard.', 'Each video gets a different random iPhone model.')}
+                  {tr('Chaque vidéo reçoit un modèle différent au hasard (iPhone + Android).', 'Each video gets a different random model (iPhone + Android).')}
                 </p>
               )}
             </div>
@@ -465,15 +535,36 @@ export function Spoof({ user }: { user: User }) {
 
             {/* Custom date */}
             <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Date de création', 'Creation date')}</div>
-              <input
-                type="date"
-                value={customDate}
-                onChange={e => setCustomDate(e.target.value)}
-                disabled={running}
-                className="sf-input"
-                style={{ width: '100%', fontSize: 12 }}
-              />
+              <div className="sf-section-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>{tr('Date de création', 'Creation date')}</span>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--muted)', cursor: running ? 'default' : 'pointer', textTransform: 'none', letterSpacing: 0 }}>
+                  <input type="checkbox" checked={randomDate} disabled={running} onChange={e => setRandomDate(e.target.checked)} style={{ cursor: 'inherit' }} />
+                  {tr('🎲 Aléatoire', '🎲 Random')}
+                </label>
+              </div>
+              {randomDate ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="number" min={1} max={365} value={randomDateDays}
+                    onChange={e => setRandomDateDays(Math.max(1, Math.min(365, Number(e.target.value) || 1)))}
+                    disabled={running}
+                    className="sf-input"
+                    style={{ width: 72, fontSize: 12 }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {tr(`derniers jours (date tirée au hasard par vidéo)`, `last days (random date per video)`)}
+                  </span>
+                </div>
+              ) : (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={e => setCustomDate(e.target.value)}
+                  disabled={running}
+                  className="sf-input"
+                  style={{ width: '100%', fontSize: 12 }}
+                />
+              )}
             </div>
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
@@ -504,6 +595,31 @@ export function Spoof({ user }: { user: User }) {
                   {selectedVideos.length} {tr(`vidéo${selectedVideos.length > 1 ? 's' : ''}`, `video${selectedVideos.length > 1 ? 's' : ''}`)} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> {tr(`export${totalOutputs > 1 ? 's' : ''}`, `export${totalOutputs > 1 ? 's' : ''}`)}
                 </div>
               )}
+            </div>
+
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
+
+            {/* Vidéos simultanées (parallélisme) */}
+            <div style={{ padding: '0 16px' }}>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>
+                {tr('Vidéos simultanées', 'Parallel videos')}
+                <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>{tr('plus = plus rapide', 'higher = faster')}</span>
+              </div>
+              <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setConcurrency(n)}
+                    disabled={running}
+                    className={`sf-segment-item cursor-pointer${concurrency === n ? ' is-active' : ''}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 2px 0' }}>
+                {tr('Chaque vidéo est traitée sur un serveur séparé — aucun risque de conflit.', 'Each video runs on a separate server — no conflict risk.')}
+              </p>
             </div>
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />

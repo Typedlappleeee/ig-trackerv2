@@ -16,12 +16,21 @@ const os = require('os')
 const execFileAsync = promisify(execFile)
 
 // ── Spoofing presets / cities ──────────────────────────────────────────────────
+// `platform` détermine QUELLES métadonnées on écrit : les vidéos iPhone portent des
+// clés com.apple.quicktime.* ; les vidéos Android portent des clés com.android.* —
+// mélanger les deux (ex. tags Apple sur une vidéo "Samsung") serait un red flag.
+// Pour Android, `androidModel` = code interne réel (ex. SM-S928B) attendu dans les tags.
 const PRESETS = {
-  iphone17pro:  { make: 'Apple', model: 'iPhone 17 Pro',  software: 'iOS 26.2', encoder: 'com.apple.quicktime', lens: 'iPhone 17 Pro back triple camera 6.9mm f/1.78' },
-  iphone16pro:  { make: 'Apple', model: 'iPhone 16 Pro',  software: 'iOS 18.5', encoder: 'com.apple.quicktime', lens: 'iPhone 16 Pro back triple camera 6.765mm f/1.78' },
-  iphone16:     { make: 'Apple', model: 'iPhone 16',       software: 'iOS 18.4', encoder: 'com.apple.quicktime', lens: 'iPhone 16 back dual camera 5.96mm f/1.6' },
-  iphone15pro:  { make: 'Apple', model: 'iPhone 15 Pro',  software: 'iOS 17.5', encoder: 'com.apple.quicktime', lens: 'iPhone 15 Pro back triple camera 6.765mm f/1.78' },
-  iphone15:     { make: 'Apple', model: 'iPhone 15',       software: 'iOS 17.4', encoder: 'com.apple.quicktime', lens: 'iPhone 15 back dual camera 5.7mm f/1.6' },
+  iphone17pro:  { platform: 'apple', make: 'Apple', model: 'iPhone 17 Pro',  software: 'iOS 26.2', encoder: 'com.apple.quicktime', lens: 'iPhone 17 Pro back triple camera 6.9mm f/1.78' },
+  iphone16pro:  { platform: 'apple', make: 'Apple', model: 'iPhone 16 Pro',  software: 'iOS 18.5', encoder: 'com.apple.quicktime', lens: 'iPhone 16 Pro back triple camera 6.765mm f/1.78' },
+  iphone16:     { platform: 'apple', make: 'Apple', model: 'iPhone 16',       software: 'iOS 18.4', encoder: 'com.apple.quicktime', lens: 'iPhone 16 back dual camera 5.96mm f/1.6' },
+  iphone15pro:  { platform: 'apple', make: 'Apple', model: 'iPhone 15 Pro',  software: 'iOS 17.5', encoder: 'com.apple.quicktime', lens: 'iPhone 15 Pro back triple camera 6.765mm f/1.78' },
+  iphone15:     { platform: 'apple', make: 'Apple', model: 'iPhone 15',       software: 'iOS 17.4', encoder: 'com.apple.quicktime', lens: 'iPhone 15 back dual camera 5.7mm f/1.6' },
+  // Android — métadonnées com.android.*, pas de tags Apple.
+  s24ultra:     { platform: 'android', make: 'samsung', model: 'Galaxy S24 Ultra', androidModel: 'SM-S928B', software: 'Android 14', encoder: 'Lavf' },
+  s23ultra:     { platform: 'android', make: 'samsung', model: 'Galaxy S23 Ultra', androidModel: 'SM-S918B', software: 'Android 14', encoder: 'Lavf' },
+  pixel8pro:    { platform: 'android', make: 'Google',  model: 'Pixel 8 Pro',      androidModel: 'Pixel 8 Pro', software: 'Android 14', encoder: 'Lavf' },
+  pixel9pro:    { platform: 'android', make: 'Google',  model: 'Pixel 9 Pro',      androidModel: 'Pixel 9 Pro', software: 'Android 15', encoder: 'Lavf' },
 }
 
 // International locations across many countries. tz = UTC offset for authentic
@@ -164,8 +173,9 @@ async function handleSpoof(req, res) {
     const creationLocal = `${dateDash}T${hh}:${mm}:${ss}${tzOffset}`
     // Per-export random identifiers (every file gets unique camera/track metadata).
     const cameraId   = `${randId(8)}-${randId(4)}-${randId(4)}-${randId(4)}-${randId(12)}`
-    const focalLen   = (meta.lens.match(/([\d.]+)mm/) || [])[1] || '6.9'
-    const apertureF  = (meta.lens.match(/f\/([\d.]+)/) || [])[1] || '1.78'
+    const isAndroid  = meta.platform === 'android'
+    const focalLen   = (meta.lens?.match(/([\d.]+)mm/) || [])[1] || '6.9'
+    const apertureF  = (meta.lens?.match(/f\/([\d.]+)/) || [])[1] || '1.78'
     const iso        = [32, 40, 50, 64, 80, 100, 125, 160, 200, 250][Math.floor(Math.random() * 10)]
     const exposureMs = ['1/30', '1/40', '1/60', '1/80', '1/120', '1/250', '1/500'][Math.floor(Math.random() * 7)]
 
@@ -186,32 +196,50 @@ async function handleSpoof(req, res) {
 
     const ffArgs = ['-nostdin', '-threads', '0', '-i', inputPath]
 
-    // Container-level (moov-level) metadata
-    ffArgs.push(
-      '-metadata', `make=${meta.make}`,
-      '-metadata', `model=${meta.model}`,
-      '-metadata', `software=${meta.software}`,
-      '-metadata', `encoder=${meta.encoder}`,
-      '-metadata', `location=${locationAltStr}`,
-      '-metadata', `location-eng=${locationAltStr}`,
-      '-metadata', `com.apple.quicktime.location.ISO6709=${locationAltStr}`,
-      '-metadata', `com.apple.quicktime.location.accuracy.horizontal=${(Math.random() * 8 + 2).toFixed(6)}`,
-      '-metadata', `com.apple.quicktime.make=${meta.make}`,
-      '-metadata', `com.apple.quicktime.model=${meta.model}`,
-      '-metadata', `com.apple.quicktime.software=${meta.software}`,
-      '-metadata', `com.apple.quicktime.creationdate=${creationLocal}`,
-      '-metadata', `com.apple.quicktime.camera.identifier=${cameraId}`,
-      '-metadata', `com.apple.quicktime.camera.lens_model=${meta.lens}`,
-      '-metadata', `com.apple.quicktime.camera.focal_length.35mm_equivalent=${focalLen}`,
-      '-metadata', `com.apple.quicktime.camera.aperture=${apertureF}`,
-      '-metadata', `com.apple.quicktime.camera.exposure_time=1/${exposureMs.split('/')[1] || 60}`,
-      '-metadata', `com.apple.quicktime.camera.iso=${iso}`,
-      '-metadata', `creation_time=${creationTime}`,
-      '-metadata', `date=${dateDash}`,
-      '-metadata', `comment=${gps.city}`,
-      '-metadata', `description=Shot on ${meta.model}`,
-      '-metadata', `copyright=© ${dateDash.slice(0, 4)} ${meta.make}`,
-    )
+    // Container-level (moov-level) metadata — branché selon la plateforme.
+    if (isAndroid) {
+      // Vidéo Android : clés com.android.* (comme un vrai enregistrement Samsung/
+      // Pixel). Pas de tags Apple. Le GPS ISO6709 reste standard (les deux OS l'écrivent).
+      ffArgs.push(
+        '-metadata', `make=${meta.make}`,
+        '-metadata', `model=${meta.androidModel ?? meta.model}`,
+        '-metadata', `com.android.manufacturer=${meta.make}`,
+        '-metadata', `com.android.model=${meta.androidModel ?? meta.model}`,
+        '-metadata', `com.android.version=${(meta.software.match(/(\d+)/) || [])[1] || '14'}`,
+        '-metadata', `location=${locationAltStr}`,
+        '-metadata', `location-eng=${locationAltStr}`,
+        '-metadata', `com.apple.quicktime.location.ISO6709=${locationAltStr}`, // clé ISO6709 générique, écrite aussi par Android
+        '-metadata', `creation_time=${creationTime}`,
+        '-metadata', `date=${dateDash}`,
+        '-metadata', `comment=${gps.city}`,
+      )
+    } else {
+      ffArgs.push(
+        '-metadata', `make=${meta.make}`,
+        '-metadata', `model=${meta.model}`,
+        '-metadata', `software=${meta.software}`,
+        '-metadata', `encoder=${meta.encoder}`,
+        '-metadata', `location=${locationAltStr}`,
+        '-metadata', `location-eng=${locationAltStr}`,
+        '-metadata', `com.apple.quicktime.location.ISO6709=${locationAltStr}`,
+        '-metadata', `com.apple.quicktime.location.accuracy.horizontal=${(Math.random() * 8 + 2).toFixed(6)}`,
+        '-metadata', `com.apple.quicktime.make=${meta.make}`,
+        '-metadata', `com.apple.quicktime.model=${meta.model}`,
+        '-metadata', `com.apple.quicktime.software=${meta.software}`,
+        '-metadata', `com.apple.quicktime.creationdate=${creationLocal}`,
+        '-metadata', `com.apple.quicktime.camera.identifier=${cameraId}`,
+        '-metadata', `com.apple.quicktime.camera.lens_model=${meta.lens}`,
+        '-metadata', `com.apple.quicktime.camera.focal_length.35mm_equivalent=${focalLen}`,
+        '-metadata', `com.apple.quicktime.camera.aperture=${apertureF}`,
+        '-metadata', `com.apple.quicktime.camera.exposure_time=1/${exposureMs.split('/')[1] || 60}`,
+        '-metadata', `com.apple.quicktime.camera.iso=${iso}`,
+        '-metadata', `creation_time=${creationTime}`,
+        '-metadata', `date=${dateDash}`,
+        '-metadata', `comment=${gps.city}`,
+        '-metadata', `description=Shot on ${meta.model}`,
+        '-metadata', `copyright=© ${dateDash.slice(0, 4)} ${meta.make}`,
+      )
+    }
 
     // Build video filter chain — always re-encode for true binary uniqueness.
     // NB : aucun filtre n'altère le texte à l'écran (pas de flip/miroir par défaut,
@@ -275,12 +303,13 @@ async function handleSpoof(req, res) {
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', String(crf),
       '-g', String(gopSize), '-bf', String(bframes),
       '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-      // Stream-level metadata (video track)
-      '-metadata:s:v:0', `handler_name=${meta.make} Video Media Handler`,
+      // Stream-level metadata (video track) — noms de handler réalistes par OS :
+      // iPhone écrit "Core Media Video/Audio", Android "VideoHandle/SoundHandle".
+      '-metadata:s:v:0', `handler_name=${isAndroid ? 'VideoHandle' : 'Core Media Video'}`,
       '-metadata:s:v:0', `encoder=${meta.encoder}`,
       '-c:a', 'aac', `-b:a`, `${audioBitrate}k`, '-ar', '44100',
       // Stream-level metadata (audio track)
-      '-metadata:s:a:0', `handler_name=${meta.make} Sound Media Handler`,
+      '-metadata:s:a:0', `handler_name=${isAndroid ? 'SoundHandle' : 'Core Media Audio'}`,
     )
 
     // use_metadata_tags forces the MP4 muxer to write arbitrary keys
@@ -319,7 +348,7 @@ async function handleSpoof(req, res) {
       creationDate: creationLocal,
       timezone:     tzOffset,
       cameraId,
-      lens:         meta.lens,
+      lens:         meta.lens ?? (isAndroid ? `${meta.model} camera` : ''),
       iso,
       exposure:     exposureMs,
       aperture:     `f/${apertureF}`,
