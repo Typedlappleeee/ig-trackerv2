@@ -603,6 +603,7 @@ const Support        = lazyWithReload(() => import('@/pages/Support').then(m => 
 const History        = lazyWithReload(() => import('@/pages/History').then(m => ({ default: m.History })))
 const Reports        = lazyWithReload(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
 const Blowsome       = lazyWithReload(() => import('@/pages/Blowsome').then(m => ({ default: m.Blowsome })))
+const BlowsomeApp    = lazyWithReload(() => import('@/blowsome/BlowsomeApp').then(m => ({ default: m.BlowsomeApp })))
 const Library        = lazyWithReload(() => import('@/pages/Library').then(m => ({ default: m.Library })))
 const Organization   = lazyWithReload(() => import('@/pages/Organization').then(m => ({ default: m.Organization })))
 const Community      = lazyWithReload(() => import('@/pages/Community').then(m => ({ default: m.Community })))
@@ -637,6 +638,7 @@ function AppContent({ user }: { user: User }) {
       ensureWebhookRegistered(conns.bearer)).catch(() => {})
   }, [conns.bearer])
   const [page, setPage]                     = useState<Page>('hub')
+  const [appMode, setAppMode]               = useState<'main' | 'blowsome'>('main')  // sous-app Blowsome (VIP)
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showTour, setShowTour]             = useState(() => !!localStorage.getItem(TOUR_KEY))
@@ -856,6 +858,12 @@ function AppContent({ user }: { user: User }) {
   }
 
   function handleNavigate(p: Page, tab?: string) {
+    // Blowsome est une SOUS-APPLICATION : on n'ouvre pas une page dans le shell
+    // ScaleFlow, on bascule tout l'écran sur le shell Blowsome (réservé VIP).
+    if (p === 'blowsome') {
+      if (license?.blowsome || license?.isSuperAdmin) { setAppMode('blowsome'); return }
+      return // pas d'accès → on ignore
+    }
     setPage(p)
     setSettingsPanel(tab)
   }
@@ -905,6 +913,19 @@ function AppContent({ user }: { user: User }) {
         initialStep="create_org"
         onActivated={() => window.location.reload()}
       />
+    )
+  }
+
+  // ── Sous-application Blowsome (VIP) : prend tout l'écran, hors shell ScaleFlow ──
+  if (appMode === 'blowsome' && (license.blowsome || license.isSuperAdmin)) {
+    return (
+      <LicenseContext.Provider value={license}>
+      <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
+        <Suspense fallback={<FullPageLoader />}>
+          <BlowsomeApp user={user} onExit={() => setAppMode('main')} />
+        </Suspense>
+      </CreditContext.Provider>
+      </LicenseContext.Provider>
     )
   }
 
