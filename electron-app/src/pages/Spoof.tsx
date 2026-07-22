@@ -16,32 +16,66 @@ const PRESETS: Record<string, string> = {
 }
 
 // International locations grouped by country (label includes a flag).
-const GPS_GROUPS: { country: string; cities: Record<string, string> }[] = [
-  { country: '🇫🇷 France', cities: {
+// `id` sert de clé stable pour l'option « 🎲 Aléatoire <région> ».
+const GPS_GROUPS: { id: string; country: string; cities: Record<string, string> }[] = [
+  { id: 'france', country: '🇫🇷 France', cities: {
     paris: 'Paris', marseille: 'Marseille', lyon: 'Lyon', toulouse: 'Toulouse', nice: 'Nice', bordeaux: 'Bordeaux',
   }},
-  { country: '🇬🇧 Royaume-Uni / 🇮🇪 Irlande', cities: {
+  { id: 'uk', country: '🇬🇧 Royaume-Uni / 🇮🇪 Irlande', cities: {
     london: 'Londres', manchester: 'Manchester', dublin: 'Dublin',
   }},
-  { country: '🇪🇸 Espagne / 🇵🇹 Portugal', cities: {
+  { id: 'iberia', country: '🇪🇸 Espagne / 🇵🇹 Portugal', cities: {
     madrid: 'Madrid', barcelona: 'Barcelone', lisbon: 'Lisbonne',
   }},
-  { country: '🇮🇹 Italie', cities: {
+  { id: 'italy', country: '🇮🇹 Italie', cities: {
     rome: 'Rome', milan: 'Milan',
   }},
-  { country: '🇩🇪 Europe centrale', cities: {
+  { id: 'central-eu', country: '🇩🇪 Europe centrale', cities: {
     berlin: 'Berlin', munich: 'Munich', amsterdam: 'Amsterdam', brussels: 'Bruxelles', zurich: 'Zurich', geneva: 'Genève',
   }},
-  { country: '🌎 Amériques', cities: {
+  { id: 'americas', country: '🌎 Amériques', cities: {
     newyork: 'New York', losangeles: 'Los Angeles', miami: 'Miami', toronto: 'Toronto', montreal: 'Montréal', mexico: 'Mexico', saopaulo: 'São Paulo',
   }},
-  { country: '🌏 Asie / Moyen-Orient / Océanie', cities: {
+  { id: 'asia', country: '🌏 Asie / Moyen-Orient / Océanie', cities: {
     dubai: 'Dubaï', istanbul: 'Istanbul', tokyo: 'Tokyo', singapore: 'Singapour', sydney: 'Sydney',
   }},
 ]
 
 const GPS_CITY_KEYS = GPS_GROUPS.flatMap(g => Object.keys(g.cities))
 const FRANCE_CITY_KEYS = Object.keys(GPS_GROUPS[0].cities) // GPS_GROUPS[0] is France
+// Villes par région → clé « random_region:<id> » pour un aléatoire limité à une région.
+const REGION_CITY_KEYS: Record<string, string[]> = Object.fromEntries(
+  GPS_GROUPS.map(g => [`random_region:${g.id}`, Object.keys(g.cities)]),
+)
+const PRESET_KEYS = Object.keys(PRESETS)
+const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+
+// Résout une sélection de ville (éventuellement aléatoire) en une ville concrète.
+function resolveCity(sel: string): string {
+  if (sel === 'random') return pickRandom(GPS_CITY_KEYS)
+  if (sel === 'random_france') return pickRandom(FRANCE_CITY_KEYS)
+  if (REGION_CITY_KEYS[sel]) return pickRandom(REGION_CITY_KEYS[sel])
+  return sel
+}
+
+// Journal discret (jamais affiché dans l'UI) : anneau borné en localStorage +
+// console.debug. Sert à diagnostiquer les erreurs de spoof après coup sans rien
+// montrer à l'utilisateur. Récupérable via window.spoofLogs() dans la console.
+function spoofLog(evt: string, data?: unknown) {
+  try {
+    const KEY = 'sf-spoof-log'
+    const arr = JSON.parse(localStorage.getItem(KEY) || '[]') as unknown[]
+    arr.push({ t: new Date().toISOString(), evt, data })
+    while (arr.length > 200) arr.shift()
+    localStorage.setItem(KEY, JSON.stringify(arr))
+    console.debug('[spoof]', evt, data ?? '')
+  } catch { /* le logging ne doit jamais casser le flow */ }
+}
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { spoofLogs?: () => unknown }).spoofLogs = () => {
+    try { return JSON.parse(localStorage.getItem('sf-spoof-log') || '[]') } catch { return [] }
+  }
+}
 
 type JobStatus = 'queued' | 'processing' | 'done' | 'error'
 
@@ -178,78 +212,96 @@ export function Spoof({ user }: { user: User }) {
     setRunning(true)
 
     const { data: { session } } = await supabase.auth.getSession()
+    spoofLog('run:start', { jobs: initialJobs.length, preset, gpsCity, autoMode, copies })
+
+    // Traite UN job (1 vidéo → 1 sortie spoofée) avec auto-retry.
+    const processJob = async (job: SpoofJob) => {
+      updateJob(job.id, { status: 'processing' })
+
+      // Mode automatique : chaque vidéo/copie reçoit ses propres réglages aléatoires.
+      const adj = autoMode ? randomAdjustments() : { brightness, saturation, contrast, noise, vignette, flipH, zoomPct }
+      // Résolution PAR JOB : téléphone + ville peuvent être aléatoires → chaque
+      // sortie a un device et une localisation différents (empreinte plus variée).
+      const resolvedPreset = preset === 'random' ? pickRandom(PRESET_KEYS) : preset
+      const resolvedCity   = resolveCity(gpsCity)
+      spoofLog('job:start', { id: job.id, name: job.name, resolvedPreset, resolvedCity })
+
+      // Auto-retry : les échecs du spoof sont surtout transitoires (timeout 60s
+      // Vercel + cold start, hoquet réseau) → re-tenter suffit presque toujours.
+      // Jusqu'à 3 tentatives avec backoff. Pas de risque de double débit (le
+      // spoof est gratuit) ; une tentative qui a timeout n'a rien enregistré en
+      // banque côté client, donc on ne crée pas de doublon.
+      const MAX_TRIES = 3
+      let lastErr = tr('Erreur inconnue', 'Unknown error')
+      let succeeded = false
+      for (let attempt = 1; attempt <= MAX_TRIES && !succeeded; attempt++) {
+        try {
+          const res = await fetch('/api/repurpose', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sourceUrl: job.url,
+              userId: user.id,
+              mode: 'spoof',
+              preset: resolvedPreset,
+              gpsCity: resolvedCity,
+              customDate: customDate.replace(/-/g, ':'),
+              adjustments: adj,
+              supabaseToken: session?.access_token,
+              supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            }),
+          })
+          const data = await res.json().catch(() => ({ ok: false, error: tr(`Réponse serveur invalide (HTTP ${res.status})`, `Invalid server response (HTTP ${res.status})`) }))
+          if (data.ok) {
+            // Auto-enregistrement dans la banque dès qu'une vidéo est prête
+            // (dossier choisi, ou racine si aucun) — plus besoin de cliquer.
+            let savedOk = false
+            if (data.storagePath) {
+              const { error: bankErr } = await supabase.from('content_bank').insert({
+                user_id: user.id, org_id: currentOrg?.id ?? null,
+                title: `Spoof — ${job.name}`,
+                file_url: null, storage_path: data.storagePath, thumbnail_path: null,
+                folder: saveFolder,
+                // meta dans les tags (pas dans notes, qui sert de description/légende).
+                tags: ['spoof', ...(data.appliedMeta ? [data.appliedMeta.model, data.appliedMeta.city].filter(Boolean) : [])],
+                notes: '',
+              })
+              savedOk = !bankErr
+              if (bankErr) { console.error('[Spoof] auto-save bank failed', bankErr); spoofLog('job:bank-error', { id: job.id, error: bankErr.message }) }
+            }
+            updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta, savedToBank: savedOk })
+            succeeded = true
+            spoofLog('job:done', { id: job.id, attempt, savedOk })
+          } else {
+            lastErr = data.error ?? tr('Erreur inconnue', 'Unknown error')
+          }
+        } catch (err) {
+          lastErr = String(err)
+        }
+        if (!succeeded && attempt < MAX_TRIES) {
+          spoofLog('job:retry', { id: job.id, attempt, error: lastErr })
+          updateJob(job.id, { status: 'processing', error: tr(`nouvelle tentative ${attempt + 1}/${MAX_TRIES}…`, `retry ${attempt + 1}/${MAX_TRIES}…`) })
+          await new Promise(r => setTimeout(r, 2500 * attempt))
+        }
+      }
+      if (!succeeded) { updateJob(job.id, { status: 'error', error: lastErr }); spoofLog('job:error', { id: job.id, error: lastErr }) }
+    }
 
     try {
-      for (const job of initialJobs) {
-        updateJob(job.id, { status: 'processing' })
-
-        // Mode automatique : chaque vidéo/copie reçoit ses propres réglages aléatoires.
-        const adj = autoMode ? randomAdjustments() : { brightness, saturation, contrast, noise, vignette, flipH, zoomPct }
-
-        const resolvedCity = gpsCity === 'random'
-          ? GPS_CITY_KEYS[Math.floor(Math.random() * GPS_CITY_KEYS.length)]
-          : gpsCity === 'random_france'
-          ? FRANCE_CITY_KEYS[Math.floor(Math.random() * FRANCE_CITY_KEYS.length)]
-          : gpsCity
-
-        // Auto-retry : les échecs du spoof sont surtout transitoires (timeout 60s
-        // Vercel + cold start, hoquet réseau) → re-tenter suffit presque toujours.
-        // Jusqu'à 3 tentatives avec backoff. Pas de risque de double débit (le
-        // spoof est gratuit) ; une tentative qui a timeout n'a rien enregistré en
-        // banque côté client, donc on ne crée pas de doublon.
-        const MAX_TRIES = 3
-        let lastErr = tr('Erreur inconnue', 'Unknown error')
-        let succeeded = false
-        for (let attempt = 1; attempt <= MAX_TRIES && !succeeded; attempt++) {
-          try {
-            const res = await fetch('/api/repurpose', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sourceUrl: job.url,
-                userId: user.id,
-                mode: 'spoof',
-                preset,
-                gpsCity: resolvedCity,
-                customDate: customDate.replace(/-/g, ':'),
-                adjustments: adj,
-                supabaseToken: session?.access_token,
-                supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-              }),
-            })
-            const data = await res.json().catch(() => ({ ok: false, error: tr(`Réponse serveur invalide (HTTP ${res.status})`, `Invalid server response (HTTP ${res.status})`) }))
-            if (data.ok) {
-              // Auto-enregistrement dans la banque dès qu'une vidéo est prête
-              // (dossier choisi, ou racine si aucun) — plus besoin de cliquer.
-              let savedOk = false
-              if (data.storagePath) {
-                const { error: bankErr } = await supabase.from('content_bank').insert({
-                  user_id: user.id, org_id: currentOrg?.id ?? null,
-                  title: `Spoof — ${job.name}`,
-                  file_url: null, storage_path: data.storagePath, thumbnail_path: null,
-                  folder: saveFolder,
-                  // meta dans les tags (pas dans notes, qui sert de description/légende).
-                  tags: ['spoof', ...(data.appliedMeta ? [data.appliedMeta.model, data.appliedMeta.city].filter(Boolean) : [])],
-                  notes: '',
-                })
-                savedOk = !bankErr
-                if (bankErr) console.error('[Spoof] auto-save bank failed', bankErr)
-              }
-              updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta, savedToBank: savedOk })
-              succeeded = true
-            } else {
-              lastErr = data.error ?? tr('Erreur inconnue', 'Unknown error')
-            }
-          } catch (err) {
-            lastErr = String(err)
-          }
-          if (!succeeded && attempt < MAX_TRIES) {
-            updateJob(job.id, { status: 'processing', error: tr(`nouvelle tentative ${attempt + 1}/${MAX_TRIES}…`, `retry ${attempt + 1}/${MAX_TRIES}…`) })
-            await new Promise(r => setTimeout(r, 2500 * attempt))
-          }
+      // Parallélisme : chaque job = 1 requête vers /api/repurpose, donc 1 instance
+      // serverless Vercel séparée (pas de contention CPU entre elles). On lance un
+      // pool borné (3) pour aller bien plus vite sans saturer. Chaque sortie reste
+      // 100 % indépendante → aucun risque de "tout casser".
+      const CONCURRENCY = Math.min(3, initialJobs.length)
+      let cursor = 0
+      const worker = async () => {
+        while (cursor < initialJobs.length) {
+          const job = initialJobs[cursor++]
+          await processJob(job)
         }
-        if (!succeeded) updateJob(job.id, { status: 'error', error: lastErr })
       }
+      await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+      spoofLog('run:end', { jobs: initialJobs.length })
     } finally {
       setRunning(false)
     }
@@ -354,6 +406,13 @@ export function Spoof({ user }: { user: User }) {
             <div style={{ padding: '0 16px' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Modèle iPhone', 'iPhone model')}</div>
               <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setPreset('random')}
+                  disabled={running}
+                  className={`sf-segment-item cursor-pointer${preset === 'random' ? ' is-active' : ''}`}
+                >
+                  {tr('🎲 Aléatoire', '🎲 Random')}
+                </button>
                 {Object.entries(PRESETS).map(([key, label]) => (
                   <button
                     key={key}
@@ -365,6 +424,11 @@ export function Spoof({ user }: { user: User }) {
                   </button>
                 ))}
               </div>
+              {preset === 'random' && (
+                <p style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 2px 0' }}>
+                  {tr('Chaque vidéo reçoit un modèle iPhone différent au hasard.', 'Each video gets a different random iPhone model.')}
+                </p>
+              )}
             </div>
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
@@ -380,7 +444,13 @@ export function Spoof({ user }: { user: User }) {
                 style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
               >
                 <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{tr('🎲 Aléatoire (tous pays)', '🎲 Random (all countries)')}</option>
-                <option value="random_france" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{tr('🇫🇷 Aléatoire France uniquement', '🇫🇷 Random France only')}</option>
+                <optgroup label={tr('🎲 Aléatoire par région', '🎲 Random by region')} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
+                  {GPS_GROUPS.map(group => (
+                    <option key={`rnd-${group.id}`} value={`random_region:${group.id}`} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>
+                      {tr('🎲 ', '🎲 ')}{group.country}
+                    </option>
+                  ))}
+                </optgroup>
                 {GPS_GROUPS.map(group => (
                   <optgroup key={group.country} label={group.country} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
                     {Object.entries(group.cities).map(([key, label]) => (

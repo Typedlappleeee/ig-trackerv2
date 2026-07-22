@@ -136,8 +136,15 @@ async function handleSpoof(req, res) {
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
     }
 
-    const meta = PRESETS[preset] ?? PRESETS.iphone17pro
-    const gps  = GPS_CITIES[gpsCity] ?? GPS_CITIES.paris
+    // Filet de sécurité : si le client envoie 'random' (ou une clé inconnue), on
+    // choisit ici pour ne jamais retomber bêtement sur un preset/ville fixe.
+    const presetKeys = Object.keys(PRESETS)
+    const cityKeys   = Object.keys(GPS_CITIES)
+    const presetKey  = PRESETS[preset] ? preset : presetKeys[Math.floor(Math.random() * presetKeys.length)]
+    const cityKey    = GPS_CITIES[gpsCity] ? gpsCity : cityKeys[Math.floor(Math.random() * cityKeys.length)]
+    const meta = PRESETS[presetKey]
+    const gps  = GPS_CITIES[cityKey]
+    console.log(`[SPOOF] start user=${String(userId).slice(0, 8)} preset=${presetKey} city=${cityKey} src=${sourceUrl ? 'url' : 'path'}`)
     const lat  = jitter(gps.lat)
     const lon  = jitter(gps.lon)
     // GPS fix with random altitude → ISO 6709 (e.g. +48.8571+002.3490+035.123/)
@@ -323,8 +330,10 @@ async function handleSpoof(req, res) {
       gopSize,
       colorSpace:   'yuv420p',
     }
+    console.log(`[SPOOF] ok user=${String(userId).slice(0, 8)} model=${meta.model} city=${gps.city} out=${resultPath}`)
     res.json({ ok: true, url: publicUrl, storagePath: resultPath, appliedMeta })
   } catch (err) {
+    console.error(`[SPOOF] error user=${String(userId).slice(0, 8)} : ${String(err).slice(0, 300)}`)
     res.status(500).json({ ok: false, error: String(err) })
   } finally {
     fs.rmSync(inputPath, { force: true })
