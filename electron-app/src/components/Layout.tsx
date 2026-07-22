@@ -256,13 +256,12 @@ function RecoBadge() {
   const [copied, setCopied] = useState(false)
   const RECO_LINES = [
     tr('Reels / Posts : fiables sur toutes les versions (automation native GeeLark)', 'Reels / Posts: reliable on all versions (native GeeLark automation)'),
-    tr('Story : préférer Android 13-15 + cloud phone en anglais', 'Story: prefer Android 13-15 + English cloud phone'),
-    tr('Éviter Android 16 pour les stories (automation encore instable)', 'Avoid Android 16 for stories (automation still unstable)'),
+    tr('Story : fiable sur Android 13 à 16 + cloud phone en anglais', 'Story: reliable on Android 13 to 16 + English cloud phone'),
   ]
   const RECO_TEXT =
     tr('ℹ️ Compatibilité de l\'automatisation :', 'ℹ️ Automation compatibility:') + '\n' +
     RECO_LINES.map(l => `• ${l}`).join('\n') +
-    '\n\n' + tr('Le posting Reels marche partout. La Story pilote l\'app pas-à-pas et peut casser sur les tout nouveaux Android (ex. 16) — on ajuste au fil des versions.', 'Reels posting works everywhere. Story drives the app step-by-step and can break on brand-new Android versions (e.g. 16) — we adjust as versions evolve.')
+    '\n\n' + tr('Le posting Reels marche partout. La Story pilote l\'app pas-à-pas et tourne désormais bien de Android 13 à 16 (cloud phone en anglais recommandé).', 'Reels posting works everywhere. Story drives the app step-by-step and now runs well on Android 13 to 16 (English cloud phone recommended).')
   const copy = () => {
     navigator.clipboard?.writeText(RECO_TEXT).then(() => {
       setCopied(true)
