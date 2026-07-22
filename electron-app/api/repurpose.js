@@ -253,6 +253,10 @@ async function handleSpoof(req, res) {
     const spd = clamp(Number(speed) || 1, 0.9, 1.1)
     if (spd !== 1) filters.push(`setpts=PTS/${spd.toFixed(4)}`)
 
+    // Plafonne la résolution à 1920px sur le grand côté (aspect conservé). IG/TikTok
+    // recompressent de toute façon en 1080p : encoder du 4K côté serveur = attente
+    // inutile qui fait dépasser le budget. Gros gain de vitesse, aucune perte visible.
+    filters.push("scale='min(iw,1920)':'min(ih,1920)':force_original_aspect_ratio=decrease")
     // Force even dimensions — libx264 + yuv420p reject odd width/height
     filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
 
@@ -276,7 +280,17 @@ async function handleSpoof(req, res) {
     // (make/model/software + com.apple.quicktime.*) instead of dropping them.
     ffArgs.push('-movflags', 'use_metadata_tags+faststart', '-y', outPath)
 
-    await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 100 * 1024 * 1024 })
+    // Timeout SOUS le budget Vercel (maxDuration 60s). Sans ça, un encodage trop
+    // long dépasse 60s → Vercel tue la fonction sans réponse → le client "reste
+    // bloqué sur les vidéos". Ici on échoue proprement avec un message clair.
+    try {
+      await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 55000, killSignal: 'SIGKILL' })
+    } catch (e) {
+      if (e && (e.killed || e.signal)) {
+        return res.status(200).json({ ok: false, error: 'Vidéo trop longue/lourde pour le spoof serveur (>55s d\'encodage). Essaie une vidéo plus courte ou plus légère.' })
+      }
+      throw e
+    }
 
     const resultPath = `videos/users/${userId}/spoof-${ts}_${rand}.mp4`
     const outBuf = fs.readFileSync(outPath)
@@ -380,7 +394,17 @@ module.exports = async (req, res) => {
     })
     ffArgs.push('-y')
 
-    await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 100 * 1024 * 1024 })
+    // Timeout SOUS le budget Vercel : N variantes = N encodages dans un seul appel
+    // ffmpeg → très vite au-delà de 60s. Sans timeout, Vercel tue la fonction et le
+    // client reste bloqué. On échoue proprement avec un message actionnable.
+    try {
+      await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 55000, killSignal: 'SIGKILL' })
+    } catch (e) {
+      if (e && (e.killed || e.signal)) {
+        return res.status(200).json({ ok: false, error: `Encodage trop long (>55s) pour ${variants.length} variante(s). Réduis le nombre de variantes ou utilise une vidéo plus courte/légère.` })
+      }
+      throw e
+    }
 
     // ── Upload all outputs to Supabase in parallel ─────────────────────────
     const thumbPaths = variants.map((_, i) => path.join(tmpDir, `rp_thumb_${ts}_${i}.jpg`))
