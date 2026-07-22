@@ -206,6 +206,21 @@ export function Licences({ user: _user }: Props) {
     }
   }
 
+  // Active/désactive l'add-on Blowsome sur une clé EXISTANTE.
+  async function toggleBlowsome(k: LicenseKey) {
+    const next = !k.blowsome
+    const { error } = await supabase.from('license_keys').update({ blowsome: next }).eq('id', k.id)
+    if (error) {
+      const msg = /blowsome/.test(error.message)
+        ? (lang === 'en' ? 'Run migration 20260722_license_blowsome.sql first.' : 'Lance d\'abord la migration 20260722_license_blowsome.sql.')
+        : error.message
+      toast.show({ title: lang === 'en' ? 'Update failed' : 'Mise à jour échouée', body: msg, kind: 'error' })
+      return
+    }
+    setKeys(prev => prev.map(x => x.id === k.id ? { ...x, blowsome: next } : x))
+    toast.show({ title: next ? tr('Blowsome activé ✦', 'Blowsome enabled ✦') : tr('Blowsome retiré', 'Blowsome removed'), kind: 'ok' })
+  }
+
   async function revokeKey(id: string) {
     const { error } = await supabase.from('license_keys').update({ is_active: false }).eq('id', id)
     if (error) {
@@ -526,6 +541,14 @@ export function Licences({ user: _user }: Props) {
 
                   {/* Actions */}
                   <div className="flex gap-1">
+                    <button
+                      onClick={() => toggleBlowsome(k)}
+                      className="sf-btn sf-btn-ghost text-[12px] px-3 py-1.5 cursor-pointer"
+                      style={{ color: k.blowsome ? '#F472B6' : 'var(--text-3)' }}
+                      title={k.blowsome ? tr('Retirer Blowsome', 'Remove Blowsome') : tr('Ajouter Blowsome', 'Add Blowsome')}
+                    >
+                      {k.blowsome ? tr('✦ Blowsome ✓', '✦ Blowsome ✓') : tr('✦ Blowsome', '✦ Blowsome')}
+                    </button>
                     {k.expires_at && (
                       <button
                         onClick={() => { setExtendTarget(extendTarget === k.id ? null : k.id); setCustomDays('') }}
