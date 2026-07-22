@@ -132,7 +132,6 @@ export function Spoof({ user }: { user: User }) {
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
   const [autoMode, setAutoMode]           = useState(false)
-  const [concurrency, setConcurrency]     = useState(3)   // vidéos traitées en parallèle
   const [randomDate, setRandomDate]       = useState(false)
   const [randomDateDays, setRandomDateDays] = useState(30) // fenêtre (jours) pour la date aléatoire
   const [showDebug, setShowDebug]         = useState(false)
@@ -322,7 +321,7 @@ export function Spoof({ user }: { user: User }) {
       // serverless Vercel séparée (pas de contention CPU entre elles). On lance un
       // pool borné (3) pour aller bien plus vite sans saturer. Chaque sortie reste
       // 100 % indépendante → aucun risque de "tout casser".
-      const CONCURRENCY = Math.min(Math.max(1, concurrency), initialJobs.length)
+      const CONCURRENCY = Math.min(5, initialJobs.length)
       let cursor = 0
       const worker = async () => {
         while (cursor < initialJobs.length) {
@@ -595,31 +594,6 @@ export function Spoof({ user }: { user: User }) {
                   {selectedVideos.length} {tr(`vidéo${selectedVideos.length > 1 ? 's' : ''}`, `video${selectedVideos.length > 1 ? 's' : ''}`)} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> {tr(`export${totalOutputs > 1 ? 's' : ''}`, `export${totalOutputs > 1 ? 's' : ''}`)}
                 </div>
               )}
-            </div>
-
-            <div className="sf-divider" style={{ margin: '16px 0' }} />
-
-            {/* Vidéos simultanées (parallélisme) */}
-            <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>
-                {tr('Vidéos simultanées', 'Parallel videos')}
-                <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>{tr('plus = plus rapide', 'higher = faster')}</span>
-              </div>
-              <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
-                {[1, 2, 3, 4, 5].map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setConcurrency(n)}
-                    disabled={running}
-                    className={`sf-segment-item cursor-pointer${concurrency === n ? ' is-active' : ''}`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <p style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 2px 0' }}>
-                {tr('Chaque vidéo est traitée sur un serveur séparé — aucun risque de conflit.', 'Each video runs on a separate server — no conflict risk.')}
-              </p>
             </div>
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
