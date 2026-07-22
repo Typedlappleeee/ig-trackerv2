@@ -108,7 +108,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
-      { id: 'blowsome',    label: 'navBlowsome',     icon: '✦', isNew: true },
     ],
   },
   {
@@ -918,6 +917,29 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
             </button>
           </div>
+
+          {/* Lanceur de la sous-application Blowsome (VIP) — pas un simple onglet :
+              un bouton "espace" distinct, visible seulement avec l'add-on blowsome. */}
+          {(license?.blowsome === true || effectiveSuperAdmin) && (
+            <div style={{ margin: '6px 0 2px' }}>
+              <button
+                onClick={() => { playNav(); onNavigate('blowsome') }}
+                title="Blowsome — espace VIP"
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  padding: collapsed ? '10px 0' : '11px 12px', borderRadius: 12, border: '1px solid rgba(168,85,247,0.4)', cursor: 'pointer',
+                  color: '#fff', fontWeight: 800, fontSize: 13.5,
+                  background: 'linear-gradient(100deg, rgba(236,72,153,0.9), rgba(168,85,247,0.9), rgba(99,102,241,0.9))',
+                  backgroundSize: '180% auto', boxShadow: '0 10px 26px -12px rgba(168,85,247,0.9)',
+                }}
+              >
+                <span style={{ display: 'grid', placeItems: 'center', width: 20, fontSize: 15 }}>✦</span>
+                {!collapsed && <span style={{ flex: 1, textAlign: 'left' }}>Blowsome</span>}
+                {!collapsed && <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.08em', padding: '2px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.2)' }}>VIP</span>}
+              </button>
+            </div>
+          )}
 
           <SidebarDivider />
 

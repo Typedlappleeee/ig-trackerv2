@@ -4,19 +4,23 @@
 import { useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useBlowCSS, Grad, Ico, ICON, GRAD, INK, MUTED, HAIR, BlowStat, BlowCard, BlowPageHeader, BlowBadge, BlowButton } from './ui'
-import { BlowClients } from './pages/Clients'
-import { BlowCampaigns } from './pages/Campaigns'
+import { BankHub } from '@/pages/BankHub'
+import { BlowPosting } from './pages/Posting'
 import { BlowAnalytics } from './pages/Analytics'
 import { BlowSettings } from './pages/Settings'
+import { BlowTools } from './pages/ToolsManager'
+import { BlowPhoneFarm } from './pages/PhoneFarm'
 
-type Tab = 'dashboard' | 'clients' | 'campaigns' | 'analytics' | 'settings'
+type Tab = 'dashboard' | 'posting' | 'bank' | 'tools' | 'phonefarm' | 'analytics' | 'settings'
 
 const NAV: { id: Tab; label: string; icon: string }[] = [
-  { id: 'dashboard', label: 'Dashboard',  icon: ICON.grid },
-  { id: 'clients',   label: 'Clients',    icon: ICON.users },
-  { id: 'campaigns', label: 'Campagnes',  icon: ICON.rocket },
-  { id: 'analytics', label: 'Analytics',  icon: ICON.chart },
-  { id: 'settings',  label: 'Paramètres', icon: ICON.gear },
+  { id: 'dashboard', label: 'Dashboard',   icon: ICON.grid },
+  { id: 'posting',   label: 'Posting',     icon: ICON.send },
+  { id: 'bank',      label: 'Banque',      icon: ICON.folder },
+  { id: 'tools',     label: 'Gestionnaire de tool', icon: ICON.wrench },
+  { id: 'phonefarm', label: 'Phone Farm',  icon: ICON.phone },
+  { id: 'analytics', label: 'Analytics',   icon: ICON.chart },
+  { id: 'settings',  label: 'Paramètres',  icon: ICON.gear },
 ]
 
 export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }) {
@@ -88,13 +92,21 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
           </div>
         </header>
 
-        <div style={{ padding: '30px 30px 80px', maxWidth: 1120, margin: '0 auto' }}>
-          {tab === 'dashboard' && <BlowDashboard name={firstName} onGo={setTab} />}
-          {tab === 'clients'   && <BlowClients user={user} />}
-          {tab === 'campaigns' && <BlowCampaigns user={user} />}
-          {tab === 'analytics' && <BlowAnalytics user={user} />}
-          {tab === 'settings'  && <BlowSettings user={user} />}
-        </div>
+        {tab === 'bank' ? (
+          // Banque : le VRAI composant ScaleFlow (même contenu). Plein cadre.
+          <div style={{ height: 'calc(100% - 65px)', minHeight: 520 }}>
+            <BankHub user={user} />
+          </div>
+        ) : (
+          <div style={{ padding: '30px 30px 80px', maxWidth: 1120, margin: '0 auto' }}>
+            {tab === 'dashboard' && <BlowDashboard name={firstName} onGo={setTab} />}
+            {tab === 'posting'   && <BlowPosting user={user} />}
+            {tab === 'tools'     && <BlowTools />}
+            {tab === 'phonefarm' && <BlowPhoneFarm />}
+            {tab === 'analytics' && <BlowAnalytics user={user} />}
+            {tab === 'settings'  && <BlowSettings user={user} />}
+          </div>
+        )}
       </main>
     </div>
   )
@@ -118,16 +130,16 @@ function BlowDashboard({ name, onGo }: { name: string; onGo: (t: Tab) => void })
             Ton cockpit VIP pour piloter tes clients, tes campagnes et tes résultats — tout au même endroit, en beauté.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-            <BlowButton onClick={() => onGo('campaigns')}><Ico d={ICON.rocket} size={15} /> Nouvelle campagne</BlowButton>
-            <BlowButton variant="ghost" onClick={() => onGo('clients')}><Ico d={ICON.users} size={15} /> Gérer les clients</BlowButton>
+            <BlowButton onClick={() => onGo('posting')}><Ico d={ICON.send} size={15} /> Voir les postings</BlowButton>
+            <BlowButton variant="ghost" onClick={() => onGo('bank')}><Ico d={ICON.folder} size={15} /> Ouvrir la banque</BlowButton>
           </div>
         </div>
       </BlowCard>
 
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 24 }}>
-        <BlowStat label="Clients actifs" value={12} delta="+3 ce mois" icon={<Ico d={ICON.users} size={16} />} accent="#A855F7" delay={0.05} />
-        <BlowStat label="Campagnes" value={7} delta="+2" icon={<Ico d={ICON.rocket} size={16} />} accent="#EC4899" delay={0.1} />
+        <BlowStat label="Postings actifs" value={7} delta="+2" icon={<Ico d={ICON.send} size={16} />} accent="#A855F7" delay={0.05} />
+        <BlowStat label="Comptes gérés" value={38} delta="+6 ce mois" icon={<Ico d={ICON.phone} size={16} />} accent="#EC4899" delay={0.1} />
         <BlowStat label="Posts publiés" value="1.4k" delta="+18%" icon={<Ico d={ICON.bolt} size={16} />} accent="#6366F1" delay={0.15} />
         <BlowStat label="Reach estimé" value="2.9M" delta="+24%" icon={<Ico d={ICON.eye} size={16} />} accent="#22D3EE" delay={0.2} />
       </div>
@@ -140,8 +152,8 @@ function BlowDashboard({ name, onGo }: { name: string; onGo: (t: Tab) => void })
             <button onClick={() => onGo('analytics')} style={{ fontSize: 11.5, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>Analytics →</button>
           </div>
           {[
-            { c: '#34D399', t: 'Campagne « Summer Drop » lancée', s: 'il y a 2 h · 8 comptes' },
-            { c: '#A855F7', t: 'Nouveau client ajouté — @luxe.paris', s: 'il y a 5 h' },
+            { c: '#34D399', t: 'Posting « Summer Drop » lancé', s: 'il y a 2 h · 8 comptes' },
+            { c: '#A855F7', t: 'Banque : 24 vidéos importées', s: 'il y a 5 h' },
             { c: '#EC4899', t: '320 posts publiés', s: 'hier · reach 210k' },
           ].map((r, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', borderBottom: i < 2 ? `1px solid ${HAIR}` : 'none' }}>
