@@ -2858,9 +2858,9 @@ select.sf-input:disabled {
    Appended en fin de fichier : ces règles priment sur les définitions de base.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --sf-grad: linear-gradient(100deg, #EC4899, #A855F7 52%, #6366F1);
-  --sf-grad-soft: linear-gradient(100deg, rgba(236,72,153,0.14), rgba(168,85,247,0.12), rgba(99,102,241,0.12));
-  --sf-glow: 0 14px 40px -18px rgba(168,85,247,0.6);
+  --sf-grad: linear-gradient(100deg, #818CF8, #8B5CF6 52%, #6366F1);
+  --sf-grad-soft: linear-gradient(100deg, rgba(99,102,241,0.14), rgba(139,92,246,0.12), rgba(99,102,241,0.12));
+  --sf-glow: 0 14px 40px -18px rgba(139,92,246,0.6);
 }
 
 @keyframes sf-grad-flow { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
@@ -2872,32 +2872,32 @@ select.sf-input:disabled {
 
 /* Boutons primaires — dégradé tri-color premium + halo */
 .sf-btn-primary {
-  background: linear-gradient(100deg, #EC4899, #A855F7 50%, #6366F1) !important;
+  background: linear-gradient(100deg, #818CF8, #8B5CF6 50%, #6366F1) !important;
   background-size: 180% auto !important;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 14px 30px -14px rgba(168,85,247,0.7),
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 14px 30px -14px rgba(139,92,246,0.7),
               inset 0 1px 0 rgba(255,255,255,0.2) !important;
 }
 .sf-btn-primary:hover {
   background-position: 100% 0 !important;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.3), 0 18px 40px -12px rgba(236,72,153,0.7),
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3), 0 18px 40px -12px rgba(99,102,241,0.7),
               inset 0 1px 0 rgba(255,255,255,0.24) !important;
   transform: translateY(-1px);
 }
 
 /* Icônes d'en-tête de page — dégradé premium par défaut + halo + flottement doux */
 .sf-page-icon {
-  background: var(--icon-grad, linear-gradient(135deg, #EC4899, #A855F7 55%, #6366F1)) !important;
-  box-shadow: 0 12px 28px -12px rgba(168,85,247,0.65), inset 0 1px 0 rgba(255,255,255,0.32) !important;
+  background: var(--icon-grad, linear-gradient(135deg, #818CF8, #8B5CF6 55%, #6366F1)) !important;
+  box-shadow: 0 12px 28px -12px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.32) !important;
 }
 
 /* Barre d'accent des en-têtes — tri-color */
 .sf-page-header::before {
-  background: linear-gradient(90deg, transparent, rgba(236,72,153,0.5) 35%, rgba(168,85,247,0.6) 50%, rgba(99,102,241,0.5) 65%, transparent) !important;
+  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.5) 35%, rgba(139,92,246,0.6) 50%, rgba(99,102,241,0.5) 65%, transparent) !important;
 }
 
 /* Titre en dégradé animé (opt-in) */
 .sf-title-grad {
-  background: linear-gradient(100deg, #F0A8D0, #C4B5FD 50%, #93C5FD);
+  background: linear-gradient(100deg, #A5B4FC, #C4B5FD 50%, #93C5FD);
   background-size: 200% auto;
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2910,13 +2910,13 @@ select.sf-input:disabled {
   box-shadow: 0 10px 30px -20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05) !important;
 }
 .sf-card:hover {
-  border-color: rgba(168,85,247,0.3) !important;
-  box-shadow: 0 16px 40px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(168,85,247,0.12),
+  border-color: rgba(139,92,246,0.3) !important;
+  box-shadow: 0 16px 40px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(139,92,246,0.12),
               inset 0 1px 0 rgba(255,255,255,0.07) !important;
 }
 
 /* Chip "live"/statut — dégradé doux */
-.sf-status-chip.is-live { background: var(--sf-grad-soft) !important; border-color: rgba(168,85,247,0.35) !important; }
+.sf-status-chip.is-live { background: var(--sf-grad-soft) !important; border-color: rgba(139,92,246,0.35) !important; }
 
 /* Utilitaires premium (pour les vagues de refonte par page) */
 .sf-glass {
@@ -2931,12 +2931,12 @@ select.sf-input:disabled {
 }
 .sf-hero {
   position: relative; overflow: hidden;
-  background: linear-gradient(150deg, rgba(236,72,153,0.08), rgba(168,85,247,0.06) 45%, rgba(99,102,241,0.06));
-  border: 1px solid rgba(168,85,247,0.2);
+  background: linear-gradient(150deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06) 45%, rgba(99,102,241,0.06));
+  border: 1px solid rgba(139,92,246,0.2);
   border-radius: var(--r-lg);
 }
 .sf-hero::before {
   content: ''; position: absolute; top: -60px; right: -40px; width: 260px; height: 260px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(168,85,247,0.25), transparent 66%); pointer-events: none;
+  background: radial-gradient(circle, rgba(139,92,246,0.25), transparent 66%); pointer-events: none;
 }
 .sf-float { animation: sf-float-y 6s ease-in-out infinite; }
