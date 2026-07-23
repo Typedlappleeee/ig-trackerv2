@@ -32,8 +32,11 @@ export function CommandPalette({ items, onSelect }: { items: CommandItem[]; onSe
         setOpen(false)
       }
     }
+    // Ouverture aussi via un bouton (ex. barre latérale) qui dispatch cet évènement.
+    const onOpenEvt = () => setOpen(true)
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('sf:cmdk', onOpenEvt)
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('sf:cmdk', onOpenEvt) }
   }, [open])
 
   useEffect(() => {

@@ -931,6 +931,28 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           </button>
         </div>
 
+        {/* ── Recherche / palette de commandes (⌘K) ─────────────────────── */}
+        <div style={{ padding: '2px 10px 8px', flexShrink: 0 }}>
+          <button
+            onClick={() => { playNav(); window.dispatchEvent(new Event('sf:cmdk')) }}
+            title={tr('Rechercher — Ctrl/Cmd + K', 'Search — Ctrl/Cmd + K')}
+            aria-label={tr('Rechercher', 'Search')}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              height: 36, padding: collapsed ? 0 : '0 11px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(233,234,240,0.09)',
+              color: 'rgba(233,234,240,0.55)', fontSize: 13, fontWeight: 500, transition: 'all .15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; e.currentTarget.style.color = 'rgba(241,240,247,0.85)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.09)'; e.currentTarget.style.color = 'rgba(233,234,240,0.55)' }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+            {!collapsed && <span style={{ flex: 1, textAlign: 'left' }}>{tr('Rechercher…', 'Search…')}</span>}
+            {!collapsed && <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(233,234,240,0.1)', letterSpacing: '0.02em' }}>⌘K</span>}
+          </button>
+        </div>
+
         {/* ── Nav ───────────────────────────────────────────────────────── */}
         <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 6px 8px' }}>
 
