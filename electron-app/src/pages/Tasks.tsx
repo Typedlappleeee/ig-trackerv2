@@ -1264,6 +1264,15 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     && segments.every(s => s.videos.length > 0)
     && (!anyStory || phonesWithLink === phoneList.length)
 
+  // Raison précise du blocage du bouton — affichée en tooltip + sous le bouton.
+  const disabledReason: string | null =
+    submitting ? null
+    : phoneList.length === 0 ? tr('Sélectionne au moins un téléphone', 'Select at least one phone')
+    : segments.length === 0 ? tr('Ajoute au moins une sous-tâche', 'Add at least one sub-task')
+    : segments.some(s => s.videos.length === 0) ? tr('Ajoute au moins un média à chaque sous-tâche', 'Add at least one media to every sub-task')
+    : (anyStory && phonesWithLink < phoneList.length) ? tr('Renseigne un lien de story pour chaque compte', 'Set a story link for every account')
+    : null
+
   const totalMedia = segments.reduce((n, s) => n + s.videos.length, 0)
 
   const labelStyle: React.CSSProperties = {
@@ -1436,6 +1445,21 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           display: 'flex', flexDirection: 'column', gap: 22, scrollbarWidth: 'thin',
         }}>
 
+          {/* ── Comment ça marche : guide express ── */}
+          <div style={{
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+            padding: '11px 14px', borderRadius: 10,
+            border: '1px solid rgba(99,102,241,0.22)', background: 'rgba(99,102,241,0.06)',
+          }}>
+            <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex', color: '#818CF8' }}><IconRepeat size={15} color="currentColor" /></span>
+            <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.6, color: 'rgba(233,234,240,0.72)' }}>
+              {tr(
+                'Une tâche republie automatiquement en boucle sur les téléphones choisis, à l’intervalle défini — elle tourne côté serveur, même ScaleFlow et PC éteints. Renseigne dans l’ordre : téléphones, puis chaque sous-tâche (médias, légende, intervalle).',
+                'A task automatically re-posts on a loop to the chosen phones at the interval you set — it runs on the server, even with ScaleFlow and your PC off. Fill in, in order: phones, then each sub-task (media, caption, interval).',
+              )}
+            </p>
+          </div>
+
           {!bearer && (
             <div style={{
               padding: '10px 14px', borderRadius: 8,
@@ -1471,6 +1495,9 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 </span>
               )}
             </span>
+            <p style={{ margin: '-2px 0 8px', fontSize: 11, color: MUTED }}>
+              {tr('Chaque compte coché recevra chaque exécution de la tâche (2 crédits par compte et par exécution).', 'Every selected account receives each run of the task (2 credits per account per run).')}
+            </p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
               {groups.length > 1 && (
                 <select
@@ -2132,6 +2159,12 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
               </>
             )}
+            {!submitting && disabledReason && (
+              <span style={{ fontSize: 11, color: '#F59E0B', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+                {disabledReason}
+              </span>
+            )}
             {phoneList.length > 0 && (
               <span style={{ fontSize: 11, color: MUTED }}
                 title={tr('Coût : 2 crédits × nb téléphones à chaque exécution, plus 50 crédits/jour tant que la tâche est active.', 'Cost: 2 credits × number of phones per run, plus 50 credits/day while the task is active.')}>
@@ -2157,6 +2190,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           <button
             onClick={submit}
             disabled={!canSubmit}
+            title={disabledReason ?? (isEdit ? tr('Enregistrer les modifications', 'Save changes') : tr('Créer et activer la tâche', 'Create and activate the task'))}
             className="cursor-pointer"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -2165,6 +2199,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               background: canSubmit ? GOLD : 'rgba(233,234,240,0.08)',
               color: canSubmit ? '#fff' : MUTED,
               border: 'none', borderRadius: 8, transition: 'all 0.18s',
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
             }}
             onMouseEnter={e => { if (canSubmit) e.currentTarget.style.background = '#818CF8' }}
             onMouseLeave={e => { if (canSubmit) e.currentTarget.style.background = canSubmit ? GOLD : 'rgba(233,234,240,0.08)' }}

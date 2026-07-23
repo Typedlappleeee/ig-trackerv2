@@ -1045,10 +1045,11 @@ export function Scheduler({ user, onNavigate }: Props) {
             <button
               onClick={() => { setPresetSchedAt(undefined); setShowTypeChoice(true) }}
               className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+              title={tr('Choisir un type (Reel ou Story), puis une date — la publication partira toute seule, même app fermée.', 'Pick a type (Reel or Story), then a date — the post fires on its own, even with the app closed.')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-              {tr('Programmer', 'Schedule')}
+              {tr('Programmer un post', 'Schedule a post')}
             </button>
           </div>
         </div>
@@ -1234,6 +1235,25 @@ export function Scheduler({ user, onNavigate }: Props) {
                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                 {posts.length === 0 ? tr('Programmer ton premier post', 'Schedule your first post') : t('schedulerSchedulePost')}
               </button>
+            )}
+            {tab === 'pending' && (
+              <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', maxWidth: 380, width: '100%' }}>
+                {([
+                  tr('Choisis un type : Reel (vidéo) ou Story avec lien.', 'Pick a type: Reel (video) or Story with a link.'),
+                  tr('Sélectionne les comptes, les médias et la date de départ.', 'Select the accounts, the media and the start date.'),
+                  tr('ScaleFlow publie tout seul à l’heure prévue — même app et PC éteints.', 'ScaleFlow posts on its own at the scheduled time — even with the app and PC off.'),
+                ]).map((step, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <span style={{
+                      flexShrink: 0, width: 20, height: 20, borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.3)',
+                      color: 'var(--accent-l)', fontSize: 11, fontWeight: 800,
+                    }}>{i + 1}</span>
+                    <span style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--muted)' }}>{step}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         ) : (
@@ -1478,6 +1498,9 @@ export function Scheduler({ user, onNavigate }: Props) {
               ))}
             </div>
             <div style={{ position: 'relative', padding: '0 22px 18px' }}>
+              <p style={{ margin: '0 0 12px', fontSize: 11.5, lineHeight: 1.5, color: 'rgba(233,234,240,0.45)', textAlign: 'center' }}>
+                {tr('Prochaine étape : comptes, médias et date de départ. La publication part toute seule à l’heure prévue.', 'Next step: accounts, media and start date. The post fires on its own at the scheduled time.')}
+              </p>
               <button
                 onClick={() => setShowTypeChoice(false)}
                 className="sf-btn sf-btn-ghost cursor-pointer"

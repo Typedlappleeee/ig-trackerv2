@@ -1017,6 +1017,11 @@ export default function StoryLink({ user }: { user: User }) {
               )}
             </div>
 
+            {/* Guidance : première étape du flux Story */}
+            <p style={{ fontSize: 11, color: 'var(--text-4)', margin: '0 0 10px', lineHeight: 1.45 }}>
+              {tr('Étape 1 — coche les comptes qui publieront la story.', 'Step 1 — tick the accounts that will publish the story.')}
+            </p>
+
             {/* Toggle Téléphones / Groupes */}
             {groups.filter(g => g !== 'Tous').length > 0 && (
               <div className="sf-segment" style={{ display: 'flex', width: '100%', marginBottom: 8 }}>
@@ -1223,10 +1228,11 @@ export default function StoryLink({ user }: { user: User }) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}><IconPhoto /></span>
-                  <span className="sf-section-label" style={{ margin: 0 }}>{tr('Pool de photos', 'Photo pool')}</span>
+                  <span className="sf-section-label" style={{ margin: 0 }}>{tr('Étape 2 — Pool de photos', 'Step 2 — Photo pool')}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A5B4FC', background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.28)', borderRadius: 99, padding: '2px 7px' }}>{tr('Requis', 'Required')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  {tr('Les images seront distribuées automatiquement entre les comptes.', 'Images will be automatically distributed across accounts.')}
+                  {tr('Ajoute une ou plusieurs images : elles seront distribuées automatiquement entre les comptes (voir Distribution plus bas).', 'Add one or more images: they are distributed automatically across accounts (see Distribution below).')}
                 </p>
               </div>
               <button
@@ -1299,9 +1305,10 @@ export default function StoryLink({ user }: { user: User }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.22)', color: '#A5B4FC' }}><IconText /></span>
                   <span className="sf-section-label" style={{ margin: 0 }}>{tr('Pool de textes sticker', 'Sticker text pool')}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 99, padding: '2px 7px' }}>{tr('Optionnel', 'Optional')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  {tr("Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.", 'Text shown on the link sticker. Leave empty to show only the URL.')}
+                  {tr("Texte affiché sur le sticker lien (ex. « Voir plus »). Plusieurs textes = distribués entre les comptes. Laisse vide pour n'afficher que l'URL.", 'Text shown on the link sticker (e.g. "See more"). Several texts = spread across accounts. Leave empty to show only the URL.')}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 12 }}>
@@ -1376,10 +1383,11 @@ export default function StoryLink({ user }: { user: User }) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}><IconLinkSm /></span>
-                  <span className="sf-section-label" style={{ margin: 0 }}>{tr('Liens — 1 lien par compte', 'Links — 1 link per account')}</span>
+                  <span className="sf-section-label" style={{ margin: 0 }}>{tr('Étape 3 — Lien sticker par compte', 'Step 3 — Link sticker per account')}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A5B4FC', background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.28)', borderRadius: 99, padding: '2px 7px' }}>{tr('Requis', 'Required')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-                  {tr('Chaque compte a son propre lien, éditable dans l’aperçu et sauvegardé automatiquement.', 'Each account has its own link, editable in the preview and saved automatically.')}
+                  {tr('Chaque compte publie SON propre lien (le lien du sticker de sa story). Édite-le à droite dans l’aperçu — il est sauvegardé automatiquement. Astuce : « Appliquer à tous » pour le même lien partout.', 'Each account publishes ITS own link (its story link sticker). Edit it on the right in the preview — it saves automatically. Tip: "Apply to all" to set the same link everywhere.')}
                 </p>
               </div>
               {selectedIds.length > 0 && (
@@ -1406,7 +1414,10 @@ export default function StoryLink({ user }: { user: User }) {
           <div className="sf-card" style={{ padding: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <span className="sf-section-label" style={{ margin: 0 }}>{tr('Ajouter à la une (highlight)', 'Add to highlights')}</span>
+                <span className="sf-section-label" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                  {tr('Ajouter à la une (highlight)', 'Add to highlights')}
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 99, padding: '2px 7px' }}>{tr('Optionnel', 'Optional')}</span>
+                </span>
                 <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '3px 0 0' }}>{tr("Après la story, l'épingle dans un highlight du profil.", 'After the story, pin it to a profile highlight.')}</p>
               </div>
               <button
@@ -1447,10 +1458,13 @@ export default function StoryLink({ user }: { user: User }) {
 
           {/* ── Distribution mode ───────────────────────────────────────────── */}
           <div className="sf-card" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
               <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.22)', color: '#A5B4FC' }}><IconShuffle /></span>
               <span className="sf-section-label" style={{ margin: 0 }}>{tr('Distribution', 'Distribution')}</span>
             </div>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5, margin: '0 0 14px' }}>
+              {tr('Comment les photos et textes du pool sont répartis entre les comptes sélectionnés.', 'How the pool photos and texts are spread across the selected accounts.')}
+            </p>
 
             <div style={{ display: 'flex', gap: 10 }}>
               {([

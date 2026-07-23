@@ -98,6 +98,9 @@ export function Publish({ user }: { user: User }) {
               </button>
             ))}
           </div>
+          <p style={{ position: 'relative', margin: 0, padding: '0 var(--sp-6) var(--sp-5)', textAlign: 'center', fontSize: 11.5, color: 'var(--text-3)', lineHeight: 1.5 }}>
+            {tr('Tu pourras changer de plateforme à tout moment depuis le bandeau en haut.', 'You can switch platform at any time from the top bar.')}
+          </p>
         </div>
       </div>
     )

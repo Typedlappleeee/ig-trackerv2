@@ -159,6 +159,9 @@ notify pgrst, 'reload schema';`}</pre>
             <p className="sf-page-sub">
               <span className="sf-tabular">{rows.length}</span> {tr(rows.length > 1 ? 'comptes' : 'compte', rows.length > 1 ? 'accounts' : 'account')} · {tr('clique dans une case, ça s\'enregistre tout seul', 'click a cell, it saves automatically')}
             </p>
+            <p className="sf-page-sub" style={{ marginTop: 2, color: 'var(--text-4)', fontSize: 11.5 }}>
+              {tr('Le carnet de tes comptes : 1 téléphone = 1 compte Instagram. Relie chaque compte à son modèle, son marché et son statut par plateforme.', 'Your accounts logbook: 1 phone = 1 Instagram account. Link each account to its model, market and per-platform status.')}
+            </p>
           </div>
         </div>
         <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
@@ -167,7 +170,7 @@ notify pgrst, 'reload schema';`}</pre>
               {tr(`↧ Importer mes comptes (${importCount})`, `↧ Import my accounts (${importCount})`)}
             </button>
           )}
-          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
+          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer" title={tr('Ajoute une ligne vide à remplir à la main (nom, pseudo, statut…)', 'Adds a blank row to fill in by hand (name, handle, status…)')}>{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
         </div>
       </div>
 
@@ -227,15 +230,23 @@ notify pgrst, 'reload schema';`}</pre>
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <div className="sf-empty sf-anim-slide-up" style={{ margin: '10px auto', maxWidth: 520 }}>
+        <div className="sf-empty sf-anim-slide-up" style={{ margin: '10px auto', maxWidth: 560 }}>
           <div className="sf-empty-icon">📋</div>
           <p className="sf-empty-title">{tr('Aucun compte suivi', 'No tracked accounts')}</p>
-          <p className="sf-empty-desc">{tr('Ajoute ta première ligne pour commencer ton suivi, ou importe les comptes déjà assignés à tes téléphones.', 'Add your first row to start tracking, or import the accounts already assigned to your phones.')}</p>
+          <p className="sf-empty-desc">{tr('Rappel : chaque téléphone GeeLark fait tourner 1 compte Instagram. Ce tableau relie chaque compte à son modèle, son marché et son statut, et centralise ses accès (mail, mot de passe).', 'Reminder: each GeeLark phone runs 1 Instagram account. This table links every account to its model, market and status, and stores its logins (email, password).')}</p>
+          <div style={{ textAlign: 'left', maxWidth: 420, margin: 'var(--sp-4) auto 0', fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.7 }}>
+            <div><b style={{ color: 'var(--text-2)' }}>{tr('Deux façons de démarrer :', 'Two ways to get started:')}</b></div>
+            <div>{tr('1. Importe en un clic les comptes déjà assignés à tes téléphones.', '1. Import in one click the accounts already assigned to your phones.')}</div>
+            <div>{tr('2. Ou ajoute une ligne à la main et remplis chaque case (tout s\'enregistre tout seul).', '2. Or add a row by hand and fill each cell (everything saves automatically).')}</div>
+            {importCount === 0 && (
+              <div style={{ marginTop: 6, color: 'var(--text-4)' }}>{tr('Astuce : assigne d\'abord un pseudo Instagram à tes téléphones (onglet Téléphones) pour pouvoir les importer ici.', 'Tip: first assign an Instagram handle to your phones (Phones tab) so they can be imported here.')}</div>
+            )}
+          </div>
           <div className="sf-cluster" style={{ justifyContent: 'center', marginTop: 'var(--sp-4)' }}>
             {importCount > 0 && (
-              <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm sf-press cursor-pointer">{tr(`↧ Importer mes comptes (${importCount})`, `↧ Import my accounts (${importCount})`)}</button>
+              <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm sf-press cursor-pointer" title={tr('Crée une ligne pour chaque compte Instagram déjà assigné à un téléphone', 'Creates a row for each Instagram account already assigned to a phone')}>{tr(`↧ Importer mes comptes (${importCount})`, `↧ Import my accounts (${importCount})`)}</button>
             )}
-            <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
+            <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer">{tr('＋ Ajouter une ligne vide', '＋ Add a blank row')}</button>
           </div>
         </div>
       ) : filtered.length === 0 ? (

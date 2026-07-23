@@ -1936,6 +1936,11 @@ export function MassPosting({ user }: MassPostingProps) {
               )}
             </div>
 
+            {/* Guidage étape 1 */}
+            <p style={{ fontSize: 10.5, color: MUTED, lineHeight: 1.5, margin: '0 0 10px' }}>
+              {tr('Étape 1 · Choisis les comptes qui vont publier — coche un ou plusieurs téléphones.', 'Step 1 · Choose the accounts that will post — check one or more phones.')}
+            </p>
+
             {/* Phones / Groups toggle */}
             <div style={{ display: 'flex', border: '1px solid rgba(233,234,240,0.08)', borderRadius: 6, overflow: 'hidden', marginBottom: 10 }}>
               {([{ k: 'phones', l: t('massPostingPhones') }, { k: 'groups', l: t('massPostingGroups') }] as const).map(m => (
@@ -2230,6 +2235,10 @@ export function MassPosting({ user }: MassPostingProps) {
                   </div>
                 </div>
 
+                <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, margin: '-4px 0 14px' }}>
+                  {tr('Étape 2 · Ajoute les vidéos à publier — depuis la banque, un dossier ou ton PC. Elles seront réparties sur les comptes sélectionnés.', 'Step 2 · Add the videos to post — from the bank, a folder or your PC. They are spread across the selected accounts.')}
+                </p>
+
                 {addingFolder && (
                   <div className="sf-banner is-accent" style={{ marginBottom: 10, fontSize: 12 }}>
                     <div className="sf-spinner" style={{ width: 12, height: 12 }} />
@@ -2311,6 +2320,10 @@ export function MassPosting({ user }: MassPostingProps) {
                   </span>
                 </div>
 
+                <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, margin: '-4px 0 14px' }}>
+                  {tr('Étape 3 · Écris la légende commune à tous les comptes (optionnelle). Laisse vide ou génère-la avec l\'IA.', 'Step 3 · Write the caption shared by all accounts (optional). Leave empty or generate it with AI.')}
+                </p>
+
                 <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
                   <textarea
                     value={caption}
@@ -2375,6 +2388,9 @@ export function MassPosting({ user }: MassPostingProps) {
                   <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{t('massPostingPublishOptions')}</span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
                 </div>
+                <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, margin: '-4px 0 14px' }}>
+                  {tr('Étape 4 · Ajuste le comportement du run — téléphones simultanés, essai Reels, usage unique des vidéos. Les valeurs par défaut conviennent dans la plupart des cas.', 'Step 4 · Tune how the run behaves — simultaneous phones, Reels trial, single-use videos. The defaults are fine for most cases.')}
+                </p>
                 <div className="sf-card" style={{ padding: '16px 18px' }}>
                   <PostingOptions opts={postingOpts} onChange={o => { setPostingOpts(o); savePostingOpts(o) }} />
                 </div>
@@ -2389,6 +2405,9 @@ export function MassPosting({ user }: MassPostingProps) {
                     <span className="sf-badge sf-badge-accent" style={{ fontSize: 9 }}>{assignments.length}</span>
                     <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
                   </div>
+                  <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, margin: '-4px 0 14px' }}>
+                    {tr('Aperçu avant lancement — vérifie quelle vidéo part sur quel compte. Change le mode (Séquentiel / Aléatoire) en haut à droite pour ajuster la répartition.', 'Preview before launch — check which video goes to which account. Switch the mode (Sequential / Random) top-right to adjust the spread.')}
+                  </p>
                   <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>

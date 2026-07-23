@@ -115,6 +115,7 @@ function RenameModal({ item, onSave, onClose }: {
   onClose: () => void
 }) {
   const t = useT()
+  const tr = useTr()
   const [val, setVal] = useState(item.title)
   return (
     <div className="sf-modal-bg" onClick={onClose}>
@@ -135,7 +136,7 @@ function RenameModal({ item, onSave, onClose }: {
           />
           <div className="flex gap-2 justify-end">
             <button className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" onClick={onClose}>{t('cancel')}</button>
-            <button className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" onClick={() => { onSave(item.id, val.trim()); onClose() }} disabled={!val.trim()}>{t('save')}</button>
+            <button className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" onClick={() => { onSave(item.id, val.trim()); onClose() }} disabled={!val.trim()} title={!val.trim() ? tr('Saisis un nom pour enregistrer', 'Enter a name to save') : undefined}>{t('save')}</button>
           </div>
         </div>
       </div>
@@ -289,6 +290,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
   onClose: () => void
 }) {
   const t = useT()
+  const tr = useTr()
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -372,6 +374,9 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
             <IconPlus size={14} />
             {t('bankChoosePC')}
           </button>
+          <p className="text-[11px] text-text3 text-center">
+            {tr('Les fichiers sont ajoutés au dossier sélectionné et deviennent réutilisables dans tes posts et stories.', 'Files are added to the selected folder and become reusable in your posts and stories.')}
+          </p>
         </div>
       </div>
     </div>
@@ -1062,6 +1067,7 @@ export function Bank({ user }: BankProps) {
             <button
               key={tf.k}
               onClick={() => setTypeFilter(tf.k)}
+              title={tr('Filtrer la banque par type de média', 'Filter the bank by media type')}
               className={`sf-btn sf-btn-ghost sf-btn-sm cursor-pointer px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
                 typeFilter === tf.k
                   ? 'text-accent'
@@ -1132,6 +1138,11 @@ export function Bank({ user }: BankProps) {
               </button>
             )}
           </div>
+
+          {/* Sidebar helper — what folders do */}
+          <p className="px-4 pt-2 pb-1 text-[10.5px] leading-snug text-text3 flex-shrink-0">
+            {tr('Range tes médias par thème ou par compte. Glisse une vignette sur un dossier pour l\'y déplacer.', 'Sort your media by theme or account. Drag a thumbnail onto a folder to move it there.')}
+          </p>
 
           {/* New folder input */}
           {showNewFolder && (
@@ -1374,15 +1385,27 @@ export function Bank({ user }: BankProps) {
                 </div>
                 <p className="sf-empty-title">{t('bankEmptyTitle')}</p>
                 <p className="sf-empty-desc">{t('bankEmptyDesc')}</p>
-                {canUpload && (
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
-                    style={{ marginTop: 20 }}
-                  >
-                    <IconPlus size={14} />
-                    {t('bankAddMediaBtn')}
-                  </button>
+                <p className="sf-empty-desc" style={{ maxWidth: 420, margin: '6px auto 0', color: 'var(--text-4)', fontSize: 12 }}>
+                  {tr('Ajoute tes vidéos et images ici pour les réutiliser dans tes posts, stories et tâches automatiques. Glisse-dépose plusieurs fichiers d\'un coup, ou clique sur « Ajouter un média ».', 'Add your videos and images here to reuse them in your posts, stories and automated tasks. Drag-and-drop several files at once, or click “Add media”.')}
+                </p>
+                {canUpload ? (
+                  <>
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+                      style={{ marginTop: 20 }}
+                    >
+                      <IconPlus size={14} />
+                      {t('bankAddMediaBtn')}
+                    </button>
+                    <p className="sf-empty-desc" style={{ marginTop: 10, color: 'var(--text-4)', fontSize: 11 }}>
+                      {tr('Formats : vidéo (mp4, mov…), image (jpg, png…), GIF, audio.', 'Formats: video (mp4, mov…), image (jpg, png…), GIF, audio.')}
+                    </p>
+                  </>
+                ) : (
+                  <p className="sf-empty-desc" style={{ marginTop: 14, color: 'var(--text-4)', fontSize: 12 }}>
+                    {tr('Ton rôle ne permet pas d\'ajouter des médias — demande à un admin de ton organisation.', 'Your role can\'t add media — ask an admin of your organization.')}
+                  </p>
                 )}
               </div>
 

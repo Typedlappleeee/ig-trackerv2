@@ -975,6 +975,19 @@ export function Warmup({ user }: WarmupProps) {
               ))}
             </div>
 
+            {/* Guidance : rôle de l'onglet actif + rappel de sélectionner les comptes */}
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', lineHeight: 1.5, margin: '-2px 2px 0', display: 'flex', gap: 6 }}>
+              <span style={{ color: 'var(--accent-l)', flexShrink: 0, fontWeight: 700 }}>→</span>
+              <span>
+                {activeTab === 'login'
+                  ? tr('Connecte tes comptes Instagram sur les téléphones sélectionnés (email : mot de passe : 2FA).', 'Log your Instagram accounts in on the selected phones (email : password : 2FA).')
+                  : activeTab === 'massEdit'
+                    ? tr('Modifie en une fois le profil (nom, pseudo, bio, photo) des comptes sélectionnés.', 'Edit the profile (name, username, bio, picture) of the selected accounts in one go.')
+                    : tr('Simule une activité humaine (navigation, likes, reels) pour réchauffer les comptes avant de poster.', 'Simulates human activity (browsing, likes, reels) to warm up the accounts before posting.')}
+                {' '}{tr('Sélectionne d’abord les comptes à gauche.', 'First select the accounts on the left.')}
+              </span>
+            </p>
+
             {/* ── LOG IN tab ── */}
             {activeTab === 'login' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="sf-anim-slide-up">
@@ -1099,6 +1112,11 @@ export function Warmup({ user }: WarmupProps) {
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"
                   style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
+                  title={
+                    selectedPhones.length === 0 ? tr('Sélectionne au moins un compte à gauche', 'Select at least one account on the left')
+                    : selectedPhones.some(p => !loginCreds[p.id]?.email || !loginCreds[p.id]?.password) ? tr('Renseigne email + mot de passe pour chaque compte sélectionné', 'Enter email + password for every selected account')
+                    : tr('Connecter les comptes sélectionnés', 'Log in the selected accounts')
+                  }
                   disabled={selectedPhones.length === 0 || running ||
                     selectedPhones.some(p => !loginCreds[p.id]?.email || !loginCreds[p.id]?.password)}
                   loading={running}
@@ -1215,6 +1233,11 @@ export function Warmup({ user }: WarmupProps) {
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"
                   style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
+                  title={
+                    selectedPhones.length === 0 ? tr('Sélectionne au moins un compte à gauche', 'Select at least one account on the left')
+                    : (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim()) ? tr('Remplis au moins un champ à modifier (nom, pseudo, bio ou photo)', 'Fill at least one field to change (name, username, bio or picture)')
+                    : tr('Appliquer les modifications aux comptes sélectionnés', 'Apply the edits to the selected accounts')
+                  }
                   disabled={selectedPhones.length === 0 || running ||
                     (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim())}
                   loading={running}
@@ -1389,6 +1412,11 @@ export function Warmup({ user }: WarmupProps) {
                     cursor: selectedPhones.length === 0 || running || browseMinutes === 0 ? 'not-allowed' : 'pointer',
                   }}
                   disabled={selectedPhones.length === 0 || running || browseMinutes === 0}
+                  title={
+                    selectedPhones.length === 0 ? tr('Sélectionne au moins un compte à gauche', 'Select at least one account on the left')
+                    : browseMinutes === 0 ? tr('Choisis une durée de navigation supérieure à 0', 'Pick a browsing duration above 0')
+                    : tr('Lancer le warmup sur les comptes sélectionnés', 'Start warmup on the selected accounts')
+                  }
                   onClick={launchWarmup}
                 >
                   {running
