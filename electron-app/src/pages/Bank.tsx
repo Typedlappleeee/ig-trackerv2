@@ -927,8 +927,8 @@ export function Bank({ user }: BankProps) {
         {/* Icon + title */}
         <div className="sf-cluster min-w-0" style={{ gap: 14 }}>
           <div
-            className="sf-page-icon sf-anim-scale-spring"
-            style={{ ['--icon-grad' as any]: 'linear-gradient(135deg,#EC4899,#8B5CF6)', boxShadow: '0 10px 24px -8px rgba(236,72,153,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)' }}
+            className="sf-page-icon sf-anim-scale-spring sf-float"
+            style={{ ['--icon-grad' as any]: 'linear-gradient(135deg,#818CF8,#8B5CF6 55%,#6366F1)', boxShadow: '0 12px 28px -10px rgba(139,92,246,0.6), inset 0 1px 0 0 rgba(255,255,255,0.35)' }}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
@@ -936,7 +936,7 @@ export function Bank({ user }: BankProps) {
           </div>
           <div className="min-w-0 sf-anim-slide-up sf-d50">
             <div className="flex items-center gap-2.5">
-              <h1 className="sf-page-title">{t('bankTitle')}</h1>
+              <h1 className="sf-page-title sf-title-grad">{t('bankTitle')}</h1>
               <span className="sf-badge sf-badge-accent sf-tabular text-[11px]">{items.length}</span>
             </div>
             <p className="sf-page-sub">{t('bankSubtitle')}</p>
@@ -1369,7 +1369,7 @@ export function Bank({ user }: BankProps) {
             ) : items.length === 0 ? (
               /* Empty state — upload CTA centered */
               <div className="sf-empty py-24">
-                <div className="sf-empty-icon sf-anim-scale-spring" style={{ borderStyle: 'dashed' }}>
+                <div className="sf-empty-icon sf-anim-scale-spring sf-float" style={{ borderStyle: 'dashed', borderColor: 'rgba(139,92,246,0.4)', color: '#A5B4FC', background: 'linear-gradient(160deg, rgba(99,102,241,0.1), rgba(139,92,246,0.05))' }}>
                   <IconUpload size={30} />
                 </div>
                 <p className="sf-empty-title">{t('bankEmptyTitle')}</p>
@@ -1389,7 +1389,7 @@ export function Bank({ user }: BankProps) {
             ) : visible.length === 0 ? (
               /* Empty state — no search results */
               <div className="sf-empty py-20">
-                <div className="sf-empty-icon sf-anim-scale-spring">
+                <div className="sf-empty-icon sf-anim-scale-spring" style={{ borderColor: 'rgba(99,102,241,0.35)', color: '#A5B4FC' }}>
                   <IconSearch size={28} />
                 </div>
                 <p className="sf-empty-title">{t('bankNoResults')}</p>
@@ -2121,11 +2121,11 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
     <div
       draggable={!selectionMode}
       onDragStart={e => e.dataTransfer.setData('bank-item-id', item.id)}
-      className="group cursor-default select-none rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_30px_-10px_rgba(124,58,237,0.45)]"
+      className="group cursor-default select-none rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_18px_40px_-14px_rgba(139,92,246,0.55)] hover:border-[rgba(139,92,246,0.45)]"
       style={{
         background: 'var(--surface)',
         border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
-        boxShadow: isSelected ? '0 0 0 2px rgba(99,102,241,0.25)' : undefined,
+        boxShadow: isSelected ? '0 0 0 2px rgba(99,102,241,0.3), 0 12px 30px -14px rgba(99,102,241,0.4)' : undefined,
       }}
       onContextMenu={e => !selectionMode && onContextMenu(e, item)}
     >
@@ -2171,10 +2171,10 @@ const VideoCard = memo(function VideoCard({ item, onContextMenu, onPlay, selecti
 
         {/* Play button on hover */}
         {!selectionMode && (
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
             <div
-              className="w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(99,102,241,0.75)', backdropFilter: 'blur(8px)', boxShadow: '0 0 20px rgba(99,102,241,0.5)' }}
+              className="w-12 h-12 rounded-full flex items-center justify-center scale-90 group-hover:scale-100 transition-transform duration-300"
+              style={{ background: 'linear-gradient(135deg,#818CF8,#8B5CF6 55%,#6366F1)', backdropFilter: 'blur(8px)', boxShadow: '0 0 26px rgba(139,92,246,0.6), inset 0 1px 0 rgba(255,255,255,0.35)' }}
             >
               <IconPlay size={16} />
             </div>

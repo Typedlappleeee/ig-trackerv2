@@ -22,7 +22,7 @@ const PLATFORMS: {
 }[] = [
   {
     k: 'instagram', label: 'Instagram', desc: 'Reels — publication native via RPA', descEn: 'Reels — native posting via RPA',
-    grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6',
+    grad: 'linear-gradient(135deg,#818CF8,#8B5CF6)', glow: 'rgba(139,92,246,0.5)', accent: '#A5B4FC',
     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>,
   },
   {
@@ -61,9 +61,10 @@ export function Publish({ user }: { user: User }) {
           borderRadius: 'var(--r-xl)', overflow: 'hidden',
         }}>
           <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(99,102,241,0.16), transparent 70%)', filter: 'var(--blur-lg)', pointerEvents: 'none' }} />
+          <div aria-hidden style={{ position: 'absolute', bottom: -80, right: '20%', width: 260, height: 160, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(139,92,246,0.12), transparent 70%)', filter: 'var(--blur-lg)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative', padding: 'var(--sp-6) var(--sp-6) var(--sp-1)', textAlign: 'center' }}>
             <p className="sf-eyebrow" style={{ margin: '0 0 var(--sp-1)' }}>{tr('Publication', 'Publishing')}</p>
-            <h2 className="sf-page-title" style={{ margin: 0 }}>{tr('Où veux-tu publier ?', 'Where do you want to publish?')}</h2>
+            <h2 className="sf-page-title sf-title-grad" style={{ margin: 0 }}>{tr('Où veux-tu publier ?', 'Where do you want to publish?')}</h2>
             <p className="sf-page-sub" style={{ marginTop: 6, marginBottom: 0 }}>
               {tr('Choisis la plateforme pour cette session de publication.', 'Choose the platform for this publishing session.')}
             </p>

@@ -1176,7 +1176,7 @@ export function Phones({ user }: PhonesProps) {
               </svg>
             </div>
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <h1 className="sf-page-title">{t('phonesHeading')}</h1>
+              <h1 className="sf-page-title sf-title-grad">{t('phonesHeading')}</h1>
               <p className="sf-page-sub">{t('phonesSubtitle')}</p>
             </div>
           </div>

@@ -108,6 +108,12 @@ export function AccountTracker({ user, orgId }: { user: User; orgId: string | nu
   const importCount = phoneAccounts.filter(p => p.ig_username && !trackedPseudos.has(p.ig_username.replace(/^@+/, '').toLowerCase())).length
   const pseudoSuggestions = [...new Set(phoneAccounts.map(p => p.ig_username).filter(Boolean))].sort()
 
+  // KPIs dérivés (présentation uniquement — aucun impact sur les données).
+  const statusesOf = (r: Row) => [r.insta, r.tiktok, r.threads, r.youtube]
+  const healthyCount = rows.filter(r => statusesOf(r).includes('Bon')).length
+  const warmingCount = rows.filter(r => statusesOf(r).some(s => s === 'Warm-up' || s === 'À chauffer')).length
+  const alertCount = rows.filter(r => statusesOf(r).some(s => s === 'Banni' || s === 'Shadowban')).length
+
   if (needsSetup) {
     return (
       <div className="sf-card sf-elev-1 sf-anim-slide-up" style={{ padding: 'var(--sp-7) var(--sp-6)', maxWidth: 640, margin: '20px auto', textAlign: 'center' }}>
@@ -156,7 +162,34 @@ notify pgrst, 'reload schema';`}</pre>
           </div>
         </div>
         <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
-          <select value={marketFilter} onChange={e => setMarketFilter(e.target.value)} className="sf-input sf-btn-sm cursor-pointer" style={{ width: 'auto', height: 34, fontSize: 12.5 }}>
+          {importCount > 0 && (
+            <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm sf-press cursor-pointer" title={tr('Crée une ligne pour chaque compte Instagram déjà assigné à un téléphone', 'Creates a row for each Instagram account already assigned to a phone')}>
+              {tr(`↧ Importer mes comptes (${importCount})`, `↧ Import my accounts (${importCount})`)}
+            </button>
+          )}
+          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
+        </div>
+      </div>
+
+      {/* KPI — répartition de la santé des comptes */}
+      {!loading && rows.length > 0 && (
+        <div className="sf-anim-slide-up sf-d100" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+          <StatCard label={tr('Comptes suivis', 'Tracked accounts')} value={rows.length} accent="linear-gradient(135deg,#818CF8,#8B5CF6)" glyph="◆" tint="rgba(139,92,246,0.14)" fg="#A5B4FC" />
+          <StatCard label={tr('En forme', 'Healthy')} value={healthyCount} accent="linear-gradient(135deg,#34d399,#10b981)" glyph="●" tint="rgba(52,211,153,0.14)" fg="var(--ok)" />
+          <StatCard label={tr('En chauffe', 'Warming up')} value={warmingCount} accent="linear-gradient(135deg,#60a5fa,#6366F1)" glyph="◐" tint="rgba(96,165,250,0.14)" fg="#60a5fa" />
+          <StatCard label={tr('À surveiller', 'Needs attention')} value={alertCount} accent="linear-gradient(135deg,#fbbf24,#ef4444)" glyph="▲" tint="rgba(245,158,11,0.14)" fg="#fbbf24" />
+        </div>
+      )}
+
+      {/* Barre de filtres */}
+      {!loading && rows.length > 0 && (
+        <div className="sf-glass sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--sp-2)', padding: '10px 12px', marginBottom: 'var(--sp-4)' }}>
+          <span className="sf-section-label" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)', marginRight: 4, flex: '0 0 auto' }}>{tr('Filtrer', 'Filter')}</span>
+          <div style={{ position: 'relative', flex: '1 1 180px', maxWidth: 260, minWidth: 150 }}>
+            <span aria-hidden style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', fontSize: 12, pointerEvents: 'none' }}>🔎</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher un compte…', 'Search an account…')} className="sf-input" style={{ width: '100%', height: 34, fontSize: 12.5, paddingLeft: 30 }} />
+          </div>
+          <select value={marketFilter} onChange={e => setMarketFilter(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 34, fontSize: 12.5 }}>
             <option value="__all__">{tr('Tous les marchés', 'All markets')}</option>
             {markets.map(m => <option key={m} value={m}>{m}</option>)}
             <option value="__none__">{tr('Non classé', 'Unclassified')}</option>
@@ -168,15 +201,16 @@ notify pgrst, 'reload schema';`}</pre>
               <option value="__none__">{tr('Non classé', 'Unclassified')}</option>
             </select>
           )}
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')} className="sf-input" style={{ width: 170, height: 34, fontSize: 12.5 }} />
-          {importCount > 0 && (
-            <button onClick={importFromPhones} className="sf-btn sf-btn-secondary sf-btn-sm sf-press cursor-pointer" title={tr('Crée une ligne pour chaque compte Instagram déjà assigné à un téléphone', 'Creates a row for each Instagram account already assigned to a phone')}>
-              {tr(`↧ Importer mes comptes (${importCount})`, `↧ Import my accounts (${importCount})`)}
-            </button>
+          {(search || marketFilter !== '__all__' || folderFilter !== '__all__') && (
+            <>
+              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-4)', fontVariantNumeric: 'tabular-nums' }}>
+                {filtered.length}/{rows.length}
+              </span>
+              <button onClick={() => { setSearch(''); setMarketFilter('__all__'); setFolderFilter('__all__') }} className="sf-btn sf-btn-ghost sf-btn-sm sf-press cursor-pointer" style={{ height: 30, fontSize: 12 }}>{tr('Effacer', 'Clear')}</button>
+            </>
           )}
-          <button onClick={addRow} className="sf-btn sf-btn-primary sf-btn-sm sf-press cursor-pointer">{tr('＋ Ajouter une ligne', '＋ Add a row')}</button>
         </div>
-      </div>
+      )}
 
       {/* Tableau */}
       {loading ? (
@@ -216,9 +250,9 @@ notify pgrst, 'reload schema';`}</pre>
           <div className="sf-scroll-x" style={{ overflowX: 'auto' }}>
             <table className="sf-table" style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1280, fontSize: 12.5 }}>
               <thead>
-                <tr style={{ background: 'var(--surface-2)' }}>
+                <tr style={{ background: 'linear-gradient(180deg, var(--surface-2), var(--surface))' }}>
                   {[tr('Compte', 'Account'), tr('Marché', 'Market'), tr('Dossier', 'Folder'), tr('Pseudo', 'Handle'), 'Insta', 'TikTok', 'Threads', 'YouTube', tr('Mail', 'Email'), tr('Mot de passe', 'Password'), tr('Commentaire', 'Comment'), ''].map((h, i) => (
-                    <th key={i} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-4)', borderBottom: '1px solid var(--border-md)', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={i} style={{ textAlign: 'left', padding: '11px 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)', borderBottom: '1px solid var(--border-md)', whiteSpace: 'nowrap', position: 'sticky', top: 0 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -226,9 +260,14 @@ notify pgrst, 'reload schema';`}</pre>
                 {filtered.map(r => (
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     {/* Compte + Modèle */}
-                    <td style={{ padding: '6px 10px', minWidth: 170 }}>
-                      <TextCell value={r.name} placeholder={tr('Nom du compte', 'Account name')} bold onSave={v => patch(r.id, 'name', v)} />
-                      <TextCell value={r.model} placeholder={tr('Modèle', 'Model')} small onSave={v => patch(r.id, 'model', v)} />
+                    <td style={{ padding: '8px 10px', minWidth: 190 }}>
+                      <div className="sf-cluster" style={{ gap: 10, alignItems: 'center' }}>
+                        <Avatar name={r.name} pseudo={r.pseudo} />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <TextCell value={r.name} placeholder={tr('Nom du compte', 'Account name')} bold onSave={v => patch(r.id, 'name', v)} />
+                          <TextCell value={r.model} placeholder={tr('Modèle', 'Model')} small onSave={v => patch(r.id, 'model', v)} />
+                        </div>
+                      </div>
                     </td>
                     <td style={{ padding: '6px 8px' }}><SelectCell value={r.market} options={MARKETS} onSave={v => patch(r.id, 'market', v)} /></td>
                     <td style={{ padding: '6px 8px', minWidth: 110 }}><TextCell value={r.folder} placeholder="—" onSave={v => patch(r.id, 'folder', v)} /></td>
@@ -251,6 +290,41 @@ notify pgrst, 'reload schema';`}</pre>
         </div>
       )}
     </div>
+  )
+}
+
+// ── KPI stat card (présentation) ──────────────────────────────────────────────
+function StatCard({ label, value, accent, glyph, tint, fg }: { label: string; value: number; accent: string; glyph: string; tint: string; fg: string }) {
+  return (
+    <div className="sf-stat-card sf-card-lift">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>{label}</span>
+        <span aria-hidden style={{ width: 26, height: 26, borderRadius: 8, display: 'grid', placeItems: 'center', background: tint, color: fg, fontSize: 12, flex: '0 0 auto' }}>{glyph}</span>
+      </div>
+      <div className="sf-tabular" style={{ fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--text-1)' }}>{value}</div>
+      <div aria-hidden style={{ height: 3, borderRadius: 3, background: accent, opacity: 0.85, width: '100%' }} />
+    </div>
+  )
+}
+
+// ── Avatar (initiale, présentation) ───────────────────────────────────────────
+function Avatar({ name, pseudo }: { name: string | null; pseudo: string | null }) {
+  const src = (name || pseudo || '').replace(/^@+/, '').trim()
+  const initial = src ? src[0].toUpperCase() : '·'
+  // Dégradé indigo/violet déterministe selon la première lettre.
+  const grads = [
+    'linear-gradient(135deg,#818CF8,#8B5CF6)',
+    'linear-gradient(135deg,#6366F1,#A5B4FC)',
+    'linear-gradient(135deg,#8B5CF6,#6366F1)',
+    'linear-gradient(135deg,#A5B4FC,#818CF8)',
+  ]
+  const g = grads[(initial.charCodeAt(0) || 0) % grads.length]
+  return (
+    <span aria-hidden style={{
+      width: 34, height: 34, borderRadius: 10, flex: '0 0 auto', display: 'grid', placeItems: 'center',
+      background: g, color: '#fff', fontSize: 14, fontWeight: 800,
+      boxShadow: '0 4px 12px -4px rgba(99,102,241,0.6), inset 0 1px 0 rgba(255,255,255,0.3)',
+    }}>{initial}</span>
   )
 }
 

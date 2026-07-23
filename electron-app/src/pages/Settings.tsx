@@ -638,7 +638,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">{t('settingsTitle')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{t('settingsTitle')}</h1>
             <p className="sf-page-sub">{user.email}</p>
           </div>
         </div>
@@ -677,7 +677,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
           </div>
 
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">{t('settingsTitle')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{t('settingsTitle')}</h1>
             <p className="sf-page-sub">{user.email}</p>
           </div>
         </div>
@@ -770,7 +770,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     {/* Section header */}
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('appearanceTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('appearanceTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('appearanceSub')}</p>
                     </div>
 
@@ -865,7 +865,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'sons' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('soundsTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('soundsTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('soundsSub')}</p>
                     </div>
 
@@ -926,7 +926,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'notifications' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('notificationsTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('notificationsTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('notificationsSub')}</p>
                     </div>
 
@@ -979,7 +979,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'langue' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('languageTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('languageTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('languageSub')}</p>
                     </div>
 
@@ -1021,7 +1021,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'securite' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('securityTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('securityTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('securitySub')}</p>
                     </div>
 
@@ -1104,7 +1104,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'avance' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('advancedTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('advancedTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('advancedSub')}</p>
                     </div>
 
@@ -1208,7 +1208,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {panel === 'profile' && (
                 <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div style={{ paddingBottom: 4 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('profileTitle')}</h2>
+                    <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('profileTitle')}</h2>
                     <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('profileSub')}</p>
                   </div>
 
@@ -1273,7 +1273,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {panel === 'connexions' && canSeeConnexions && (
                 <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div style={{ paddingBottom: 4 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('connexionsTitle')}</h2>
+                    <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('connexionsTitle')}</h2>
                     <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('connexionsSub')}</p>
                   </div>
 
@@ -1518,7 +1518,7 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
   return (
     <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20, padding: '28px 28px 0' }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('desktopTitle')}</h2>
+        <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t('desktopTitle')}</h2>
         <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>
           {isElectron ? t('desktopAlready') : t('desktopSub')}
         </p>

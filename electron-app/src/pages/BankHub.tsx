@@ -48,15 +48,15 @@ export function BankHub({ user, initialTab = 'videos' }: { user: User; initialTa
         <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
           {/* Icon tile */}
           <div
-            className="sf-page-icon sf-anim-scale-spring"
-            style={{ ['--icon-grad' as any]: `linear-gradient(135deg, ${activeTab.accent}, #8B5CF6)`, transition: 'background 0.3s ease' }}
+            className="sf-page-icon sf-anim-scale-spring sf-float"
+            style={{ ['--icon-grad' as any]: `linear-gradient(135deg, #818CF8, ${activeTab.accent} 50%, #8B5CF6)`, transition: 'background 0.3s ease' }}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">{tr('Banque de contenu', 'Content Bank')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{tr('Banque de contenu', 'Content Bank')}</h1>
             <p className="sf-page-sub">{tr('Gérez vos vidéos, médias et modèles de légendes', 'Manage your videos, media and caption templates')} · {activeTab.label}</p>
           </div>
         </div>

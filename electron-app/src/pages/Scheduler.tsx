@@ -479,7 +479,8 @@ function CalendarWeek({ posts, onMove, onOpen, onSlotClick, onDuplicate, onDelet
                 fontSize: 15, fontWeight: 700, marginTop: 2,
                 color: isToday ? '#fff' : 'var(--ivory)',
                 width: 26, height: 26, lineHeight: '26px', borderRadius: '50%', margin: '2px auto 0',
-                background: isToday ? 'var(--accent)' : 'transparent',
+                background: isToday ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'transparent',
+                boxShadow: isToday ? '0 6px 16px -6px rgba(99,102,241,0.7), inset 0 1px 0 rgba(255,255,255,0.28)' : 'none',
               }}>{d.getDate()}</div>
             </div>
           )
@@ -1022,14 +1023,14 @@ export function Scheduler({ user, onNavigate }: Props) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--sp-5)', gap: 'var(--sp-4)', flexWrap: 'wrap' }}>
           <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
             {/* Icon */}
-            <div className="sf-page-icon sf-anim-scale-spring">
+            <div className="sf-page-icon sf-anim-scale-spring sf-glow-accent">
               <IconCalendarSm size={24} color="#fff" />
             </div>
 
             {/* Text */}
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
               <div className="sf-eyebrow" style={{ marginBottom: 3 }}>{tr('Programmation', 'Scheduling')}</div>
-              <h1 className="sf-page-title">{t('schedulerTitle')}</h1>
+              <h1 className="sf-page-title sf-title-grad">{t('schedulerTitle')}</h1>
               <p className="sf-page-sub">
                 {tr(
                   `${pending.length} en attente · ${doneCount} publié${doneCount > 1 ? 's' : ''} · part même app fermée`,
@@ -1061,14 +1062,17 @@ export function Scheduler({ user, onNavigate }: Props) {
                 <button
                   onClick={clickable ? () => onNavigate?.('history') : undefined}
                   title={clickable ? tr("Voir l'historique complet", 'View full history') : undefined}
+                  className="sf-glass"
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 9, padding: '9px 15px 9px 11px', borderRadius: 12,
-                    background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
-                    border: '1px solid rgba(255,255,255,0.08)', cursor: clickable ? 'pointer' : 'default',
+                    display: 'inline-flex', alignItems: 'center', gap: 9, padding: '10px 16px 10px 12px', borderRadius: 13,
+                    cursor: clickable ? 'pointer' : 'default',
+                    transition: 'transform 0.2s cubic-bezier(0.16,1,0.3,1), border-color 0.2s, box-shadow 0.2s',
                   }}
+                  onMouseEnter={clickable ? e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.35)'; e.currentTarget.style.boxShadow = '0 14px 30px -18px rgba(99,102,241,0.55)' } : undefined}
+                  onMouseLeave={clickable ? e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = 'none' } : undefined}
                 >
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 8px ${color}` }} />
-                  <span style={{ fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{val}</span>
+                  <span style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{val}</span>
                   <span style={{ fontSize: 12, color: 'rgba(233,234,240,0.5)', fontWeight: 600 }}>{label}</span>
                   {clickable && <span style={{ opacity: 0.5, marginLeft: 2 }}>›</span>}
                 </button>
@@ -1212,7 +1216,7 @@ export function Scheduler({ user, onNavigate }: Props) {
         ) : shown.length === 0 ? (
           /* ── Empty state ──────────────────────────────────────────────────────── */
           <div className="sf-empty sf-card sf-anim-slide-up" style={{ marginTop: 8 }}>
-            <div className="sf-empty-icon" style={{ width: 64, height: 64 }}>
+            <div className="sf-empty-icon sf-glow-accent sf-float" style={{ width: 68, height: 68, background: 'linear-gradient(150deg, rgba(99,102,241,0.16), rgba(139,92,246,0.10))', border: '1px solid rgba(139,92,246,0.28)' }}>
               <IconCalendar size={32} color="var(--accent-l)" />
             </div>
             <p className="sf-empty-title">
@@ -1327,7 +1331,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             background: 'linear-gradient(170deg, #16171F, #0F1014)', border: '1px solid rgba(255,255,255,0.09)',
             borderRadius: 20, overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}>
-            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(236,72,153,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(139,92,246,0.18), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: '22px 24px 4px', textAlign: 'center' }}>
               <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)' }}>{tr('Reel programmé', 'Scheduled Reel')}</p>
               <p style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
@@ -1591,12 +1595,13 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
         {/* Time chip */}
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'rgba(99,102,241,0.10)',
-          border: '1px solid rgba(99,102,241,0.22)',
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.16), rgba(139,92,246,0.10))',
+          border: '1px solid rgba(99,102,241,0.28)',
           borderRadius: 8,
           padding: '4px 10px',
           color: 'var(--accent-l)', fontSize: 12.5, fontWeight: 700,
           letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
         }}>
           <IconClock size={13} color="var(--accent-l)" />
           {fmtScheduledTime(post.scheduled_at)}

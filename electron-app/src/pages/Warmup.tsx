@@ -499,11 +499,11 @@ export function Warmup({ user }: WarmupProps) {
       <div className="sf-page anim-page">
         <div className="sf-page-header">
           <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
-            <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as any]: 'linear-gradient(135deg,#EA580C,#FB923C)', boxShadow: '0 10px 24px -8px rgba(251,146,60,0.55), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
+            <div className="sf-page-icon sf-anim-scale-spring">
               <IconBolt size={22} />
             </div>
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <h1 className="sf-page-title">{t('warmupPageTitle')}</h1>
+              <h1 className="sf-page-title sf-title-grad">{t('warmupPageTitle')}</h1>
               <p className="sf-page-sub">{t('warmupPageSub')}</p>
             </div>
           </div>
@@ -543,9 +543,9 @@ export function Warmup({ user }: WarmupProps) {
             borderRadius: 20, overflow: 'hidden',
             boxShadow: '0 40px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}>
-            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(251,146,60,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(139,92,246,0.18), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: '24px 24px 4px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(251,146,60,0.8)' }}>Warmup</p>
+              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#A5B4FC' }}>Warmup</p>
               <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>{tr('Quelle plateforme ?', 'Which platform?')}</h2>
               <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>{tr('Choisis la plateforme pour cette session.', 'Choose the platform for this session.')}</p>
             </div>
@@ -553,7 +553,7 @@ export function Warmup({ user }: WarmupProps) {
               {([
                 {
                   k: 'instagram', label: 'Instagram', desc: 'Login + Mass Edit + Warmup',
-                  grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6',
+                  grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(139,92,246,0.5)', accent: '#A5B4FC',
                   icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>,
                 },
                 {
@@ -609,21 +609,19 @@ export function Warmup({ user }: WarmupProps) {
       <div className="sf-page-header">
         <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
           <div className="sf-page-icon sf-anim-scale-spring" style={{
-            ['--icon-grad' as any]: 'linear-gradient(135deg,#EA580C,#FB923C)',
-            boxShadow: '0 10px 24px -8px rgba(251,146,60,0.55), inset 0 1px 0 rgba(255,255,255,0.35)',
             position: 'relative', overflow: 'hidden',
           }}>
             <IconBolt size={22} />
             {running && (
               <div style={{
                 position: 'absolute', inset: 0, borderRadius: 'inherit',
-                background: 'linear-gradient(135deg,#fff,#FDBA74)',
-                opacity: 0.25, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
+                background: 'linear-gradient(135deg,#fff,#A5B4FC)',
+                opacity: 0.28, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
               }} />
             )}
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">{t('warmupPageTitle')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{t('warmupPageTitle')}</h1>
             <p className="sf-page-sub">{t('warmupPageSub')}</p>
           </div>
         </div>
@@ -880,7 +878,8 @@ export function Warmup({ user }: WarmupProps) {
                       <div style={{
                         height: '100%', borderRadius: 99,
                         width: `${progress}%`,
-                        background: 'var(--ok)',
+                        background: 'linear-gradient(90deg,#6366F1,#8B5CF6)',
+                        boxShadow: '0 0 12px -2px rgba(139,92,246,0.6)',
                         transition: 'width 300ms ease',
                       }} />
                     </div>

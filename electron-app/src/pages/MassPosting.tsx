@@ -1792,7 +1792,7 @@ export function MassPosting({ user }: MassPostingProps) {
             </div>
 
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <h1 className="sf-page-title">Mass Posting</h1>
+              <h1 className="sf-page-title sf-title-grad">Mass Posting</h1>
               <p className="sf-page-sub">
                 {tr('Instagram · Publication', 'Instagram · Post')}
                 {launchCost > 0 && (
@@ -1929,7 +1929,7 @@ export function MassPosting({ user }: MassPostingProps) {
           {/* Panel header */}
           <div style={{ flexShrink: 0, padding: '16px 16px 12px', borderBottom: '1px solid rgba(233,234,240,0.07)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>01</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, fontFamily: SANS, fontStyle: 'normal', fontSize: 11.5, fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#818CF8,#8B5CF6)', boxShadow: '0 6px 14px -7px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.32)' }}>01</span>
               <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{t('massPostingTargets')}</span>
               {selectedPhones.size > 0 && (
                 <span className="sf-badge sf-badge-accent" style={{ marginLeft: 'auto', fontSize: 10 }}>{selectedPhones.size}</span>
@@ -2208,7 +2208,7 @@ export function MassPosting({ user }: MassPostingProps) {
               <section className="sf-anim-slide-up sf-d50">
                 {/* Section header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                  <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>02</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, fontFamily: SANS, fontStyle: 'normal', fontSize: 11.5, fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#818CF8,#8B5CF6)', boxShadow: '0 6px 14px -7px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.32)' }}>02</span>
                   <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{t('massPostingContent')}</span>
                   {selectedVideos.length > 0 && (
                     <span className="sf-badge sf-badge-accent" style={{ fontSize: 9 }}>{selectedVideos.length}</span>
@@ -2303,7 +2303,7 @@ export function MassPosting({ user }: MassPostingProps) {
               {/* ── 03 — Légende ─────────────────────────────────────────────── */}
               <section className="sf-anim-slide-up sf-d100">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                  <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>03</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, fontFamily: SANS, fontStyle: 'normal', fontSize: 11.5, fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#818CF8,#8B5CF6)', boxShadow: '0 6px 14px -7px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.32)' }}>03</span>
                   <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{t('massPostingDescription')}</span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
                   <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: caption.length > 2200 ? 'var(--err)' : FAINT }}>
@@ -2371,7 +2371,7 @@ export function MassPosting({ user }: MassPostingProps) {
               {/* ── 04 — Options de publication ──────────────────────────────── */}
               <section className="sf-anim-slide-up sf-d150">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                  <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>04</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, fontFamily: SANS, fontStyle: 'normal', fontSize: 11.5, fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#818CF8,#8B5CF6)', boxShadow: '0 6px 14px -7px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.32)' }}>04</span>
                   <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{t('massPostingPublishOptions')}</span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
                 </div>
@@ -2384,7 +2384,7 @@ export function MassPosting({ user }: MassPostingProps) {
               {assignments.length > 0 && (
                 <section className="sf-anim-slide-up">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                    <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>05</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, fontFamily: SANS, fontStyle: 'normal', fontSize: 11.5, fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#818CF8,#8B5CF6)', boxShadow: '0 6px 14px -7px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.32)' }}>05</span>
                     <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{t('massPostingAssignments')}</span>
                     <span className="sf-badge sf-badge-accent" style={{ fontSize: 9 }}>{assignments.length}</span>
                     <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
@@ -2447,7 +2447,9 @@ export function MassPosting({ user }: MassPostingProps) {
               {logs.length > 0 && (
                 <section className="sf-anim-slide-up">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                    <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>·</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, fontSize: 12, fontWeight: 800, color: 'var(--accent-l)', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.22)' }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    </span>
                     <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{tr('Journal', 'Log')}</span>
                     <span className="sf-badge sf-badge-muted" style={{ fontSize: 9 }}>{logs.length}</span>
                     <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />

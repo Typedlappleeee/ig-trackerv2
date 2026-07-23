@@ -288,13 +288,13 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
       {/* Header */}
       <div className="sf-page-header">
         <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
-          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#64748B,#475569)' }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#6366F1,#8B5CF6)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">{tr('Historique', 'History')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{tr('Historique', 'History')}</h1>
             <p className="sf-page-sub">{tr('Tous vos posts — programmés et directs', 'All your posts — scheduled and direct')}</p>
           </div>
         </div>
@@ -353,13 +353,32 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
       </div>
 
       {/* Résumé santé — sur les entrées chargées */}
-      {items.length > 0 && (
-        <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED, fontFamily: SANS, fontVariantNumeric: 'tabular-nums' }}>
-          <span style={{ color: IVORY, fontWeight: 700 }}>{items.length}</span> {tr(items.length > 1 ? 'entrées chargées' : 'entrée chargée', items.length > 1 ? 'entries loaded' : 'entry loaded')}
-          {' · '}<span style={{ color: successRate >= 90 ? OK : successRate >= 60 ? '#FBBF24' : ERR, fontWeight: 700 }}>{successRate}%</span> {tr('de réussite', 'success rate')}
-          {(items.length - okCount) > 0 && <> · <span style={{ color: ERR, fontWeight: 600 }}>{items.length - okCount} {tr((items.length - okCount) > 1 ? 'échecs' : 'échec', (items.length - okCount) > 1 ? 'failures' : 'failure')}</span></>}
-        </p>
-      )}
+      {items.length > 0 && (() => {
+        const rateColor = successRate >= 90 ? OK : successRate >= 60 ? '#FBBF24' : ERR
+        const failures = items.length - okCount
+        const statCard = (value: string | number, label: string, accent: string) => (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 11,
+            padding: '10px 16px 10px 12px', borderRadius: 13,
+            background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
+            border: `1px solid ${HAIR}`,
+            boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+          }}>
+            <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: accent, opacity: 0.85 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: 19, fontWeight: 900, color: accent, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</span>
+              <span style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</span>
+            </div>
+          </div>
+        )
+        return (
+          <div className="sf-anim-slide-up" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 16px', fontFamily: SANS }}>
+            {statCard(items.length, tr(items.length > 1 ? 'entrées' : 'entrée', items.length > 1 ? 'entries' : 'entry'), IVORY)}
+            {statCard(`${successRate}%`, tr('réussite', 'success rate'), rateColor)}
+            {failures > 0 && statCard(failures, tr(failures > 1 ? 'échecs' : 'échec', failures > 1 ? 'failures' : 'failure'), ERR)}
+          </div>
+        )
+      })()}
 
       {/* List */}
       <div className="sf-card sf-anim-slide-up" style={{ background: BG2, border: `1px solid ${HAIR}`, borderRadius: 14, overflow: 'hidden', padding: 0 }}>

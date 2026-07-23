@@ -839,9 +839,9 @@ export default function StoryLink({ user }: { user: User }) {
             borderRadius: 20, overflow: 'hidden',
             boxShadow: '0 40px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}>
-            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(245,158,11,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(139,92,246,0.18), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: '24px 24px 4px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(251,191,36,0.75)' }}>Story</p>
+              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#A5B4FC' }}>Story</p>
               <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>{tr('Quelle plateforme ?', 'Which platform?')}</h2>
               <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>{tr('Les stories sont disponibles sur Instagram.', 'Stories are available on Instagram.')}</p>
             </div>
@@ -852,13 +852,13 @@ export default function StoryLink({ user }: { user: User }) {
                 style={{
                   padding: 18, borderRadius: 16, textAlign: 'center',
                   background: 'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012))',
-                  border: '1px solid rgba(244,114,182,0.35)',
+                  border: '1px solid rgba(139,92,246,0.35)',
                   transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s, border-color 0.25s',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 22px 46px -20px rgba(236,72,153,0.5)'; e.currentTarget.style.borderColor = 'rgba(244,114,182,0.55)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'rgba(244,114,182,0.35)' }}>
-                <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', boxShadow: '0 10px 22px -8px rgba(236,72,153,0.5), inset 0 1px 0 rgba(255,255,255,0.3)' }}>
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 22px 46px -20px rgba(139,92,246,0.5)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.55)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.35)' }}>
+                <div style={{ width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#8B5CF6,#6366F1)', boxShadow: '0 10px 22px -8px rgba(139,92,246,0.5), inset 0 1px 0 rgba(255,255,255,0.3)' }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>
                 </div>
                 <div>
@@ -919,12 +919,11 @@ export default function StoryLink({ user }: { user: User }) {
         <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
           <div
             className="sf-page-icon sf-anim-scale-spring"
-            style={{ ['--icon-grad' as any]: 'linear-gradient(135deg,#F59E0B,#EF4444)', boxShadow: '0 10px 24px -8px rgba(245,158,11,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)' }}
           >
             <IconLink />
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">Story</h1>
+            <h1 className="sf-page-title sf-title-grad">Story</h1>
             <p className="sf-page-sub">
               {tr('Instagram · Publie ou programme des stories avec lien.', 'Instagram · Publish or schedule stories with a link.')}
               {selectedIds.length > 0 ? ` · ${storyCost} ${tr('crédits', 'credits')}` : ` · ${CREDIT_COSTS.story} ${tr('crédit/compte', 'credit/account')}`}
@@ -1222,8 +1221,8 @@ export default function StoryLink({ user }: { user: User }) {
           <div className="sf-card anim-stagger" style={{ padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--accent-l)' }}><IconPhoto /></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}><IconPhoto /></span>
                   <span className="sf-section-label" style={{ margin: 0 }}>{tr('Pool de photos', 'Photo pool')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
@@ -1297,8 +1296,8 @@ export default function StoryLink({ user }: { user: User }) {
           <div className="sf-card" style={{ padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--accent-l)' }}><IconText /></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.22)', color: '#A5B4FC' }}><IconText /></span>
                   <span className="sf-section-label" style={{ margin: 0 }}>{tr('Pool de textes sticker', 'Sticker text pool')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
@@ -1325,12 +1324,12 @@ export default function StoryLink({ user }: { user: User }) {
                     background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)',
                     maxWidth: 260,
                   }}>
-                    <span style={{ fontSize: 12, color: '#67e8f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txt}</span>
+                    <span style={{ fontSize: 12, color: 'var(--accent-l)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txt}</span>
                     <button
                       onClick={() => setTextPool(prev => prev.filter((_, j) => j !== i))}
                       aria-label={tr('Retirer le texte', 'Remove text')}
                       className="sf-press cursor-pointer"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(165,180,252,0.55)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', flexShrink: 0 }}
                     >
                       <IconX />
                     </button>
@@ -1357,7 +1356,7 @@ export default function StoryLink({ user }: { user: User }) {
                 onClick={() => { if (editingText.trim()) { setTextPool(prev => [...prev, editingText.trim()]); setEditingText('') } }}
                 disabled={!editingText.trim()}
                 className="sf-btn sf-btn-secondary cursor-pointer"
-                style={{ cursor: editingText.trim() ? 'pointer' : 'not-allowed', opacity: editingText.trim() ? 1 : 0.4, color: '#67e8f9', borderColor: 'rgba(99,102,241,0.22)' }}
+                style={{ cursor: editingText.trim() ? 'pointer' : 'not-allowed', opacity: editingText.trim() ? 1 : 0.4, color: 'var(--accent-l)', borderColor: 'rgba(99,102,241,0.22)' }}
               >
                 {tr('Ajouter', 'Add')}
               </button>
@@ -1375,8 +1374,8 @@ export default function StoryLink({ user }: { user: User }) {
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--accent-l)' }}><IconLinkSm /></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: 'var(--accent-l)' }}><IconLinkSm /></span>
                   <span className="sf-section-label" style={{ margin: 0 }}>{tr('Liens — 1 lien par compte', 'Links — 1 link per account')}</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
@@ -1448,8 +1447,8 @@ export default function StoryLink({ user }: { user: User }) {
 
           {/* ── Distribution mode ───────────────────────────────────────────── */}
           <div className="sf-card" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
-              <span style={{ color: 'var(--accent-l)' }}><IconShuffle /></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
+              <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.22)', color: '#A5B4FC' }}><IconShuffle /></span>
               <span className="sf-section-label" style={{ margin: 0 }}>{tr('Distribution', 'Distribution')}</span>
             </div>
 

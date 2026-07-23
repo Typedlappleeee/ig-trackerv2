@@ -60,6 +60,10 @@ const HUB_CSS = `
   @keyframes hub-float-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(34px,24px)} }
   @keyframes hub-float-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-28px,30px)} }
   @keyframes hub-line-grow { from{transform:scaleX(0)} to{transform:scaleX(1)} }
+  .hub-row { transition: background 0.22s ease, padding-left 0.22s ease; position: relative; }
+  .hub-row::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px; background:linear-gradient(180deg,#818CF8,#8B5CF6); opacity:0; transform:scaleY(0.4); transition:opacity 0.22s ease, transform 0.22s ease; }
+  .hub-row:hover { background: rgba(139,92,246,0.05); padding-left: 24px; }
+  .hub-row:hover::before { opacity:1; transform:scaleY(1); }
 `
 function useHubCSS() {
   useEffect(() => {
@@ -84,15 +88,15 @@ function KpiCard({ label, value, icon, loading, delay = 0, grad, glow, accentCol
       onMouseLeave={() => setHover(false)}
       style={{
         flex: 1, minWidth: 190,
-        padding: 20, borderRadius: 16,
-        background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
-        border: '1px solid rgba(255,255,255,0.08)',
+        padding: '22px 22px 24px', borderRadius: 18,
+        background: 'linear-gradient(160deg, rgba(255,255,255,0.06), rgba(255,255,255,0.014))',
+        border: `1px solid ${hover ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.08)'}`,
         animation: `hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) ${delay}s both`,
-        transform: hover ? 'translateY(-4px)' : 'none',
+        transform: hover ? 'translateY(-5px)' : 'none',
         boxShadow: hover
-          ? `0 26px 54px -26px ${glow}, inset 0 1px 0 0 rgba(255,255,255,0.1)`
-          : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 8px 26px -18px rgba(0,0,0,0.6)',
-        transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s',
+          ? `0 30px 60px -28px ${glow}, 0 0 0 1px rgba(139,92,246,0.1), inset 0 1px 0 0 rgba(255,255,255,0.12)`
+          : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 10px 30px -20px rgba(0,0,0,0.6)',
+        transition: 'transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s, border-color 0.35s',
         position: 'relative', overflow: 'hidden', isolation: 'isolate',
       }}
     >
@@ -176,11 +180,11 @@ function ToolChip({ label, icon, onClick }: { label: string; icon: string; onCli
 function SectionHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <div style={{
-      padding: '16px 20px',
+      padding: '17px 20px',
       borderBottom: `1px solid ${HAIR}`,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: IVORY, fontFamily: SANS }}>{title}</span>
+      <span style={{ fontSize: 13.5, fontWeight: 700, color: IVORY, fontFamily: SANS, letterSpacing: '-0.01em' }}>{title}</span>
       {action && onAction && (
         <button
           onClick={onAction}
@@ -368,33 +372,36 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
       {/* ambient animated glows */}
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{
-          position: 'absolute', top: -120, left: '18%', width: 560, height: 420,
-          background: 'radial-gradient(ellipse, rgba(99,102,241,0.13), transparent 66%)',
-          filter: 'blur(70px)', animation: 'hub-float-a 20s ease-in-out infinite',
+          position: 'absolute', top: -140, left: '14%', width: 620, height: 460,
+          background: 'radial-gradient(ellipse, rgba(99,102,241,0.16), transparent 66%)',
+          filter: 'blur(78px)', animation: 'hub-float-a 20s ease-in-out infinite',
         }} />
         <div style={{
-          position: 'absolute', top: 40, right: '6%', width: 460, height: 380,
-          background: 'radial-gradient(ellipse, rgba(16,185,129,0.09), transparent 68%)',
-          filter: 'blur(72px)', animation: 'hub-float-b 24s ease-in-out infinite',
+          position: 'absolute', top: 20, right: '4%', width: 500, height: 420,
+          background: 'radial-gradient(ellipse, rgba(139,92,246,0.13), transparent 68%)',
+          filter: 'blur(80px)', animation: 'hub-float-b 24s ease-in-out infinite',
         }} />
       </div>
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1120, margin: '0 auto' }}>
 
-        {/* ── Header (variante héro v2) ───────────────────────────────────── */}
-        <div className="sf-page-header is-hero" style={{ marginBottom: 24 }}>
-          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <p className="sf-eyebrow" style={{ margin: '0 0 6px' }}>{dateLabel}</p>
-            <h1 className="sf-page-title" style={{ margin: 0 }}>
-              {greeting},&nbsp;
-              <span style={{
-                background: 'linear-gradient(100deg,#818CF8 10%,#c4b5fd 50%,#6ee7b7 90%)',
-                backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text', animation: 'hub-shimmer 6s linear infinite',
-              }}>{firstName}</span>
+        {/* ── Header (héro — panneau glass premium) ───────────────────────── */}
+        <div className="sf-hero sf-page-header is-hero sf-anim-slide-up sf-d50" style={{
+          marginBottom: 28, padding: '30px 32px', gap: 20,
+          border: '1px solid rgba(139,92,246,0.22)',
+          boxShadow: '0 24px 60px -34px rgba(99,102,241,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
+        }}>
+          <div style={{ minWidth: 0, position: 'relative', zIndex: 1 }}>
+            <p className="sf-eyebrow" style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span aria-hidden style={{ width: 6, height: 6, borderRadius: 99, background: '#818CF8', boxShadow: '0 0 10px 2px rgba(129,140,248,0.7)' }} />
+              {dateLabel}
+            </p>
+            <h1 className="sf-page-title" style={{ margin: 0, fontSize: 'clamp(26px, 4vw, 38px)', letterSpacing: '-0.03em', lineHeight: 1.05 }}>
+              <span style={{ color: 'var(--text-2)', fontWeight: 700 }}>{greeting},&nbsp;</span>
+              <span className="sf-title-grad" style={{ fontWeight: 900 }}>{firstName}</span>
             </h1>
           </div>
-          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100" style={{ position: 'relative', zIndex: 1 }}>
             <span className={`sf-status-chip ${loading ? 'is-accent' : 'is-live'}`}>
               <span className="sf-status-dot" />
               {loading ? t('hubLoading') : tr('En direct', 'Live')}
@@ -440,12 +447,13 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
         )}
 
         {/* ── KPI row — reliée par un flux lumineux ───────────────────────── */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="sf-section-label" style={{ marginBottom: 12 }}>{tr('Aperçu', 'Overview')}</div>
+        <div style={{ display: 'flex', gap: 0, marginBottom: 28, flexWrap: 'wrap', alignItems: 'center' }}>
           {([
-            { label: t('hubKpiPhones'),    value: phoneCount, load: loading,     icon: 'phone',    delay: 0.05, grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', accentColor: '#fff', c: '#818CF8' },
-            { label: t('hubKpiVideos'),    value: videoCount, load: loading,     icon: 'video',    delay: 0.10, grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accentColor: '#fff', c: '#F472B6' },
+            { label: t('hubKpiPhones'),    value: phoneCount, load: loading,     icon: 'phone',    delay: 0.05, grad: 'linear-gradient(135deg,#6366F1,#818CF8)', glow: 'rgba(99,102,241,0.5)', accentColor: '#fff', c: '#818CF8' },
+            { label: t('hubKpiVideos'),    value: videoCount, load: loading,     icon: 'video',    delay: 0.10, grad: 'linear-gradient(135deg,#8B5CF6,#A5B4FC)', glow: 'rgba(139,92,246,0.5)', accentColor: '#fff', c: '#A5B4FC' },
             { label: t('hubKpiWeekPosts'), value: weekPosts,  load: loading,     icon: 'send',     delay: 0.15, grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.5)', accentColor: '#fff', c: '#34D399' },
-            { label: t('hubKpiCredits'),   value: balance.toLocaleString(locale), load: credLoading, icon: 'sparkles', delay: 0.20, grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.5)', accentColor: '#FBBF24', c: '#FBBF24' },
+            { label: t('hubKpiCredits'),   value: balance.toLocaleString(locale), load: credLoading, icon: 'sparkles', delay: 0.20, grad: 'linear-gradient(135deg,#F59E0B,#F59E0B)', glow: 'rgba(245,158,11,0.5)', accentColor: '#FBBF24', c: '#FBBF24' },
           ]).map((k, i, arr) => (
             <Fragment key={k.label}>
               {i > 0 && (
@@ -464,8 +472,9 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
         </div>
 
         {/* ── Quick actions ──────────────────────────────────────────────── */}
+        <div className="sf-section-label" style={{ marginBottom: 12 }}>{tr('Actions rapides', 'Quick actions')}</div>
         <div style={{
-          display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap',
+          display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap',
           animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both',
         }}>
           <QuickBtn label="Mass Posting"  icon="zap"      primary onClick={() => { playNav(); onNavigate('massposting') }} />
@@ -475,11 +484,11 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
         </div>
 
         {/* ── Two-column: Upcoming + Recent ─────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, marginBottom: 24 }}>
 
           {/* Upcoming posts */}
           <div className="sf-card" style={{
-            padding: 0, borderRadius: 12, overflow: 'hidden',
+            padding: 0, borderRadius: 16, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.30s both',
           }}>
             <SectionHead title={t('hubUpcoming')} action={t('hubSeeAll')} onAction={() => { playNav(); onNavigate('scheduler') }} />
@@ -501,8 +510,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
               upcoming.map((post, i) => {
                 const phones = Array.isArray(post.phones) ? post.phones : []
                 return (
-                  <div key={post.id} style={{
-                    padding: '12px 20px',
+                  <div key={post.id} className="hub-row" style={{
+                    padding: '13px 20px',
                     borderBottom: i < upcoming.length - 1 ? `1px solid ${HAIR}` : 'none',
                     display: 'flex', alignItems: 'center', gap: 12,
                   }}>
@@ -534,7 +543,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
           {/* Recent activity */}
           <div className="sf-card" style={{
-            padding: 0, borderRadius: 12, overflow: 'hidden',
+            padding: 0, borderRadius: 16, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.35s both',
           }}>
             <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('history') }} />
@@ -562,8 +571,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                 const status = item.kind === 'scheduled' ? item.data.status : (ok ? 'done' : 'failed')
                 const key = item.kind === 'scheduled' ? `sp-${item.data.id}` : `pr-${item.data.id}`
                 return (
-                  <div key={key} style={{
-                    padding: '12px 20px',
+                  <div key={key} className="hub-row" style={{
+                    padding: '13px 20px',
                     borderBottom: i < recent.length - 1 ? `1px solid ${HAIR}` : 'none',
                     display: 'flex', alignItems: 'center', gap: 12,
                   }}>
