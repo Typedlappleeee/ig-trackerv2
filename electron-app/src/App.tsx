@@ -602,6 +602,8 @@ const Licences       = lazyWithReload(() => import('@/pages/Licences').then(m =>
 const Support        = lazyWithReload(() => import('@/pages/Support').then(m => ({ default: m.Support })))
 const History        = lazyWithReload(() => import('@/pages/History').then(m => ({ default: m.History })))
 const Reports        = lazyWithReload(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
+const Automation     = lazyWithReload(() => import('@/pages/Automation').then(m => ({ default: m.Automation })))
+const Activity       = lazyWithReload(() => import('@/pages/Activity').then(m => ({ default: m.Activity })))
 const Blowsome       = lazyWithReload(() => import('@/pages/Blowsome').then(m => ({ default: m.Blowsome })))
 const BlowsomeApp    = lazyWithReload(() => import('@/blowsome/BlowsomeApp').then(m => ({ default: m.BlowsomeApp })))
 const Library        = lazyWithReload(() => import('@/pages/Library').then(m => ({ default: m.Library })))
@@ -939,6 +941,8 @@ function AppContent({ user }: { user: User }) {
       case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'tasks':        return <Tasks       user={user} />
+      case 'automation':   return <Automation  user={user} onNavigate={(p) => handleNavigate(p as Page)} showRecurring={license.isSuperAdmin} />
+      case 'activity':     return <Activity    user={user} onNavigate={handleNavigate} />
       case 'storylink':    return <StoryLink   user={user} />
       case 'bank':         return <BankHub     user={user} initialTab="videos" />
       case 'warmup':       return <Warmup      user={user} />

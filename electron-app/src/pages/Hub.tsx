@@ -422,7 +422,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.02s both' }}>
             {runningCount > 0 && (
               <button
-                onClick={() => { playNav(); onNavigate('history') }}
+                onClick={() => { playNav(); onNavigate('activity') }}
                 className="sf-card"
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderRadius: 12, cursor: 'pointer', border: '1px solid rgba(52,211,153,0.28)', background: 'rgba(52,211,153,0.06)' }}
               >
@@ -433,7 +433,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             )}
             {failedCount > 0 && (
               <button
-                onClick={() => { playNav(); onNavigate('history') }}
+                onClick={() => { playNav(); onNavigate('activity') }}
                 className="sf-card"
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderRadius: 12, cursor: 'pointer', border: '1px solid rgba(248,113,113,0.32)', background: 'rgba(248,113,113,0.07)' }}
               >
@@ -478,7 +478,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both',
         }}>
           <QuickBtn label="Mass Posting"  icon="zap"      primary onClick={() => { playNav(); onNavigate('massposting') }} />
-          <QuickBtn label={t('hubQuickSchedule')} icon="calendar" onClick={() => { playNav(); onNavigate('scheduler') }} />
+          <QuickBtn label={t('hubQuickSchedule')} icon="calendar" onClick={() => { playNav(); onNavigate('automation') }} />
           <QuickBtn label={t('hubQuickBank')}     icon="video"    onClick={() => { playNav(); onNavigate('bank') }} />
           <QuickBtn label={t('hubKpiPhones')}     icon="phone"    onClick={() => { playNav(); onNavigate('phones') }} />
         </div>
@@ -491,7 +491,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             padding: 0, borderRadius: 16, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.30s both',
           }}>
-            <SectionHead title={t('hubUpcoming')} action={t('hubSeeAll')} onAction={() => { playNav(); onNavigate('scheduler') }} />
+            <SectionHead title={t('hubUpcoming')} action={t('hubSeeAll')} onAction={() => { playNav(); onNavigate('automation') }} />
             {loading ? (
               <ListSkeleton rows={3} />
             ) : upcoming.length === 0 ? (
@@ -501,7 +501,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                 </div>
                 <p className="sf-empty-title">{t('hubNoUpcoming')}</p>
                 <button
-                  onClick={() => { playNav(); onNavigate('scheduler') }}
+                  onClick={() => { playNav(); onNavigate('automation') }}
                   className="sf-btn sf-btn-secondary sf-btn-sm"
                   style={{ marginTop: 4 }}
                 >{t('hubSchedulePost')}</button>
@@ -546,7 +546,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             padding: 0, borderRadius: 16, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.35s both',
           }}>
-            <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('history') }} />
+            <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('activity') }} />
             {loading ? (
               <ListSkeleton rows={4} />
             ) : recent.length === 0 ? (

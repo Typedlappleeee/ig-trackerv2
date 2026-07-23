@@ -75,6 +75,8 @@ export type Page =
   | 'crossposting'
   | 'proxyhealth'
   | 'blowsome'
+  | 'automation'
+  | 'activity'
 
 interface LayoutProps {
   user:      User
@@ -97,8 +99,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'phones',      label: 'navPhones',       icon: '📱' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'library',     label: 'navLibrary',      icon: '📚', isNew: true },
-      { id: 'history',     label: 'navHistory',      icon: '🕑' },
-      { id: 'reports',     label: 'navReports',      icon: '📊', isNew: true },
+      { id: 'activity',    label: 'navActivity',     icon: '📊' },
     ],
   },
   {
@@ -106,8 +107,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'publishhub',  label: 'navPublishVideo', icon: '🚀' },
-      { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
+      { id: 'automation',  label: 'navAutomation',   icon: '📅' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
     ],
   },
@@ -180,6 +180,8 @@ type IconKey = keyof typeof ICONS
 const PAGE_ICON: Record<string, IconKey> = {
   phones:          'phone',
   blowsome:        'sparkles',
+  automation:      'calendar',
+  activity:        'monitor',
   proxyhealth:     'refresh',
   stats:           'monitor',
   monitor:         'monitor',
@@ -756,6 +758,17 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     // Onglet Blowsome (agence VIP) : visible UNIQUEMENT si la clé porte l'add-on
     // blowsome (ou superadmin, qui l'a d'office).
     if (id === 'blowsome') return license?.blowsome === true || effectiveSuperAdmin
+    // Onglets fusionnés : hérite des permissions des sous-vues.
+    // Automatisation = Programmé (scheduler) [+ Récurrent superadmin].
+    if (id === 'automation') {
+      if (role && role !== 'owner' && role !== 'admin' && !canSeeTab(role, perms, 'scheduler')) return false
+      return true
+    }
+    // Activité = Journal (history) + Comptes/Stats (reports) : visible si au moins une l'est.
+    if (id === 'activity') {
+      if (role && role !== 'owner' && role !== 'admin' && !canSeeTab(role, perms, 'history') && !canSeeTab(role, perms, 'reports')) return false
+      return true
+    }
     // Pages internes / superadmin ScaleFlow uniquement (Tâches inclus).
     if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
@@ -774,19 +787,17 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
   // ── Palette de commandes (Cmd/Ctrl+K) — liste des destinations navigables ──
   const paletteItems: CommandItem[] = (() => {
-    const CANDIDATES: { id: Page; label: string; group: string; emoji: string }[] = [
+    const CANDIDATES: { id: Page; label: string; group: string; emoji: string; keywords?: string }[] = [
       { id: 'hub',         label: t('navHub'),        group: tr('Principal', 'Main'),      emoji: '🏠' },
       { id: 'phones',      label: t('navPhones'),     group: tr('Principal', 'Main'),      emoji: '📱' },
       { id: 'bank',        label: t('navBank'),       group: tr('Principal', 'Main'),      emoji: '🗂' },
       { id: 'captionbank', label: t('navCaptionBank'),group: tr('Principal', 'Main'),      emoji: '💬' },
       { id: 'library',     label: t('navLibrary'),    group: tr('Principal', 'Main'),      emoji: '📚' },
-      { id: 'history',     label: t('navHistory'),    group: tr('Principal', 'Main'),      emoji: '🕑' },
-      { id: 'reports',     label: t('navReports'),    group: tr('Principal', 'Main'),      emoji: '📊' },
+      { id: 'activity',    label: t('navActivity'),   group: tr('Principal', 'Main'),      emoji: '📊', keywords: 'historique rapports stats comptes history reports' },
       { id: 'posting',     label: tr('Publier une vidéo', 'Publish a video'), group: tr('Publier', 'Publish'), emoji: '🚀' },
       { id: 'massposting', label: t('navMassPosting'),group: tr('Publier', 'Publish'),     emoji: '⚡' },
       { id: 'storylink',   label: t('navStoryLink'),  group: tr('Publier', 'Publish'),     emoji: '🔗' },
-      { id: 'scheduler',   label: t('navScheduler'),  group: tr('Publier', 'Publish'),     emoji: '📅' },
-      { id: 'tasks',       label: t('navTasks'),      group: tr('Publier', 'Publish'),     emoji: '🤖' },
+      { id: 'automation',  label: t('navAutomation'), group: tr('Publier', 'Publish'),     emoji: '📅', keywords: 'programmation tâches scheduler tasks récurrent programmé' },
       { id: 'warmup',      label: t('navWarmup'),     group: tr('Publier', 'Publish'),     emoji: '🔥' },
       { id: 'remix',       label: t('navRemix'),      group: tr('Studio vidéo', 'Video Studio'), emoji: '🎞' },
       { id: 'spoof',       label: 'Spoof',            group: tr('Studio vidéo', 'Video Studio'), emoji: '🛡' },
@@ -796,7 +807,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       { id: 'settings',    label: t('navSettings'),   group: tr('Compte', 'Account'),      emoji: '⚙️' },
       { id: 'organization',label: t('navOrganization'), group: tr('Compte', 'Account'),    emoji: '🏢' },
     ]
-    return CANDIDATES.filter(c => isVisibleTab(c.id)).map(c => ({ id: c.id, label: c.label, group: c.group, emoji: c.emoji }))
+    return CANDIDATES.filter(c => isVisibleTab(c.id)).map(c => ({ id: c.id, label: c.label, group: c.group, emoji: c.emoji, keywords: c.keywords }))
   })()
 
   // Auto-redirect to the hub when the current page isn’t accessible in this org
@@ -863,6 +874,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     library:     t('navLibrary'),
     organization: t('navOrganization'),
     proxyhealth: t('navProxyHealth'),
+    automation:  t('navAutomation'),
+    activity:    t('navActivity'),
   }
 
   return (
