@@ -80,7 +80,7 @@ const GRAD = {
   green: { grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
   slate: { grad: 'linear-gradient(135deg,#64748B,#475569)', glow: 'rgba(148,163,184,0.4)', accent: '#94A3B8' },
   amber: { grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
-  pink:  { grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)',  accent: '#F472B6' },
+  pink:  { grad: 'linear-gradient(135deg,#A78BFA,#7C3AED)', glow: 'rgba(167,139,250,0.5)',  accent: '#C4B5FD' },
   cyan:  { grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.42)', accent: '#22D3EE' },
   indigo:{ grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)',  accent: '#818CF8' },
   violet:{ grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
@@ -186,7 +186,7 @@ const phoneName = (p: GeelarkPhone) => p.serialName ?? p.name ?? p.serialNo ?? p
 const TEASERS = [
   { emoji: '🔌', title: 'Allumer / Éteindre', titleEn: 'Power on / off', desc: 'Démarre et arrête tes cloud phones en un clic.', descEn: 'Start and stop your cloud phones in one click.', grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
   { emoji: '🔥', title: 'Warmup automatique', titleEn: 'Automatic warmup', desc: 'Chauffe les comptes de façon naturelle avant de publier.', descEn: 'Warm up accounts naturally before posting.', grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
-  { emoji: '✏️', title: 'Édition de profil', titleEn: 'Profile editing', desc: 'Nom, bio et lien mis à jour en masse sur tous les comptes.', descEn: 'Name, bio and link updated in bulk across all accounts.', grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6' },
+  { emoji: '✏️', title: 'Édition de profil', titleEn: 'Profile editing', desc: 'Nom, bio et lien mis à jour en masse sur tous les comptes.', descEn: 'Name, bio and link updated in bulk across all accounts.', grad: 'linear-gradient(135deg,#A78BFA,#7C3AED)', glow: 'rgba(167,139,250,0.5)', accent: '#C4B5FD' },
   { emoji: '📥', title: 'Envoyer des médias', titleEn: 'Send media', desc: 'Dépose des photos/vidéos de ta banque dans la galerie des téléphones.', descEn: 'Drop photos/videos from your bank into the phones\' gallery.', grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
 ]
 function ComingSoon() {
@@ -198,7 +198,7 @@ function ComingSoon() {
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#818CF8', animation: 'lib-pulse 2s ease-in-out infinite' }} />
           {tr('Bibliothèque · Bientôt', 'Library · Soon')}
         </div>
-        <h1 style={{ margin: '0 0 14px', fontSize: 'clamp(34px, 5.6vw, 58px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff' }}>{tr("Une bibliothèque d'automatisations", 'A library of automations')}</h1>
+        <h1 className="sf-title-grad" style={{ margin: '0 0 14px', fontSize: 'clamp(34px, 5.6vw, 58px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0 }}>{tr("Une bibliothèque d'automatisations", 'A library of automations')}</h1>
         <p style={{ margin: '0 auto', maxWidth: 560, fontSize: 15.5, color: 'rgba(233,234,240,0.6)', lineHeight: 1.65 }}>
           {tr('Bientôt : lance des tâches sur tes téléphones en un clic — allumage, warmup, édition de profil et plus.', 'Coming soon: run tasks on your phones in one click — power on, warmup, profile editing and more.')}
         </p>
@@ -328,11 +328,11 @@ function GeelarkLauncher({ user }: { user: User }) {
     <div style={{ position: 'relative', zIndex: 1, maxWidth: 1120, margin: '0 auto' }}>
       <div className="sf-page-header" style={{ marginBottom: 22 }}>
         <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
-          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#10B981,#059669)' }} aria-hidden>
+          <div className="sf-page-icon sf-anim-scale-spring sf-float" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#10B981,#059669)' }} aria-hidden>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">{tr('Lance une tâche sur tes téléphones', 'Run a task on your phones')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{tr('Lance une tâche sur tes téléphones', 'Run a task on your phones')}</h1>
             <p className="sf-page-sub">{tr("Sélectionne des téléphones, choisis une action — elle s'exécute sur chacun, suivi en direct.", 'Select phones, choose an action — it runs on each one, tracked live.')}</p>
           </div>
         </div>
@@ -425,7 +425,8 @@ function GeelarkLauncher({ user }: { user: User }) {
                 <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{tr('Sélectionne un ou plusieurs téléphones à gauche pour activer les actions.', 'Select one or more phones on the left to enable the actions.')}</div>
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 12 }}>
+            <div className="sf-section-label" style={{ margin: '2px 0 -4px' }}>{tr('Actions disponibles', 'Available actions')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 14 }}>
               {tasks.map(t => (
                 <button key={t.key} onClick={() => openTask(t)} disabled={!selected.size || running} className="libtask cursor-pointer" style={{
                   textAlign: 'left', padding: 'var(--sp-4)', borderRadius: 'var(--r-lg)', minHeight: 128,

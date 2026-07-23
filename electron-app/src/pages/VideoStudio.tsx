@@ -45,15 +45,15 @@ const TOOLS: Tool[] = [
   { id: 'spoof', Icon: IconShield, title: 'Spoof', titleEn: 'Spoof', tag: 'Anti-détection', tagEn: 'Anti-detection', preview: 'spoof',
     desc: 'Réécrit device, GPS et EXIF et micro-varie l\'image — invisible aux filtres de doublons.',
     descEn: 'Rewrites device, GPS and EXIF and micro-varies the image — invisible to duplicate filters.',
-    grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
+    grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(139,92,246,0.5)', accent: '#A5B4FC' },
   { id: 'subtitles', Icon: IconCaptions, title: 'Sous-titres', titleEn: 'Subtitles', tag: 'IA Whisper', tagEn: 'Whisper AI', preview: 'subtitles',
     desc: 'Transcription IA (Groq Whisper) et incrustation stylée, mot par mot, en un clic.',
     descEn: 'AI transcription (Groq Whisper) and styled word-by-word burn-in, in one click.',
-    grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
+    grad: 'linear-gradient(135deg,#818CF8,#A78BFA)', glow: 'rgba(129,140,248,0.45)', accent: '#A5B4FC' },
   { id: 'mixer', Icon: IconOverlay, title: 'Mixer', titleEn: 'Mixer', tag: 'Overlay', tagEn: 'Overlay', preview: 'mixer',
     desc: 'Incruste un hook accrocheur sur la vidéo, avec un rendu propre côté serveur.',
     descEn: 'Burns a catchy hook onto the video, with clean server-side rendering.',
-    grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.45)', accent: '#F472B6' },
+    grad: 'linear-gradient(135deg,#8B5CF6,#A78BFA)', glow: 'rgba(139,92,246,0.45)', accent: '#A5B4FC' },
 ]
 
 function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
@@ -64,7 +64,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
     border: '1px solid rgba(255,255,255,0.07)', padding: 14,
   }
   if (kind === 'remix') {
-    const grads = ['linear-gradient(160deg,#3b2f6b,#1a1733)', 'linear-gradient(160deg,#22405e,#0e1c2b)', 'linear-gradient(160deg,#4a2d63,#1d1230)', 'linear-gradient(160deg,#5b2350,#231024)']
+    const grads = ['linear-gradient(160deg,#3b2f6b,#1a1733)', 'linear-gradient(160deg,#39337a,#131033)', 'linear-gradient(160deg,#4a2d63,#1d1230)', 'linear-gradient(160deg,#453a7a,#1a1533)']
     return (
       <div style={{ ...box, display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 52, height: 88, borderRadius: 9, background: grads[0], border: `1px solid ${accent}66`, boxShadow: `0 0 0 3px ${accent}22`, flexShrink: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 6 }}>
@@ -102,7 +102,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
   if (kind === 'subtitles') {
     const words = [tr('tu', 'you'), tr('vas', 'will'), tr('ADORER', 'LOVE'), tr('ça', 'it')]
     return (
-      <div style={{ ...box, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 18, background: 'radial-gradient(130% 130% at 50% 0%, rgba(245,158,11,0.08), rgba(0,0,0,0.42))' }}>
+      <div style={{ ...box, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 18, background: 'radial-gradient(130% 130% at 50% 0%, rgba(139,92,246,0.1), rgba(0,0,0,0.42))' }}>
         <span style={{ position: 'absolute', top: 13, left: 14, fontSize: 8, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.35)' }}>Whisper · live</span>
         <div style={{ position: 'absolute', left: 0, right: 0, top: 8, height: 1, background: `linear-gradient(90deg,transparent,${accent},transparent)`, opacity: 0.5, animation: 'hub-scan 3s ease-in-out infinite alternate' }} />
         <div style={{ display: 'flex', gap: 5 }}>
@@ -114,7 +114,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
     )
   }
   return (
-    <div style={{ ...box, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,#3a1f37,#150c18)' }}>
+    <div style={{ ...box, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,#2a1f4d,#120c1f)' }}>
       <div style={{ padding: '8px 20px', background: 'rgba(0,0,0,0.4)', borderRadius: 7, border: `1px solid ${accent}66`, animation: 'hub-tilt 4s ease-in-out infinite' }}>
         <span style={{ fontSize: 19, fontWeight: 900, letterSpacing: '0.02em', color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>HOOK</span>
       </div>
@@ -175,24 +175,24 @@ export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
       <style>{CSS}</style>
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{ position: 'absolute', top: -140, left: '8%', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.16), transparent 70%)', filter: 'blur(46px)', animation: 'vs-float-a 18s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', top: 20, right: '2%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,0.13), transparent 70%)', filter: 'blur(46px)', animation: 'vs-float-b 22s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: 20, right: '2%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.14), transparent 70%)', filter: 'blur(46px)', animation: 'vs-float-b 22s ease-in-out infinite' }} />
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 980, margin: '0 auto' }}>
-        <div style={{ marginBottom: 36 }}>
-          <div className="sf-anim-slide-up" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 16, fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
+        <div className="sf-hero" style={{ marginBottom: 40, padding: 'clamp(24px, 4vw, 44px)' }}>
+          <div className="sf-anim-slide-up sf-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 18, letterSpacing: '0.24em' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M7 6v12"/><path d="M17 6v12"/></svg>
             {tr('Studio Vidéo', 'Video Studio')}
           </div>
-          <h1 className="sf-anim-slide-up sf-d50" style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#f0abfc 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
+          <h1 className="sf-anim-slide-up sf-d50" style={{ margin: '0 0 14px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 12%,#a5b4fc 48%,#c4b5fd 82%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
             {tr('Ton usine à contenu unique', 'Your unique-content factory')}
           </h1>
-          <p className="sf-anim-slide-up sf-d100" style={{ margin: 0, fontSize: 15, color: 'rgba(233,234,240,0.55)', maxWidth: 600, lineHeight: 1.65 }}>
+          <p className="sf-anim-slide-up sf-d100" style={{ margin: 0, fontSize: 15.5, color: 'var(--text-2)', maxWidth: 620, lineHeight: 1.7 }}>
             {tr('Quatre outils pour transformer une vidéo en dizaines de posts uniques — puis les balancer dans le posting.', 'Four tools to turn one video into dozens of unique posts — then push them straight to posting.')}
           </p>
           {/* Mini-flux : 1 vidéo → 4 outils → ∞ variantes → export */}
-          <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', gap: 12, marginTop: 22, flexWrap: 'wrap', alignItems: 'center' }}>
-            {([['1', tr('vidéo source', 'source video'), '#818CF8'], ['4', tr('outils', 'tools'), '#F472B6'], ['∞', tr('variantes uniques', 'unique variants'), '#34D399'], [tr('1 clic', '1 click'), 'export', '#FBBF24']] as const).map(([v, l, c], i, arr) => (
+          <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', gap: 12, marginTop: 26, flexWrap: 'wrap', alignItems: 'center' }}>
+            {([['1', tr('vidéo source', 'source video'), '#818CF8'], ['4', tr('outils', 'tools'), '#A5B4FC'], ['∞', tr('variantes uniques', 'unique variants'), '#8B5CF6'], [tr('1 clic', '1 click'), 'export', '#A78BFA']] as const).map(([v, l, c], i, arr) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '7px 13px', borderRadius: 99, background: 'rgba(255,255,255,0.035)', border: `1px solid ${c}33` }}>
                   <span style={{ fontSize: 16, fontWeight: 900, color: c, letterSpacing: '-0.02em' }}>{v}</span>
@@ -213,7 +213,8 @@ export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </div>
 
         {/* Grille uniforme 2 colonnes */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18 }}>
+        <div className="sf-anim-slide-up sf-d150 sf-section-label" style={{ marginBottom: 16 }}>{tr('Les outils', 'The tools')}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20 }}>
           {TOOLS.map((tool, i) => <ToolCard key={tool.id} tool={tool} delayClass={`sf-d${Math.min(200 + i * 50, 400)}`} onOpen={() => onNavigate(tool.id)} />)}
         </div>
       </div>

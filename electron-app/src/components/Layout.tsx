@@ -5,6 +5,7 @@ import type { PageKey } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
 import { ActivePostingsWidget } from '@/components/ActivePostingsWidget'
+import { CommandPalette, type CommandItem } from '@/components/CommandPalette'
 import { useT, useTr, tr as trStatic } from '@/lib/i18n'
 import { useToast }  from '@/components/Toast'
 import { playNav }   from '@/lib/sounds'
@@ -767,9 +768,36 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       const pk = PAGE_PERM_KEY[id]
       if (pk && !canSeeTab(role, perms, pk)) return false
     }
-    // Tous les autres onglets sont visibles pour tout le monde.
+    // Tous les autres onglets sont visibles pour tout le monce.
     return true
   }
+
+  // ── Palette de commandes (Cmd/Ctrl+K) — liste des destinations navigables ──
+  const paletteItems: CommandItem[] = (() => {
+    const CANDIDATES: { id: Page; label: string; group: string; emoji: string }[] = [
+      { id: 'hub',         label: t('navHub'),        group: tr('Principal', 'Main'),      emoji: '🏠' },
+      { id: 'phones',      label: t('navPhones'),     group: tr('Principal', 'Main'),      emoji: '📱' },
+      { id: 'bank',        label: t('navBank'),       group: tr('Principal', 'Main'),      emoji: '🗂' },
+      { id: 'captionbank', label: t('navCaptionBank'),group: tr('Principal', 'Main'),      emoji: '💬' },
+      { id: 'library',     label: t('navLibrary'),    group: tr('Principal', 'Main'),      emoji: '📚' },
+      { id: 'history',     label: t('navHistory'),    group: tr('Principal', 'Main'),      emoji: '🕑' },
+      { id: 'reports',     label: t('navReports'),    group: tr('Principal', 'Main'),      emoji: '📊' },
+      { id: 'posting',     label: tr('Publier une vidéo', 'Publish a video'), group: tr('Publier', 'Publish'), emoji: '🚀' },
+      { id: 'massposting', label: t('navMassPosting'),group: tr('Publier', 'Publish'),     emoji: '⚡' },
+      { id: 'storylink',   label: t('navStoryLink'),  group: tr('Publier', 'Publish'),     emoji: '🔗' },
+      { id: 'scheduler',   label: t('navScheduler'),  group: tr('Publier', 'Publish'),     emoji: '📅' },
+      { id: 'tasks',       label: t('navTasks'),      group: tr('Publier', 'Publish'),     emoji: '🤖' },
+      { id: 'warmup',      label: t('navWarmup'),     group: tr('Publier', 'Publish'),     emoji: '🔥' },
+      { id: 'remix',       label: t('navRemix'),      group: tr('Studio vidéo', 'Video Studio'), emoji: '🎞' },
+      { id: 'spoof',       label: 'Spoof',            group: tr('Studio vidéo', 'Video Studio'), emoji: '🛡' },
+      { id: 'subtitles',   label: t('navSubtitles'),  group: tr('Studio vidéo', 'Video Studio'), emoji: '💬' },
+      { id: 'mixer',       label: 'Mixer',            group: tr('Studio vidéo', 'Video Studio'), emoji: '🎚' },
+      { id: 'montage',     label: 'Montage',          group: tr('Studio vidéo', 'Video Studio'), emoji: '✂️' },
+      { id: 'settings',    label: t('navSettings'),   group: tr('Compte', 'Account'),      emoji: '⚙️' },
+      { id: 'organization',label: t('navOrganization'), group: tr('Compte', 'Account'),    emoji: '🏢' },
+    ]
+    return CANDIDATES.filter(c => isVisibleTab(c.id)).map(c => ({ id: c.id, label: c.label, group: c.group, emoji: c.emoji }))
+  })()
 
   // Auto-redirect to the hub when the current page isn’t accessible in this org
   useEffect(() => {
@@ -1693,6 +1721,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
       {/* Suivi global des postings en cours (visible partout, survit au refresh) */}
       <ActivePostingsWidget onOpen={p => onNavigate(p as Page)} orgId={currentOrg?.id ?? null} userId={user.id} />
+
+      {/* Palette de commandes — Cmd/Ctrl+K, navigation instantanée */}
+      <CommandPalette items={paletteItems} onSelect={id => onNavigate(id as Page)} />
     </div>
   )
 }

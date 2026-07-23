@@ -973,13 +973,13 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
                       padding: '9px 11px', borderRadius: 8, border: 'none',
-                      background: on ? 'rgba(244,114,182,0.08)' : 'rgba(233,234,240,0.02)',
-                      outline: on ? '1px solid rgba(244,114,182,0.3)' : '1px solid transparent',
+                      background: on ? 'rgba(139,92,246,0.1)' : 'rgba(233,234,240,0.02)',
+                      outline: on ? '1px solid rgba(139,92,246,0.32)' : '1px solid transparent',
                       transition: 'all 0.12s',
                     }}>
                     <div style={{
                       width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 2,
-                      background: on ? '#F472B6' : 'transparent',
+                      background: on ? 'linear-gradient(135deg,#818CF8,#8B5CF6)' : 'transparent',
                       border: on ? 'none' : '1px solid rgba(233,234,240,0.2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
@@ -1015,7 +1015,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
             className="cursor-pointer"
             style={{
               padding: '9px 20px', fontSize: 11, fontWeight: 800,
-              background: selected.size > 0 ? '#F472B6' : 'rgba(233,234,240,0.08)',
+              background: selected.size > 0 ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'rgba(233,234,240,0.08)',
               color: selected.size > 0 ? '#fff' : 'rgba(233,234,240,0.3)',
               border: 'none', borderRadius: 8,
             }}
@@ -1762,10 +1762,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               {segments.map((seg, idx) => {
                 const isStory = seg.type === 'story'
                 const open = expandedIdx === idx
-                const storyAccent = '#F472B6'
+                const storyAccent = '#A78BFA'
                 const pubAccent   = '#818CF8'
                 const accent = isStory ? storyAccent : pubAccent
-                const accentAlpha = isStory ? 'rgba(244,114,182,' : 'rgba(129,140,248,'
+                const accentAlpha = isStory ? 'rgba(167,139,250,' : 'rgba(129,140,248,'
                 const intervalLabel = formatInterval(draftRecurHours(seg))
                 return (
                   <div key={idx} style={{
@@ -1791,9 +1791,9 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                         {/* Type pill */}
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5,
-                          background: isStory ? 'rgba(236,72,153,0.1)' : 'rgba(99,102,241,0.1)',
+                          background: isStory ? 'rgba(139,92,246,0.1)' : 'rgba(99,102,241,0.1)',
                           color: accent,
-                          border: `1px solid ${isStory ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
+                          border: `1px solid ${isStory ? 'rgba(139,92,246,0.28)' : 'rgba(99,102,241,0.28)'}`,
                           borderRadius: 8, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
                         }}>
                           {isStory ? <IconLinkType size={11} /> : <IconVideo size={11} />}
@@ -1853,21 +1853,21 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                   style={{
                                     display: 'flex', alignItems: 'center', gap: 11,
                                     padding: '11px 14px', borderRadius: 8,
-                                    border: `1px solid ${active ? (opt.k === 'story' ? 'rgba(244,114,182,0.45)' : 'rgba(99,102,241,0.45)') : HAIR}`,
-                                    background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.08)' : 'rgba(99,102,241,0.08)') : 'rgba(255,255,255,0.02)',
+                                    border: `1px solid ${active ? (opt.k === 'story' ? 'rgba(167,139,250,0.45)' : 'rgba(99,102,241,0.45)') : HAIR}`,
+                                    background: active ? (opt.k === 'story' ? 'rgba(167,139,250,0.08)' : 'rgba(99,102,241,0.08)') : 'rgba(255,255,255,0.02)',
                                     color: active ? optAccent : 'rgba(233,234,240,0.55)',
                                     transition: 'all 0.15s',
                                   }}>
                                   <span style={{
                                     width: 32, height: 32, borderRadius: 8, flexShrink: 0,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.12)' : 'rgba(99,102,241,0.12)') : 'rgba(255,255,255,0.04)',
+                                    background: active ? (opt.k === 'story' ? 'rgba(167,139,250,0.12)' : 'rgba(99,102,241,0.12)') : 'rgba(255,255,255,0.04)',
                                   }}>
                                     {opt.icon}
                                   </span>
                                   <div style={{ textAlign: 'left' }}>
                                     <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.6)' }}>{opt.title}</p>
-                                    <p style={{ margin: 0, fontSize: 10.5, color: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.7)' : 'rgba(129,140,248,0.7)') : MUTED }}>{opt.sub}</p>
+                                    <p style={{ margin: 0, fontSize: 10.5, color: active ? (opt.k === 'story' ? 'rgba(167,139,250,0.7)' : 'rgba(129,140,248,0.7)') : MUTED }}>{opt.sub}</p>
                                   </div>
                                 </button>
                               )
@@ -1952,7 +1952,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                     border: `1px solid ${HAIR}`,
                                     background: 'rgba(233,234,240,0.02)',
                                   }}>
-                                    <span style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(244,114,182,0.12)', color: storyAccent, fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                                    <span style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(167,139,250,0.12)', color: storyAccent, fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
                                     <span style={{ flex: 1, fontSize: 12, color: 'rgba(233,234,240,0.75)', lineHeight: 1.5, wordBreak: 'break-word' }}>{txt}</span>
                                     <button
                                       onClick={() => patchSegment(idx, { story_texts: seg.story_texts.filter((_, j) => j !== i) })}
@@ -1985,9 +1985,9 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 className="cursor-pointer"
                                 style={{
                                   padding: '0 14px', fontSize: 11, fontWeight: 700,
-                                  background: storyTextDraft.trim() ? 'rgba(244,114,182,0.12)' : 'rgba(233,234,240,0.05)',
+                                  background: storyTextDraft.trim() ? 'rgba(167,139,250,0.12)' : 'rgba(233,234,240,0.05)',
                                   color: storyTextDraft.trim() ? storyAccent : MUTED,
-                                  border: `1px solid ${storyTextDraft.trim() ? 'rgba(244,114,182,0.3)' : HAIR}`,
+                                  border: `1px solid ${storyTextDraft.trim() ? 'rgba(167,139,250,0.3)' : HAIR}`,
                                   borderRadius: 8,
                                 }}
                               >
@@ -2001,8 +2001,8 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 7,
                                 padding: '7px 13px', fontSize: 11, fontWeight: 700,
-                                background: 'rgba(244,114,182,0.07)', color: storyAccent,
-                                border: '1px solid rgba(244,114,182,0.25)', borderRadius: 8,
+                                background: 'rgba(167,139,250,0.07)', color: storyAccent,
+                                border: '1px solid rgba(167,139,250,0.25)', borderRadius: 8,
                               }}
                             >
                               <IconPlus size={10} /> {tr('Depuis la banque de captions', 'From the caption bank')}
@@ -2305,12 +2305,12 @@ function StepEditor({
     <div style={{
       border: `1px solid ${
         step.type === 'publication' ? 'rgba(99,102,241,0.25)'
-        : step.type === 'story' ? 'rgba(236,72,153,0.25)'
+        : step.type === 'story' ? 'rgba(139,92,246,0.25)'
         : 'rgba(245,158,11,0.25)'}`,
       borderRadius: 12,
       padding: '14px 16px',
       background: step.type === 'publication' ? 'rgba(99,102,241,0.04)'
-        : step.type === 'story' ? 'rgba(236,72,153,0.04)'
+        : step.type === 'story' ? 'rgba(139,92,246,0.04)'
         : 'rgba(245,158,11,0.04)',
       display: 'flex',
       flexDirection: 'column',
@@ -2337,13 +2337,13 @@ function StepEditor({
                 letterSpacing: '0.04em', textTransform: 'uppercase',
                 borderRadius: 8, border: '1px solid',
                 borderColor: step.type === t
-                  ? (t === 'publication' ? 'rgba(99,102,241,0.55)' : t === 'story' ? 'rgba(236,72,153,0.55)' : 'rgba(245,158,11,0.55)')
+                  ? (t === 'publication' ? 'rgba(99,102,241,0.55)' : t === 'story' ? 'rgba(139,92,246,0.55)' : 'rgba(245,158,11,0.55)')
                   : 'rgba(233,234,240,0.1)',
                 background: step.type === t
-                  ? (t === 'publication' ? 'rgba(99,102,241,0.18)' : t === 'story' ? 'rgba(236,72,153,0.18)' : 'rgba(245,158,11,0.18)')
+                  ? (t === 'publication' ? 'rgba(99,102,241,0.18)' : t === 'story' ? 'rgba(139,92,246,0.18)' : 'rgba(245,158,11,0.18)')
                   : 'transparent',
                 color: step.type === t
-                  ? (t === 'publication' ? '#818CF8' : t === 'story' ? '#F472B6' : '#F59E0B')
+                  ? (t === 'publication' ? '#818CF8' : t === 'story' ? '#A78BFA' : '#F59E0B')
                   : MUTED,
               }}
             >
@@ -3114,7 +3114,7 @@ function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           {effType === 'story' && (
-            <span style={{ display: 'inline-flex', color: '#F472B6' }} title="Story"><IconLinkType size={13} /></span>
+            <span style={{ display: 'inline-flex', color: '#A78BFA' }} title="Story"><IconLinkType size={13} /></span>
           )}
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.name || tr('Tâche sans nom', 'Untitled task')}</span>
           {segs.length > 1 && (
@@ -3533,7 +3533,7 @@ export function Tasks({ user }: { user: User }) {
             </div>
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
               <div className="sf-eyebrow" style={{ marginBottom: 4 }}>{tr('Automatisation', 'Automation')}</div>
-              <h1 className="sf-page-title">
+              <h1 className="sf-page-title sf-title-grad">
                 {tr("Workflows d'automatisation", 'Automation workflows')}
               </h1>
               <p className="sf-page-sub">

@@ -374,7 +374,7 @@ export function Subtitles({ user }: SubtitlesProps) {
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">{tr('Sous-titres Auto', 'Auto Subtitles')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{tr('Sous-titres Auto', 'Auto Subtitles')}</h1>
             <p className="sf-page-sub">
               {tr('Groq Whisper transcrit · FFmpeg incruste', 'Groq Whisper transcribes · FFmpeg burns in')}
             </p>
@@ -427,7 +427,7 @@ export function Subtitles({ user }: SubtitlesProps) {
               />
             ) : (
               <div className="sf-empty flex flex-col items-center justify-center h-full select-none" style={{ gap: 12, padding: '48px 0' }}>
-                <div className="sf-empty-icon flex items-center justify-center" style={{ width: 52, height: 52, borderRadius: 'var(--r-md)', background: 'rgba(99,102,241,0.1)', border: `1px solid rgba(99,102,241,0.2)` }}>
+                <div className="sf-empty-icon flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: 'var(--r-md)', background: 'linear-gradient(135deg, rgba(129,140,248,0.16), rgba(139,92,246,0.08))', border: `1px solid rgba(139,92,246,0.25)`, boxShadow: '0 12px 30px -12px rgba(139,92,246,0.5), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
                   <VideoIcon />
                 </div>
                 <div className="text-center">

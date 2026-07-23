@@ -320,7 +320,7 @@ export function Licences({ user: _user }: Props) {
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">Admin — {t('licencesTitle')}</h1>
+            <h1 className="sf-page-title sf-title-grad">Admin — {t('licencesTitle')}</h1>
             <p className="sf-page-sub">{t('licencesSub')}</p>
           </div>
         </div>
@@ -631,7 +631,7 @@ export function Licences({ user: _user }: Props) {
               </svg>
             </div>
             <div style={{ minWidth: 0 }}>
-              <h2 className="text-[16px] font-black text-text leading-none">{lang === 'en' ? 'Credit codes' : 'Codes de crédits'}</h2>
+              <h2 className="text-[16px] font-black sf-grad-text leading-none">{lang === 'en' ? 'Credit codes' : 'Codes de crédits'}</h2>
               <p className="text-[13px] text-text2 mt-0.5">{lang === 'en' ? 'Generate codes that users can redeem for credits' : 'Génère des codes que les utilisateurs peuvent échanger contre des crédits'}</p>
             </div>
           </div>

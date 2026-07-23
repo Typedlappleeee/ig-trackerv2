@@ -440,7 +440,7 @@ export function Mixer({ user }: MixerProps) {
       <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
         <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {/* Icon badge */}
-          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#EC4899,#8B5CF6)' }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#818CF8,#8B5CF6 55%,#6366F1)' }}>
             {/* Edit + merge icon */}
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -449,11 +449,7 @@ export function Mixer({ user }: MixerProps) {
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h1 className="sf-page-title" style={{
-                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(233,234,240,0.9) 100%)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                fontSize: 22, fontWeight: 800,
-              }}>
+              <h1 className="sf-page-title sf-title-grad" style={{ fontSize: 22, fontWeight: 800 }}>
                 Mixer
               </h1>
               {running ? (
@@ -662,7 +658,7 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Summary card */}
           {canStart && (
-            <div className="sf-card anim-scale-in" style={{ padding: '16px 20px', borderColor: 'rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.06)' }}>
+            <div className="sf-card anim-scale-in sf-glow-accent" style={{ padding: '16px 20px', borderColor: 'rgba(139,92,246,0.28)', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06))' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', flexShrink: 0 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>

@@ -45,15 +45,15 @@ const KINDS: Kind[] = [
   { id: 'storylink', Icon: IconStory, title: 'Story', tag: 'Sticker lien', tagEn: 'Link sticker', preview: 'story',
     desc: 'Une story avec un sticker lien propre à chaque compte, publiée en masse.',
     descEn: 'A story with a link sticker unique to each account, posted in bulk.',
-    grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
+    grad: 'linear-gradient(135deg,#8B5CF6,#A78BFA)', glow: 'rgba(139,92,246,0.5)', accent: '#A5B4FC' },
   { id: 'photoposting', Icon: IconPhoto, title: 'Photo', tag: 'Feed', tagEn: 'Feed', preview: 'photo', soon: true,
     desc: 'Publie une photo dans le feed sur tous tes comptes.',
     descEn: 'Post a photo to the feed on all your accounts.',
-    grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.4)', accent: '#34D399' },
+    grad: 'linear-gradient(135deg,#818CF8,#A5B4FC)', glow: 'rgba(129,140,248,0.4)', accent: '#A5B4FC' },
   { id: 'crossposting', Icon: IconGlobe, title: 'Cross-posting', tag: 'Multi-plateforme', tagEn: 'Multi-platform', preview: 'reels', admin: true,
     desc: 'Publie une vidéo sur Facebook, YouTube Shorts, X, Threads, Reddit & Pinterest en une fois.',
     descEn: 'Post a video to Facebook, YouTube Shorts, X, Threads, Reddit & Pinterest all at once.',
-    grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(6,182,212,0.4)', accent: '#38BDF8' },
+    grad: 'linear-gradient(135deg,#4F46E5,#6366F1)', glow: 'rgba(79,70,229,0.45)', accent: '#818CF8' },
 ]
 
 function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
@@ -83,7 +83,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
         ))}
         <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 9 }}>
           <div style={{ flex: 1, height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg,${accent},#34D399)`, animation: 'hub-bar 3.5s ease-in-out infinite alternate' }} />
+            <div style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg,${accent},#8B5CF6)`, animation: 'hub-bar 3.5s ease-in-out infinite alternate' }} />
           </div>
           <span style={{ fontSize: 11, fontWeight: 900, color: accent, fontVariantNumeric: 'tabular-nums' }}>42/47</span>
         </div>
@@ -92,8 +92,8 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
   }
   if (kind === 'story') {
     return (
-      <div style={{ ...box, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,#3a2a12,#160f08)' }}>
-        <div style={{ width: 56, height: 86, borderRadius: 10, background: 'linear-gradient(160deg,#5b4020,#241606)', border: '1px solid rgba(255,255,255,0.12)', position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 10, animation: 'hub-tilt 4s ease-in-out infinite' }}>
+      <div style={{ ...box, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,#251a4a,#100a22)' }}>
+        <div style={{ width: 56, height: 86, borderRadius: 10, background: 'linear-gradient(160deg,#3d2f6b,#1a1233)', border: '1px solid rgba(255,255,255,0.12)', position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 10, animation: 'hub-tilt 4s ease-in-out infinite' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 8, fontWeight: 800, color: '#0a0a0d', background: '#fff', borderRadius: 5, padding: '3px 6px' }}>
             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
             LIEN
@@ -106,7 +106,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
   return (
     <div style={{ ...box, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gridTemplateRows: 'repeat(2,1fr)', gap: 6 }}>
       {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} style={{ borderRadius: 6, background: `linear-gradient(160deg, rgba(16,185,129,${0.16 - i * 0.014}), rgba(0,0,0,0.25))`, border: '1px solid rgba(255,255,255,0.06)' }} />
+        <div key={i} style={{ borderRadius: 6, background: `linear-gradient(160deg, rgba(129,140,248,${0.18 - i * 0.014}), rgba(0,0,0,0.25))`, border: '1px solid rgba(255,255,255,0.06)' }} />
       ))}
       <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: accent, background: 'rgba(8,8,12,0.42)' }}>{tr('Bientôt', 'Soon')}</span>
     </div>
@@ -191,27 +191,27 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
       <style>{CSS}</style>
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{ position: 'absolute', top: -140, left: '8%', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.16), transparent 70%)', filter: 'blur(46px)', animation: 'ph-float-a 18s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', top: 20, right: '2%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.12), transparent 70%)', filter: 'blur(46px)', animation: 'ph-float-b 22s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', top: 20, right: '2%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.13), transparent 70%)', filter: 'blur(46px)', animation: 'ph-float-b 22s ease-in-out infinite' }} />
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 980, margin: '0 auto' }}>
-        <div style={{ marginBottom: 36 }}>
+        <div className="sf-hero" style={{ marginBottom: 40, padding: 'clamp(24px, 4vw, 44px)' }}>
           <div className="sf-eyebrow sf-anim-slide-up" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 'var(--sp-4)', letterSpacing: '0.24em' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
             {tr('Publication', 'Publishing')}
           </div>
-          <h1 className="sf-anim-slide-up sf-d50" style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#6ee7b7 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
+          <h1 className="sf-anim-slide-up sf-d50" style={{ margin: '0 0 12px', fontSize: 'clamp(34px, 5.6vw, 56px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, background: 'linear-gradient(100deg,#fff 15%,#a5b4fc 50%,#c4b5fd 85%)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'hub-shimmer 7s linear infinite' }}>
             {tr('Publie partout, en un clic', 'Publish everywhere, in one click')}
           </h1>
-          <p className="sf-anim-slide-up sf-d100" style={{ margin: 0, fontSize: 15, color: 'var(--text-2)', maxWidth: 600, lineHeight: 1.65 }}>
+          <p className="sf-anim-slide-up sf-d100" style={{ margin: 0, fontSize: 15.5, color: 'var(--text-2)', maxWidth: 620, lineHeight: 1.7 }}>
             {tr('Choisis un format ci-dessous, sélectionne tes comptes et ton contenu, puis publie sur des dizaines de comptes Instagram & TikTok en parallèle.', 'Pick a format below, select your accounts and content, then publish to dozens of Instagram & TikTok accounts in parallel.')}
           </p>
           {/* Comment ça marche — 3 étapes */}
           <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 'var(--sp-6)', flexWrap: 'wrap' }}>
             {[
               { n: '1', t: tr('Choisis un format', 'Pick a format'), s: tr('Reels, Story ou Photo', 'Reels, Story or Photo'), c: '#818CF8' },
-              { n: '2', t: tr('Comptes & contenu', 'Accounts & content'), s: tr('Sélectionne tes téléphones', 'Select your phones'), c: '#FBBF24' },
-              { n: '3', t: tr('Publie en 1 clic', 'Publish in 1 click'), s: tr('Tout part en parallèle', 'Everything goes in parallel'), c: '#34D399' },
+              { n: '2', t: tr('Comptes & contenu', 'Accounts & content'), s: tr('Sélectionne tes téléphones', 'Select your phones'), c: '#A5B4FC' },
+              { n: '3', t: tr('Publie en 1 clic', 'Publish in 1 click'), s: tr('Tout part en parallèle', 'Everything goes in parallel'), c: '#8B5CF6' },
             ].map((step, i, arr) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px 8px 8px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border-md)' }}>
@@ -236,6 +236,7 @@ export function PublishHub({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </div>
 
         {/* Grille uniforme */}
+        <div className="sf-anim-slide-up sf-d150 sf-section-label" style={{ marginBottom: 16 }}>{tr('Choisis un format', 'Pick a format')}</div>
         <div className="sf-anim-slide-up sf-d200" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(visibleKinds.length, 3)}, 1fr)`, gap: 'var(--sp-4)' }}>
           {visibleKinds.map(kind => (
             <KindCard key={kind.id} kind={kind} disabled={kind.soon} badge={kind.soon ? tr('Bientôt', 'Soon') : kind.admin ? 'Admin' : undefined} onOpen={() => onNavigate(kind.id)} />

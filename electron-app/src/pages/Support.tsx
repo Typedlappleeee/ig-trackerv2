@@ -164,9 +164,9 @@ function SupportPageHeader({ title, sub, actions }: { title: string; sub: ReactN
   return (
     <div className="sf-page-header">
       <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
-        <div className="sf-page-icon sf-anim-scale-spring"><IconHeaderSupport /></div>
+        <div className="sf-page-icon sf-anim-scale-spring sf-float"><IconHeaderSupport /></div>
         <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-          <h1 className="sf-page-title">{title}</h1>
+          <h1 className="sf-page-title sf-title-grad">{title}</h1>
           <p className="sf-page-sub">{sub}</p>
         </div>
       </div>
@@ -283,7 +283,7 @@ function CreateTicketForm({
           <IconBack />
           {t('supportBackBtn')}
         </button>
-        <h2 className="text-[20px] font-black text-text">{t('supportNewTicket')}</h2>
+        <h2 className="text-[20px] font-black sf-grad-text">{t('supportNewTicket')}</h2>
       </div>
 
       <div className="sf-card p-6 space-y-5 sf-anim-slide-up sf-d100">
@@ -721,7 +721,7 @@ function UserSupport({ user }: { user: User }) {
             <TicketListSkeleton />
           ) : tickets.length === 0 ? (
             <div className="sf-empty">
-              <div className="sf-empty-icon sf-anim-scale-spring">
+              <div className="sf-empty-icon sf-anim-scale-spring sf-glow-accent sf-float">
                 <IconTicket />
               </div>
               <p className="sf-empty-title mt-2">{t('supportNoTicketsYet')}</p>
@@ -891,7 +891,7 @@ function AdminSupport({ user }: { user: User }) {
           <TicketListSkeleton />
         ) : shown.length === 0 ? (
           <div className="sf-empty">
-            <div className="sf-empty-icon sf-anim-scale-spring"><IconTicket /></div>
+            <div className="sf-empty-icon sf-anim-scale-spring sf-glow-accent sf-float"><IconTicket /></div>
             <p className="sf-empty-title mt-2">{t('supportAdminNoTickets')}</p>
           </div>
         ) : (

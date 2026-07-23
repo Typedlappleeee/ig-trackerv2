@@ -1196,12 +1196,12 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
             />
           ) : (
             <div className="text-center text-text2 space-y-3 flex flex-col items-center">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center sf-anim-scale-spring" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center sf-anim-scale-spring" style={{ background: 'linear-gradient(135deg, rgba(129,140,248,0.16), rgba(139,92,246,0.08))', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 12px 30px -12px rgba(139,92,246,0.55), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#A5B4FC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>
               </div>
-              <p className="text-sm">{t('montageSelectClipPreview')}</p>
+              <p className="text-sm font-medium text-text">{t('montageSelectClipPreview')}</p>
               <p className="text-xs text-text2/60">{t('montageOrDragVideo')}</p>
             </div>
           )}

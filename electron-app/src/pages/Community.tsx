@@ -1291,14 +1291,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 sf-topbar">
         <div className="flex items-center gap-3.5" style={{ minWidth: 0 }}>
-          <div className="sf-page-icon sf-anim-scale-spring">
+          <div className="sf-page-icon sf-anim-scale-spring sf-float">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
             <div className="flex items-center gap-2.5">
-              <h1 className="sf-page-title">{t('communityTitle')}</h1>
+              <h1 className="sf-page-title sf-title-grad">{t('communityTitle')}</h1>
               {uniqueUserCount > 0 && (
                 <span className="sf-status-chip is-live sf-tabular">
                   <span className="sf-status-dot" />
@@ -1618,7 +1618,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
                   {newsMessages.length === 0 && !isAdmin && (
                     <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 sf-glow-accent sf-float"
                         style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--accent-l)' }}>
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
@@ -1762,7 +1762,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
                 {topics.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 sf-glow-accent sf-float"
                       style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--accent-l)' }}>
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
@@ -1917,7 +1917,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div ref={topicListRef} className="flex-1 overflow-y-auto px-5 py-4">
                 {topicMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 sf-glow-accent sf-float"
                       style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
                       {selectedTopic?.emoji}
                     </div>
