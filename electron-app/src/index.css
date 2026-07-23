@@ -2952,3 +2952,40 @@ select.sf-input:disabled {
   background: linear-gradient(180deg, #818CF8, #8B5CF6);
   box-shadow: 0 0 10px 0 rgba(99,102,241,0.6);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PERF v1 — réduire le coût GPU des animations décoratives (anti-lag).
+   Les gros halos floutés ANIMÉS en boucle (blur + keyframe infinie) forcent un
+   recompositing permanent → principale cause de ralentissement. On les fige :
+   le rendu flouté est peint UNE fois puis mis en cache (look identique, 0 coût
+   continu). On garde les animations d'ENTRÉE (jouées une seule fois).
+   ═══════════════════════════════════════════════════════════════════════════ */
+[style*="hub-float"], [style*="sch-float"], [style*="blow-orb"],
+[style*="hub-kpi-flow"], [style*="hub-shimmer"], [style*="hub-pulse-bg"],
+[style*="blow-glow"], [style*="blow-orb"] {
+  animation: none !important;
+}
+/* Titres en dégradé : shimmer figé (plus de repaint permanent du texte). */
+.sf-title-grad, .sf-grad-text { animation: none !important; }
+/* Halo d'accent des cartes actives : conservé, mais les ombres restent statiques. */
+
+/* Accessibilité + perf : respecte « réduire les animations » du système. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* PERF v1 (suite) — gèle TOUTES les animations décoratives en boucle repérées
+   (halos floutés *-float, points lumineux *-flow, shimmers et maquettes des hubs).
+   On NE gèle PAS les indicateurs fonctionnels : sf-ping (téléphone en ligne),
+   wf-rotate (tâche active), spinners — ils restent animés. */
+[style*="-float"], [style*="-flow"],
+[style*="hub-shimmer"], [style*="hub-check"], [style*="hub-bar"],
+[style*="hub-tilt"], [style*="hub-rise"], [style*="hub-scan"], [style*="hub-word"],
+[style*="blow-orb"], [style*="blow-glow"], [style*="hub-pulse"] {
+  animation: none !important;
+}
