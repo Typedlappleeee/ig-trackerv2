@@ -316,14 +316,15 @@ async function handleSpoof(req, res) {
     // (make/model/software + com.apple.quicktime.*) instead of dropping them.
     ffArgs.push('-movflags', 'use_metadata_tags+faststart', '-y', outPath)
 
-    // Timeout SOUS le budget Vercel (maxDuration 60s). Sans ça, un encodage trop
-    // long dépasse 60s → Vercel tue la fonction sans réponse → le client "reste
-    // bloqué sur les vidéos". Ici on échoue proprement avec un message clair.
+    // Pas de limite "vidéo trop longue" : on encode jusqu'au budget max de la
+    // fonction (maxDuration 300s). Le seul plafond restant est celui de Vercel
+    // (5 min en Pro / 60s en Hobby) — c'est une contrainte plateforme, pas la nôtre.
+    // Filet de sécurité contre un ffmpeg réellement bloqué (input corrompu).
     try {
-      await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 55000, killSignal: 'SIGKILL' })
+      await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 290000, killSignal: 'SIGKILL' })
     } catch (e) {
       if (e && (e.killed || e.signal)) {
-        return res.status(200).json({ ok: false, error: 'Vidéo trop longue/lourde pour le spoof serveur (>55s d\'encodage). Essaie une vidéo plus courte ou plus légère.' })
+        return res.status(200).json({ ok: false, error: 'Encodage interrompu (fichier trop lourd ou illisible). Réessaie ; si ça persiste, la vidéo dépasse le budget serveur.' })
       }
       throw e
     }
@@ -432,14 +433,13 @@ module.exports = async (req, res) => {
     })
     ffArgs.push('-y')
 
-    // Timeout SOUS le budget Vercel : N variantes = N encodages dans un seul appel
-    // ffmpeg → très vite au-delà de 60s. Sans timeout, Vercel tue la fonction et le
-    // client reste bloqué. On échoue proprement avec un message actionnable.
+    // Pas de limite : on encode jusqu'au budget max de la fonction (300s). Filet
+    // de sécurité contre un ffmpeg bloqué uniquement.
     try {
-      await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 100 * 1024 * 1024, timeout: 55000, killSignal: 'SIGKILL' })
+      await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 290000, killSignal: 'SIGKILL' })
     } catch (e) {
       if (e && (e.killed || e.signal)) {
-        return res.status(200).json({ ok: false, error: `Encodage trop long (>55s) pour ${variants.length} variante(s). Réduis le nombre de variantes ou utilise une vidéo plus courte/légère.` })
+        return res.status(200).json({ ok: false, error: `Encodage interrompu pour ${variants.length} variante(s) (trop lourd/illisible). Réessaie.` })
       }
       throw e
     }
@@ -504,4 +504,4 @@ module.exports = async (req, res) => {
   }
 }
 
-module.exports.config = { maxDuration: 60 }
+module.exports.config = { maxDuration: 300 }  // budget max (Vercel Pro = 5 min ; Hobby plafonné à 60s)
