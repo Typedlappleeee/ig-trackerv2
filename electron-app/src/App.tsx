@@ -863,7 +863,7 @@ function AppContent({ user }: { user: User }) {
     // Blowsome est une SOUS-APPLICATION : on n'ouvre pas une page dans le shell
     // ScaleFlow, on bascule tout l'écran sur le shell Blowsome (réservé VIP).
     if (p === 'blowsome') {
-      if (license?.blowsome || license?.isSuperAdmin) { setAppMode('blowsome'); return }
+      if (license?.blowsome) { setAppMode('blowsome'); return }
       return // pas d'accès → on ignore
     }
     setPage(p)
@@ -919,7 +919,7 @@ function AppContent({ user }: { user: User }) {
   }
 
   // ── Sous-application Blowsome (VIP) : prend tout l'écran, hors shell ScaleFlow ──
-  if (appMode === 'blowsome' && (license.blowsome || license.isSuperAdmin)) {
+  if (appMode === 'blowsome' && license.blowsome) {
     return (
       <LicenseContext.Provider value={license}>
       <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>

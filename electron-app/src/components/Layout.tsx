@@ -757,7 +757,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const isVisibleTab = (id: Page): boolean => {
     // Onglet Blowsome (agence VIP) : visible UNIQUEMENT si la clé porte l'add-on
     // blowsome (ou superadmin, qui l'a d'office).
-    if (id === 'blowsome') return license?.blowsome === true || effectiveSuperAdmin
+    if (id === 'blowsome') return license?.blowsome === true
     // Onglets fusionnés : hérite des permissions des sous-vues.
     // Automatisation = Programmé (scheduler) [+ Récurrent superadmin].
     if (id === 'automation') {
@@ -983,7 +983,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
           {/* Lanceur de la sous-application Blowsome (VIP) — pas un simple onglet :
               un bouton "espace" distinct, visible seulement avec l'add-on blowsome. */}
-          {(license?.blowsome === true || effectiveSuperAdmin) && (
+          {(license?.blowsome === true) && (
             <div style={{ margin: '6px 0 2px' }}>
               <button
                 onClick={() => { playNav(); onNavigate('blowsome') }}
@@ -1084,18 +1084,6 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             >
               <span className="sf-sidebar-icon"><NavIcon d={ICONS.shield} size={17} /></span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
-            </button>
-          )}
-
-          {license.isSuperAdmin && (
-            <button
-              className={`sf-sidebar-item${page === 'massunique' ? ' is-active' : ''}`}
-              onClick={() => { playNav(); onNavigate('massunique') }}
-              title={tr('Générateur de masse (superadmin)', 'Mass generator (superadmin)')}
-              style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
-            >
-              <span className="sf-sidebar-icon"><NavIcon d={ICONS.sparkles} size={17} /></span>
-              {!collapsed && <span style={{ flex: 1 }}>{tr('Générateur de masse', 'Mass generator')}</span>}
             </button>
           )}
 
