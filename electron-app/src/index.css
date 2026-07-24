@@ -3014,3 +3014,8 @@ select.sf-input:disabled {
   background-size: 100% 100%, 100% 100%, 100% 100%, 46px 46px, 46px 46px !important;
   background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat !important;
 }
+
+/* Densité par défaut : équivaut à un zoom navigateur ~90 % (l'UI est plus
+   compacte/pro à ce niveau). `zoom` est natif sur les navigateurs Chromium
+   (Edge/Chrome) et Electron. Ajustable facilement (0.9 = 90 %, 0.85 = 85 %). */
+body { zoom: 0.9; }
