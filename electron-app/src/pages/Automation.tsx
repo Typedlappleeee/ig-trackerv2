@@ -14,14 +14,9 @@ export function Automation({ user, onNavigate, showRecurring = false }: {
 }) {
   const tr = useTr()
   const [tab, setTab] = useState<'scheduled' | 'recurring'>('scheduled')
-  // Popup d'info affiché à l'entrée (une fois par session).
-  const [notice, setNotice] = useState(() => {
-    try { return sessionStorage.getItem('sf-automation-notice') !== '1' } catch { return true }
-  })
-  const closeNotice = () => {
-    try { sessionStorage.setItem('sf-automation-notice', '1') } catch { /* ignore */ }
-    setNotice(false)
-  }
+  // Popup d'info affiché à CHAQUE entrée dans l'onglet (à chaque montage).
+  const [notice, setNotice] = useState(true)
+  const closeNotice = () => setNotice(false)
   const eff = showRecurring ? tab : 'scheduled'
 
   return (
