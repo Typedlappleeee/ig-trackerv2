@@ -86,7 +86,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
   }
 
   // ── Génération (simple ou masse) ────────────────────────────────────────────
-  const renderOne = async (v: Vid, p: Photo, token?: string): Promise<{ ok: boolean; url?: string; storagePath?: string; error?: string }> => {
+  const renderOne = async (v: Vid, p: Photo, token?: string): Promise<{ ok: boolean; url?: string; storagePath?: string; thumbnailPath?: string; error?: string }> => {
     const res = await fetch('/api/mix-overlay', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -123,7 +123,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
           if (r.storagePath) {
             await supabase.from('content_bank').insert({
               user_id: user.id, org_id: currentOrg?.id ?? null, title: `Overlay — ${pr.v.title}`,
-              file_url: null, storage_path: r.storagePath, thumbnail_path: null, folder: saveFolder, tags: ['overlay'], notes: '',
+              file_url: null, storage_path: r.storagePath, thumbnail_path: r.thumbnailPath ?? null, folder: saveFolder, tags: ['overlay'], notes: '',
             })
           }
           setJobs(prev => prev.map(j => j.id === `${i}` ? { ...j, status: 'done', url: r.url } : j))

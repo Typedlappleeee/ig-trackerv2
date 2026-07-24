@@ -154,6 +154,7 @@ async function handleMediaOverlay(req, res) {
   const inPath  = path.join(tmpDir, `movl_in_${ts}.mp4`)
   const ovPath  = path.join(tmpDir, `movl_ov_${ts}`)
   const outPath = path.join(tmpDir, `movl_out_${ts}.mp4`)
+  const thumbPath = path.join(tmpDir, `movl_th_${ts}.jpg`)
   try {
     const r1 = await fetchMediaFollow(videoUrl)
     if (!r1.ok) return res.status(400).json({ ok: false, error: `base ${r1.status}` })
@@ -193,18 +194,30 @@ async function handleMediaOverlay(req, res) {
       throw new Error(`FFmpeg: ${stderr || ffErr.message}`)
     }
 
-    const resultPath = userId
-      ? `videos/users/${userId}/overlay-${ts}_${Math.random().toString(36).slice(2)}.mp4`
-      : `mix-results/${ts}_${Math.random().toString(36).slice(2)}.mp4`
+    const rand = Math.random().toString(36).slice(2)
+    const resultPath = userId ? `videos/users/${userId}/overlay-${ts}_${rand}.mp4` : `mix-results/${ts}_${rand}.mp4`
     const outBuf = fs.readFileSync(outPath)
     const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, { contentType: 'video/mp4', upsert: true })
     if (upErr) throw new Error(upErr.message)
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
-    res.json({ ok: true, url: publicUrl, storagePath: resultPath })
+
+    // Miniature prise PENDANT la fenêtre d'incrustation → la banque montre bien la
+    // vidéo AVEC l'image dessus (et pas la 1re frame sans overlay). Best-effort.
+    let thumbnailPath = null
+    try {
+      const at = Math.min(st + dur / 2, Math.max(st + 0.03, 0.1))
+      await execFileAsync(ffmpegPath, ['-nostdin', '-ss', String(at), '-i', outPath, '-vframes', '1', '-q:v', '3', '-y', thumbPath], { maxBuffer: 20 * 1024 * 1024, timeout: 15000 })
+      const thBuf = fs.readFileSync(thumbPath)
+      const thPath = resultPath.replace(/\.mp4$/, '_thumb.jpg')
+      const { error: thErr } = await supabase.storage.from(bucket).upload(thPath, thBuf, { contentType: 'image/jpeg', upsert: true })
+      if (!thErr) thumbnailPath = thPath
+    } catch { /* miniature best-effort */ }
+
+    res.json({ ok: true, url: publicUrl, storagePath: resultPath, thumbnailPath })
   } catch (err) {
     res.status(500).json({ ok: false, error: (err instanceof Error ? err.message : String(err)).slice(0, 1000) })
   } finally {
-    fs.rmSync(inPath, { force: true }); fs.rmSync(ovPath, { force: true }); fs.rmSync(outPath, { force: true })
+    fs.rmSync(inPath, { force: true }); fs.rmSync(ovPath, { force: true }); fs.rmSync(outPath, { force: true }); fs.rmSync(thumbPath, { force: true })
   }
 }
 
