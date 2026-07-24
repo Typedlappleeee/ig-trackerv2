@@ -2989,3 +2989,13 @@ select.sf-input:disabled {
 [style*="blow-orb"], [style*="blow-glow"], [style*="hub-pulse"] {
   animation: none !important;
 }
+
+/* Fond statique plus riche — évite l'effet "vide/plat" maintenant que les halos
+   ne sont plus animés. Deux lueurs douces (haut + bas) peintes une seule fois. */
+.sf-page {
+  background:
+    radial-gradient(760px 440px at 88% 106%, rgba(139,92,246,0.07), transparent 72%),
+    radial-gradient(680px 380px at 8% 96%, rgba(99,102,241,0.05), transparent 72%),
+    radial-gradient(1100px 380px at 50% -12%, rgba(99,102,241,0.06), transparent 70%),
+    var(--base) !important;
+}

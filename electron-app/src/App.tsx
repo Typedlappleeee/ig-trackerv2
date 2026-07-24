@@ -941,7 +941,7 @@ function AppContent({ user }: { user: User }) {
       case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'tasks':        return <Tasks       user={user} />
-      case 'automation':   return <Automation  user={user} onNavigate={(p) => handleNavigate(p as Page)} showRecurring={license.isSuperAdmin} />
+      case 'automation':   return <Automation  user={user} onNavigate={(p) => handleNavigate(p as Page)} showRecurring={true} />
       case 'activity':     return <Activity    user={user} onNavigate={handleNavigate} />
       case 'storylink':    return <StoryLink   user={user} />
       case 'bank':         return <BankHub     user={user} initialTab="videos" />
