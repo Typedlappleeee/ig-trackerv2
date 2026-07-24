@@ -7,6 +7,7 @@ import { getSignedUrl, uploadVideoFromPath } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { useTr } from '@/lib/i18n'
 import type { CaptionItem } from './CaptionBank'
+import { OverlayComposer } from './OverlayComposer'
 
 interface MixerProps { user: User }
 type MixPosition = 'bottom' | 'middle' | 'top'
@@ -314,6 +315,7 @@ export function Mixer({ user }: MixerProps) {
   const [fontSize,  setFontSize]  = useState(52)
   const [fontColor, setFontColor] = useState('#ffffff')
   const [mode,      setMode]      = useState<'random' | 'all'>('random')
+  const [composerMode, setComposerMode] = useState<'caption' | 'overlay'>('caption')
 
   const [jobs,    setJobs]    = useState<MixJob[]>([])
   const [running, setRunning] = useState(false)
@@ -433,6 +435,9 @@ export function Mixer({ user }: MixerProps) {
   const doneJobs  = jobs.filter(j => j.status === 'done')
   const errorJobs = jobs.filter(j => j.status === 'error')
 
+  // Mode « Image/Vidéo positionnée » → composeur dédié (placement + timing).
+  if (composerMode === 'overlay') return <OverlayComposer user={user} onMode={setComposerMode} />
+
   return (
     <div className="anim-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--base)' }}>
 
@@ -468,6 +473,11 @@ export function Mixer({ user }: MixerProps) {
         </div>
 
         <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {/* Composer type : texte (défaut) vs image/vidéo positionnée */}
+          <div className="sf-segment">
+            <button className="sf-segment-item is-active cursor-pointer">{tr('Texte', 'Text')}</button>
+            <button className="sf-segment-item cursor-pointer" onClick={() => setComposerMode('overlay')}>{tr('Image/Vidéo', 'Image/Video')}</button>
+          </div>
           {/* Mode toggle */}
           <div className="sf-segment">
             {([{ k: 'random' as const, label: tr('Aléatoire', 'Random') }, { k: 'all' as const, label: tr('Tout combiner', 'Combine all') }] as const).map(m => (

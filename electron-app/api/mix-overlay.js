@@ -138,8 +138,81 @@ function buildAssFile(caption, fontSize, fontColor, position) {
   )
 }
 
+// ── Incrustation d'un MÉDIA (image/vidéo) positionné + timé ──────────────────
+// Position (x,y) et largeur (w) en FRACTIONS de la vidéo de sortie (0..1) → placement
+// précis indépendant de la résolution. Timing : apparaît entre `start` et start+duration.
+async function handleMediaOverlay(req, res) {
+  const {
+    videoUrl, overlayUrl, overlayType = 'image', userId, bucket = 'content',
+    x = 0.1, y = 0.1, w = 0.3, start = 0, duration = 5,
+    supabaseToken, supabaseAnonKey,
+  } = req.body ?? {}
+  if (!videoUrl || !overlayUrl) return res.status(400).json({ ok: false, error: 'Missing videoUrl or overlayUrl' })
+
+  const supabase = getSupabaseAdmin({ supabaseToken, supabaseAnonKey })
+  const ts = Date.now(); const tmpDir = os.tmpdir()
+  const inPath  = path.join(tmpDir, `movl_in_${ts}.mp4`)
+  const ovPath  = path.join(tmpDir, `movl_ov_${ts}`)
+  const outPath = path.join(tmpDir, `movl_out_${ts}.mp4`)
+  try {
+    const r1 = await fetchMediaFollow(videoUrl)
+    if (!r1.ok) return res.status(400).json({ ok: false, error: `base ${r1.status}` })
+    fs.writeFileSync(inPath, Buffer.from(await r1.arrayBuffer()))
+    const r2 = await fetchMediaFollow(overlayUrl)
+    if (!r2.ok) return res.status(400).json({ ok: false, error: `overlay ${r2.status}` })
+    fs.writeFileSync(ovPath, Buffer.from(await r2.arrayBuffer()))
+
+    const clamp = (v, lo, hi) => Math.min(Math.max(Number(v), lo), hi)
+    const fx = clamp(x || 0, 0, 1), fy = clamp(y || 0, 0, 1), fw = clamp(w || 0.3, 0.02, 1)
+    const st = Math.max(Number(start) || 0, 0)
+    const dur = Math.max(Number(duration) || 3, 0.2)
+    const end = (st + dur).toFixed(3)
+    const ox = Math.round(fx * VW), oy = Math.round(fy * VH), ow = Math.round(fw * VW)
+    const isVideo = overlayType === 'video'
+
+    const bg = `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg]`
+    const ovChain = isVideo
+      ? `[1:v]scale=${ow}:-1,setpts=PTS-STARTPTS+${st}/TB[ov]`  // vidéo overlay démarre à `start`
+      : `[1:v]scale=${ow}:-1[ov]`
+    const filter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=pass[out]`
+    const inputs = isVideo ? ['-i', inPath, '-i', ovPath] : ['-i', inPath, '-loop', '1', '-i', ovPath]
+
+    const ffArgs = [
+      '-nostdin', '-threads', '0', ...inputs,
+      '-filter_complex', filter,
+      '-map', '[out]', '-map', '0:a?',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart', '-shortest', '-y', outPath,
+    ]
+    try {
+      await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 290000, killSignal: 'SIGKILL' })
+    } catch (ffErr) {
+      const stderr = (ffErr.stderr ?? '').slice(-800)
+      throw new Error(`FFmpeg: ${stderr || ffErr.message}`)
+    }
+
+    const resultPath = userId
+      ? `videos/users/${userId}/overlay-${ts}_${Math.random().toString(36).slice(2)}.mp4`
+      : `mix-results/${ts}_${Math.random().toString(36).slice(2)}.mp4`
+    const outBuf = fs.readFileSync(outPath)
+    const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, { contentType: 'video/mp4', upsert: true })
+    if (upErr) throw new Error(upErr.message)
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
+    res.json({ ok: true, url: publicUrl, storagePath: resultPath })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: (err instanceof Error ? err.message : String(err)).slice(0, 1000) })
+  } finally {
+    fs.rmSync(inPath, { force: true }); fs.rmSync(ovPath, { force: true }); fs.rmSync(outPath, { force: true })
+  }
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
+
+  // Nouveau mode : incrustation d'une image/vidéo positionnée + timée.
+  if (req.body && req.body.mode === 'media') return handleMediaOverlay(req, res)
 
   const {
     videoUrl, storagePath, caption, userId,
@@ -265,4 +338,4 @@ module.exports = async (req, res) => {
   }
 }
 
-module.exports.config = { maxDuration: 60 }
+module.exports.config = { maxDuration: 300, memory: 3008 }
