@@ -504,4 +504,6 @@ module.exports = async (req, res) => {
   }
 }
 
-module.exports.config = { maxDuration: 300 }  // budget max (Vercel Pro = 5 min ; Hobby plafonné à 60s)
+// Budget max fonction : temps (300s = 5 min en Pro) + mémoire (3008MB en Pro) pour
+// encaisser les grosses/longues vidéos. Sur Vercel Hobby, plafonné à 60s / 1024MB.
+module.exports.config = { maxDuration: 300, memory: 3008 }
