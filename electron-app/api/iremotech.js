@@ -15,16 +15,18 @@ const { fetchMediaFollow } = require('./_ssrf')
 module.exports.config = { maxDuration: 60 }
 
 const BASE = (process.env.IREMOTECH_API_BASE || 'https://api.iremotech.com/v1').replace(/\/$/, '')
-const KEY = process.env.IREMOTECH_API_KEY
 
 async function jsonOr(res) { try { return await res.json() } catch { return null } }
 
 module.exports = async (req, res) => {
-  if (req.method === 'GET') return res.status(200).json({ ok: true, configured: !!KEY, base: BASE })
+  if (req.method === 'GET') return res.status(200).json({ ok: true, base: BASE })
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
-  if (!KEY) return res.status(200).json({ ok: false, error: 'Clé iRemoTech absente : définis IREMOTECH_API_KEY dans les variables d\'env Vercel.' })
 
-  const { op, deviceId, body, filename, mediaUrl } = req.body ?? {}
+  const { op, deviceId, body, filename, mediaUrl, apiKey } = req.body ?? {}
+  // Clé : d'abord celle envoyée par le client (config par agence dans ScaleFlow),
+  // sinon la variable d'env Vercel globale (fallback optionnel).
+  const KEY = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey.trim() : process.env.IREMOTECH_API_KEY
+  if (!KEY) return res.status(200).json({ ok: false, error: 'Clé iRemoTech absente : colle ta clé API dans ScaleFlow (Phone Farm → ⚙) ou définis IREMOTECH_API_KEY sur Vercel.' })
   const auth = { Authorization: `Bearer ${KEY}` }
   const dev = encodeURIComponent(String(deviceId ?? ''))
 

@@ -2,7 +2,9 @@
 // iPhones iRemoTech via leur Device API (proxy /api/iremotech).
 // Capture d'écran cliquable → tap aux coordonnées, + actions (texte, scroll, URL…).
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { iremotech, extractDevices, type IrtDevice, type IrtAction } from '@/lib/iremotech'
+import type { User } from '@supabase/supabase-js'
+import { useOrg } from '@/lib/orgContext'
+import { iremotech, extractDevices, loadIremotechKey, saveIremotechKey, type IrtDevice, type IrtAction } from '@/lib/iremotech'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, GOLD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
@@ -10,8 +12,9 @@ import {
 
 type Conn = 'checking' | 'ok' | 'unconfigured' | 'error'
 
-export function BlowPhoneFarm() {
+export function BlowPhoneFarm({ user }: { user: User }) {
   useBlowCSS()
+  const { currentOrg } = useOrg()
   const [conn, setConn] = useState<Conn>('checking')
   const [connMsg, setConnMsg] = useState('')
   const [devices, setDevices] = useState<IrtDevice[]>([])
@@ -21,6 +24,11 @@ export function BlowPhoneFarm() {
   const [text, setText] = useState('')
   const [log, setLog] = useState<string[]>([])
   const imgRef = useRef<HTMLImageElement>(null)
+  // Config de la clé API par agence.
+  const [showKey, setShowKey] = useState(false)
+  const [keyInput, setKeyInput] = useState('')
+  const [savingKey, setSavingKey] = useState(false)
+  const [hasKey, setHasKey] = useState(false)
 
   const addLog = (m: string) => setLog(l => [`${new Date().toLocaleTimeString()} · ${m}`, ...l].slice(0, 30))
 
@@ -32,14 +40,40 @@ export function BlowPhoneFarm() {
       setDevices(list)
       setConn('ok')
       if (list.length && !selected) setSelected(list[0])
-    } else if ((r.error ?? '').toLowerCase().includes('iremotech_api_key') || (r.error ?? '').includes('Clé iRemoTech absente')) {
-      setConn('unconfigured'); setConnMsg(r.error ?? '')
+    } else if ((r.error ?? '').includes('Clé iRemoTech absente')) {
+      setConn('unconfigured'); setConnMsg(r.error ?? ''); setShowKey(true)
     } else {
       setConn('error'); setConnMsg(r.error ?? `Erreur ${r.status ?? ''}`)
     }
   }, [selected])
 
-  useEffect(() => { loadDevices() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Au montage : charge la clé de l'agence puis liste les appareils.
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const k = await loadIremotechKey(currentOrg?.id ?? null, user.id)
+      if (!alive) return
+      setHasKey(!!k)
+      if (!k) { setConn('unconfigured'); setShowKey(true); return }
+      loadDevices()
+    })()
+    return () => { alive = false }
+  }, [currentOrg?.id, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveKey = async () => {
+    if (!keyInput.trim()) return
+    setSavingKey(true)
+    const r = await saveIremotechKey(currentOrg?.id ?? null, user.id, keyInput.trim())
+    setSavingKey(false)
+    if (r.ok) {
+      setHasKey(true); setShowKey(false); setKeyInput('')
+      addLog('✓ clé iRemoTech enregistrée')
+      loadDevices()
+    } else {
+      const hint = /iremotech_config/.test(r.error ?? '') ? ' — lance d\'abord la migration 20260726_iremotech_config.sql' : ''
+      addLog(`❌ sauvegarde clé : ${r.error}${hint}`)
+    }
+  }
 
   const refreshSnapshot = useCallback(async (dev: IrtDevice | null) => {
     if (!dev) return
@@ -74,22 +108,35 @@ export function BlowPhoneFarm() {
       <BlowPageHeader
         title="Phone Farm — iRemoTech"
         subtitle="Pilote tes vrais iPhones à distance (capture, taps, actions)"
-        action={<BlowButton variant="ghost" onClick={loadDevices}><Ico d={ICON.spark} size={15} /> Rafraîchir</BlowButton>}
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <BlowButton variant="ghost" onClick={() => setShowKey(v => !v)} style={{ height: 40 }}><Ico d={ICON.gear} size={15} /> Clé API</BlowButton>
+            <BlowButton variant="ghost" onClick={loadDevices} style={{ height: 40 }}><Ico d={ICON.spark} size={15} /> Rafraîchir</BlowButton>
+          </div>
+        }
       />
 
-      {/* Connexion non configurée */}
-      {conn === 'unconfigured' && (
-        <BlowCard style={{ padding: 24 }}>
-          <BlowBadge tone="gold">✦ Configuration requise</BlowBadge>
-          <h3 style={{ margin: '12px 0 8px', fontSize: 18, fontWeight: 800, color: INK }}>Connecte ton compte iRemoTech</h3>
-          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: MUTED, maxWidth: 560 }}>
-            Ajoute ta clé API iRemoTech dans les variables d'environnement Vercel :
+      {/* Config de la clé API — par agence (comme le token GeeLark) */}
+      {showKey && (
+        <BlowCard style={{ padding: 22, marginBottom: 16 }}>
+          <BlowBadge tone="gold">✦ Clé API iRemoTech {hasKey ? '· configurée' : '· requise'}</BlowBadge>
+          <h3 style={{ margin: '12px 0 6px', fontSize: 17, fontWeight: 800, color: INK }}>Connecte ton compte iRemoTech</h3>
+          <p style={{ margin: '0 0 14px', fontSize: 13, lineHeight: 1.6, color: MUTED, maxWidth: 560 }}>
+            Colle ta clé API (créée dans ton dashboard iRemoTech, scopes <b>read · control · upload</b>). Elle est enregistrée <b>pour ton agence</b> — chaque agence a la sienne, comme le token GeeLark.
           </p>
-          <pre style={{ margin: '12px 0', padding: '12px 14px', borderRadius: 10, background: '#0b0b12', border: `1px solid ${HAIR}`, fontSize: 12.5, color: '#c8c8e0', overflowX: 'auto' }}>
-IREMOTECH_API_KEY = irt_live_&lt;key_id&gt;_&lt;secret&gt;{'\n'}IREMOTECH_API_BASE = https://api.iremotech.com/v1  (optionnel)
-          </pre>
-          <p style={{ margin: 0, fontSize: 12.5, color: FAINT }}>
-            Crée la clé dans ton dashboard iRemoTech (scopes <b>read · control · upload</b>), puis redéploie et clique « Rafraîchir ».
+          <div style={{ display: 'flex', gap: 8, maxWidth: 620, flexWrap: 'wrap' }}>
+            <input
+              type="password"
+              value={keyInput}
+              onChange={e => setKeyInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveKey() }}
+              placeholder={hasKey ? '•••••••• (clé déjà enregistrée — colle pour remplacer)' : 'irt_live_<key_id>_<secret>'}
+              style={{ flex: 1, minWidth: 240, height: 42, padding: '0 14px', borderRadius: 11, outline: 'none', color: INK, fontSize: 13.5, background: 'rgba(255,255,255,0.045)', border: `1px solid ${HAIR}` }}
+            />
+            <BlowButton onClick={saveKey} style={{ height: 42 }}>{savingKey ? 'Enregistrement…' : 'Enregistrer'}</BlowButton>
+          </div>
+          <p style={{ margin: '12px 0 0', fontSize: 11.5, color: FAINT }}>
+            🔒 La clé n'est jamais renvoyée au navigateur ni loguée. Elle transite vers l'API via notre relai sécurisé.
           </p>
         </BlowCard>
       )}

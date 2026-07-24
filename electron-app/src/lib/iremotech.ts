@@ -1,5 +1,37 @@
 // Client iRemoTech (Device API) — passe par le proxy serverless /api/iremotech
-// (clé API côté serveur, pas de CORS). Utilisé par la sous-app Blowsome.
+// (pas de CORS). La clé API est configurée PAR AGENCE dans ScaleFlow (comme le
+// token GeeLark) : stockée dans Supabase org_config/app_config.iremotech_config,
+// chargée en mémoire, puis envoyée au proxy à chaque appel.
+import { supabase } from './supabase'
+
+// Clé courante en mémoire (définie après chargement de la config de l'agence).
+let apiKey: string | null = null
+export function setIremotechKey(k: string | null) { apiKey = (k && k.trim()) ? k.trim() : null }
+export function getIremotechKey(): string | null { return apiKey }
+
+// Charge la clé de l'agence (org) ou du compte perso depuis Supabase.
+export async function loadIremotechKey(orgId: string | null, userId: string): Promise<string | null> {
+  const table = orgId ? 'org_config' : 'app_config'
+  const col = orgId ? 'org_id' : 'user_id'
+  const val = orgId ?? userId
+  try {
+    const { data } = await supabase.from(table).select('iremotech_config').eq(col, val).maybeSingle()
+    const key = (data?.iremotech_config as { api_key?: string } | null)?.api_key ?? null
+    setIremotechKey(key)
+    return key
+  } catch { return null }
+}
+
+// Enregistre la clé de l'agence.
+export async function saveIremotechKey(orgId: string | null, userId: string, key: string): Promise<{ ok: boolean; error?: string }> {
+  const table = orgId ? 'org_config' : 'app_config'
+  const col = orgId ? 'org_id' : 'user_id'
+  const val = orgId ?? userId
+  const { error } = await supabase.from(table).upsert({ [col]: val, iremotech_config: { api_key: key.trim() } }, { onConflict: col })
+  if (error) return { ok: false, error: error.message }
+  setIremotechKey(key)
+  return { ok: true }
+}
 
 export interface IrtDevice {
   public_id: string
@@ -29,7 +61,7 @@ async function irt<T = unknown>(op: string, payload: Record<string, unknown> = {
     const res = await fetch('/api/iremotech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op, ...payload }),
+      body: JSON.stringify({ op, apiKey: apiKey ?? undefined, ...payload }),
     })
     return await res.json() as IrtResult<T>
   } catch (e) {

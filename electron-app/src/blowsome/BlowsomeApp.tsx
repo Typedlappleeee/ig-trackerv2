@@ -107,7 +107,7 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
             {tab === 'dashboard' && <BlowDashboard user={user} onGo={setTab} onPublish={() => setShowPublish(true)} />}
             {tab === 'posting'   && <BlowPosting user={user} />}
             {tab === 'tools'     && <BlowTools />}
-            {tab === 'phonefarm' && <BlowPhoneFarm />}
+            {tab === 'phonefarm' && <BlowPhoneFarm user={user} />}
           </div>
         )}
       </main>
