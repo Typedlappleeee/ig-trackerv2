@@ -41,20 +41,10 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       HARDCODED_SUPER_ADMINS.includes((await supabase.auth.getUser()).data.user?.email ?? '')
 
     if (isSuperAdmin) {
-      // Blowsome n'est PAS accordé d'office au superadmin : il dépend de l'add-on
-      // sur SA propre clé (comme pour tout le monde). Le statut admin/superadmin
-      // seul ne débloque jamais Blowsome. Pour y accéder, ajoute l'add-on ✦ Blowsome
-      // à ta clé (page Licences).
-      let superBlowsome = false
-      try {
-        const { data: sk } = await supabase
-          .from('license_keys')
-          .select('blowsome')
-          .eq('user_id', userId)
-          .eq('is_active', true)
-        superBlowsome = (sk ?? []).some(k => (k as { blowsome?: boolean }).blowsome === true)
-      } catch { /* colonne absente / erreur → pas d'accès Blowsome */ }
-      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null, blowsome: superBlowsome }
+      // Le superadmin (compte god) garde TOUJOURS l'accès Blowsome — c'est le compte
+      // qui gère/teste tout. Le verrouillage add-on ne concerne que les autres :
+      // un org-admin sans l'add-on ne verra pas Blowsome (gates basés sur license.blowsome).
+      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null, blowsome: true }
     }
 
     // Helper: resolve org owner plan (null if not in org mode or user is the owner).
