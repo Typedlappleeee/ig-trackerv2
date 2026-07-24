@@ -165,7 +165,7 @@ async function handleMediaOverlay(req, res) {
     const clamp = (v, lo, hi) => Math.min(Math.max(Number(v), lo), hi)
     const fx = clamp(x || 0, 0, 1), fy = clamp(y || 0, 0, 1), fw = clamp(w || 0.3, 0.02, 1)
     const st = Math.max(Number(start) || 0, 0)
-    const dur = Math.max(Number(duration) || 3, 0.2)
+    const dur = Math.max(Number(duration) || 3, 0.03)  // autorise des flashs très courts (0.1s et moins)
     const end = (st + dur).toFixed(3)
     const ox = Math.round(fx * VW), oy = Math.round(fy * VH), ow = Math.round(fw * VW)
     const isVideo = overlayType === 'video'
