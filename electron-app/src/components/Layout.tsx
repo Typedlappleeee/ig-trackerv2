@@ -962,7 +962,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
             {!collapsed && <span style={{ flex: 1, textAlign: 'left' }}>{tr('Rechercher…', 'Search…')}</span>}
-            {!collapsed && <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(233,234,240,0.1)', letterSpacing: '0.02em' }}>⌘K</span>}
+            {!collapsed && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(233,234,240,0.1)', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>Ctrl K</span>}
           </button>
         </div>
 

@@ -124,7 +124,7 @@ export function CommandPalette({ items, onSelect }: { items: CommandItem[]; onSe
 
         {/* Pied */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '9px 16px', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text-4)' }}>
-          <span>↑↓ naviguer</span><span>↵ ouvrir</span><span style={{ marginLeft: 'auto' }}>⌘/Ctrl K</span>
+          <span>↑↓ naviguer</span><span>↵ ouvrir</span><span style={{ marginLeft: 'auto' }}>Ctrl K</span>
         </div>
       </div>
     </div>

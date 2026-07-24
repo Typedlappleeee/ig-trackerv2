@@ -171,7 +171,7 @@ function ToolCard({ tool, onOpen, delayClass }: { tool: Tool; onOpen: () => void
 export function VideoStudio({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const tr = useTr()
   return (
-    <div className="anim-page" style={{ minHeight: '100%', background: 'var(--base)', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
+    <div className="anim-page" style={{ minHeight: '100%', backgroundColor: 'var(--base)', backgroundImage: 'radial-gradient(780px 480px at 88% 106%, rgba(139,92,246,0.11), transparent 68%), radial-gradient(680px 420px at 6% 90%, rgba(99,102,241,0.09), transparent 72%), linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px)', backgroundSize: '100% 100%, 100% 100%, 46px 46px, 46px 46px', backgroundRepeat: 'no-repeat, no-repeat, repeat, repeat', padding: '32px 32px 90px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' }}>
       <style>{CSS}</style>
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{ position: 'absolute', top: -140, left: '8%', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.16), transparent 70%)', filter: 'blur(46px)', animation: 'vs-float-a 18s ease-in-out infinite' }} />

@@ -2999,3 +2999,18 @@ select.sf-input:disabled {
     radial-gradient(1100px 380px at 50% -12%, rgba(99,102,241,0.06), transparent 70%),
     var(--base) !important;
 }
+
+/* Fond moins "fade" : grille très discrète + lueurs un peu plus présentes.
+   100% statique (aucune animation) → aucun impact perf. Grille = texture/
+   profondeur qui fait "designé" au lieu de "vide". */
+.sf-page {
+  background-color: var(--base) !important;
+  background-image:
+    radial-gradient(780px 480px at 88% 106%, rgba(139,92,246,0.11), transparent 68%),
+    radial-gradient(680px 420px at 6% 92%, rgba(99,102,241,0.09), transparent 70%),
+    radial-gradient(1100px 420px at 50% -10%, rgba(99,102,241,0.09), transparent 68%),
+    linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 46px 46px, 46px 46px !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat !important;
+}
