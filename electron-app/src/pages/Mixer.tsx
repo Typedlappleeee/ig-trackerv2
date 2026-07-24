@@ -436,7 +436,7 @@ export function Mixer({ user }: MixerProps) {
   const errorJobs = jobs.filter(j => j.status === 'error')
 
   // Mode « Image/Vidéo positionnée » → composeur dédié (placement + timing).
-  if (composerMode === 'overlay') return <OverlayComposer user={user} onMode={setComposerMode} />
+  if (composerMode === 'overlay') return <OverlayComposer user={user} onExit={() => setComposerMode('caption')} />
 
   return (
     <div className="anim-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--base)' }}>

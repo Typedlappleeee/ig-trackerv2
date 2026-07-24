@@ -17,7 +17,7 @@ function isVideoName(s: string): boolean {
   return /\.(mp4|mov|webm|m4v|avi|mkv)(\?|$)/i.test(s)
 }
 
-export function OverlayComposer({ user, onMode }: { user: User; onMode: (m: 'caption' | 'overlay') => void }) {
+export function OverlayComposer({ user, onExit }: { user: User; onExit: () => void }) {
   const tr = useTr()
   const { currentOrg } = useOrg()
 
@@ -130,10 +130,10 @@ export function OverlayComposer({ user, onMode }: { user: User; onMode: (m: 'cap
             <p className="sf-page-sub">{tr('Incruste une image/vidéo — position + timing précis', 'Overlay an image/video — precise position + timing')}</p>
           </div>
         </div>
-        <div className="sf-segment" style={{ flexShrink: 0 }}>
-          <button className="sf-segment-item cursor-pointer" onClick={() => onMode('caption')}>{tr('Texte', 'Text')}</button>
-          <button className="sf-segment-item is-active cursor-pointer">{tr('Image/Vidéo', 'Image/Video')}</button>
-        </div>
+        <button onClick={onExit} className="sf-btn sf-btn-secondary cursor-pointer" style={{ flexShrink: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+          {tr('Retour', 'Back')}
+        </button>
       </header>
 
       <div className="sf-page-body" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 320px) 1fr', gap: 24, alignItems: 'start' }}>

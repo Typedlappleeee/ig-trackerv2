@@ -102,11 +102,15 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
           <div style={{ height: 'calc(100% - 65px)', minHeight: 520 }}>
             <BankHub user={user} />
           </div>
+        ) : tab === 'tools' ? (
+          // Gestionnaire de tool : plein cadre (les outils gèrent leur propre layout).
+          <div style={{ height: 'calc(100% - 65px)', minHeight: 520 }}>
+            <BlowTools user={user} />
+          </div>
         ) : (
           <div style={{ padding: '30px 30px 80px', maxWidth: 1120, margin: '0 auto' }}>
             {tab === 'dashboard' && <BlowDashboard user={user} onGo={setTab} onPublish={() => setShowPublish(true)} />}
             {tab === 'posting'   && <BlowPosting user={user} />}
-            {tab === 'tools'     && <BlowTools />}
             {tab === 'phonefarm' && <BlowPhoneFarm user={user} />}
           </div>
         )}
