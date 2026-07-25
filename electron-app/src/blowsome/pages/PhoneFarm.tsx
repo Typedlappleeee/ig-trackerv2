@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
-import { iremotech, openSnapshotStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount } from '@/lib/iremotech'
+import { iremotech, openSnapshotStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget } from '@/lib/iremotech'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, GOLD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
@@ -27,6 +27,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [offline, setOffline] = useState(false)   // 503 device_offline
   const [snapErr, setSnapErr] = useState('')       // message d'erreur brut d'iRemoTech
   const [reach, setReach] = useState<Record<string, 'on' | 'off'>>({}) // joignabilité par tel
+  const [usage, setUsage] = useState<IrtUsage | null>(null)          // budgets du jour (/usage)
   const imgRef = useRef<HTMLImageElement>(null)
   const snapBusy = useRef(false)                  // évite d'empiler les captures
   const gesture = useRef<{ x: number; y: number; t: number } | null>(null)  // début d'un geste (tap/swipe)
@@ -54,6 +55,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
       setDevices(list)
       setConn('ok')
       if (list.length && !selected) setSelected(list[0])
+      iremotech.usage().then(u => { if (u.ok && u.data) setUsage(u.data) })
     } else if ((r.error ?? '').includes('Clé iRemoTech absente')) {
       setConn('unconfigured'); setConnMsg(r.error ?? ''); setShowKey(true)
     } else {
@@ -282,6 +284,37 @@ export function BlowPhoneFarm({ user }: { user: User }) {
               })}
             </div>
           </BlowCard>
+
+          {/* Diagnostic : budgets du jour (GET /usage) */}
+          {usage && (() => {
+            const rows: Array<[string, IrtBudget | undefined]> = [
+              ['Captures', usage.snapshots], ['Actions', usage.actions],
+              ['Minutes actives', usage.active_minutes], ['Uploads', usage.uploads],
+            ]
+            return (
+              <BlowCard style={{ padding: 12, marginTop: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: MUTED }}>Quotas du jour</span>
+                  <button onClick={() => iremotech.usage().then(u => { if (u.ok && u.data) setUsage(u.data) })} className="blow-tap" title="Rafraîchir" style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻</button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {rows.map(([label, b]) => b && (
+                    <div key={label}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: FAINT, marginBottom: 3 }}>
+                        <span>{label}</span><span>{b.remaining} / {b.budget}</span>
+                      </div>
+                      <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${b.budget ? Math.max(2, Math.round((b.remaining / b.budget) * 100)) : 0}%`, borderRadius: 99, background: b.remaining <= 0 ? '#F87171' : GRAD }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {typeof usage.max_active_devices === 'number' && (
+                  <p style={{ margin: '9px 0 0', fontSize: 10, color: FAINT }}>Max simultanés : <b style={{ color: MUTED }}>{usage.max_active_devices}</b>{usage.resets_at ? ` · reset ${new Date(usage.resets_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</p>
+                )}
+              </BlowCard>
+            )
+          })()}
 
           {/* Contrôle de l'iPhone sélectionné */}
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 300px) 1fr', gap: 16, alignItems: 'start' }}>

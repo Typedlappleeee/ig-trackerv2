@@ -63,6 +63,17 @@ export type IrtAction =
 
 interface IrtResult<T = unknown> { ok: boolean; status?: number; data?: T; dataUrl?: string; error?: string }
 
+// Réponse de GET /usage (budgets quotidiens, remis à zéro à minuit UTC).
+export interface IrtBudget { used: number; budget: number; remaining: number }
+export interface IrtUsage {
+  active_minutes?: IrtBudget
+  actions?: IrtBudget
+  snapshots?: IrtBudget
+  uploads?: IrtBudget
+  max_active_devices?: number
+  resets_at?: string
+}
+
 async function irt<T = unknown>(op: string, payload: Record<string, unknown> = {}): Promise<IrtResult<T>> {
   try {
     const res = await fetch('/api/iremotech', {
@@ -151,7 +162,7 @@ export const iremotech = {
   // Liste des iPhones pilotables.
   listDevices: () => irt<{ devices?: IrtDevice[] } | IrtDevice[]>('devices'),
   // Quotas/budgets du jour.
-  usage: () => irt('usage'),
+  usage: () => irt<IrtUsage>('usage'),
   // Capture d'écran → data URL JPEG (base64).
   snapshot: (deviceId: string) => irt('snapshot', { deviceId }),
   // Envoie UNE action (tap, texte, swipe…).
