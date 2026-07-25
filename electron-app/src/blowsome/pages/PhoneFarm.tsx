@@ -29,6 +29,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [keyInput, setKeyInput] = useState('')
   const [savingKey, setSavingKey] = useState(false)
   const [hasKey, setHasKey] = useState(false)
+  const [keyErr, setKeyErr] = useState('')
 
   const addLog = (m: string) => setLog(l => [`${new Date().toLocaleTimeString()} · ${m}`, ...l].slice(0, 30))
 
@@ -62,7 +63,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
 
   const saveKey = async () => {
     if (!keyInput.trim()) return
-    setSavingKey(true)
+    setSavingKey(true); setKeyErr('')
     const r = await saveIremotechKey(currentOrg?.id ?? null, user.id, keyInput.trim())
     setSavingKey(false)
     if (r.ok) {
@@ -70,8 +71,12 @@ export function BlowPhoneFarm({ user }: { user: User }) {
       addLog('✓ clé iRemoTech enregistrée')
       loadDevices()
     } else {
-      const hint = /iremotech_config/.test(r.error ?? '') ? ' — lance d\'abord la migration 20260726_iremotech_config.sql' : ''
-      addLog(`❌ sauvegarde clé : ${r.error}${hint}`)
+      const missing = /iremotech_config|column|schema cache/i.test(r.error ?? '')
+      const hint = missing
+        ? " · La colonne de config n'existe pas encore. Lance ce SQL dans Supabase : alter table public.org_config add column if not exists iremotech_config jsonb; alter table public.app_config add column if not exists iremotech_config jsonb;"
+        : ''
+      setKeyErr(`Échec de l'enregistrement : ${r.error ?? 'erreur inconnue'}${hint}`)
+      addLog(`❌ sauvegarde clé : ${r.error}`)
     }
   }
 
@@ -135,6 +140,11 @@ export function BlowPhoneFarm({ user }: { user: User }) {
             />
             <BlowButton onClick={saveKey} style={{ height: 42 }}>{savingKey ? 'Enregistrement…' : 'Enregistrer'}</BlowButton>
           </div>
+          {keyErr && (
+            <div style={{ margin: '12px 0 0', padding: '10px 13px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.35)', color: '#FCA5A5', fontSize: 12, lineHeight: 1.5 }}>
+              {keyErr}
+            </div>
+          )}
           <p style={{ margin: '12px 0 0', fontSize: 11.5, color: FAINT }}>
             🔒 La clé n'est jamais renvoyée au navigateur ni loguée. Elle transite vers l'API via notre relai sécurisé.
           </p>
