@@ -122,7 +122,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     if (!selected) return
     const r = await iremotech.action(selected.public_id, a)
     addLog(r.ok ? `✓ ${label}` : `❌ ${label} : ${r.error ?? r.status}`)
-    if (r.ok) window.setTimeout(() => refreshSnapshot(selected, true), 350)
+    if (r.ok && !offline) window.setTimeout(() => refreshSnapshot(selected, true), 350)
   }
 
   // Convertit une position écran → coordonnées pixel de la capture.
@@ -168,7 +168,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     if (r.ok) { setMetaSaved(true); window.setTimeout(() => setMetaSaved(false), 2000) }
     else addLog(`❌ notes/comptes : ${r.error}`)
   }
-  const addAccount = () => setAccounts(a => [...a, { username: '', password: '', auth_id: '' }])
+  const addAccount = () => setAccounts(a => [...a, { username: '', password: '' }])
   const updateAccount = (i: number, patch: Partial<IrtAccount>) => setAccounts(a => a.map((x, j) => j === i ? { ...x, ...patch } : x))
   const removeAccount = (i: number) => { setAccounts(a => a.filter((_, j) => j !== i)); setReveal(new Set()) }
   const copy = (v: string) => { try { navigator.clipboard?.writeText(v) } catch { /* noop */ } }
@@ -379,10 +379,6 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                                 {field(acc.password, 'Mot de passe', v => updateAccount(i, { password: v }), shown ? 'text' : 'password')}
                                 <button onClick={() => setReveal(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })} className="blow-tap" title={shown ? 'Masquer' : 'Afficher'} style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>{shown ? '🙈' : '👁'}</button>
                                 <button onClick={() => copy(acc.password)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
-                              </div>
-                              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                                {field(acc.auth_id ?? '', 'ID auth (email / 2FA…)', v => updateAccount(i, { auth_id: v }))}
-                                <button onClick={() => copy(acc.auth_id ?? '')} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
                               </div>
                             </div>
                           )
