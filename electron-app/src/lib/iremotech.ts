@@ -103,6 +103,50 @@ export async function saveDeviceMeta(orgId: string | null, userId: string, devic
   return error ? { ok: false, error: error.message } : { ok: true }
 }
 
+// Flux "live" relayé côté serveur (une seule requête POST, frames en NDJSON).
+// Bien plus fluide qu'un polling navigateur et ne sature pas le tel (boucle
+// serveur, une capture à la fois). Renvoie une fonction pour arrêter le flux.
+export interface IrtStreamHandlers {
+  onFrame: (dataUrl: string) => void
+  onOffline: () => void
+  onEnd?: () => void
+  onError?: (msg: string) => void
+}
+export function openSnapshotStream(deviceId: string, h: IrtStreamHandlers): () => void {
+  const ctrl = new AbortController()
+  ;(async () => {
+    try {
+      const res = await fetch('/api/iremotech-stream', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId, apiKey: apiKey ?? undefined }), signal: ctrl.signal,
+      })
+      if (!res.ok || !res.body) { h.onError?.(`stream ${res.status}`); return }
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        let nl: number
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1)
+          if (!line) continue
+          let msg: { t?: string; d?: string; s?: number }
+          try { msg = JSON.parse(line) } catch { continue }
+          if (msg.t === 'frame' && msg.d) h.onFrame(`data:image/jpeg;base64,${msg.d}`)
+          else if (msg.t === 'offline') h.onOffline()
+          else if (msg.t === 'end') h.onEnd?.()
+          else if (msg.t === 'err') h.onError?.(`amont ${msg.s ?? ''}`)
+        }
+      }
+    } catch (e) {
+      if (!ctrl.signal.aborted) h.onError?.(String(e))
+    }
+  })()
+  return () => ctrl.abort()
+}
+
 export const iremotech = {
   // Liste des iPhones pilotables.
   listDevices: () => irt<{ devices?: IrtDevice[] } | IrtDevice[]>('devices'),

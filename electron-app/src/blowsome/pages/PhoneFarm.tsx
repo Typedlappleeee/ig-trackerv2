@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
-import { iremotech, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount } from '@/lib/iremotech'
+import { iremotech, openSnapshotStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount } from '@/lib/iremotech'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, GOLD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
@@ -26,6 +26,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [live, setLive] = useState(false)         // rafraîchissement auto (opt-in, coûte du budget)
   const [offline, setOffline] = useState(false)   // 503 device_offline
   const [snapErr, setSnapErr] = useState('')       // message d'erreur brut d'iRemoTech
+  const [reach, setReach] = useState<Record<string, 'on' | 'off'>>({}) // joignabilité par tel
   const imgRef = useRef<HTMLImageElement>(null)
   const snapBusy = useRef(false)                  // évite d'empiler les captures
   const gesture = useRef<{ x: number; y: number; t: number } | null>(null)  // début d'un geste (tap/swipe)
@@ -99,24 +100,38 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     const r = await iremotech.snapshot(dev.public_id)
     snapBusy.current = false
     if (!silent) setSnapLoading(false)
-    if (r.ok && r.dataUrl) { setSnap(r.dataUrl); setOffline(false); setSnapErr('') }
+    if (r.ok && r.dataUrl) { setSnap(r.dataUrl); setOffline(false); setSnapErr(''); setReach(m => ({ ...m, [dev.public_id]: 'on' })) }
     else if (r.status === 503) {
       // 503 = DeviceOffline (iRemoTech) — inutile de continuer à spammer l'API.
       setOffline(true)
       setLive(false)
       setSnapErr(r.error ?? 'snapshot 503')
+      setReach(m => ({ ...m, [dev.public_id]: 'off' }))
       if (!silent) addLog(`⚠️ ${r.error ?? 'snapshot 503'}`)
     } else if (!silent) addLog(`❌ snapshot : ${r.error ?? r.status}`)
   }, [])
 
   useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
 
-  // Rafraîchissement auto (écran "live") → contrôle bien plus fluide.
+  // Écran "live" → flux relayé côté serveur (frames continues, une seule requête).
+  // Bien plus fluide qu'un polling et sans saturer le tel. Reconnecte à la fin de
+  // la fenêtre serverless ; s'arrête tout seul si le tel passe hors ligne.
   useEffect(() => {
     if (!live || !selected || conn !== 'ok') return
-    const id = window.setInterval(() => refreshSnapshot(selected, true), 2000)
-    return () => window.clearInterval(id)
-  }, [live, selected, conn, refreshSnapshot])
+    const dev = selected
+    let alive = true
+    let stop = () => {}
+    const start = () => {
+      stop = openSnapshotStream(dev.public_id, {
+        onFrame: (u) => { setSnap(u); setOffline(false); setReach(m => ({ ...m, [dev.public_id]: 'on' })) },
+        onOffline: () => { setOffline(true); setReach(m => ({ ...m, [dev.public_id]: 'off' })); alive = false; setLive(false) },
+        onEnd: () => { if (alive) start() },                     // fenêtre finie → on reprend
+        onError: (m) => { alive = false; setLive(false); addLog(`❌ live : ${m}`) },
+      })
+    }
+    start()
+    return () => { alive = false; stop() }
+  }, [live, selected, conn])
 
   const sendAction = async (a: IrtAction, label: string) => {
     if (!selected) return
@@ -244,18 +259,23 @@ export function BlowPhoneFarm({ user }: { user: User }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 520, overflowY: 'auto' }} className="blow-scroll">
               {devices.map(d => {
                 const on = selected?.public_id === d.public_id
+                const rc = reach[d.public_id]                    // joignabilité RÉELLE (dernière capture)
+                const isOn = rc === 'on'
+                const isOff = rc === 'off'
+                const dot = isOn ? '#34D399' : isOff ? '#F87171' : '#94A3B8'
                 return (
                   <button key={d.public_id} onClick={() => setSelected(d)} className="blow-tap" style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '10px 11px', borderRadius: 11, border: 'none', cursor: 'pointer', textAlign: 'left',
                     background: on ? 'linear-gradient(100deg, rgba(168,85,247,0.2), rgba(99,102,241,0.12))' : 'transparent',
                     boxShadow: on ? 'inset 0 0 0 1px rgba(168,85,247,0.35)' : 'none',
                   }}>
-                    <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'grid', placeItems: 'center', color: '#fff', background: on ? GRAD : 'var(--surface-3)' }}>
+                    <span style={{ position: 'relative', width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'grid', placeItems: 'center', color: '#fff', background: on ? GRAD : 'var(--surface-3)' }}>
                       <Ico d={ICON.phone} size={15} />
+                      <span title={isOn ? 'joignable' : isOff ? 'hors ligne (503)' : 'non testé'} style={{ position: 'absolute', right: -2, bottom: -2, width: 10, height: 10, borderRadius: 99, background: dot, boxShadow: `0 0 0 2px var(--surface-1)${isOn ? ', 0 0 6px ' + dot : ''}` }} />
                     </span>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name || d.public_id}</span>
-                      <span style={{ display: 'block', fontSize: 10.5, color: FAINT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.public_id}</span>
+                      <span style={{ display: 'block', fontSize: 10.5, color: FAINT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isOff ? 'hors ligne' : d.public_id}</span>
                     </span>
                   </button>
                 )
@@ -280,8 +300,13 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 {offline ? (
                   <div style={{ textAlign: 'center', padding: 20 }}>
                     <div style={{ fontSize: 30, marginBottom: 8 }}>📴</div>
-                    <div style={{ fontSize: 12.5, fontWeight: 800, color: INK, marginBottom: 4 }}>Le téléphone ne répond pas (503)</div>
-                    <div style={{ fontSize: 10.5, color: FAINT, marginBottom: 10, lineHeight: 1.5 }}>iRemoTech renvoie « device offline » sur cet ID. Vérifie que c'est bien le bon appareil et qu'il est réveillé, puis réessaie.</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: INK, marginBottom: 6 }}>iRemoTech ne joint pas ce tel</div>
+                    <div style={{ fontSize: 10.5, color: FAINT, marginBottom: 10, lineHeight: 1.6, textAlign: 'left' }}>
+                      L'API répond <b style={{ color: '#F87171' }}>device_offline / unreachable</b> : l'agent iRemoTech sur l'iPhone n'est pas joignable. À vérifier sur le tel :
+                      <br />• l'app / l'agent iRemoTech est <b>ouverte et connectée</b> (relance-la si besoin)
+                      <br />• l'iPhone est <b>déverrouillé et réveillé</b> (pas en veille)
+                      <br />• le tel a du <b>réseau</b> (Wi-Fi / data actifs)
+                    </div>
                     {snapErr && <div style={{ fontSize: 9.5, color: FAINT, marginBottom: 12, fontFamily: 'monospace', wordBreak: 'break-word', opacity: 0.8 }}>{snapErr}</div>}
                     <BlowButton variant="ghost" onClick={() => { setOffline(false); refreshSnapshot(selected) }} style={{ height: 32 }}>Réessayer</BlowButton>
                   </div>
