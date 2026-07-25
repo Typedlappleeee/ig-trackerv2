@@ -76,21 +76,29 @@ async function irt<T = unknown>(op: string, payload: Record<string, unknown> = {
   }
 }
 
-// ── Notes + comptes (login/mdp) par téléphone (coffre perso, Supabase) ───────
-export interface IrtAccount { label?: string; platform?: string; username: string; password: string }
+// ── Notes + comptes par téléphone (visible par toute l'agence, Supabase) ─────
+// Champs d'un compte : login (username), mot de passe, id auth (auth_id).
+export interface IrtAccount { username: string; password: string; auth_id?: string }
 export interface IrtDeviceMeta { notes: string; accounts: IrtAccount[] }
 
-export async function loadDeviceMeta(userId: string, deviceId: string): Promise<IrtDeviceMeta> {
+// scope = l'agence (org_id) si présente, sinon le compte perso (user_id).
+function metaScope(orgId: string | null, userId: string) {
+  return orgId ? { scope_id: orgId, is_org: true } : { scope_id: userId, is_org: false }
+}
+
+export async function loadDeviceMeta(orgId: string | null, userId: string, deviceId: string): Promise<IrtDeviceMeta> {
+  const { scope_id } = metaScope(orgId, userId)
   try {
-    const { data } = await supabase.from('iremotech_device_meta').select('notes, accounts').eq('user_id', userId).eq('device_id', deviceId).maybeSingle()
+    const { data } = await supabase.from('iremotech_device_meta').select('notes, accounts').eq('scope_id', scope_id).eq('device_id', deviceId).maybeSingle()
     return { notes: data?.notes ?? '', accounts: (data?.accounts as IrtAccount[] | null) ?? [] }
   } catch { return { notes: '', accounts: [] } }
 }
 
-export async function saveDeviceMeta(userId: string, orgId: string | null, deviceId: string, meta: IrtDeviceMeta): Promise<{ ok: boolean; error?: string }> {
+export async function saveDeviceMeta(orgId: string | null, userId: string, deviceId: string, meta: IrtDeviceMeta): Promise<{ ok: boolean; error?: string }> {
+  const { scope_id, is_org } = metaScope(orgId, userId)
   const { error } = await supabase.from('iremotech_device_meta').upsert(
-    { user_id: userId, org_id: orgId, device_id: deviceId, notes: meta.notes, accounts: meta.accounts, updated_at: new Date().toISOString() },
-    { onConflict: 'user_id,device_id' },
+    { scope_id, is_org, device_id: deviceId, notes: meta.notes, accounts: meta.accounts, updated_at: new Date().toISOString() },
+    { onConflict: 'scope_id,device_id' },
   )
   return error ? { ok: false, error: error.message } : { ok: true }
 }

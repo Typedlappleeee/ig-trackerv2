@@ -39,6 +39,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [metaSaving, setMetaSaving] = useState(false)
   const [metaSaved, setMetaSaved] = useState(false)
   const [reveal, setReveal] = useState<Set<number>>(new Set())
+  const [showMeta, setShowMeta] = useState(false)   // section notes/comptes repliable
 
   const addLog = (m: string) => setLog(l => [`${new Date().toLocaleTimeString()} · ${m}`, ...l].slice(0, 30))
 
@@ -105,7 +106,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   // Rafraîchissement auto (écran "live") → contrôle bien plus fluide.
   useEffect(() => {
     if (!live || !selected || conn !== 'ok') return
-    const id = window.setInterval(() => refreshSnapshot(selected, true), 1100)
+    const id = window.setInterval(() => refreshSnapshot(selected, true), 2000)
     return () => window.clearInterval(id)
   }, [live, selected, conn, refreshSnapshot])
 
@@ -147,19 +148,19 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   useEffect(() => {
     if (!selected) { setNotes(''); setAccounts([]); return }
     let alive = true
-    loadDeviceMeta(user.id, selected.public_id).then(m => { if (alive) { setNotes(m.notes); setAccounts(m.accounts); setMetaSaved(false); setReveal(new Set()) } })
+    loadDeviceMeta(currentOrg?.id ?? null, user.id, selected.public_id).then(m => { if (alive) { setNotes(m.notes); setAccounts(m.accounts); setMetaSaved(false); setReveal(new Set()) } })
     return () => { alive = false }
   }, [selected, user.id])
 
   const saveMeta = async () => {
     if (!selected) return
     setMetaSaving(true); setMetaSaved(false)
-    const r = await saveDeviceMeta(user.id, currentOrg?.id ?? null, selected.public_id, { notes, accounts })
+    const r = await saveDeviceMeta(currentOrg?.id ?? null, user.id, selected.public_id, { notes, accounts })
     setMetaSaving(false)
     if (r.ok) { setMetaSaved(true); window.setTimeout(() => setMetaSaved(false), 2000) }
     else addLog(`❌ notes/comptes : ${r.error}`)
   }
-  const addAccount = () => setAccounts(a => [...a, { label: '', username: '', password: '' }])
+  const addAccount = () => setAccounts(a => [...a, { username: '', password: '', auth_id: '' }])
   const updateAccount = (i: number, patch: Partial<IrtAccount>) => setAccounts(a => a.map((x, j) => j === i ? { ...x, ...patch } : x))
   const removeAccount = (i: number) => { setAccounts(a => a.filter((_, j) => j !== i)); setReveal(new Set()) }
   const copy = (v: string) => { try { navigator.clipboard?.writeText(v) } catch { /* noop */ } }
@@ -283,87 +284,98 @@ export function BlowPhoneFarm({ user }: { user: User }) {
             {/* Actions + journal */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <BlowCard style={{ padding: 16 }}>
-                <p style={{ margin: '0 0 10px', fontSize: 12.5, fontWeight: 800, color: INK }}>Apps</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                  {([
-                    { l: '📷 Instagram', url: 'instagram://app' },
-                    { l: '🎵 TikTok', url: 'tiktok://' },
-                    { l: '🧵 Threads', url: 'barcelona://' },
-                    { l: '👻 Snapchat', url: 'snapchat://' },
-                    { l: '🌐 Safari', url: 'https://google.com' },
-                  ] as const).map(a => (
-                    <BlowButton key={a.l} variant="ghost" onClick={() => sendAction({ type: 'open_url', url: a.url }, `open ${a.l}`)} style={{ height: 34 }}>{a.l}</BlowButton>
-                  ))}
-                </div>
-                <p style={{ margin: '0 0 10px', fontSize: 12.5, fontWeight: 800, color: INK }}>Système & navigation</p>
+                {/* Actions = catalogue documenté iRemoTech (press/airplane/scroll/open_url/text) */}
+                <p style={{ margin: '0 0 10px', fontSize: 12.5, fontWeight: 800, color: INK }}>Actions</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   <BlowButton variant="ghost" onClick={() => sendAction({ type: 'press', name: 'home' }, 'home')} style={{ height: 34 }}>⌂ Accueil</BlowButton>
+                  <BlowButton variant="ghost" onClick={() => sendAction({ type: 'press', name: 'screenshot' }, 'screenshot')} style={{ height: 34 }}>📸 Capture</BlowButton>
                   <BlowButton variant="ghost" onClick={() => sendAction({ type: 'scroll', x: 200, y: 500, dy: -600 }, 'scroll ↑')} style={{ height: 34 }}>↑ Scroll</BlowButton>
                   <BlowButton variant="ghost" onClick={() => sendAction({ type: 'scroll', x: 200, y: 500, dy: 600 }, 'scroll ↓')} style={{ height: 34 }}>↓ Scroll</BlowButton>
                   <BlowButton variant="ghost" onClick={() => sendAction({ type: 'airplane', on: true }, 'avion ON')} style={{ height: 34 }}>✈️ Avion ON</BlowButton>
                   <BlowButton variant="ghost" onClick={() => sendAction({ type: 'airplane', on: false }, 'avion OFF')} style={{ height: 34 }}>✈️ Avion OFF</BlowButton>
                 </div>
+
                 <div style={{ height: 1, background: HAIR, margin: '14px 0' }} />
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                {/* Ouvrir une app / une URL (open_url) */}
+                <p style={{ margin: '0 0 8px', fontSize: 12.5, fontWeight: 800, color: INK }}>Ouvrir</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                  {([
+                    { l: 'Instagram', url: 'https://instagram.com' },
+                    { l: 'TikTok', url: 'https://www.tiktok.com' },
+                    { l: 'Threads', url: 'https://www.threads.net' },
+                  ] as const).map(a => (
+                    <BlowButton key={a.l} variant="ghost" onClick={() => sendAction({ type: 'open_url', url: a.url }, `open ${a.l}`)} style={{ height: 34 }}>{a.l}</BlowButton>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
                   <input
                     value={text} onChange={e => setText(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && text) { sendAction({ type: 'text', text }, `texte "${text}"`); setText('') } }}
-                    placeholder="Taper du texte dans le champ actif…"
+                    onKeyDown={e => { if (e.key === 'Enter' && text.trim()) { sendAction(/^https?:\/\//.test(text) ? { type: 'open_url', url: text } : { type: 'text', text }, text); setText('') } }}
+                    placeholder="Taper du texte, ou coller une URL à ouvrir…"
                     style={{ flex: 1, height: 38, padding: '0 13px', borderRadius: 11, outline: 'none', color: INK, fontSize: 13, background: 'rgba(255,255,255,0.045)', border: `1px solid ${HAIR}` }}
                   />
-                  <BlowButton onClick={() => { if (text) { sendAction({ type: 'text', text }, `texte "${text}"`); setText('') } }} style={{ height: 38 }}>Envoyer</BlowButton>
+                  <BlowButton onClick={() => { if (text.trim()) { sendAction(/^https?:\/\//.test(text) ? { type: 'open_url', url: text } : { type: 'text', text }, text); setText('') } }} style={{ height: 38 }}>Envoyer</BlowButton>
                 </div>
               </BlowCard>
 
-              {/* Notes + comptes du téléphone */}
+              {/* Notes + comptes du téléphone — section repliable */}
               <BlowCard style={{ padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <p style={{ margin: 0, fontSize: 12.5, fontWeight: 800, color: INK }}>Notes & comptes</p>
-                  <button onClick={saveMeta} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: metaSaved ? '#34D399' : '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    {metaSaving ? 'Enregistrement…' : metaSaved ? '✓ Enregistré' : 'Enregistrer'}
-                  </button>
-                </div>
-                <textarea
-                  value={notes} onChange={e => setNotes(e.target.value)}
-                  placeholder="Notes sur ce téléphone (proxy, statut, remarques…)"
-                  rows={2}
-                  style={{ width: '100%', resize: 'vertical', padding: '9px 11px', borderRadius: 10, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.045)', border: `1px solid ${HAIR}`, fontFamily: 'inherit' }}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 8px' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: MUTED }}>Comptes ({accounts.length})</span>
-                  <button onClick={addAccount} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>+ Ajouter un compte</button>
-                </div>
-                {accounts.length === 0 ? (
-                  <p style={{ fontSize: 11.5, color: FAINT, margin: 0 }}>Aucun compte enregistré. Ajoute tes logins pour t'en souvenir.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {accounts.map((acc, i) => {
-                      const shown = reveal.has(i)
-                      const field = (v: string, ph: string, on: (val: string) => void, type = 'text') => (
-                        <input value={v} onChange={e => on(e.target.value)} placeholder={ph} type={type}
-                          style={{ flex: 1, minWidth: 0, height: 32, padding: '0 10px', borderRadius: 8, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${HAIR}` }} />
-                      )
-                      return (
-                        <div key={i} style={{ padding: 10, borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'flex', flexDirection: 'column', gap: 7 }}>
-                          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                            {field(acc.label ?? '', 'Libellé (ex. compte 1)', v => updateAccount(i, { label: v }))}
-                            <button onClick={() => removeAccount(i)} className="blow-tap" title="Supprimer" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: '#F87171', cursor: 'pointer', fontSize: 14 }}>✕</button>
-                          </div>
-                          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                            {field(acc.username, 'Identifiant / @', v => updateAccount(i, { username: v }))}
-                            <button onClick={() => copy(acc.username)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
-                          </div>
-                          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                            {field(acc.password, 'Mot de passe', v => updateAccount(i, { password: v }), shown ? 'text' : 'password')}
-                            <button onClick={() => setReveal(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })} className="blow-tap" title={shown ? 'Masquer' : 'Afficher'} style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>{shown ? '🙈' : '👁'}</button>
-                            <button onClick={() => copy(acc.password)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
-                          </div>
-                        </div>
-                      )
-                    })}
+                <button onClick={() => setShowMeta(v => !v)} className="blow-tap" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>Notes & comptes {accounts.length > 0 && <span style={{ color: MUTED, fontWeight: 600 }}>· {accounts.length}</span>}</span>
+                  <span style={{ fontSize: 13, color: MUTED, transform: showMeta ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
+                </button>
+
+                {showMeta && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 8 }}>
+                      <button onClick={saveMeta} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: metaSaved ? '#34D399' : '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        {metaSaving ? 'Enregistrement…' : metaSaved ? '✓ Enregistré' : 'Enregistrer'}
+                      </button>
+                    </div>
+                    <textarea
+                      value={notes} onChange={e => setNotes(e.target.value)}
+                      placeholder="Notes sur ce téléphone (proxy, statut, remarques…)"
+                      rows={2}
+                      style={{ width: '100%', resize: 'vertical', padding: '9px 11px', borderRadius: 10, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.045)', border: `1px solid ${HAIR}`, fontFamily: 'inherit' }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 8px' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: MUTED }}>Comptes ({accounts.length})</span>
+                      <button onClick={addAccount} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>+ Ajouter un compte</button>
+                    </div>
+                    {accounts.length === 0 ? (
+                      <p style={{ fontSize: 11.5, color: FAINT, margin: 0 }}>Aucun compte. Ajoute login / mot de passe / id auth.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {accounts.map((acc, i) => {
+                          const shown = reveal.has(i)
+                          const field = (v: string, ph: string, on: (val: string) => void, type = 'text') => (
+                            <input value={v} onChange={e => on(e.target.value)} placeholder={ph} type={type}
+                              style={{ flex: 1, minWidth: 0, height: 32, padding: '0 10px', borderRadius: 8, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${HAIR}` }} />
+                          )
+                          return (
+                            <div key={i} style={{ padding: 10, borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                                {field(acc.username, 'Login', v => updateAccount(i, { username: v }))}
+                                <button onClick={() => copy(acc.username)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
+                                <button onClick={() => removeAccount(i)} className="blow-tap" title="Supprimer" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: '#F87171', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                              </div>
+                              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                                {field(acc.password, 'Mot de passe', v => updateAccount(i, { password: v }), shown ? 'text' : 'password')}
+                                <button onClick={() => setReveal(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })} className="blow-tap" title={shown ? 'Masquer' : 'Afficher'} style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>{shown ? '🙈' : '👁'}</button>
+                                <button onClick={() => copy(acc.password)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
+                              </div>
+                              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                                {field(acc.auth_id ?? '', 'ID auth (email / 2FA…)', v => updateAccount(i, { auth_id: v }))}
+                                <button onClick={() => copy(acc.auth_id ?? '')} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    <p style={{ margin: '10px 0 0', fontSize: 10.5, color: FAINT }}>👥 Visible par toute ton agence. Pense à cliquer « Enregistrer ».</p>
                   </div>
                 )}
-                <p style={{ margin: '10px 0 0', fontSize: 10.5, color: FAINT }}>🔒 Coffre privé (visible par toi uniquement). Pense à cliquer « Enregistrer ».</p>
               </BlowCard>
 
               <BlowCard style={{ padding: 16 }}>
