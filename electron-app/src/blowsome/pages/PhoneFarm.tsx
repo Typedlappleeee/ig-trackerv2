@@ -23,7 +23,9 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [snapLoading, setSnapLoading] = useState(false)
   const [text, setText] = useState('')
   const [log, setLog] = useState<string[]>([])
-  const [live, setLive] = useState(true)          // rafraîchissement auto de l'écran
+  const [live, setLive] = useState(false)         // rafraîchissement auto (opt-in, coûte du budget)
+  const [offline, setOffline] = useState(false)   // 503 device_offline
+  const [snapErr, setSnapErr] = useState('')       // message d'erreur brut d'iRemoTech
   const imgRef = useRef<HTMLImageElement>(null)
   const snapBusy = useRef(false)                  // évite d'empiler les captures
   const gesture = useRef<{ x: number; y: number; t: number } | null>(null)  // début d'un geste (tap/swipe)
@@ -97,11 +99,17 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     const r = await iremotech.snapshot(dev.public_id)
     snapBusy.current = false
     if (!silent) setSnapLoading(false)
-    if (r.ok && r.dataUrl) setSnap(r.dataUrl)
-    else if (!silent) addLog(`❌ snapshot : ${r.error ?? r.status}`)
+    if (r.ok && r.dataUrl) { setSnap(r.dataUrl); setOffline(false); setSnapErr('') }
+    else if (r.status === 503) {
+      // 503 = DeviceOffline (iRemoTech) — inutile de continuer à spammer l'API.
+      setOffline(true)
+      setLive(false)
+      setSnapErr(r.error ?? 'snapshot 503')
+      if (!silent) addLog(`⚠️ ${r.error ?? 'snapshot 503'}`)
+    } else if (!silent) addLog(`❌ snapshot : ${r.error ?? r.status}`)
   }, [])
 
-  useEffect(() => { if (selected) { setSnap(null); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
+  useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
 
   // Rafraîchissement auto (écran "live") → contrôle bien plus fluide.
   useEffect(() => {
@@ -269,7 +277,15 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 </div>
               </div>
               <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center' }}>
-                {snap ? (
+                {offline ? (
+                  <div style={{ textAlign: 'center', padding: 20 }}>
+                    <div style={{ fontSize: 30, marginBottom: 8 }}>📴</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: INK, marginBottom: 4 }}>Le téléphone ne répond pas (503)</div>
+                    <div style={{ fontSize: 10.5, color: FAINT, marginBottom: 10, lineHeight: 1.5 }}>iRemoTech renvoie « device offline » sur cet ID. Vérifie que c'est bien le bon appareil et qu'il est réveillé, puis réessaie.</div>
+                    {snapErr && <div style={{ fontSize: 9.5, color: FAINT, marginBottom: 12, fontFamily: 'monospace', wordBreak: 'break-word', opacity: 0.8 }}>{snapErr}</div>}
+                    <BlowButton variant="ghost" onClick={() => { setOffline(false); refreshSnapshot(selected) }} style={{ height: 32 }}>Réessayer</BlowButton>
+                  </div>
+                ) : snap ? (
                   <img ref={imgRef} src={snap} alt="écran" draggable={false}
                     onPointerDown={onSnapDown} onPointerUp={onSnapUp} onWheel={onSnapWheel}
                     style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none' }}

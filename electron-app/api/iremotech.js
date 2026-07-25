@@ -41,7 +41,13 @@ module.exports = async (req, res) => {
     }
     if (op === 'snapshot') {
       const r = await fetch(`${BASE}/devices/${dev}/snapshot`, { headers: auth, signal: AbortSignal.timeout(25000) })
-      if (!r.ok) return res.status(200).json({ ok: false, status: r.status, error: `snapshot ${r.status}` })
+      if (!r.ok) {
+        // On remonte le corps réel d'iRemoTech (souvent un JSON { error, message })
+        // pour diagnostiquer un 503 « device offline » vs autre chose.
+        let detail = ''
+        try { detail = (await r.text()).slice(0, 300) } catch { /* ignore */ }
+        return res.status(200).json({ ok: false, status: r.status, error: `snapshot ${r.status}${detail ? ` — ${detail}` : ''}` })
+      }
       const buf = Buffer.from(await r.arrayBuffer())
       return res.status(200).json({ ok: true, dataUrl: `data:image/jpeg;base64,${buf.toString('base64')}` })
     }
