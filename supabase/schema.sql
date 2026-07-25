@@ -1246,10 +1246,10 @@ $$;
 -- ║  8. STORAGE                                                  ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
--- Bucket "content" — privé, 50 MB max (vidéos + thumbnails)
+-- Bucket "content" — privé, 100 MB max (vidéos + thumbnails)
 INSERT INTO storage.buckets (id, name, public, file_size_limit)
-VALUES ('content', 'content', false, 52428800)
-ON CONFLICT (id) DO UPDATE SET file_size_limit = 52428800, public = false;
+VALUES ('content', 'content', false, 104857600)
+ON CONFLICT (id) DO UPDATE SET file_size_limit = 104857600, public = false;
 
 DROP POLICY IF EXISTS "content_select" ON storage.objects;
 DROP POLICY IF EXISTS "content_insert" ON storage.objects;
