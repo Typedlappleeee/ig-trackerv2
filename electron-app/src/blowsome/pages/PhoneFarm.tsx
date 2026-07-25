@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
-import { iremotech, extractDevices, loadIremotechKey, saveIremotechKey, type IrtDevice, type IrtAction } from '@/lib/iremotech'
+import { iremotech, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount } from '@/lib/iremotech'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, GOLD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
@@ -33,6 +33,12 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [savingKey, setSavingKey] = useState(false)
   const [hasKey, setHasKey] = useState(false)
   const [keyErr, setKeyErr] = useState('')
+  // Notes + comptes par téléphone (coffre perso).
+  const [notes, setNotes] = useState('')
+  const [accounts, setAccounts] = useState<IrtAccount[]>([])
+  const [metaSaving, setMetaSaving] = useState(false)
+  const [metaSaved, setMetaSaved] = useState(false)
+  const [reveal, setReveal] = useState<Set<number>>(new Set())
 
   const addLog = (m: string) => setLog(l => [`${new Date().toLocaleTimeString()} · ${m}`, ...l].slice(0, 30))
 
@@ -136,6 +142,27 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     const dy = e.deltaY > 0 ? 500 : -500
     sendAction({ type: 'scroll', x: p.x, y: p.y, dy }, `scroll ${dy > 0 ? '↓' : '↑'}`)
   }
+
+  // ── Notes + comptes du téléphone sélectionné ────────────────────────────────
+  useEffect(() => {
+    if (!selected) { setNotes(''); setAccounts([]); return }
+    let alive = true
+    loadDeviceMeta(user.id, selected.public_id).then(m => { if (alive) { setNotes(m.notes); setAccounts(m.accounts); setMetaSaved(false); setReveal(new Set()) } })
+    return () => { alive = false }
+  }, [selected, user.id])
+
+  const saveMeta = async () => {
+    if (!selected) return
+    setMetaSaving(true); setMetaSaved(false)
+    const r = await saveDeviceMeta(user.id, currentOrg?.id ?? null, selected.public_id, { notes, accounts })
+    setMetaSaving(false)
+    if (r.ok) { setMetaSaved(true); window.setTimeout(() => setMetaSaved(false), 2000) }
+    else addLog(`❌ notes/comptes : ${r.error}`)
+  }
+  const addAccount = () => setAccounts(a => [...a, { label: '', username: '', password: '' }])
+  const updateAccount = (i: number, patch: Partial<IrtAccount>) => setAccounts(a => a.map((x, j) => j === i ? { ...x, ...patch } : x))
+  const removeAccount = (i: number) => { setAccounts(a => a.filter((_, j) => j !== i)); setReveal(new Set()) }
+  const copy = (v: string) => { try { navigator.clipboard?.writeText(v) } catch { /* noop */ } }
 
   return (
     <div>
@@ -286,6 +313,57 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   />
                   <BlowButton onClick={() => { if (text) { sendAction({ type: 'text', text }, `texte "${text}"`); setText('') } }} style={{ height: 38 }}>Envoyer</BlowButton>
                 </div>
+              </BlowCard>
+
+              {/* Notes + comptes du téléphone */}
+              <BlowCard style={{ padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <p style={{ margin: 0, fontSize: 12.5, fontWeight: 800, color: INK }}>Notes & comptes</p>
+                  <button onClick={saveMeta} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: metaSaved ? '#34D399' : '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    {metaSaving ? 'Enregistrement…' : metaSaved ? '✓ Enregistré' : 'Enregistrer'}
+                  </button>
+                </div>
+                <textarea
+                  value={notes} onChange={e => setNotes(e.target.value)}
+                  placeholder="Notes sur ce téléphone (proxy, statut, remarques…)"
+                  rows={2}
+                  style={{ width: '100%', resize: 'vertical', padding: '9px 11px', borderRadius: 10, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.045)', border: `1px solid ${HAIR}`, fontFamily: 'inherit' }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 8px' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: MUTED }}>Comptes ({accounts.length})</span>
+                  <button onClick={addAccount} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>+ Ajouter un compte</button>
+                </div>
+                {accounts.length === 0 ? (
+                  <p style={{ fontSize: 11.5, color: FAINT, margin: 0 }}>Aucun compte enregistré. Ajoute tes logins pour t'en souvenir.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {accounts.map((acc, i) => {
+                      const shown = reveal.has(i)
+                      const field = (v: string, ph: string, on: (val: string) => void, type = 'text') => (
+                        <input value={v} onChange={e => on(e.target.value)} placeholder={ph} type={type}
+                          style={{ flex: 1, minWidth: 0, height: 32, padding: '0 10px', borderRadius: 8, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${HAIR}` }} />
+                      )
+                      return (
+                        <div key={i} style={{ padding: 10, borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                            {field(acc.label ?? '', 'Libellé (ex. compte 1)', v => updateAccount(i, { label: v }))}
+                            <button onClick={() => removeAccount(i)} className="blow-tap" title="Supprimer" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: '#F87171', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                          </div>
+                          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                            {field(acc.username, 'Identifiant / @', v => updateAccount(i, { username: v }))}
+                            <button onClick={() => copy(acc.username)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
+                          </div>
+                          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                            {field(acc.password, 'Mot de passe', v => updateAccount(i, { password: v }), shown ? 'text' : 'password')}
+                            <button onClick={() => setReveal(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })} className="blow-tap" title={shown ? 'Masquer' : 'Afficher'} style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>{shown ? '🙈' : '👁'}</button>
+                            <button onClick={() => copy(acc.password)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <p style={{ margin: '10px 0 0', fontSize: 10.5, color: FAINT }}>🔒 Coffre privé (visible par toi uniquement). Pense à cliquer « Enregistrer ».</p>
               </BlowCard>
 
               <BlowCard style={{ padding: 16 }}>

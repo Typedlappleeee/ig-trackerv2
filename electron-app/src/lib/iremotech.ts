@@ -76,6 +76,25 @@ async function irt<T = unknown>(op: string, payload: Record<string, unknown> = {
   }
 }
 
+// ── Notes + comptes (login/mdp) par téléphone (coffre perso, Supabase) ───────
+export interface IrtAccount { label?: string; platform?: string; username: string; password: string }
+export interface IrtDeviceMeta { notes: string; accounts: IrtAccount[] }
+
+export async function loadDeviceMeta(userId: string, deviceId: string): Promise<IrtDeviceMeta> {
+  try {
+    const { data } = await supabase.from('iremotech_device_meta').select('notes, accounts').eq('user_id', userId).eq('device_id', deviceId).maybeSingle()
+    return { notes: data?.notes ?? '', accounts: (data?.accounts as IrtAccount[] | null) ?? [] }
+  } catch { return { notes: '', accounts: [] } }
+}
+
+export async function saveDeviceMeta(userId: string, orgId: string | null, deviceId: string, meta: IrtDeviceMeta): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase.from('iremotech_device_meta').upsert(
+    { user_id: userId, org_id: orgId, device_id: deviceId, notes: meta.notes, accounts: meta.accounts, updated_at: new Date().toISOString() },
+    { onConflict: 'user_id,device_id' },
+  )
+  return error ? { ok: false, error: error.message } : { ok: true }
+}
+
 export const iremotech = {
   // Liste des iPhones pilotables.
   listDevices: () => irt<{ devices?: IrtDevice[] } | IrtDevice[]>('devices'),
