@@ -9,25 +9,32 @@ let apiKey: string | null = null
 export function setIremotechKey(k: string | null) { apiKey = (k && k.trim()) ? k.trim() : null }
 export function getIremotechKey(): string | null { return apiKey }
 
-// Charge la clé de l'agence (org) ou du compte perso depuis Supabase.
-export async function loadIremotechKey(orgId: string | null, userId: string): Promise<string | null> {
-  const table = orgId ? 'org_config' : 'app_config'
-  const col = orgId ? 'org_id' : 'user_id'
-  const val = orgId ?? userId
+async function readKey(table: string, col: string, val: string): Promise<string | null> {
   try {
     const { data } = await supabase.from(table).select('iremotech_config').eq(col, val).maybeSingle()
-    const key = (data?.iremotech_config as { api_key?: string } | null)?.api_key ?? null
-    setIremotechKey(key)
-    return key
+    return (data?.iremotech_config as { api_key?: string } | null)?.api_key ?? null
   } catch { return null }
 }
 
-// Enregistre la clé de l'agence.
+// Charge la clé : d'abord l'agence (org_config), sinon le compte perso (app_config).
+export async function loadIremotechKey(orgId: string | null, userId: string): Promise<string | null> {
+  let key: string | null = null
+  if (orgId) key = await readKey('org_config', 'org_id', orgId)
+  if (!key) key = await readKey('app_config', 'user_id', userId)
+  setIremotechKey(key)
+  return key
+}
+
+// Enregistre la clé : essaie l'agence (org_config) ; si la RLS bloque, repli sur
+// le compte perso (app_config) pour que ça marche quand même.
 export async function saveIremotechKey(orgId: string | null, userId: string, key: string): Promise<{ ok: boolean; error?: string }> {
-  const table = orgId ? 'org_config' : 'app_config'
-  const col = orgId ? 'org_id' : 'user_id'
-  const val = orgId ?? userId
-  const { error } = await supabase.from(table).upsert({ [col]: val, iremotech_config: { api_key: key.trim() } }, { onConflict: col })
+  const val = { api_key: key.trim() }
+  if (orgId) {
+    const { error } = await supabase.from('org_config').upsert({ org_id: orgId, iremotech_config: val }, { onConflict: 'org_id' })
+    if (!error) { setIremotechKey(key); return { ok: true } }
+    // RLS / colonne absente → on retombe sur la config perso ci-dessous.
+  }
+  const { error } = await supabase.from('app_config').upsert({ user_id: userId, iremotech_config: val }, { onConflict: 'user_id' })
   if (error) return { ok: false, error: error.message }
   setIremotechKey(key)
   return { ok: true }
