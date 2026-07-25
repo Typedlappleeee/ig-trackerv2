@@ -23,7 +23,10 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [snapLoading, setSnapLoading] = useState(false)
   const [text, setText] = useState('')
   const [log, setLog] = useState<string[]>([])
+  const [live, setLive] = useState(true)          // rafraîchissement auto de l'écran
   const imgRef = useRef<HTMLImageElement>(null)
+  const snapBusy = useRef(false)                  // évite d'empiler les captures
+  const gesture = useRef<{ x: number; y: number; t: number } | null>(null)  // début d'un geste (tap/swipe)
   // Config de la clé API par agence.
   const [showKey, setShowKey] = useState(false)
   const [keyInput, setKeyInput] = useState('')
@@ -80,32 +83,58 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     }
   }
 
-  const refreshSnapshot = useCallback(async (dev: IrtDevice | null) => {
-    if (!dev) return
-    setSnapLoading(true)
+  const refreshSnapshot = useCallback(async (dev: IrtDevice | null, silent = false) => {
+    if (!dev || snapBusy.current) return
+    snapBusy.current = true
+    if (!silent) setSnapLoading(true)
     const r = await iremotech.snapshot(dev.public_id)
-    setSnapLoading(false)
+    snapBusy.current = false
+    if (!silent) setSnapLoading(false)
     if (r.ok && r.dataUrl) setSnap(r.dataUrl)
-    else addLog(`❌ snapshot : ${r.error ?? r.status}`)
+    else if (!silent) addLog(`❌ snapshot : ${r.error ?? r.status}`)
   }, [])
 
   useEffect(() => { if (selected) { setSnap(null); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
+
+  // Rafraîchissement auto (écran "live") → contrôle bien plus fluide.
+  useEffect(() => {
+    if (!live || !selected || conn !== 'ok') return
+    const id = window.setInterval(() => refreshSnapshot(selected, true), 1100)
+    return () => window.clearInterval(id)
+  }, [live, selected, conn, refreshSnapshot])
 
   const sendAction = async (a: IrtAction, label: string) => {
     if (!selected) return
     const r = await iremotech.action(selected.public_id, a)
     addLog(r.ok ? `✓ ${label}` : `❌ ${label} : ${r.error ?? r.status}`)
-    if (r.ok) window.setTimeout(() => refreshSnapshot(selected), 700)
+    if (r.ok) window.setTimeout(() => refreshSnapshot(selected, true), 350)
   }
 
-  // Clic sur la capture → tap aux coordonnées (espace pixel de la capture).
-  const onSnapClick = (e: React.MouseEvent<HTMLImageElement>) => {
+  // Convertit une position écran → coordonnées pixel de la capture.
+  const toDeviceXY = (clientX: number, clientY: number): { x: number; y: number } | null => {
     const img = imgRef.current
-    if (!img || !img.naturalWidth) return
-    const rect = img.getBoundingClientRect()
-    const x = Math.round((e.clientX - rect.left) / rect.width * img.naturalWidth)
-    const y = Math.round((e.clientY - rect.top) / rect.height * img.naturalHeight)
-    sendAction({ type: 'tap', x, y }, `tap (${x}, ${y})`)
+    if (!img || !img.naturalWidth) return null
+    const r = img.getBoundingClientRect()
+    return { x: Math.round((clientX - r.left) / r.width * img.naturalWidth), y: Math.round((clientY - r.top) / r.height * img.naturalHeight) }
+  }
+  // Glisser sur l'écran = SWIPE envoyé au tel ; simple clic = TAP.
+  const onSnapDown = (e: React.PointerEvent<HTMLImageElement>) => {
+    const p = toDeviceXY(e.clientX, e.clientY); if (!p) return
+    gesture.current = { x: p.x, y: p.y, t: Date.now() }
+  }
+  const onSnapUp = (e: React.PointerEvent<HTMLImageElement>) => {
+    const g = gesture.current; gesture.current = null
+    const p = toDeviceXY(e.clientX, e.clientY); if (!g || !p) return
+    const dx = p.x - g.x, dy = p.y - g.y
+    if (Math.abs(dx) + Math.abs(dy) < 24) sendAction({ type: 'tap', x: g.x, y: g.y }, `tap (${g.x}, ${g.y})`)
+    else sendAction({ type: 'swipe', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: 250 }, `swipe`)
+  }
+  // Molette sur l'écran = scroll sur le tel (et pas sur la page).
+  const onSnapWheel = (e: React.WheelEvent<HTMLImageElement>) => {
+    e.preventDefault()
+    const p = toDeviceXY(e.clientX, e.clientY); if (!p) return
+    const dy = e.deltaY > 0 ? 500 : -500
+    sendAction({ type: 'scroll', x: p.x, y: p.y, dy }, `scroll ${dy > 0 ? '↓' : '↑'}`)
   }
 
   return (
@@ -200,32 +229,54 @@ export function BlowPhoneFarm({ user }: { user: User }) {
 
           {/* Contrôle de l'iPhone sélectionné */}
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 300px) 1fr', gap: 16, alignItems: 'start' }}>
-            {/* Capture cliquable */}
+            {/* Écran — tap / swipe / molette envoyés au tel */}
             <BlowCard style={{ padding: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>Écran</span>
-                <button onClick={() => refreshSnapshot(selected)} className="blow-tap" style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻ Rafraîchir</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button onClick={() => setLive(v => !v)} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: live ? '#34D399' : 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 99, background: live ? '#34D399' : 'var(--text-4)', boxShadow: live ? '0 0 8px #34D399' : 'none' }} /> Live
+                  </button>
+                  <button onClick={() => refreshSnapshot(selected)} className="blow-tap" style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻</button>
+                </div>
               </div>
               <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center' }}>
                 {snap ? (
-                  <img ref={imgRef} src={snap} alt="écran" onClick={onSnapClick} style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair' }} title="Clique pour taper à cet endroit" />
+                  <img ref={imgRef} src={snap} alt="écran" draggable={false}
+                    onPointerDown={onSnapDown} onPointerUp={onSnapUp} onWheel={onSnapWheel}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none' }}
+                    title="Clic = taper · glisser = swipe · molette = scroll" />
                 ) : (
                   <span style={{ fontSize: 12, color: FAINT }}>{snapLoading ? 'Capture…' : 'Pas de capture'}</span>
                 )}
               </div>
-              <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}>Clique sur l'écran pour <Grad style={{ fontWeight: 700 }}>taper</Grad> à cet endroit</p>
+              <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}><Grad style={{ fontWeight: 700 }}>Clic</Grad> = taper · <Grad style={{ fontWeight: 700 }}>glisser</Grad> = swipe · <Grad style={{ fontWeight: 700 }}>molette</Grad> = scroll</p>
             </BlowCard>
 
             {/* Actions + journal */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <BlowCard style={{ padding: 16 }}>
-                <p style={{ margin: '0 0 12px', fontSize: 12.5, fontWeight: 800, color: INK }}>Actions rapides</p>
+                <p style={{ margin: '0 0 10px', fontSize: 12.5, fontWeight: 800, color: INK }}>Apps</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                  {([
+                    { l: '📷 Instagram', url: 'instagram://app' },
+                    { l: '🎵 TikTok', url: 'tiktok://' },
+                    { l: '🧵 Threads', url: 'barcelona://' },
+                    { l: '👻 Snapchat', url: 'snapchat://' },
+                    { l: '🌐 Safari', url: 'https://google.com' },
+                  ] as const).map(a => (
+                    <BlowButton key={a.l} variant="ghost" onClick={() => sendAction({ type: 'open_url', url: a.url }, `open ${a.l}`)} style={{ height: 34 }}>{a.l}</BlowButton>
+                  ))}
+                </div>
+                <p style={{ margin: '0 0 10px', fontSize: 12.5, fontWeight: 800, color: INK }}>Système & navigation</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  <BlowButton variant="ghost" onClick={() => sendAction({ type: 'press', name: 'home' }, 'home')} style={{ height: 34 }}>⌂ Accueil</BlowButton>
                   <BlowButton variant="ghost" onClick={() => sendAction({ type: 'scroll', x: 200, y: 500, dy: -600 }, 'scroll ↑')} style={{ height: 34 }}>↑ Scroll</BlowButton>
                   <BlowButton variant="ghost" onClick={() => sendAction({ type: 'scroll', x: 200, y: 500, dy: 600 }, 'scroll ↓')} style={{ height: 34 }}>↓ Scroll</BlowButton>
-                  <BlowButton variant="ghost" onClick={() => sendAction({ type: 'press', name: 'home' }, 'home')} style={{ height: 34 }}>⌂ Accueil</BlowButton>
-                  <BlowButton variant="ghost" onClick={() => sendAction({ type: 'open_url', url: 'https://instagram.com' }, 'open instagram')} style={{ height: 34 }}>Instagram</BlowButton>
+                  <BlowButton variant="ghost" onClick={() => sendAction({ type: 'airplane', on: true }, 'avion ON')} style={{ height: 34 }}>✈️ Avion ON</BlowButton>
+                  <BlowButton variant="ghost" onClick={() => sendAction({ type: 'airplane', on: false }, 'avion OFF')} style={{ height: 34 }}>✈️ Avion OFF</BlowButton>
                 </div>
+                <div style={{ height: 1, background: HAIR, margin: '14px 0' }} />
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <input
                     value={text} onChange={e => setText(e.target.value)}
