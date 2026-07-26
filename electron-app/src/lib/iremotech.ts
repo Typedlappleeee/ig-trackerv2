@@ -88,8 +88,16 @@ async function irt<T = unknown>(op: string, payload: Record<string, unknown> = {
 }
 
 // ── Notes + comptes par téléphone (visible par toute l'agence, Supabase) ─────
-// Champs d'un compte : login (username), mot de passe, id auth (auth_id).
-export interface IrtAccount { username: string; password: string; auth_id?: string }
+// Champs d'un compte : nom IG de base, nom IG modifié, mot de passe, id A2F (2FA).
+// (username/auth_id restent optionnels pour lire d'anciennes fiches.)
+export interface IrtAccount {
+  ig_base?: string      // nom IG de base
+  ig_modified?: string  // nom IG modifié
+  password?: string     // mot de passe
+  a2f?: string          // id A2F (2FA)
+  username?: string     // ancien champ (compat)
+  auth_id?: string      // ancien champ (compat)
+}
 export interface IrtDeviceMeta { notes: string; accounts: IrtAccount[] }
 
 // scope = l'agence (org_id) si présente, sinon le compte perso (user_id).

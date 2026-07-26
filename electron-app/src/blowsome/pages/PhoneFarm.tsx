@@ -185,7 +185,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     if (r.ok) { setMetaSaved(true); window.setTimeout(() => setMetaSaved(false), 2000) }
     else addLog(`❌ notes/comptes : ${r.error}`)
   }
-  const addAccount = () => setAccounts(a => [...a, { username: '', password: '' }])
+  const addAccount = () => setAccounts(a => [...a, { ig_base: '', ig_modified: '', password: '', a2f: '' }])
   const updateAccount = (i: number, patch: Partial<IrtAccount>) => setAccounts(a => a.map((x, j) => j === i ? { ...x, ...patch } : x))
   const removeAccount = (i: number) => { setAccounts(a => a.filter((_, j) => j !== i)); setReveal(new Set()) }
   const copy = (v: string) => { try { navigator.clipboard?.writeText(v) } catch { /* noop */ } }
@@ -417,7 +417,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                       <button onClick={addAccount} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>+ Ajouter un compte</button>
                     </div>
                     {accounts.length === 0 ? (
-                      <p style={{ fontSize: 11.5, color: FAINT, margin: 0 }}>Aucun compte. Ajoute login / mot de passe / id auth.</p>
+                      <p style={{ fontSize: 11.5, color: FAINT, margin: 0 }}>Aucun compte. Ajoute nom IG de base / nom IG modifié / mot de passe / id A2F.</p>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {accounts.map((acc, i) => {
@@ -426,17 +426,32 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                             <input value={v} onChange={e => on(e.target.value)} placeholder={ph} type={type}
                               style={{ flex: 1, minWidth: 0, height: 32, padding: '0 10px', borderRadius: 8, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${HAIR}` }} />
                           )
+                          const copyBtn = (v: string) => (
+                            <button onClick={() => copy(v)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
+                          )
                           return (
                             <div key={i} style={{ padding: 10, borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                              {/* Nom IG de base + supprimer */}
                               <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                                {field(acc.username, 'Login', v => updateAccount(i, { username: v }))}
-                                <button onClick={() => copy(acc.username)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
+                                {field(acc.ig_base ?? acc.username ?? '', 'Nom IG de base', v => updateAccount(i, { ig_base: v }))}
+                                {copyBtn(acc.ig_base ?? acc.username ?? '')}
                                 <button onClick={() => removeAccount(i)} className="blow-tap" title="Supprimer" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: '#F87171', cursor: 'pointer', fontSize: 14 }}>✕</button>
                               </div>
+                              {/* Nom IG modifié */}
                               <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                                {field(acc.password, 'Mot de passe', v => updateAccount(i, { password: v }), shown ? 'text' : 'password')}
+                                {field(acc.ig_modified ?? '', 'Nom IG modifié', v => updateAccount(i, { ig_modified: v }))}
+                                {copyBtn(acc.ig_modified ?? '')}
+                              </div>
+                              {/* Mot de passe (masqué + révéler) */}
+                              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                                {field(acc.password ?? '', 'Mot de passe', v => updateAccount(i, { password: v }), shown ? 'text' : 'password')}
                                 <button onClick={() => setReveal(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })} className="blow-tap" title={shown ? 'Masquer' : 'Afficher'} style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>{shown ? '🙈' : '👁'}</button>
-                                <button onClick={() => copy(acc.password)} className="blow-tap" title="Copier" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.04)', color: MUTED, cursor: 'pointer', fontSize: 12 }}>⧉</button>
+                                {copyBtn(acc.password ?? '')}
+                              </div>
+                              {/* Id A2F (2FA) */}
+                              <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                                {field(acc.a2f ?? acc.auth_id ?? '', 'Id A2F (2FA)', v => updateAccount(i, { a2f: v }), shown ? 'text' : 'password')}
+                                {copyBtn(acc.a2f ?? acc.auth_id ?? '')}
                               </div>
                             </div>
                           )
