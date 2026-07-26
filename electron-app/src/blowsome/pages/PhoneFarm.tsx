@@ -422,8 +422,12 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {accounts.map((acc, i) => {
                           const shown = reveal.has(i)
+                          // autoComplete=new-password + data-*ignore : empêche le navigateur / gestionnaire
+                          // de mots de passe d'auto-remplir ces champs (login app, clé API…).
                           const field = (v: string, ph: string, on: (val: string) => void, type = 'text') => (
                             <input value={v} onChange={e => on(e.target.value)} placeholder={ph} type={type}
+                              autoComplete="new-password" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+                              data-lpignore="true" data-1p-ignore data-form-type="other" name={`sf-${ph}-${i}`}
                               style={{ flex: 1, minWidth: 0, height: 32, padding: '0 10px', borderRadius: 8, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${HAIR}` }} />
                           )
                           const copyBtn = (v: string) => (
