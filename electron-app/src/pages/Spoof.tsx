@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
@@ -132,6 +132,8 @@ export function Spoof({ user }: { user: User }) {
   const [copies, setCopies]               = useState(1)
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
+  const cancelRef                         = useRef(false)   // « Annuler » : stoppe le traitement en cours
+  const [cancelling, setCancelling]       = useState(false)
   const [autoMode, setAutoMode]           = useState(true)
   const [randomDate, setRandomDate]       = useState(false)
   const [randomDateDays, setRandomDateDays] = useState(30) // fenêtre (jours) pour la date aléatoire
@@ -211,8 +213,12 @@ export function Spoof({ user }: { user: User }) {
     }
   }
 
+  // Annule la tâche en cours : on arrête de lancer de nouveaux spoofs.
+  function cancelSpoof() { cancelRef.current = true; setCancelling(true) }
+
   async function runSpoof() {
     if (!selectedVideos.length || running) return
+    cancelRef.current = false; setCancelling(false)
 
     const totalOutputs = selectedVideos.length * copies
     const creditCost = totalOutputs * CREDIT_COSTS.clone_vid
@@ -326,14 +332,16 @@ export function Spoof({ user }: { user: User }) {
       let cursor = 0
       const worker = async () => {
         while (cursor < initialJobs.length) {
+          if (cancelRef.current) break   // annulé → on ne lance plus de nouveaux jobs
           const job = initialJobs[cursor++]
           await processJob(job)
         }
       }
       await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+      if (cancelRef.current) setJobs(prev => prev.map(j => (j.status === 'queued' || j.status === 'processing') ? { ...j, status: 'error', error: 'annulé' } : j))
       spoofLog('run:end', { jobs: initialJobs.length })
     } finally {
-      setRunning(false)
+      setRunning(false); setCancelling(false)
     }
   }
 
@@ -760,6 +768,12 @@ export function Spoof({ user }: { user: User }) {
                   </>
                 )}
               </button>
+              {running && (
+                <button onClick={cancelSpoof} disabled={cancelling} className="sf-btn cursor-pointer"
+                  style={{ width: '100%', justifyContent: 'center', background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.4)', color: '#F87171', fontWeight: 700 }}>
+                  {cancelling ? tr('Annulation…', 'Cancelling…') : tr('Annuler', 'Cancel')}
+                </button>
+              )}
             </div>
           </div>
 

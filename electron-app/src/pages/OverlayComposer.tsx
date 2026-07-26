@@ -48,6 +48,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
   const videoRef = useRef<HTMLVideoElement>(null)
   const tlRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ k: string; px: number; s0: number; e0: number } | null>(null)
+  const cancelRef = useRef(false)   // « Annuler » : stoppe le traitement en cours
 
   const refV = videos[0] ?? null
   const refP = photos[0] ?? null
@@ -120,6 +121,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
 
   const generate = useCallback(async () => {
     if (!videos.length || !photos.length || running) return
+    cancelRef.current = false
     setRunning(true); setError('')
     const pairs: { v: Vid; p: Photo }[] = !mass
       ? [{ v: videos[0], p: photos[0] }]
@@ -134,6 +136,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
     let cursor = 0
     const worker = async () => {
       while (cursor < pairs.length) {
+        if (cancelRef.current) break   // annulé → on arrête de lancer de nouveaux rendus
         const i = cursor++; const pr = pairs[i]
         setJobs(prev => prev.map(j => j.id === `${i}` ? { ...j, status: 'processing' } : j))
         try {
@@ -153,8 +156,12 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
       }
     }
     await Promise.all(Array.from({ length: Math.min(3, pairs.length) }, worker))
+    if (cancelRef.current) setJobs(prev => prev.map(j => (j.status === 'pending' || j.status === 'processing') ? { ...j, status: 'error', error: 'annulé' } : j))
     setRunning(false)
-  }, [videos, photos, mass, distribution, running, x, y, w, start, end, user.id, currentOrg?.id, saveFolder])
+  }, [videos, photos, mass, distribution, running, x, y, w, h, start, end, user.id, currentOrg?.id, saveFolder])
+
+  // Annule la tâche en cours (arrête de lancer de nouveaux rendus).
+  const cancelRun = () => { cancelRef.current = true }
 
   const pct = (v: number) => dur > 0 ? `${(v / dur) * 100}%` : '0%'
   const doneCount = jobs.filter(j => j.status === 'done').length
@@ -289,10 +296,16 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
 
           <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label={tr('Dossier de destination', 'Destination folder')} />
 
-          <button onClick={generate} disabled={!canGen} className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer" style={{ justifyContent: 'center', opacity: canGen ? 1 : 0.6 }}
-            title={!videos.length ? tr('Choisis une vidéo', 'Pick a video') : !photos.length ? tr('Choisis une photo', 'Pick a photo') : ''}>
-            {running ? tr(`Génération… ${doneCount}/${jobs.length}`, `Rendering… ${doneCount}/${jobs.length}`) : mass ? tr('Générer en masse', 'Generate all') : tr('Générer la vidéo', 'Generate video')}
-          </button>
+          {running ? (
+            <button onClick={cancelRun} disabled={cancelRef.current} className="sf-btn sf-btn-lg cursor-pointer" style={{ justifyContent: 'center', background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.4)', color: '#F87171', fontWeight: 700 }}>
+              {cancelRef.current ? tr('Annulation…', 'Cancelling…') : tr(`Annuler (${doneCount}/${jobs.length})`, `Cancel (${doneCount}/${jobs.length})`)}
+            </button>
+          ) : (
+            <button onClick={generate} disabled={!canGen} className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer" style={{ justifyContent: 'center', opacity: canGen ? 1 : 0.6 }}
+              title={!videos.length ? tr('Choisis une vidéo', 'Pick a video') : !photos.length ? tr('Choisis une photo', 'Pick a photo') : ''}>
+              {mass ? tr('Générer en masse', 'Generate all') : tr('Générer la vidéo', 'Generate video')}
+            </button>
+          )}
 
           {error && <div className="sf-banner is-danger" style={{ fontSize: 12.5 }}>{error}</div>}
 

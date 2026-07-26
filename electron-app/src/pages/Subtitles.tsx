@@ -105,6 +105,8 @@ export function Subtitles({ user }: SubtitlesProps) {
   const [outputUrl,  setOutputUrl]  = useState<string | null>(null)
   const [outputPath, setOutputPath] = useState<string | null>(null)
   const [error,      setError]      = useState('')
+  const cancelRef                   = useRef(false)   // « Annuler » : stoppe le traitement en cours
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => () => {
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
@@ -176,6 +178,7 @@ export function Subtitles({ user }: SubtitlesProps) {
     if (!groqKey) { setError(tr('Clé API Groq manquante — configure-la dans Paramètres', 'Groq API key missing — set it up in Settings')); return }
     if (!videoSrc) { setError(tr('Sélectionne une vidéo', 'Select a video')); return }
 
+    cancelRef.current = false; setCancelling(false)
     setPhase('transcribing')
     setStatus(tr('Préparation…', 'Preparing…'))
     setError('')
@@ -280,6 +283,8 @@ export function Subtitles({ user }: SubtitlesProps) {
       const segs = groupWords(words, perGroup)
       setSegments(segs)
 
+      if (cancelRef.current) { setStatus(''); setPhase('idle'); return }
+
       // ── Step 3: burn subtitles via FFmpeg ────────────────────────────────────
       setPhase('burning')
       setStatus(tr(`Incrustation de ${segs.length} segments…`, `Burning ${segs.length} segments…`))
@@ -290,6 +295,8 @@ export function Subtitles({ user }: SubtitlesProps) {
         fontSize, fontColor, position, style, preset,
       })
       if (!ffRes.ok || !ffRes.outputPath) throw new Error(ffRes.error ?? tr('L\'incrustation des sous-titres a échoué', 'Subtitle burn-in failed'))
+
+      if (cancelRef.current) { setStatus(''); setPhase('idle'); return }
 
       // Load result for preview
       if (!isWeb && window.electronAPI?.readLocalVideo) {
@@ -306,9 +313,13 @@ export function Subtitles({ user }: SubtitlesProps) {
       setError(err instanceof Error ? err.message : String(err))
       setPhase('error')
     } finally {
+      setCancelling(false)
       if (tempPaths.length) deleteStorageObjects(tempPaths).catch(() => {})
     }
   }
+
+  // Annule la génération en cours (stoppe avant l'enregistrement du résultat).
+  function cancelGenerate() { cancelRef.current = true; setCancelling(true) }
 
   async function download() {
     // Web: outputUrl is a blob/data/http URL → trigger a browser download.
@@ -544,6 +555,15 @@ export function Subtitles({ user }: SubtitlesProps) {
          phase === 'burning'       ? tr('Incrustation FFmpeg…', 'FFmpeg burn-in…') :
          tr('Générer les sous-titres →', 'Generate subtitles →')}
       </button>
+
+      {/* Cancel */}
+      {isRunning && (
+        <button onClick={cancelGenerate} disabled={cancelling}
+          className="sf-btn sf-btn-lg"
+          style={{ width: '100%', background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.4)', color: '#F87171', fontWeight: 700 }}>
+          {cancelling ? tr('Annulation…', 'Cancelling…') : tr('Annuler', 'Cancel')}
+        </button>
+      )}
 
       {/* Status */}
       {isRunning && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { ACCENT, ACCENT_L, TEXT_1, TEXT_2, TEXT_3, HAIR, BG_1, BG_2, OK, WARN, ERR } from '@/lib/theme'
 import { supabase, fetchAllRows, type ContentItem } from '@/lib/supabase'
@@ -319,6 +319,8 @@ export function Mixer({ user }: MixerProps) {
 
   const [jobs,    setJobs]    = useState<MixJob[]>([])
   const [running, setRunning] = useState(false)
+  const cancelRef             = useRef(false)   // « Annuler » : stoppe le traitement en cours
+  const [cancelling, setCancelling] = useState(false)
   const [error,   setError]   = useState('')
   const [saveFolder, setSaveFolder] = useState<string | null>(null)
 
@@ -378,8 +380,12 @@ export function Mixer({ user }: MixerProps) {
     } catch { return false }
   }
 
+  // Annule le mix en cours : on arrête de lancer de nouveaux jobs.
+  const cancelMix = () => { cancelRef.current = true; setCancelling(true) }
+
   const startMix = async () => {
     setError('')
+    cancelRef.current = false; setCancelling(false)
     const newJobs = buildJobs()
     setJobs(newJobs)
     setRunning(true)
@@ -427,9 +433,11 @@ export function Mixer({ user }: MixerProps) {
     }
 
     for (let i = 0; i < newJobs.length; i += CONCURRENCY) {
+      if (cancelRef.current) break
       await Promise.all(newJobs.slice(i, i + CONCURRENCY).map(processJob))
     }
-    setRunning(false)
+    if (cancelRef.current) setJobs(prev => prev.map(j => (j.status === 'pending' || j.status === 'processing') ? { ...j, status: 'error', error: 'annulé' } : j))
+    setRunning(false); setCancelling(false)
   }
 
   const doneJobs  = jobs.filter(j => j.status === 'done')
@@ -498,6 +506,13 @@ export function Mixer({ user }: MixerProps) {
               <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>{tr('Lancer le mix', 'Start mix')}</>
             )}
           </button>
+          {running && (
+            <button onClick={cancelMix} disabled={cancelling}
+              className="sf-btn sf-btn-lg cursor-pointer"
+              style={{ background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.4)', color: '#F87171', fontWeight: 700 }}>
+              {cancelling ? tr('Annulation…', 'Cancelling…') : tr('Annuler', 'Cancel')}
+            </button>
+          )}
         </div>
       </header>
 
