@@ -289,6 +289,8 @@ export function MassRemix({ user }: MassRemixProps) {
   const [jobs,        setJobs]        = useState<MassJob[]>([])
   const [running,     setRunning]     = useState(false)
   const abortRef = useRef(false)
+  const cancelRef = useRef(false)   // « Annuler » : stoppe le traitement en cours
+  const [cancelling, setCancelling] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640)
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 640)
@@ -487,11 +489,12 @@ export function MassRemix({ user }: MassRemixProps) {
     setJobs(pairs)
     setRunning(true)
     abortRef.current = false
+    cancelRef.current = false; setCancelling(false)
 
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
     await pLimit(pairs.map(job => async () => {
-      if (abortRef.current) return
+      if (abortRef.current || cancelRef.current) return
 
       try {
         updateJob(job.id, { status: 'detecting' })
@@ -835,8 +838,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       }
     }), 3)
 
-    setRunning(false)
+    if (cancelRef.current) setJobs(prev => prev.map(j => (j.status !== 'done' && j.status !== 'error') ? { ...j, status: 'error', error: 'annulé' } : j))
+    setRunning(false); setCancelling(false)
   }
+
+  // Annule le traitement en cours : on arrête de lancer de nouveaux remix.
+  const cancelRun = () => { cancelRef.current = true; abortRef.current = true; setCancelling(true) }
 
   const prevRunningRef = useRef(false)
   useEffect(() => {
@@ -1584,6 +1591,13 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   : `${t('massRemixLaunchBtn')} ${copies} remix`}
               </span>
             </button>
+            {running && (
+              <button onClick={cancelRun} disabled={cancelling}
+                className="sf-btn sf-btn-lg cursor-pointer"
+                style={{ background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.4)', color: '#F87171', fontWeight: 700 }}>
+                {cancelling ? tr('Annulation…', 'Cancelling…') : tr('Annuler', 'Cancel')}
+              </button>
+            )}
           </div>
         </div>
 

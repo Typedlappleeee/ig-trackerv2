@@ -445,6 +445,8 @@ export function Montage({ user }: MontageProps) {
 
   // Export
   const [exporting, setExporting]   = useState(false)
+  const cancelRef                   = useRef(false)   // « Annuler » : stoppe l'export en cours
+  const [cancelling, setCancelling] = useState(false)
   const [expResult, setExpResult]   = useState<{ ok: boolean; msg: string; command?: string } | null>(null)
 
   // Clear-all confirmation + draft restore banner
@@ -613,8 +615,12 @@ export function Montage({ user }: MontageProps) {
   }
 
   // ── Export ───────────────────────────────────────────────────────────────────────────────
+  // Annule l'export en cours (le résultat FFmpeg ne sera pas enregistré).
+  function cancelExport() { cancelRef.current = true; setCancelling(true) }
+
   async function handleExport() {
     if (!clips.length) return
+    cancelRef.current = false; setCancelling(false)
     setExporting(true); setExpResult(null)
 
     // Montage is free — no credit deduction
@@ -631,12 +637,15 @@ export function Montage({ user }: MontageProps) {
       const res = await window.electronAPI?.runFfmpeg?.({
         clips: ffmpegClips, outputPath: out, preset, transition: 'cut',
       })
+      if (cancelRef.current) { setExporting(false); setCancelling(false); return }
       setExporting(false)
       if (res?.ok) setExpResult({ ok: true, msg: `Exported: ${out}` })
       else setExpResult({ ok: false, msg: res?.error ?? 'FFmpeg error', command: res?.command })
     } catch (e) {
       setExporting(false)
       setExpResult({ ok: false, msg: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -852,6 +861,13 @@ Réponds UNIQUEMENT avec la caption, rien d’autre.`,
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               {t('montageExport')}
             </button>
+            {exporting && (
+              <button onClick={cancelExport} disabled={cancelling}
+                className="sf-btn sf-btn-sm cursor-pointer"
+                style={{ background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.4)', color: '#F87171', fontWeight: 700 }}>
+                {cancelling ? tr('Annulation…', 'Cancelling…') : tr('Annuler', 'Cancel')}
+              </button>
+            )}
           </div>
         </div>
       </div>
