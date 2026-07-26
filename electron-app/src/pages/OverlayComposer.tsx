@@ -3,7 +3,7 @@
 // Masse : pool de vidéos × pool de photos → applique le même placement/timing à
 // toutes (position/taille en fractions → s'adapte à chaque vidéo). Durées ultra
 // courtes possibles (0.1s et moins) via des durées rapides.
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -33,6 +33,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
   const [x, setX] = useState(0.35)
   const [y, setY] = useState(0.4)
   const [w, setW] = useState(0.3)
+  const [h, setH] = useState(0.3)   // hauteur (fraction) — réglable indépendamment → plein écran possible
   const [start, setStart] = useState(0)
   const [end, setEnd] = useState(1)
   const [dur, setDur] = useState(0)
@@ -53,20 +54,39 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
   const visible = t >= start && t <= end
   const setDuration = (d: number) => setEnd(Math.min(start + d, dur || start + d))
 
+  // Quand on choisit une NOUVELLE photo, on cale la hauteur sur son ratio réel
+  // (via le ratio 9:16 de la scène) → l'incrustation démarre sans déformation.
+  const wRef = useRef(w); wRef.current = w
+  useEffect(() => {
+    if (!refP || refP.type !== 'image') return
+    const img = new Image()
+    img.onload = () => {
+      if (!img.naturalWidth || !img.naturalHeight) return
+      const stageAR = 9 / 16 // largeur/hauteur de la scène (= VW/VH côté serveur)
+      const nh = Math.min(Math.max(wRef.current * stageAR * (img.naturalHeight / img.naturalWidth), 0.05), 1)
+      setH(nh)
+    }
+    img.src = refP.url
+  }, [refP])
+
   // ── Placement sur l'aperçu ─────────────────────────────────────────────────
   const onStageDown = (mode: 'move' | 'resize') => (e: React.PointerEvent) => {
     e.preventDefault(); e.stopPropagation()
-    const px = e.clientX, py = e.clientY, x0 = x, y0 = y, w0 = w
+    const px = e.clientX, py = e.clientY, x0 = x, y0 = y, w0 = w, h0 = h
     const onMove = (ev: PointerEvent) => {
       const c = stageRef.current; if (!c) return
       const r = c.getBoundingClientRect()
       const dx = (ev.clientX - px) / r.width, dy = (ev.clientY - py) / r.height
-      if (mode === 'move') { setX(Math.min(Math.max(x0 + dx, 0), 1 - w)); setY(Math.min(Math.max(y0 + dy, 0), 1)) }
-      else setW(Math.min(Math.max(w0 + dx, 0.05), 1 - x))
+      if (mode === 'move') { setX(Math.min(Math.max(x0 + dx, 0), 1 - w)); setY(Math.min(Math.max(y0 + dy, 0), 1 - h)) }
+      // Redimension LIBRE : largeur ET hauteur → l'image peut couvrir tout l'écran.
+      else { setW(Math.min(Math.max(w0 + dx, 0.05), 1 - x)); setH(Math.min(Math.max(h0 + dy, 0.05), 1 - y)) }
     }
     const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
   }
+
+  // Place l'incrustation en plein écran (couvre toute la vidéo).
+  const fitFullScreen = () => { setX(0); setY(0); setW(1); setH(1) }
 
   // ── Timeline ───────────────────────────────────────────────────────────────
   const timeAt = (cx: number) => { const b = tlRef.current; if (!b || dur <= 0) return 0; const r = b.getBoundingClientRect(); return Math.min(Math.max((cx - r.left) / r.width, 0), 1) * dur }
@@ -91,7 +111,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mode: 'media', videoUrl: v.url, overlayUrl: p.url, overlayType: p.type,
-        userId: user.id, x, y, w, start, duration: Math.max(end - start, MIN_WIN),
+        userId: user.id, x, y, w, h, start, duration: Math.max(end - start, MIN_WIN),
         supabaseToken: token, supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       }),
     })
@@ -183,7 +203,14 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
       <div className="sf-page-body" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', gap: 28, alignItems: 'start' }}>
         {/* Aperçu (vidéo de référence) + timeline */}
         <div>
-          <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Aperçu — glisse la photo pour la placer', 'Preview — drag the photo to place it')}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+            <div className="sf-section-label" style={{ margin: 0 }}>{tr('Aperçu — glisse pour placer, coin pour redimensionner', 'Preview — drag to place, corner to resize')}</div>
+            {refV && refP && (
+              <button onClick={fitFullScreen} className="sf-btn sf-btn-sm sf-btn-secondary cursor-pointer" style={{ padding: '0 10px', flexShrink: 0 }} title={tr('Couvrir tout l\'écran', 'Cover full screen')}>
+                ⛶ {tr('Plein écran', 'Full screen')}
+              </button>
+            )}
+          </div>
           <div ref={stageRef} style={{ position: 'relative', width: '100%', aspectRatio: '9/16', maxHeight: '54vh', margin: '0 auto', borderRadius: 14, overflow: 'hidden', background: '#0b0b12', border: '1px solid var(--border)' }}>
             {refV
               ? <video ref={videoRef} src={refV.url} muted loop autoPlay playsInline
@@ -192,8 +219,8 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--text-4)', fontSize: 12 }}>{tr('Choisis une vidéo', 'Pick a video')}</div>}
             {refV && refP && (
-              <div onPointerDown={onStageDown('move')} style={{ position: 'absolute', left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, cursor: 'move', touchAction: 'none', opacity: visible ? 1 : 0.28, outline: '2px solid #A5B4FC', borderRadius: 4, transition: 'opacity .12s' }}>
-                {refP.type === 'video' ? <video src={refP.url} muted loop autoPlay playsInline style={{ display: 'block', width: '100%' }} /> : <img src={refP.url} alt="" style={{ display: 'block', width: '100%' }} />}
+              <div onPointerDown={onStageDown('move')} style={{ position: 'absolute', left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%`, cursor: 'move', touchAction: 'none', opacity: visible ? 1 : 0.28, outline: '2px solid #A5B4FC', borderRadius: 4, overflow: 'hidden', transition: 'opacity .12s' }}>
+                {refP.type === 'video' ? <video src={refP.url} muted loop autoPlay playsInline style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }} /> : <img src={refP.url} alt="" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }} />}
                 <div onPointerDown={onStageDown('resize')} style={{ position: 'absolute', right: -7, bottom: -7, width: 16, height: 16, borderRadius: '50%', background: '#818CF8', border: '2px solid #fff', cursor: 'nwse-resize', touchAction: 'none' }} />
               </div>
             )}

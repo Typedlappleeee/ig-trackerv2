@@ -144,7 +144,7 @@ function buildAssFile(caption, fontSize, fontColor, position) {
 async function handleMediaOverlay(req, res) {
   const {
     videoUrl, overlayUrl, overlayType = 'image', userId, bucket = 'content',
-    x = 0.1, y = 0.1, w = 0.3, start = 0, duration = 5,
+    x = 0.1, y = 0.1, w = 0.3, h, start = 0, duration = 5,
     supabaseToken, supabaseAnonKey,
   } = req.body ?? {}
   if (!videoUrl || !overlayUrl) return res.status(400).json({ ok: false, error: 'Missing videoUrl or overlayUrl' })
@@ -171,10 +171,20 @@ async function handleMediaOverlay(req, res) {
     const ox = Math.round(fx * VW), oy = Math.round(fy * VH), ow = Math.round(fw * VW)
     const isVideo = overlayType === 'video'
 
+    // Hauteur : si le client l'envoie (nouveau composer), on redimensionne l'image
+    // pour REMPLIR exactement la zone dessinée (cover + crop, comme l'aperçu) → le
+    // plein écran fonctionne. Sinon (anciens appels), largeur seule, ratio conservé.
+    const hasH = h !== undefined && h !== null && Number(h) > 0
+    const oh = hasH ? Math.round(clamp(h, 0.02, 1) * VH) : 0
+    // `cover` : on agrandit à la plus grande dimension puis on recadre à ow×oh (pas de déformation).
+    const sizeChain = hasH
+      ? `scale=${ow}:${oh}:force_original_aspect_ratio=increase,crop=${ow}:${oh}`
+      : `scale=${ow}:-1`
+
     const bg = `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg]`
     const ovChain = isVideo
-      ? `[1:v]scale=${ow}:-1,setpts=PTS-STARTPTS+${st}/TB[ov]`  // vidéo overlay démarre à `start`
-      : `[1:v]scale=${ow}:-1[ov]`
+      ? `[1:v]${sizeChain},setpts=PTS-STARTPTS+${st}/TB[ov]`  // vidéo overlay démarre à `start`
+      : `[1:v]${sizeChain}[ov]`
     const filter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=pass[out]`
     const inputs = isVideo ? ['-i', inPath, '-i', ovPath] : ['-i', inPath, '-loop', '1', '-i', ovPath]
 
