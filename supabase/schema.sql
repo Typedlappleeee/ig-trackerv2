@@ -1262,6 +1262,14 @@ CREATE POLICY "content_select" ON storage.objects FOR SELECT USING (
   bucket_id = 'content' AND (
     ((storage.foldername(name))[2] = 'users' AND (storage.foldername(name))[3]::uuid = auth.uid())
     OR ((storage.foldername(name))[2] = 'orgs'  AND public.is_org_member((storage.foldername(name))[3]::uuid))
+    -- fichier référencé par une ligne content_bank partagée à mon agence
+    -- (overlays/spoofs enregistrés sous videos/users/{autre_membre}/)
+    OR EXISTS (
+      SELECT 1 FROM public.content_bank cb
+      WHERE (cb.storage_path = storage.objects.name OR cb.thumbnail_path = storage.objects.name)
+        AND cb.org_id IS NOT NULL
+        AND public.is_org_member(cb.org_id)
+    )
   )
 );
 CREATE POLICY "content_insert" ON storage.objects FOR INSERT WITH CHECK (
