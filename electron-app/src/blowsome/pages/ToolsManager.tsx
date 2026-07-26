@@ -25,25 +25,33 @@ const TOOLS: { id: Tool; title: string; desc: string; emoji: string }[] = [
 export function BlowTools({ user }: { user: User }) {
   useBlowCSS()
   const [tool, setTool] = useState<Tool | null>(null)
+  // `nonce` change → remonte l'outil de zéro (« Recommencer » : annule tout et
+  // repart d'une page vierge, sans quitter l'outil).
+  const [nonce, setNonce] = useState(0)
+  const openTool = (id: Tool) => { setNonce(n => n + 1); setTool(id) }
+  const cancel = () => setTool(null)                    // annule et revient au hub d'outils
+  const restart = () => setNonce(n => n + 1)            // repart de zéro dans le même outil
 
-  // Chaque outil s'ouvre en pleine page. Les pages du Studio ne prennent que `user`
-  // (pas d'`onExit`) → on ajoute une barre « Retour » au-dessus. L'incrustation a
-  // son propre bouton retour (onExit).
+  // Chaque outil s'ouvre en pleine page, sous une barre « Annuler / Recommencer ».
+  // Le `key={nonce}` garantit qu'un « Recommencer » réinitialise TOUT l'état de l'outil.
   if (tool) {
-    if (tool === 'overlay') {
-      return <div style={{ height: '100%' }}><OverlayComposer user={user} onExit={() => setTool(null)} /></div>
-    }
     const inner =
-      tool === 'remix'     ? <Remix user={user} /> :
-      tool === 'spoof'     ? <Spoof user={user} /> :
-      tool === 'subtitles' ? <Subtitles user={user} /> :
-      tool === 'mixer'     ? <Mixer user={user} /> :
-      /* montage */          <Montage user={user} />
+      tool === 'overlay'   ? <OverlayComposer key={nonce} user={user} onExit={cancel} /> :
+      tool === 'remix'     ? <Remix key={nonce} user={user} /> :
+      tool === 'spoof'     ? <Spoof key={nonce} user={user} /> :
+      tool === 'subtitles' ? <Subtitles key={nonce} user={user} /> :
+      tool === 'mixer'     ? <Mixer key={nonce} user={user} /> :
+      /* montage */          <Montage key={nonce} user={user} />
+    const label = TOOLS.find(t => t.id === tool)?.title ?? ''
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ flexShrink: 0, padding: '10px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <button onClick={() => setTool(null)} className="blow-tap" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: '#D8B4FE', fontSize: 13, fontWeight: 700 }}>
-            <Ico d="M19 12H5M11 6l-6 6 6 6" size={15} /> Retour aux outils
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '9px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <button onClick={cancel} className="blow-tap" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: '#F87171', fontSize: 13, fontWeight: 700 }} title="Annuler et revenir aux outils">
+            <Ico d="M18 6 6 18M6 6l12 12" size={15} /> Annuler
+          </button>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+          <button onClick={restart} className="blow-tap" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: '#D8B4FE', fontSize: 13, fontWeight: 700 }} title="Tout effacer et recommencer">
+            <Ico d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" size={15} /> Recommencer
           </button>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }} className="blow-scroll">{inner}</div>
@@ -60,7 +68,7 @@ export function BlowTools({ user }: { user: User }) {
             <BlowCard
               key={t.id}
               hover
-              onClick={() => setTool(t.id)}
+              onClick={() => openTool(t.id)}
               style={{ padding: 22, cursor: 'pointer', position: 'relative', overflow: 'hidden', animation: `blow-rise .5s cubic-bezier(.16,1,.3,1) ${i * 0.05}s both` }}
             >
               <div aria-hidden style={{ position: 'absolute', top: -34, right: -24, width: 130, height: 130, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.22), transparent 68%)', opacity: .6 }} />
