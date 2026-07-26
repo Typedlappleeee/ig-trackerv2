@@ -752,7 +752,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   // accès). Sur Pro et Organisation, ils sont disponibles (et gratuits en crédits).
   const CONTENT_CREATION_TABS = new Set<Page>(['remix', 'spoof', 'subtitles', 'mixer', 'montage', 'aitools', 'videostudio'])
   const planNow = effectivePlan(license)
-  const hasContentCreation = effectiveSuperAdmin || planNow === 'pro' || planNow === 'organisation'
+  // Blowsome (add-on VIP) débloque AUSSI le studio vidéo, même sur un plan Standard.
+  const hasContentCreation = effectiveSuperAdmin || planNow === 'pro' || planNow === 'organisation' || license?.blowsome === true
 
   const isVisibleTab = (id: Page): boolean => {
     // Onglet Blowsome (agence VIP) : visible UNIQUEMENT si la clé porte l'add-on
