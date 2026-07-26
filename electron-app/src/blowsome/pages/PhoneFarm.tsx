@@ -44,6 +44,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [accounts, setAccounts] = useState<IrtAccount[]>([])
   const [metaSaving, setMetaSaving] = useState(false)
   const [metaSaved, setMetaSaved] = useState(false)
+  const [metaErr, setMetaErr] = useState('')       // erreur de sauvegarde notes/comptes (visible)
   const [reveal, setReveal] = useState<Set<number>>(new Set())
   const [showMeta, setShowMeta] = useState(false)   // section notes/comptes repliable
   const [showLog, setShowLog] = useState(false)     // Journal caché par défaut (raccourci Ctrl/Cmd+J)
@@ -197,11 +198,19 @@ export function BlowPhoneFarm({ user }: { user: User }) {
 
   const saveMeta = async () => {
     if (!selected) return
-    setMetaSaving(true); setMetaSaved(false)
+    setMetaSaving(true); setMetaSaved(false); setMetaErr('')
     const r = await saveDeviceMeta(currentOrg?.id ?? null, user.id, selected.public_id, { notes, accounts })
     setMetaSaving(false)
     if (r.ok) { setMetaSaved(true); window.setTimeout(() => setMetaSaved(false), 2000) }
-    else addLog(tr(`❌ notes/comptes : ${r.error}`, `❌ notes/accounts: ${r.error}`))
+    else {
+      // Cas fréquent : la table n'a pas encore été créée (migration non lancée).
+      const missing = /iremotech_device_meta|relation|does not exist|schema cache|column/i.test(r.error ?? '')
+      const hint = missing
+        ? tr(' · Lance la migration 20260728_iremotech_device_meta.sql dans Supabase.', ' · Run migration 20260728_iremotech_device_meta.sql in Supabase.')
+        : ''
+      setMetaErr(`${tr('Échec de la sauvegarde', 'Save failed')} : ${r.error ?? tr('erreur inconnue', 'unknown error')}${hint}`)
+      addLog(tr(`❌ notes/comptes : ${r.error}`, `❌ notes/accounts: ${r.error}`))
+    }
   }
   const addAccount = () => setAccounts(a => [...a, { ig_base: '', ig_modified: '', password: '', a2f: '' }])
   const updateAccount = (i: number, patch: Partial<IrtAccount>) => setAccounts(a => a.map((x, j) => j === i ? { ...x, ...patch } : x))
@@ -434,6 +443,11 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                         {metaSaving ? tr('Enregistrement…', 'Saving…') : metaSaved ? tr('✓ Enregistré', '✓ Saved') : tr('Enregistrer', 'Save')}
                       </button>
                     </div>
+                    {metaErr && (
+                      <div style={{ margin: '0 0 10px', padding: '9px 11px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.35)', color: '#FCA5A5', fontSize: 11.5, lineHeight: 1.5 }}>
+                        {metaErr}
+                      </div>
+                    )}
                     <textarea
                       value={notes} onChange={e => setNotes(e.target.value)}
                       placeholder={tr('Notes sur ce téléphone (proxy, statut, remarques…)', 'Notes about this phone (proxy, status, remarks…)')}
