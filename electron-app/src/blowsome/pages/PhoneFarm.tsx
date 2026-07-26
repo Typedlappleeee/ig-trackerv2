@@ -270,7 +270,9 @@ export function BlowPhoneFarm({ user }: { user: User }) {
       )}
 
       {conn === 'ok' && devices.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 260px) 1fr', gap: 16, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
+          {/* Région 1 — rail : liste des iPhones + quotas du jour */}
+          <div style={{ flex: '0 1 230px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Liste des iPhones */}
           <BlowCard style={{ padding: 10 }}>
             <p style={{ margin: '4px 6px 10px', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: MUTED }}>
@@ -310,7 +312,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
               [tr('Minutes actives', 'Active minutes'), usage.active_minutes], [tr('Uploads', 'Uploads'), usage.uploads],
             ]
             return (
-              <BlowCard style={{ padding: 12, marginTop: 12 }}>
+              <BlowCard style={{ padding: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: MUTED }}>{tr('Quotas du jour', "Today's quotas")}</span>
                   <button onClick={() => iremotech.usage().then(u => { if (u.ok && u.data) setUsage(u.data) })} className="blow-tap" title={tr('Rafraîchir', 'Refresh')} style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻</button>
@@ -333,11 +335,12 @@ export function BlowPhoneFarm({ user }: { user: User }) {
               </BlowCard>
             )
           })()}
+          </div>
 
-          {/* Contrôle de l'iPhone sélectionné */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 300px) 1fr', gap: 16, alignItems: 'start' }}>
+          {/* Région 2 — écran façon téléphone (hero) */}
+          <div style={{ flex: '0 1 300px', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
             {/* Écran — tap / swipe / molette envoyés au tel */}
-            <BlowCard style={{ padding: 12 }}>
+            <BlowCard style={{ padding: 14, width: '100%', maxWidth: 320 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>{tr('Écran', 'Screen')}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -347,7 +350,9 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   <button onClick={() => refreshSnapshot(selected)} className="blow-tap" style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻</button>
                 </div>
               </div>
-              <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center' }}>
+              <div style={{ padding: 10, borderRadius: 34, background: 'linear-gradient(160deg,#1b1b27,#0d0d15)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 30px 60px -32px rgba(99,102,241,0.55), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+                <div style={{ width: 52, height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.14)', margin: '0 auto 8px', pointerEvents: 'none' }} />
+                <div style={{ position: 'relative', borderRadius: 26, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center' }}>
                 {offline ? (
                   <div style={{ textAlign: 'center', padding: 20 }}>
                     <div style={{ fontSize: 30, marginBottom: 8 }}>📴</div>
@@ -369,12 +374,14 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 ) : (
                   <span style={{ fontSize: 12, color: FAINT }}>{snapLoading ? tr('Capture…', 'Capturing…') : tr('Pas de capture', 'No snapshot')}</span>
                 )}
+                </div>
               </div>
               <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}><Grad style={{ fontWeight: 700 }}>{tr('Clic', 'Click')}</Grad> = {tr('taper', 'tap')} · <Grad style={{ fontWeight: 700 }}>{tr('glisser', 'drag')}</Grad> = swipe · <Grad style={{ fontWeight: 700 }}>{tr('molette', 'wheel')}</Grad> = scroll</p>
             </BlowCard>
+          </div>
 
-            {/* Actions + journal */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Région 3 — dock des contrôles (actions · notes · journal) */}
+          <div style={{ flex: '1 1 360px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Actions masquées quand le tel est injoignable (rien à piloter) */}
               {!offline && (
               <BlowCard style={{ padding: 16 }}>
@@ -502,7 +509,6 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 </BlowCard>
               )}
             </div>
-          </div>
         </div>
       )}
     </div>
