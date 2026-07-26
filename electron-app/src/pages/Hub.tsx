@@ -344,8 +344,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const isSuperAdmin = license?.isSuperAdmin === true
   // Création de contenu réservée à partir de Pro (cf. Layout).
   const planNow = effectivePlan(license)
-  // Blowsome (add-on VIP) débloque aussi le studio vidéo, même en Standard.
-  const hasContentCreation = isSuperAdmin || planNow === 'pro' || planNow === 'organisation' || license?.blowsome === true
+  const hasContentCreation = isSuperAdmin || planNow === 'pro' || planNow === 'organisation'
   const CONTENT_CREATION_IDS = new Set(['remix', 'spoof', 'subtitles', 'mixer', 'montage', 'aitools'])
   const allToolShortcuts: { id: Page; label: string; icon: string; superAdminOnly?: boolean; dev?: boolean }[] = [
     { id: 'phones',      label: t('navPhones'),      icon: 'phone' },

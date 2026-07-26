@@ -1,23 +1,52 @@
-// Blowsome — Gestionnaire de tool : hub des outils VIP. Ouvre chaque outil en place.
+// Blowsome — Gestionnaire de tool : hub des outils VIP. Tous les outils vidéo du
+// Studio (incrustation, remix, spoof, sous-titres, mixer, montage) sont ici,
+// directement dans Blowsome (pas besoin du plan Pro/Org). Ouvre chaque outil en place.
 import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { OverlayComposer } from '@/pages/OverlayComposer'
-import { useBlowCSS, Grad, Ico, GRAD, MUTED, INK, HAIR, BlowCard, BlowPageHeader, BlowBadge } from '../ui'
+import { Remix } from '@/pages/Remix'
+import { Spoof } from '@/pages/Spoof'
+import { Subtitles } from '@/pages/Subtitles'
+import { Mixer } from '@/pages/Mixer'
+import { Montage } from '@/pages/Montage'
+import { useBlowCSS, Grad, Ico, GRAD, MUTED, INK, BlowCard, BlowPageHeader } from '../ui'
 
-type Tool = 'overlay'
+type Tool = 'overlay' | 'remix' | 'spoof' | 'subtitles' | 'mixer' | 'montage'
 
 const TOOLS: { id: Tool; title: string; desc: string; emoji: string }[] = [
-  { id: 'overlay', title: 'Incrustation photo/vidéo', desc: 'Mets une vidéo, choisis une photo et place-la où tu veux, pendant la durée que tu veux.', emoji: '🖼' },
+  { id: 'overlay',   title: 'Incrustation photo/vidéo', desc: 'Mets une vidéo, choisis une photo et place-la où tu veux, le temps que tu veux.', emoji: '🖼' },
+  { id: 'montage',   title: 'Montage',                  desc: 'Assemble et découpe tes vidéos.', emoji: '✂️' },
+  { id: 'mixer',     title: 'Mixer',                    desc: 'Ajoute une légende / un montage par-dessus ta vidéo.', emoji: '🎚' },
+  { id: 'remix',     title: 'Remix',                    desc: 'Régénère des variantes uniques de tes vidéos.', emoji: '🎞' },
+  { id: 'spoof',     title: 'Spoof',                    desc: 'Anti-empreinte : rend chaque vidéo unique pour l\'algo.', emoji: '🛡' },
+  { id: 'subtitles', title: 'Sous-titres',              desc: 'Sous-titres automatiques (Groq Whisper).', emoji: '💬' },
 ]
 
 export function BlowTools({ user }: { user: User }) {
   useBlowCSS()
   const [tool, setTool] = useState<Tool | null>(null)
 
-  if (tool === 'overlay') {
+  // Chaque outil s'ouvre en pleine page. Les pages du Studio ne prennent que `user`
+  // (pas d'`onExit`) → on ajoute une barre « Retour » au-dessus. L'incrustation a
+  // son propre bouton retour (onExit).
+  if (tool) {
+    if (tool === 'overlay') {
+      return <div style={{ height: '100%' }}><OverlayComposer user={user} onExit={() => setTool(null)} /></div>
+    }
+    const inner =
+      tool === 'remix'     ? <Remix user={user} /> :
+      tool === 'spoof'     ? <Spoof user={user} /> :
+      tool === 'subtitles' ? <Subtitles user={user} /> :
+      tool === 'mixer'     ? <Mixer user={user} /> :
+      /* montage */          <Montage user={user} />
     return (
-      <div style={{ height: '100%' }}>
-        <OverlayComposer user={user} onExit={() => setTool(null)} />
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flexShrink: 0, padding: '10px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <button onClick={() => setTool(null)} className="blow-tap" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: '#D8B4FE', fontSize: 13, fontWeight: 700 }}>
+            <Ico d="M19 12H5M11 6l-6 6 6 6" size={15} /> Retour aux outils
+          </button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }} className="blow-scroll">{inner}</div>
       </div>
     )
   }
@@ -25,7 +54,7 @@ export function BlowTools({ user }: { user: User }) {
   return (
     <div className="blow-scroll" style={{ height: '100%', overflowY: 'auto', padding: '30px 30px 80px' }}>
       <div style={{ maxWidth: 1120, margin: '0 auto' }}>
-        <BlowPageHeader title="Gestionnaire de tool" subtitle="Tes outils VIP, au même endroit" />
+        <BlowPageHeader title="Gestionnaire de tool" subtitle="Tous tes outils vidéo VIP, au même endroit" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {TOOLS.map((t, i) => (
             <BlowCard
@@ -43,13 +72,6 @@ export function BlowTools({ user }: { user: User }) {
               </span>
             </BlowCard>
           ))}
-
-          {/* Placeholder "à venir" pour les futurs outils */}
-          <BlowCard style={{ padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8, borderStyle: 'dashed' }}>
-            <BlowBadge tone="muted">Bientôt</BlowBadge>
-            <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: INK }}>D'autres outils arrivent</p>
-            <p style={{ margin: 0, fontSize: 12.5, color: MUTED, borderTop: `1px solid ${HAIR}`, paddingTop: 8, marginTop: 4 }}>Spoof, sous-titres, remix… regroupés ici.</p>
-          </BlowCard>
         </div>
       </div>
     </div>
