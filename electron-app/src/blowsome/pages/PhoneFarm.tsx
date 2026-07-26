@@ -7,7 +7,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useTr } from '@/lib/i18n'
 import { iremotech, openSnapshotStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget } from '@/lib/iremotech'
 import {
-  useBlowCSS, Grad, Ico, ICON, GRAD, GOLD, INK, MUTED, FAINT, HAIR,
+  useBlowCSS, Grad, Ico, ICON, GRAD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
 } from '../ui'
 
@@ -46,8 +46,20 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [metaSaved, setMetaSaved] = useState(false)
   const [reveal, setReveal] = useState<Set<number>>(new Set())
   const [showMeta, setShowMeta] = useState(false)   // section notes/comptes repliable
+  const [showLog, setShowLog] = useState(false)     // Journal caché par défaut (raccourci Ctrl/Cmd+J)
 
   const addLog = (m: string) => setLog(l => [`${new Date().toLocaleTimeString()} · ${m}`, ...l].slice(0, 30))
+
+  // Raccourci Ctrl/Cmd+J → affiche/masque le Journal (caché par défaut).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j') {
+        e.preventDefault(); setShowLog(v => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const loadDevices = useCallback(async () => {
     setConn('checking'); setConnMsg('')
@@ -60,6 +72,10 @@ export function BlowPhoneFarm({ user }: { user: User }) {
       iremotech.usage().then(u => { if (u.ok && u.data) setUsage(u.data) })
     } else if ((r.error ?? '').includes('Clé iRemoTech absente')) {
       setConn('unconfigured'); setConnMsg(r.error ?? ''); setShowKey(true)
+    } else if (r.status === 401 || r.status === 403) {
+      // Clé présente mais refusée par iRemoTech (révoquée / incomplète / mauvaise).
+      setConn('unconfigured'); setShowKey(true)
+      setConnMsg(tr('Clé API invalide ou révoquée — recolle ta clé iRemoTech complète.', 'Invalid or revoked API key — paste your full iRemoTech key again.'))
     } else {
       setConn('error'); setConnMsg(r.error ?? tr(`Erreur ${r.status ?? ''}`, `Error ${r.status ?? ''}`))
     }
@@ -469,18 +485,19 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 )}
               </BlowCard>
 
-              <BlowCard style={{ padding: 16 }}>
-                <p style={{ margin: '0 0 10px', fontSize: 12.5, fontWeight: 800, color: INK }}>{tr('Journal', 'Log')}</p>
-                <div className="blow-scroll" style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {log.length === 0
-                    ? <span style={{ fontSize: 12, color: FAINT }}>{tr("Aucune action pour l'instant.", 'No action yet.')}</span>
-                    : log.map((l, i) => <span key={i} style={{ fontSize: 11.5, color: l.includes('❌') ? '#F87171' : 'var(--text-2)', fontFamily: 'monospace' }}>{l}</span>)}
-                </div>
-              </BlowCard>
-
-              <p style={{ margin: '2px 2px 0', fontSize: 11.5, color: FAINT, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: GOLD }}>✦</span> {tr("POC iRemoTech — l'automatisation complète (posting/story) se construira sur ces primitives.", 'iRemoTech POC — full automation (posting/story) will be built on these primitives.')}
-              </p>
+              {showLog && (
+                <BlowCard style={{ padding: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <p style={{ margin: 0, fontSize: 12.5, fontWeight: 800, color: INK }}>{tr('Journal', 'Log')}</p>
+                    <span style={{ fontSize: 10.5, color: FAINT }}>Ctrl/Cmd + J</span>
+                  </div>
+                  <div className="blow-scroll" style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {log.length === 0
+                      ? <span style={{ fontSize: 12, color: FAINT }}>{tr("Aucune action pour l'instant.", 'No action yet.')}</span>
+                      : log.map((l, i) => <span key={i} style={{ fontSize: 11.5, color: l.includes('❌') ? '#F87171' : 'var(--text-2)', fontFamily: 'monospace' }}>{l}</span>)}
+                  </div>
+                </BlowCard>
+              )}
             </div>
           </div>
         </div>

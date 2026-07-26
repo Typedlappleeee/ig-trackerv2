@@ -16,26 +16,25 @@ async function readKey(table: string, col: string, val: string): Promise<string 
   } catch { return null }
 }
 
-// Charge la clé : d'abord l'agence (org_config), sinon le compte perso (app_config).
+// Charge la clé : d'abord TA clé perso (app_config, toujours à jour), sinon la
+// clé de l'agence (org_config, partagée). Cet ordre évite qu'une ancienne clé
+// d'org masque la nouvelle clé perso que tu viens d'enregistrer.
 export async function loadIremotechKey(orgId: string | null, userId: string): Promise<string | null> {
-  let key: string | null = null
-  if (orgId) key = await readKey('org_config', 'org_id', orgId)
-  if (!key) key = await readKey('app_config', 'user_id', userId)
+  let key: string | null = await readKey('app_config', 'user_id', userId)
+  if (!key && orgId) key = await readKey('org_config', 'org_id', orgId)
   setIremotechKey(key)
   return key
 }
 
-// Enregistre la clé : essaie l'agence (org_config) ; si la RLS bloque, repli sur
-// le compte perso (app_config) pour que ça marche quand même.
+// Enregistre la clé : PRIMAIRE = compte perso (app_config, accessible via RLS,
+// toujours fiable) ; puis, best-effort, on la partage à l'agence (org_config).
+// Ainsi la clé qu'on vient d'enregistrer est TOUJOURS celle qui sera rechargée.
 export async function saveIremotechKey(orgId: string | null, userId: string, key: string): Promise<{ ok: boolean; error?: string }> {
   const val = { api_key: key.trim() }
-  if (orgId) {
-    const { error } = await supabase.from('org_config').upsert({ org_id: orgId, iremotech_config: val }, { onConflict: 'org_id' })
-    if (!error) { setIremotechKey(key); return { ok: true } }
-    // RLS / colonne absente → on retombe sur la config perso ci-dessous.
-  }
   const { error } = await supabase.from('app_config').upsert({ user_id: userId, iremotech_config: val }, { onConflict: 'user_id' })
   if (error) return { ok: false, error: error.message }
+  // Partage à l'agence (peut échouer selon la RLS : sans importance, la perso suffit).
+  if (orgId) { try { await supabase.from('org_config').upsert({ org_id: orgId, iremotech_config: val }, { onConflict: 'org_id' }) } catch { /* best-effort */ } }
   setIremotechKey(key)
   return { ok: true }
 }
