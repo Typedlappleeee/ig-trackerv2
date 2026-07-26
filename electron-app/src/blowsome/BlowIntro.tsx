@@ -3,6 +3,7 @@
 // mot BLOWSOME → shine + tagline → barre de progression → fondu de sortie.
 // Skippable via "Entrer".
 import { useEffect, useRef, useState } from 'react'
+import { useTr } from '@/lib/i18n'
 
 const DURATION = 6000
 const WORD = 'BLOWSOME'
@@ -22,6 +23,7 @@ const CSS = `
 `
 
 export function BlowIntro({ onDone }: { onDone: () => void }) {
+  const tr = useTr()
   const [exiting, setExiting] = useState(false)
   const doneRef = useRef(false)
 
@@ -100,7 +102,7 @@ export function BlowIntro({ onDone }: { onDone: () => void }) {
         {/* Ligne + tagline */}
         <div style={{ height: 2, width: 220, margin: '26px auto 16px', background: 'linear-gradient(90deg, transparent, #A855F7, transparent)', transformOrigin: 'center', animation: 'bi-line .9s cubic-bezier(.16,1,.3,1) 2.1s both' }} />
         <p style={{ margin: 0, fontSize: 13, fontWeight: 800, textTransform: 'uppercase', color: '#E9C46A', animation: 'bi-tag 1s ease 2.4s both' }}>
-          ✦ Espace VIP
+          ✦ {tr('Espace VIP', 'VIP Space')}
         </p>
       </div>
 
@@ -119,7 +121,7 @@ export function BlowIntro({ onDone }: { onDone: () => void }) {
           animation: 'bi-skip .6s ease 1.4s both',
         }}
       >
-        Entrer <span style={{ fontSize: 15 }}>→</span>
+        {tr('Entrer', 'Enter')} <span style={{ fontSize: 15 }}>→</span>
       </button>
     </div>
   )

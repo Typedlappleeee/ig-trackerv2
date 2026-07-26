@@ -3,14 +3,11 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { getActiveRuns, subscribeActiveRuns, type ActiveRun } from '@/lib/activeRuns'
+import { useTr } from '@/lib/i18n'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, GOLD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowEmpty,
 } from '../ui'
-
-const TYPE_LABEL: Record<ActiveRun['type'], string> = {
-  mass: 'Mass posting', story: 'Story', warmup: 'Warmup', threads: 'Threads',
-}
 
 function since(ts: number): string {
   const s = Math.max(0, Math.floor((Date.now() - ts) / 1000))
@@ -22,6 +19,10 @@ function since(ts: number): string {
 
 export function BlowPosting({ user: _user }: { user: User }) {
   useBlowCSS()
+  const tr = useTr()
+  const TYPE_LABEL: Record<ActiveRun['type'], string> = {
+    mass: tr('Mass posting', 'Mass posting'), story: tr('Story', 'Story'), warmup: tr('Warmup', 'Warmup'), threads: tr('Threads', 'Threads'),
+  }
   const [runs, setRuns] = useState<ActiveRun[]>(() => getActiveRuns())
   // Ticker pour rafraîchir les durées + s'abonner au registre global.
   const [, tick] = useState(0)
@@ -36,19 +37,19 @@ export function BlowPosting({ user: _user }: { user: User }) {
   return (
     <div>
       <BlowPageHeader
-        title="Posting"
-        subtitle="Tes publications en cours — synchronisées en direct avec ScaleFlow"
+        title={tr('Posting', 'Posting')}
+        subtitle={tr('Tes publications en cours — synchronisées en direct avec ScaleFlow', 'Your publications in progress — synced live with ScaleFlow')}
         action={<BlowBadge tone={running.length ? 'ok' : 'muted'}>
           <span style={{ width: 6, height: 6, borderRadius: 99, background: 'currentColor', boxShadow: running.length ? '0 0 8px 1px currentColor' : 'none' }} />
-          {running.length ? `${running.length} en cours` : 'Aucun en cours'}
+          {running.length ? `${running.length} ${tr('en cours', 'in progress')}` : tr('Aucun en cours', 'None in progress')}
         </BlowBadge>}
       />
 
       {runs.length === 0 ? (
         <BlowCard style={{ padding: 8 }}>
           <BlowEmpty
-            title="Aucun posting en cours"
-            hint="Lance une publication depuis ScaleFlow (Mass Posting, Story, Warmup…) — elle apparaîtra ici en temps réel."
+            title={tr('Aucun posting en cours', 'No posting in progress')}
+            hint={tr('Lance une publication depuis ScaleFlow (Mass Posting, Story, Warmup…) — elle apparaîtra ici en temps réel.', 'Start a publication from ScaleFlow (Mass Posting, Story, Warmup…) — it will appear here in real time.')}
             icon={<Ico d={ICON.send} size={22} />}
           />
         </BlowCard>
@@ -59,7 +60,7 @@ export function BlowPosting({ user: _user }: { user: User }) {
             const done = r.status === 'done'
             const err = r.status === 'error'
             const tone = err ? 'muted' : done ? 'ok' : 'accent'
-            const statusLabel = err ? 'échec' : done ? 'terminé' : 'en cours'
+            const statusLabel = err ? tr('échec', 'failed') : done ? tr('terminé', 'done') : tr('en cours', 'in progress')
             return (
               <BlowCard key={r.id} hover style={{ padding: 22, position: 'relative', overflow: 'hidden', animation: `blow-rise .5s cubic-bezier(.16,1,.3,1) ${i * 0.05}s both` }}>
                 <div aria-hidden style={{ position: 'absolute', top: -40, right: -30, width: 150, height: 150, borderRadius: '50%', background: `radial-gradient(circle, ${err ? 'rgba(248,113,113,0.14)' : 'rgba(236,72,153,0.16)'}, transparent 68%)`, opacity: .7 }} />
@@ -72,7 +73,7 @@ export function BlowPosting({ user: _user }: { user: User }) {
                     </div>
                     <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900, letterSpacing: '-.02em', color: INK }}>{r.label}</h3>
                     <p style={{ margin: '4px 0 0', fontSize: 12.5, color: FAINT, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Ico d={ICON.clock} size={13} /> démarré il y a {since(r.startedAt)}
+                      <Ico d={ICON.clock} size={13} /> {tr('démarré il y a', 'started')} {since(r.startedAt)}
                     </p>
                   </div>
                   <BlowBadge tone={tone}>{statusLabel}</BlowBadge>
@@ -82,7 +83,7 @@ export function BlowPosting({ user: _user }: { user: User }) {
                 <div style={{ position: 'relative' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: MUTED }}>
-                      {r.done} / {r.total} comptes
+                      {r.done} / {r.total} {tr('comptes', 'accounts')}
                     </span>
                     <span style={{ fontSize: 13, fontWeight: 900, color: done ? GOLD : INK, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
                   </div>
@@ -110,7 +111,7 @@ export function BlowPosting({ user: _user }: { user: User }) {
       )}
 
       <p style={{ margin: '22px 2px 0', fontSize: 12.5, color: FAINT }}>
-        Piloté en direct depuis <Grad style={{ fontWeight: 800 }}>ScaleFlow</Grad> · le suivi survit au rafraîchissement.
+        {tr('Piloté en direct depuis', 'Driven live from')} <Grad style={{ fontWeight: 800 }}>ScaleFlow</Grad> · {tr('le suivi survit au rafraîchissement.', 'tracking survives a refresh.')}
       </p>
     </div>
   )

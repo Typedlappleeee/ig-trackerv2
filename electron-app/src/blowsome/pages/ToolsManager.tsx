@@ -10,20 +10,21 @@ import { Subtitles } from '@/pages/Subtitles'
 import { Mixer } from '@/pages/Mixer'
 import { Montage } from '@/pages/Montage'
 import { useBlowCSS, Grad, Ico, GRAD, MUTED, INK, BlowCard, BlowPageHeader } from '../ui'
+import { useTr } from '@/lib/i18n'
 
 type Tool = 'overlay' | 'remix' | 'spoof' | 'subtitles' | 'mixer' | 'montage'
 
-const TOOLS: { id: Tool; title: string; desc: string; emoji: string }[] = [
-  { id: 'overlay',   title: 'Incrustation photo/vidéo', desc: 'Mets une vidéo, choisis une photo et place-la où tu veux, le temps que tu veux.', emoji: '🖼' },
-  { id: 'montage',   title: 'Montage',                  desc: 'Assemble et découpe tes vidéos.', emoji: '✂️' },
-  { id: 'mixer',     title: 'Mixer',                    desc: 'Ajoute une légende / un montage par-dessus ta vidéo.', emoji: '🎚' },
-  { id: 'remix',     title: 'Remix',                    desc: 'Régénère des variantes uniques de tes vidéos.', emoji: '🎞' },
-  { id: 'spoof',     title: 'Spoof',                    desc: 'Anti-empreinte : rend chaque vidéo unique pour l\'algo.', emoji: '🛡' },
-  { id: 'subtitles', title: 'Sous-titres',              desc: 'Sous-titres automatiques (Groq Whisper).', emoji: '💬' },
-]
-
 export function BlowTools({ user }: { user: User }) {
   useBlowCSS()
+  const tr = useTr()
+  const TOOLS: { id: Tool; title: string; desc: string; emoji: string }[] = [
+    { id: 'overlay',   title: tr('Incrustation photo/vidéo', 'Photo/video overlay'), desc: tr('Mets une vidéo, choisis une photo et place-la où tu veux, le temps que tu veux.', 'Add a video, pick a photo and place it wherever you want, for as long as you want.'), emoji: '🖼' },
+    { id: 'montage',   title: tr('Montage', 'Editing'),                  desc: tr('Assemble et découpe tes vidéos.', 'Assemble and cut your videos.'), emoji: '✂️' },
+    { id: 'mixer',     title: tr('Mixer', 'Mixer'),                    desc: tr('Ajoute une légende / un montage par-dessus ta vidéo.', 'Add a caption / overlay on top of your video.'), emoji: '🎚' },
+    { id: 'remix',     title: tr('Remix', 'Remix'),                    desc: tr('Régénère des variantes uniques de tes vidéos.', 'Regenerate unique variants of your videos.'), emoji: '🎞' },
+    { id: 'spoof',     title: tr('Spoof', 'Spoof'),                    desc: tr('Anti-empreinte : rend chaque vidéo unique pour l\'algo.', 'Anti-fingerprint: makes each video unique for the algorithm.'), emoji: '🛡' },
+    { id: 'subtitles', title: tr('Sous-titres', 'Subtitles'),              desc: tr('Sous-titres automatiques (Groq Whisper).', 'Automatic subtitles (Groq Whisper).'), emoji: '💬' },
+  ]
   const [tool, setTool] = useState<Tool | null>(null)
   const openTool = (id: Tool) => setTool(id)
 
@@ -42,8 +43,8 @@ export function BlowTools({ user }: { user: User }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '9px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <button onClick={() => setTool(null)} className="blow-tap" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: '#D8B4FE', fontSize: 13, fontWeight: 700 }} title="Retour au hub d'outils">
-            <Ico d="M19 12H5M11 6l-6 6 6 6" size={15} /> Retour aux outils
+          <button onClick={() => setTool(null)} className="blow-tap" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: '#D8B4FE', fontSize: 13, fontWeight: 700 }} title={tr("Retour au hub d'outils", 'Back to tools hub')}>
+            <Ico d="M19 12H5M11 6l-6 6 6 6" size={15} /> {tr('Retour aux outils', 'Back to tools')}
           </button>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
         </div>
@@ -55,7 +56,7 @@ export function BlowTools({ user }: { user: User }) {
   return (
     <div className="blow-scroll" style={{ height: '100%', overflowY: 'auto', padding: '30px 30px 80px' }}>
       <div style={{ maxWidth: 1120, margin: '0 auto' }}>
-        <BlowPageHeader title="Gestionnaire de tool" subtitle="Tous tes outils vidéo VIP, au même endroit" />
+        <BlowPageHeader title={tr('Gestionnaire de tool', 'Tool Manager')} subtitle={tr('Tous tes outils vidéo VIP, au même endroit', 'All your VIP video tools, in one place')} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {TOOLS.map((t, i) => (
             <BlowCard
@@ -69,7 +70,7 @@ export function BlowTools({ user }: { user: User }) {
               <h3 style={{ position: 'relative', margin: '14px 0 6px', fontSize: 17, fontWeight: 800, color: INK }}>{t.title}</h3>
               <p style={{ position: 'relative', margin: 0, fontSize: 13, lineHeight: 1.55, color: MUTED }}>{t.desc}</p>
               <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 14, fontSize: 12.5, fontWeight: 700 }}>
-                <Grad>Ouvrir</Grad> <Ico d="M5 12h14M13 6l6 6-6 6" size={14} />
+                <Grad>{tr('Ouvrir', 'Open')}</Grad> <Ico d="M5 12h14M13 6l6 6-6 6" size={14} />
               </span>
             </BlowCard>
           ))}

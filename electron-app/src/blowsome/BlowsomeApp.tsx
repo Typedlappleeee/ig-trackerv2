@@ -3,6 +3,7 @@
 // et un bouton "← ScaleFlow" pour rebasculer sur l'app principale.
 import { useState, Suspense, lazy } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { useTr } from '@/lib/i18n'
 import { useBlowCSS, Grad, Ico, ICON, GRAD, INK, MUTED, HAIR, BlowBadge, BlowButton } from './ui'
 import { BankHub } from '@/pages/BankHub'
 import { BlowIntro } from './BlowIntro'
@@ -15,16 +16,16 @@ const Publish = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Pub
 
 type Tab = 'dashboard' | 'posting' | 'bank' | 'tools' | 'phonefarm'
 
-const NAV: { id: Tab; label: string; icon: string }[] = [
-  { id: 'dashboard', label: 'Dashboard',   icon: ICON.grid },
-  { id: 'posting',   label: 'Posting',     icon: ICON.send },
-  { id: 'bank',      label: 'Banque',      icon: ICON.folder },
-  { id: 'tools',     label: 'Gestionnaire de tool', icon: ICON.wrench },
-  { id: 'phonefarm', label: 'Phone Farm',  icon: ICON.phone },
-]
-
 export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }) {
   useBlowCSS()
+  const tr = useTr()
+  const NAV: { id: Tab; label: string; icon: string }[] = [
+    { id: 'dashboard', label: tr('Dashboard', 'Dashboard'),   icon: ICON.grid },
+    { id: 'posting',   label: tr('Posting', 'Posting'),     icon: ICON.send },
+    { id: 'bank',      label: tr('Banque', 'Bank'),      icon: ICON.folder },
+    { id: 'tools',     label: tr('Gestionnaire de tool', 'Tool Manager'), icon: ICON.wrench },
+    { id: 'phonefarm', label: tr('Phone Farm', 'Phone Farm'),  icon: ICON.phone },
+  ]
   const [tab, setTab] = useState<Tab>('dashboard')
   const [intro, setIntro] = useState(true)          // intro cinématique à l'entrée
   const [showPublish, setShowPublish] = useState(false)  // modale posting ScaleFlow
@@ -79,7 +80,7 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
           style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, border: `1px solid ${HAIR}`, cursor: 'pointer', color: MUTED, background: 'rgba(255,255,255,0.03)', fontSize: 12.5, fontWeight: 700 }}
         >
           <Ico d={ICON.back} size={16} />
-          Retour à ScaleFlow
+          {tr('Retour à ScaleFlow', 'Back to ScaleFlow')}
         </button>
       </aside>
 
@@ -87,9 +88,9 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
       <main className="blow-scroll" style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', minWidth: 0 }}>
         {/* Topbar */}
         <header style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '16px 30px', borderBottom: `1px solid ${HAIR}`, background: 'rgba(8,7,13,0.72)', backdropFilter: 'blur(14px)' }}>
-          <BlowBadge tone="gold">✦ Agence VIP</BlowBadge>
+          <BlowBadge tone="gold">✦ {tr('Agence VIP', 'VIP Agency')}</BlowBadge>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <BlowButton onClick={() => setShowPublish(true)} style={{ height: 36 }}><Ico d={ICON.send} size={14} /> Publier</BlowButton>
+            <BlowButton onClick={() => setShowPublish(true)} style={{ height: 36 }}><Ico d={ICON.send} size={14} /> {tr('Publier', 'Publish')}</BlowButton>
             <span style={{ fontSize: 13, color: MUTED, textTransform: 'capitalize' }}>{firstName}</span>
             <span style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, background: GRAD }}>
               {firstName.slice(0, 1).toUpperCase()}
@@ -121,19 +122,19 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', flexDirection: 'column', background: '#07070c' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 20px', borderBottom: `1px solid ${HAIR}`, background: 'rgba(10,7,16,0.9)', backdropFilter: 'blur(14px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <BlowBadge tone="accent">✦ Publier</BlowBadge>
-              <span style={{ fontSize: 13, color: MUTED }}>Posting ScaleFlow — tu restes sur <Grad style={{ fontWeight: 800 }}>Blowsome</Grad></span>
+              <BlowBadge tone="accent">✦ {tr('Publier', 'Publish')}</BlowBadge>
+              <span style={{ fontSize: 13, color: MUTED }}>{tr('Posting ScaleFlow — tu restes sur', 'ScaleFlow posting — you stay on')} <Grad style={{ fontWeight: 800 }}>Blowsome</Grad></span>
             </div>
             <button
               onClick={() => setShowPublish(false)}
               className="blow-tap"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 36, padding: '0 15px', borderRadius: 11, cursor: 'pointer', color: INK, fontWeight: 700, fontSize: 13, background: 'rgba(255,255,255,0.06)', border: `1px solid ${HAIR}` }}
             >
-              <Ico d={ICON.back} size={15} /> Retour
+              <Ico d={ICON.back} size={15} /> {tr('Retour', 'Back')}
             </button>
           </div>
           <div className="blow-scroll" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-            <Suspense fallback={<div style={{ display: 'grid', placeItems: 'center', height: '100%', color: MUTED }}>Chargement…</div>}>
+            <Suspense fallback={<div style={{ display: 'grid', placeItems: 'center', height: '100%', color: MUTED }}>{tr('Chargement…', 'Loading…')}</div>}>
               <Publish user={user} />
             </Suspense>
           </div>
