@@ -375,6 +375,8 @@ export function BlowPhoneFarm({ user }: { user: User }) {
 
             {/* Actions + journal */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Actions masquées quand le tel est injoignable (rien à piloter) */}
+              {!offline && (
               <BlowCard style={{ padding: 16 }}>
                 {/* Actions = catalogue documenté iRemoTech (press/airplane/scroll/open_url/text) */}
                 <p style={{ margin: '0 0 10px', fontSize: 12.5, fontWeight: 800, color: INK }}>{tr('Actions', 'Actions')}</p>
@@ -409,6 +411,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   <BlowButton onClick={() => { if (text.trim()) { sendAction(/^https?:\/\//.test(text) ? { type: 'open_url', url: text } : { type: 'text', text }, text); setText('') } }} style={{ height: 38 }}>{tr('Envoyer', 'Send')}</BlowButton>
                 </div>
               </BlowCard>
+              )}
 
               {/* Notes + comptes du téléphone — section repliable */}
               <BlowCard style={{ padding: 16 }}>
