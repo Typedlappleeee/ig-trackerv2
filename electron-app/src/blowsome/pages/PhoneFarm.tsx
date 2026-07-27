@@ -26,7 +26,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [snapLoading, setSnapLoading] = useState(false)
   const [text, setText] = useState('')
   const [log, setLog] = useState<string[]>([])
-  const [live, setLive] = useState(false)         // rafraîchissement auto (opt-in, coûte du budget)
+  const [live, setLive] = useState(true)          // flux temps réel ON par défaut (démarre direct)
   const [offline, setOffline] = useState(false)   // 503 device_offline
   const [snapErr, setSnapErr] = useState('')       // message d'erreur brut d'iRemoTech
   const [reach, setReach] = useState<Record<string, 'on' | 'off'>>({}) // joignabilité par tel
@@ -138,10 +138,10 @@ export function BlowPhoneFarm({ user }: { user: User }) {
       setSnapErr(r.error ?? 'snapshot 503')
       setReach(m => ({ ...m, [dev.public_id]: 'off' }))
       if (!silent) addLog(`⚠️ ${r.error ?? 'snapshot 503'}`)
-    } else if (!silent) addLog(tr(`❌ snapshot : ${r.error ?? r.status}`, `❌ snapshot: ${r.error ?? r.status}`))
+    } else { setSnapErr(String(r.error ?? `snapshot ${r.status ?? '?'}`)); if (!silent) addLog(tr(`❌ snapshot : ${r.error ?? r.status}`, `❌ snapshot: ${r.error ?? r.status}`)) }
   }, [])
 
-  useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
+  useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); setLive(true); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
 
   // Deep-link « nouvel onglet » : #pf-fs=<deviceId> → ouvre ce tel en plein écran.
   useEffect(() => {
@@ -407,7 +407,11 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                     style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none' }}
                     title={tr('Clic = taper · glisser = swipe · molette = scroll', 'Click = tap · drag = swipe · wheel = scroll')} />
                 ) : (
-                  <span style={{ fontSize: 12, color: FAINT }}>{snapLoading ? tr('Capture…', 'Capturing…') : tr('Pas de capture', 'No snapshot')}</span>
+                  <div style={{ textAlign: 'center', padding: 16 }}>
+                    <div style={{ fontSize: 12, color: FAINT, marginBottom: snapErr ? 8 : 0 }}>{snapLoading ? tr('Connexion au flux…', 'Connecting to stream…') : tr('En attente du flux…', 'Waiting for stream…')}</div>
+                    {!snapLoading && snapErr && <div style={{ fontSize: 9.5, color: '#FCA5A5', fontFamily: 'monospace', wordBreak: 'break-word', marginBottom: 8 }}>{snapErr}</div>}
+                    {!snapLoading && <button onClick={() => { setLive(true); refreshSnapshot(selected) }} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: '#D8B4FE', background: 'none', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}>{tr('Réessayer', 'Retry')}</button>}
+                  </div>
                 )}
                 </div>
               </div>
