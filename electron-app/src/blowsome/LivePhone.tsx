@@ -11,11 +11,12 @@ interface Props {
   fps?: number
   rounded?: number                       // rayon des coins de l'écran
   bezel?: boolean                        // cadre "téléphone" autour
+  startDelay?: number                    // décale l'ouverture du flux (évite d'ouvrir N flux d'un coup)
   onStatus?: (reachable: boolean) => void
   onLog?: (m: string) => void
 }
 
-export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, onStatus, onLog }: Props) {
+export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, onStatus, onLog }: Props) {
   const [src, setSrc] = useState<string | null>(null)
   const [offline, setOffline] = useState(false)
   const gesture = useRef<{ x: number; y: number } | null>(null)
@@ -41,16 +42,23 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, onStat
       }, fps)
     }
     setSrc(null); setOffline(false)
-    start()
-    return () => { alive = false; stop() }
-  }, [id, fps, onStatus])
+    // Décalage d'ouverture → en multi-écrans, les flux ne s'ouvrent pas tous en
+    // même temps (respect de la limite ~5 req/s et de max_active_devices).
+    const t = window.setTimeout(start, startDelay)
+    return () => { alive = false; window.clearTimeout(t); stop() }
+  }, [id, fps, startDelay, onStatus])
 
-  // Géométrie : on lit la boîte de l'IMG cliquée (marche pour n'importe quelle taille).
+  // Géométrie : l'image est en objectFit:contain → on calcule sa zone RÉELLE
+  // (échelle + décalage) pour que le clic tombe pile au bon endroit (calibration).
   const toXY = (e: React.PointerEvent<HTMLImageElement> | React.WheelEvent<HTMLImageElement>) => {
     const img = e.currentTarget
     if (!img.naturalWidth) return null
     const r = img.getBoundingClientRect()
-    return { x: Math.round((e.clientX - r.left) / r.width * img.naturalWidth), y: Math.round((e.clientY - r.top) / r.height * img.naturalHeight) }
+    const scale = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight)
+    const offX = (r.width - img.naturalWidth * scale) / 2, offY = (r.height - img.naturalHeight * scale) / 2
+    const x = (e.clientX - r.left - offX) / scale, y = (e.clientY - r.top - offY) / scale
+    if (x < 0 || y < 0 || x > img.naturalWidth || y > img.naturalHeight) return null
+    return { x: Math.round(x), y: Math.round(y) }
   }
   const act = useCallback(async (a: IrtAction, label: string) => {
     const r = await iremotech.action(id, a)

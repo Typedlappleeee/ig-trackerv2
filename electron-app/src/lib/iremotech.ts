@@ -73,7 +73,30 @@ export interface IrtUsage {
   resets_at?: string
 }
 
+// ── Limiteur de débit ────────────────────────────────────────────────────────
+// iRemoTech plafonne à ~5 requêtes/seconde (token-bucket). On sérialise nos
+// appels HTTP à ~4/s (260 ms) pour ne JAMAIS déclencher de 429. Le flux vidéo
+// WebSocket n'est PAS concerné (une seule connexion, frames poussées).
+const REQ_MIN_GAP = 260
+let reqLastAt = 0
+const reqQueue: Array<() => void> = []
+let reqDraining = false
+function reqSlot(): Promise<void> {
+  return new Promise(resolve => { reqQueue.push(resolve); if (!reqDraining) reqDrain() })
+}
+function reqDrain() {
+  reqDraining = true
+  const step = () => {
+    const next = reqQueue.shift()
+    if (!next) { reqDraining = false; return }
+    const wait = Math.max(0, REQ_MIN_GAP - (Date.now() - reqLastAt))
+    window.setTimeout(() => { reqLastAt = Date.now(); next(); step() }, wait)
+  }
+  step()
+}
+
 async function irt<T = unknown>(op: string, payload: Record<string, unknown> = {}): Promise<IrtResult<T>> {
+  await reqSlot()   // respecte la limite ~4 req/s
   try {
     const res = await fetch('/api/iremotech', {
       method: 'POST',

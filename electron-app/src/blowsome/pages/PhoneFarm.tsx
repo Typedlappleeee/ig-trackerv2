@@ -141,7 +141,9 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     } else { setSnapErr(String(r.error ?? `snapshot ${r.status ?? '?'}`)); if (!silent) addLog(tr(`❌ snapshot : ${r.error ?? r.status}`, `❌ snapshot: ${r.error ?? r.status}`)) }
   }, [])
 
-  useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); setLive(true); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
+  // Sélection d'un tel → on (ré)arme le live. Pas de snapshot one-shot en plus :
+  // le flux fournit déjà l'image (évite un appel superflu = économie de rate-limit).
+  useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); setLive(true) } }, [selected])
 
   // Deep-link « nouvel onglet » : #pf-fs=<deviceId> → ouvre ce tel en plein écran.
   useEffect(() => {
@@ -181,15 +183,23 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     if (!selected) return
     const r = await iremotech.action(selected.public_id, a)
     addLog(r.ok ? `✓ ${label}` : tr(`❌ ${label} : ${r.error ?? r.status}`, `❌ ${label}: ${r.error ?? r.status}`))
-    if (r.ok && !offline) window.setTimeout(() => refreshSnapshot(selected, true), 350)
+    // Si le live tourne, le flux montre déjà le résultat → pas de snapshot en plus.
+    if (r.ok && !offline && !live) window.setTimeout(() => refreshSnapshot(selected, true), 350)
   }
 
-  // Convertit une position écran → coordonnées pixel de la capture.
+  // Convertit une position écran → coordonnées pixel de la capture. IMPORTANT :
+  // l'image est en objectFit:contain (bandes possibles), donc on calcule la zone
+  // RÉELLE de l'image dans l'élément (échelle + décalage) — sinon le clic est
+  // décalé (c'est la "calibration"). Renvoie null si le clic est hors image.
   const toDeviceXY = (clientX: number, clientY: number): { x: number; y: number } | null => {
     const img = imgRef.current
     if (!img || !img.naturalWidth) return null
     const r = img.getBoundingClientRect()
-    return { x: Math.round((clientX - r.left) / r.width * img.naturalWidth), y: Math.round((clientY - r.top) / r.height * img.naturalHeight) }
+    const scale = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight)
+    const offX = (r.width - img.naturalWidth * scale) / 2, offY = (r.height - img.naturalHeight * scale) / 2
+    const x = (clientX - r.left - offX) / scale, y = (clientY - r.top - offY) / scale
+    if (x < 0 || y < 0 || x > img.naturalWidth || y > img.naturalHeight) return null
+    return { x: Math.round(x), y: Math.round(y) }
   }
   // Glisser sur l'écran = SWIPE envoyé au tel ; simple clic = TAP.
   const onSnapDown = (e: React.PointerEvent<HTMLImageElement>) => {
@@ -578,13 +588,13 @@ export function BlowPhoneFarm({ user }: { user: User }) {
             <button onClick={() => setMulti(false)} className="blow-tap" style={{ fontSize: 13, fontWeight: 700, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer' }}>✕ {tr('Fermer', 'Close')}</button>
           </div>
           <div className="blow-scroll" style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 14, alignContent: 'start' }}>
-            {devices.map(d => (
+            {devices.map((d, i) => (
               <div key={d.public_id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name || d.public_id}</span>
                   <button onClick={() => { setSelected(d); setMulti(false); setFs(true) }} className="blow-tap" title={tr('Plein écran', 'Fullscreen')} style={{ fontSize: 12, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>⛶</button>
                 </div>
-                <LivePhone device={d} fps={6} bezel={false} onLog={addLog} />
+                <LivePhone device={d} fps={6} bezel={false} startDelay={i * 500} onLog={addLog} />
               </div>
             ))}
           </div>
