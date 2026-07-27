@@ -222,9 +222,12 @@ export function openLiveStream(
     ws.onmessage = (ev) => {
       if (closed || !(ev.data instanceof Blob)) return
       const url = URL.createObjectURL(ev.data)
-      h.onFrame(url)
-      if (lastUrl) URL.revokeObjectURL(lastUrl)   // libère la frame précédente
+      const prev = lastUrl
       lastUrl = url
+      h.onFrame(url)
+      // On libère la frame PRÉCÉDENTE seulement après un court délai, une fois la
+      // nouvelle bien affichée → pas de flicker (le revoke immédiat cassait l'image).
+      if (prev) window.setTimeout(() => URL.revokeObjectURL(prev), 400)
     }
     ws.onerror = () => { if (!closed) h.onClose?.('error') }
     ws.onclose = (ev) => { if (!closed) h.onClose?.(`close ${ev.code}`) }

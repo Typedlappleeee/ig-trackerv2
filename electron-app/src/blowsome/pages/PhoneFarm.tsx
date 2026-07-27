@@ -55,6 +55,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [fs, setFs] = useState(false)               // plein écran du tel sélectionné
   const [multi, setMulti] = useState(false)         // multi-écrans (grille de tous les tels)
   const [calibMode, setCalibMode] = useState(false) // mode calibration du curseur
+  const [heroKey, setHeroKey] = useState(0)         // ↻ = reconnecte le flux principal
   const [calib, setCalibState] = useState({ dx: 0, dy: 0 })  // décalage du tel sélectionné
 
   // Ouvre un tel en PLEIN ÉCRAN dans un NOUVEL ONGLET (deep-link via hash).
@@ -148,7 +149,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
 
   // Sélection d'un tel → on (ré)arme le live. Pas de snapshot one-shot en plus :
   // le flux fournit déjà l'image (évite un appel superflu = économie de rate-limit).
-  useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); setLive(true); setCalibState(getCalib(selected.public_id)) } }, [selected])
+  useEffect(() => { if (selected) { setOffline(false); setCalibState(getCalib(selected.public_id)) } }, [selected])
 
   // Ajuste la calibration du tel sélectionné (et mémorise).
   const nudgeCalib = (ddx: number, ddy: number) => {
@@ -165,38 +166,18 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     if (d) { setSelected(d); setFs(true) }
   }, [devices])
 
-  // Écran "live" → flux vidéo TEMPS RÉEL (WebSocket, frames JPEG) = le mode le
-  // plus fluide. Si le WS ferme, on teste une capture (503 = hors ligne → stop),
-  // sinon on affiche la capture et on retente le WS en douceur.
-  useEffect(() => {
-    if (!live || !selected || conn !== 'ok') return
-    const dev = selected
-    let alive = true
-    let stop = () => {}
-    let tries = 0
-    const start = () => {
-      stop = openLiveStream(dev.public_id, {
-        onFrame: (u) => { setSnap(u); setOffline(false); setReach(m => ({ ...m, [dev.public_id]: 'on' })) },
-        onClose: async () => {
-          if (!alive) return
-          const s = await iremotech.snapshot(dev.public_id)
-          if (!alive) return
-          if (s.ok && s.dataUrl) { setSnap(s.dataUrl); setOffline(false); setReach(m => ({ ...m, [dev.public_id]: 'on' })) }
-          else if (s.status === 503) { setOffline(true); setReach(m => ({ ...m, [dev.public_id]: 'off' })); setLive(false); return }
-          if (tries++ < 3) window.setTimeout(() => { if (alive) start() }, 1200)
-        },
-      }, 10)
-    }
-    start()
-    return () => { alive = false; stop() }
-  }, [live, selected, conn])
+  // L'écran principal est rendu par <LivePhone> (flux fluide + repli capture).
+  // Il nous remonte l'état de joignabilité → on met à jour hors-ligne + la pastille.
+  const onHeroStatus = useCallback((reachable: boolean) => {
+    setOffline(!reachable)
+    if (selected) setReach(m => ({ ...m, [selected.public_id]: reachable ? 'on' : 'off' }))
+  }, [selected])
 
   const sendAction = async (a: IrtAction, label: string) => {
     if (!selected) return
     const r = await iremotech.action(selected.public_id, a)
     addLog(r.ok ? `✓ ${label}` : tr(`❌ ${label} : ${r.error ?? r.status}`, `❌ ${label}: ${r.error ?? r.status}`))
-    // Si le live tourne, le flux montre déjà le résultat → pas de snapshot en plus.
-    if (r.ok && !offline && !live) window.setTimeout(() => refreshSnapshot(selected, true), 350)
+    // Le flux live montre déjà le résultat → pas de snapshot en plus.
   }
 
   // Convertit une position écran → coordonnées pixel de la capture. IMPORTANT :
@@ -401,10 +382,10 @@ export function BlowPhoneFarm({ user }: { user: User }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>{tr('Écran', 'Screen')}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <button onClick={() => setLive(v => !v)} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: live ? '#34D399' : 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: 99, background: live ? '#34D399' : 'var(--text-4)', boxShadow: live ? '0 0 8px #34D399' : 'none' }} /> Live
-                  </button>
-                  <button onClick={() => refreshSnapshot(selected)} className="blow-tap" title={tr('Rafraîchir', 'Refresh')} style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻</button>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: offline ? '#F87171' : '#34D399', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 99, background: offline ? '#F87171' : '#34D399', boxShadow: offline ? 'none' : '0 0 8px #34D399' }} /> {offline ? tr('Hors ligne', 'Offline') : 'Live'}
+                  </span>
+                  <button onClick={() => { setOffline(false); setHeroKey(k => k + 1) }} className="blow-tap" title={tr('Reconnecter', 'Reconnect')} style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻</button>
                   <button onClick={() => setFs(true)} className="blow-tap" title={tr('Plein écran', 'Fullscreen')} style={{ fontSize: 13, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>⛶</button>
                   <button onClick={() => selected && openInNewTab(selected)} className="blow-tap" title={tr('Ouvrir dans un nouvel onglet', 'Open in a new tab')} style={{ fontSize: 12, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↗</button>
                   <button onClick={() => setMulti(true)} className="blow-tap" title={tr('Multi-écrans', 'Multi-view')} style={{ fontSize: 13, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>▦</button>
@@ -427,36 +408,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   </div>
                 </div>
               )}
-              <div style={{ padding: 10, borderRadius: 34, background: 'linear-gradient(160deg,#1b1b27,#0d0d15)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 30px 60px -32px rgba(99,102,241,0.55), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-                <div style={{ width: 52, height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.14)', margin: '0 auto 8px', pointerEvents: 'none' }} />
-                <div style={{ position: 'relative', borderRadius: 26, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center' }}>
-                {offline ? (
-                  <div style={{ textAlign: 'center', padding: 20 }}>
-                    <div style={{ fontSize: 30, marginBottom: 8 }}>📴</div>
-                    <div style={{ fontSize: 12.5, fontWeight: 800, color: INK, marginBottom: 6 }}>{tr('iRemoTech ne joint pas ce tel', "iRemoTech can't reach this phone")}</div>
-                    <div style={{ fontSize: 10.5, color: FAINT, marginBottom: 10, lineHeight: 1.6, textAlign: 'left' }}>
-                      {tr("L'API répond", 'The API returns')} <b style={{ color: '#F87171' }}>device_offline / unreachable</b> : {tr("l'agent iRemoTech sur l'iPhone n'est pas joignable. À vérifier sur le tel :", "the iRemoTech agent on the iPhone is unreachable. To check on the phone:")}
-                      <br />• {tr("l'app / l'agent iRemoTech est", 'the iRemoTech app / agent is')} <b>{tr('ouverte et connectée', 'open and connected')}</b> ({tr('relance-la si besoin', 'restart it if needed')})
-                      <br />• {tr("l'iPhone est", 'the iPhone is')} <b>{tr('déverrouillé et réveillé', 'unlocked and awake')}</b> ({tr('pas en veille', 'not sleeping')})
-                      <br />• {tr('le tel a du', 'the phone has')} <b>{tr('réseau', 'network')}</b> ({tr('Wi-Fi / data actifs', 'Wi-Fi / data on')})
-                    </div>
-                    {snapErr && <div style={{ fontSize: 9.5, color: FAINT, marginBottom: 12, fontFamily: 'monospace', wordBreak: 'break-word', opacity: 0.8 }}>{snapErr}</div>}
-                    <BlowButton variant="ghost" onClick={() => { setOffline(false); refreshSnapshot(selected) }} style={{ height: 32 }}>{tr('Réessayer', 'Retry')}</BlowButton>
-                  </div>
-                ) : snap ? (
-                  <img ref={imgRef} src={snap} alt={tr('écran', 'screen')} draggable={false}
-                    onPointerDown={onSnapDown} onPointerUp={onSnapUp} onWheel={onSnapWheel}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none' }}
-                    title={tr('Clic = taper · glisser = swipe · molette = scroll', 'Click = tap · drag = swipe · wheel = scroll')} />
-                ) : (
-                  <div style={{ textAlign: 'center', padding: 16 }}>
-                    <div style={{ fontSize: 12, color: FAINT, marginBottom: snapErr ? 8 : 0 }}>{snapLoading ? tr('Connexion au flux…', 'Connecting to stream…') : tr('En attente du flux…', 'Waiting for stream…')}</div>
-                    {!snapLoading && snapErr && <div style={{ fontSize: 9.5, color: '#FCA5A5', fontFamily: 'monospace', wordBreak: 'break-word', marginBottom: 8 }}>{snapErr}</div>}
-                    {!snapLoading && <button onClick={() => { setLive(true); refreshSnapshot(selected) }} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: '#D8B4FE', background: 'none', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}>{tr('Réessayer', 'Retry')}</button>}
-                  </div>
-                )}
-                </div>
-              </div>
+              {selected && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={12} rounded={26} onStatus={onHeroStatus} onLog={addLog} />}
               <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}><Grad style={{ fontWeight: 700 }}>{tr('Clic', 'Click')}</Grad> = {tr('taper', 'tap')} · <Grad style={{ fontWeight: 700 }}>{tr('glisser', 'drag')}</Grad> = swipe · <Grad style={{ fontWeight: 700 }}>{tr('molette', 'wheel')}</Grad> = scroll</p>
             </BlowCard>
           </div>

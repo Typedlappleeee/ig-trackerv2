@@ -17,35 +17,46 @@ interface Props {
 }
 
 export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, onStatus, onLog }: Props) {
-  const [src, setSrc] = useState<string | null>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
   const gesture = useRef<{ x: number; y: number } | null>(null)
   const id = device.public_id
 
-  // Flux : WebSocket temps réel ; si ça ferme, on teste une capture (503 = hors
-  // ligne → on arrête), sinon on affiche la capture et on retente le WS.
+  // Rendu IMPÉRATIF : on écrit direct dans l'<img> (pas de re-render React par
+  // frame → bien plus fluide).
+  const paint = (url: string) => { const img = imgRef.current; if (img) img.src = url; setHasFrame(true); setOffline(false); onStatus?.(true) }
+
+  // Flux : WebSocket temps réel (fluide) ; si le WS ne délivre pas, on bascule sur
+  // une boucle de captures CONTINUE (≈ cadence limite) — jamais figé.
   useEffect(() => {
     let alive = true
     let stop = () => {}
-    let tries = 0
-    const start = () => {
-      stop = openLiveStream(id, {
-        onFrame: (url) => { if (!alive) return; setSrc(url); setOffline(false); onStatus?.(true); tries = 0 },
-        onClose: async () => {
-          if (!alive) return
-          const snap = await iremotech.snapshot(id)
-          if (!alive) return
-          if (snap.ok && snap.dataUrl) { setSrc(snap.dataUrl); setOffline(false); onStatus?.(true) }
-          else if (snap.status === 503) { setOffline(true); onStatus?.(false); return }  // hors ligne → stop
-          if (tries++ < 3) window.setTimeout(() => { if (alive) start() }, 1200) // reconnexion douce
-        },
-      }, fps)
+    let mode: 'ws' | 'snap' = 'ws'
+    setHasFrame(false); setOffline(false)
+
+    const snapLoop = async () => {
+      while (alive && mode === 'snap') {
+        const s = await iremotech.snapshot(id)   // sérialisé par le limiteur ~4/s
+        if (!alive) break
+        if (s.ok && s.dataUrl) paint(s.dataUrl)
+        else if (s.status === 503) { setOffline(true); onStatus?.(false); break }
+      }
     }
-    setSrc(null); setOffline(false)
-    // Décalage d'ouverture → en multi-écrans, les flux ne s'ouvrent pas tous en
-    // même temps (respect de la limite ~5 req/s et de max_active_devices).
-    const t = window.setTimeout(start, startDelay)
-    return () => { alive = false; window.clearTimeout(t); stop() }
+    const toSnap = () => { if (mode === 'snap') return; mode = 'snap'; snapLoop() }
+
+    const startWs = () => {
+      let gotFrame = false
+      stop = openLiveStream(id, {
+        onFrame: (url) => { if (!alive) return; gotFrame = true; mode = 'ws'; paint(url) },
+        onClose: () => { if (alive && mode === 'ws') toSnap() },   // WS coupé → captures continues
+      }, fps)
+      // Pas de frame WS en 3.5s → on bascule captures (WS bloqué/indispo).
+      window.setTimeout(() => { if (alive && !gotFrame) toSnap() }, 3500)
+    }
+
+    const t = window.setTimeout(startWs, startDelay)   // décalage (multi-écrans)
+    return () => { alive = false; mode = 'snap'; window.clearTimeout(t); stop() }
   }, [id, fps, startDelay, onStatus])
 
   // Géométrie : l'image est en objectFit:contain → on calcule sa zone RÉELLE
@@ -78,26 +89,26 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
   }
 
   const screen = (
-    <div style={{ position: 'relative', borderRadius: rounded, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
+    <div style={{ position: 'relative', borderRadius: rounded, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center', width: '100%' }}>
+      {/* L'img est toujours montée (ref dispo pour l'écriture impérative) ; masquée tant qu'aucune frame. */}
+      <img ref={imgRef} alt={device.name || id} draggable={false}
+        onPointerDown={onDown} onPointerUp={onUp} onWheel={onWheel}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none', display: !offline && hasFrame ? 'block' : 'none' }} />
       {offline ? (
         <div style={{ textAlign: 'center', padding: 16 }}>
           <div style={{ fontSize: 26, marginBottom: 6 }}>📴</div>
           <div style={{ fontSize: 11.5, fontWeight: 800, color: INK }}>{device.name || id}</div>
           <div style={{ fontSize: 10.5, color: FAINT, marginTop: 3 }}>hors ligne</div>
         </div>
-      ) : src ? (
-        <img src={src} alt={device.name || id} draggable={false}
-          onPointerDown={onDown} onPointerUp={onUp} onWheel={onWheel}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none' }} />
-      ) : (
+      ) : !hasFrame ? (
         <span style={{ fontSize: 11.5, color: FAINT }}>…</span>
-      )}
+      ) : null}
     </div>
   )
 
   if (!bezel) return screen
   return (
-    <div style={{ padding: 8, borderRadius: rounded + 8, background: 'linear-gradient(160deg,#1b1b27,#0d0d15)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 50px -30px rgba(99,102,241,0.5), inset 0 1px 0 rgba(255,255,255,0.05)', height: '100%' }}>
+    <div style={{ padding: 8, borderRadius: rounded + 8, background: 'linear-gradient(160deg,#1b1b27,#0d0d15)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 50px -30px rgba(99,102,241,0.5), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
       <div style={{ width: 46, height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.14)', margin: '0 auto 7px', pointerEvents: 'none' }} />
       {screen}
     </div>
