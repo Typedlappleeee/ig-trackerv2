@@ -26,8 +26,11 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
     { id: 'tools',     label: tr('Gestionnaire de tool', 'Tool Manager'), icon: ICON.wrench },
     { id: 'phonefarm', label: tr('Phone Farm', 'Phone Farm'),  icon: ICON.phone },
   ]
-  const [tab, setTab] = useState<Tab>('dashboard')
-  const [intro, setIntro] = useState(true)          // intro cinématique à l'entrée
+  // Deep-link « nouvel onglet » Phone Farm (#pf-fs=<id>) : on ouvre direct Phone
+  // Farm et on saute l'intro cinématique.
+  const deepPhone = typeof location !== 'undefined' && /pf-fs=/.test(location.hash)
+  const [tab, setTab] = useState<Tab>(deepPhone ? 'phonefarm' : 'dashboard')
+  const [intro, setIntro] = useState(!deepPhone)    // intro cinématique à l'entrée
   const [showPublish, setShowPublish] = useState(false)  // modale posting ScaleFlow
   const firstName = (user.email?.split('@')[0] ?? 'VIP').replace(/[._]/g, ' ')
 

@@ -640,7 +640,8 @@ function AppContent({ user }: { user: User }) {
       ensureWebhookRegistered(conns.bearer)).catch(() => {})
   }, [conns.bearer])
   const [page, setPage]                     = useState<Page>('hub')
-  const [appMode, setAppMode]               = useState<'main' | 'blowsome'>('main')  // sous-app Blowsome (VIP)
+  // Deep-link « nouvel onglet » Phone Farm (#pf-fs=<id>) → on démarre dans Blowsome.
+  const [appMode, setAppMode]               = useState<'main' | 'blowsome'>(() => (typeof location !== 'undefined' && /pf-fs=/.test(location.hash)) ? 'blowsome' : 'main')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showTour, setShowTour]             = useState(() => !!localStorage.getItem(TOUR_KEY))

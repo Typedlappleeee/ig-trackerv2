@@ -5,7 +5,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
 import { useTr } from '@/lib/i18n'
-import { iremotech, openSnapshotStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget } from '@/lib/iremotech'
+import { iremotech, openLiveStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget } from '@/lib/iremotech'
+import { LivePhone } from '../LivePhone'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
@@ -48,6 +49,13 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [reveal, setReveal] = useState<Set<number>>(new Set())
   const [showMeta, setShowMeta] = useState(false)   // section notes/comptes repliable
   const [showLog, setShowLog] = useState(false)     // Journal caché par défaut (raccourci Ctrl/Cmd+J)
+  const [fs, setFs] = useState(false)               // plein écran du tel sélectionné
+  const [multi, setMulti] = useState(false)         // multi-écrans (grille de tous les tels)
+
+  // Ouvre un tel en PLEIN ÉCRAN dans un NOUVEL ONGLET (deep-link via hash).
+  const openInNewTab = (dev: IrtDevice) => {
+    window.open(`${location.origin}${location.pathname}#pf-fs=${encodeURIComponent(dev.public_id)}`, '_blank', 'noopener')
+  }
 
   const addLog = (m: string) => setLog(l => [`${new Date().toLocaleTimeString()} · ${m}`, ...l].slice(0, 30))
 
@@ -57,6 +65,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j') {
         e.preventDefault(); setShowLog(v => !v)
       }
+      if (e.key === 'Escape') { setFs(false); setMulti(false) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -134,21 +143,35 @@ export function BlowPhoneFarm({ user }: { user: User }) {
 
   useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
 
-  // Écran "live" → flux relayé côté serveur (frames continues, une seule requête).
-  // Bien plus fluide qu'un polling et sans saturer le tel. Reconnecte à la fin de
-  // la fenêtre serverless ; s'arrête tout seul si le tel passe hors ligne.
+  // Deep-link « nouvel onglet » : #pf-fs=<deviceId> → ouvre ce tel en plein écran.
+  useEffect(() => {
+    const m = /pf-fs=([^&]+)/.exec(window.location.hash)
+    if (!m || !devices.length) return
+    const d = devices.find(x => x.public_id === decodeURIComponent(m[1]))
+    if (d) { setSelected(d); setFs(true) }
+  }, [devices])
+
+  // Écran "live" → flux vidéo TEMPS RÉEL (WebSocket, frames JPEG) = le mode le
+  // plus fluide. Si le WS ferme, on teste une capture (503 = hors ligne → stop),
+  // sinon on affiche la capture et on retente le WS en douceur.
   useEffect(() => {
     if (!live || !selected || conn !== 'ok') return
     const dev = selected
     let alive = true
     let stop = () => {}
+    let tries = 0
     const start = () => {
-      stop = openSnapshotStream(dev.public_id, {
+      stop = openLiveStream(dev.public_id, {
         onFrame: (u) => { setSnap(u); setOffline(false); setReach(m => ({ ...m, [dev.public_id]: 'on' })) },
-        onOffline: () => { setOffline(true); setReach(m => ({ ...m, [dev.public_id]: 'off' })); alive = false; setLive(false) },
-        onEnd: () => { if (alive) start() },                     // fenêtre finie → on reprend
-        onError: (m) => { alive = false; setLive(false); addLog(tr(`❌ live : ${m}`, `❌ live: ${m}`)) },
-      })
+        onClose: async () => {
+          if (!alive) return
+          const s = await iremotech.snapshot(dev.public_id)
+          if (!alive) return
+          if (s.ok && s.dataUrl) { setSnap(s.dataUrl); setOffline(false); setReach(m => ({ ...m, [dev.public_id]: 'on' })) }
+          else if (s.status === 503) { setOffline(true); setReach(m => ({ ...m, [dev.public_id]: 'off' })); setLive(false); return }
+          if (tries++ < 3) window.setTimeout(() => { if (alive) start() }, 1200)
+        },
+      }, 10)
     }
     start()
     return () => { alive = false; stop() }
@@ -356,7 +379,10 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   <button onClick={() => setLive(v => !v)} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: live ? '#34D399' : 'var(--text-4)', background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                     <span style={{ width: 7, height: 7, borderRadius: 99, background: live ? '#34D399' : 'var(--text-4)', boxShadow: live ? '0 0 8px #34D399' : 'none' }} /> Live
                   </button>
-                  <button onClick={() => refreshSnapshot(selected)} className="blow-tap" style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻</button>
+                  <button onClick={() => refreshSnapshot(selected)} className="blow-tap" title={tr('Rafraîchir', 'Refresh')} style={{ fontSize: 11, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↻</button>
+                  <button onClick={() => setFs(true)} className="blow-tap" title={tr('Plein écran', 'Fullscreen')} style={{ fontSize: 13, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>⛶</button>
+                  <button onClick={() => selected && openInNewTab(selected)} className="blow-tap" title={tr('Ouvrir dans un nouvel onglet', 'Open in a new tab')} style={{ fontSize: 12, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↗</button>
+                  <button onClick={() => setMulti(true)} className="blow-tap" title={tr('Multi-écrans', 'Multi-view')} style={{ fontSize: 13, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>▦</button>
                 </div>
               </div>
               <div style={{ padding: 10, borderRadius: 34, background: 'linear-gradient(160deg,#1b1b27,#0d0d15)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 30px 60px -32px rgba(99,102,241,0.55), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
@@ -523,6 +549,41 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 </BlowCard>
               )}
             </div>
+        </div>
+      )}
+
+      {/* Plein écran d'un tel (interactif) */}
+      {fs && selected && (
+        <div onClick={() => setFs(false)} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(5,5,10,0.92)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: INK }}>{selected.name || selected.public_id}</span>
+            <button onClick={() => setFs(false)} className="blow-tap" style={{ fontSize: 13, fontWeight: 700, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer' }}>✕ {tr('Fermer', 'Close')}</button>
+          </div>
+          <div onClick={e => e.stopPropagation()} style={{ height: '80vh', aspectRatio: '9/19.5', maxWidth: '95vw' }}>
+            <LivePhone device={selected} fps={12} onLog={addLog} />
+          </div>
+          <span style={{ fontSize: 11, color: FAINT }}>{tr('Clic = taper · glisser = swipe · molette = scroll · Échap = fermer', 'Click = tap · drag = swipe · wheel = scroll · Esc = close')}</span>
+        </div>
+      )}
+
+      {/* Multi-écrans : tous les tels en direct */}
+      {multi && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(5,5,10,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', padding: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: INK }}>{tr('Multi-écrans', 'Multi-view')} · {devices.length}</span>
+            <button onClick={() => setMulti(false)} className="blow-tap" style={{ fontSize: 13, fontWeight: 700, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer' }}>✕ {tr('Fermer', 'Close')}</button>
+          </div>
+          <div className="blow-scroll" style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 14, alignContent: 'start' }}>
+            {devices.map(d => (
+              <div key={d.public_id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name || d.public_id}</span>
+                  <button onClick={() => { setSelected(d); setMulti(false); setFs(true) }} className="blow-tap" title={tr('Plein écran', 'Fullscreen')} style={{ fontSize: 12, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>⛶</button>
+                </div>
+                <LivePhone device={d} fps={6} bezel={false} onLog={addLog} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

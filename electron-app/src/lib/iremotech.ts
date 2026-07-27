@@ -165,6 +165,41 @@ export function openSnapshotStream(deviceId: string, h: IrtStreamHandlers): () =
   return () => ctrl.abort()
 }
 
+// Flux vidéo TEMPS RÉEL via WebSocket (frames JPEG binaires, une par message).
+// C'est le mode le plus fluide (vs captures relayées). La clé passe en query
+// param `token` — les WebSockets navigateur ne peuvent pas poser d'en-tête, et
+// la clé est de toute façon déjà chargée en mémoire client.
+const WS_BASE = 'wss://api.iremotech.com/v1'
+export function openLiveStream(
+  deviceId: string,
+  h: { onFrame: (objectUrl: string) => void; onClose?: (why: string) => void },
+  fps = 10,
+): () => void {
+  const key = apiKey
+  if (!key) { h.onClose?.('no-key'); return () => {} }
+  let ws: WebSocket | null = null
+  let lastUrl: string | null = null
+  let closed = false
+  try {
+    ws = new WebSocket(`${WS_BASE}/devices/${encodeURIComponent(deviceId)}/stream?token=${encodeURIComponent(key)}&fps=${fps}`)
+    ws.binaryType = 'blob'
+    ws.onmessage = (ev) => {
+      if (closed || !(ev.data instanceof Blob)) return
+      const url = URL.createObjectURL(ev.data)
+      h.onFrame(url)
+      if (lastUrl) URL.revokeObjectURL(lastUrl)   // libère la frame précédente
+      lastUrl = url
+    }
+    ws.onerror = () => { if (!closed) h.onClose?.('error') }
+    ws.onclose = (ev) => { if (!closed) h.onClose?.(`close ${ev.code}`) }
+  } catch (e) { h.onClose?.(String(e)) }
+  return () => {
+    closed = true
+    try { ws?.close() } catch { /* noop */ }
+    if (lastUrl) URL.revokeObjectURL(lastUrl)
+  }
+}
+
 export const iremotech = {
   // Liste des iPhones pilotables.
   listDevices: () => irt<{ devices?: IrtDevice[] } | IrtDevice[]>('devices'),
