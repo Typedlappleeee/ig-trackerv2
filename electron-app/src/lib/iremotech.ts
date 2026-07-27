@@ -47,6 +47,19 @@ export interface IrtDevice {
   [k: string]: unknown
 }
 
+// ── Calibration du curseur PAR TÉLÉPHONE (comme le "calibrer" d'iRemoTech) ────
+// Décalage en pixels appliqué aux taps quand le mapping dérive côté device.
+// Mémorisé en localStorage → persiste et vaut pour toutes les vues (écran, plein
+// écran, multi).
+export interface IrtCalib { dx: number; dy: number }
+export function getCalib(deviceId: string): IrtCalib {
+  try { const r = localStorage.getItem('sf-irt-calib-' + deviceId); if (r) { const c = JSON.parse(r); return { dx: Number(c.dx) || 0, dy: Number(c.dy) || 0 } } } catch { /* noop */ }
+  return { dx: 0, dy: 0 }
+}
+export function setCalib(deviceId: string, c: IrtCalib) {
+  try { localStorage.setItem('sf-irt-calib-' + deviceId, JSON.stringify({ dx: Math.round(c.dx), dy: Math.round(c.dy) })) } catch { /* noop */ }
+}
+
 // Actions supportées (cf. OpenAPI /devices/{id}/actions).
 export type IrtAction =
   | { type: 'tap'; x: number; y: number }

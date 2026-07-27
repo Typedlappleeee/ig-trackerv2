@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
 import { useTr } from '@/lib/i18n'
-import { iremotech, openLiveStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget } from '@/lib/iremotech'
+import { iremotech, openLiveStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, getCalib, setCalib, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget } from '@/lib/iremotech'
 import { LivePhone } from '../LivePhone'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, INK, MUTED, FAINT, HAIR,
@@ -13,6 +13,9 @@ import {
 } from '../ui'
 
 type Conn = 'checking' | 'ok' | 'unconfigured' | 'error'
+
+// Style des boutons-flèches de calibration.
+const calibBtn: React.CSSProperties = { display: 'grid', placeItems: 'center', width: 28, height: 28, borderRadius: 7, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#D8B4FE', cursor: 'pointer', fontSize: 13, fontWeight: 700 }
 
 export function BlowPhoneFarm({ user }: { user: User }) {
   useBlowCSS()
@@ -51,6 +54,8 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [showLog, setShowLog] = useState(false)     // Journal caché par défaut (raccourci Ctrl/Cmd+J)
   const [fs, setFs] = useState(false)               // plein écran du tel sélectionné
   const [multi, setMulti] = useState(false)         // multi-écrans (grille de tous les tels)
+  const [calibMode, setCalibMode] = useState(false) // mode calibration du curseur
+  const [calib, setCalibState] = useState({ dx: 0, dy: 0 })  // décalage du tel sélectionné
 
   // Ouvre un tel en PLEIN ÉCRAN dans un NOUVEL ONGLET (deep-link via hash).
   const openInNewTab = (dev: IrtDevice) => {
@@ -143,7 +148,14 @@ export function BlowPhoneFarm({ user }: { user: User }) {
 
   // Sélection d'un tel → on (ré)arme le live. Pas de snapshot one-shot en plus :
   // le flux fournit déjà l'image (évite un appel superflu = économie de rate-limit).
-  useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); setLive(true) } }, [selected])
+  useEffect(() => { if (selected) { setSnap(null); setOffline(false); setSnapErr(''); setLive(true); setCalibState(getCalib(selected.public_id)) } }, [selected])
+
+  // Ajuste la calibration du tel sélectionné (et mémorise).
+  const nudgeCalib = (ddx: number, ddy: number) => {
+    if (!selected) return
+    setCalibState(c => { const n = { dx: c.dx + ddx, dy: c.dy + ddy }; setCalib(selected.public_id, n); return n })
+  }
+  const resetCalib = () => { if (!selected) return; const n = { dx: 0, dy: 0 }; setCalibState(n); setCalib(selected.public_id, n) }
 
   // Deep-link « nouvel onglet » : #pf-fs=<deviceId> → ouvre ce tel en plein écran.
   useEffect(() => {
@@ -199,7 +211,10 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     const offX = (r.width - img.naturalWidth * scale) / 2, offY = (r.height - img.naturalHeight * scale) / 2
     const x = (clientX - r.left - offX) / scale, y = (clientY - r.top - offY) / scale
     if (x < 0 || y < 0 || x > img.naturalWidth || y > img.naturalHeight) return null
-    return { x: Math.round(x), y: Math.round(y) }
+    // + décalage de calibration (borné à l'image)
+    const cx = Math.min(Math.max(x + calib.dx, 0), img.naturalWidth)
+    const cy = Math.min(Math.max(y + calib.dy, 0), img.naturalHeight)
+    return { x: Math.round(cx), y: Math.round(cy) }
   }
   // Glisser sur l'écran = SWIPE envoyé au tel ; simple clic = TAP.
   const onSnapDown = (e: React.PointerEvent<HTMLImageElement>) => {
@@ -393,8 +408,25 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   <button onClick={() => setFs(true)} className="blow-tap" title={tr('Plein écran', 'Fullscreen')} style={{ fontSize: 13, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>⛶</button>
                   <button onClick={() => selected && openInNewTab(selected)} className="blow-tap" title={tr('Ouvrir dans un nouvel onglet', 'Open in a new tab')} style={{ fontSize: 12, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>↗</button>
                   <button onClick={() => setMulti(true)} className="blow-tap" title={tr('Multi-écrans', 'Multi-view')} style={{ fontSize: 13, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>▦</button>
+                  <button onClick={() => setCalibMode(v => !v)} className="blow-tap" title={tr('Calibrer le curseur', 'Calibrate the cursor')} style={{ fontSize: 13, color: calibMode ? '#34D399' : '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>🎯</button>
                 </div>
               </div>
+
+              {calibMode && (
+                <div style={{ marginBottom: 10, padding: 10, borderRadius: 11, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.3)' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: 11, color: MUTED, lineHeight: 1.5 }}>{tr('Le tap tombe à côté ? Ajuste jusqu\'à ce que ce soit calé — c\'est mémorisé pour ce tel.', 'Taps landing off? Nudge until it lines up — saved for this phone.')}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 28px)', gap: 3 }}>
+                      <span /><button onClick={() => nudgeCalib(0, -10)} className="blow-tap" style={calibBtn}>↑</button><span />
+                      <button onClick={() => nudgeCalib(-10, 0)} className="blow-tap" style={calibBtn}>←</button>
+                      <button onClick={resetCalib} className="blow-tap" title={tr('Réinitialiser', 'Reset')} style={{ ...calibBtn, fontSize: 12 }}>⟳</button>
+                      <button onClick={() => nudgeCalib(10, 0)} className="blow-tap" style={calibBtn}>→</button>
+                      <span /><button onClick={() => nudgeCalib(0, 10)} className="blow-tap" style={calibBtn}>↓</button><span />
+                    </div>
+                    <div style={{ fontSize: 11, color: FAINT, fontFamily: 'monospace' }}>dx {calib.dx > 0 ? '+' : ''}{calib.dx} · dy {calib.dy > 0 ? '+' : ''}{calib.dy}</div>
+                  </div>
+                </div>
+              )}
               <div style={{ padding: 10, borderRadius: 34, background: 'linear-gradient(160deg,#1b1b27,#0d0d15)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 30px 60px -32px rgba(99,102,241,0.55), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
                 <div style={{ width: 52, height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.14)', margin: '0 auto 8px', pointerEvents: 'none' }} />
                 <div style={{ position: 'relative', borderRadius: 26, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center' }}>

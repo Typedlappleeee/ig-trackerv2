@@ -3,7 +3,7 @@
 // = scroll) envoyées au tel. Sert à l'écran principal, au plein écran et au
 // multi-écrans. Chaque instance gère son propre flux et sa propre géométrie.
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { iremotech, openLiveStream, type IrtDevice, type IrtAction } from '@/lib/iremotech'
+import { iremotech, openLiveStream, getCalib, type IrtDevice, type IrtAction } from '@/lib/iremotech'
 import { INK, FAINT, HAIR } from './ui'
 
 interface Props {
@@ -58,7 +58,8 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     const offX = (r.width - img.naturalWidth * scale) / 2, offY = (r.height - img.naturalHeight * scale) / 2
     const x = (e.clientX - r.left - offX) / scale, y = (e.clientY - r.top - offY) / scale
     if (x < 0 || y < 0 || x > img.naturalWidth || y > img.naturalHeight) return null
-    return { x: Math.round(x), y: Math.round(y) }
+    const c = getCalib(id)   // décalage de calibration mémorisé pour ce tel
+    return { x: Math.round(Math.min(Math.max(x + c.dx, 0), img.naturalWidth)), y: Math.round(Math.min(Math.max(y + c.dy, 0), img.naturalHeight)) }
   }
   const act = useCallback(async (a: IrtAction, label: string) => {
     const r = await iremotech.action(id, a)
