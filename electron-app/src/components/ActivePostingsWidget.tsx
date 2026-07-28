@@ -180,9 +180,7 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
                       {r.status === 'running' ? `${r.done}/${r.total}` : r.status === 'done' ? tr('✓ terminé', '✓ done') : tr('✕ échec', '✕ failed')}
                     </span>
                     {hasPhases && <span style={{ fontSize: 10, color: 'var(--text-4)', flexShrink: 0 }}>{isExp ? '▾' : '▸'}</span>}
-                    {r.status !== 'running' && (
-                      <button onClick={e => { e.stopPropagation(); removeRun(r.id) }} title={tr('Retirer', 'Dismiss')} className="cursor-pointer sf-press" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, flexShrink: 0, transition: 'color var(--t-fast)' }}>✕</button>
-                    )}
+                    <button onClick={e => { e.stopPropagation(); removeRun(r.id) }} title={r.status === 'running' ? tr('Forcer le retrait (si bloqué)', 'Force dismiss (if stuck)') : tr('Retirer', 'Dismiss')} className="cursor-pointer sf-press" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, flexShrink: 0, transition: 'color var(--t-fast)' }}>✕</button>
                   </div>
                   <div style={{ height: 4, borderRadius: 'var(--r-xs)', background: 'var(--surface-3)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${r.status === 'done' ? 100 : pct}%`, background: color, borderRadius: 'var(--r-xs)', transition: 'width var(--t-smooth)' }} />
@@ -206,6 +204,14 @@ export function ActivePostingsWidget({ onOpen, orgId, userId }: { onOpen?: (page
                     <span className="sf-tabular" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
                       {s.total > 0 ? `${s.done}/${s.total}` : tr('en cours', 'running')}
                     </span>
+                    <button
+                      onClick={async e => {
+                        e.stopPropagation()
+                        setServerRuns(rs => rs.filter(x => x.id !== s.id))          // retire tout de suite du widget
+                        try { await supabase.from('scheduled_posts').update({ status: 'cancelled' }).eq('id', s.id) } catch { /* réseau */ }
+                      }}
+                      title={tr('Forcer le retrait (post bloqué)', 'Force dismiss (stuck post)')}
+                      className="cursor-pointer sf-press" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', fontSize: 12, flexShrink: 0, transition: 'color var(--t-fast)' }}>✕</button>
                   </div>
                   <div style={{ height: 4, borderRadius: 'var(--r-xs)', background: 'var(--surface-3)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${s.total > 0 ? pct : 30}%`, background: 'var(--accent)', borderRadius: 'var(--r-xs)', transition: 'width var(--t-smooth)', ...(s.total === 0 ? { animation: 'sf-pulse 1.6s ease-in-out infinite' } : {}) }} />
