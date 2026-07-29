@@ -25,38 +25,42 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
 
   // Rendu IMPÉRATIF : on écrit direct dans l'<img> (pas de re-render React par
   // frame → bien plus fluide).
+  const [live, setLive] = useState(false)   // true = flux WebSocket actif (fluide)
   const paint = (url: string) => { const img = imgRef.current; if (img) img.src = url; setHasFrame(true); setOffline(false); onStatus?.(true) }
 
-  // Flux : WebSocket temps réel (fluide) ; si le WS ne délivre pas, on bascule sur
-  // une boucle de captures CONTINUE (≈ cadence limite) — jamais figé.
+  // Stratégie : le WebSocket est PRIORITAIRE et reste ouvert (reconnexion continue
+  // avec backoff). Les captures ne servent que de PONT quand aucune frame WS n'est
+  // arrivée récemment → dès que le WS livre, les captures s'arrêtent (fluide).
   useEffect(() => {
     let alive = true
     let stop = () => {}
-    let mode: 'ws' | 'snap' = 'ws'
-    setHasFrame(false); setOffline(false)
+    let lastWs = 0            // horodatage de la dernière frame WebSocket
+    let reconnect: number | undefined
+    setHasFrame(false); setOffline(false); setLive(false)
 
-    const snapLoop = async () => {
-      while (alive && mode === 'snap') {
-        const s = await iremotech.snapshot(id)   // sérialisé par le limiteur ~4/s
-        if (!alive) break
-        if (s.ok && s.dataUrl) paint(s.dataUrl)
-        else if (s.status === 503) { setOffline(true); onStatus?.(false); break }
+    const openWs = () => {
+      stop = openLiveStream(id, {
+        onFrame: (url) => { if (!alive) return; lastWs = Date.now(); setLive(true); paint(url) },
+        onClose: () => { if (!alive) return; setLive(false); reconnect = window.setTimeout(() => { if (alive) openWs() }, 2000) }, // on RÉ-ouvre toujours
+      }, fps)
+    }
+
+    // Pont captures : ne tire une capture que si le WS n'a rien donné depuis 1.5s.
+    const bridge = async () => {
+      while (alive) {
+        if (Date.now() - lastWs > 1500) {
+          const s = await iremotech.snapshot(id)
+          if (!alive) break
+          if (s.ok && s.dataUrl) { if (Date.now() - lastWs > 1200) paint(s.dataUrl) }  // n'écrase pas une frame WS fraîche
+          else if (s.status === 503) { setOffline(true); onStatus?.(false); await new Promise(r => window.setTimeout(r, 3000)) }
+        } else {
+          await new Promise(r => window.setTimeout(r, 600))   // WS actif → on dort (limiteur libre pour les taps)
+        }
       }
     }
-    const toSnap = () => { if (mode === 'snap') return; mode = 'snap'; snapLoop() }
 
-    const startWs = () => {
-      let gotFrame = false
-      stop = openLiveStream(id, {
-        onFrame: (url) => { if (!alive) return; gotFrame = true; mode = 'ws'; paint(url) },
-        onClose: () => { if (alive && mode === 'ws') toSnap() },   // WS coupé → captures continues
-      }, fps)
-      // Pas de frame WS en 3.5s → on bascule captures (WS bloqué/indispo).
-      window.setTimeout(() => { if (alive && !gotFrame) toSnap() }, 3500)
-    }
-
-    const t = window.setTimeout(startWs, startDelay)   // décalage (multi-écrans)
-    return () => { alive = false; mode = 'snap'; window.clearTimeout(t); stop() }
+    const t = window.setTimeout(() => { openWs(); bridge() }, startDelay)   // décalage (multi-écrans)
+    return () => { alive = false; window.clearTimeout(t); if (reconnect) window.clearTimeout(reconnect); stop() }
   }, [id, fps, startDelay, onStatus])
 
   // Géométrie : l'image est en objectFit:contain → on calcule sa zone RÉELLE
@@ -94,6 +98,10 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
       <img ref={imgRef} alt={device.name || id} draggable={false}
         onPointerDown={onDown} onPointerUp={onUp} onWheel={onWheel}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none', display: !offline && hasFrame ? 'block' : 'none' }} />
+      {/* Indicateur : WS temps réel (vert) vs captures de secours (ambre) */}
+      {!offline && hasFrame && (
+        <span title={live ? 'Flux WebSocket (temps réel)' : 'Captures (WebSocket indisponible)'} style={{ position: 'absolute', top: 6, right: 6, zIndex: 2, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', padding: '2px 6px', borderRadius: 99, background: live ? 'rgba(52,211,153,0.2)' : 'rgba(251,191,36,0.2)', color: live ? '#34D399' : '#FBBF24', pointerEvents: 'none' }}>{live ? 'LIVE' : 'SD'}</span>
+      )}
       {offline ? (
         <div style={{ textAlign: 'center', padding: 16 }}>
           <div style={{ fontSize: 26, marginBottom: 6 }}>📴</div>

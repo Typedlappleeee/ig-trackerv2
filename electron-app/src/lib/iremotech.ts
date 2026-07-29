@@ -90,17 +90,18 @@ export interface IrtUsage {
 // iRemoTech plafonne à ~5 requêtes/seconde (token-bucket). On sérialise nos
 // appels HTTP à ~4/s (260 ms) pour ne JAMAIS déclencher de 429. Le flux vidéo
 // WebSocket n'est PAS concerné (une seule connexion, frames poussées).
-const REQ_MIN_GAP = 260
+const REQ_MIN_GAP = 220
 let reqLastAt = 0
-const reqQueue: Array<() => void> = []
+const reqQueueHi: Array<() => void> = []   // actions (tap/swipe…) — PRIORITAIRES
+const reqQueueLo: Array<() => void> = []   // captures (stream de secours) — passent après
 let reqDraining = false
-function reqSlot(): Promise<void> {
-  return new Promise(resolve => { reqQueue.push(resolve); if (!reqDraining) reqDrain() })
+function reqSlot(hi = false): Promise<void> {
+  return new Promise(resolve => { (hi ? reqQueueHi : reqQueueLo).push(resolve); if (!reqDraining) reqDrain() })
 }
 function reqDrain() {
   reqDraining = true
   const step = () => {
-    const next = reqQueue.shift()
+    const next = reqQueueHi.shift() ?? reqQueueLo.shift()   // les actions doublent les captures
     if (!next) { reqDraining = false; return }
     const wait = Math.max(0, REQ_MIN_GAP - (Date.now() - reqLastAt))
     window.setTimeout(() => { reqLastAt = Date.now(); next(); step() }, wait)
@@ -109,7 +110,8 @@ function reqDrain() {
 }
 
 async function irt<T = unknown>(op: string, payload: Record<string, unknown> = {}): Promise<IrtResult<T>> {
-  await reqSlot()   // respecte la limite ~4 req/s
+  // Un tap/une action passe DEVANT les captures → réactivité immédiate.
+  await reqSlot(op === 'action')
   try {
     const res = await fetch('/api/iremotech', {
       method: 'POST',
