@@ -20,7 +20,7 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
   const imgRef = useRef<HTMLImageElement>(null)
   const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
-  const gesture = useRef<{ x: number; y: number } | null>(null)
+  const gesture = useRef<{ x: number; y: number; t: number } | null>(null)
   const id = device.public_id
 
   // Rendu IMPÉRATIF : on écrit direct dans l'<img> (pas de re-render React par
@@ -82,11 +82,22 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     onLog?.(r.ok ? `✓ ${label}` : `❌ ${label} : ${r.error ?? r.status}`)
   }, [id, onLog])
 
-  const onDown = (e: React.PointerEvent<HTMLImageElement>) => { const p = toXY(e); if (p) gesture.current = p }
+  const onDown = (e: React.PointerEvent<HTMLImageElement>) => { const p = toXY(e); if (p) { gesture.current = { ...p, t: Date.now() }; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* noop */ } } }
   const onUp = (e: React.PointerEvent<HTMLImageElement>) => {
     const g = gesture.current; gesture.current = null; const p = toXY(e); if (!g || !p) return
-    if (Math.abs(p.x - g.x) + Math.abs(p.y - g.y) < 24) act({ type: 'tap', x: g.x, y: g.y }, `tap (${g.x}, ${g.y})`)
-    else act({ type: 'swipe', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: 250 }, 'swipe')
+    const dist = Math.abs(p.x - g.x) + Math.abs(p.y - g.y)
+    const dt = Date.now() - g.t   // durée du maintien (ms)
+    if (dist < 24) {
+      // Pas de mouvement : appui court = tap, appui maintenu = long_press.
+      if (dt >= 450) act({ type: 'long_press', x: g.x, y: g.y, hold_ms: Math.min(dt, 4000) }, `long_press (${g.x}, ${g.y})`)
+      else act({ type: 'tap', x: g.x, y: g.y }, `tap (${g.x}, ${g.y})`)
+    } else {
+      // Mouvement : on rejoue le geste sur la VRAIE durée du maintien → swipe rapide
+      // (flick) ou drag lent contrôlé selon combien de temps tu es resté appuyé.
+      const dur = Math.min(Math.max(dt, 60), 2500)
+      if (dt >= 350) act({ type: 'drag', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: dur }, 'drag')
+      else act({ type: 'swipe', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: dur }, 'swipe')
+    }
   }
   const onWheel = (e: React.WheelEvent<HTMLImageElement>) => {
     e.preventDefault(); const p = toXY(e); if (!p) return

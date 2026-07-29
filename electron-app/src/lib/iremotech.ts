@@ -109,6 +109,21 @@ function reqDrain() {
   step()
 }
 
+// Actions (tap/swipe/scroll) : relai EDGE dédié (faible latence) + priorité dans
+// le limiteur. Repli sur le proxy Node si l'Edge échoue.
+async function irtAction(deviceId: string, action: IrtAction): Promise<IrtResult> {
+  await reqSlot(true)   // prioritaire + respecte les ~5 req/s
+  try {
+    const res = await fetch('/api/irt-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId, action, apiKey: apiKey ?? undefined }),
+    })
+    return await res.json() as IrtResult
+  } catch {
+    return irt('action', { deviceId, body: action })
+  }
+}
+
 async function irt<T = unknown>(op: string, payload: Record<string, unknown> = {}): Promise<IrtResult<T>> {
   // Un tap/une action passe DEVANT les captures → réactivité immédiate.
   await reqSlot(op === 'action')
@@ -248,8 +263,8 @@ export const iremotech = {
   usage: () => irt<IrtUsage>('usage'),
   // Capture d'écran → data URL JPEG (base64).
   snapshot: (deviceId: string) => irt('snapshot', { deviceId }),
-  // Envoie UNE action (tap, texte, swipe…).
-  action: (deviceId: string, action: IrtAction) => irt('action', { deviceId, body: action }),
+  // Envoie UNE action (tap, texte, swipe…) via le relai Edge rapide.
+  action: (deviceId: string, action: IrtAction) => irtAction(deviceId, action),
   // Upload d'un média de la banque (URL Supabase signée) vers l'iPhone.
   uploadMedia: (deviceId: string, mediaUrl: string, filename?: string) => irt('media', { deviceId, mediaUrl, filename }),
 }
