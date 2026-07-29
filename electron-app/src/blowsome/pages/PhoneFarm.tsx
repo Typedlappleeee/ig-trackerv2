@@ -7,6 +7,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useTr } from '@/lib/i18n'
 import { iremotech, openLiveStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, getCalib, setCalib, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget } from '@/lib/iremotech'
 import { LivePhone } from '../LivePhone'
+import { BankPicker } from '@/pages/Bank'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
@@ -57,6 +58,33 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [calibMode, setCalibMode] = useState(false) // mode calibration du curseur
   const [heroKey, setHeroKey] = useState(0)         // ↻ = reconnecte le flux principal
   const [broadcast, setBroadcast] = useState(false) // miroir : action sur 1 tel = sur tous
+  const [uploadPick, setUploadPick] = useState(false) // sélecteur banque pour envoyer sur le tel
+  const [uploadMsg, setUploadMsg] = useState('')       // état de l'upload vers le tel
+
+  // Envoie un média de la BANQUE vers le tel sélectionné (URL signée → proxy).
+  const uploadFromBank = async (urls: string[], titles?: string[]) => {
+    setUploadPick(false)
+    if (!selected || !urls.length) return
+    for (let i = 0; i < urls.length; i++) {
+      const name = (titles?.[i] || `media_${i}`).replace(/[^\w.\-]+/g, '_')
+      setUploadMsg(tr(`Envoi ${i + 1}/${urls.length}…`, `Sending ${i + 1}/${urls.length}…`))
+      const r = await iremotech.uploadMedia(selected.public_id, urls[i], name)
+      addLog(r.ok ? `✓ upload ${name}` : `❌ upload ${name} : ${r.error ?? r.status}`)
+    }
+    setUploadMsg(tr('✓ Envoyé sur le tel', '✓ Sent to the phone')); window.setTimeout(() => setUploadMsg(''), 2500)
+  }
+  // Envoie un fichier du PC vers le tel (base64 ≤ ~4 Mo — limite corps serverless).
+  const uploadFromPC = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; e.target.value = ''
+    if (!f || !selected) return
+    if (f.size > 4 * 1024 * 1024) { setUploadMsg(tr('Fichier > 4 Mo : passe par la banque.', 'File > 4 MB: use the bank instead.')); window.setTimeout(() => setUploadMsg(''), 3500); return }
+    setUploadMsg(tr('Lecture du fichier…', 'Reading file…'))
+    const b64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.onerror = rej; r.readAsDataURL(f) })
+    setUploadMsg(tr('Envoi sur le tel…', 'Sending to the phone…'))
+    const r = await iremotech.uploadMediaData(selected.public_id, b64, f.name.replace(/[^\w.\-]+/g, '_'))
+    addLog(r.ok ? `✓ upload ${f.name}` : `❌ upload ${f.name} : ${r.error ?? r.status}`)
+    setUploadMsg(r.ok ? tr('✓ Envoyé sur le tel', '✓ Sent to the phone') : tr('❌ Échec', '❌ Failed')); window.setTimeout(() => setUploadMsg(''), 2800)
+  }
   const [calib, setCalibState] = useState({ dx: 0, dy: 0 })  // décalage du tel sélectionné
 
   // Ouvre un tel en PLEIN ÉCRAN dans un NOUVEL ONGLET (deep-link via hash).
@@ -455,6 +483,19 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   />
                   <BlowButton onClick={() => { if (text.trim()) { sendAction(/^https?:\/\//.test(text) ? { type: 'open_url', url: text } : { type: 'text', text }, text); setText('') } }} style={{ height: 38 }}>{tr('Envoyer', 'Send')}</BlowButton>
                 </div>
+
+                <div style={{ height: 1, background: HAIR, margin: '14px 0' }} />
+                {/* Upload d'un média vers le tel (banque OU fichier PC) */}
+                <p style={{ margin: '0 0 8px', fontSize: 12.5, fontWeight: 800, color: INK }}>{tr('Envoyer un média sur le tel', 'Send media to the phone')}</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                  <BlowButton variant="ghost" onClick={() => setUploadPick(true)} style={{ height: 34 }}>🗂 {tr('Depuis la banque', 'From the bank')}</BlowButton>
+                  <label className="blow-tap" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 13px', borderRadius: 11, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.045)', color: INK, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                    💻 {tr('Depuis le PC', 'From the PC')}
+                    <input type="file" accept="image/*,video/*" onChange={uploadFromPC} style={{ display: 'none' }} />
+                  </label>
+                  {uploadMsg && <span style={{ fontSize: 11, color: uploadMsg.includes('❌') ? '#F87171' : '#34D399' }}>{uploadMsg}</span>}
+                </div>
+                <p style={{ margin: '7px 0 0', fontSize: 10, color: FAINT }}>{tr('PC : ≤ 4 Mo (sinon passe par la banque). Le média arrive dans la pellicule du tel.', 'PC: ≤ 4 MB (otherwise use the bank). Media lands in the phone camera roll.')}</p>
               </BlowCard>
               )}
 
@@ -553,6 +594,13 @@ export function BlowPhoneFarm({ user }: { user: User }) {
               )}
             </div>
         </div>
+      )}
+
+      {/* Sélecteur banque → envoyer sur le tel */}
+      {uploadPick && (
+        <BankPicker user={user} mode="multi" resolveMode="signed-url"
+          onSelect={(paths, titles) => uploadFromBank(paths, titles)}
+          onClose={() => setUploadPick(false)} />
       )}
 
       {/* Plein écran d'un tel (interactif) */}

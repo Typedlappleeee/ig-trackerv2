@@ -267,6 +267,8 @@ export const iremotech = {
   action: (deviceId: string, action: IrtAction) => irtAction(deviceId, action),
   // Upload d'un média de la banque (URL Supabase signée) vers l'iPhone.
   uploadMedia: (deviceId: string, mediaUrl: string, filename?: string) => irt('media', { deviceId, mediaUrl, filename }),
+  // Upload d'un fichier du PC (base64) vers l'iPhone (≤ ~4 Mo — limite corps serverless).
+  uploadMediaData: (deviceId: string, fileData: string, filename: string) => irt('media', { deviceId, fileData, filename }),
 }
 
 // Normalise la réponse /devices (peut être { devices: [] } ou [] selon l'API).

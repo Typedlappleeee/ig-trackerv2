@@ -59,12 +59,18 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: r.ok, status: r.status, data: await jsonOr(r) })
     }
     if (op === 'media') {
-      // Télécharge le média (banque Supabase) — garde anti-SSRF — puis envoie les octets.
-      let dl
-      try { dl = await fetchMediaFollow(mediaUrl) }
-      catch (e) { return res.status(200).json({ ok: false, error: `média refusé: ${e?.message ?? e}` }) }
-      if (!dl.ok) return res.status(200).json({ ok: false, error: `fetch média ${dl.status}` })
-      const bytes = Buffer.from(await dl.arrayBuffer())
+      // Deux sources : fileData (base64, fichier PC ≤ ~4 Mo) OU mediaUrl (banque Supabase).
+      let bytes
+      if (typeof req.body?.fileData === 'string' && req.body.fileData) {
+        try { bytes = Buffer.from(req.body.fileData, 'base64') }
+        catch (e) { return res.status(200).json({ ok: false, error: `base64 invalide: ${e?.message ?? e}` }) }
+      } else {
+        let dl
+        try { dl = await fetchMediaFollow(mediaUrl) }
+        catch (e) { return res.status(200).json({ ok: false, error: `média refusé: ${e?.message ?? e}` }) }
+        if (!dl.ok) return res.status(200).json({ ok: false, error: `fetch média ${dl.status}` })
+        bytes = Buffer.from(await dl.arrayBuffer())
+      }
       const r = await fetch(`${BASE}/devices/${dev}/media?filename=${encodeURIComponent(filename || 'video.mp4')}`, {
         method: 'POST', headers: { ...auth, 'Content-Type': 'application/octet-stream' },
         body: bytes, signal: AbortSignal.timeout(55000),
