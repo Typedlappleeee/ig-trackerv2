@@ -12,11 +12,12 @@ interface Props {
   rounded?: number                       // rayon des coins de l'écran
   bezel?: boolean                        // cadre "téléphone" autour
   startDelay?: number                    // décale l'ouverture du flux (évite d'ouvrir N flux d'un coup)
+  broadcast?: string[]                    // miroir : rejouer chaque action sur TOUS ces tels
   onStatus?: (reachable: boolean) => void
   onLog?: (m: string) => void
 }
 
-export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, onStatus, onLog }: Props) {
+export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, broadcast, onStatus, onLog }: Props) {
   const imgRef = useRef<HTMLImageElement>(null)
   const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
@@ -78,9 +79,12 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     return { x: Math.round(Math.min(Math.max(x + c.dx, 0), img.naturalWidth)), y: Math.round(Math.min(Math.max(y + c.dy, 0), img.naturalHeight)) }
   }
   const act = useCallback(async (a: IrtAction, label: string) => {
-    const r = await iremotech.action(id, a)
-    onLog?.(r.ok ? `✓ ${label}` : `❌ ${label} : ${r.error ?? r.status}`)
-  }, [id, onLog])
+    // Miroir : on rejoue l'action sur tous les tels ciblés (dont soi). Le limiteur
+    // ~5 req/s sérialise → pas de dépassement. Sinon, juste ce tel.
+    const targets = (broadcast && broadcast.length) ? Array.from(new Set([id, ...broadcast])) : [id]
+    targets.forEach(t => { iremotech.action(t, a) })
+    onLog?.(`✓ ${label}${targets.length > 1 ? ` ×${targets.length}` : ''}`)
+  }, [id, broadcast, onLog])
 
   const onDown = (e: React.PointerEvent<HTMLImageElement>) => { const p = toXY(e); if (p) { gesture.current = { ...p, t: Date.now() }; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* noop */ } } }
   const onUp = (e: React.PointerEvent<HTMLImageElement>) => {

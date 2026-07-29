@@ -56,6 +56,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [multi, setMulti] = useState(false)         // multi-écrans (grille de tous les tels)
   const [calibMode, setCalibMode] = useState(false) // mode calibration du curseur
   const [heroKey, setHeroKey] = useState(0)         // ↻ = reconnecte le flux principal
+  const [broadcast, setBroadcast] = useState(false) // miroir : action sur 1 tel = sur tous
   const [calib, setCalibState] = useState({ dx: 0, dy: 0 })  // décalage du tel sélectionné
 
   // Ouvre un tel en PLEIN ÉCRAN dans un NOUVEL ONGLET (deep-link via hash).
@@ -408,7 +409,11 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   </div>
                 </div>
               )}
-              {selected && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={12} rounded={26} onStatus={onHeroStatus} onLog={addLog} />}
+              {/* On coupe le flux principal quand un modal (plein écran / multi) est
+                  ouvert → libère le slot (max_active_devices) et évite un double flux
+                  sur le même tel, pour que le plein écran / multi passe bien en WebSocket. */}
+              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={12} rounded={26} onStatus={onHeroStatus} onLog={addLog} />}
+              {selected && (fs || multi) && <div style={{ aspectRatio: '9/19.5', width: '100%', maxWidth: 300, margin: '0 auto', borderRadius: 34, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'grid', placeItems: 'center', color: FAINT, fontSize: 11.5 }}>{tr('Ouvert en grand', 'Open in the big view')}</div>}
               <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}><Grad style={{ fontWeight: 700 }}>{tr('Clic', 'Click')}</Grad> = {tr('taper', 'tap')} · <Grad style={{ fontWeight: 700 }}>{tr('glisser', 'drag')}</Grad> = swipe · <Grad style={{ fontWeight: 700 }}>{tr('molette', 'wheel')}</Grad> = scroll</p>
             </BlowCard>
           </div>
@@ -567,18 +572,26 @@ export function BlowPhoneFarm({ user }: { user: User }) {
       {/* Multi-écrans : tous les tels en direct */}
       {multi && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(5,5,10,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', padding: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 14, fontWeight: 800, color: INK }}>{tr('Multi-écrans', 'Multi-view')} · {devices.length}</span>
-            <button onClick={() => setMulti(false)} className="blow-tap" style={{ fontSize: 13, fontWeight: 700, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer' }}>✕ {tr('Fermer', 'Close')}</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {/* Miroir : une action sur un tel se répercute sur TOUS */}
+              <button onClick={() => setBroadcast(v => !v)} className="blow-tap" title={tr('Reproduit chaque action sur tous les tels', 'Repeats every action on all phones')}
+                style={{ fontSize: 12, fontWeight: 800, color: broadcast ? '#34D399' : '#D8B4FE', background: broadcast ? 'rgba(52,211,153,0.14)' : 'none', border: `1px solid ${broadcast ? 'rgba(52,211,153,0.4)' : HAIR}`, borderRadius: 8, padding: '5px 11px', cursor: 'pointer' }}>
+                🔁 {tr('Miroir', 'Mirror')}{broadcast ? tr(' ON', ' ON') : ''}
+              </button>
+              <button onClick={() => setMulti(false)} className="blow-tap" style={{ fontSize: 13, fontWeight: 700, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer' }}>✕ {tr('Fermer', 'Close')}</button>
+            </div>
           </div>
+          {broadcast && <p style={{ margin: '0 0 10px', fontSize: 11, color: '#34D399' }}>🔁 {tr('Miroir actif : ce que tu fais sur un tel se répète sur les', 'Mirror on: what you do on one phone repeats on all')} {devices.length} {tr('tels.', 'phones.')}</p>}
           <div className="blow-scroll" style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 14, alignContent: 'start' }}>
             {devices.map((d, i) => (
-              <div key={d.public_id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div key={d.public_id} style={{ display: 'flex', flexDirection: 'column', gap: 6, outline: broadcast ? '1px solid rgba(52,211,153,0.3)' : 'none', outlineOffset: 3, borderRadius: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name || d.public_id}</span>
                   <button onClick={() => { setSelected(d); setMulti(false); setFs(true) }} className="blow-tap" title={tr('Plein écran', 'Fullscreen')} style={{ fontSize: 12, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>⛶</button>
                 </div>
-                <LivePhone device={d} fps={6} bezel={false} startDelay={i * 500} onLog={addLog} />
+                <LivePhone device={d} fps={6} bezel={false} startDelay={i * 500} broadcast={broadcast ? devices.map(x => x.public_id) : undefined} onLog={addLog} />
               </div>
             ))}
           </div>
