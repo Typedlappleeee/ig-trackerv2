@@ -52,7 +52,12 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
     // member can validate access via the OWNER's license without needing their
     // own key (you don't need a license to JOIN an org, only the org needs one).
     let orgOwnerPlan: LicenseStatus['plan'] = null
+    // Add-on Blowsome hérité de l'agence : un membre d'une orga dont l'OWNER a
+    // l'add-on Blowsome y a droit aussi. (RPC SECURITY DEFINER best-effort.)
+    let orgOwnerBlowsome = false
     if (orgId) {
+      const { data: rpcBlow } = await supabase.rpc('org_owner_blowsome', { p_org: orgId })
+      orgOwnerBlowsome = rpcBlow === true
       const { data: rpcPlan, error: rpcErr } = await supabase.rpc('org_owner_plan', { p_org: orgId })
       if (!rpcErr && rpcPlan) {
         orgOwnerPlan = rpcPlan as LicenseStatus['plan']
@@ -76,14 +81,19 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
           if (ownerProfileErr) return FAIL_OPEN
 
           if (ownerProfile?.is_super_admin) {
-            orgOwnerPlan = 'pro'
+            orgOwnerPlan = 'pro'; orgOwnerBlowsome = true
           } else {
-            const { data: ownerKey, error: ownerKeyErr } = await supabase
+            let ownerRes = await supabase
               .from('license_keys')
-              .select('expires_at, plan')
+              .select('expires_at, plan, blowsome')
               .eq('user_id', org.owner_id)
               .eq('is_active', true)
               .maybeSingle()
+            // La colonne blowsome peut manquer (migration non passée) → on réessaie sans.
+            if (ownerRes.error && /blowsome/.test(ownerRes.error.message)) {
+              ownerRes = await supabase.from('license_keys').select('expires_at, plan').eq('user_id', org.owner_id).eq('is_active', true).maybeSingle() as typeof ownerRes
+            }
+            const { data: ownerKey, error: ownerKeyErr } = ownerRes
 
             if (ownerKeyErr) return FAIL_OPEN
 
@@ -91,6 +101,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
               const exp = ownerKey.expires_at ? new Date(ownerKey.expires_at) : null
               if (!exp || exp > new Date()) {
                 orgOwnerPlan = (ownerKey.plan as LicenseStatus['plan']) ?? 'standard'
+                if ((ownerKey as { blowsome?: boolean }).blowsome === true) orgOwnerBlowsome = true
               }
             }
           }
@@ -131,17 +142,17 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
         const expiresAt = bestKey.expires_at ? new Date(bestKey.expires_at) : null
         const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
         const plan = (bestKey.plan as Plan) ?? 'standard'
-        // blowsome : true si AU MOINS une clé valide porte le flag.
-        const blowsome = validKeys.some(k => (k as { blowsome?: boolean }).blowsome === true)
+        // blowsome : true si AU MOINS une clé valide porte le flag, OU si l'agence l'a.
+        const blowsome = validKeys.some(k => (k as { blowsome?: boolean }).blowsome === true) || orgOwnerBlowsome
         return { valid: true, expired: false, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan, orgOwnerPlan, blowsome }
       }
       // All keys are expired
       return { valid: false, expired: true, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }
     }
 
-    // Org owner has an active key → member gets access via org
+    // Org owner has an active key → member gets access via org (+ Blowsome si l'agence l'a)
     if (orgOwnerPlan) {
-      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan, blowsome: false }
+      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan, blowsome: orgOwnerBlowsome }
     }
 
     // No active key found — check if user ever had one (active or deactivated) to distinguish
