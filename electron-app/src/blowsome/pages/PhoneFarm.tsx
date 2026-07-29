@@ -56,6 +56,8 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [fs, setFs] = useState(false)               // plein écran du tel sélectionné
   const [multi, setMulti] = useState(false)         // multi-écrans (grille de tous les tels)
   const [calibMode, setCalibMode] = useState(false) // mode calibration du curseur
+  const [calibStep, setCalibStep] = useState<'idle' | 'target' | 'observe'>('idle') // calibrage guidé
+  const calibTarget = useRef<{ x: number; y: number } | null>(null)
   const [heroKey, setHeroKey] = useState(0)         // ↻ = reconnecte le flux principal
   const [broadcast, setBroadcast] = useState(false) // miroir : action sur 1 tel = sur tous
   const [uploadPick, setUploadPick] = useState(false) // sélecteur banque pour envoyer sur le tel
@@ -186,6 +188,26 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     setCalibState(c => { const n = { dx: c.dx + ddx, dy: c.dy + ddy }; setCalib(selected.public_id, n); return n })
   }
   const resetCalib = () => { if (!selected) return; const n = { dx: 0, dy: 0 }; setCalibState(n); setCalib(selected.public_id, n) }
+
+  // Calibrage GUIDÉ : 1) tu cliques la cible → on tape dessus ; 2) tu cliques où
+  // le point a réellement atterri → on calcule le décalage tout seul.
+  const onCaptureRaw = (rawX: number, rawY: number) => {
+    if (!selected) return
+    if (calibStep === 'target') {
+      calibTarget.current = { x: rawX, y: rawY }
+      const tx = Math.round(rawX + calib.dx), ty = Math.round(rawY + calib.dy)
+      iremotech.action(selected.public_id, { type: 'tap', x: tx, y: ty })  // tap à l'endroit visé
+      setCalibStep('observe')
+    } else if (calibStep === 'observe') {
+      const t = calibTarget.current; calibTarget.current = null
+      if (t) {
+        const n = { dx: Math.round(calib.dx + (t.x - rawX)), dy: Math.round(calib.dy + (t.y - rawY)) }
+        setCalibState(n); setCalib(selected.public_id, n)
+        addLog(tr(`🎯 Calibré : dx ${n.dx}, dy ${n.dy}`, `🎯 Calibrated: dx ${n.dx}, dy ${n.dy}`))
+      }
+      setCalibStep('idle')
+    }
+  }
 
   // Deep-link « nouvel onglet » : #pf-fs=<deviceId> → ouvre ce tel en plein écran.
   useEffect(() => {
@@ -435,12 +457,25 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                     </div>
                     <div style={{ fontSize: 11, color: FAINT, fontFamily: 'monospace' }}>dx {calib.dx > 0 ? '+' : ''}{calib.dx} · dy {calib.dy > 0 ? '+' : ''}{calib.dy}</div>
                   </div>
+                  {/* Calibrage guidé (semi-auto) */}
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${HAIR}` }}>
+                    {calibStep === 'idle' ? (
+                      <button onClick={() => setCalibStep('target')} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: '#34D399', background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.35)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>🎯 {tr('Calibrage guidé', 'Guided calibration')}</button>
+                    ) : (
+                      <div style={{ fontSize: 11, color: '#34D399', lineHeight: 1.5 }}>
+                        {calibStep === 'target'
+                          ? tr('① Clique sur l\'écran là où tu VEUX taper (une icône précise).', '① Click on the screen where you WANT to tap (a precise icon).')
+                          : tr('② Regarde où le point a réellement atterri, puis clique dessus.', '② See where it actually landed, then click there.')}
+                        <button onClick={() => { setCalibStep('idle'); calibTarget.current = null }} className="blow-tap" style={{ marginLeft: 8, fontSize: 10.5, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>{tr('annuler', 'cancel')}</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {/* On coupe le flux principal quand un modal (plein écran / multi) est
                   ouvert → libère le slot (max_active_devices) et évite un double flux
                   sur le même tel, pour que le plein écran / multi passe bien en WebSocket. */}
-              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={12} rounded={26} onStatus={onHeroStatus} onLog={addLog} />}
+              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={12} rounded={26} captureRaw={calibStep !== 'idle' ? onCaptureRaw : undefined} onStatus={onHeroStatus} onLog={addLog} />}
               {selected && (fs || multi) && <div style={{ aspectRatio: '9/19.5', width: '100%', maxWidth: 300, margin: '0 auto', borderRadius: 34, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'grid', placeItems: 'center', color: FAINT, fontSize: 11.5 }}>{tr('Ouvert en grand', 'Open in the big view')}</div>}
               <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}><Grad style={{ fontWeight: 700 }}>{tr('Clic', 'Click')}</Grad> = {tr('taper', 'tap')} · <Grad style={{ fontWeight: 700 }}>{tr('glisser', 'drag')}</Grad> = swipe · <Grad style={{ fontWeight: 700 }}>{tr('molette', 'wheel')}</Grad> = scroll</p>
             </BlowCard>

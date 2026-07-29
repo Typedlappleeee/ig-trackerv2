@@ -13,11 +13,12 @@ interface Props {
   bezel?: boolean                        // cadre "téléphone" autour
   startDelay?: number                    // décale l'ouverture du flux (évite d'ouvrir N flux d'un coup)
   broadcast?: string[]                    // miroir : rejouer chaque action sur TOUS ces tels
+  captureRaw?: (x: number, y: number) => void // calibrage guidé : renvoie les coords BRUTES (sans calib) au lieu de taper
   onStatus?: (reachable: boolean) => void
   onLog?: (m: string) => void
 }
 
-export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, broadcast, onStatus, onLog }: Props) {
+export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, broadcast, captureRaw, onStatus, onLog }: Props) {
   const imgRef = useRef<HTMLImageElement>(null)
   const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
@@ -66,8 +67,8 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
   }, [id, fps, startDelay, onStatus])
 
   // Géométrie : l'image est en objectFit:contain → on calcule sa zone RÉELLE
-  // (échelle + décalage) pour que le clic tombe pile au bon endroit (calibration).
-  const toXY = (e: React.PointerEvent<HTMLImageElement> | React.WheelEvent<HTMLImageElement>) => {
+  // (échelle + décalage). baseXY = coords brutes ; toXY = + calibration mémorisée.
+  const baseXY = (e: React.PointerEvent<HTMLImageElement> | React.WheelEvent<HTMLImageElement>) => {
     const img = e.currentTarget
     if (!img.naturalWidth) return null
     const r = img.getBoundingClientRect()
@@ -75,8 +76,12 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     const offX = (r.width - img.naturalWidth * scale) / 2, offY = (r.height - img.naturalHeight * scale) / 2
     const x = (e.clientX - r.left - offX) / scale, y = (e.clientY - r.top - offY) / scale
     if (x < 0 || y < 0 || x > img.naturalWidth || y > img.naturalHeight) return null
+    return { x, y, w: img.naturalWidth, h: img.naturalHeight }
+  }
+  const toXY = (e: React.PointerEvent<HTMLImageElement> | React.WheelEvent<HTMLImageElement>) => {
+    const b = baseXY(e); if (!b) return null
     const c = getCalib(id)   // décalage de calibration mémorisé pour ce tel
-    return { x: Math.round(Math.min(Math.max(x + c.dx, 0), img.naturalWidth)), y: Math.round(Math.min(Math.max(y + c.dy, 0), img.naturalHeight)) }
+    return { x: Math.round(Math.min(Math.max(b.x + c.dx, 0), b.w)), y: Math.round(Math.min(Math.max(b.y + c.dy, 0), b.h)) }
   }
   const act = useCallback(async (a: IrtAction, label: string) => {
     // Miroir : on rejoue l'action sur tous les tels ciblés (dont soi). Le limiteur
@@ -86,8 +91,12 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     onLog?.(`✓ ${label}${targets.length > 1 ? ` ×${targets.length}` : ''}`)
   }, [id, broadcast, onLog])
 
-  const onDown = (e: React.PointerEvent<HTMLImageElement>) => { const p = toXY(e); if (p) { gesture.current = { ...p, t: Date.now() }; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* noop */ } } }
+  const onDown = (e: React.PointerEvent<HTMLImageElement>) => {
+    if (captureRaw) return   // mode calibrage : on capture au relâchement, pas de geste
+    const p = toXY(e); if (p) { gesture.current = { ...p, t: Date.now() }; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* noop */ } }
+  }
   const onUp = (e: React.PointerEvent<HTMLImageElement>) => {
+    if (captureRaw) { const b = baseXY(e); if (b) captureRaw(Math.round(b.x), Math.round(b.y)); return }
     const g = gesture.current; gesture.current = null; const p = toXY(e); if (!g || !p) return
     const dist = Math.abs(p.x - g.x) + Math.abs(p.y - g.y)
     const dt = Date.now() - g.t   // durée du maintien (ms)
