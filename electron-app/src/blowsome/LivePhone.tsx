@@ -38,10 +38,11 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     let reconnect: number | undefined
     setHasFrame(false); setOffline(false); setLive(false)
 
+    let firstFrame = true
     const openWs = () => {
       stop = openLiveStream(id, {
-        onFrame: (url) => { if (!alive) return; lastWs = Date.now(); setLive(true); paint(url) },
-        onClose: () => { if (!alive) return; setLive(false); reconnect = window.setTimeout(() => { if (alive) openWs() }, 2000) }, // on RÉ-ouvre toujours
+        onFrame: (url) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } lastWs = Date.now(); setLive(true); paint(url) },
+        onClose: (why) => { if (!alive) return; setLive(false); if (firstFrame) onLog?.(`⚠️ WebSocket ${why} (scope "stream" ?) → captures`); reconnect = window.setTimeout(() => { if (alive) openWs() }, 3000) },
       }, fps)
     }
 
