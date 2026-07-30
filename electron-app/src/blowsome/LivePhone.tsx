@@ -88,23 +88,22 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     return () => { alive = false; window.clearTimeout(t); if (reconnect) window.clearTimeout(reconnect); stop() }
   }, [id, fps, startDelay]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Géométrie : canvas en object-fit:contain → on calcule sa zone RÉELLE. baseXY =
-  // coords brutes ; toXY = + calibration mémorisée.
-  const baseXY = (e: React.PointerEvent<HTMLCanvasElement> | React.WheelEvent<HTMLCanvasElement>) => {
-    const el = e.currentTarget; const nw = el.width, nh = el.height
-    if (!nw || !nh) return null
+  // Géométrie : canvas en object-fit:contain → zone RÉELLE (échelle + décalage).
+  // raw=true → coords brutes (calibrage) ; sinon + calibration mémorisée.
+  const mapXY = (clientX: number, clientY: number, el: HTMLCanvasElement | null, raw = false) => {
+    if (!el) return null
+    const nw = el.width, nh = el.height; if (!nw || !nh) return null
     const r = el.getBoundingClientRect()
     const scale = Math.min(r.width / nw, r.height / nh)
     const offX = (r.width - nw * scale) / 2, offY = (r.height - nh * scale) / 2
-    const x = (e.clientX - r.left - offX) / scale, y = (e.clientY - r.top - offY) / scale
+    const x = (clientX - r.left - offX) / scale, y = (clientY - r.top - offY) / scale
     if (x < 0 || y < 0 || x > nw || y > nh) return null
-    return { x, y, w: nw, h: nh }
-  }
-  const toXY = (e: React.PointerEvent<HTMLCanvasElement> | React.WheelEvent<HTMLCanvasElement>) => {
-    const b = baseXY(e); if (!b) return null
+    if (raw) return { x, y, w: nw, h: nh }
     const c = getCalib(id)
-    return { x: Math.round(Math.min(Math.max(b.x + c.dx, 0), b.w)), y: Math.round(Math.min(Math.max(b.y + c.dy, 0), b.h)) }
+    return { x: Math.round(Math.min(Math.max(x + c.dx, 0), nw)), y: Math.round(Math.min(Math.max(y + c.dy, 0), nh)), w: nw, h: nh }
   }
+  const baseXY = (e: React.PointerEvent<HTMLCanvasElement>) => mapXY(e.clientX, e.clientY, e.currentTarget, true)
+  const toXY = (e: React.PointerEvent<HTMLCanvasElement>) => mapXY(e.clientX, e.clientY, e.currentTarget, false)
   // Retour tactile instantané : petit cercle à l'endroit cliqué (feedback immédiat
   // → tu sais que le tap a pris, tu ne re-tapes pas → pas d'empilement/délai).
   const ripple = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -119,6 +118,30 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     targets.forEach(t => { iremotech.action(t, a) })
     onLog?.(`✓ ${label}${targets.length > 1 ? ` ×${targets.length}` : ''}`)
   }, [id, broadcast, onLog])
+  const actRef = useRef(act); actRef.current = act
+
+  // Molette → scroll sur le TEL. On DOIT attacher un listener NON-PASSIF (le
+  // onWheel React est passif → preventDefault ignoré → c'est la PAGE qui scrolle).
+  // On accumule les crans et on envoie une action toutes les ~90 ms.
+  useEffect(() => {
+    const c = canvasRef.current; if (!c) return
+    const onWheelNative = (ev: WheelEvent) => {
+      ev.preventDefault()
+      const p = mapXY(ev.clientX, ev.clientY, c, false); if (!p) return
+      scrollAcc.current += ev.deltaY; scrollPt.current = { x: p.x, y: p.y }
+      if (scrollTimer.current == null) {
+        scrollTimer.current = window.setTimeout(() => {
+          scrollTimer.current = null
+          const pt = scrollPt.current
+          const dy = Math.max(-2500, Math.min(2500, Math.round(scrollAcc.current * 6)))  // amplifie pour un scroll franc
+          scrollAcc.current = 0
+          if (dy !== 0 && pt) actRef.current({ type: 'scroll', x: pt.x, y: pt.y, dy }, 'scroll')
+        }, 90)
+      }
+    }
+    c.addEventListener('wheel', onWheelNative, { passive: false })
+    return () => c.removeEventListener('wheel', onWheelNative)
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (captureRaw) { ripple(e); return }   // mode calibrage : capture au relâchement
@@ -139,24 +162,10 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
       else act({ type: 'swipe', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: dur }, 'swipe')
     }
   }
-  const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault(); const p = toXY(e); if (!p) return
-    scrollAcc.current += e.deltaY; scrollPt.current = p
-    if (scrollTimer.current == null) {
-      scrollTimer.current = window.setTimeout(() => {
-        scrollTimer.current = null
-        const pt = scrollPt.current
-        const dy = Math.max(-1400, Math.min(1400, Math.round(scrollAcc.current * 3)))
-        scrollAcc.current = 0
-        if (dy !== 0 && pt) act({ type: 'scroll', x: pt.x, y: pt.y, dy }, 'scroll')
-      }, 120)
-    }
-  }
-
   const screen = (
     <div style={{ position: 'relative', borderRadius: rounded, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center', width: '100%' }}>
       <canvas ref={canvasRef}
-        onPointerDown={onDown} onPointerUp={onUp} onWheel={onWheel}
+        onPointerDown={onDown} onPointerUp={onUp}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none', display: !offline && hasFrame ? 'block' : 'none' }} />
       {/* Retours tactiles */}
       {ripples.map(rp => (
