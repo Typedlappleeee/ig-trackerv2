@@ -25,11 +25,12 @@ interface Props {
   broadcast?: string[]                    // miroir : rejouer chaque action sur TOUS ces tels
   captureRaw?: (x: number, y: number) => void // calibrage guidé : renvoie les coords BRUTES (sans calib) au lieu de taper
   onRecord?: (a: IrtAction) => void       // enregistreur de séquence : capte chaque action
+  onScreenSize?: (w: number, h: number) => void  // taille réelle de l'écran du tel (pixels)
   onStatus?: (reachable: boolean) => void
   onLog?: (m: string) => void
 }
 
-export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, paused = false, broadcast, captureRaw, onRecord, onStatus, onLog }: Props) {
+export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, paused = false, broadcast, captureRaw, onRecord, onScreenSize, onStatus, onLog }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
@@ -49,7 +50,7 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
   // gère le letterbox). Ne notifie le parent QUE si la joignabilité change.
   const draw = (src: CanvasImageSource, w: number, h: number) => {
     const c = canvasRef.current; if (!c || !w || !h) return
-    if (c.width !== w || c.height !== h) { c.width = w; c.height = h }
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; onScreenSize?.(w, h) }
     const ctx = c.getContext('2d'); if (ctx) ctx.drawImage(src, 0, 0)
     if (!hasFrame) setHasFrame(true)
     if (reachRef.current !== true) { reachRef.current = true; setOffline(false); onStatus?.(true) }
@@ -216,8 +217,10 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     const dist = Math.abs(p.x - g.x) + Math.abs(p.y - g.y)
     const dt = Date.now() - g.t
     if (dist < 24) {
-      if (dt >= 450) act({ type: 'long_press', x: g.x, y: g.y, hold_ms: Math.min(dt, 4000) }, `long_press (${g.x}, ${g.y})`)
-      else act({ type: 'tap', x: g.x, y: g.y }, `tap (${g.x}, ${g.y})`)
+      // On logue aussi la position en % → sert à recaler les points du flow IG.
+      const pc = `${Math.round((g.x / (canvasRef.current?.width || 1)) * 100)}% ${Math.round((g.y / (canvasRef.current?.height || 1)) * 100)}%`
+      if (dt >= 450) act({ type: 'long_press', x: g.x, y: g.y, hold_ms: Math.min(dt, 4000) }, `long_press (${g.x}, ${g.y}) · ${pc}`)
+      else act({ type: 'tap', x: g.x, y: g.y }, `tap (${g.x}, ${g.y}) · ${pc}`)
     } else {
       const dur = Math.min(Math.max(dt, 60), 2500)
       if (dt >= 350) act({ type: 'drag', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: dur }, 'drag')

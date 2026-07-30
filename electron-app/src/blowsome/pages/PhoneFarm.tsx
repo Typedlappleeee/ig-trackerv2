@@ -8,6 +8,7 @@ import { useTr } from '@/lib/i18n'
 import { iremotech, openLiveStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, getCalib, setCalib, loadSequences, saveSequence, deleteSequence, replaySequence, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget, type SeqStep, type IrtSequence } from '@/lib/iremotech'
 import { LivePhone } from '../LivePhone'
 import { BankPicker } from '@/pages/Bank'
+import { postIgReel, getIgCoords, setIgCoords, resetIgCoords, IG_COORD_LABELS, type IgReelCoords } from '@/lib/igReelFlow'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
@@ -61,6 +62,39 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [heroKey, setHeroKey] = useState(0)         // ↻ = reconnecte le flux principal
   const [broadcast, setBroadcast] = useState(false) // miroir : action sur 1 tel = sur tous
   const [hoverId, setHoverId] = useState<string | null>(null) // tel survolé en multi (priorité flux)
+  // ── Poster un Reel (flow Instagram codé en dur) ──
+  const [screenSize, setScreenSize] = useState({ w: 1170, h: 2532 })  // taille réelle du tel
+  const [postVideo, setPostVideo] = useState<{ url: string; name: string } | null>(null)
+  const [postCaption, setPostCaption] = useState('')
+  const [postAll, setPostAll] = useState(false)
+  const [postPick, setPostPick] = useState(false)
+  const [postMsg, setPostMsg] = useState('')
+  const [postBusy, setPostBusy] = useState(false)
+  const postStop = useRef(false)
+  const [tuneCoords, setTuneCoords] = useState(false)          // réglage des points de tap
+  const [coords, setCoordsState] = useState<IgReelCoords>(() => getIgCoords())
+
+  const runPostReel = async () => {
+    if (!selected || !postVideo || postBusy) return
+    setPostBusy(true); postStop.current = false
+    const targets = postAll ? devices.map(d => d.public_id) : [selected.public_id]
+    for (let i = 0; i < targets.length; i++) {
+      if (postStop.current) break
+      const dev = targets[i]
+      const who = devices.find(d => d.public_id === dev)?.name ?? dev
+      const r = await postIgReel(dev, {
+        videoUrl: postVideo.url, videoName: postVideo.name, caption: postCaption,
+        screen: screenSize, coords,
+      }, {
+        onStep: (label, s, t) => setPostMsg(`${who} · ${label} (${s + 1}/${t})`),
+        shouldStop: () => postStop.current,
+      })
+      addLog(r.ok ? tr(`✓ Reel posté sur ${who}`, `✓ Reel posted on ${who}`) : `❌ ${who} : ${r.error}`)
+    }
+    setPostBusy(false)
+    setPostMsg(postStop.current ? tr('Arrêté', 'Stopped') : tr(`✓ Terminé (${targets.length})`, `✓ Done (${targets.length})`))
+    window.setTimeout(() => setPostMsg(''), 4000)
+  }
   // ── Séquences / RPA maison ──
   const [showSeq, setShowSeq] = useState(false)        // panneau séquences repliable
   const [recording, setRecording] = useState(false)
@@ -532,7 +566,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
               {/* On coupe le flux principal quand un modal (plein écran / multi) est
                   ouvert → libère le slot (max_active_devices) et évite un double flux
                   sur le même tel, pour que le plein écran / multi passe bien en WebSocket. */}
-              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={30} rounded={26} captureRaw={calibStep !== 'idle' ? onCaptureRaw : undefined} onRecord={recording ? (a => recordStep({ action: a })) : undefined} onStatus={onHeroStatus} onLog={addLog} />}
+              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={30} rounded={26} captureRaw={calibStep !== 'idle' ? onCaptureRaw : undefined} onRecord={recording ? (a => recordStep({ action: a })) : undefined} onScreenSize={(w, h) => setScreenSize({ w, h })} onStatus={onHeroStatus} onLog={addLog} />}
               {selected && (fs || multi) && <div style={{ aspectRatio: '9/19.5', width: '100%', maxWidth: 300, margin: '0 auto', borderRadius: 34, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'grid', placeItems: 'center', color: FAINT, fontSize: 11.5 }}>{tr('Ouvert en grand', 'Open in the big view')}</div>}
               <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}><Grad style={{ fontWeight: 700 }}>{tr('Clic', 'Click')}</Grad> = {tr('taper', 'tap')} · <Grad style={{ fontWeight: 700 }}>{tr('glisser', 'drag')}</Grad> = swipe · <Grad style={{ fontWeight: 700 }}>{tr('molette', 'wheel')}</Grad> = scroll</p>
             </BlowCard>
@@ -671,6 +705,58 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 )}
               </BlowCard>
 
+              {/* Poster un Reel : vidéo + description → ça poste (flow IG intégré) */}
+              <BlowCard style={{ padding: 16 }}>
+                <p style={{ margin: '0 0 4px', fontSize: 12.5, fontWeight: 800, color: INK }}>📱 {tr('Poster un Reel', 'Post a Reel')}</p>
+                <p style={{ margin: '0 0 11px', fontSize: 10.5, color: FAINT }}>{tr('Choisis la vidéo et la description — ScaleFlow fait tout le reste.', 'Pick the video and caption — ScaleFlow does the rest.')}</p>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 9 }}>
+                  <BlowButton variant="ghost" onClick={() => setPostPick(true)} style={{ height: 34 }}>🗂 {postVideo ? tr('Vidéo ✓', 'Video ✓') : tr('Choisir la vidéo', 'Pick the video')}</BlowButton>
+                  {postVideo && <span style={{ fontSize: 10.5, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>{postVideo.name}</span>}
+                </div>
+
+                <textarea value={postCaption} onChange={e => setPostCaption(e.target.value)} rows={3}
+                  placeholder={tr('Ta description… #hashtags', 'Your caption… #hashtags')}
+                  style={{ width: '100%', resize: 'vertical', padding: '9px 11px', borderRadius: 10, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.045)', border: `1px solid ${HAIR}`, fontFamily: 'inherit', marginBottom: 9 }} />
+
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: MUTED, cursor: 'pointer', marginBottom: 10 }}>
+                  <input type="checkbox" checked={postAll} onChange={e => setPostAll(e.target.checked)} />
+                  {tr(`Sur TOUS mes tels (${devices.length})`, `On ALL my phones (${devices.length})`)}
+                </label>
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <BlowButton onClick={runPostReel} style={{ height: 38, flex: 1, opacity: (!postVideo || postBusy) ? 0.55 : 1 }}>
+                    {postBusy ? tr('Publication…', 'Posting…') : `🚀 ${tr('POSTER', 'POST')}${postAll ? ` (${devices.length})` : ''}`}
+                  </BlowButton>
+                  {postBusy && <button onClick={() => { postStop.current = true }} className="blow-tap" style={{ fontSize: 12, fontWeight: 700, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer' }}>{tr('stop', 'stop')}</button>}
+                </div>
+                {postMsg && <div style={{ marginTop: 8, fontSize: 11.5, color: postMsg.includes('❌') ? '#F87171' : '#34D399' }}>{postMsg}</div>}
+
+                {/* Réglage fin des points de tap (si un bouton tombe à côté) */}
+                <button onClick={() => setTuneCoords(v => !v)} className="blow-tap" style={{ marginTop: 10, fontSize: 10.5, color: FAINT, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  ⚙ {tr('Un bouton tombe à côté ? Régler les positions', 'A button misses? Adjust positions')} {tuneCoords ? '▴' : '▾'}
+                </button>
+                {tuneCoords && (
+                  <div style={{ marginTop: 9, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}` }}>
+                    <p style={{ margin: '0 0 8px', fontSize: 10.5, color: MUTED, lineHeight: 1.5 }}>
+                      {tr('Position en % de l\'écran. Astuce : clique sur l\'écran du tel à l\'endroit du bouton, le Journal (Ctrl+J) affiche les coordonnées.', 'Position in % of the screen. Tip: tap the phone screen on the button — the Log (Ctrl+J) shows the coordinates.')}
+                    </p>
+                    {(Object.keys(IG_COORD_LABELS) as (keyof IgReelCoords)[]).map(k => (
+                      <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                        <span style={{ flex: 1, fontSize: 11, color: MUTED }}>{IG_COORD_LABELS[k]}</span>
+                        {(['x', 'y'] as const).map(axis => (
+                          <input key={axis} type="number" min={0} max={100} value={Math.round(coords[k][axis] * 100)}
+                            onChange={e => { const v = Math.min(Math.max(Number(e.target.value) || 0, 0), 100) / 100; const next = { ...coords, [k]: { ...coords[k], [axis]: v } }; setCoordsState(next); setIgCoords(next) }}
+                            title={axis.toUpperCase()}
+                            style={{ width: 52, height: 26, padding: '0 7px', borderRadius: 7, outline: 'none', color: INK, fontSize: 11, background: 'rgba(255,255,255,0.05)', border: `1px solid ${HAIR}` }} />
+                        ))}
+                      </div>
+                    ))}
+                    <button onClick={() => { resetIgCoords(); setCoordsState(getIgCoords()) }} className="blow-tap" style={{ marginTop: 6, fontSize: 10.5, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>↺ {tr('Valeurs par défaut', 'Reset to defaults')}</button>
+                  </div>
+                )}
+              </BlowCard>
+
               {/* Séquences / RPA maison : enregistre un flow, rejoue-le sur tous les tels */}
               <BlowCard style={{ padding: 16 }}>
                 <button onClick={() => setShowSeq(v => !v)} className="blow-tap" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
@@ -771,6 +857,13 @@ export function BlowPhoneFarm({ user }: { user: User }) {
         <BankPicker user={user} mode="multi" resolveMode="signed-url"
           onSelect={(paths, titles) => uploadFromBank(paths, titles)}
           onClose={() => setUploadPick(false)} />
+      )}
+
+      {/* Sélecteur banque → vidéo du Reel à poster */}
+      {postPick && (
+        <BankPicker user={user} mode="single" resolveMode="signed-url"
+          onSelect={(paths, titles) => { setPostPick(false); if (paths[0]) setPostVideo({ url: paths[0], name: (titles?.[0] || 'video.mp4').replace(/[^\w.\-]+/g, '_') }) }}
+          onClose={() => setPostPick(false)} />
       )}
 
       {/* Sélecteur banque → vidéo pour le rejeu d'une séquence */}
