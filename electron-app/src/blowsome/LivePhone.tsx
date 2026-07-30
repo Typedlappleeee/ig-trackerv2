@@ -67,7 +67,21 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     createImageBitmap(blob).then(b => { draw(b, b.width, b.height); b.close() }).catch(() => {}).finally(drainFrames)
   }
   const paintBlob = (blob: Blob) => { pendingFrame.current = blob; if (!decoding.current) drainFrames() }
-  const paintUrl = (url: string) => { const im = new Image(); im.onload = () => draw(im, im.naturalWidth, im.naturalHeight); im.src = url }
+  // Les coordonnées d'action doivent être dans l'espace pixel du SNAPSHOT (doc
+  // iRemoTech). Le flux WebSocket peut être d'une AUTRE résolution → on mémorise
+  // la taille du snapshot comme référence, sinon les taps tombent à côté.
+  const refDims = useRef<{ w: number; h: number } | null>(null)
+  const paintUrl = (url: string) => {
+    const im = new Image()
+    im.onload = () => {
+      if (!refDims.current || refDims.current.w !== im.naturalWidth) {
+        refDims.current = { w: im.naturalWidth, h: im.naturalHeight }
+        onScreenSize?.(im.naturalWidth, im.naturalHeight)
+      }
+      draw(im, im.naturalWidth, im.naturalHeight)
+    }
+    im.src = url
+  }
   const goOffline = () => { if (reachRef.current !== false) { reachRef.current = false; setOffline(true); onStatus?.(false) } }
 
   // Le WebSocket est PRIORITAIRE et reste ouvert (reconnexion continue). Les
@@ -158,11 +172,15 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     const r = el.getBoundingClientRect()
     const scale = Math.min(r.width / nw, r.height / nh)
     const offX = (r.width - nw * scale) / 2, offY = (r.height - nh * scale) / 2
-    const x = (clientX - r.left - offX) / scale, y = (clientY - r.top - offY) / scale
-    if (x < 0 || y < 0 || x > nw || y > nh) return null
-    if (raw) return { x, y, w: nw, h: nh }
+    const cx = (clientX - r.left - offX) / scale, cy = (clientY - r.top - offY) / scale
+    if (cx < 0 || cy < 0 || cx > nw || cy > nh) return null
+    // On passe par une FRACTION puis on projette dans l'espace SNAPSHOT (référence
+    // de l'API) — le flux WS peut avoir une autre résolution que le snapshot.
+    const ref = refDims.current ?? { w: nw, h: nh }
+    const x = (cx / nw) * ref.w, y = (cy / nh) * ref.h
+    if (raw) return { x, y, w: ref.w, h: ref.h }
     const c = getCalib(id)
-    return { x: Math.round(Math.min(Math.max(x + c.dx, 0), nw)), y: Math.round(Math.min(Math.max(y + c.dy, 0), nh)), w: nw, h: nh }
+    return { x: Math.round(Math.min(Math.max(x + c.dx, 0), ref.w)), y: Math.round(Math.min(Math.max(y + c.dy, 0), ref.h)), w: ref.w, h: ref.h }
   }
   const baseXY = (e: React.PointerEvent<HTMLCanvasElement>) => mapXY(e.clientX, e.clientY, e.currentTarget, true)
   const toXY = (e: React.PointerEvent<HTMLCanvasElement>) => mapXY(e.clientX, e.clientY, e.currentTarget, false)
@@ -218,7 +236,8 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     const dt = Date.now() - g.t
     if (dist < 24) {
       // On logue aussi la position en % → sert à recaler les points du flow IG.
-      const pc = `${Math.round((g.x / (canvasRef.current?.width || 1)) * 100)}% ${Math.round((g.y / (canvasRef.current?.height || 1)) * 100)}%`
+      const ref = refDims.current ?? { w: canvasRef.current?.width || 1, h: canvasRef.current?.height || 1 }
+      const pc = `${Math.round((g.x / ref.w) * 100)}% ${Math.round((g.y / ref.h) * 100)}%`
       if (dt >= 450) act({ type: 'long_press', x: g.x, y: g.y, hold_ms: Math.min(dt, 4000) }, `long_press (${g.x}, ${g.y}) · ${pc}`)
       else act({ type: 'tap', x: g.x, y: g.y }, `tap (${g.x}, ${g.y}) · ${pc}`)
     } else {
