@@ -302,7 +302,10 @@ async function handleSpoof(req, res) {
       '-vf', filters.join(','),
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', String(crf),
       '-g', String(gopSize), '-bf', String(bframes),
-      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      // profil high (meilleure qualité, universellement lu par les tels/IG/TikTok) ;
+      // PAS de -level codé en dur → x264 calcule le bon niveau selon résolution/fps
+      // (le level 4.0 fixe cassait l'encodage des sources 1080p60/4K).
+      '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
       // Stream-level metadata (video track) — noms de handler réalistes par OS :
       // iPhone écrit "Core Media Video/Audio", Android "VideoHandle/SoundHandle".
       '-metadata:s:v:0', `handler_name=${isAndroid ? 'VideoHandle' : 'Core Media Video'}`,
