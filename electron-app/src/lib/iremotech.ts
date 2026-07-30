@@ -252,6 +252,8 @@ export function openLiveStream(
   if (!key) { h.onClose?.('no-key'); return () => {} }
   let ws: WebSocket | null = null
   let closed = false
+  let fired = false   // onClose ne doit se déclencher QU'UNE fois (onerror + onclose)
+  const fireClose = (why: string) => { if (closed || fired) return; fired = true; h.onClose?.(why) }
   try {
     ws = new WebSocket(`${WS_BASE}/devices/${encodeURIComponent(deviceId)}/stream?token=${encodeURIComponent(key)}&fps=${fps}`)
     ws.binaryType = 'blob'
@@ -259,9 +261,9 @@ export function openLiveStream(
     // On passe la frame BRUTE (Blob) → le consommateur la décode via
     // createImageBitmap (hors-thread) et la dessine sur un canvas = flux lisse.
     ws.onmessage = (ev) => { if (!closed && ev.data instanceof Blob) h.onFrame(ev.data) }
-    ws.onerror = () => { if (!closed) h.onClose?.('error') }
-    ws.onclose = (ev) => { if (!closed) h.onClose?.(`close ${ev.code}`) }
-  } catch (e) { h.onClose?.(String(e)) }
+    ws.onerror = () => fireClose('error')
+    ws.onclose = (ev) => fireClose(`close ${ev.code}`)
+  } catch (e) { fireClose(String(e)) }
   return () => { closed = true; try { ws?.close() } catch { /* noop */ } }
 }
 

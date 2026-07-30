@@ -77,16 +77,26 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     let wsOk = false          // WS réellement connecté (open, pas juste "pas de frame")
     let wsDownSince = Date.now()   // depuis quand le WS est down (0 = jamais monté)
     let reconnect: number | undefined
+    let retries = 0           // backoff exponentiel des reconnexions
+    let logged = false        // ne logge l'échec qu'UNE fois par panne
     setHasFrame(false); setOffline(false); setLive(false); reachRef.current = null
 
     let firstFrame = true
     const openWs = () => {
+      if (reconnect) { window.clearTimeout(reconnect); reconnect = undefined }
       stop = openLiveStream(id, {
-        // LIVE = WS CONNECTÉ (même si l'écran est statique = 0 frame). C'est la
-        // connexion qui compte, pas la dernière frame.
-        onOpen: () => { if (!alive) return; wsOk = true; setLive(true) },
-        onFrame: (blob) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } wsOk = true; setLive(true); paintBlob(blob) },
-        onClose: (why) => { if (!alive) return; wsOk = false; wsDownSince = Date.now(); setLive(false); if (firstFrame) onLog?.(`⚠️ WebSocket ${why} (scope "stream" ?) → captures`); reconnect = window.setTimeout(() => { if (alive) openWs() }, 2000) },
+        // LIVE = WS CONNECTÉ (même si l'écran est statique = 0 frame).
+        onOpen: () => { if (!alive) return; wsOk = true; retries = 0; logged = false; setLive(true) },
+        onFrame: (blob) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } wsOk = true; retries = 0; setLive(true); paintBlob(blob) },
+        onClose: (why) => {
+          if (!alive) return
+          wsOk = false; wsDownSince = Date.now(); setLive(false)
+          if (!logged) { logged = true; onLog?.(`⚠️ WebSocket ${why} → captures (reconnexion…)`) }
+          const delay = Math.min(1500 * 2 ** retries, 20000)   // 1.5s, 3s, 6s, 12s… max 20s
+          retries++
+          if (reconnect) window.clearTimeout(reconnect)
+          reconnect = window.setTimeout(() => { if (alive) openWs() }, delay)
+        },
       }, fps)
     }
 
