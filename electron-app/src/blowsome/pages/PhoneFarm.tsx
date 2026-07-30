@@ -79,15 +79,19 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   // Charge les séquences enregistrées.
   useEffect(() => { loadSequences(currentOrg?.id ?? null, user.id).then(setSequences) }, [currentOrg?.id, user.id])
 
-  // Enregistre une étape pendant l'enregistrement (délai = temps depuis la précédente).
-  const recordStep = (step: Omit<SeqStep, 'delay'>) => {
+  // Enregistre une étape pendant l'enregistrement. delay = temps depuis la précédente
+  // (ou un délai fixe pour les insertions manuelles depuis le menu).
+  const recordStep = (step: Omit<SeqStep, 'delay'>, fixedDelay?: number) => {
     if (!recording) return
     const now = Date.now()
-    const delay = recLast.current ? Math.min(now - recLast.current, 15000) : 400
+    const delay = fixedDelay != null ? fixedDelay : (recLast.current ? Math.min(now - recLast.current, 15000) : 400)
     recLast.current = now
     recSteps.current.push({ delay, ...step })
     setRecCount(recSteps.current.length)
   }
+  // Insère une action "toute prête" (sans coordonnées) dans la séquence.
+  const insertAction = (a: IrtAction) => recordStep({ action: a }, 1000)
+  const insertWait = (sec: number) => recordStep({}, sec * 1000)   // pure pause
   const startRec = () => { recSteps.current = []; recLast.current = 0; setRecCount(0); setRecording(true); setLive(true) }
   const stopRecSave = async () => {
     setRecording(false)
@@ -682,9 +686,24 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                       <div style={{ padding: 10, borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.35)' }}>
                         <div style={{ fontSize: 12, fontWeight: 800, color: '#F87171', marginBottom: 8 }}>⏺ {tr('Enregistrement…', 'Recording…')} · {recCount} {tr('étapes', 'steps')}</div>
                         <p style={{ margin: '0 0 8px', fontSize: 10.5, color: MUTED, lineHeight: 1.5 }}>{tr('Fais ton posting sur le tel. Aux moments clés :', 'Do your posting on the phone. At key moments:')}</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
                           <button onClick={() => recordStep({ upload: true })} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: '#A5B4FC', background: 'rgba(129,140,248,0.12)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}>＋ {tr('Envoyer la vidéo', 'Upload the video')}</button>
                           <button onClick={() => recordStep({ action: { type: 'text', text: '' }, captionVar: true })} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: '#A5B4FC', background: 'rgba(129,140,248,0.12)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}>＋ {tr('Insérer la description', 'Insert the caption')}</button>
+                        </div>
+                        {/* Menu d'actions toutes prêtes (sans coordonnées) */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                          {([
+                            { l: '⌂ ' + tr('Accueil', 'Home'), a: { type: 'press', name: 'home' } as IrtAction },
+                            { l: '📱 ' + tr('Ouvrir Insta', 'Open IG'), a: { type: 'open_url', url: 'instagram://app' } as IrtAction },
+                            { l: '📸 ' + tr('Capture', 'Screenshot'), a: { type: 'press', name: 'screenshot' } as IrtAction },
+                            { l: '✈️ ON', a: { type: 'airplane', on: true } as IrtAction },
+                            { l: '✈️ OFF', a: { type: 'airplane', on: false } as IrtAction },
+                          ]).map(x => (
+                            <button key={x.l} onClick={() => insertAction(x.a)} className="blow-tap" style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, background: 'rgba(255,255,255,0.05)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '4px 9px', cursor: 'pointer' }}>{x.l}</button>
+                          ))}
+                          {[1, 2, 3, 5].map(s => (
+                            <button key={s} onClick={() => insertWait(s)} className="blow-tap" style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, background: 'rgba(255,255,255,0.05)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '4px 9px', cursor: 'pointer' }}>⏱ {s}s</button>
+                          ))}
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <BlowButton onClick={stopRecSave} style={{ height: 32, flex: 1 }}>{tr('Arrêter & enregistrer', 'Stop & save')}</BlowButton>
