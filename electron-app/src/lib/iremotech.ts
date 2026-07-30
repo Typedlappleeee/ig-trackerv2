@@ -245,7 +245,7 @@ export function openSnapshotStream(deviceId: string, h: IrtStreamHandlers): () =
 const WS_BASE = 'wss://api.iremotech.com/v1'
 export function openLiveStream(
   deviceId: string,
-  h: { onFrame: (frame: Blob) => void; onClose?: (why: string) => void },
+  h: { onOpen?: () => void; onFrame: (frame: Blob) => void; onClose?: (why: string) => void },
   fps = 10,
 ): () => void {
   const key = apiKey
@@ -255,6 +255,7 @@ export function openLiveStream(
   try {
     ws = new WebSocket(`${WS_BASE}/devices/${encodeURIComponent(deviceId)}/stream?token=${encodeURIComponent(key)}&fps=${fps}`)
     ws.binaryType = 'blob'
+    ws.onopen = () => { if (!closed) h.onOpen?.() }
     // On passe la frame BRUTE (Blob) → le consommateur la décode via
     // createImageBitmap (hors-thread) et la dessine sur un canvas = flux lisse.
     ws.onmessage = (ev) => { if (!closed && ev.data instanceof Blob) h.onFrame(ev.data) }

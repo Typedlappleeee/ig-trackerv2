@@ -1,21 +1,44 @@
 // Page AUTONOME "un tel en plein écran" — ouverte dans un nouvel onglet léger
 // (#pf-fs=<deviceId>). Ne charge PAS tout ScaleFlow : juste l'écran du tel + des
-// actions rapides. La clé iRemoTech vient du cache localStorage (partagé entre
-// onglets). On peut en ouvrir autant qu'on veut.
+// actions rapides. La clé iRemoTech est lue AUTOMATIQUEMENT (cache localStorage,
+// sinon la config Supabase de l'utilisateur) — l'utilisateur n'a rien à saisir.
+import { useEffect, useState } from 'react'
 import { LivePhone } from './LivePhone'
-import { iremotech, getIremotechKey, type IrtAction, type IrtDevice } from '@/lib/iremotech'
+import { iremotech, getIremotechKey, loadIremotechKey, type IrtAction, type IrtDevice } from '@/lib/iremotech'
+import { supabase } from '@/lib/supabase'
 
 export function StandalonePhone({ deviceId, name }: { deviceId: string; name?: string }) {
   const device: IrtDevice = { public_id: deviceId, name: name || deviceId }
-  const hasKey = !!getIremotechKey()
+  const [keyState, setKeyState] = useState<'checking' | 'ok' | 'none'>(getIremotechKey() ? 'ok' : 'checking')
+
+  // Récupère la clé sans intervention : cache d'abord, sinon la config Supabase.
+  useEffect(() => {
+    if (getIremotechKey()) { setKeyState('ok'); return }
+    let alive = true
+    ;(async () => {
+      try {
+        const { data } = await supabase.auth.getUser()
+        const uid = data.user?.id
+        if (!uid) { if (alive) setKeyState('none'); return }
+        // org d'abord (si l'utilisateur en a une), sinon perso (app_config).
+        const { data: mem } = await supabase.from('organization_members').select('org_id').eq('user_id', uid).limit(1).maybeSingle()
+        const k = await loadIremotechKey((mem?.org_id as string) ?? null, uid)
+        if (alive) setKeyState(k ? 'ok' : 'none')
+      } catch { if (alive) setKeyState('none') }
+    })()
+    return () => { alive = false }
+  }, [])
+
   const act = (a: IrtAction) => { iremotech.action(deviceId, a) }
   const btn: React.CSSProperties = { height: 34, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: '#E9E9F2', fontSize: 13, fontWeight: 700, cursor: 'pointer' }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(1200px 600px at 50% -10%, #16121f, #08080d)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 14 }}>
-      {!hasKey ? (
-        <div style={{ color: '#FCA5A5', fontSize: 13, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
-          Clé iRemoTech introuvable dans cet onglet. Ouvre d'abord Phone Farm dans ScaleFlow (pour charger la clé), puis rouvre ce tel.
+      {keyState === 'checking' ? (
+        <div style={{ color: '#8b8b9c', fontSize: 13 }}>Connexion à iRemoTech…</div>
+      ) : keyState === 'none' ? (
+        <div style={{ color: '#FCA5A5', fontSize: 13, textAlign: 'center', maxWidth: 340, lineHeight: 1.55 }}>
+          Clé iRemoTech introuvable. Connecte-toi à ScaleFlow et configure ta clé API dans Phone Farm (⚙), puis rouvre ce tel.
         </div>
       ) : (
         <>

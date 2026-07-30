@@ -68,34 +68,53 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
   const goOffline = () => { if (reachRef.current !== false) { reachRef.current = false; setOffline(true); onStatus?.(false) } }
 
   // Le WebSocket est PRIORITAIRE et reste ouvert (reconnexion continue). Les
-  // captures ne servent que de PONT quand aucune frame WS depuis 1.5s.
+  // captures ne servent QUE de secours quand le WS est DÉCONNECTÉ — surtout PAS
+  // quand l'écran est statique (iRemoTech n'envoie une frame QUE sur changement) :
+  // sinon on tirerait des captures en boucle et le quota exploserait.
   useEffect(() => {
     let alive = true
     let stop = () => {}
-    let lastWs = 0
+    let wsOk = false          // WS réellement connecté (open, pas juste "pas de frame")
     let reconnect: number | undefined
     setHasFrame(false); setOffline(false); setLive(false); reachRef.current = null
 
     let firstFrame = true
     const openWs = () => {
       stop = openLiveStream(id, {
-        onFrame: (blob) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } lastWs = Date.now(); if (!live) setLive(true); paintBlob(blob) },
-        onClose: (why) => { if (!alive) return; setLive(false); if (firstFrame) onLog?.(`⚠️ WebSocket ${why} (scope "stream" ?) → captures`); reconnect = window.setTimeout(() => { if (alive) openWs() }, 3000) },
+        onOpen: () => { if (alive) wsOk = true },
+        onFrame: (blob) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } wsOk = true; if (!live) setLive(true); paintBlob(blob) },
+        onClose: (why) => { if (!alive) return; wsOk = false; setLive(false); if (firstFrame) onLog?.(`⚠️ WebSocket ${why} (scope "stream" ?) → captures`); reconnect = window.setTimeout(() => { if (alive) openWs() }, 3000) },
       }, fps)
     }
+
+    // Une SEULE capture d'amorçage → image initiale immédiate (le WS ne pousse
+    // ensuite que sur changement).
+    const prime = async () => {
+      const s = await iremotech.snapshot(id)
+      if (!alive) return
+      if (s.ok && s.dataUrl) paintUrl(s.dataUrl)
+      else if (s.status === 503) goOffline()
+    }
+    // Secours : tire des captures UNIQUEMENT tant que le WS n'est pas connecté.
     const bridge = async () => {
       while (alive) {
-        if (Date.now() - lastWs > 1500) {
+        if (!wsOk) {
           const s = await iremotech.snapshot(id)
           if (!alive) break
-          if (s.ok && s.dataUrl) { if (Date.now() - lastWs > 1200) paintUrl(s.dataUrl) }
+          if (s.ok && s.dataUrl) { if (!wsOk) paintUrl(s.dataUrl) }
           else if (s.status === 503) { goOffline(); await new Promise(r => window.setTimeout(r, 3000)) }
+          else await new Promise(r => window.setTimeout(r, 500))
         } else {
-          await new Promise(r => window.setTimeout(r, 600))
+          await new Promise(r => window.setTimeout(r, 800))   // WS connecté → aucune capture
         }
       }
     }
-    const t = window.setTimeout(() => { openWs(); bridge() }, startDelay)
+    const t = window.setTimeout(() => {
+      prime(); openWs()
+      // On ne lance le secours captures qu'après avoir laissé le WS se connecter →
+      // si le WS marche, ZÉRO capture (quota préservé).
+      window.setTimeout(() => { if (alive) bridge() }, 2000)
+    }, startDelay)
     return () => { alive = false; window.clearTimeout(t); if (reconnect) window.clearTimeout(reconnect); stop() }
   }, [id, fps, startDelay]) // eslint-disable-line react-hooks/exhaustive-deps
 
