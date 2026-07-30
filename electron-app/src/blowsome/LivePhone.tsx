@@ -1,10 +1,19 @@
 // Écran d'UN iPhone iRemoTech, réutilisable : flux vidéo temps réel (WebSocket,
 // fluide) + repli capture, et interactions (clic = tap, glisser = swipe, molette
-// = scroll) envoyées au tel. Sert à l'écran principal, au plein écran et au
-// multi-écrans. Chaque instance gère son propre flux et sa propre géométrie.
+// = scroll) envoyées au tel. Rendu sur <canvas> via createImageBitmap (décodage
+// hors-thread → flux ultra-lisse). Sert à l'écran principal, au plein écran et
+// au multi-écrans. Chaque instance gère son propre flux et sa propre géométrie.
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { iremotech, openLiveStream, getCalib, type IrtDevice, type IrtAction } from '@/lib/iremotech'
 import { INK, FAINT, HAIR } from './ui'
+
+// Anim du retour tactile (cercle qui s'agrandit et disparaît) — injectée une fois.
+function ensureRippleStyle() {
+  if (typeof document === 'undefined' || document.getElementById('lp-ripple-style')) return
+  const s = document.createElement('style'); s.id = 'lp-ripple-style'
+  s.textContent = '@keyframes lp-ripple{from{transform:translate(-50%,-50%) scale(.4);opacity:.75}to{transform:translate(-50%,-50%) scale(2.4);opacity:0}}'
+  document.head.appendChild(s)
+}
 
 interface Props {
   device: IrtDevice
@@ -19,114 +28,125 @@ interface Props {
 }
 
 export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, broadcast, captureRaw, onStatus, onLog }: Props) {
-  const imgRef = useRef<HTMLImageElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
+  const [live, setLive] = useState(false)   // true = flux WebSocket actif (fluide)
   const gesture = useRef<{ x: number; y: number; t: number } | null>(null)
-  const scrollAcc = useRef(0)                                   // crans de molette cumulés
+  const scrollAcc = useRef(0)
   const scrollPt = useRef<{ x: number; y: number } | null>(null)
   const scrollTimer = useRef<number | null>(null)
-  useEffect(() => () => { if (scrollTimer.current != null) window.clearTimeout(scrollTimer.current) }, [])
+  const reachRef = useRef<boolean | null>(null)   // évite d'appeler onStatus/re-render à CHAQUE frame
+  const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([])
+  const rippleId = useRef(0)
   const id = device.public_id
+  useEffect(() => { ensureRippleStyle() }, [])
+  useEffect(() => () => { if (scrollTimer.current != null) window.clearTimeout(scrollTimer.current) }, [])
 
-  // Rendu IMPÉRATIF : on écrit direct dans l'<img> (pas de re-render React par
-  // frame → bien plus fluide).
-  const [live, setLive] = useState(false)   // true = flux WebSocket actif (fluide)
-  const paint = (url: string) => { const img = imgRef.current; if (img) img.src = url; setHasFrame(true); setOffline(false); onStatus?.(true) }
+  // Dessine une frame sur le canvas (buffer = taille native → object-fit:contain
+  // gère le letterbox). Ne notifie le parent QUE si la joignabilité change.
+  const draw = (src: CanvasImageSource, w: number, h: number) => {
+    const c = canvasRef.current; if (!c || !w || !h) return
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h }
+    const ctx = c.getContext('2d'); if (ctx) ctx.drawImage(src, 0, 0)
+    if (!hasFrame) setHasFrame(true)
+    if (reachRef.current !== true) { reachRef.current = true; setOffline(false); onStatus?.(true) }
+  }
+  const paintBlob = (blob: Blob) => { createImageBitmap(blob).then(b => { draw(b, b.width, b.height); b.close() }).catch(() => {}) }
+  const paintUrl = (url: string) => { const im = new Image(); im.onload = () => draw(im, im.naturalWidth, im.naturalHeight); im.src = url }
+  const goOffline = () => { if (reachRef.current !== false) { reachRef.current = false; setOffline(true); onStatus?.(false) } }
 
-  // Stratégie : le WebSocket est PRIORITAIRE et reste ouvert (reconnexion continue
-  // avec backoff). Les captures ne servent que de PONT quand aucune frame WS n'est
-  // arrivée récemment → dès que le WS livre, les captures s'arrêtent (fluide).
+  // Le WebSocket est PRIORITAIRE et reste ouvert (reconnexion continue). Les
+  // captures ne servent que de PONT quand aucune frame WS depuis 1.5s.
   useEffect(() => {
     let alive = true
     let stop = () => {}
-    let lastWs = 0            // horodatage de la dernière frame WebSocket
+    let lastWs = 0
     let reconnect: number | undefined
-    setHasFrame(false); setOffline(false); setLive(false)
+    setHasFrame(false); setOffline(false); setLive(false); reachRef.current = null
 
     let firstFrame = true
     const openWs = () => {
       stop = openLiveStream(id, {
-        onFrame: (url) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } lastWs = Date.now(); setLive(true); paint(url) },
+        onFrame: (blob) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } lastWs = Date.now(); if (!live) setLive(true); paintBlob(blob) },
         onClose: (why) => { if (!alive) return; setLive(false); if (firstFrame) onLog?.(`⚠️ WebSocket ${why} (scope "stream" ?) → captures`); reconnect = window.setTimeout(() => { if (alive) openWs() }, 3000) },
       }, fps)
     }
-
-    // Pont captures : ne tire une capture que si le WS n'a rien donné depuis 1.5s.
     const bridge = async () => {
       while (alive) {
         if (Date.now() - lastWs > 1500) {
           const s = await iremotech.snapshot(id)
           if (!alive) break
-          if (s.ok && s.dataUrl) { if (Date.now() - lastWs > 1200) paint(s.dataUrl) }  // n'écrase pas une frame WS fraîche
-          else if (s.status === 503) { setOffline(true); onStatus?.(false); await new Promise(r => window.setTimeout(r, 3000)) }
+          if (s.ok && s.dataUrl) { if (Date.now() - lastWs > 1200) paintUrl(s.dataUrl) }
+          else if (s.status === 503) { goOffline(); await new Promise(r => window.setTimeout(r, 3000)) }
         } else {
-          await new Promise(r => window.setTimeout(r, 600))   // WS actif → on dort (limiteur libre pour les taps)
+          await new Promise(r => window.setTimeout(r, 600))
         }
       }
     }
-
-    const t = window.setTimeout(() => { openWs(); bridge() }, startDelay)   // décalage (multi-écrans)
+    const t = window.setTimeout(() => { openWs(); bridge() }, startDelay)
     return () => { alive = false; window.clearTimeout(t); if (reconnect) window.clearTimeout(reconnect); stop() }
-  }, [id, fps, startDelay, onStatus])
+  }, [id, fps, startDelay]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Géométrie : l'image est en objectFit:contain → on calcule sa zone RÉELLE
-  // (échelle + décalage). baseXY = coords brutes ; toXY = + calibration mémorisée.
-  const baseXY = (e: React.PointerEvent<HTMLImageElement> | React.WheelEvent<HTMLImageElement>) => {
-    const img = e.currentTarget
-    if (!img.naturalWidth) return null
-    const r = img.getBoundingClientRect()
-    const scale = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight)
-    const offX = (r.width - img.naturalWidth * scale) / 2, offY = (r.height - img.naturalHeight * scale) / 2
+  // Géométrie : canvas en object-fit:contain → on calcule sa zone RÉELLE. baseXY =
+  // coords brutes ; toXY = + calibration mémorisée.
+  const baseXY = (e: React.PointerEvent<HTMLCanvasElement> | React.WheelEvent<HTMLCanvasElement>) => {
+    const el = e.currentTarget; const nw = el.width, nh = el.height
+    if (!nw || !nh) return null
+    const r = el.getBoundingClientRect()
+    const scale = Math.min(r.width / nw, r.height / nh)
+    const offX = (r.width - nw * scale) / 2, offY = (r.height - nh * scale) / 2
     const x = (e.clientX - r.left - offX) / scale, y = (e.clientY - r.top - offY) / scale
-    if (x < 0 || y < 0 || x > img.naturalWidth || y > img.naturalHeight) return null
-    return { x, y, w: img.naturalWidth, h: img.naturalHeight }
+    if (x < 0 || y < 0 || x > nw || y > nh) return null
+    return { x, y, w: nw, h: nh }
   }
-  const toXY = (e: React.PointerEvent<HTMLImageElement> | React.WheelEvent<HTMLImageElement>) => {
+  const toXY = (e: React.PointerEvent<HTMLCanvasElement> | React.WheelEvent<HTMLCanvasElement>) => {
     const b = baseXY(e); if (!b) return null
-    const c = getCalib(id)   // décalage de calibration mémorisé pour ce tel
+    const c = getCalib(id)
     return { x: Math.round(Math.min(Math.max(b.x + c.dx, 0), b.w)), y: Math.round(Math.min(Math.max(b.y + c.dy, 0), b.h)) }
   }
+  // Retour tactile instantané : petit cercle à l'endroit cliqué (feedback immédiat
+  // → tu sais que le tap a pris, tu ne re-tapes pas → pas d'empilement/délai).
+  const ripple = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - r.left) / r.width) * 100, y = ((e.clientY - r.top) / r.height) * 100
+    const rid = ++rippleId.current
+    setRipples(rs => [...rs, { id: rid, x, y }])
+    window.setTimeout(() => setRipples(rs => rs.filter(z => z.id !== rid)), 480)
+  }
   const act = useCallback(async (a: IrtAction, label: string) => {
-    // Miroir : on rejoue l'action sur tous les tels ciblés (dont soi). Le limiteur
-    // ~5 req/s sérialise → pas de dépassement. Sinon, juste ce tel.
     const targets = (broadcast && broadcast.length) ? Array.from(new Set([id, ...broadcast])) : [id]
     targets.forEach(t => { iremotech.action(t, a) })
     onLog?.(`✓ ${label}${targets.length > 1 ? ` ×${targets.length}` : ''}`)
   }, [id, broadcast, onLog])
 
-  const onDown = (e: React.PointerEvent<HTMLImageElement>) => {
-    if (captureRaw) return   // mode calibrage : on capture au relâchement, pas de geste
+  const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (captureRaw) { ripple(e); return }   // mode calibrage : capture au relâchement
+    ripple(e)                                // feedback immédiat
     const p = toXY(e); if (p) { gesture.current = { ...p, t: Date.now() }; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* noop */ } }
   }
-  const onUp = (e: React.PointerEvent<HTMLImageElement>) => {
+  const onUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (captureRaw) { const b = baseXY(e); if (b) captureRaw(Math.round(b.x), Math.round(b.y)); return }
     const g = gesture.current; gesture.current = null; const p = toXY(e); if (!g || !p) return
     const dist = Math.abs(p.x - g.x) + Math.abs(p.y - g.y)
-    const dt = Date.now() - g.t   // durée du maintien (ms)
+    const dt = Date.now() - g.t
     if (dist < 24) {
-      // Pas de mouvement : appui court = tap, appui maintenu = long_press.
       if (dt >= 450) act({ type: 'long_press', x: g.x, y: g.y, hold_ms: Math.min(dt, 4000) }, `long_press (${g.x}, ${g.y})`)
       else act({ type: 'tap', x: g.x, y: g.y }, `tap (${g.x}, ${g.y})`)
     } else {
-      // Mouvement : on rejoue le geste sur la VRAIE durée du maintien → swipe rapide
-      // (flick) ou drag lent contrôlé selon combien de temps tu es resté appuyé.
       const dur = Math.min(Math.max(dt, 60), 2500)
       if (dt >= 350) act({ type: 'drag', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: dur }, 'drag')
       else act({ type: 'swipe', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: dur }, 'swipe')
     }
   }
-  // Scroll molette : on ACCUMULE les crans et on n'envoie qu'UNE action toutes les
-  // ~120ms (sinon chaque cran = 1 requête → on sature la limite 5/s et ça lague).
-  const onWheel = (e: React.WheelEvent<HTMLImageElement>) => {
+  const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault(); const p = toXY(e); if (!p) return
-    scrollAcc.current += e.deltaY
-    scrollPt.current = p
+    scrollAcc.current += e.deltaY; scrollPt.current = p
     if (scrollTimer.current == null) {
       scrollTimer.current = window.setTimeout(() => {
         scrollTimer.current = null
         const pt = scrollPt.current
-        const dy = Math.max(-1400, Math.min(1400, Math.round(scrollAcc.current * 3)))  // amplifie un peu
+        const dy = Math.max(-1400, Math.min(1400, Math.round(scrollAcc.current * 3)))
         scrollAcc.current = 0
         if (dy !== 0 && pt) act({ type: 'scroll', x: pt.x, y: pt.y, dy }, 'scroll')
       }, 120)
@@ -135,11 +155,13 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
 
   const screen = (
     <div style={{ position: 'relative', borderRadius: rounded, overflow: 'hidden', border: `1px solid ${HAIR}`, background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center', width: '100%' }}>
-      {/* L'img est toujours montée (ref dispo pour l'écriture impérative) ; masquée tant qu'aucune frame. */}
-      <img ref={imgRef} alt={device.name || id} draggable={false}
+      <canvas ref={canvasRef}
         onPointerDown={onDown} onPointerUp={onUp} onWheel={onWheel}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none', display: !offline && hasFrame ? 'block' : 'none' }} />
-      {/* Indicateur : WS temps réel (vert) vs captures de secours (ambre) */}
+      {/* Retours tactiles */}
+      {ripples.map(rp => (
+        <span key={rp.id} style={{ position: 'absolute', left: `${rp.x}%`, top: `${rp.y}%`, width: 26, height: 26, borderRadius: '50%', border: '2px solid #A5B4FC', pointerEvents: 'none', zIndex: 3, animation: 'lp-ripple .48s ease-out forwards' }} />
+      ))}
       {!offline && hasFrame && (
         <span title={live ? 'Flux WebSocket (temps réel)' : 'Captures (WebSocket indisponible)'} style={{ position: 'absolute', top: 6, right: 6, zIndex: 2, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', padding: '2px 6px', borderRadius: 99, background: live ? 'rgba(52,211,153,0.2)' : 'rgba(251,191,36,0.2)', color: live ? '#34D399' : '#FBBF24', pointerEvents: 'none' }}>{live ? 'LIVE' : 'SD'}</span>
       )}

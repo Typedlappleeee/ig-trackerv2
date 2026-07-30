@@ -86,25 +86,39 @@ export interface IrtUsage {
   resets_at?: string
 }
 
-// ── Limiteur de débit ────────────────────────────────────────────────────────
-// iRemoTech plafonne à ~5 requêtes/seconde (token-bucket). On sérialise nos
-// appels HTTP à ~4/s (260 ms) pour ne JAMAIS déclencher de 429. Le flux vidéo
-// WebSocket n'est PAS concerné (une seule connexion, frames poussées).
-const REQ_MIN_GAP = 220
-let reqLastAt = 0
+// ── Limiteur de débit (token-bucket, comme iRemoTech) ────────────────────────
+// iRemoTech plafonne à ~5 req/s via un token-bucket → il AUTORISE les rafales
+// courtes. On modélise pareil : une rafale de 5 taps part instantanément, puis
+// ça se régule à ~5/s (1 jeton toutes les 220 ms). Fini le retard sur 3-4 clics
+// rapides. Le flux vidéo WebSocket n'est PAS concerné (1 connexion).
+const BUCKET_CAP = 5, REFILL_MS = 220
+let tokens = BUCKET_CAP
+let lastRefill = Date.now()
 const reqQueueHi: Array<() => void> = []   // actions (tap/swipe…) — PRIORITAIRES
 const reqQueueLo: Array<() => void> = []   // captures (stream de secours) — passent après
-let reqDraining = false
-function reqSlot(hi = false): Promise<void> {
-  return new Promise(resolve => { (hi ? reqQueueHi : reqQueueLo).push(resolve); if (!reqDraining) reqDrain() })
+let reqPumping = false
+function refill() {
+  const now = Date.now(); const add = Math.floor((now - lastRefill) / REFILL_MS)
+  if (add > 0) { tokens = Math.min(BUCKET_CAP, tokens + add); lastRefill += add * REFILL_MS }
 }
-function reqDrain() {
-  reqDraining = true
+function reqSlot(hi = false): Promise<void> {
+  return new Promise(resolve => { (hi ? reqQueueHi : reqQueueLo).push(resolve); pump() })
+}
+function pump() {
+  if (reqPumping) return
+  reqPumping = true
   const step = () => {
-    const next = reqQueueHi.shift() ?? reqQueueLo.shift()   // les actions doublent les captures
-    if (!next) { reqDraining = false; return }
-    const wait = Math.max(0, REQ_MIN_GAP - (Date.now() - reqLastAt))
-    window.setTimeout(() => { reqLastAt = Date.now(); next(); step() }, wait)
+    refill()
+    if (tokens >= 1 && (reqQueueHi.length || reqQueueLo.length)) {
+      tokens -= 1
+      const next = reqQueueHi.shift() ?? reqQueueLo.shift()   // les actions doublent les captures
+      next?.()
+      window.setTimeout(step, 0)   // enchaîne la rafale tant qu'il reste des jetons
+    } else if (reqQueueHi.length || reqQueueLo.length) {
+      window.setTimeout(step, REFILL_MS)   // plus de jeton → on attend le prochain refill
+    } else {
+      reqPumping = false
+    }
   }
   step()
 }
@@ -225,35 +239,23 @@ export function openSnapshotStream(deviceId: string, h: IrtStreamHandlers): () =
 const WS_BASE = 'wss://api.iremotech.com/v1'
 export function openLiveStream(
   deviceId: string,
-  h: { onFrame: (objectUrl: string) => void; onClose?: (why: string) => void },
+  h: { onFrame: (frame: Blob) => void; onClose?: (why: string) => void },
   fps = 10,
 ): () => void {
   const key = apiKey
   if (!key) { h.onClose?.('no-key'); return () => {} }
   let ws: WebSocket | null = null
-  let lastUrl: string | null = null
   let closed = false
   try {
     ws = new WebSocket(`${WS_BASE}/devices/${encodeURIComponent(deviceId)}/stream?token=${encodeURIComponent(key)}&fps=${fps}`)
     ws.binaryType = 'blob'
-    ws.onmessage = (ev) => {
-      if (closed || !(ev.data instanceof Blob)) return
-      const url = URL.createObjectURL(ev.data)
-      const prev = lastUrl
-      lastUrl = url
-      h.onFrame(url)
-      // On libère la frame PRÉCÉDENTE seulement après un court délai, une fois la
-      // nouvelle bien affichée → pas de flicker (le revoke immédiat cassait l'image).
-      if (prev) window.setTimeout(() => URL.revokeObjectURL(prev), 400)
-    }
+    // On passe la frame BRUTE (Blob) → le consommateur la décode via
+    // createImageBitmap (hors-thread) et la dessine sur un canvas = flux lisse.
+    ws.onmessage = (ev) => { if (!closed && ev.data instanceof Blob) h.onFrame(ev.data) }
     ws.onerror = () => { if (!closed) h.onClose?.('error') }
     ws.onclose = (ev) => { if (!closed) h.onClose?.(`close ${ev.code}`) }
   } catch (e) { h.onClose?.(String(e)) }
-  return () => {
-    closed = true
-    try { ws?.close() } catch { /* noop */ }
-    if (lastUrl) URL.revokeObjectURL(lastUrl)
-  }
+  return () => { closed = true; try { ws?.close() } catch { /* noop */ } }
 }
 
 export const iremotech = {
