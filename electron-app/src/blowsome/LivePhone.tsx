@@ -23,6 +23,10 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
   const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
   const gesture = useRef<{ x: number; y: number; t: number } | null>(null)
+  const scrollAcc = useRef(0)                                   // crans de molette cumulés
+  const scrollPt = useRef<{ x: number; y: number } | null>(null)
+  const scrollTimer = useRef<number | null>(null)
+  useEffect(() => () => { if (scrollTimer.current != null) window.clearTimeout(scrollTimer.current) }, [])
   const id = device.public_id
 
   // Rendu IMPÉRATIF : on écrit direct dans l'<img> (pas de re-render React par
@@ -112,9 +116,21 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
       else act({ type: 'swipe', x1: g.x, y1: g.y, x2: p.x, y2: p.y, duration_ms: dur }, 'swipe')
     }
   }
+  // Scroll molette : on ACCUMULE les crans et on n'envoie qu'UNE action toutes les
+  // ~120ms (sinon chaque cran = 1 requête → on sature la limite 5/s et ça lague).
   const onWheel = (e: React.WheelEvent<HTMLImageElement>) => {
     e.preventDefault(); const p = toXY(e); if (!p) return
-    act({ type: 'scroll', x: p.x, y: p.y, dy: e.deltaY > 0 ? 500 : -500 }, 'scroll')
+    scrollAcc.current += e.deltaY
+    scrollPt.current = p
+    if (scrollTimer.current == null) {
+      scrollTimer.current = window.setTimeout(() => {
+        scrollTimer.current = null
+        const pt = scrollPt.current
+        const dy = Math.max(-1400, Math.min(1400, Math.round(scrollAcc.current * 3)))  // amplifie un peu
+        scrollAcc.current = 0
+        if (dy !== 0 && pt) act({ type: 'scroll', x: pt.x, y: pt.y, dy }, 'scroll')
+      }, 120)
+    }
   }
 
   const screen = (
