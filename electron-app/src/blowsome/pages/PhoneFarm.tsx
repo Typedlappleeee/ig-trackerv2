@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
 import { useTr } from '@/lib/i18n'
-import { iremotech, openLiveStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, getCalib, setCalib, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget } from '@/lib/iremotech'
+import { iremotech, openLiveStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, getCalib, setCalib, loadSequences, saveSequence, deleteSequence, replaySequence, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget, type SeqStep, type IrtSequence } from '@/lib/iremotech'
 import { LivePhone } from '../LivePhone'
 import { BankPicker } from '@/pages/Bank'
 import {
@@ -61,6 +61,55 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [heroKey, setHeroKey] = useState(0)         // ↻ = reconnecte le flux principal
   const [broadcast, setBroadcast] = useState(false) // miroir : action sur 1 tel = sur tous
   const [hoverId, setHoverId] = useState<string | null>(null) // tel survolé en multi (priorité flux)
+  // ── Séquences / RPA maison ──
+  const [showSeq, setShowSeq] = useState(false)        // panneau séquences repliable
+  const [recording, setRecording] = useState(false)
+  const recSteps = useRef<SeqStep[]>([])
+  const recLast = useRef(0)
+  const [recCount, setRecCount] = useState(0)
+  const [sequences, setSequences] = useState<IrtSequence[]>([])
+  const [replaySeq, setReplaySeq] = useState<IrtSequence | null>(null)  // séquence en cours de config de rejeu
+  const [replayVideo, setReplayVideo] = useState<{ url: string; name: string } | null>(null)
+  const [replayCaption, setReplayCaption] = useState('')
+  const [replayAll, setReplayAll] = useState(false)     // rejouer sur tous les tels
+  const [replayPickVideo, setReplayPickVideo] = useState(false)
+  const [replayMsg, setReplayMsg] = useState('')
+  const replayStop = useRef(false)
+
+  // Charge les séquences enregistrées.
+  useEffect(() => { loadSequences(currentOrg?.id ?? null, user.id).then(setSequences) }, [currentOrg?.id, user.id])
+
+  // Enregistre une étape pendant l'enregistrement (délai = temps depuis la précédente).
+  const recordStep = (step: Omit<SeqStep, 'delay'>) => {
+    if (!recording) return
+    const now = Date.now()
+    const delay = recLast.current ? Math.min(now - recLast.current, 15000) : 400
+    recLast.current = now
+    recSteps.current.push({ delay, ...step })
+    setRecCount(recSteps.current.length)
+  }
+  const startRec = () => { recSteps.current = []; recLast.current = 0; setRecCount(0); setRecording(true); setLive(true) }
+  const stopRecSave = async () => {
+    setRecording(false)
+    const steps = recSteps.current
+    if (!steps.length) return
+    const name = window.prompt(tr('Nom de la séquence (ex: Post Reel IG)', 'Sequence name (e.g. Post IG Reel)'), tr('Post Reel', 'Reel post'))
+    if (!name) return
+    const r = await saveSequence(currentOrg?.id ?? null, user.id, name.trim(), steps)
+    if (r.ok) { addLog(tr(`✓ séquence "${name}" enregistrée (${steps.length} étapes)`, `✓ sequence "${name}" saved (${steps.length} steps)`)); loadSequences(currentOrg?.id ?? null, user.id).then(setSequences) }
+    else addLog(`❌ séquence : ${r.error}`)
+  }
+  const runReplay = async () => {
+    if (!replaySeq || !selected) return
+    replayStop.current = false
+    const targets = replayAll ? devices.map(d => d.public_id) : [selected.public_id]
+    setReplayMsg(tr('Rejeu…', 'Replaying…'))
+    await replaySequence(targets, replaySeq.steps,
+      { videoUrl: replayVideo?.url, videoName: replayVideo?.name, caption: replayCaption },
+      { onStep: (i, t) => setReplayMsg(tr(`Étape ${i + 1}/${t}`, `Step ${i + 1}/${t}`)), shouldStop: () => replayStop.current })
+    setReplayMsg(replayStop.current ? tr('Arrêté', 'Stopped') : tr(`✓ Terminé sur ${targets.length} tel(s)`, `✓ Done on ${targets.length} phone(s)`))
+    window.setTimeout(() => setReplayMsg(''), 3000)
+  }
   const [uploadPick, setUploadPick] = useState(false) // sélecteur banque pour envoyer sur le tel
   const [uploadMsg, setUploadMsg] = useState('')       // état de l'upload vers le tel
 
@@ -68,6 +117,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const uploadFromBank = async (urls: string[], titles?: string[]) => {
     setUploadPick(false)
     if (!selected || !urls.length) return
+    recordStep({ upload: true })   // dans une séquence : étape "envoyer la vidéo" (variable au rejeu)
     for (let i = 0; i < urls.length; i++) {
       const name = (titles?.[i] || `media_${i}`).replace(/[^\w.\-]+/g, '_')
       setUploadMsg(tr(`Envoi ${i + 1}/${urls.length}…`, `Sending ${i + 1}/${urls.length}…`))
@@ -81,6 +131,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
     const f = e.target.files?.[0]; e.target.value = ''
     if (!f || !selected) return
     if (f.size > 4 * 1024 * 1024) { setUploadMsg(tr('Fichier > 4 Mo : passe par la banque.', 'File > 4 MB: use the bank instead.')); window.setTimeout(() => setUploadMsg(''), 3500); return }
+    recordStep({ upload: true })
     setUploadMsg(tr('Lecture du fichier…', 'Reading file…'))
     const b64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.onerror = rej; r.readAsDataURL(f) })
     setUploadMsg(tr('Envoi sur le tel…', 'Sending to the phone…'))
@@ -227,6 +278,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
 
   const sendAction = async (a: IrtAction, label: string) => {
     if (!selected) return
+    recordStep({ action: a })   // capture pour la séquence (si enregistrement)
     const r = await iremotech.action(selected.public_id, a)
     addLog(r.ok ? `✓ ${label}` : tr(`❌ ${label} : ${r.error ?? r.status}`, `❌ ${label}: ${r.error ?? r.status}`))
     // Le flux live montre déjà le résultat → pas de snapshot en plus.
@@ -476,7 +528,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
               {/* On coupe le flux principal quand un modal (plein écran / multi) est
                   ouvert → libère le slot (max_active_devices) et évite un double flux
                   sur le même tel, pour que le plein écran / multi passe bien en WebSocket. */}
-              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={30} rounded={26} captureRaw={calibStep !== 'idle' ? onCaptureRaw : undefined} onStatus={onHeroStatus} onLog={addLog} />}
+              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={30} rounded={26} captureRaw={calibStep !== 'idle' ? onCaptureRaw : undefined} onRecord={recording ? (a => recordStep({ action: a })) : undefined} onStatus={onHeroStatus} onLog={addLog} />}
               {selected && (fs || multi) && <div style={{ aspectRatio: '9/19.5', width: '100%', maxWidth: 300, margin: '0 auto', borderRadius: 34, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'grid', placeItems: 'center', color: FAINT, fontSize: 11.5 }}>{tr('Ouvert en grand', 'Open in the big view')}</div>}
               <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}><Grad style={{ fontWeight: 700 }}>{tr('Clic', 'Click')}</Grad> = {tr('taper', 'tap')} · <Grad style={{ fontWeight: 700 }}>{tr('glisser', 'drag')}</Grad> = swipe · <Grad style={{ fontWeight: 700 }}>{tr('molette', 'wheel')}</Grad> = scroll</p>
             </BlowCard>
@@ -615,6 +667,69 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 )}
               </BlowCard>
 
+              {/* Séquences / RPA maison : enregistre un flow, rejoue-le sur tous les tels */}
+              <BlowCard style={{ padding: 16 }}>
+                <button onClick={() => setShowSeq(v => !v)} className="blow-tap" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>🤖 {tr('Séquences / RPA', 'Sequences / RPA')} {sequences.length > 0 && <span style={{ color: MUTED, fontWeight: 600 }}>· {sequences.length}</span>}</span>
+                  <span style={{ fontSize: 13, color: MUTED, transform: showSeq ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
+                </button>
+                {showSeq && (
+                  <div style={{ marginTop: 12 }}>
+                    {/* Enregistrement */}
+                    {!recording ? (
+                      <button onClick={startRec} className="blow-tap" style={{ fontSize: 12, fontWeight: 700, color: '#F87171', background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 9, padding: '7px 12px', cursor: 'pointer', width: '100%' }}>● {tr('Enregistrer une séquence', 'Record a sequence')}</button>
+                    ) : (
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.35)' }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#F87171', marginBottom: 8 }}>⏺ {tr('Enregistrement…', 'Recording…')} · {recCount} {tr('étapes', 'steps')}</div>
+                        <p style={{ margin: '0 0 8px', fontSize: 10.5, color: MUTED, lineHeight: 1.5 }}>{tr('Fais ton posting sur le tel. Aux moments clés :', 'Do your posting on the phone. At key moments:')}</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                          <button onClick={() => recordStep({ upload: true })} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: '#A5B4FC', background: 'rgba(129,140,248,0.12)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}>＋ {tr('Envoyer la vidéo', 'Upload the video')}</button>
+                          <button onClick={() => recordStep({ action: { type: 'text', text: '' }, captionVar: true })} className="blow-tap" style={{ fontSize: 11, fontWeight: 700, color: '#A5B4FC', background: 'rgba(129,140,248,0.12)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}>＋ {tr('Insérer la description', 'Insert the caption')}</button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <BlowButton onClick={stopRecSave} style={{ height: 32, flex: 1 }}>{tr('Arrêter & enregistrer', 'Stop & save')}</BlowButton>
+                          <button onClick={() => { setRecording(false); recSteps.current = [] }} className="blow-tap" style={{ fontSize: 11.5, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>{tr('annuler', 'cancel')}</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Séquences enregistrées */}
+                    {!recording && sequences.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+                        {sequences.map(sq => (
+                          <div key={sq.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}` }}>
+                            <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sq.name} <span style={{ color: FAINT, fontWeight: 500 }}>· {sq.steps.length}</span></span>
+                            <button onClick={() => { setReplaySeq(sq); setReplayVideo(null); setReplayCaption(''); setReplayAll(false) }} className="blow-tap" style={{ fontSize: 11.5, fontWeight: 700, color: '#34D399', background: 'none', border: 'none', cursor: 'pointer' }}>▶ {tr('Rejouer', 'Replay')}</button>
+                            <button onClick={() => { if (sq.id) { deleteSequence(sq.id); setSequences(s => s.filter(x => x.id !== sq.id)) } }} className="blow-tap" title={tr('Supprimer', 'Delete')} style={{ fontSize: 13, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Config de rejeu */}
+                    {replaySeq && (
+                      <div style={{ marginTop: 12, padding: 11, borderRadius: 10, background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.3)' }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: INK, marginBottom: 8 }}>▶ {tr('Rejouer', 'Replay')} : {replaySeq.name}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                          <BlowButton variant="ghost" onClick={() => setReplayPickVideo(true)} style={{ height: 30 }}>🗂 {replayVideo ? tr('Vidéo ✓', 'Video ✓') : tr('Choisir la vidéo', 'Pick the video')}</BlowButton>
+                          {replayVideo && <span style={{ fontSize: 10.5, color: FAINT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>{replayVideo.name}</span>}
+                        </div>
+                        <textarea value={replayCaption} onChange={e => setReplayCaption(e.target.value)} placeholder={tr('Description (remplace l\'étape « description »)', 'Caption (replaces the “caption” step)')} rows={2}
+                          style={{ width: '100%', resize: 'vertical', padding: '8px 10px', borderRadius: 9, outline: 'none', color: INK, fontSize: 12, background: 'rgba(255,255,255,0.045)', border: `1px solid ${HAIR}`, fontFamily: 'inherit', marginBottom: 8 }} />
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: MUTED, cursor: 'pointer', marginBottom: 8 }}>
+                          <input type="checkbox" checked={replayAll} onChange={e => setReplayAll(e.target.checked)} /> {tr(`Sur TOUS les tels (${devices.length})`, `On ALL phones (${devices.length})`)}
+                        </label>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <BlowButton onClick={() => { if (!replayMsg || replayMsg.startsWith('✓')) runReplay() }} style={{ height: 32, flex: 1 }}>{tr('Lancer', 'Run')} {replayAll ? `(${devices.length})` : tr('(ce tel)', '(this phone)')}</BlowButton>
+                          {replayMsg ? <button onClick={() => { replayStop.current = true }} className="blow-tap" style={{ fontSize: 11.5, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>{tr('stop', 'stop')}</button> : <button onClick={() => setReplaySeq(null)} className="blow-tap" style={{ fontSize: 11.5, color: MUTED, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>{tr('fermer', 'close')}</button>}
+                        </div>
+                        {replayMsg && <div style={{ marginTop: 6, fontSize: 11, color: '#34D399' }}>{replayMsg}</div>}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </BlowCard>
+
               {showLog && (
                 <BlowCard style={{ padding: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -637,6 +752,13 @@ export function BlowPhoneFarm({ user }: { user: User }) {
         <BankPicker user={user} mode="multi" resolveMode="signed-url"
           onSelect={(paths, titles) => uploadFromBank(paths, titles)}
           onClose={() => setUploadPick(false)} />
+      )}
+
+      {/* Sélecteur banque → vidéo pour le rejeu d'une séquence */}
+      {replayPickVideo && (
+        <BankPicker user={user} mode="single" resolveMode="signed-url"
+          onSelect={(paths, titles) => { setReplayPickVideo(false); if (paths[0]) setReplayVideo({ url: paths[0], name: (titles?.[0] || 'video.mp4').replace(/[^\w.\-]+/g, '_') }) }}
+          onClose={() => setReplayPickVideo(false)} />
       )}
 
       {/* Plein écran d'un tel (interactif) */}

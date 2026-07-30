@@ -267,6 +267,54 @@ export function openLiveStream(
   return () => { closed = true; try { ws?.close() } catch { /* noop */ } }
 }
 
+// ── Séquences d'automatisation (macros) ──────────────────────────────────────
+// Une étape = une action (avec le délai depuis la précédente). `upload` = étape
+// "envoyer la vidéo sur le tel" (la vidéo choisie au rejeu). `captionVar` = étape
+// texte à remplacer par la description choisie au rejeu.
+export interface SeqStep { delay: number; action?: IrtAction; upload?: boolean; captionVar?: boolean }
+export interface IrtSequence { id?: string; name: string; steps: SeqStep[] }
+
+function seqScope(orgId: string | null, userId: string) {
+  return orgId ? { scope_id: orgId, is_org: true } : { scope_id: userId, is_org: false }
+}
+export async function loadSequences(orgId: string | null, userId: string): Promise<IrtSequence[]> {
+  const { scope_id } = seqScope(orgId, userId)
+  try {
+    const { data } = await supabase.from('iremotech_sequences').select('id, name, steps').eq('scope_id', scope_id).order('created_at', { ascending: false })
+    return (data ?? []).map(r => ({ id: r.id as string, name: r.name as string, steps: (r.steps as SeqStep[]) ?? [] }))
+  } catch { return [] }
+}
+export async function saveSequence(orgId: string | null, userId: string, name: string, steps: SeqStep[]): Promise<{ ok: boolean; error?: string }> {
+  const { scope_id, is_org } = seqScope(orgId, userId)
+  const { error } = await supabase.from('iremotech_sequences').insert({ scope_id, is_org, name, steps })
+  return error ? { ok: false, error: error.message } : { ok: true }
+}
+export async function deleteSequence(id: string): Promise<void> {
+  try { await supabase.from('iremotech_sequences').delete().eq('id', id) } catch { /* noop */ }
+}
+
+// Rejoue une séquence sur un ou plusieurs tels, avec la vidéo/description choisies.
+export async function replaySequence(
+  deviceIds: string[], steps: SeqStep[],
+  vars: { videoUrl?: string; videoName?: string; caption?: string },
+  hooks?: { onStep?: (i: number, total: number) => void; shouldStop?: () => boolean },
+): Promise<void> {
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, Math.min(Math.max(ms, 0), 20000)))
+  for (let i = 0; i < steps.length; i++) {
+    if (hooks?.shouldStop?.()) return
+    const s = steps[i]
+    await sleep(s.delay)
+    hooks?.onStep?.(i, steps.length)
+    for (const dev of deviceIds) {
+      if (s.upload) { if (vars.videoUrl) await iremotech.uploadMedia(dev, vars.videoUrl, vars.videoName || 'video.mp4') }
+      else if (s.action) {
+        const a: IrtAction = (s.action.type === 'text' && s.captionVar && vars.caption != null) ? { type: 'text', text: vars.caption } : s.action
+        await iremotech.action(dev, a)
+      }
+    }
+  }
+}
+
 export const iremotech = {
   // Liste des iPhones pilotables.
   listDevices: () => irt<{ devices?: IrtDevice[] } | IrtDevice[]>('devices'),

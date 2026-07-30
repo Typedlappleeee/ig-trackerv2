@@ -24,11 +24,12 @@ interface Props {
   paused?: boolean                        // true = pas de flux WS (image figée) → libère un slot (limite 5)
   broadcast?: string[]                    // miroir : rejouer chaque action sur TOUS ces tels
   captureRaw?: (x: number, y: number) => void // calibrage guidé : renvoie les coords BRUTES (sans calib) au lieu de taper
+  onRecord?: (a: IrtAction) => void       // enregistreur de séquence : capte chaque action
   onStatus?: (reachable: boolean) => void
   onLog?: (m: string) => void
 }
 
-export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, paused = false, broadcast, captureRaw, onStatus, onLog }: Props) {
+export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, paused = false, broadcast, captureRaw, onRecord, onStatus, onLog }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
@@ -174,10 +175,11 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     window.setTimeout(() => setRipples(rs => rs.filter(z => z.id !== rid)), 480)
   }
   const act = useCallback(async (a: IrtAction, label: string) => {
+    onRecord?.(a)   // enregistreur de séquence (RPA maison)
     const targets = (broadcast && broadcast.length) ? Array.from(new Set([id, ...broadcast])) : [id]
     targets.forEach(t => { iremotech.action(t, a) })
     onLog?.(`✓ ${label}${targets.length > 1 ? ` ×${targets.length}` : ''}`)
-  }, [id, broadcast, onLog])
+  }, [id, broadcast, onRecord, onLog])
   const actRef = useRef(act); actRef.current = act
 
   // Molette → scroll sur le TEL. On DOIT attacher un listener NON-PASSIF (le
