@@ -82,8 +82,10 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     let firstFrame = true
     const openWs = () => {
       stop = openLiveStream(id, {
-        onOpen: () => { if (alive) wsOk = true },
-        onFrame: (blob) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } wsOk = true; if (!live) setLive(true); paintBlob(blob) },
+        // LIVE = WS CONNECTÉ (même si l'écran est statique = 0 frame). C'est la
+        // connexion qui compte, pas la dernière frame.
+        onOpen: () => { if (!alive) return; wsOk = true; setLive(true) },
+        onFrame: (blob) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } wsOk = true; setLive(true); paintBlob(blob) },
         onClose: (why) => { if (!alive) return; wsOk = false; wsDownSince = Date.now(); setLive(false); if (firstFrame) onLog?.(`⚠️ WebSocket ${why} (scope "stream" ?) → captures`); reconnect = window.setTimeout(() => { if (alive) openWs() }, 2000) },
       }, fps)
     }
