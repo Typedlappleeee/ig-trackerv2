@@ -75,6 +75,7 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     let alive = true
     let stop = () => {}
     let wsOk = false          // WS réellement connecté (open, pas juste "pas de frame")
+    let wsDownSince = Date.now()   // depuis quand le WS est down (0 = jamais monté)
     let reconnect: number | undefined
     setHasFrame(false); setOffline(false); setLive(false); reachRef.current = null
 
@@ -83,7 +84,7 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
       stop = openLiveStream(id, {
         onOpen: () => { if (alive) wsOk = true },
         onFrame: (blob) => { if (!alive) return; if (firstFrame) { firstFrame = false; onLog?.(`✓ WebSocket live ${device.name || id}`) } wsOk = true; if (!live) setLive(true); paintBlob(blob) },
-        onClose: (why) => { if (!alive) return; wsOk = false; setLive(false); if (firstFrame) onLog?.(`⚠️ WebSocket ${why} (scope "stream" ?) → captures`); reconnect = window.setTimeout(() => { if (alive) openWs() }, 3000) },
+        onClose: (why) => { if (!alive) return; wsOk = false; wsDownSince = Date.now(); setLive(false); if (firstFrame) onLog?.(`⚠️ WebSocket ${why} (scope "stream" ?) → captures`); reconnect = window.setTimeout(() => { if (alive) openWs() }, 2000) },
       }, fps)
     }
 
@@ -95,17 +96,18 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
       if (s.ok && s.dataUrl) paintUrl(s.dataUrl)
       else if (s.status === 503) goOffline()
     }
-    // Secours : tire des captures UNIQUEMENT tant que le WS n'est pas connecté.
+    // Secours : captures UNIQUEMENT si le WS est down depuis >4s (vraie panne, pas
+    // une reconnexion de routine). WS connecté OU reconnexion rapide → 0 capture.
     const bridge = async () => {
       while (alive) {
-        if (!wsOk) {
+        if (!wsOk && Date.now() - wsDownSince > 4000) {
           const s = await iremotech.snapshot(id)
           if (!alive) break
           if (s.ok && s.dataUrl) { if (!wsOk) paintUrl(s.dataUrl) }
           else if (s.status === 503) { goOffline(); await new Promise(r => window.setTimeout(r, 3000)) }
           else await new Promise(r => window.setTimeout(r, 500))
         } else {
-          await new Promise(r => window.setTimeout(r, 800))   // WS connecté → aucune capture
+          await new Promise(r => window.setTimeout(r, 900))   // WS ok / reconnexion → aucune capture
         }
       }
     }
