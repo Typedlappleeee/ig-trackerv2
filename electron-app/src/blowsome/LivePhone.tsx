@@ -52,7 +52,18 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     if (!hasFrame) setHasFrame(true)
     if (reachRef.current !== true) { reachRef.current = true; setOffline(false); onStatus?.(true) }
   }
-  const paintBlob = (blob: Blob) => { createImageBitmap(blob).then(b => { draw(b, b.width, b.height); b.close() }).catch(() => {}) }
+  // Frame-dropping : on ne décode QU'UNE frame à la fois et on ne garde que la
+  // PLUS RÉCENTE (les périmées sont jetées) → jamais de retard accumulé, toujours
+  // l'image la plus fraîche, comme le fait iRemoTech côté serveur.
+  const pendingFrame = useRef<Blob | null>(null)
+  const decoding = useRef(false)
+  const drainFrames = () => {
+    const blob = pendingFrame.current; pendingFrame.current = null
+    if (!blob) { decoding.current = false; return }
+    decoding.current = true
+    createImageBitmap(blob).then(b => { draw(b, b.width, b.height); b.close() }).catch(() => {}).finally(drainFrames)
+  }
+  const paintBlob = (blob: Blob) => { pendingFrame.current = blob; if (!decoding.current) drainFrames() }
   const paintUrl = (url: string) => { const im = new Image(); im.onload = () => draw(im, im.naturalWidth, im.naturalHeight); im.src = url }
   const goOffline = () => { if (reachRef.current !== false) { reachRef.current = false; setOffline(true); onStatus?.(false) } }
 
