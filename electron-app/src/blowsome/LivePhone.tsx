@@ -21,13 +21,14 @@ interface Props {
   rounded?: number                       // rayon des coins de l'écran
   bezel?: boolean                        // cadre "téléphone" autour
   startDelay?: number                    // décale l'ouverture du flux (évite d'ouvrir N flux d'un coup)
+  paused?: boolean                        // true = pas de flux WS (image figée) → libère un slot (limite 5)
   broadcast?: string[]                    // miroir : rejouer chaque action sur TOUS ces tels
   captureRaw?: (x: number, y: number) => void // calibrage guidé : renvoie les coords BRUTES (sans calib) au lieu de taper
   onStatus?: (reachable: boolean) => void
   onLog?: (m: string) => void
 }
 
-export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, broadcast, captureRaw, onStatus, onLog }: Props) {
+export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startDelay = 0, paused = false, broadcast, captureRaw, onStatus, onLog }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hasFrame, setHasFrame] = useState(false)
   const [offline, setOffline] = useState(false)
@@ -79,7 +80,20 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
     let reconnect: number | undefined
     let retries = 0           // backoff exponentiel des reconnexions
     let logged = false        // ne logge l'échec qu'UNE fois par panne
-    setHasFrame(false); setOffline(false); setLive(false); reachRef.current = null
+    setLive(false); reachRef.current = null
+
+    // En PAUSE (ex. tel non survolé en multi) : pas de flux WS → on libère un slot
+    // (limite de 5 tels simultanés). On montre juste une image figée.
+    if (paused) {
+      ;(async () => {
+        const s = await iremotech.snapshot(id)
+        if (!alive) return
+        if (s.ok && s.dataUrl) paintUrl(s.dataUrl)
+        else if (s.status === 503) goOffline()
+      })()
+      return () => { alive = false }
+    }
+    setHasFrame(false); setOffline(false)
 
     let firstFrame = true
     const openWs = () => {
@@ -132,7 +146,7 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
       window.setTimeout(() => { if (alive) bridge() }, 2000)
     }, startDelay)
     return () => { alive = false; window.clearTimeout(t); if (reconnect) window.clearTimeout(reconnect); stop() }
-  }, [id, fps, startDelay]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, fps, startDelay, paused]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Géométrie : canvas en object-fit:contain → zone RÉELLE (échelle + décalage).
   // raw=true → coords brutes (calibrage) ; sinon + calibration mémorisée.
@@ -218,7 +232,11 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
         <span key={rp.id} style={{ position: 'absolute', left: `${rp.x}%`, top: `${rp.y}%`, width: 26, height: 26, borderRadius: '50%', border: '2px solid #A5B4FC', pointerEvents: 'none', zIndex: 3, animation: 'lp-ripple .48s ease-out forwards' }} />
       ))}
       {!offline && hasFrame && (
-        <span title={live ? 'Flux WebSocket (temps réel)' : 'Captures (WebSocket indisponible)'} style={{ position: 'absolute', top: 6, right: 6, zIndex: 2, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', padding: '2px 6px', borderRadius: 99, background: live ? 'rgba(52,211,153,0.2)' : 'rgba(251,191,36,0.2)', color: live ? '#34D399' : '#FBBF24', pointerEvents: 'none' }}>{live ? 'LIVE' : 'SD'}</span>
+        paused ? (
+          <span title="En pause (survole pour le flux live)" style={{ position: 'absolute', top: 6, right: 6, zIndex: 2, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', padding: '2px 6px', borderRadius: 99, background: 'rgba(148,163,184,0.22)', color: '#cbd5e1', pointerEvents: 'none' }}>❚❚</span>
+        ) : (
+          <span title={live ? 'Flux WebSocket (temps réel)' : 'Captures (WebSocket indisponible)'} style={{ position: 'absolute', top: 6, right: 6, zIndex: 2, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', padding: '2px 6px', borderRadius: 99, background: live ? 'rgba(52,211,153,0.2)' : 'rgba(251,191,36,0.2)', color: live ? '#34D399' : '#FBBF24', pointerEvents: 'none' }}>{live ? 'LIVE' : 'SD'}</span>
+        )
       )}
       {offline ? (
         <div style={{ textAlign: 'center', padding: 16 }}>

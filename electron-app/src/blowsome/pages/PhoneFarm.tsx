@@ -60,6 +60,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const calibTarget = useRef<{ x: number; y: number } | null>(null)
   const [heroKey, setHeroKey] = useState(0)         // ↻ = reconnecte le flux principal
   const [broadcast, setBroadcast] = useState(false) // miroir : action sur 1 tel = sur tous
+  const [hoverId, setHoverId] = useState<string | null>(null) // tel survolé en multi (priorité flux)
   const [uploadPick, setUploadPick] = useState(false) // sélecteur banque pour envoyer sur le tel
   const [uploadMsg, setUploadMsg] = useState('')       // état de l'upload vers le tel
 
@@ -668,15 +669,21 @@ export function BlowPhoneFarm({ user }: { user: User }) {
           </div>
           {broadcast && <p style={{ margin: '0 0 10px', fontSize: 11, color: '#34D399' }}>🔁 {tr('Miroir actif : ce que tu fais sur un tel se répète sur les', 'Mirror on: what you do on one phone repeats on all')} {devices.length} {tr('tels.', 'phones.')}</p>}
           <div className="blow-scroll" style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 14, alignContent: 'start' }}>
-            {devices.map((d, i) => (
-              <div key={d.public_id} style={{ display: 'flex', flexDirection: 'column', gap: 6, outline: broadcast ? '1px solid rgba(52,211,153,0.3)' : 'none', outlineOffset: 3, borderRadius: 4 }}>
+            {devices.map((d, i) => {
+              // Priorité flux : seul le tel SURVOLÉ (ou le 1er par défaut) est en
+              // live → respecte la limite de 5 tels simultanés. Le miroir force tout.
+              const livePhone = hoverId ? hoverId === d.public_id : i === 0
+              return (
+              <div key={d.public_id} onMouseEnter={() => setHoverId(d.public_id)}
+                style={{ display: 'flex', flexDirection: 'column', gap: 6, outline: broadcast ? '1px solid rgba(52,211,153,0.3)' : (livePhone ? '1px solid rgba(129,140,248,0.4)' : 'none'), outlineOffset: 3, borderRadius: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name || d.public_id}</span>
                   <button onClick={() => { setSelected(d); setMulti(false); setFs(true) }} className="blow-tap" title={tr('Plein écran', 'Fullscreen')} style={{ fontSize: 12, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>⛶</button>
                 </div>
-                <LivePhone device={d} fps={12} bezel={false} startDelay={i * 500} broadcast={broadcast ? devices.map(x => x.public_id) : undefined} onLog={addLog} />
+                <LivePhone device={d} fps={12} bezel={false} paused={!livePhone} broadcast={broadcast ? devices.map(x => x.public_id) : undefined} onLog={addLog} />
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
