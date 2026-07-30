@@ -4,9 +4,15 @@
 // chargée en mémoire, puis envoyée au proxy à chaque appel.
 import { supabase } from './supabase'
 
-// Clé courante en mémoire (définie après chargement de la config de l'agence).
-let apiKey: string | null = null
-export function setIremotechKey(k: string | null) { apiKey = (k && k.trim()) ? k.trim() : null }
+// Clé courante en mémoire. On la met AUSSI en cache localStorage (partagé entre
+// onglets même origine) pour que la page "tel en plein écran" (nouvel onglet
+// léger) l'ait direct, sans rechargement de toute l'app.
+const IRT_KEY_LS = 'sf-irt-key'
+let apiKey: string | null = (() => { try { return localStorage.getItem(IRT_KEY_LS) } catch { return null } })()
+export function setIremotechKey(k: string | null) {
+  apiKey = (k && k.trim()) ? k.trim() : null
+  try { if (apiKey) localStorage.setItem(IRT_KEY_LS, apiKey); else localStorage.removeItem(IRT_KEY_LS) } catch { /* noop */ }
+}
 export function getIremotechKey(): string | null { return apiKey }
 
 async function readKey(table: string, col: string, val: string): Promise<string | null> {

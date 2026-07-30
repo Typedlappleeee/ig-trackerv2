@@ -104,13 +104,29 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, EBSta
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
-    </ErrorBoundary>
-  </React.StrictMode>,
-)
+// ── Onglet léger "un tel en plein écran" (#pf-fs=<deviceId>) ──────────────────
+// Ouvert depuis Phone Farm (bouton ↗). On rend UNIQUEMENT l'écran du tel, sans
+// charger tout ScaleFlow → on peut en ouvrir autant qu'on veut.
+const pfMatch = /pf-fs=([^&]+)/.exec(window.location.hash)
+if (pfMatch) {
+  import('./blowsome/StandalonePhone').then(({ StandalonePhone }) => {
+    ReactDOM.createRoot(document.getElementById('root')!).render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <StandalonePhone deviceId={decodeURIComponent(pfMatch[1])} />
+        </ErrorBoundary>
+      </React.StrictMode>,
+    )
+  })
+} else {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </ErrorBoundary>
+    </React.StrictMode>,
+  )
+}
 
