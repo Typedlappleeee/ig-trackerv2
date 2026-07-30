@@ -8,7 +8,7 @@ import { useTr } from '@/lib/i18n'
 import { iremotech, openLiveStream, extractDevices, loadIremotechKey, saveIremotechKey, loadDeviceMeta, saveDeviceMeta, getCalib, setCalib, loadSequences, saveSequence, deleteSequence, replaySequence, type IrtDevice, type IrtAction, type IrtAccount, type IrtUsage, type IrtBudget, type SeqStep, type IrtSequence } from '@/lib/iremotech'
 import { LivePhone } from '../LivePhone'
 import { BankPicker } from '@/pages/Bank'
-import { postIgReel, getIgCoords, setIgCoords, resetIgCoords, IG_COORD_LABELS, type IgReelCoords } from '@/lib/igReelFlow'
+import { postIgReel, getIgCoords, setIgCoords, resetIgCoords, IG_COORD_LABELS, type IgReelCoords, type IgEntry } from '@/lib/igReelFlow'
 import {
   useBlowCSS, Grad, Ico, ICON, GRAD, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowPageHeader, BlowBadge, BlowButton, BlowEmpty,
@@ -71,6 +71,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
   const [postMsg, setPostMsg] = useState('')
   const [postBusy, setPostBusy] = useState(false)
   const postStop = useRef(false)
+  const [igEntry, setIgEntry] = useState<IgEntry>('camera')    // point d'entrée dans Instagram
   const [tuneCoords, setTuneCoords] = useState(false)          // réglage des points de tap
   const [coords, setCoordsState] = useState<IgReelCoords>(() => getIgCoords())
 
@@ -84,7 +85,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
       const who = devices.find(d => d.public_id === dev)?.name ?? dev
       const r = await postIgReel(dev, {
         videoUrl: postVideo.url, videoName: postVideo.name, caption: postCaption,
-        screen: screenSize, coords,
+        screen: screenSize, coords, entry: igEntry,
       }, {
         onStep: (label, s, t) => setPostMsg(`${who} · ${label} (${s + 1}/${t})`),
         shouldStop: () => postStop.current,
@@ -593,7 +594,9 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 <p style={{ margin: '0 0 8px', fontSize: 12.5, fontWeight: 800, color: INK }}>{tr('Ouvrir', 'Open')}</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                   {([
-                    { l: 'Instagram', url: 'https://instagram.com' },
+                    { l: 'Instagram', url: 'instagram://app' },
+                    { l: tr('Créer un post', 'Create post'), url: 'instagram://camera' },
+                    { l: tr('Créer une story', 'Create story'), url: 'instagram://story-camera' },
                     { l: 'TikTok', url: 'https://www.tiktok.com' },
                     { l: 'Threads', url: 'https://www.threads.net' },
                   ] as const).map(a => (
@@ -718,6 +721,19 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                 <textarea value={postCaption} onChange={e => setPostCaption(e.target.value)} rows={3}
                   placeholder={tr('Ta description… #hashtags', 'Your caption… #hashtags')}
                   style={{ width: '100%', resize: 'vertical', padding: '9px 11px', borderRadius: 10, outline: 'none', color: INK, fontSize: 12.5, background: 'rgba(255,255,255,0.045)', border: `1px solid ${HAIR}`, fontFamily: 'inherit', marginBottom: 9 }} />
+
+                {/* Point d'entrée : deep link direct (saute le « + ») ou via l'app */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                  {([
+                    { v: 'camera' as IgEntry, l: tr('Création directe', 'Direct create'), t: 'instagram://camera' },
+                    { v: 'app' as IgEntry, l: tr('Via l\'app (+)', 'Via app (+)'), t: 'instagram://app → tap +' },
+                  ]).map(o => (
+                    <button key={o.v} onClick={() => setIgEntry(o.v)} title={o.t} className="blow-tap"
+                      style={{ flex: 1, fontSize: 11, fontWeight: 700, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', color: igEntry === o.v ? '#34D399' : MUTED, background: igEntry === o.v ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${igEntry === o.v ? 'rgba(52,211,153,0.35)' : HAIR}` }}>
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
 
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: MUTED, cursor: 'pointer', marginBottom: 10 }}>
                   <input type="checkbox" checked={postAll} onChange={e => setPostAll(e.target.checked)} />

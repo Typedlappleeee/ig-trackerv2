@@ -51,9 +51,15 @@ export interface FlowHooks {
 
 // Poste un Reel sur UN téléphone. `screen` = taille réelle de l'écran en pixels
 // (lue sur la dernière capture) pour convertir les fractions en coordonnées.
+// `entry` : point d'entrée dans Instagram.
+//   'camera' → deep link instagram://camera : ouvre DIRECTEMENT l'écran de
+//              création (on saute le tap sur le « + », l'étape la plus fragile).
+//   'app'    → ouvre l'app puis tape le « + » (repli si le deep link ne marche pas).
+export type IgEntry = 'camera' | 'app'
+
 export async function postIgReel(
   deviceId: string,
-  opts: { videoUrl: string; videoName?: string; caption: string; screen: { w: number; h: number }; coords?: IgReelCoords; waits?: Partial<Record<string, number>> },
+  opts: { videoUrl: string; videoName?: string; caption: string; screen: { w: number; h: number }; coords?: IgReelCoords; entry?: IgEntry; waits?: Partial<Record<string, number>> },
   hooks?: FlowHooks,
 ): Promise<{ ok: boolean; error?: string }> {
   const c = opts.coords ?? getIgCoords()
@@ -62,11 +68,18 @@ export async function postIgReel(
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
   const stopped = () => hooks?.shouldStop?.() === true
 
+  const entry: IgEntry = opts.entry ?? 'camera'
+
   // Chaque étape : libellé, action, puis attente que l'écran suivant charge.
   const steps: { label: string; run: () => Promise<unknown>; wait: number }[] = [
     { label: 'Envoi de la vidéo', run: () => iremotech.uploadMedia(deviceId, opts.videoUrl, opts.videoName || 'video.mp4'), wait: 6000 },
-    { label: 'Ouvre Instagram',   run: () => iremotech.action(deviceId, { type: 'open_url', url: 'instagram://app' }), wait: 5000 },
-    { label: 'Bouton +',          run: () => iremotech.action(deviceId, pt(c.plus)), wait: 2500 },
+    // Deep link direct vers l'écran de création → évite le tap sur le « + ».
+    ...(entry === 'camera'
+      ? [{ label: 'Ouvre la création IG', run: () => iremotech.action(deviceId, { type: 'open_url' as const, url: 'instagram://camera' }), wait: 6000 }]
+      : [
+          { label: 'Ouvre Instagram', run: () => iremotech.action(deviceId, { type: 'open_url' as const, url: 'instagram://app' }), wait: 5000 },
+          { label: 'Bouton +',        run: () => iremotech.action(deviceId, pt(c.plus)), wait: 2500 },
+        ]),
     { label: 'Onglet Reel',       run: () => iremotech.action(deviceId, pt(c.reel)), wait: 3000 },
     { label: 'Choisit la vidéo',  run: () => iremotech.action(deviceId, pt(c.firstMedia)), wait: 3000 },
     { label: 'Suivant',           run: () => iremotech.action(deviceId, pt(c.next1)), wait: 4000 },
