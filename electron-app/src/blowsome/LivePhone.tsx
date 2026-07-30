@@ -108,18 +108,20 @@ export function LivePhone({ device, fps = 10, rounded = 22, bezel = true, startD
       if (s.ok && s.dataUrl) paintUrl(s.dataUrl)
       else if (s.status === 503) goOffline()
     }
-    // Secours : captures UNIQUEMENT si le WS est down depuis >4s (vraie panne, pas
-    // une reconnexion de routine). WS connecté OU reconnexion rapide → 0 capture.
+    // Secours : captures UNIQUEMENT si le WS est down depuis >6s (vraie panne). Et
+    // à cadence LENTE (1 toutes les ~1,8 s) → préserve le quota. WS connecté OU
+    // reconnexion → 0 capture.
+    const SNAP_EVERY = 1800
     const bridge = async () => {
       while (alive) {
-        if (!wsOk && Date.now() - wsDownSince > 4000) {
+        if (!wsOk && Date.now() - wsDownSince > 6000) {
           const s = await iremotech.snapshot(id)
           if (!alive) break
-          if (s.ok && s.dataUrl) { if (!wsOk) paintUrl(s.dataUrl) }
-          else if (s.status === 503) { goOffline(); await new Promise(r => window.setTimeout(r, 3000)) }
-          else await new Promise(r => window.setTimeout(r, 500))
+          if (s.ok && s.dataUrl) { if (!wsOk) paintUrl(s.dataUrl); await new Promise(r => window.setTimeout(r, SNAP_EVERY)) }
+          else if (s.status === 503) { goOffline(); await new Promise(r => window.setTimeout(r, 4000)) }
+          else await new Promise(r => window.setTimeout(r, SNAP_EVERY))
         } else {
-          await new Promise(r => window.setTimeout(r, 900))   // WS ok / reconnexion → aucune capture
+          await new Promise(r => window.setTimeout(r, 1000))   // WS ok / reconnexion → aucune capture
         }
       }
     }
