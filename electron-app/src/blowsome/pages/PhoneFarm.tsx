@@ -475,7 +475,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
               {/* On coupe le flux principal quand un modal (plein écran / multi) est
                   ouvert → libère le slot (max_active_devices) et évite un double flux
                   sur le même tel, pour que le plein écran / multi passe bien en WebSocket. */}
-              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={12} rounded={26} captureRaw={calibStep !== 'idle' ? onCaptureRaw : undefined} onStatus={onHeroStatus} onLog={addLog} />}
+              {selected && !fs && !multi && <LivePhone key={`${selected.public_id}-${heroKey}`} device={selected} fps={30} rounded={26} captureRaw={calibStep !== 'idle' ? onCaptureRaw : undefined} onStatus={onHeroStatus} onLog={addLog} />}
               {selected && (fs || multi) && <div style={{ aspectRatio: '9/19.5', width: '100%', maxWidth: 300, margin: '0 auto', borderRadius: 34, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, display: 'grid', placeItems: 'center', color: FAINT, fontSize: 11.5 }}>{tr('Ouvert en grand', 'Open in the big view')}</div>}
               <p style={{ margin: '9px 2px 0', fontSize: 10.5, color: FAINT, textAlign: 'center' }}><Grad style={{ fontWeight: 700 }}>{tr('Clic', 'Click')}</Grad> = {tr('taper', 'tap')} · <Grad style={{ fontWeight: 700 }}>{tr('glisser', 'drag')}</Grad> = swipe · <Grad style={{ fontWeight: 700 }}>{tr('molette', 'wheel')}</Grad> = scroll</p>
             </BlowCard>
@@ -646,7 +646,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
             <button onClick={() => setFs(false)} className="blow-tap" style={{ fontSize: 13, fontWeight: 700, color: '#F87171', background: 'none', border: 'none', cursor: 'pointer' }}>✕ {tr('Fermer', 'Close')}</button>
           </div>
           <div onClick={e => e.stopPropagation()} style={{ height: '80vh', aspectRatio: '9/19.5', maxWidth: '95vw' }}>
-            <LivePhone device={selected} fps={12} onLog={addLog} />
+            <LivePhone device={selected} fps={30} onLog={addLog} />
           </div>
           <span style={{ fontSize: 11, color: FAINT }}>{tr('Clic = taper · glisser = swipe · molette = scroll · Échap = fermer', 'Click = tap · drag = swipe · wheel = scroll · Esc = close')}</span>
         </div>
@@ -674,7 +674,7 @@ export function BlowPhoneFarm({ user }: { user: User }) {
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name || d.public_id}</span>
                   <button onClick={() => { setSelected(d); setMulti(false); setFs(true) }} className="blow-tap" title={tr('Plein écran', 'Fullscreen')} style={{ fontSize: 12, color: '#D8B4FE', background: 'none', border: 'none', cursor: 'pointer' }}>⛶</button>
                 </div>
-                <LivePhone device={d} fps={6} bezel={false} startDelay={i * 500} broadcast={broadcast ? devices.map(x => x.public_id) : undefined} onLog={addLog} />
+                <LivePhone device={d} fps={12} bezel={false} startDelay={i * 500} broadcast={broadcast ? devices.map(x => x.public_id) : undefined} onLog={addLog} />
               </div>
             ))}
           </div>
