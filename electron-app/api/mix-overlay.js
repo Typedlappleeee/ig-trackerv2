@@ -187,7 +187,18 @@ async function handleMediaOverlay(req, res) {
       : `[1:v]${sizeChain}[ov]`
     // Flash noir optionnel : un cache noir apparaît JUSTE AVANT et JUSTE APRÈS
     // l'incrustation (durée très courte, ex. 0.1-0.2 s), à la même position/taille.
-    const bDur = clamp(req.body?.blackDur ?? 0.15, 0.02, 1)
+    // Durée du cache noir. On autorise des flashs ultra-courts (0.01 s), MAIS on
+    // garantit au moins UNE frame : en dessous de 1/fps, aucune image ne serait
+    // rendue (à 30 fps une frame dure 0.033 s). On lit donc le fps de la source.
+    let srcFps = 30
+    try {
+      await execFileAsync(ffmpegPath, ['-nostdin', '-i', inPath], { maxBuffer: 8 * 1024 * 1024, timeout: 15000 })
+    } catch (probeIn) {
+      const mf = /(\d+(?:\.\d+)?)\s*fps/.exec(probeIn.stderr ?? '')
+      if (mf) { const f = parseFloat(mf[1]); if (f > 0 && f < 250) srcFps = f }
+    }
+    const oneFrame = 1 / srcFps
+    const bDur = Math.max(clamp(req.body?.blackDur ?? 0.15, 0.005, 1), oneFrame * 1.05)
     const bx = hasH ? ox : 0, by = hasH ? oy : 0
     const bw = hasH ? ow : VW, bh = hasH ? oh : VH
     // Un drawbox SÉPARÉ par fenêtre (plus sûr qu'une expression combinée), et on

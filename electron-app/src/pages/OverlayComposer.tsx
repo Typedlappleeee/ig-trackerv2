@@ -306,9 +306,12 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
             {blackFlash && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{tr('Durée :', 'Duration:')}</span>
-                {[0.1, 0.15, 0.2, 0.3].map(d => (
+                {[0.01, 0.03, 0.05, 0.1, 0.2].map(d => (
                   <button key={d} onClick={() => setBlackDur(d)} className={`sf-btn sf-btn-sm cursor-pointer ${Math.abs(blackDur - d) < 0.001 ? 'sf-btn-primary' : 'sf-btn-secondary'}`} style={{ padding: '0 10px' }}>{d}s</button>
                 ))}
+                <span style={{ fontSize: 10, color: 'var(--text-4)', width: '100%', marginTop: 3 }}>
+                  {tr('Minimum réel = 1 image (~0,03 s à 30 fps) : en dessous, le flash dure une seule image.', 'Real minimum = 1 frame (~0.03s at 30fps): below that, the flash lasts a single frame.')}
+                </span>
               </div>
             )}
           </div>
