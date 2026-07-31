@@ -200,8 +200,15 @@ async function handleMediaOverlay(req, res) {
       if (st - preS > 0.01) blackChain += boxAt(preS, st)          // cache AVANT
       blackChain += boxAt(st + dur, st + dur + bDur)               // cache APRÈS
     }
-    const filter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=pass${blackChain}[out]`
-    const inputs = isVideo ? ['-i', inPath, '-i', ovPath] : ['-i', inPath, '-loop', '1', '-i', ovPath]
+    // IMAGE : une seule frame, répétée par l'overlay (`repeat`) → elle reste
+    //   affichable pendant toute la fenêtre `enable`. Surtout PAS de `-loop 1`
+    //   (le fichier n'a pas d'extension → démuxeur png_pipe, `-loop` ignoré → 1
+    //   seule frame) ni de `-shortest` (qui couperait la sortie à cette frame).
+    // VIDÉO : `pass` → une fois l'overlay terminé, la vidéo de base continue.
+    // Dans les deux cas la sortie s'arrête avec la vidéo de BASE.
+    const eof = isVideo ? 'pass' : 'repeat'
+    const filter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=${eof}${blackChain}[out]`
+    const inputs = ['-i', inPath, '-i', ovPath]
 
     const ffArgs = [
       '-nostdin', '-threads', '0', ...inputs,
@@ -212,7 +219,9 @@ async function handleMediaOverlay(req, res) {
       // 1080p60/4K → fichier non conforme, lu comme "0 seconde / noir".
       '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
       '-c:a', 'aac', '-b:a', '128k',
-      '-movflags', '+faststart', '-shortest', '-y', outPath,
+      // PAS de -shortest : la longueur suit la vidéo de BASE (sinon un overlay
+      // court — ou une image d'une frame — tronquait toute la sortie).
+      '-movflags', '+faststart', '-y', outPath,
     ]
     try {
       await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 290000, killSignal: 'SIGKILL' })
