@@ -36,6 +36,8 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
   const [h, setH] = useState(0.3)   // hauteur (fraction) — réglable indépendamment → plein écran possible
   const [start, setStart] = useState(0)
   const [end, setEnd] = useState(1)
+  const [blackFlash, setBlackFlash] = useState(false)   // cache noir avant/après l'incrustation
+  const [blackDur, setBlackDur] = useState(0.15)
   const [dur, setDur] = useState(0)
   const [t, setT] = useState(0)
 
@@ -113,6 +115,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
       body: JSON.stringify({
         mode: 'media', videoUrl: v.url, overlayUrl: p.url, overlayType: p.type,
         userId: user.id, x, y, w, h, start, duration: Math.max(end - start, MIN_WIN),
+        blackFlash, blackDur,
         supabaseToken: token, supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       }),
     })
@@ -158,7 +161,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
     await Promise.all(Array.from({ length: Math.min(3, pairs.length) }, worker))
     if (cancelRef.current) setJobs(prev => prev.map(j => (j.status === 'pending' || j.status === 'processing') ? { ...j, status: 'error', error: 'annulé' } : j))
     setRunning(false)
-  }, [videos, photos, mass, distribution, running, x, y, w, h, start, end, user.id, currentOrg?.id, saveFolder])
+  }, [videos, photos, mass, distribution, running, x, y, w, h, start, end, blackFlash, blackDur, user.id, currentOrg?.id, saveFolder])
 
   // Annule la tâche en cours (arrête de lancer de nouveaux rendus).
   const cancelRun = () => { cancelRef.current = true }
@@ -292,6 +295,22 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
           <div>
             <div className="sf-section-label" style={{ marginBottom: 6 }}>{tr('Taille', 'Size')} · {Math.round(w * 100)}%</div>
             <input type="range" min={5} max={100} value={Math.round(w * 100)} onChange={e => setW(Math.min(Number(e.target.value) / 100, 1 - x))} style={{ width: '100%', accentColor: '#818CF8' }} />
+          </div>
+
+          {/* Cache noir juste avant / juste après l'incrustation */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={blackFlash} onChange={e => setBlackFlash(e.target.checked)} />
+              <span className="sf-section-label" style={{ margin: 0 }}>{tr('Cache noir avant / après', 'Black frame before / after')}</span>
+            </label>
+            {blackFlash && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{tr('Durée :', 'Duration:')}</span>
+                {[0.1, 0.15, 0.2, 0.3].map(d => (
+                  <button key={d} onClick={() => setBlackDur(d)} className={`sf-btn sf-btn-sm cursor-pointer ${Math.abs(blackDur - d) < 0.001 ? 'sf-btn-primary' : 'sf-btn-secondary'}`} style={{ padding: '0 10px' }}>{d}s</button>
+                ))}
+              </div>
+            )}
           </div>
 
           <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label={tr('Dossier de destination', 'Destination folder')} />

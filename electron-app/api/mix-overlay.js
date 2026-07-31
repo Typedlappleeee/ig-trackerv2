@@ -185,7 +185,17 @@ async function handleMediaOverlay(req, res) {
     const ovChain = isVideo
       ? `[1:v]${sizeChain},setpts=PTS-STARTPTS+${st}/TB[ov]`  // vidéo overlay démarre à `start`
       : `[1:v]${sizeChain}[ov]`
-    const filter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=pass[out]`
+    // Flash noir optionnel : un cache noir apparaît JUSTE AVANT et JUSTE APRÈS
+    // l'incrustation (durée très courte, ex. 0.1-0.2 s), à la même position/taille.
+    const bDur = clamp(req.body?.blackDur ?? 0.15, 0.02, 1)
+    const bx = hasH ? ox : 0, by = hasH ? oy : 0
+    const bw = hasH ? ow : VW, bh = hasH ? oh : VH
+    const preS = Math.max(st - bDur, 0).toFixed(3), preE = st.toFixed(3)
+    const postS = end, postE = (st + dur + bDur).toFixed(3)
+    const blackChain = req.body?.blackFlash
+      ? `,drawbox=x=${bx}:y=${by}:w=${bw}:h=${bh}:color=black@1:t=fill:enable='between(t,${preS},${preE})+between(t,${postS},${postE})'`
+      : ''
+    const filter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=pass${blackChain}[out]`
     const inputs = isVideo ? ['-i', inPath, '-i', ovPath] : ['-i', inPath, '-loop', '1', '-i', ovPath]
 
     const ffArgs = [
