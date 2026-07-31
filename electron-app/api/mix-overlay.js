@@ -208,7 +208,9 @@ async function handleMediaOverlay(req, res) {
       '-filter_complex', filter,
       '-map', '[out]', '-map', '0:a?',
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      // PAS de -level codé en dur : un level fixe (4.0) est violé par une source
+      // 1080p60/4K → fichier non conforme, lu comme "0 seconde / noir".
+      '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
       '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart', '-shortest', '-y', outPath,
     ]
@@ -217,6 +219,22 @@ async function handleMediaOverlay(req, res) {
     } catch (ffErr) {
       const stderr = (ffErr.stderr ?? '').slice(-800)
       throw new Error(`FFmpeg: ${stderr || ffErr.message}`)
+    }
+
+    // Garde-fou : on vérifie que la sortie est une VRAIE vidéo (durée > 0) avant
+    // de l'envoyer dans la banque — sinon on remonte l'erreur au lieu d'y stocker
+    // un fichier vide/noir.
+    const outStat = fs.existsSync(outPath) ? fs.statSync(outPath) : { size: 0 }
+    let outDur = 0
+    try {
+      // `ffmpeg -i <file>` sort en code 1 mais écrit les infos sur stderr.
+      await execFileAsync(ffmpegPath, ['-nostdin', '-i', outPath], { maxBuffer: 8 * 1024 * 1024, timeout: 15000 })
+    } catch (probeErr) {
+      const m = /Duration:\s*(\d+):(\d+):(\d+\.?\d*)/.exec(probeErr.stderr ?? '')
+      if (m) outDur = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3])
+    }
+    if (outStat.size < 8000 || (outDur > 0 && outDur < 0.2)) {
+      throw new Error(`sortie invalide (${Math.round(outStat.size / 1024)} Ko, ${outDur.toFixed(2)}s) — vérifie que le média de base est bien une vidéo`)
     }
 
     const rand = Math.random().toString(36).slice(2)
@@ -318,7 +336,7 @@ module.exports = async (req, res) => {
         '-i', inputPath, '-i', overlayPath,
         '-filter_complex', filterComplex,
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+        '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
         '-c:a', 'aac', '-b:a', '128k',
         '-movflags', '+faststart',
         '-y', outPath,
@@ -339,7 +357,7 @@ module.exports = async (req, res) => {
         '-i', inputPath,
         '-vf', vf,
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+        '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
         '-c:a', 'aac', '-b:a', '128k',
         '-movflags', '+faststart',
         '-y', outPath,
