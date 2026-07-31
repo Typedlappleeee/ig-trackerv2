@@ -336,7 +336,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
                   <span style={{ width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: j.status === 'done' ? 'var(--ok)' : j.status === 'error' ? 'var(--danger)' : j.status === 'processing' ? '#818CF8' : 'var(--text-4)' }} />
                   <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.vTitle} · {j.pTitle}</span>
                   {j.status === 'done' && j.url && <a href={j.url} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: 'var(--accent-l)', fontWeight: 700 }}>{tr('Voir', 'View')} ↗</a>}
-                  {j.status === 'error' && <span style={{ fontSize: 11, color: 'var(--danger)' }}>{tr('échec', 'failed')}</span>}
+                  {j.status === 'error' && <span title={j.error} style={{ fontSize: 10.5, color: 'var(--danger)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.error || tr('échec', 'failed')}</span>}
                   {j.status === 'processing' && <span style={{ fontSize: 11, color: '#818CF8' }}>…</span>}
                 </div>
               ))}
