@@ -25,6 +25,15 @@ const FAIL_OPEN: LicenseStatus = { valid: true, expired: false, expiresAt: null,
 const HARDCODED_SUPER_ADMINS = ['tintin.aunea@gmail.com']
 
 export async function checkLicense(userId: string, orgId?: string | null): Promise<LicenseStatus> {
+  // Accès complet garanti au superadmin, même si la BASE est injoignable :
+  // l'email vient de la SESSION d'auth (pas de la table profiles). Sans ça, une
+  // simple erreur sur `profiles` faisait retomber en "Free plan" sans Blowsome
+  // ni Studio vidéo.
+  const SUPERADMIN_FULL: LicenseStatus = { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null, blowsome: true }
+  let authEmail = ''
+  try { authEmail = (await supabase.auth.getUser()).data.user?.email ?? '' } catch { /* hors ligne */ }
+  if (HARDCODED_SUPER_ADMINS.includes(authEmail)) return SUPERADMIN_FULL
+
   try {
     // Super admin always valid
     const { data: profile, error: profileErr } = await supabase
@@ -38,7 +47,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
 
     const isSuperAdmin = profile?.is_super_admin ||
       HARDCODED_SUPER_ADMINS.includes(profile?.email ?? '') ||
-      HARDCODED_SUPER_ADMINS.includes((await supabase.auth.getUser()).data.user?.email ?? '')
+      HARDCODED_SUPER_ADMINS.includes(authEmail)
 
     if (isSuperAdmin) {
       // Le superadmin (compte god) garde TOUJOURS l'accès Blowsome — c'est le compte
