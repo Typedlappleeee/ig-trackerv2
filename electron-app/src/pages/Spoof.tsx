@@ -6,6 +6,7 @@ import { useOrg } from '@/lib/orgContext'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { useTr } from '@/lib/i18n'
+import { nextScaleflowNumber, scaleflowName } from '@/lib/bankNaming'
 
 const PRESETS: Record<string, string> = {
   iphone17pro: 'iPhone 17 Pro',
@@ -133,6 +134,9 @@ export function Spoof({ user }: { user: User }) {
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
   const cancelRef                         = useRef(false)   // « Annuler » : stoppe le traitement en cours
+  // Compteur de nommage « scaleflowN.mp4 ». Réservé avant le lot puis incrémenté
+  // à chaque sauvegarde : JS est mono-thread → pas de doublon entre les workers.
+  const bankNum                           = useRef(1)
   const [cancelling, setCancelling]       = useState(false)
   const [autoMode, setAutoMode]           = useState(true)
   const [randomDate, setRandomDate]       = useState(false)
@@ -187,9 +191,10 @@ export function Spoof({ user }: { user: User }) {
 
   async function saveJobToBank(job: SpoofJob): Promise<boolean> {
     if (!job.storagePath || job.savedToBank) return false
+    const n = await nextScaleflowNumber(user.id, currentOrg?.id ?? null)
     const { error } = await supabase.from('content_bank').insert({
       user_id: user.id, org_id: currentOrg?.id ?? null,
-      title: `Spoof — ${job.name}`,
+      title: scaleflowName(n),
       file_url: null,
       storage_path: job.storagePath,
       thumbnail_path: null,
@@ -219,6 +224,7 @@ export function Spoof({ user }: { user: User }) {
   async function runSpoof() {
     if (!selectedVideos.length || running) return
     cancelRef.current = false; setCancelling(false)
+    bankNum.current = await nextScaleflowNumber(user.id, currentOrg?.id ?? null)   // numérotation du lot
 
     const totalOutputs = selectedVideos.length * copies
     const creditCost = totalOutputs * CREDIT_COSTS.clone_vid
@@ -295,7 +301,7 @@ export function Spoof({ user }: { user: User }) {
             if (data.storagePath) {
               const { error: bankErr } = await supabase.from('content_bank').insert({
                 user_id: user.id, org_id: currentOrg?.id ?? null,
-                title: `Spoof — ${job.name}`,
+                title: scaleflowName(bankNum.current++),
                 file_url: null, storage_path: data.storagePath, thumbnail_path: null,
                 folder: saveFolder,
                 // meta dans les tags (pas dans notes, qui sert de description/légende).

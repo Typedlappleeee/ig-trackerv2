@@ -10,6 +10,7 @@ import { useOrg } from '@/lib/orgContext'
 import { BankPicker } from '@/pages/Bank'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { useTr } from '@/lib/i18n'
+import { nextScaleflowNumber, scaleflowName } from '@/lib/bankNaming'
 
 type Vid = { url: string; title: string }
 type Photo = Vid & { type: 'image' | 'video' }
@@ -136,17 +137,8 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
 
-    // Numérotation « scaleflow<N>.mp4 » : on repart du plus grand numéro déjà
-    // présent en banque pour ne jamais créer de doublon.
-    let nextNum = 1
-    try {
-      const q = supabase.from('content_bank').select('title').ilike('title', 'scaleflow%')
-      const { data: existing } = await (currentOrg?.id ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id))
-      for (const row of existing ?? []) {
-        const m = /^scaleflow(\d+)/i.exec(String((row as { title?: string }).title ?? ''))
-        if (m) nextNum = Math.max(nextNum, Number(m[1]) + 1)
-      }
-    } catch { /* pas bloquant : on démarre à 1 */ }
+    // Numérotation « scaleflow<N>.mp4 » (helper partagé avec le Spoof).
+    const nextNum = await nextScaleflowNumber(user.id, currentOrg?.id ?? null)
 
     let cursor = 0
     const worker = async () => {
@@ -160,7 +152,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
           // auto-enregistrement en banque
           if (r.storagePath) {
             await supabase.from('content_bank').insert({
-              user_id: user.id, org_id: currentOrg?.id ?? null, title: `scaleflow${nextNum + i}.mp4`,
+              user_id: user.id, org_id: currentOrg?.id ?? null, title: scaleflowName(nextNum + i),
               file_url: null, storage_path: r.storagePath, thumbnail_path: r.thumbnailPath ?? null, folder: saveFolder, tags: ['overlay'], notes: '',
             })
           }
