@@ -141,10 +141,16 @@ export async function rotateAllProxies(urls: string[], log?: (m: string) => void
   const list = (urls ?? []).map(u => (u ?? '').trim()).filter(u => /^https?:\/\//i.test(u))
   if (list.length === 0) return
   await Promise.all(list.map(u => rotateProxyIp(u, log)))
-  // Laisse le(s) dongle(s) couper l'ancienne IP avant le check de connectivité.
-  // (Le waitForPhoneConnectivity qui suit fait de toute façon office de filet.)
-  await sleep(4000)
+  // Temps de réattribution de la NOUVELLE IP. 4 s était trop court : la plupart
+  // des fournisseurs (quantumhproxy, dongles 4G…) mettent 10-20 s à réattribuer.
+  // Continuer trop tôt = le téléphone boote sans connexion et reste hors-ligne.
+  // (waitForPhoneConnectivity reste le filet de sécurité derrière.)
+  log?.('⏳ Nouvelle IP en cours d’attribution — attente 12 s…')
+  await sleep(ROTATION_SETTLE_MS)
 }
+
+// Délai laissé au fournisseur pour attribuer la nouvelle IP après une rotation.
+export const ROTATION_SETTLE_MS = 12000
 
 // Rote l'IP proxy (si configurée) AVANT d'allumer le téléphone — pour qu'il boote
 // sur la nouvelle IP — puis démarre le téléphone et logue l'IP obtenue. Utilisé par
