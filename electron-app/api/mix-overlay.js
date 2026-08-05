@@ -207,13 +207,40 @@ async function handleMediaOverlay(req, res) {
     // VIDÉO : `pass` → une fois l'overlay terminé, la vidéo de base continue.
     // Dans les deux cas la sortie s'arrête avec la vidéo de BASE.
     const eof = isVideo ? 'pass' : 'repeat'
-    const filter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=${eof}${blackChain}[out]`
+    const vFilter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=${eof}${blackChain}[out]`
     const inputs = ['-i', inPath, '-i', ovPath]
+
+    // ── Son « cling » joué AU MOMENT où l'image apparaît (optionnel) ──────────
+    // On décale le son à `start` (adelay) puis on le mixe à la piste d'origine.
+    // Si la vidéo de base n'a PAS d'audio, on ne mixe pas : le son devient la
+    // piste (sinon amix échoue sur une entrée inexistante).
+    const clingPath = path.join(__dirname, 'assets', 'cling.mp3')
+    const wantSound = !!req.body?.overlaySound && fs.existsSync(clingPath)
+    let srcHasAudio = false
+    if (wantSound) {
+      try { await execFileAsync(ffmpegPath, ['-nostdin', '-i', inPath], { maxBuffer: 8 * 1024 * 1024, timeout: 15000 }) }
+      // `ffmpeg -i` sans sortie termine toujours en erreur : les infos sont sur stderr.
+      // Test volontairement large : si on rate la détection, on garderait le son
+      // « cling » SEUL et on perdrait la bande-son d'origine.
+      catch (p) { srcHasAudio = /Audio:/.test(p.stderr ?? '') }
+    }
+    let aFilter = '', audioMaps = ['-map', '0:a?']
+    if (wantSound) {
+      inputs.push('-i', clingPath)
+      const delayMs = Math.round(st * 1000)
+      const vol = clamp(req.body?.soundVolume ?? 1, 0.05, 3)
+      const snd = `[2:a]adelay=${delayMs}|${delayMs},volume=${vol.toFixed(2)}[snd]`
+      aFilter = srcHasAudio
+        ? `;${snd};[0:a][snd]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]`
+        : `;${snd}`
+      audioMaps = ['-map', srcHasAudio ? '[aout]' : '[snd]']
+    }
+    const filter = `${vFilter}${aFilter}`
 
     const ffArgs = [
       '-nostdin', '-threads', '0', ...inputs,
       '-filter_complex', filter,
-      '-map', '[out]', '-map', '0:a?',
+      '-map', '[out]', ...audioMaps,
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
       // PAS de -level codé en dur : un level fixe (4.0) est violé par une source
       // 1080p60/4K → fichier non conforme, lu comme "0 seconde / noir".

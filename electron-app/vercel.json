@@ -4,6 +4,7 @@
     "api/gx.js":      { "maxDuration": 30 },
     "api/rotate.js":  { "maxDuration": 15 },
     "api/cron.js":    { "maxDuration": 60 },
+    "api/mix-overlay.js": { "includeFiles": "api/assets/**" },
     "api/iremotech.js": { "maxDuration": 60 },
     "api/iremotech-stream.js": { "maxDuration": 60 }
   },
