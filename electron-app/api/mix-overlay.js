@@ -156,10 +156,10 @@ async function handleMediaOverlay(req, res) {
   const outPath = path.join(tmpDir, `movl_out_${ts}.mp4`)
   const thumbPath = path.join(tmpDir, `movl_th_${ts}.jpg`)
   try {
-    const r1 = await fetchMediaFollow(videoUrl)
+    const r1 = await fetchMediaFollow(videoUrl, { timeoutMs: 120000 })  // gros fichiers (banque 100 Mo)
     if (!r1.ok) return res.status(400).json({ ok: false, error: `base ${r1.status}` })
     fs.writeFileSync(inPath, Buffer.from(await r1.arrayBuffer()))
-    const r2 = await fetchMediaFollow(overlayUrl)
+    const r2 = await fetchMediaFollow(overlayUrl, { timeoutMs: 60000 })
     if (!r2.ok) return res.status(400).json({ ok: false, error: `overlay ${r2.status}` })
     fs.writeFileSync(ovPath, Buffer.from(await r2.arrayBuffer()))
 
@@ -331,7 +331,7 @@ module.exports = async (req, res) => {
     if (videoUrl) {
       // anti-SSRF : uniquement une URL de la banque Supabase ; suit les
       // redirections (Supabase → CDN) en re-validant chaque saut.
-      const resp = await fetchMediaFollow(videoUrl)
+      const resp = await fetchMediaFollow(videoUrl, { timeoutMs: 120000 })
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch video: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {

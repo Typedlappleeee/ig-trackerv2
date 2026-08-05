@@ -135,7 +135,7 @@ async function handleSpoof(req, res) {
     if (sourceUrl) {
       // anti-SSRF : uniquement une URL de la banque Supabase ; suit les
       // redirections (Supabase → CDN) en re-validant chaque saut.
-      const resp = await fetchMediaFollow(sourceUrl)
+      const resp = await fetchMediaFollow(sourceUrl, { timeoutMs: 120000 })  // gros fichiers (banque 100 Mo)
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch source: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {
@@ -394,7 +394,7 @@ module.exports = async (req, res) => {
     if (sourceUrl) {
       // anti-SSRF : uniquement une URL de la banque Supabase ; suit les
       // redirections (Supabase → CDN) en re-validant chaque saut.
-      const resp = await fetchMediaFollow(sourceUrl)
+      const resp = await fetchMediaFollow(sourceUrl, { timeoutMs: 120000 })  // gros fichiers (banque 100 Mo)
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch source: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {
