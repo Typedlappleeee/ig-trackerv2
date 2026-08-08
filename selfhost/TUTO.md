@@ -13,11 +13,17 @@ et envoie-moi le message.
 1. Va sur **[console.hetzner.cloud](https://console.hetzner.cloud)** → crée un compte
 2. **New Project** → nomme-le `scaleflow` → **Add Server**
 3. Renseigne :
-   - **Location** : Falkenstein (Allemagne)
+   - **Location** : **Falkenstein**, **Nuremberg** ou **Helsinki** ← ⚠️ l'ARM
+     n'existe QUE dans ces 3 villes. Ailleurs (US, Singapour), rien ne s'affichera.
    - **Image** : **Ubuntu 24.04**
-   - **Type** : clique l'onglet **Arm64 (Ampere)** ← ⚠️ **très important**
-     - **CAX41** (16 vCPU, 31 Go) ≈ 33 €/mois → ~10-12 téléphones
-     - ou **CAX21** (8 vCPU, 16 Go) ≈ 16 €/mois → 4-5 téléphones *(pour tester)*
+   - **Type** : onglet **Arm64 (Ampere)** ← ⚠️ **très important**
+
+   | Modèle | vCPU / RAM | Prix/mois | Téléphones |
+   |---|---|---|---|
+   | **CAX41** | 16 / 32 Go | **41,49 €** | ~10-12 |
+   | **CAX31** | 8 / 16 Go | **21,49 €** | ~5-6 |
+   | **CAX21** | 4 / 8 Go | **10,99 €** | ~2-3 *(test)* |
+
    - **SSH key** : ajoute la tienne, sinon coche le mot de passe root (reçu par mail)
 4. **Create & Buy now**
 
@@ -25,6 +31,27 @@ et envoie-moi le message.
 
 > ⚠️ **ARM (CAX) obligatoire.** Sur un serveur x86 (CX/CPX), Android doit traduire
 > les applis ARM → signal de détection évident pour Instagram.
+
+### 🔴 « Not available » sur tous les modèles ?
+
+C'est fréquent : **l'ARM Hetzner est souvent en rupture**. Dans l'ordre :
+
+1. **Vérifie la localisation** — choisis **Falkenstein**, **Nuremberg** ou
+   **Helsinki**. Sur toute autre ville, l'ARM n'est pas proposé du tout.
+2. **Regarde le stock en direct** : [radar.iodev.org/cloud-status](https://radar.iodev.org/cloud-status)
+   → tu vois quel modèle est dispo dans quelle ville, en temps réel.
+3. **Essaie le CAX41** — les petits modèles (CAX11/21/31) partent en premier.
+4. **Réessaie plus tard** — le stock revient en général **en quelques heures**.
+
+**Si vraiment rien ne se libère**, alternatives ARM :
+
+| Fournisseur | Offre | Prix |
+|---|---|---|
+| **Oracle Cloud** | Ampere A1 : 4 cœurs / 24 Go | **gratuit à vie** *(idéal pour tester)* |
+| **Scaleway** | instances ARM Ampere | ~15-40 €/mois |
+| **Netcup** | VPS ARM | ~8-25 €/mois |
+
+Dis-moi lequel tu prends, je t'adapte le tuto (les commandes sont quasi identiques).
 
 ---
 

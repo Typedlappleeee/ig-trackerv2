@@ -16,7 +16,7 @@ Chez **Hetzner Cloud** (le moins cher pour de l'ARM) :
 2. **Location** : Falkenstein ou Helsinki
 3. **Image** : **Ubuntu 24.04**
 4. **Type** : onglet **Arm64 (Ampere)** → **CAX41** (16 vCPU, 31 Go) ≈ **33 €/mois**
-   - Pour un simple test : **CAX21** (8 vCPU, 16 Go) ≈ 16 €/mois → 4-5 téléphones
+   - Pour tester : **CAX31** (8 vCPU, 16 Go) ≈ 21,49 €/mois → ~5-6 téléphones
 5. **SSH key** : ajoute la tienne (ou choisis un mot de passe root, envoyé par mail)
 6. **Create & Buy now**
 
