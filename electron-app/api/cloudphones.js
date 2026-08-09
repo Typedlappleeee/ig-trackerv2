@@ -21,7 +21,7 @@ async function relay(agentUrl, agentToken, path, method = 'GET', body, timeoutMs
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
 
-  const { op, agentUrl, agentToken, id, name, cmd, timeout, url } = req.body ?? {}
+  const { op, agentUrl, agentToken, id, name, androidVersion, cmd, timeout, url } = req.body ?? {}
   if (!agentUrl || !agentToken) return res.status(200).json({ ok: false, error: 'Agent non configuré (URL/token manquant)' })
 
   // Garde-fou : n'autorise pas de cibler une IP interne (SSRF) — l'agent doit
@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
     switch (op) {
       case 'health':     r = await relay(agentUrl, agentToken, '/health'); break
       case 'list':        r = await relay(agentUrl, agentToken, '/instances'); break
-      case 'create':      r = await relay(agentUrl, agentToken, '/instances', 'POST', { name }); break
+      case 'create':      r = await relay(agentUrl, agentToken, '/instances', 'POST', { name, androidVersion }, 210000); break
       case 'remove':       r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}`, 'DELETE'); break
       case 'start':       r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/start`, 'POST'); break
       case 'stop':        r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/stop`, 'POST'); break

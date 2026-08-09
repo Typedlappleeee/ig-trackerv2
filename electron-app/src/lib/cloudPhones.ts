@@ -36,7 +36,35 @@ export async function saveCloudAgentConfig(orgId: string | null, userId: string,
 }
 
 export interface CpInstance { id: string; name: string; state: string; adbPort: number | null; serial: string | null }
+export interface CpFingerprint { brand: string; model: string; device: string; name: string }
 interface CpResult<T = unknown> { ok: boolean; status?: number; error?: string; data?: T }
+
+// ─── Métadonnées locales ─────────────────────────────────────────────────────
+// L'agent ne stocke que l'id du conteneur : ni nom convivial, ni version Android,
+// ni modèle, ni date de création. On garde ça côté navigateur (localStorage) pour
+// pouvoir l'afficher dans la table. Clé unique par id de téléphone.
+export interface CpMeta { name?: string; android?: string; store?: string; model?: string; createdAt?: number }
+const META_KEY = 'sf-cp-meta'
+export function loadAllCpMeta(): Record<string, CpMeta> {
+  try { return JSON.parse(localStorage.getItem(META_KEY) || '{}') as Record<string, CpMeta> } catch { return {} }
+}
+export function saveCpMeta(id: string, meta: CpMeta): void {
+  const all = loadAllCpMeta(); all[id] = { ...all[id], ...meta }
+  localStorage.setItem(META_KEY, JSON.stringify(all))
+}
+export function removeCpMeta(id: string): void {
+  const all = loadAllCpMeta(); delete all[id]; localStorage.setItem(META_KEY, JSON.stringify(all))
+}
+// Slug + suffixe hexadécimal → identifiant de création unique et lisible
+// (respecte le NAME_RE de l'agent : a-z 0-9 _ - , ≤ 40 car.).
+export function slugifyPhone(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 28) || 'phone'
+}
+export function genPhoneId(name: string): string {
+  const hex = Array.from({ length: 6 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')
+  return `${slugifyPhone(name)}-${hex}`
+}
 
 async function call<T = unknown>(op: string, payload: Record<string, unknown> = {}): Promise<CpResult<T>> {
   if (!agentUrl || !agentToken) return { ok: false, error: 'Agent non configuré' }
@@ -52,7 +80,8 @@ async function call<T = unknown>(op: string, payload: Record<string, unknown> = 
 export const cloudPhones = {
   health: () => call('health'),
   list: () => call<{ instances: CpInstance[] }>('list'),
-  create: (name: string) => call<{ instance: CpInstance }>('create', { name }),
+  create: (name: string, androidVersion?: string) =>
+    call<{ instance: CpInstance & { fingerprint?: CpFingerprint } }>('create', { name, androidVersion }),
   remove: (id: string) => call('remove', { id }),
   start: (id: string) => call('start', { id }),
   stop: (id: string) => call('stop', { id }),
