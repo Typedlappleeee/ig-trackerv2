@@ -332,6 +332,21 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     flash(next === 0 ? 'Portrait' : 'Paysage')
   }
 
+  // Capture l'arbre UI de l'écran (uiautomator) et l'enregistre en .xml sur le PC
+  // — sert à écrire/déboguer les flows d'automatisation (sélecteurs d'éléments).
+  const dumpUiFile = async () => {
+    setPanel(null); flash('Capture de l\'interface…', 0)
+    await cloudPhones.shell(inst.id, 'uiautomator dump /sdcard/sf-ui.xml >/dev/null 2>&1', 30000)
+    const r = await cloudPhones.shell(inst.id, 'cat /sdcard/sf-ui.xml', 15000)
+    const xml = r.ok ? (r.data?.output ?? '') : ''
+    if (!xml || xml.indexOf('<node') < 0) { flash('Échec du dump UI'); return }
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([xml], { type: 'text/xml' }))
+    a.download = `ui-${inst.name}-${Date.now()}.xml`
+    document.body.appendChild(a); a.click(); a.remove()
+    flash('✓ Dump UI enregistré')
+  }
+
   const restart = async () => {
     if (!window.confirm('Redémarrer le téléphone ?')) return
     setPanel(null); flash('Redémarrage…', 0)
@@ -526,6 +541,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <button onClick={() => { setFluid(v => !v); setPanel(null) }} style={ghostBtnWide}>{fluid ? '📷 Passer en mode capture' : '🎥 Passer en mode fluide'}</button>
                   <button onClick={() => quickKey('3')} style={ghostBtnWide}>🏠 Accueil</button>
+                  <button onClick={dumpUiFile} style={ghostBtnWide}>🔍 Dump UI (debug auto)</button>
                   <button onClick={restart} style={{ ...ghostBtnWide, color: '#F87171', borderColor: 'rgba(248,113,113,0.3)' }}>♻️ Redémarrer le téléphone</button>
                 </div>
               </>
