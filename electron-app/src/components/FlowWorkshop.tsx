@@ -6,7 +6,7 @@
 // retrouve le bouton par son sens → résistant aux changements de layout/version.
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cloudPhones, type CpInstance } from '@/lib/cloudPhones'
-import { dumpUi, matcherAt, typeText, dismissPopups } from '@/lib/phoneAutomation'
+import { dumpUi, matcherAt, typeText, dismissPopups, openApp, isInstalled } from '@/lib/phoneAutomation'
 import { runFlow, type Step, type Flow } from '@/lib/flowRunner'
 import { upsertFlow, newFlowId, type Visibility } from '@/lib/flowStore'
 
@@ -134,8 +134,12 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
   const addWait = () => { const s = window.prompt('Attendre combien de secondes ?', '2'); const ms = Math.round((Number(s) || 0) * 1000); if (ms > 0) addStep({ do: 'wait', ms }, `Attendre ${ms / 1000}s`) }
   const chooseApp = async (pkg: string, label: string) => {
     setShowApps(false)
+    if (phoneId && !await isInstalled(phoneId, pkg)) {
+      setBusy(`⚠️ ${label} n’est pas installé sur ce tel — installe-le via Cloud Phones → Apps`)
+      window.setTimeout(() => setBusy(''), 4000); return
+    }
     addStep({ do: 'open', pkg }, `Ouvrir ${label}`)
-    if (phoneId) { await cloudPhones.shell(phoneId, `monkey -p ${pkg} -c android.intent.category.LAUNCHER 1`); window.setTimeout(refreshSnap, 1600) }
+    if (phoneId) { await openApp(phoneId, pkg); window.setTimeout(refreshSnap, 1800) }
   }
   const chooseAppOther = () => {
     const p = window.prompt('Package Android de l’app (ex: com.reddit.frontpage) :'); if (!p?.trim()) return

@@ -171,9 +171,23 @@ export async function typeText(id: string, text: string): Promise<void> {
   await cloudPhones.shell(id, `am broadcast -a ADB_INPUT_B64 --es msg ${b64}`)
 }
 
-// Ouvre une app par son package.
-export async function openApp(id: string, pkg: string): Promise<void> {
+// Vrai si le package est installé sur le tel.
+export async function isInstalled(id: string, pkg: string): Promise<boolean> {
+  const r = await cloudPhones.shell(id, `pm list packages ${pkg}`, 10000)
+  return !!r.ok && (r.data?.output ?? '').split('\n').some(l => l.trim() === `package:${pkg}`)
+}
+
+// Ouvre une app par son package. On résout d'abord l'activité de lancement
+// (fiable) puis on la démarre ; repli sur monkey si la résolution échoue.
+export async function openApp(id: string, pkg: string): Promise<boolean> {
+  const r = await cloudPhones.shell(id, `cmd package resolve-activity --brief ${pkg} | tail -n 1`, 10000)
+  const comp = (r.data?.output ?? '').trim()
+  if (comp.includes('/') && !/no\s|error|exception/i.test(comp)) {
+    await cloudPhones.shell(id, `am start -n ${comp}`)
+    return true
+  }
   await cloudPhones.shell(id, `monkey -p ${pkg} -c android.intent.category.LAUNCHER 1`)
+  return false
 }
 
 // Touches système utiles.
