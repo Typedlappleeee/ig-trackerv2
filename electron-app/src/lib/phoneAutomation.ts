@@ -65,6 +65,12 @@ const norm = (s: string) => s.toLowerCase().trim()
 // coordonnée !). On prend le plus petit nœud sous le doigt, et on choisit le
 // critère le plus stable dispo : texte > description > resource-id. C'est ce qui
 // rend un flow enregistré robuste (il retrouve le bouton par son sens au rejeu).
+// resource-id génériques (conteneurs plein écran) à NE PAS utiliser comme cible :
+// ils ne désignent pas un bouton et cassent le rejeu.
+const GENERIC_IDS = new Set([
+  'action_bar_root', 'content', 'container', 'root', 'decor_content_parent', 'list',
+  'recycler_view', 'main_content', 'coordinator', 'drawer_layout', 'fragment_container', 'navigation_bar_background',
+])
 export function matcherAt(nodes: UiNode[], x: number, y: number): { matcher: Matcher; label: string } | null {
   const inside = nodes.filter(n => x >= n.x && x <= n.x + n.w && y >= n.y && y <= n.y + n.h)
   if (!inside.length) return null
@@ -73,7 +79,9 @@ export function matcherAt(nodes: UiNode[], x: number, y: number): { matcher: Mat
   if (withText) return { matcher: { text: withText.text.trim() }, label: `texte « ${withText.text.trim()} »` }
   const withDesc = byArea.find(n => n.desc.trim())
   if (withDesc) return { matcher: { desc: withDesc.desc.trim() }, label: `desc « ${withDesc.desc.trim()} »` }
-  const withId = byArea.find(n => n.id.trim())
+  // id : on ignore les conteneurs génériques, et on préfère un élément cliquable.
+  const idOk = (n: UiNode) => { const s = n.id.split('/').pop() || ''; return !!s && !GENERIC_IDS.has(s) }
+  const withId = byArea.find(n => idOk(n) && n.clickable) || byArea.find(idOk)
   if (withId) { const short = withId.id.split('/').pop() || withId.id; return { matcher: { id: short }, label: `id « ${short} »` } }
   return null
 }
