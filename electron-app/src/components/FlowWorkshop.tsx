@@ -8,11 +8,11 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { cloudPhones, type CpInstance } from '@/lib/cloudPhones'
 import { dumpUi, matcherAt } from '@/lib/phoneAutomation'
 import { runFlow, type Step, type Flow } from '@/lib/flowRunner'
-import { saveUserFlow, newFlowId } from '@/lib/userFlows'
+import { upsertFlow, newFlowId, type Visibility } from '@/lib/flowStore'
 
-interface Props { phones: CpInstance[]; onSaved: () => void }
+interface Props { phones: CpInstance[]; userId: string; orgId: string | null; onSaved: () => void }
 
-export function FlowWorkshop({ phones, onSaved }: Props) {
+export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
   const [phoneId, setPhoneId] = useState('')
   const [snap, setSnap] = useState<string | null>(null)
   const [steps, setSteps] = useState<Step[]>([])
@@ -22,6 +22,7 @@ export function FlowWorkshop({ phones, onSaved }: Props) {
   const [busy, setBusy] = useState('')
   const [running, setRunning] = useState(false)
   const [log, setLog] = useState<string[]>([])
+  const [visibility, setVisibility] = useState<Visibility>('private')
   const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => { setPhoneId(p => p || phones[0]?.id || '') }, [phones])
@@ -81,13 +82,16 @@ export function FlowWorkshop({ phones, onSaved }: Props) {
     refreshSnap()
   }
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim() || !steps.length) { setBusy('Donne un nom et au moins une étape'); window.setTimeout(() => setBusy(''), 2500); return }
+    setBusy('Enregistrement…')
     const flow: Flow = { id: newFlowId(), name: name.trim(), steps, official: false }
-    saveUserFlow(flow)
-    setBusy('✓ Automatisation enregistrée')
-    onSaved()
-    window.setTimeout(() => setBusy(''), 2500)
+    const res = await upsertFlow(flow, { userId, orgId, visibility })
+    if (res.ok) {
+      setBusy(visibility === 'community' ? '✓ Publié dans la communauté' : '✓ Automatisation enregistrée')
+      onSaved()
+      window.setTimeout(() => setBusy(''), 2500)
+    } else setBusy(`Échec : ${res.error}`)
   }
 
   return (
@@ -136,6 +140,11 @@ export function FlowWorkshop({ phones, onSaved }: Props) {
 
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Nom de l’automatisation" style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+          <select value={visibility} onChange={e => setVisibility(e.target.value as Visibility)} style={{ ...inputStyle, width: 'auto' }} title="Visibilité">
+            <option value="private">🔒 Privé</option>
+            {orgId && <option value="org">🏢 Mon agence</option>}
+            <option value="community">🌍 Communauté</option>
+          </select>
           <button onClick={test} disabled={running || !steps.length} style={{ ...ghost, opacity: (running || !steps.length) ? 0.5 : 1 }}>{running ? '⏳' : '▶️ Tester'}</button>
           <button onClick={save} style={primary}>💾 Enregistrer</button>
         </div>

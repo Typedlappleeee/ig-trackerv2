@@ -14,7 +14,7 @@ import { useOrg } from '@/lib/orgContext'
 import { cloudPhones, loadCloudAgentConfig, getCloudAgent, type CpInstance } from '@/lib/cloudPhones'
 import { runFlow, type Flow } from '@/lib/flowRunner'
 import { OFFICIAL_FLOWS } from '@/lib/officialFlows'
-import { loadUserFlows } from '@/lib/userFlows'
+import { listMyFlows, listCommunityFlows, bumpInstalls, type StoredFlow } from '@/lib/flowStore'
 import { FlowWorkshop } from '@/components/FlowWorkshop'
 
 interface Props { user: User }
@@ -27,16 +27,24 @@ export function AutomationLab({ user }: Props) {
   const [instances, setInstances] = useState<CpInstance[]>([])
   const [tab, setTab] = useState<'run' | 'create'>('run')
 
-  const [userFlows, setUserFlows] = useState<Flow[]>(() => loadUserFlows())
+  const [myFlows, setMyFlows] = useState<StoredFlow[]>([])
+  const [communityFlows, setCommunityFlows] = useState<StoredFlow[]>([])
   const [flowId, setFlowId] = useState(OFFICIAL_FLOWS[0]?.id ?? '')
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<Record<string, RunState>>({})
   const [running, setRunning] = useState(false)
 
-  const allFlows: Flow[] = [...OFFICIAL_FLOWS, ...userFlows]
+  const orgId = currentOrg?.id ?? null
+  const allFlows: Flow[] = [...OFFICIAL_FLOWS, ...myFlows, ...communityFlows]
   const flow = allFlows.find(f => f.id === flowId)
   const runningPhones = instances.filter(i => /running|up/i.test(i.state))
+
+  const loadFlows = useCallback(async () => {
+    const [mine, community] = await Promise.all([listMyFlows(user.id), listCommunityFlows(user.id)])
+    setMyFlows(mine); setCommunityFlows(community)
+  }, [user.id])
+  useEffect(() => { loadFlows() }, [loadFlows])
 
   const loadInstances = useCallback(async () => {
     const r = await cloudPhones.list()
@@ -64,6 +72,7 @@ export function AutomationLab({ user }: Props) {
   const run = async () => {
     if (!flow || selected.size === 0) return
     const ids = [...selected]
+    if (communityFlows.some(f => f.id === flow.id)) bumpInstalls(flow.id)  // compteur de popularité
     setResults(Object.fromEntries(ids.map(id => [id, { status: 'run', log: [] } as RunState])))
     setRunning(true)
     await Promise.all(ids.map(async id => {
@@ -93,15 +102,16 @@ export function AutomationLab({ user }: Props) {
           </div>
 
           {tab === 'create'
-            ? <FlowWorkshop phones={runningPhones} onSaved={() => setUserFlows(loadUserFlows())} />
+            ? <FlowWorkshop phones={runningPhones} userId={user.id} orgId={orgId} onSaved={loadFlows} />
             : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* 1 · Automatisation (catégorisée) */}
                 <Card title="1 · Automatisation">
                   <FlowGroup title="⭐ Officielles" flows={OFFICIAL_FLOWS} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} />
-                  <FlowGroup title="👤 Mes automatisations" flows={userFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }}
+                  <FlowGroup title="👤 Mes automatisations" flows={myFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }}
                     empty="Rien encore — crée-en dans l’onglet « Créer »." />
-                  <FlowGroup title="🌍 Communauté" flows={[]} sel={flowId} onPick={() => {}} empty="Bientôt : automatisations partagées par la communauté." />
+                  <FlowGroup title="🌍 Communauté" flows={communityFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }}
+                    empty="Aucune automatisation communautaire pour l’instant." />
                   {flow?.inputs?.map(inp => (
                     <div key={inp.key} style={{ marginTop: 12 }}>
                       <label style={{ fontSize: 11.5, fontWeight: 700, color: '#c8c8d8', display: 'block', marginBottom: 4 }}>{inp.label}{inp.optional ? ' (optionnel)' : ''}</label>
