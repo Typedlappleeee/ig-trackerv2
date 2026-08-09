@@ -6,11 +6,21 @@
 // retrouve le bouton par son sens → résistant aux changements de layout/version.
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cloudPhones, type CpInstance } from '@/lib/cloudPhones'
-import { dumpUi, matcherAt } from '@/lib/phoneAutomation'
+import { dumpUi, matcherAt, typeText, dismissPopups } from '@/lib/phoneAutomation'
 import { runFlow, type Step, type Flow } from '@/lib/flowRunner'
 import { upsertFlow, newFlowId, type Visibility } from '@/lib/flowStore'
 
 interface Props { phones: CpInstance[]; userId: string; orgId: string | null; onSaved: () => void }
+
+// Apps connues → on choisit dans une liste (plus besoin de connaître le package).
+const KNOWN_APPS: { label: string; pkg: string; icon: string }[] = [
+  { label: 'Instagram', pkg: 'com.instagram.android',    icon: '📸' },
+  { label: 'TikTok',    pkg: 'com.zhiliaoapp.musically', icon: '🎵' },
+  { label: 'Threads',   pkg: 'com.instagram.barcelona',  icon: '🧵' },
+  { label: 'Snapchat',  pkg: 'com.snapchat.android',     icon: '👻' },
+  { label: 'Facebook',  pkg: 'com.facebook.katana',      icon: '📘' },
+  { label: 'X',         pkg: 'com.twitter.android',      icon: '🐦' },
+]
 
 export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
   const [phoneId, setPhoneId] = useState('')
@@ -23,6 +33,7 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
   const [running, setRunning] = useState(false)
   const [log, setLog] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Visibility>('private')
+  const [showApps, setShowApps] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
   const gestureRef = useRef<{ x: number; y: number; t: number } | null>(null)
 
@@ -99,11 +110,24 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
     window.setTimeout(refreshSnap, 650)
   }
 
-  const addType = () => { const t = window.prompt('Texte à écrire (emoji ok) :'); if (t) addStep({ do: 'type', text: t }, `Écrire « ${t} »`) }
+  // Les actions agissent EN DIRECT sur le tel (l'aperçu suit) + ajoutent l'étape.
+  const addType = async () => {
+    const t = window.prompt('Texte à écrire (emoji ok) :'); if (!t) return
+    addStep({ do: 'type', text: t }, `Écrire « ${t} »`)
+    if (phoneId) { await typeText(phoneId, t); window.setTimeout(refreshSnap, 500) }
+  }
   const addWait = () => { const s = window.prompt('Attendre combien de secondes ?', '2'); const ms = Math.round((Number(s) || 0) * 1000); if (ms > 0) addStep({ do: 'wait', ms }, `Attendre ${ms / 1000}s`) }
-  const addOpen = () => { const p = window.prompt('Package de l’app à ouvrir :', 'com.instagram.android'); if (p) addStep({ do: 'open', pkg: p.trim() }, `Ouvrir ${p.trim()}`) }
-  const addPopups = () => addStep({ do: 'popups' }, 'Fermer les popups')
-  const addBack = () => addStep({ do: 'key', key: 'back' }, 'Retour')
+  const chooseApp = async (pkg: string, label: string) => {
+    setShowApps(false)
+    addStep({ do: 'open', pkg }, `Ouvrir ${label}`)
+    if (phoneId) { await cloudPhones.shell(phoneId, `monkey -p ${pkg} -c android.intent.category.LAUNCHER 1`); window.setTimeout(refreshSnap, 1600) }
+  }
+  const chooseAppOther = () => {
+    const p = window.prompt('Package Android de l’app (ex: com.reddit.frontpage) :'); if (!p?.trim()) return
+    chooseApp(p.trim(), p.trim())
+  }
+  const addPopups = async () => { addStep({ do: 'popups' }, 'Fermer les popups'); if (phoneId) { await dismissPopups(phoneId); window.setTimeout(refreshSnap, 650) } }
+  const addBack = async () => { addStep({ do: 'key', key: 'back' }, 'Retour'); if (phoneId) { await cloudPhones.shell(phoneId, 'input keyevent 4'); window.setTimeout(refreshSnap, 650) } }
 
   const test = async () => {
     if (!phoneId || !steps.length) return
@@ -158,12 +182,24 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
 
       {/* Étapes + actions */}
       <div style={{ flex: 1, minWidth: 280 }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-          <TB onClick={addType}>➕ Écrire</TB>
-          <TB onClick={addWait}>➕ Attendre</TB>
-          <TB onClick={addOpen}>➕ Ouvrir app</TB>
-          <TB onClick={addBack}>➕ Retour</TB>
-          <TB onClick={addPopups}>➕ Fermer popups</TB>
+        <div style={{ position: 'relative', marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <TB onClick={addType}>➕ Écrire</TB>
+            <TB onClick={addWait}>➕ Attendre</TB>
+            <TB onClick={() => setShowApps(v => !v)}>➕ Ouvrir app ▾</TB>
+            <TB onClick={addBack}>➕ Retour</TB>
+            <TB onClick={addPopups}>➕ Fermer popups</TB>
+          </div>
+          {showApps && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20, padding: 8, borderRadius: 10, background: 'rgba(17,18,26,0.98)', border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 16px 40px -14px rgba(0,0,0,0.8)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: 260 }}>
+              {KNOWN_APPS.map(a => (
+                <button key={a.pkg} onClick={() => chooseApp(a.pkg, a.label)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#E9E9F2', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                  <span>{a.icon}</span>{a.label}
+                </button>
+              ))}
+              <button onClick={chooseAppOther} style={{ gridColumn: '1 / -1', padding: '7px 9px', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent', color: '#8a8a9c', cursor: 'pointer', fontSize: 11.5 }}>Autre (package)…</button>
+            </div>
+          )}
         </div>
 
         <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', minHeight: 120, padding: 8 }}>
