@@ -26,7 +26,10 @@ const APP_CATALOG: { pkg: string; label: string; icon: string }[] = [
 ]
 
 export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Props) {
-  const [pos, setPos] = useState({ x: 80 + offset * 28, y: 70 + offset * 24 })
+  const [pos, setPos] = useState({ x: 80 + offset * 28, y: 60 + offset * 24 })
+  const [size, setSize] = useState({ w: 400, h: 820 })   // fenêtre redimensionnable
+  const [maximized, setMaximized] = useState(false)
+  const prevBox = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
   const dragRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
   const [phase, setPhase] = useState<Phase>('fetching')
   const [errMsg, setErrMsg] = useState('')
@@ -80,6 +83,33 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     }
     const onUp = () => { dragRef.current = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
+  }
+
+  // Redimensionnement par la poignée en bas à droite.
+  const onResizeDown = (e: React.PointerEvent) => {
+    e.stopPropagation(); onFocus()
+    if (maximized) setMaximized(false)
+    const start = { w: size.w, h: size.h, px: e.clientX, py: e.clientY }
+    const onMove = (ev: PointerEvent) => {
+      setSize({ w: Math.max(300, start.w + (ev.clientX - start.px)), h: Math.max(460, start.h + (ev.clientY - start.py)) })
+    }
+    const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
+  }
+
+  // Plein écran : agrandit au max de la hauteur dispo en gardant le ratio d'un
+  // téléphone (largeur ≈ hauteur × 9/16 + place pour la barre scrcpy).
+  const toggleMax = () => {
+    if (maximized && prevBox.current) {
+      const b = prevBox.current
+      setPos({ x: b.x, y: b.y }); setSize({ w: b.w, h: b.h }); setMaximized(false)
+    } else {
+      prevBox.current = { x: pos.x, y: pos.y, w: size.w, h: size.h }
+      const h = Math.max(560, Math.round(window.innerHeight * 0.92))
+      const w = Math.round((h - 92) * 9 / 16 + 48)
+      setPos({ x: Math.max(16, Math.round((window.innerWidth - w) / 2)), y: 16 })
+      setSize({ w, h }); setMaximized(true)
+    }
   }
 
   const onScreenClick = async (e: React.MouseEvent<HTMLImageElement>) => {
@@ -140,31 +170,41 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
       })()
     : null
 
+  const running = /running|up/i.test(inst.state)
+
   return (
     <div
       onMouseDown={onFocus}
       style={{
-        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: fluid && phase === 'ready' ? 460 : 300,
-        borderRadius: 14, overflow: 'hidden', background: '#0d0e14',
-        border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 60px -20px rgba(0,0,0,0.7)',
+        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: size.w, height: size.h,
+        borderRadius: 16, overflow: 'hidden', background: '#0b0c12',
+        border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 30px 70px -24px rgba(0,0,0,0.8)',
         display: 'flex', flexDirection: 'column',
       }}
     >
       {/* Barre de titre — déplaçable */}
-      <div onPointerDown={onTitleDown} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', background: 'linear-gradient(135deg,#1b1c28,#14151d)', cursor: 'grab', userSelect: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <span style={{ width: 18, height: 18, borderRadius: 5, background: 'linear-gradient(135deg,#818CF8,#6366F1)', display: 'grid', placeItems: 'center', fontSize: 10, flexShrink: 0 }}>📱</span>
-        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: '#E9E9F2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</span>
-        <button onClick={onClose} style={{ width: 20, height: 20, borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.06)', color: '#9a9ab0', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}>✕</button>
+      <div onPointerDown={onTitleDown} onDoubleClick={toggleMax}
+        style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 8px 0 12px', height: 42, flexShrink: 0, background: 'linear-gradient(135deg,#1c1d2a,#131420)', cursor: 'grab', userSelect: 'none', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <span style={{ width: 20, height: 20, borderRadius: 6, background: 'linear-gradient(135deg,#818CF8,#6366F1)', display: 'grid', placeItems: 'center', fontSize: 11, flexShrink: 0 }}>📱</span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: '#F0F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: running ? '#34D399' : '#8a8a9c' }}>
+            <span style={{ width: 6, height: 6, borderRadius: 99, background: running ? '#34D399' : '#6b6b7c', boxShadow: running ? '0 0 5px #34D399' : 'none' }} />
+            {running ? 'En ligne' : 'Arrêté'}{inst.adbPort ? ` · :${inst.adbPort}` : ''}
+          </span>
+        </div>
+        <button onClick={toggleMax} title={maximized ? 'Réduire' : 'Plein écran'} style={titleBtn}>{maximized ? '❐' : '⛶'}</button>
+        <button onClick={onClose} title="Fermer" style={{ ...titleBtn, color: '#F87171' }}>✕</button>
       </div>
 
       {/* Corps — ws-scrcpy calcule lui-même la taille de la vidéo en JS à partir
           de CE conteneur (pas de simple CSS statique) : lui masquer sa barre
           d'outils ou forcer width/height en CSS cassait son calcul (vidéo
           minuscule ou étirée). On lui laisse sa mise en page native (barre
-          d'outils comprise, comme GeeLark) et on lui donne assez de place pour
-          qu'il fasse son calcul correctement — la vidéo se redimensionne toute
-          seule en JS quand ce conteneur change de taille. */}
-      <div style={{ background: '#08090d', ...(fluid && phase === 'ready' ? { height: 800 } : { aspectRatio: '9/16' }), display: 'grid', placeItems: 'center', position: 'relative' }}>
+          d'outils comprise, comme GeeLark) et on le laisse remplir tout
+          l'espace dispo (flex:1) — la vidéo se redimensionne toute seule en JS
+          quand ce conteneur change de taille (fenêtre redimensionnable). */}
+      <div style={{ flex: 1, minHeight: 0, background: '#050609', display: 'grid', placeItems: 'center', position: 'relative' }}>
         {phase !== 'ready' && phase !== 'error' && (
           <div style={{ textAlign: 'center', padding: 24 }}>
             <div style={{ width: 40, height: 40, margin: '0 auto 16px', borderRadius: '50%', border: '3px solid rgba(129,140,248,0.25)', borderTopColor: '#818CF8', animation: 'cp-spin 0.9s linear infinite' }} />
@@ -197,18 +237,21 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
 
       {/* Barre d'actions */}
       {phase === 'ready' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 8, background: '#0d0e14' }}>
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px 10px', flexShrink: 0, background: 'linear-gradient(0deg,#0b0c12,#0f1019)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             <TinyBtn onClick={() => setFluid(v => !v)} active={fluid}>{fluid ? '🎥 Fluide' : '📷 Capture'}</TinyBtn>
-            <TinyBtn onClick={() => quickKey('3')}>⌂</TinyBtn>
-            <TinyBtn onClick={() => quickKey('4')}>←</TinyBtn>
-            <TinyBtn onClick={() => quickKey('187')}>▢</TinyBtn>
+            <span style={{ display: 'inline-flex', gap: 6, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.04)' }}>
+              <TinyBtn onClick={() => quickKey('4')} title="Retour">◁</TinyBtn>
+              <TinyBtn onClick={() => quickKey('3')} title="Accueil">○</TinyBtn>
+              <TinyBtn onClick={() => quickKey('187')} title="Applis récentes">▢</TinyBtn>
+            </span>
+            <span style={{ flex: 1 }} />
             <TinyBtn onClick={() => setShowApps(v => !v)} active={showApps}>📥 Apps</TinyBtn>
-            <TinyBtn onClick={installApk} active={installing}>{installing ? '… Installation' : '📦 APK'}</TinyBtn>
+            <TinyBtn onClick={installApk} active={installing}>{installing ? '…' : '📦 APK'}</TinyBtn>
           </div>
           {/* Catalogue : 1 clic ouvre l'app dans Aurora Store sur le tel */}
           {showApps && (
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', paddingTop: 2 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {APP_CATALOG.map(app => (
                 <TinyBtn key={app.pkg} onClick={() => openInStore(app)}>{app.icon} {app.label}</TinyBtn>
               ))}
@@ -217,10 +260,18 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
           {installMsg && <span style={{ fontSize: 10.5, color: installMsg.startsWith('✓') ? '#34D399' : '#c8c8d8' }}>{installMsg}</span>}
         </div>
       )}
+
+      {/* Poignée de redimensionnement (coin bas-droit) */}
+      <div onPointerDown={onResizeDown} title="Redimensionner"
+        style={{ position: 'absolute', right: 0, bottom: 0, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 5,
+          background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.28) 62%, transparent 62%, transparent 74%, rgba(255,255,255,0.28) 74%)' }} />
+
       <style>{`@keyframes cp-spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
+
+const titleBtn: React.CSSProperties = { width: 26, height: 26, borderRadius: 7, border: 'none', background: 'rgba(255,255,255,0.06)', color: '#c8c8d8', cursor: 'pointer', fontSize: 13, lineHeight: 1, display: 'grid', placeItems: 'center' }
 
 function Step({ label, done, active }: { label: string; done: boolean; active: boolean }) {
   return (
@@ -230,9 +281,9 @@ function Step({ label, done, active }: { label: string; done: boolean; active: b
     </div>
   )
 }
-function TinyBtn({ children, onClick, active }: { children: React.ReactNode; onClick: () => void; active?: boolean }) {
+function TinyBtn({ children, onClick, active, title }: { children: React.ReactNode; onClick: () => void; active?: boolean; title?: string }) {
   return (
-    <button onClick={onClick} style={{ fontSize: 11, fontWeight: 700, padding: '5px 9px', borderRadius: 7, border: `1px solid ${active ? 'rgba(52,211,153,0.35)' : 'rgba(255,255,255,0.08)'}`, background: active ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', color: active ? '#34D399' : '#c8c8d8', cursor: 'pointer' }}>
+    <button onClick={onClick} title={title} style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 7, border: `1px solid ${active ? 'rgba(52,211,153,0.35)' : 'rgba(255,255,255,0.08)'}`, background: active ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)', color: active ? '#34D399' : '#d2d2e0', cursor: 'pointer', transition: 'all .12s' }}>
       {children}
     </button>
   )
