@@ -83,12 +83,60 @@ export async function waitFor(id: string, m: Matcher, timeoutMs = 15000): Promis
   return null
 }
 
-// Attend puis tape le centre de l'élément. Renvoie false si introuvable.
-export async function tap(id: string, m: Matcher, timeoutMs = 15000): Promise<boolean> {
-  const el = await waitFor(id, m, timeoutMs)
-  if (!el) return false
-  await cloudPhones.shell(id, `input tap ${el.cx} ${el.cy}`)
-  return true
+// Libellés de fermeture des popups récurrents (permissions, MAJ, notifs, « pas
+// maintenant »…) — FR + EN. Étendable au fil des cas rencontrés.
+const DISMISS_LABELS = [
+  'plus tard', 'pas maintenant', 'not now', 'ignorer', 'skip', 'passer',
+  'autoriser', 'allow', 'while using the app', 'l’application', "l'application",
+  'ok', 'continuer', 'continue', 'annuler', 'cancel', 'fermer', 'close',
+  'refuser', "don't allow", 'no thanks', 'non merci', 'got it', 'compris',
+]
+
+// Ferme les popups connus s'il y en a (jusqu'à `rounds` d'affilée). Renvoie le
+// nombre de popups fermés. À appeler entre les étapes d'un flow → anti-blocage.
+export async function dismissPopups(id: string, rounds = 3): Promise<number> {
+  let dismissed = 0
+  for (let r = 0; r < rounds; r++) {
+    const nodes = await dumpUi(id)
+    const btn = nodes.find(n => n.clickable && DISMISS_LABELS.some(l => norm(n.text) === l || norm(n.desc) === l))
+    if (!btn) break
+    await cloudPhones.shell(id, `input tap ${btn.cx} ${btn.cy}`)
+    dismissed++
+    await sleep(700)
+  }
+  return dismissed
+}
+
+// Options d'un tap robuste.
+export interface TapOpts { timeoutMs?: number; retries?: number; guardPopups?: boolean; label?: string }
+
+// Tape un élément de façon ROBUSTE : attend qu'il apparaisse, et s'il n'est pas
+// là, ferme les popups éventuels puis réessaie. C'est ça qui « ne casse pas » :
+// on ne tape jamais une coordonnée en dur, on vise l'élément par son sens, on
+// attend l'écran, on gère les popups, on réessaie. Renvoie false si vraiment
+// introuvable (le flow peut alors s'arrêter proprement plutôt que continuer à
+// l'aveugle).
+export async function tap(id: string, m: Matcher, opts: TapOpts = {}): Promise<boolean> {
+  const { timeoutMs = 12000, retries = 2, guardPopups = true } = opts
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const el = await waitFor(id, m, attempt === 0 ? timeoutMs : 4000)
+    if (el) { await cloudPhones.shell(id, `input tap ${el.cx} ${el.cy}`); return true }
+    if (guardPopups && await dismissPopups(id) > 0) continue   // un popup gênait → on réessaie
+  }
+  return false
+}
+
+// Fait défiler vers le bas puis cherche l'élément — utile pour les listes/galeries
+// (jusqu'à `maxScrolls` défilements). Renvoie le nœud ou null.
+export async function scrollToFind(id: string, m: Matcher, maxScrolls = 8): Promise<UiNode | null> {
+  for (let i = 0; i <= maxScrolls; i++) {
+    const el = find(await dumpUi(id), m)
+    if (el) return el
+    // swipe vers le haut (défile vers le bas) au centre de l'écran
+    await cloudPhones.shell(id, 'input swipe 540 1400 540 500 250')
+    await sleep(600)
+  }
+  return null
 }
 
 // Saisit du texte via ADBKeyBoard (base64 → accents/emoji fiables).
