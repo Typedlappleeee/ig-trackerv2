@@ -32,6 +32,17 @@ const APP_CATALOG: { pkg: string; label: string; icon: string }[] = [
   { pkg: 'com.snapchat.android',     label: 'Snapchat',  icon: '👻' },
   { pkg: 'com.facebook.katana',      label: 'Facebook',  icon: '📘' },
   { pkg: 'com.twitter.android',      label: 'X',         icon: '🐦' },
+  { pkg: 'com.reddit.frontpage',     label: 'Reddit',    icon: '👽' },
+  { pkg: 'com.pinterest',            label: 'Pinterest', icon: '📌' },
+]
+
+// Outils d'automatisation (hors Play Store) — installés via APK direct (URL
+// stable), pas via le store du tel. ADBKeyBoard = clavier texte/emoji piloté par
+// ADB (légendes propres). F-Droid = store open-source d'où viennent AutoX.js,
+// Material Files… (à installer ensuite depuis F-Droid sur le tel).
+const TOOLS_CATALOG: { pkg: string; label: string; icon: string; apk: string; note: string }[] = [
+  { pkg: 'com.android.adbkeyboard', label: 'ADBKeyBoard', icon: '⌨️', apk: 'https://github.com/senzhk/ADBKeyBoard/raw/master/ADBKeyBoard.apk', note: 'clavier texte/emoji via ADB' },
+  { pkg: 'org.fdroid.fdroid',       label: 'F-Droid',     icon: '🤖', apk: 'https://f-droid.org/F-Droid.apk', note: 'store open-source (AutoX.js, Material Files…)' },
 ]
 
 export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Props) {
@@ -176,18 +187,36 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
 
   const flash = (msg: string, ms = 3500) => { setBusyMsg(msg); if (ms) window.setTimeout(() => setBusyMsg(m => (m === msg ? '' : m)), ms) }
 
+  // Recharge la liste des paquets installés sur le tel (pour Installer/Ouvrir).
+  const refreshInstalled = async () => {
+    const r = await cloudPhones.shell(inst.id, 'pm list packages', 15000)
+    if (r.ok && r.data?.output) {
+      const set = new Set<string>()
+      r.data.output.split('\n').forEach(l => { const m = l.trim().replace(/^package:/, ''); if (m) set.add(m) })
+      setInstalled(set)
+    }
+  }
+
   // Ouvre/ferme un panneau (et rafraîchit la liste des apps installées à l'ouverture).
   const togglePanel = async (p: Exclude<Panel, null>) => {
     const next = panel === p ? null : p
     setPanel(next)
-    if (next === 'apps') {
-      const r = await cloudPhones.shell(inst.id, 'pm list packages', 15000)
-      if (r.ok && r.data?.output) {
-        const set = new Set<string>()
-        r.data.output.split('\n').forEach(l => { const m = l.trim().replace(/^package:/, ''); if (m) set.add(m) })
-        setInstalled(set)
-      }
-    }
+    if (next === 'apps') refreshInstalled()
+  }
+
+  // Installe un outil hors-Play depuis son APK direct (ADBKeyBoard, F-Droid…).
+  const installTool = async (t: { label: string; apk: string }) => {
+    flash(`Installation de ${t.label}…`, 0)
+    const r = await cloudPhones.install(inst.id, t.apk)
+    if (r.ok) { flash(`✓ ${t.label} installé`); refreshInstalled() }
+    else flash(`Échec : ${r.error ?? 'inconnu'}`)
+  }
+
+  // Active ADBKeyBoard et le définit comme clavier par défaut (saisie ADB propre).
+  const enableAdbKeyboard = async () => {
+    await cloudPhones.shell(inst.id, 'ime enable com.android.adbkeyboard/.AdbIME')
+    await cloudPhones.shell(inst.id, 'ime set com.android.adbkeyboard/.AdbIME')
+    flash('✓ ADBKeyBoard défini par défaut')
   }
 
   // Ouvre la page d'une app dans Aurora Store (déjà installé) sur le téléphone.
@@ -408,6 +437,25 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
                           {isIn
                             ? <button onClick={() => launchApp(app)} style={ghostBtn}>Ouvrir</button>
                             : <button onClick={() => openInStore(app)} style={miniPrimary}>Installer</button>}
+                        </div>
+                      )
+                    })}
+                    {/* Outils d'automatisation (installés via APK direct) */}
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#8a8a9c', textTransform: 'uppercase', letterSpacing: 0.4, margin: '8px 2px 2px' }}>🤖 Outils automatisation</div>
+                    {TOOLS_CATALOG.map(t => {
+                      const isIn = installed.has(t.pkg)
+                      return (
+                        <div key={t.pkg} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 9, background: 'rgba(255,255,255,0.04)' }}>
+                          <span style={{ fontSize: 16 }}>{t.icon}</span>
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#E9E9F2' }}>{t.label}</span>
+                            <span style={{ fontSize: 9, color: '#8a8a9c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.note}</span>
+                          </div>
+                          {isIn
+                            ? (t.pkg === 'com.android.adbkeyboard'
+                                ? <button onClick={enableAdbKeyboard} style={ghostBtn}>Défaut</button>
+                                : <span style={{ fontSize: 10.5, fontWeight: 700, color: '#34D399' }}>✓</span>)
+                            : <button onClick={() => installTool(t)} style={miniPrimary}>Installer</button>}
                         </div>
                       )
                     })}
