@@ -148,28 +148,31 @@ async function installApk(serial, apkUrl) {
 
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024   // 500 Mo
 
-// Télécharge une vidéo (http/https) et la pousse dans /sdcard/Movies du tel,
-// puis force l'indexation MediaStore pour qu'elle apparaisse dans la galerie.
-async function pushVideo(serial, videoUrl) {
-  if (!/^https?:\/\//i.test(videoUrl)) throw new Error('URL vidéo invalide (http/https uniquement)')
-  const r = await fetch(videoUrl, { signal: AbortSignal.timeout(180000) })
-  if (!r.ok) throw new Error(`téléchargement vidéo échoué (HTTP ${r.status})`)
-  const len = Number(r.headers.get('content-length') || 0)
-  if (len && len > MAX_VIDEO_BYTES) throw new Error('vidéo trop volumineuse (>500 Mo)')
-  const buf = Buffer.from(await r.arrayBuffer())
+// Pousse un buffer vidéo dans /sdcard/Movies du tel + indexation MediaStore
+// (visible immédiatement dans la galerie). Base commune upload URL / fichier.
+async function pushBuffer(serial, buf) {
+  if (!buf || !buf.length) throw new Error('vidéo vide')
   if (buf.length > MAX_VIDEO_BYTES) throw new Error('vidéo trop volumineuse (>500 Mo)')
   const base = `sf-${Date.now()}.mp4`
   const tmpFile = path.join(os.tmpdir(), base)
   fs.writeFileSync(tmpFile, buf)
   const dest = `/sdcard/Movies/${base}`
   try {
-    await adb(['-s', serial, 'push', tmpFile, dest], 180000)
+    await adb(['-s', serial, 'push', tmpFile, dest], 300000)
     await adb(['-s', serial, 'shell', 'am', 'broadcast', '-a',
       'android.intent.action.MEDIA_SCANNER_SCAN_FILE', '-d', `file://${dest}`], 20000).catch(() => {})
     return dest
   } finally {
     fs.unlink(tmpFile, () => {})
   }
+}
+
+// Télécharge une vidéo (http/https) côté serveur puis la pousse sur le tel.
+async function pushVideo(serial, videoUrl) {
+  if (!/^https?:\/\//i.test(videoUrl)) throw new Error('URL vidéo invalide (http/https uniquement)')
+  const r = await fetch(videoUrl, { signal: AbortSignal.timeout(180000) })
+  if (!r.ok) throw new Error(`téléchargement vidéo échoué (HTTP ${r.status})`)
+  return pushBuffer(serial, Buffer.from(await r.arrayBuffer()))
 }
 
 // Résout toujours la dernière version d'Aurora Store via l'API F-Droid (évite
@@ -201,16 +204,28 @@ async function provisionAuroraStore(serial) {
 const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) }
 
 const server = http.createServer(async (req, res) => {
+  // CORS : l'upload de fichier se fait EN DIRECT navigateur → agent (un gros
+  // fichier ne peut pas transiter par le proxy serverless). On autorise donc
+  // l'origine à appeler l'agent ; le token Bearer reste le vrai garde-fou.
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+
   // Auth : token partagé, obligatoire sur toutes les routes.
   const auth = req.headers['authorization'] || ''
   if (auth !== `Bearer ${TOKEN}`) return json(res, 401, { ok: false, error: 'non autorisé' })
 
   const url = new URL(req.url, 'http://x')
   const parts = url.pathname.split('/').filter(Boolean)
+  // Lecture du corps : binaire brut pour /pushfile (upload vidéo), JSON sinon.
+  const isFileUpload = parts[2] === 'pushfile'
   let body = {}
+  let fileBuf = null
   if (req.method === 'POST') {
-    const raw = await new Promise(r => { let d = ''; req.on('data', c => { d += c }); req.on('end', () => r(d)) })
-    try { body = raw ? JSON.parse(raw) : {} } catch { return json(res, 400, { ok: false, error: 'json invalide' }) }
+    const raw = await new Promise(r => { const a = []; req.on('data', c => a.push(c)); req.on('end', () => r(Buffer.concat(a))) })
+    if (isFileUpload) fileBuf = raw
+    else { try { body = raw.length ? JSON.parse(raw.toString('utf8')) : {} } catch { return json(res, 400, { ok: false, error: 'json invalide' }) } }
   }
 
   try {
@@ -251,6 +266,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (parts[2] === 'push' && req.method === 'POST') {
         const out = await pushVideo(inst.serial, String(body.url || ''))
+        return json(res, 200, { ok: true, output: out })
+      }
+      if (parts[2] === 'pushfile' && req.method === 'POST') {
+        const out = await pushBuffer(inst.serial, fileBuf)
         return json(res, 200, { ok: true, output: out })
       }
     }

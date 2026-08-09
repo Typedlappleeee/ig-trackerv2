@@ -54,8 +54,10 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const [rotation, setRotation] = useState(0)
   const [uploadUrl, setUploadUrl] = useState('')
   const [busyMsg, setBusyMsg] = useState('')
+  const [dragOver, setDragOver] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
   const pollRef = useRef<number | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Séquence de connexion : imite l'écran GeeLark ("Fetching data" → "Starting"
   // → "Connecting"), mais avec de VRAIES vérifications (démarre le conteneur si
@@ -217,6 +219,29 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     else flash(`Échec : ${r.error ?? 'inconnu'}`)
   }
 
+  // Upload d'un FICHIER local : glisser-déposer / sélection. Le fichier part EN
+  // DIRECT vers l'agent (pas par le proxy serverless, trop limité en taille) —
+  // XHR pour avoir la progression. Nécessite l'agent à jour (route pushfile+CORS).
+  const uploadFile = async (file: File | null | undefined) => {
+    if (!file) return
+    if (!/^video\//.test(file.type) && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(file.name)) { flash('Ce n\'est pas une vidéo'); return }
+    const { url: aUrl, token } = getCloudAgent()
+    if (!aUrl || !token) { flash('Agent non configuré'); return }
+    setPanel('upload')
+    const done = await new Promise<{ ok: boolean; err?: string }>((resolve) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${aUrl}/instances/${encodeURIComponent(inst.id)}/pushfile`)
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+      xhr.upload.onprogress = e => { if (e.lengthComputable) flash(`Envoi… ${Math.round(e.loaded / e.total * 100)}%`, 0) }
+      xhr.onload = () => { let err: string | undefined; try { err = JSON.parse(xhr.responseText)?.error } catch { /* non-JSON */ } resolve({ ok: xhr.status >= 200 && xhr.status < 300, err }) }
+      xhr.onerror = () => resolve({ ok: false, err: 'agent injoignable (CORS ? agent pas à jour ?)' })
+      xhr.send(file)
+    })
+    if (done.ok) { flash('✓ Vidéo envoyée (visible dans la galerie)'); setPanel(null) }
+    else flash(`Échec : ${done.err ?? 'inconnu'}`)
+  }
+
   // Enregistre une capture PNG de l'écran sur le PC.
   const savePhoto = async () => {
     flash('Capture…', 0)
@@ -267,6 +292,9 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   return (
     <div
       onMouseDown={onFocus}
+      onDragOver={e => { if (Array.from(e.dataTransfer?.types || []).includes('Files')) { e.preventDefault(); setDragOver(true) } }}
+      onDragLeave={e => { if (e.currentTarget === e.target) setDragOver(false) }}
+      onDrop={e => { e.preventDefault(); setDragOver(false); if (phase === 'ready') uploadFile(e.dataTransfer?.files?.[0]) }}
       style={{
         position: 'fixed', left: pos.x, top: pos.y, zIndex, width: winW + CP_RAIL,
         borderRadius: 16, overflow: 'hidden', background: '#0b0c12',
@@ -345,10 +373,18 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
             {panel === 'upload' && (
               <>
                 <PanelTitle>📤 Envoyer une vidéo</PanelTitle>
-                <p style={{ fontSize: 10.5, color: '#8a8a9c', margin: '0 0 8px', lineHeight: 1.5 }}>Colle l'URL directe d'une vidéo (http/https). Elle sera déposée dans la galerie du téléphone.</p>
+                <div onClick={() => fileInputRef.current?.click()}
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
+                  onDrop={e => { e.preventDefault(); e.stopPropagation(); setDragOver(false); uploadFile(e.dataTransfer?.files?.[0]) }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '18px 12px', marginBottom: 8, borderRadius: 10, border: '1.5px dashed rgba(129,140,248,0.5)', background: 'rgba(129,140,248,0.07)', cursor: 'pointer', textAlign: 'center' }}>
+                  <span style={{ fontSize: 22 }}>🎬</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#C7D2FE' }}>Glisse une vidéo ici</span>
+                  <span style={{ fontSize: 10, color: '#8a8a9c' }}>ou clique pour choisir un fichier</span>
+                </div>
+                <div style={{ fontSize: 9.5, color: '#6b6b7c', textAlign: 'center', margin: '2px 0 8px' }}>ou colle une URL directe</div>
                 <input value={uploadUrl} onChange={e => setUploadUrl(e.target.value)} placeholder="https://…/video.mp4"
                   style={{ width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.35)', color: '#E9E9F2', marginBottom: 8 }} />
-                <button onClick={sendVideo} style={primaryBtn}>Envoyer sur le tel</button>
+                <button onClick={sendVideo} style={primaryBtn}>Envoyer l'URL</button>
               </>
             )}
             {panel === 'apps' && (
@@ -398,6 +434,19 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
       {/* Bandeau de statut (messages d'action) */}
       {busyMsg && (
         <div style={{ padding: '6px 12px', fontSize: 10.5, fontWeight: 600, color: busyMsg.startsWith('✓') ? '#34D399' : busyMsg.startsWith('Échec') ? '#F87171' : '#c8c8d8', background: 'linear-gradient(0deg,#0b0c12,#0f1019)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>{busyMsg}</div>
+      )}
+
+      {/* Input fichier caché (déclenché par la zone de drop) */}
+      <input ref={fileInputRef} type="file" accept="video/*" style={{ display: 'none' }}
+        onChange={e => { uploadFile(e.target.files?.[0]); e.target.value = '' }} />
+
+      {/* Overlay de glisser-déposer (sur toute la fenêtre) */}
+      {dragOver && phase === 'ready' && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(11,12,18,0.86)', border: '2.5px dashed #818CF8', borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, pointerEvents: 'none' }}>
+          <span style={{ fontSize: 40 }}>🎬</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#C7D2FE' }}>Déposez la vidéo</span>
+          <span style={{ fontSize: 11, color: '#8a8a9c' }}>elle sera envoyée sur {inst.name}</span>
+        </div>
       )}
 
       {/* Poignée de redimensionnement (coin bas-droit) */}
