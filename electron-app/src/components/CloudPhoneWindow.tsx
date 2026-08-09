@@ -41,7 +41,7 @@ const APP_CATALOG: { pkg: string; label: string; icon: string }[] = [
 // ADB (légendes propres). F-Droid = store open-source d'où viennent AutoX.js,
 // Material Files… (à installer ensuite depuis F-Droid sur le tel).
 const TOOLS_CATALOG: { pkg: string; label: string; icon: string; apk: string; note: string }[] = [
-  { pkg: 'com.android.adbkeyboard', label: 'ADBKeyBoard', icon: '⌨️', apk: 'https://github.com/senzhk/ADBKeyBoard/raw/master/ADBKeyBoard.apk', note: 'clavier texte/emoji via ADB' },
+  { pkg: 'com.android.adbkeyboard', label: 'ADBKeyBoard', icon: '⌨️', apk: 'https://github.com/senzhk/ADBKeyBoard/raw/master/ADBKeyboard.apk', note: 'clavier texte/emoji via ADB' },
   { pkg: 'org.fdroid.fdroid',       label: 'F-Droid',     icon: '🤖', apk: 'https://f-droid.org/F-Droid.apk', note: 'store open-source (AutoX.js, Material Files…)' },
 ]
 
