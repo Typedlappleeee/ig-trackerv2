@@ -297,18 +297,26 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   // XHR pour avoir la progression. Nécessite l'agent à jour (route pushfile+CORS).
   const uploadFile = async (file: File | null | undefined) => {
     if (!file) return
-    if (!/^video\//.test(file.type) && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(file.name)) { flash('Ce n\'est pas une vidéo'); return }
+    if (!/^video\//.test(file.type) && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(file.name)) { flash('Ce n\'est pas une vidéo (mp4, mov…)'); return }
     const { url: aUrl, token } = getCloudAgent()
-    if (!aUrl || !token) { flash('Agent non configuré'); return }
+    if (!aUrl || !token) { flash('Agent non configuré (Cloud Phones)'); return }
+    // Garde-fou « mixed content » : page HTTPS → l'URL agent DOIT être en https.
+    if (location.protocol === 'https:' && /^http:\/\//i.test(aUrl)) {
+      flash(`URL agent en http:// → mets-la en https:// dans Cloud Phones (actuel : ${aUrl})`); return
+    }
+    const url = `${aUrl}/instances/${encodeURIComponent(inst.id)}/pushfile`
     setPanel('upload')
     const done = await new Promise<{ ok: boolean; err?: string }>((resolve) => {
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', `${aUrl}/instances/${encodeURIComponent(inst.id)}/pushfile`)
+      xhr.open('POST', url)
       xhr.setRequestHeader('Authorization', `Bearer ${token}`)
       xhr.setRequestHeader('Content-Type', 'application/octet-stream')
       xhr.upload.onprogress = e => { if (e.lengthComputable) flash(`Envoi… ${Math.round(e.loaded / e.total * 100)}%`, 0) }
-      xhr.onload = () => { let err: string | undefined; try { err = JSON.parse(xhr.responseText)?.error } catch { /* non-JSON */ } resolve({ ok: xhr.status >= 200 && xhr.status < 300, err }) }
-      xhr.onerror = () => resolve({ ok: false, err: 'agent injoignable (CORS ? agent pas à jour ?)' })
+      xhr.onload = () => { let err: string | undefined; try { err = JSON.parse(xhr.responseText)?.error } catch { /* non-JSON */ } resolve({ ok: xhr.status >= 200 && xhr.status < 300, err: err ?? (xhr.status ? `HTTP ${xhr.status}` : undefined) }) }
+      // onerror = échec réseau/CORS/mixed-content : on montre l'URL appelée pour diagnostiquer.
+      xhr.onerror = () => resolve({ ok: false, err: `agent injoignable → ${url}` })
+      xhr.ontimeout = () => resolve({ ok: false, err: 'délai dépassé' })
+      xhr.timeout = 180000
       xhr.send(file)
     })
     if (done.ok) { flash('✓ Vidéo envoyée (visible dans la galerie)'); setPanel(null) }
