@@ -61,7 +61,7 @@ const execFileAsync = promisify(execFile)
 const PORT = Number(process.env.PORT || 8787)
 const TOKEN = process.env.AGENT_TOKEN || ''
 // Image Redroid ARM (Android natif ARM = bien plus proche d'un vrai téléphone).
-const IMAGE = process.env.REDROID_IMAGE || 'redroid/redroid:13.0.0-arm64'
+const IMAGE = process.env.REDROID_IMAGE || 'redroid/redroid:13.0.0-latest'
 const DATA_ROOT = process.env.DATA_ROOT || '/var/lib/scaleflow-phones'
 const PORT_BASE = Number(process.env.PORT_BASE || 5600)   // port ADB de la 1re instance
 
@@ -112,7 +112,7 @@ async function createInstance({ name, androidVersion }) {
   if (!NAME_RE.test(name || '')) throw new Error('nom invalide (a-z, 0-9, _ et - uniquement)')
   const port = await nextPort()
   const m = rnd(MODELS)
-  const image = androidVersion ? `redroid/redroid:${androidVersion}-arm64` : IMAGE
+  const image = androidVersion ? `redroid/redroid:${androidVersion}-latest` : IMAGE
   // Chaque instance a ses propres props → empreinte distincte.
   const props = [
     `ro.product.brand=${m.brand}`, `ro.product.model=${m.model}`, `ro.product.device=${m.device}`,
