@@ -43,10 +43,11 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const [phase, setPhase] = useState<Phase>('fetching')
   const [errMsg, setErrMsg] = useState('')
   const [snap, setSnap] = useState<string | null>(null)
-  // Capture par défaut : image que l'on contrôle à 100 % → remplit parfaitement,
-  // aucune barre d'outils, aucun gris. Le mode Fluide (ws-scrcpy, flux temps
-  // réel) reste dispo mais affiche sa barre native non masquable proprement.
-  const [fluid, setFluid] = useState(false)
+  const [fluid, setFluid] = useState(true)
+  // Ratio RÉEL du téléphone (hauteur/largeur), lu depuis la 1re capture. Les
+  // cloud phones ne font pas tous 9:16 (souvent 9:19.5, 9:20…) : caler le
+  // conteneur sur ce vrai ratio évite que ws-scrcpy letterboxe la vidéo en gris.
+  const [aspect, setAspect] = useState(16 / 9)
   const [installing, setInstalling] = useState(false)
   const [installMsg, setInstallMsg] = useState('')
   const [showApps, setShowApps] = useState(false)
@@ -85,6 +86,15 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     return () => { if (pollRef.current) window.clearInterval(pollRef.current) }
   }, [phase, fluid, inst.id])
 
+  // Dès qu'on a une capture, on lit le vrai ratio du tel (dimensions natives de
+  // l'image = résolution de l'écran) et on le mémorise pour caler le conteneur.
+  useEffect(() => {
+    if (!snap) return
+    const im = new Image()
+    im.onload = () => { if (im.naturalWidth > 0) setAspect(im.naturalHeight / im.naturalWidth) }
+    im.src = snap
+  }, [snap])
+
   // Déplacement de la fenêtre par la barre de titre.
   const onTitleDown = (e: React.PointerEvent) => {
     onFocus()
@@ -101,7 +111,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   // le corps épouse pile le ratio 9:16).
   const toolbarReserve = fluid ? CP_TOOLBAR : 0
   // Largeur max pour que la fenêtre (hauteur dérivée) tienne dans l'écran.
-  const maxWidthForViewport = () => Math.round((window.innerHeight * 0.94 - CP_TITLE - CP_ACTION) * 9 / 16 + toolbarReserve)
+  const maxWidthForViewport = () => Math.round((window.innerHeight * 0.94 - CP_TITLE - CP_ACTION) / aspect + toolbarReserve)
 
   // Redimensionnement par la poignée en bas à droite : on ne pilote QUE la
   // largeur (la hauteur suit le ratio téléphone) → aucun gris possible.
@@ -134,7 +144,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   // scrcpy en Fluide). La fenêtre elle-même est en hauteur auto → pas besoin
   // d'estimer la hauteur exacte de la barre d'actions (fini les calculs de
   // chrome approximatifs qui laissaient du gris).
-  const bodyH = Math.round((winW - toolbarReserve) * 16 / 9)
+  const bodyH = Math.round((winW - toolbarReserve) * aspect)
 
   const onScreenClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     const img = imgRef.current
