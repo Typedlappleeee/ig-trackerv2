@@ -322,8 +322,24 @@ if [ ! -d /opt/ws-scrcpy ]; then
 fi
 if [ -d /opt/ws-scrcpy ]; then
   cd /opt/ws-scrcpy
+  # Habillage ScaleFlow : par défaut ws-scrcpy peint le fond de la page de flux
+  # en gris à 85 % (`body.stream`) et affiche sa barre d'outils native
+  # (`.control-buttons-list`, ~3.7rem) à droite → gros aplat gris dans notre
+  # fenêtre + barre en doublon. On écrase ces règles À LA SOURCE (avant `npm run
+  # dist`) : fond sombre assorti à l'app + barre native masquée (nos propres
+  # contrôles sont dans la barre du bas de l'app). Injecté une seule fois.
+  if [ -f src/style/app.css ] && ! grep -q 'scaleflow-fill' src/style/app.css; then
+    cat >> src/style/app.css <<'CSS'
+
+/* scaleflow-fill — écran plein & propre dans l'iframe de l'app */
+body.stream { background-color: #0b0c12 !important; }
+.control-buttons-list { display: none !important; }
+.device-view { float: none !important; text-align: center !important; }
+.device-view .video { float: none !important; display: inline-block !important; }
+CSS
+  fi
   npm install --no-audit --no-fund >/dev/null 2>&1 && npm run dist >/dev/null 2>&1 \
-    && echo "   ✓ ws-scrcpy compilé" \
+    && echo "   ✓ ws-scrcpy compilé (habillage plein écran)" \
     || echo "   ⚠ compilation ws-scrcpy échouée — envoie-moi la sortie de :  cd /opt/ws-scrcpy && npm run dist"
   # Commande de démarrage officielle du projet (npm start) — plus fiable que de
   # deviner le chemin exact du fichier compilé, qui peut varier selon la version.

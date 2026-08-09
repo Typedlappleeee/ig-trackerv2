@@ -15,14 +15,11 @@ interface Props {
 
 type Phase = 'fetching' | 'starting' | 'connecting' | 'ready' | 'error'
 
-// Hauteurs fixes du chrome (barre de titre / barre d'actions) et largeur réservée
-// à la barre d'outils native de ws-scrcpy. On DÉRIVE la hauteur de la fenêtre
-// depuis sa largeur (ratio téléphone 9:16) pour que le conteneur épouse la vidéo
-// → aucun gris. TOOLBAR est volontairement un poil surestimé : mieux vaut un fin
-// liseré sombre à droite que la vidéo rétrécie (gris haut/bas).
+// Hauteurs indicatives du chrome (barre de titre / barre d'actions) pour borner
+// la fenêtre à l'écran. La hauteur du corps, elle, est DÉRIVÉE du vrai ratio du
+// téléphone (lu depuis la capture) pour que le conteneur épouse pile la vidéo.
 const CP_TITLE = 42
 const CP_ACTION = 50
-const CP_TOOLBAR = 56
 
 // Catalogue d'apps à installer en 1 clic (ouvre la page dans Aurora Store sur le
 // tel). Pas Vinted (choix utilisateur).
@@ -107,9 +104,10 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
   }
 
-  // Réserve de largeur pour la barre scrcpy (mode Fluide uniquement ; en Capture
-  // le corps épouse pile le ratio 9:16).
-  const toolbarReserve = fluid ? CP_TOOLBAR : 0
+  // Plus aucune réserve de largeur : la barre native de ws-scrcpy est masquée à
+  // la source (CSS serveur, cf. selfhost/install.sh) et son fond passé en sombre,
+  // donc le conteneur épouse pile le ratio réel du tel → la vidéo remplit tout.
+  const toolbarReserve = 0
   // Largeur max pour que la fenêtre (hauteur dérivée) tienne dans l'écran.
   const maxWidthForViewport = () => Math.round((window.innerHeight * 0.94 - CP_TITLE - CP_ACTION) / aspect + toolbarReserve)
 
@@ -259,14 +257,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
         )}
         {phase === 'ready' && (
           fluid && fluidSrc ? (
-            <>
-              <iframe title={inst.name} src={fluidSrc} style={{ width: '100%', height: '100%', border: 'none' }} allow="clipboard-read; clipboard-write" />
-              {/* Masque la barre d'outils native de ws-scrcpy (colonne grise, non
-                  restylable car iframe cross-origin) par un bord sombre net,
-                  aligné pile sur la zone réservée. Les contrôles essentiels sont
-                  repris dans notre barre du bas. */}
-              <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: CP_TOOLBAR, background: '#0b0c12', borderLeft: '1px solid rgba(255,255,255,0.05)' }} />
-            </>
+            <iframe title={inst.name} src={fluidSrc} style={{ width: '100%', height: '100%', border: 'none' }} allow="clipboard-read; clipboard-write" />
           ) : snap ? (
             <img ref={imgRef} src={snap} alt="écran" draggable={false} onClick={onScreenClick}
               style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair' }} />
@@ -292,8 +283,8 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
               <TinyBtn onClick={() => quickKey('24')} title="Volume +">🔊</TinyBtn>
             </span>
             <span style={{ flex: 1 }} />
-            <TinyBtn onClick={() => setShowApps(v => !v)} active={showApps}>📥 Apps</TinyBtn>
-            <TinyBtn onClick={installApk} active={installing}>{installing ? '…' : '📦 APK'}</TinyBtn>
+            <TinyBtn onClick={() => setShowApps(v => !v)} active={showApps}>📲 Installer une application</TinyBtn>
+            <TinyBtn onClick={installApk} active={installing}>{installing ? '…' : '📦 Depuis un lien APK'}</TinyBtn>
           </div>
           {/* Catalogue : 1 clic ouvre l'app dans Aurora Store sur le tel */}
           {showApps && (
