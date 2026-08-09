@@ -126,6 +126,14 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
     const p = window.prompt('Package Android de l’app (ex: com.reddit.frontpage) :'); if (!p?.trim()) return
     chooseApp(p.trim(), p.trim())
   }
+  // Deep link / URL (façon GeeLark) : saute direct à un écran via am start.
+  const addLink = async () => {
+    const url = window.prompt('Lien à ouvrir (deep link ou URL) :\n\nExemples Instagram :\n• instagram://user?username=nike (un profil)\n• instagram://story-camera (caméra story)\n• instagram://explore (explorer)\n• https://instagram.com/p/XXXX (un post)')
+    if (!url?.trim()) return
+    const u = url.trim()
+    addStep({ do: 'link', url: u }, `Ouvrir le lien « ${u} »`)
+    if (phoneId) { await cloudPhones.shell(phoneId, `am start -a android.intent.action.VIEW -d '${u.replace(/'/g, '')}'`); window.setTimeout(refreshSnap, 1600) }
+  }
   const addPopups = async () => { addStep({ do: 'popups' }, 'Fermer les popups'); if (phoneId) { await dismissPopups(phoneId); window.setTimeout(refreshSnap, 650) } }
   const addBack = async () => { addStep({ do: 'key', key: 'back' }, 'Retour'); if (phoneId) { await cloudPhones.shell(phoneId, 'input keyevent 4'); window.setTimeout(refreshSnap, 650) } }
 
@@ -187,6 +195,7 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
             <TB onClick={addType}>➕ Écrire</TB>
             <TB onClick={addWait}>➕ Attendre</TB>
             <TB onClick={() => setShowApps(v => !v)}>➕ Ouvrir app ▾</TB>
+            <TB onClick={addLink}>➕ Ouvrir un lien</TB>
             <TB onClick={addBack}>➕ Retour</TB>
             <TB onClick={addPopups}>➕ Fermer popups</TB>
           </div>

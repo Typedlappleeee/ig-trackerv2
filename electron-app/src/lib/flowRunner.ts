@@ -20,6 +20,7 @@ export interface FlowInput { key: string; label: string; placeholder?: string; o
 // Étapes possibles d'un flow (le « vocabulaire » du workshop).
 export type Step =
   | { do: 'open'; pkg: string }
+  | { do: 'link'; url: string }                        // deep link / URL (am start -d) → saute à un écran
   | { do: 'tap'; any: Matcher[]; label: string; required?: boolean }
   | { do: 'type'; var?: string; text?: string }        // var → valeur saisie par l'utilisateur
   | { do: 'wait'; ms: number }
@@ -70,6 +71,7 @@ export async function runFlow(id: string, flow: Flow, opts: { log?: Logger; vars
     for (const s of flow.steps) {
       switch (s.do) {
         case 'open': log('Ouverture de l’app…'); await openApp(id, s.pkg); await wait(5000); await dismissPopups(id); break
+        case 'link': log('Ouvrir un lien'); await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d '${s.url.replace(/'/g, "")}'`); await wait(3500); await dismissPopups(id); break
         case 'wait': await wait(s.ms); break
         case 'popups': await dismissPopups(id); break
         case 'key': await keys[s.key](id); break
