@@ -1,11 +1,10 @@
 // Admin — Cloud Phones maison (auto-hébergés, voir selfhost/). Réservé au
-// super-admin. Configure l'agent (URL + token) et pilote les instances Android
-// (créer/démarrer/arrêter/supprimer, écran + actions de base).
-import { useState, useEffect, useCallback, useRef } from 'react'
+// super-admin. Configure l'agent (URL + token), liste les téléphones dans une
+// table façon GeeLark, et ouvre chacun dans sa propre fenêtre flottante.
+import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { useToast } from '@/components/Toast'
 import { useLicense } from '@/lib/license'
 import { useOrg } from '@/lib/orgContext'
 import { useTr } from '@/lib/i18n'
@@ -13,6 +12,7 @@ import {
   cloudPhones, loadCloudAgentConfig, saveCloudAgentConfig, getCloudAgent,
   type CpInstance,
 } from '@/lib/cloudPhones'
+import { CloudPhoneWindow } from '@/components/CloudPhoneWindow'
 
 interface Props { user: User }
 
@@ -20,7 +20,6 @@ type Conn = 'checking' | 'ok' | 'unconfigured' | 'error'
 
 export function CloudPhones({ user }: Props) {
   const tr = useTr()
-  const toast = useToast()
   const license = useLicense()
   const { currentOrg } = useOrg()
   const isSuperAdmin = license.isSuperAdmin
@@ -34,21 +33,23 @@ export function CloudPhones({ user }: Props) {
   const [keyErr, setKeyErr] = useState('')
 
   const [instances, setInstances] = useState<CpInstance[]>([])
-  const [selected, setSelected] = useState<CpInstance | null>(null)
-  const [snap, setSnap] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [live, setLive] = useState(false)
-  const [log, setLog] = useState<string[]>([])
-  const imgRef = useRef<HTMLImageElement>(null)
 
-  const addLog = (m: string) => setLog(l => [`${new Date().toLocaleTimeString()} · ${m}`, ...l].slice(0, 30))
+  // Fenêtres flottantes ouvertes (façon GeeLark) : une par tel, indépendantes.
+  const [openIds, setOpenIds] = useState<string[]>([])
+  const [zOrder, setZOrder] = useState<string[]>([])   // ordre d'empilement (dernier = au-dessus)
+  const openWindow = (id: string) => {
+    setOpenIds(o => o.includes(id) ? o : [...o, id])
+    setZOrder(z => [...z.filter(x => x !== id), id])
+  }
+  const closeWindow = (id: string) => { setOpenIds(o => o.filter(x => x !== id)); setZOrder(z => z.filter(x => x !== id)) }
+  const focusWindow = (id: string) => setZOrder(z => [...z.filter(x => x !== id), id])
 
   const loadInstances = useCallback(async () => {
     const r = await cloudPhones.list()
     if (r.ok) setInstances(r.data?.instances ?? [])
-    else addLog(`❌ liste : ${r.error}`)
   }, [])
 
   const checkConn = useCallback(async () => {
@@ -71,13 +72,20 @@ export function CloudPhones({ user }: Props) {
     return () => { alive = false }
   }, [currentOrg?.id, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Rafraîchit la liste toutes les 8s quand connecté (statuts à jour sans y penser).
+  useEffect(() => {
+    if (conn !== 'ok') return
+    const t = window.setInterval(loadInstances, 8000)
+    return () => window.clearInterval(t)
+  }, [conn, loadInstances])
+
   const saveKey = async () => {
     if (!urlInput.trim() || !tokenInput.trim()) return
     setSavingKey(true); setKeyErr('')
     const r = await saveCloudAgentConfig(currentOrg?.id ?? null, user.id, urlInput, tokenInput)
     setSavingKey(false)
-    if (r.ok) { setShowKey(false); addLog('✓ agent configuré'); checkConn() }
-    else { setKeyErr(`Échec : ${r.error ?? 'erreur inconnue'}`); addLog(`❌ config : ${r.error}`) }
+    if (r.ok) { setShowKey(false); checkConn() }
+    else setKeyErr(`Échec : ${r.error ?? 'erreur inconnue'}`)
   }
 
   const createInstance = async () => {
@@ -85,49 +93,15 @@ export function CloudPhones({ user }: Props) {
     setCreating(true)
     const r = await cloudPhones.create(newName.trim())
     setCreating(false)
-    if (r.ok) { addLog(`✓ ${newName} créé (boot en cours…)`); setNewName(''); loadInstances() }
-    else { toast.show({ title: tr('Échec de la création', 'Creation failed'), body: r.error ?? '', kind: 'error' }); addLog(`❌ créer : ${r.error}`) }
+    if (r.ok) { setNewName(''); loadInstances() }
+    else alert(`${tr('Échec de la création', 'Creation failed')} : ${r.error ?? ''}`)
   }
   const doAction = async (id: string, action: 'start' | 'stop' | 'remove') => {
     setBusyId(id)
     const fn = action === 'start' ? cloudPhones.start : action === 'stop' ? cloudPhones.stop : cloudPhones.remove
     const r = await fn(id)
     setBusyId(null)
-    if (r.ok) { addLog(`✓ ${id} : ${action}`); if (action === 'remove' && selected?.id === id) setSelected(null); loadInstances() }
-    else addLog(`❌ ${id} ${action} : ${r.error}`)
-  }
-
-  const refreshSnapshot = useCallback(async (inst: CpInstance | null) => {
-    if (!inst) return
-    const r = await cloudPhones.screenshot(inst.id)
-    if (r.ok && r.data?.dataUrl) setSnap(r.data.dataUrl)
-    else addLog(`❌ capture : ${r.error ?? r.status}`)
-  }, [])
-
-  useEffect(() => { if (selected) { setSnap(null); refreshSnapshot(selected) } }, [selected, refreshSnapshot])
-  useEffect(() => {
-    if (!live || !selected) return
-    const id = window.setInterval(() => refreshSnapshot(selected), 2000)
-    return () => window.clearInterval(id)
-  }, [live, selected, refreshSnapshot])
-
-  // Tap sur l'écran → coordonnées pixel → `input tap` ADB.
-  const onScreenClick = async (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!selected) return
-    const img = imgRef.current
-    if (!img || !img.naturalWidth) return
-    const r = img.getBoundingClientRect()
-    const x = Math.round((e.clientX - r.left) / r.width * img.naturalWidth)
-    const y = Math.round((e.clientY - r.top) / r.height * img.naturalHeight)
-    await cloudPhones.shell(selected.id, `input tap ${x} ${y}`)
-    addLog(`✓ tap (${x}, ${y})`)
-    window.setTimeout(() => refreshSnapshot(selected), 400)
-  }
-  const quickKey = async (key: string, label: string) => {
-    if (!selected) return
-    const r = await cloudPhones.shell(selected.id, `input keyevent ${key}`)
-    addLog(r.ok ? `✓ ${label}` : `❌ ${label} : ${r.error}`)
-    window.setTimeout(() => refreshSnapshot(selected), 400)
+    if (r.ok) { if (action === 'remove') closeWindow(id); loadInstances() }
   }
 
   if (!isSuperAdmin) return null
@@ -146,7 +120,13 @@ export function CloudPhones({ user }: Props) {
             <p className="sf-page-sub">{tr('Tes propres téléphones Android, auto-hébergés', 'Your own self-hosted Android phones')}</p>
           </div>
         </div>
-        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100" style={{ display: 'flex', gap: 8 }}>
+          {conn === 'ok' && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder={tr('nom-du-tel', 'phone-name')} style={{ width: 150, height: 36 }} className="text-[13px]" />
+              <Button onClick={createInstance} disabled={creating || !newName.trim()}>+ {tr('Nouveau', 'New')}</Button>
+            </div>
+          )}
           <button onClick={() => setShowKey(v => !v)} className="sf-btn sf-btn-secondary" style={{ height: 36 }}>
             ⚙ {tr('Agent', 'Agent')}
           </button>
@@ -158,7 +138,7 @@ export function CloudPhones({ user }: Props) {
           <div className="sf-card p-6 space-y-4 mt-6">
             <p className="sf-section-label">{tr('Configurer l\'agent', 'Configure the agent')}</p>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.6 }}>
-              {tr('L\'URL et le token de ton agent auto-hébergé (voir le guide selfhost/TUTO.md — affiché à la fin de l\'installation).', 'The URL and token of your self-hosted agent (see selfhost/TUTO.md — shown at the end of the install).')}
+              {tr('L\'URL et le token de ton agent auto-hébergé (voir selfhost/TUTO_ORACLE.md — affiché à la fin de l\'installation).', 'The URL and token of your self-hosted agent (see selfhost/TUTO_ORACLE.md — shown at the end of the install).')}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -187,93 +167,80 @@ export function CloudPhones({ user }: Props) {
           <div className="sf-banner is-danger mt-6">{tr('Connexion impossible', 'Connection failed')} : {connMsg}</div>
         )}
 
+        {/* Table façon GeeLark : statut, nom, id, ports, actions */}
         {conn === 'ok' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 280px) 1fr', gap: 16, marginTop: 24, alignItems: 'start' }}>
-            {/* Liste + création */}
-            <div className="sf-card p-4">
-              <div className="flex gap-2 mb-3">
-                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder={tr('nom-du-tel', 'phone-name')} className="text-[13px]" />
-                <Button onClick={createInstance} disabled={creating || !newName.trim()} style={{ flexShrink: 0 }}>+ </Button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 520, overflowY: 'auto' }}>
-                {instances.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-4)', padding: 8 }}>{tr('Aucun téléphone. Crée-en un ci-dessus.', 'No phone yet. Create one above.')}</p>}
-                {instances.map(inst => {
-                  const on = selected?.id === inst.id
-                  const running = /running|up/i.test(inst.state)
-                  return (
-                    <div key={inst.id} className="sf-widget-row" style={{ borderRadius: 10, background: on ? 'rgba(129,140,248,0.12)' : 'transparent', padding: '8px 10px' }}>
-                      <button onClick={() => setSelected(inst)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: 99, background: running ? 'var(--ok)' : 'var(--text-4)', flexShrink: 0 }} />
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</span>
-                      </button>
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                        {running ? (
-                          <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'stop')} className="sf-btn sf-btn-ghost text-[11px]" style={{ height: 26, padding: '0 8px' }}>{tr('Arrêter', 'Stop')}</button>
-                        ) : (
-                          <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'start')} className="sf-btn sf-btn-ghost text-[11px]" style={{ height: 26, padding: '0 8px' }}>{tr('Démarrer', 'Start')}</button>
-                        )}
-                        <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'remove')} className="sf-btn sf-btn-ghost text-[11px] text-danger" style={{ height: 26, padding: '0 8px' }}>{tr('Suppr.', 'Del.')}</button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <button onClick={loadInstances} className="sf-btn sf-btn-ghost text-[11px] mt-2" style={{ width: '100%' }}>↻ {tr('Rafraîchir', 'Refresh')}</button>
+          <div className="sf-card mt-6" style={{ overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
+                    {[tr('Statut', 'Status'), tr('Nom', 'Name'), 'ID', tr('Système', 'System'), tr('Port ADB', 'ADB port'), tr('Actions', 'Actions')].map(h => (
+                      <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-4)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {instances.length === 0 && (
+                    <tr><td colSpan={6} style={{ padding: 28, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{tr('Aucun téléphone. Crée-en un en haut à droite.', 'No phone yet. Create one at the top right.')}</td></tr>
+                  )}
+                  {instances.map(inst => {
+                    const running = /running|up/i.test(inst.state)
+                    return (
+                      <tr key={inst.id} onDoubleClick={() => openWindow(inst.id)}
+                        style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background .15s' }}
+                        className="cp-row"
+                      >
+                        <td style={{ padding: '10px 16px' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: running ? 'var(--ok)' : 'var(--text-4)' }}>
+                            <span style={{ width: 7, height: 7, borderRadius: 99, background: running ? 'var(--ok)' : 'var(--text-4)', boxShadow: running ? '0 0 6px var(--ok)' : 'none' }} />
+                            {running ? tr('En ligne', 'Online') : tr('Arrêté', 'Stopped')}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-1)' }}>{inst.name}</td>
+                        <td style={{ padding: '10px 16px', color: 'var(--text-3)', fontFamily: 'monospace', fontSize: 11.5 }}>{inst.id}</td>
+                        <td style={{ padding: '10px 16px', color: 'var(--text-3)' }}>Android 13</td>
+                        <td style={{ padding: '10px 16px', color: 'var(--text-3)', fontFamily: 'monospace', fontSize: 11.5 }}>{inst.adbPort ?? '—'}</td>
+                        <td style={{ padding: '10px 16px' }}>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => openWindow(inst.id)} className="sf-btn sf-btn-primary text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>▶ {tr('Ouvrir', 'Open')}</button>
+                            {running ? (
+                              <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'stop')} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>{tr('Arrêter', 'Stop')}</button>
+                            ) : (
+                              <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'start')} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>{tr('Démarrer', 'Start')}</button>
+                            )}
+                            <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'remove')} className="sf-btn sf-btn-ghost text-[11.5px] text-danger" style={{ height: 28, padding: '0 10px' }}>{tr('Suppr.', 'Del.')}</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-
-            {/* Écran + actions */}
-            {selected ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 280px) 1fr', gap: 16 }}>
-                <div className="sf-card p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span style={{ fontSize: 12.5, fontWeight: 800 }}>{tr('Écran', 'Screen')}</span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setLive(v => !v)} className="sf-btn sf-btn-ghost text-[11px]" style={{ color: live ? 'var(--ok)' : undefined }}>● Live</button>
-                      <button onClick={() => refreshSnapshot(selected)} className="sf-btn sf-btn-ghost text-[11px]">↻</button>
-                    </div>
-                  </div>
-                  {/* Écran FLUIDE (flux vidéo temps réel, comme GeeLark) — ouvre
-                      ws-scrcpy dans un nouvel onglet. Demande le mot de passe une
-                      fois (utilisateur "phone", mot de passe = ton token agent). */}
-                  <button
-                    onClick={() => { const { url } = getCloudAgent(); if (url) window.open(`${url}/live/`, '_blank', 'noopener') }}
-                    className="sf-btn sf-btn-primary text-[12px] mb-2" style={{ width: '100%' }}
-                  >
-                    🎥 {tr('Écran fluide (temps réel)', 'Fluid screen (real-time)')}
-                  </button>
-                  <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '0 0 10px' }}>
-                    {tr('S\'ouvre dans un nouvel onglet · identifiant : phone · mot de passe : ton token agent', 'Opens in a new tab · username: phone · password: your agent token')}
-                  </p>
-                  <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center' }}>
-                    {snap ? (
-                      <img ref={imgRef} src={snap} alt="écran" draggable={false} onClick={onScreenClick}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair' }} />
-                    ) : (
-                      <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{tr('Pas de capture', 'No snapshot')}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <button onClick={() => quickKey('3', tr('Accueil', 'Home'))} className="sf-btn sf-btn-ghost text-[12px]">⌂ {tr('Accueil', 'Home')}</button>
-                    <button onClick={() => quickKey('4', tr('Retour', 'Back'))} className="sf-btn sf-btn-ghost text-[12px]">← {tr('Retour', 'Back')}</button>
-                    <button onClick={() => quickKey('187', tr('Récents', 'Recents'))} className="sf-btn sf-btn-ghost text-[12px]">▢ {tr('Récents', 'Recents')}</button>
-                  </div>
-                </div>
-
-                <div className="sf-card p-4">
-                  <p className="sf-section-label mb-2">{tr('Journal', 'Log')}</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 480, overflowY: 'auto' }}>
-                    {log.length === 0
-                      ? <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{tr('Aucune action.', 'No action yet.')}</span>
-                      : log.map((l, i) => <span key={i} style={{ fontSize: 11.5, fontFamily: 'monospace', color: l.includes('❌') ? 'var(--danger)' : 'var(--text-3)' }}>{l}</span>)}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="sf-card p-8" style={{ textAlign: 'center', color: 'var(--text-3)' }}>{tr('Sélectionne un téléphone à gauche.', 'Select a phone on the left.')}</div>
-            )}
+            <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>{tr('Total', 'Total')} : {instances.length}</span>
+              <button onClick={loadInstances} className="sf-btn sf-btn-ghost text-[11.5px]">↻ {tr('Rafraîchir', 'Refresh')}</button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Fenêtres flottantes — une par tel ouvert, façon GeeLark */}
+      {openIds.map(id => {
+        const inst = instances.find(i => i.id === id)
+        if (!inst) return null
+        return (
+          <CloudPhoneWindow
+            key={id} inst={inst}
+            zIndex={1000 + zOrder.indexOf(id)}
+            offset={openIds.indexOf(id)}
+            onClose={() => closeWindow(id)}
+            onFocus={() => focusWindow(id)}
+          />
+        )
+      })}
+
+      <style>{`.cp-row:hover { background: rgba(129,140,248,0.06); }`}</style>
     </div>
   )
 }
