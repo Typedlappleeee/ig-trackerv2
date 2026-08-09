@@ -88,4 +88,6 @@ export const cloudPhones = {
   shell: (id: string, cmd: string, timeout?: number) => call<{ output: string }>('shell', { id, cmd, timeout }),
   screenshot: (id: string) => call<{ dataUrl: string }>('screenshot', { id }),
   install: (id: string, url: string) => call<{ output: string }>('install', { id, url }),
+  // Dépose une vidéo (URL directe http/https) dans /sdcard/Movies du téléphone.
+  pushVideo: (id: string, url: string) => call<{ output: string }>('push', { id, url }),
 }

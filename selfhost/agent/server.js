@@ -146,6 +146,32 @@ async function installApk(serial, apkUrl) {
   }
 }
 
+const MAX_VIDEO_BYTES = 500 * 1024 * 1024   // 500 Mo
+
+// Télécharge une vidéo (http/https) et la pousse dans /sdcard/Movies du tel,
+// puis force l'indexation MediaStore pour qu'elle apparaisse dans la galerie.
+async function pushVideo(serial, videoUrl) {
+  if (!/^https?:\/\//i.test(videoUrl)) throw new Error('URL vidéo invalide (http/https uniquement)')
+  const r = await fetch(videoUrl, { signal: AbortSignal.timeout(180000) })
+  if (!r.ok) throw new Error(`téléchargement vidéo échoué (HTTP ${r.status})`)
+  const len = Number(r.headers.get('content-length') || 0)
+  if (len && len > MAX_VIDEO_BYTES) throw new Error('vidéo trop volumineuse (>500 Mo)')
+  const buf = Buffer.from(await r.arrayBuffer())
+  if (buf.length > MAX_VIDEO_BYTES) throw new Error('vidéo trop volumineuse (>500 Mo)')
+  const base = `sf-${Date.now()}.mp4`
+  const tmpFile = path.join(os.tmpdir(), base)
+  fs.writeFileSync(tmpFile, buf)
+  const dest = `/sdcard/Movies/${base}`
+  try {
+    await adb(['-s', serial, 'push', tmpFile, dest], 180000)
+    await adb(['-s', serial, 'shell', 'am', 'broadcast', '-a',
+      'android.intent.action.MEDIA_SCANNER_SCAN_FILE', '-d', `file://${dest}`], 20000).catch(() => {})
+    return dest
+  } finally {
+    fs.unlink(tmpFile, () => {})
+  }
+}
+
 // Résout toujours la dernière version d'Aurora Store via l'API F-Droid (évite
 // de coder en dur un numéro de version qui périmerait). Aurora Store = client
 // Play Store open-source/anonyme (catalogue Google Play complet, sans compte
@@ -221,6 +247,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (parts[2] === 'install' && req.method === 'POST') {
         const out = await installApk(inst.serial, String(body.url || ''))
+        return json(res, 200, { ok: true, output: out })
+      }
+      if (parts[2] === 'push' && req.method === 'POST') {
+        const out = await pushVideo(inst.serial, String(body.url || ''))
         return json(res, 200, { ok: true, output: out })
       }
     }

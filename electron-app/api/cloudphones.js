@@ -43,6 +43,7 @@ module.exports = async (req, res) => {
       case 'shell':        r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/shell`, 'POST', { cmd, timeout }); break
       case 'screenshot':  r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/screenshot`); break
       case 'install':      r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/install`, 'POST', { url }, 270000); break
+      case 'push':         r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/push`, 'POST', { url }, 270000); break
       default: return res.status(400).json({ ok: false, error: `op inconnu: ${op}` })
     }
     // Les données de l'agent restent rangées sous `data` (pas dépliées à plat) —

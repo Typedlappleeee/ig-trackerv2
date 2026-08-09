@@ -1,7 +1,7 @@
 // Fenêtre flottante d'UN téléphone cloud (façon GeeLark) : titre déplaçable,
-// écran de connexion (fetching/starting/connecting) puis écran fluide ou
-// capture, + actions rapides. Plusieurs fenêtres peuvent être ouvertes en même
-// temps, chacune indépendante.
+// écran de connexion (fetching/starting/connecting) puis flux fluide (ws-scrcpy)
+// ou capture, + une barre latérale d'actions à droite (ping, upload, apps, son,
+// photo, rotation, power…). Plusieurs fenêtres indépendantes en même temps.
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cloudPhones, getCloudAgent, type CpInstance } from '@/lib/cloudPhones'
 
@@ -14,26 +14,29 @@ interface Props {
 }
 
 type Phase = 'fetching' | 'starting' | 'connecting' | 'ready' | 'error'
+type Panel = null | 'apps' | 'upload' | 'sound' | 'more'
 
-// Hauteurs indicatives du chrome (barre de titre / barre d'actions) pour borner
-// la fenêtre à l'écran. La hauteur du corps, elle, est DÉRIVÉE du vrai ratio du
-// téléphone (lu depuis la capture) pour que le conteneur épouse pile la vidéo.
+// Hauteur indicative de la barre de titre (pour borner la fenêtre à l'écran) et
+// largeur de la barre latérale d'actions. La hauteur du corps, elle, est DÉRIVÉE
+// du vrai ratio du téléphone (lu depuis la capture) → le conteneur épouse pile
+// la vidéo, aucun gris.
 const CP_TITLE = 42
-const CP_ACTION = 50
+const CP_RAIL = 54
 
 // Catalogue d'apps à installer en 1 clic (ouvre la page dans Aurora Store sur le
 // tel). Pas Vinted (choix utilisateur).
 const APP_CATALOG: { pkg: string; label: string; icon: string }[] = [
-  { pkg: 'com.instagram.android',   label: 'Instagram', icon: '📸' },
-  { pkg: 'com.facebook.katana',     label: 'Facebook',  icon: '📘' },
-  { pkg: 'com.twitter.android',     label: 'X',         icon: '🐦' },
-  { pkg: 'com.instagram.barcelona', label: 'Threads',   icon: '🧵' },
-  { pkg: 'com.zhiliaoapp.musically', label: 'TikTok',   icon: '🎵' },
+  { pkg: 'com.instagram.android',    label: 'Instagram', icon: '📸' },
+  { pkg: 'com.zhiliaoapp.musically', label: 'TikTok',    icon: '🎵' },
+  { pkg: 'com.instagram.barcelona',  label: 'Threads',   icon: '🧵' },
+  { pkg: 'com.snapchat.android',     label: 'Snapchat',  icon: '👻' },
+  { pkg: 'com.facebook.katana',      label: 'Facebook',  icon: '📘' },
+  { pkg: 'com.twitter.android',      label: 'X',         icon: '🐦' },
 ]
 
 export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Props) {
   const [pos, setPos] = useState({ x: 80 + offset * 28, y: 60 + offset * 24 })
-  const [winW, setWinW] = useState(392)   // largeur pilote ; la hauteur en découle
+  const [winW, setWinW] = useState(340)   // largeur de la VIDÉO ; la hauteur en découle
   const [maximized, setMaximized] = useState(false)
   const prevBox = useRef<{ x: number; y: number; w: number } | null>(null)
   const dragRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
@@ -45,9 +48,12 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   // cloud phones ne font pas tous 9:16 (souvent 9:19.5, 9:20…) : caler le
   // conteneur sur ce vrai ratio évite que ws-scrcpy letterboxe la vidéo en gris.
   const [aspect, setAspect] = useState(16 / 9)
-  const [installing, setInstalling] = useState(false)
-  const [installMsg, setInstallMsg] = useState('')
-  const [showApps, setShowApps] = useState(false)
+  const [panel, setPanel] = useState<Panel>(null)
+  const [ping, setPing] = useState<number | null>(null)
+  const [installed, setInstalled] = useState<Set<string>>(new Set())
+  const [rotation, setRotation] = useState(0)
+  const [uploadUrl, setUploadUrl] = useState('')
+  const [busyMsg, setBusyMsg] = useState('')
   const imgRef = useRef<HTMLImageElement>(null)
   const pollRef = useRef<number | null>(null)
 
@@ -73,7 +79,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
 
   useEffect(() => { connect() }, [connect])
 
-  // Capture en secours (mode non-fluide) : rafraîchit toutes les 2s.
+  // Capture en secours (mode non-fluide) : rafraîchit toutes les 1,2s.
   useEffect(() => {
     if (phase !== 'ready' || fluid) return
     pollRef.current = window.setInterval(async () => {
@@ -92,6 +98,22 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     im.src = snap
   }, [snap])
 
+  // Ping du téléphone : on chronomètre un aller-retour d'une commande ADB triviale
+  // toutes les ~4s → indicateur de latence live (agent + ADB compris).
+  useEffect(() => {
+    if (phase !== 'ready') return
+    let alive = true
+    const tick = async () => {
+      const t0 = Date.now()
+      const r = await cloudPhones.shell(inst.id, 'true', 8000)
+      if (!alive) return
+      setPing(r.ok ? Date.now() - t0 : null)
+    }
+    tick()
+    const id = window.setInterval(tick, 4000)
+    return () => { alive = false; window.clearInterval(id) }
+  }, [phase, inst.id])
+
   // Déplacement de la fenêtre par la barre de titre.
   const onTitleDown = (e: React.PointerEvent) => {
     onFocus()
@@ -104,22 +126,18 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
   }
 
-  // Plus aucune réserve de largeur : la barre native de ws-scrcpy est masquée à
-  // la source (CSS serveur, cf. selfhost/install.sh) et son fond passé en sombre,
-  // donc le conteneur épouse pile le ratio réel du tel → la vidéo remplit tout.
-  const toolbarReserve = 0
-  // Largeur max pour que la fenêtre (hauteur dérivée) tienne dans l'écran.
-  const maxWidthForViewport = () => Math.round((window.innerHeight * 0.94 - CP_TITLE - CP_ACTION) / aspect + toolbarReserve)
+  // Largeur vidéo max pour que la fenêtre (hauteur dérivée du ratio) tienne dans l'écran.
+  const maxWidthForViewport = () => Math.round((window.innerHeight * 0.94 - CP_TITLE) / aspect)
 
   // Redimensionnement par la poignée en bas à droite : on ne pilote QUE la
-  // largeur (la hauteur suit le ratio téléphone) → aucun gris possible.
+  // largeur vidéo (la hauteur suit le ratio téléphone) → aucun gris possible.
   const onResizeDown = (e: React.PointerEvent) => {
     e.stopPropagation(); onFocus()
     if (maximized) setMaximized(false)
     const start = { w: winW, px: e.clientX }
     const cap = maxWidthForViewport()
     const onMove = (ev: PointerEvent) => {
-      setWinW(Math.max(320, Math.min(cap, start.w + (ev.clientX - start.px))))
+      setWinW(Math.max(280, Math.min(cap, start.w + (ev.clientX - start.px))))
     }
     const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
@@ -133,16 +151,13 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     } else {
       prevBox.current = { x: pos.x, y: pos.y, w: winW }
       const w = maxWidthForViewport()
-      setPos({ x: Math.max(16, Math.round((window.innerWidth - w) / 2)), y: 14 })
+      setPos({ x: Math.max(16, Math.round((window.innerWidth - w - CP_RAIL) / 2)), y: 14 })
       setWinW(w); setMaximized(true)
     }
   }
 
-  // Hauteur du CORPS = ratio téléphone 9:16 sur la largeur utile (hors barre
-  // scrcpy en Fluide). La fenêtre elle-même est en hauteur auto → pas besoin
-  // d'estimer la hauteur exacte de la barre d'actions (fini les calculs de
-  // chrome approximatifs qui laissaient du gris).
-  const bodyH = Math.round((winW - toolbarReserve) * aspect)
+  // Hauteur du CORPS = ratio téléphone réel appliqué à la largeur vidéo.
+  const bodyH = Math.round(winW * aspect)
 
   const onScreenClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     const img = imgRef.current
@@ -155,60 +170,105 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   }
   const quickKey = async (key: string) => { await cloudPhones.shell(inst.id, `input keyevent ${key}`) }
 
+  const flash = (msg: string, ms = 3500) => { setBusyMsg(msg); if (ms) window.setTimeout(() => setBusyMsg(m => (m === msg ? '' : m)), ms) }
+
+  // Ouvre/ferme un panneau (et rafraîchit la liste des apps installées à l'ouverture).
+  const togglePanel = async (p: Exclude<Panel, null>) => {
+    const next = panel === p ? null : p
+    setPanel(next)
+    if (next === 'apps') {
+      const r = await cloudPhones.shell(inst.id, 'pm list packages', 15000)
+      if (r.ok && r.data?.output) {
+        const set = new Set<string>()
+        r.data.output.split('\n').forEach(l => { const m = l.trim().replace(/^package:/, ''); if (m) set.add(m) })
+        setInstalled(set)
+      }
+    }
+  }
+
+  // Ouvre la page d'une app dans Aurora Store (déjà installé) sur le téléphone.
+  const openInStore = async (app: { pkg: string; label: string }) => {
+    flash(`Ouverture de ${app.label} dans le store…`)
+    await cloudPhones.shell(inst.id, `am start -a android.intent.action.VIEW -d "market://details?id=${app.pkg}"`)
+    setPanel(null)
+  }
+  // Lance une app déjà installée.
+  const launchApp = async (app: { pkg: string; label: string }) => {
+    flash(`Ouverture de ${app.label}…`)
+    await cloudPhones.shell(inst.id, `monkey -p ${app.pkg} -c android.intent.category.LAUNCHER 1`)
+    setPanel(null)
+  }
+
   const installApk = async () => {
     const url = window.prompt('URL directe de l\'APK à installer (ex: APKMirror) :')
     if (!url || !url.trim()) return
-    setInstalling(true); setInstallMsg('Téléchargement + installation…')
+    flash('Téléchargement + installation de l\'APK…', 0)
     const r = await cloudPhones.install(inst.id, url.trim())
-    setInstalling(false)
-    setInstallMsg(r.ok ? '✓ Installé' : `Échec : ${r.error ?? 'inconnu'}`)
-    window.setTimeout(() => setInstallMsg(''), 4000)
+    flash(r.ok ? '✓ APK installé' : `Échec : ${r.error ?? 'inconnu'}`)
   }
 
-  // Ouvre la page d'une app dans Aurora Store (déjà installé) sur le téléphone :
-  // Aurora enregistre le schéma market:// → un simple intent VIEW l'ouvre sur la
-  // bonne app, il ne reste qu'à taper « Installer ». Plus fiable que de sourcer
-  // l'APK propriétaire côté serveur (miroirs bloqués/périmés).
-  const openInStore = async (app: { pkg: string; label: string }) => {
-    setInstallMsg(`Ouverture de ${app.label} dans le store…`)
-    await cloudPhones.shell(inst.id, `am start -a android.intent.action.VIEW -d "market://details?id=${app.pkg}"`)
-    if (!fluid) window.setTimeout(async () => { const r2 = await cloudPhones.screenshot(inst.id); if (r2.ok && r2.data?.dataUrl) setSnap(r2.data.dataUrl) }, 800)
-    window.setTimeout(() => setInstallMsg(''), 3000)
+  // Envoie une vidéo (par URL directe) dans /sdcard/Movies du tel + indexation.
+  const sendVideo = async () => {
+    const url = uploadUrl.trim()
+    if (!/^https?:\/\//i.test(url)) { flash('Colle une URL http(s) directe vers la vidéo'); return }
+    flash('Envoi de la vidéo sur le téléphone…', 0)
+    const r = await cloudPhones.pushVideo(inst.id, url)
+    if (r.ok) { flash('✓ Vidéo envoyée (visible dans la galerie)'); setUploadUrl(''); setPanel(null) }
+    else flash(`Échec : ${r.error ?? 'inconnu'}`)
+  }
+
+  // Enregistre une capture PNG de l'écran sur le PC.
+  const savePhoto = async () => {
+    flash('Capture…', 0)
+    const r = await cloudPhones.screenshot(inst.id)
+    if (r.ok && r.data?.dataUrl) {
+      const a = document.createElement('a')
+      a.href = r.data.dataUrl; a.download = `${inst.name}-${Date.now()}.png`
+      document.body.appendChild(a); a.click(); a.remove()
+      flash('✓ Capture enregistrée')
+    } else flash('Échec de la capture')
+  }
+
+  // Bascule portrait/paysage (désactive l'auto-rotation puis force l'orientation).
+  const toggleRotation = async () => {
+    const next = rotation === 0 ? 1 : 0
+    await cloudPhones.shell(inst.id, 'settings put system accelerometer_rotation 0')
+    await cloudPhones.shell(inst.id, `settings put system user_rotation ${next}`)
+    setRotation(next)
+    flash(next === 0 ? 'Portrait' : 'Paysage')
+  }
+
+  const restart = async () => {
+    if (!window.confirm('Redémarrer le téléphone ?')) return
+    setPanel(null); flash('Redémarrage…', 0)
+    await cloudPhones.shell(inst.id, 'reboot', 10000).catch(() => {})
+    window.setTimeout(connect, 4000)
   }
 
   const { url: agentUrl, token: agentToken } = getCloudAgent()
-  // ws-scrcpy sert son SPA à la racine (chemins d'assets absolus) — on ne peut
-  // pas la monter sous un préfixe /live/ sans casser le chargement des assets
-  // (écran noir). Le token protège la page d'accueil (query, jamais tronqué par
-  // Chrome contrairement à des identifiants dans l'URL) ; le flux direct vers CE
-  // téléphone se fait via le hash `#!action=stream&udid=...` propre à ws-scrcpy.
   const serial = inst.serial || (inst.adbPort ? `127.0.0.1:${inst.adbPort}` : null)
-  // `player=mse` : décodage H264 via MediaSource Extensions, supporté nativement
-  // par Chrome/Edge (pas besoin du décodeur logiciel broadway, plus fluide).
-  // `ws` : l'URL du tunnel ADB-sur-WebSocket que ws-scrcpy ouvre en interne pour
-  // parler au scrcpy-server sur le téléphone — ws-scrcpy la construit d'habitude
-  // lui-même après une étape de sélection d'appareil (jamais exposée par un
-  // simple lien direct) ; on la reconstruit à la main :
-  // wss://<host>/?action=proxy-adb&remote=tcp:8886&udid=<serial>
-  // (8886 = SERVER_PORT, le port local du scrcpy-server côté téléphone).
+  // `player=mse` : décodage H264 via MediaSource Extensions (natif Chrome/Edge).
+  // `ws` : tunnel ADB-sur-WebSocket reconstruit à la main (ws-scrcpy le construit
+  // d'ordinaire après une étape de sélection d'appareil, jamais exposée par un
+  // lien direct). Le token protège la page ET le tunnel (même ?token= côté Caddy).
   const fluidSrc = agentUrl && agentToken && serial
     ? (() => {
         const host = new URL(agentUrl).host
         const wsProto = agentUrl.startsWith('https') ? 'wss' : 'ws'
-        // Le tunnel WS passe aussi par le chemin "/" côté Caddy → il lui faut
-        // le même ?token= que la page, sinon la passerelle le bloque en 401.
         const wsParam = `${wsProto}://${host}/?action=proxy-adb&remote=tcp:8886&udid=${encodeURIComponent(serial)}&token=${encodeURIComponent(agentToken)}`
         return `${agentUrl}/?token=${encodeURIComponent(agentToken)}#!action=stream&udid=${encodeURIComponent(serial)}&player=mse&ws=${encodeURIComponent(wsParam)}`
       })()
     : null
 
   const running = /running|up/i.test(inst.state)
+  const pingColor = ping == null ? '#6b6b7c' : ping < 200 ? '#34D399' : ping < 500 ? '#FBBF24' : '#F87171'
+  const pingLabel = ping == null ? '—' : `${ping}`
 
   return (
     <div
       onMouseDown={onFocus}
       style={{
-        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: winW,
+        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: winW + CP_RAIL,
         borderRadius: 16, overflow: 'hidden', background: '#0b0c12',
         border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 30px 70px -24px rgba(0,0,0,0.8)',
         display: 'flex', flexDirection: 'column',
@@ -216,7 +276,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     >
       {/* Barre de titre — déplaçable */}
       <div onPointerDown={onTitleDown} onDoubleClick={toggleMax}
-        style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 8px 0 12px', height: 42, flexShrink: 0, background: 'linear-gradient(135deg,#1c1d2a,#131420)', cursor: 'grab', userSelect: 'none', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 8px 0 12px', height: CP_TITLE, flexShrink: 0, background: 'linear-gradient(135deg,#1c1d2a,#131420)', cursor: 'grab', userSelect: 'none', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
         <span style={{ width: 20, height: 20, borderRadius: 6, background: 'linear-gradient(135deg,#818CF8,#6366F1)', display: 'grid', placeItems: 'center', fontSize: 11, flexShrink: 0 }}>📱</span>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: '#F0F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</span>
@@ -229,78 +289,120 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
         <button onClick={onClose} title="Fermer" style={{ ...titleBtn, color: '#F87171' }}>✕</button>
       </div>
 
-      {/* Corps — ws-scrcpy calcule lui-même la taille de la vidéo en JS à partir
-          de CE conteneur (pas de simple CSS statique) : lui masquer sa barre
-          d'outils ou forcer width/height en CSS cassait son calcul (vidéo
-          minuscule ou étirée). On lui laisse sa mise en page native (barre
-          d'outils comprise, comme GeeLark) et on le laisse remplir tout
-          l'espace dispo (flex:1) — la vidéo se redimensionne toute seule en JS
-          quand ce conteneur change de taille (fenêtre redimensionnable). */}
-      <div style={{ height: bodyH, background: '#050609', display: 'grid', placeItems: 'center', position: 'relative' }}>
-        {phase !== 'ready' && phase !== 'error' && (
-          <div style={{ textAlign: 'center', padding: 24 }}>
-            <div style={{ width: 40, height: 40, margin: '0 auto 16px', borderRadius: '50%', border: '3px solid rgba(129,140,248,0.25)', borderTopColor: '#818CF8', animation: 'cp-spin 0.9s linear infinite' }} />
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#E9E9F2', marginBottom: 12 }}>Connecting to cloud phone</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 10.5, color: '#8a8a9c', textAlign: 'left' }}>
-              <Step label="Fetching data" done={phase !== 'fetching'} active={phase === 'fetching'} />
-              <Step label="Starting" done={phase === 'connecting'} active={phase === 'starting'} />
-              <Step label="Connecting" done={false} active={phase === 'connecting'} />
+      {/* Corps : vidéo (gauche) + barre latérale d'actions (droite) */}
+      <div style={{ display: 'flex', position: 'relative' }}>
+        <div style={{ width: winW, height: bodyH, background: '#050609', display: 'grid', placeItems: 'center', position: 'relative', flexShrink: 0 }}>
+          {phase !== 'ready' && phase !== 'error' && (
+            <div style={{ textAlign: 'center', padding: 24 }}>
+              <div style={{ width: 40, height: 40, margin: '0 auto 16px', borderRadius: '50%', border: '3px solid rgba(129,140,248,0.25)', borderTopColor: '#818CF8', animation: 'cp-spin 0.9s linear infinite' }} />
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#E9E9F2', marginBottom: 12 }}>Connecting to cloud phone</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 10.5, color: '#8a8a9c', textAlign: 'left' }}>
+                <Step label="Fetching data" done={phase !== 'fetching'} active={phase === 'fetching'} />
+                <Step label="Starting" done={phase === 'connecting'} active={phase === 'starting'} />
+                <Step label="Connecting" done={false} active={phase === 'connecting'} />
+              </div>
             </div>
+          )}
+          {phase === 'error' && (
+            <div style={{ textAlign: 'center', padding: 20 }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>⚠️</div>
+              <div style={{ fontSize: 11.5, color: '#F87171', marginBottom: 12, lineHeight: 1.5 }}>{errMsg}</div>
+              <button onClick={connect} style={{ fontSize: 11.5, fontWeight: 700, color: '#D8B4FE', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>Réessayer</button>
+            </div>
+          )}
+          {phase === 'ready' && (
+            fluid && fluidSrc ? (
+              <iframe title={inst.name} src={fluidSrc} style={{ width: '100%', height: '100%', border: 'none' }} allow="clipboard-read; clipboard-write" />
+            ) : snap ? (
+              <img ref={imgRef} src={snap} alt="écran" draggable={false} onClick={onScreenClick}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair' }} />
+            ) : (
+              <span style={{ fontSize: 11.5, color: '#6b6b7c' }}>…</span>
+            )
+          )}
+        </div>
+
+        {/* Barre latérale d'actions (droite) — façon GeeLark */}
+        <div style={{ width: CP_RAIL, height: bodyH, flexShrink: 0, background: 'linear-gradient(180deg,#12131d,#0d0e16)', borderLeft: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 0', overflowY: 'auto' }}>
+          {/* Ping / connexion en haut */}
+          <div title="Latence du téléphone" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, marginBottom: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 99, background: pingColor, boxShadow: `0 0 6px ${pingColor}` }} />
+            <span style={{ fontSize: 8.5, fontWeight: 800, color: pingColor, lineHeight: 1 }}>{pingLabel}</span>
+            <span style={{ fontSize: 7, color: '#6b6b7c', lineHeight: 1 }}>ms</span>
           </div>
-        )}
-        {phase === 'error' && (
-          <div style={{ textAlign: 'center', padding: 20 }}>
-            <div style={{ fontSize: 26, marginBottom: 8 }}>⚠️</div>
-            <div style={{ fontSize: 11.5, color: '#F87171', marginBottom: 12, lineHeight: 1.5 }}>{errMsg}</div>
-            <button onClick={connect} style={{ fontSize: 11.5, fontWeight: 700, color: '#D8B4FE', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>Réessayer</button>
+          <RailBtn icon="📤" label="Upload" active={panel === 'upload'} onClick={() => togglePanel('upload')} disabled={phase !== 'ready'} />
+          <RailBtn icon="📲" label="Apps"   active={panel === 'apps'}   onClick={() => togglePanel('apps')}   disabled={phase !== 'ready'} />
+          <RailBtn icon="🔊" label="Son"    active={panel === 'sound'}  onClick={() => togglePanel('sound')}  disabled={phase !== 'ready'} />
+          <RailBtn icon="📸" label="Photo"  onClick={savePhoto}      disabled={phase !== 'ready'} />
+          <RailBtn icon="🔄" label="Rotate" onClick={toggleRotation} disabled={phase !== 'ready'} />
+          <RailBtn icon="⏻"  label="Power"  onClick={() => quickKey('26')} disabled={phase !== 'ready'} />
+          <RailBtn icon="⋯"  label="Plus"   active={panel === 'more'} onClick={() => togglePanel('more')} disabled={phase !== 'ready'} />
+        </div>
+
+        {/* Panneaux flottants (ancrés à gauche de la barre latérale) */}
+        {panel && phase === 'ready' && (
+          <div style={{ position: 'absolute', top: 8, right: CP_RAIL + 8, width: 232, maxHeight: bodyH - 16, overflowY: 'auto', background: 'rgba(17,18,26,0.98)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, boxShadow: '0 20px 50px -18px rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', padding: 12, zIndex: 10 }}>
+            {panel === 'upload' && (
+              <>
+                <PanelTitle>📤 Envoyer une vidéo</PanelTitle>
+                <p style={{ fontSize: 10.5, color: '#8a8a9c', margin: '0 0 8px', lineHeight: 1.5 }}>Colle l'URL directe d'une vidéo (http/https). Elle sera déposée dans la galerie du téléphone.</p>
+                <input value={uploadUrl} onChange={e => setUploadUrl(e.target.value)} placeholder="https://…/video.mp4"
+                  style={{ width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.35)', color: '#E9E9F2', marginBottom: 8 }} />
+                <button onClick={sendVideo} style={primaryBtn}>Envoyer sur le tel</button>
+              </>
+            )}
+            {panel === 'apps' && (
+              <>
+                <PanelTitle>📲 Applications</PanelTitle>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                  {APP_CATALOG.map(app => {
+                    const isIn = installed.has(app.pkg)
+                    return (
+                      <div key={app.pkg} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 9, background: 'rgba(255,255,255,0.04)' }}>
+                        <span style={{ fontSize: 16 }}>{app.icon}</span>
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: '#E9E9F2' }}>{app.label}</span>
+                        {isIn
+                          ? <button onClick={() => launchApp(app)} style={ghostBtn}>Ouvrir</button>
+                          : <button onClick={() => openInStore(app)} style={miniPrimary}>Installer</button>}
+                      </div>
+                    )
+                  })}
+                </div>
+                <button onClick={installApk} style={ghostBtnWide}>📦 Installer depuis un lien APK</button>
+              </>
+            )}
+            {panel === 'sound' && (
+              <>
+                <PanelTitle>🔊 Son</PanelTitle>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => quickKey('25')} style={softBtn}>🔉 Baisser</button>
+                  <button onClick={() => quickKey('24')} style={softBtn}>🔊 Monter</button>
+                  <button onClick={() => quickKey('164')} style={softBtn}>🔇 Muet</button>
+                </div>
+              </>
+            )}
+            {panel === 'more' && (
+              <>
+                <PanelTitle>⋯ Plus</PanelTitle>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <button onClick={() => { setFluid(v => !v); setPanel(null) }} style={ghostBtnWide}>{fluid ? '📷 Passer en mode capture' : '🎥 Passer en mode fluide'}</button>
+                  <button onClick={() => quickKey('3')} style={ghostBtnWide}>🏠 Accueil</button>
+                  <button onClick={restart} style={{ ...ghostBtnWide, color: '#F87171', borderColor: 'rgba(248,113,113,0.3)' }}>♻️ Redémarrer le téléphone</button>
+                </div>
+              </>
+            )}
           </div>
-        )}
-        {phase === 'ready' && (
-          fluid && fluidSrc ? (
-            <iframe title={inst.name} src={fluidSrc} style={{ width: '100%', height: '100%', border: 'none' }} allow="clipboard-read; clipboard-write" />
-          ) : snap ? (
-            <img ref={imgRef} src={snap} alt="écran" draggable={false} onClick={onScreenClick}
-              style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair' }} />
-          ) : (
-            <span style={{ fontSize: 11.5, color: '#6b6b7c' }}>…</span>
-          )
         )}
       </div>
 
-      {/* Barre d'actions */}
-      {phase === 'ready' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px 10px', flexShrink: 0, background: 'linear-gradient(0deg,#0b0c12,#0f1019)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <TinyBtn onClick={() => setFluid(v => !v)} active={fluid}>{fluid ? '🎥 Fluide' : '📷 Capture'}</TinyBtn>
-            <span style={{ display: 'inline-flex', gap: 6, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.04)' }}>
-              <TinyBtn onClick={() => quickKey('4')} title="Retour">◁</TinyBtn>
-              <TinyBtn onClick={() => quickKey('3')} title="Accueil">○</TinyBtn>
-              <TinyBtn onClick={() => quickKey('187')} title="Applis récentes">▢</TinyBtn>
-            </span>
-            <span style={{ display: 'inline-flex', gap: 6, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.04)' }}>
-              <TinyBtn onClick={() => quickKey('26')} title="Marche/veille">⏻</TinyBtn>
-              <TinyBtn onClick={() => quickKey('25')} title="Volume −">🔉</TinyBtn>
-              <TinyBtn onClick={() => quickKey('24')} title="Volume +">🔊</TinyBtn>
-            </span>
-            <span style={{ flex: 1 }} />
-            <TinyBtn onClick={() => setShowApps(v => !v)} active={showApps}>📲 Installer une application</TinyBtn>
-            <TinyBtn onClick={installApk} active={installing}>{installing ? '…' : '📦 Depuis un lien APK'}</TinyBtn>
-          </div>
-          {/* Catalogue : 1 clic ouvre l'app dans Aurora Store sur le tel */}
-          {showApps && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {APP_CATALOG.map(app => (
-                <TinyBtn key={app.pkg} onClick={() => openInStore(app)}>{app.icon} {app.label}</TinyBtn>
-              ))}
-            </div>
-          )}
-          {installMsg && <span style={{ fontSize: 10.5, color: installMsg.startsWith('✓') ? '#34D399' : '#c8c8d8' }}>{installMsg}</span>}
-        </div>
+      {/* Bandeau de statut (messages d'action) */}
+      {busyMsg && (
+        <div style={{ padding: '6px 12px', fontSize: 10.5, fontWeight: 600, color: busyMsg.startsWith('✓') ? '#34D399' : busyMsg.startsWith('Échec') ? '#F87171' : '#c8c8d8', background: 'linear-gradient(0deg,#0b0c12,#0f1019)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>{busyMsg}</div>
       )}
 
       {/* Poignée de redimensionnement (coin bas-droit) */}
       <div onPointerDown={onResizeDown} title="Redimensionner"
-        style={{ position: 'absolute', right: 0, bottom: 0, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 5,
+        style={{ position: 'absolute', right: 0, bottom: 0, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 15,
           background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.28) 62%, transparent 62%, transparent 74%, rgba(255,255,255,0.28) 74%)' }} />
 
       <style>{`@keyframes cp-spin { to { transform: rotate(360deg) } }`}</style>
@@ -309,6 +411,27 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
 }
 
 const titleBtn: React.CSSProperties = { width: 26, height: 26, borderRadius: 7, border: 'none', background: 'rgba(255,255,255,0.06)', color: '#c8c8d8', cursor: 'pointer', fontSize: 13, lineHeight: 1, display: 'grid', placeItems: 'center' }
+const primaryBtn: React.CSSProperties = { width: '100%', fontSize: 11.5, fontWeight: 800, padding: '8px 10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#818CF8,#6366F1)', color: '#fff', cursor: 'pointer' }
+const miniPrimary: React.CSSProperties = { fontSize: 10.5, fontWeight: 800, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#818CF8,#6366F1)', color: '#fff', cursor: 'pointer' }
+const ghostBtn: React.CSSProperties = { fontSize: 10.5, fontWeight: 700, padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#d2d2e0', cursor: 'pointer' }
+const ghostBtnWide: React.CSSProperties = { ...ghostBtn, width: '100%', textAlign: 'center', padding: '7px 10px' }
+const softBtn: React.CSSProperties = { flex: 1, fontSize: 10.5, fontWeight: 700, padding: '8px 4px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#d2d2e0', cursor: 'pointer' }
+
+function PanelTitle({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: 12, fontWeight: 800, color: '#F0F0F7', marginBottom: 8 }}>{children}</div>
+}
+
+function RailBtn({ icon, label, onClick, active, disabled }: { icon: string; label: string; onClick: () => void; active?: boolean; disabled?: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled} title={label}
+      style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 0', borderRadius: 9,
+        border: `1px solid ${active ? 'rgba(129,140,248,0.4)' : 'transparent'}`, background: active ? 'rgba(129,140,248,0.15)' : 'transparent',
+        color: disabled ? '#4b4b58' : active ? '#C7D2FE' : '#c8c8d8', cursor: disabled ? 'default' : 'pointer', transition: 'all .12s' }}>
+      <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
+      <span style={{ fontSize: 8, fontWeight: 700, lineHeight: 1 }}>{label}</span>
+    </button>
+  )
+}
 
 function Step({ label, done, active }: { label: string; done: boolean; active: boolean }) {
   return (
@@ -316,13 +439,6 @@ function Step({ label, done, active }: { label: string; done: boolean; active: b
       <span style={{ color: done ? '#34D399' : active ? '#E9E9F2' : '#6b6b7c' }}>{label}</span>
       <span style={{ color: done ? '#34D399' : '#6b6b7c' }}>{done ? '✓' : active ? '…' : ''}</span>
     </div>
-  )
-}
-function TinyBtn({ children, onClick, active, title }: { children: React.ReactNode; onClick: () => void; active?: boolean; title?: string }) {
-  return (
-    <button onClick={onClick} title={title} style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 7, border: `1px solid ${active ? 'rgba(52,211,153,0.35)' : 'rgba(255,255,255,0.08)'}`, background: active ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)', color: active ? '#34D399' : '#d2d2e0', cursor: 'pointer', transition: 'all .12s' }}>
-      {children}
-    </button>
   )
 }
 
