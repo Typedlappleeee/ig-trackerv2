@@ -42,7 +42,9 @@ module.exports = async (req, res) => {
       case 'screenshot':  r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/screenshot`); break
       default: return res.status(400).json({ ok: false, error: `op inconnu: ${op}` })
     }
-    return res.status(200).json({ ok: r.ok, status: r.status, ...(r.data || {}) })
+    // Les données de l'agent restent rangées sous `data` (pas dépliées à plat) —
+    // le client (cloudPhones.ts) attend r.data.instances / r.data.dataUrl, etc.
+    return res.status(200).json({ ok: r.ok, status: r.status, data: r.data })
   } catch (e) {
     return res.status(200).json({ ok: false, error: (e && e.message) ? e.message : 'agent injoignable' })
   }
