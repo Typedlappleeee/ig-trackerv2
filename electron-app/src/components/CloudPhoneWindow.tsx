@@ -110,7 +110,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     <div
       onMouseDown={onFocus}
       style={{
-        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: 300,
+        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: fluid && phase === 'ready' ? 460 : 300,
         borderRadius: 14, overflow: 'hidden', background: '#0d0e14',
         border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 60px -20px rgba(0,0,0,0.7)',
         display: 'flex', flexDirection: 'column',
@@ -123,11 +123,14 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
         <button onClick={onClose} style={{ width: 20, height: 20, borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.06)', color: '#9a9ab0', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}>✕</button>
       </div>
 
-      {/* Corps — la barre d'outils native de ws-scrcpy (.control-buttons-list)
-          est masquée côté serveur (main.css), on garde nos propres actions
-          rapides en bas à la place ; la vidéo peut donc remplir tout le cadre
-          9:16 sans être écrasée. */}
-      <div style={{ background: '#08090d', aspectRatio: '9/16', display: 'grid', placeItems: 'center', position: 'relative' }}>
+      {/* Corps — ws-scrcpy calcule lui-même la taille de la vidéo en JS à partir
+          de CE conteneur (pas de simple CSS statique) : lui masquer sa barre
+          d'outils ou forcer width/height en CSS cassait son calcul (vidéo
+          minuscule ou étirée). On lui laisse sa mise en page native (barre
+          d'outils comprise, comme GeeLark) et on lui donne assez de place pour
+          qu'il fasse son calcul correctement — la vidéo se redimensionne toute
+          seule en JS quand ce conteneur change de taille. */}
+      <div style={{ background: '#08090d', ...(fluid && phase === 'ready' ? { height: 800 } : { aspectRatio: '9/16' }), display: 'grid', placeItems: 'center', position: 'relative' }}>
         {phase !== 'ready' && phase !== 'error' && (
           <div style={{ textAlign: 'center', padding: 24 }}>
             <div style={{ width: 40, height: 40, margin: '0 auto 16px', borderRadius: '50%', border: '3px solid rgba(129,140,248,0.25)', borderTopColor: '#818CF8', animation: 'cp-spin 0.9s linear infinite' }} />
