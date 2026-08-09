@@ -78,6 +78,7 @@ export type Page =
   | 'automation'
   | 'activity'
   | 'cloudphones'
+  | 'flows'
 
 interface LayoutProps {
   user:      User
@@ -119,6 +120,16 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'videostudio', label: 'navVideoStudio',  icon: '🎬' },
     ],
   },
+  // Section admin (super-admin uniquement — items filtrés par isVisibleTab, la
+  // section entière disparaît pour les non-admins).
+  {
+    title: 'Cloud',
+    defaultOpen: true,
+    items: [
+      { id: 'cloudphones', label: 'Cloud Phones',   icon: '📱' },
+      { id: 'flows',       label: 'Automatisation',  icon: '🤖' },
+    ],
+  },
 ]
 
 // Libellés anglais des sections de nav (titres FR en dur ci-dessus).
@@ -126,6 +137,7 @@ const SECTION_LABEL_EN: Record<string, string> = {
   'Principal': 'Main',
   'Publier': 'Publish',
   'Studio vidéo': 'Video Studio',
+  'Cloud': 'Cloud',
 }
 
 // Correspondance onglet de nav (Page) → clé de permission (PageKey). Seules les
@@ -772,7 +784,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       return true
     }
     // Pages internes / superadmin ScaleFlow uniquement (Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth' || id === 'cloudphones') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth' || id === 'cloudphones' || id === 'flows') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Permissions par membre : un membre/lecteur d'une orga ne voit que les onglets

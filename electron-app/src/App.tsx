@@ -600,6 +600,7 @@ const Mixer          = lazyWithReload(() => import('@/pages/Mixer').then(m => ({
 const Spoof          = lazyWithReload(() => import('@/pages/Spoof').then(m => ({ default: m.Spoof })))
 const Licences       = lazyWithReload(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
 const CloudPhones    = lazyWithReload(() => import('@/pages/CloudPhones').then(m => ({ default: m.CloudPhones })))
+const AutomationLab  = lazyWithReload(() => import('@/pages/AutomationLab').then(m => ({ default: m.AutomationLab })))
 const Support        = lazyWithReload(() => import('@/pages/Support').then(m => ({ default: m.Support })))
 const History        = lazyWithReload(() => import('@/pages/History').then(m => ({ default: m.History })))
 const Reports        = lazyWithReload(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
@@ -967,6 +968,7 @@ function AppContent({ user }: { user: User }) {
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
       case 'cloudphones':  return <CloudPhones user={user} />
+      case 'flows':        return <AutomationLab user={user} />
       case 'history':      return <History     user={user} onNavigate={handleNavigate} />
       case 'reports':      return <Reports     user={user} />
       case 'blowsome':     return <Blowsome    />
