@@ -232,6 +232,18 @@ export function CloudPhones({ user }: Props) {
                       <button onClick={() => refreshSnapshot(selected)} className="sf-btn sf-btn-ghost text-[11px]">↻</button>
                     </div>
                   </div>
+                  {/* Écran FLUIDE (flux vidéo temps réel, comme GeeLark) — ouvre
+                      ws-scrcpy dans un nouvel onglet. Demande le mot de passe une
+                      fois (utilisateur "phone", mot de passe = ton token agent). */}
+                  <button
+                    onClick={() => { const { url } = getCloudAgent(); if (url) window.open(`${url}/live/`, '_blank', 'noopener') }}
+                    className="sf-btn sf-btn-primary text-[12px] mb-2" style={{ width: '100%' }}
+                  >
+                    🎥 {tr('Écran fluide (temps réel)', 'Fluid screen (real-time)')}
+                  </button>
+                  <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '0 0 10px' }}>
+                    {tr('S\'ouvre dans un nouvel onglet · identifiant : phone · mot de passe : ton token agent', 'Opens in a new tab · username: phone · password: your agent token')}
+                  </p>
                   <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', background: '#0b0b12', aspectRatio: '9/19.5', display: 'grid', placeItems: 'center' }}>
                     {snap ? (
                       <img ref={imgRef} src={snap} alt="écran" draggable={false} onClick={onScreenClick}

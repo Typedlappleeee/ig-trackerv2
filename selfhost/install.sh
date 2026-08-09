@@ -221,11 +221,48 @@ systemctl daemon-reload
 systemctl enable --now scaleflow-agent >/dev/null 2>&1
 sleep 2
 
-say "6/6 · Vérification"
+say "6/7 · Vérification agent"
 if curl -fsS -H "Authorization: Bearer $TOKEN" http://localhost:8787/health | grep -q '"ok":true'; then
   echo "   ✓ l'agent répond"
 else
   die "L'agent ne répond pas. Diagnostic :  journalctl -u scaleflow-agent -n 40 --no-pager"
+fi
+
+say "7/7 · ws-scrcpy (écran FLUIDE — flux vidéo temps réel, comme GeeLark)"
+# Outil open-source éprouvé (github.com/NetrisTV/ws-scrcpy) : diffuse l'écran
+# Android en flux vidéo H.264 dans le navigateur, avec tap/swipe en direct.
+# Bien plus fluide que des captures d'écran répétées. Tourne en LOCAL UNIQUEMENT
+# (127.0.0.1) — ws-scrcpy n'a pas d'authentification native, donc on ne l'expose
+# jamais directement ; il passe par Caddy protégé par mot de passe (étape HTTPS).
+if ! command -v git >/dev/null; then apt-get install -y -qq git >/dev/null; fi
+if [ ! -d /opt/ws-scrcpy ]; then
+  git clone --depth 1 https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy >/dev/null 2>&1 \
+    || echo "   ⚠ clone ws-scrcpy échoué (réseau ?) — écran fluide indisponible, le mode capture reste OK"
+fi
+if [ -d /opt/ws-scrcpy ]; then
+  cd /opt/ws-scrcpy
+  npm install --no-audit --no-fund >/dev/null 2>&1 && npm run dist >/dev/null 2>&1 \
+    && echo "   ✓ ws-scrcpy compilé" \
+    || echo "   ⚠ compilation ws-scrcpy échouée — envoie-moi la sortie de :  cd /opt/ws-scrcpy && npm run dist"
+  # Commande de démarrage officielle du projet (npm start) — plus fiable que de
+  # deviner le chemin exact du fichier compilé, qui peut varier selon la version.
+  cat >/etc/systemd/system/ws-scrcpy.service <<'EOF'
+[Unit]
+Description=ws-scrcpy (écran fluide)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/ws-scrcpy
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now ws-scrcpy >/dev/null 2>&1 || true
+  cd - >/dev/null
 fi
 
 IP=$(curl -fsS -4 ifconfig.me 2>/dev/null || echo "TON_IP")
@@ -241,7 +278,7 @@ cat <<EOF
 
   🌐 IP du serveur : $IP
 
-  ➡  Étape suivante : rendre l'agent accessible en HTTPS
+  ➡  Étape suivante : rendre l'agent (ET l'écran fluide) accessibles en HTTPS
      (voir la section 4 du guide — DuckDNS si tu n'as pas de domaine)
 
 EOF

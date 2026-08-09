@@ -106,19 +106,39 @@ ScaleFlow tourne en HTTPS : il ne peut pas appeler un serveur en `http://` simpl
 Le plus simple — un nom de domaine + Caddy (certificat automatique) :
 
 1. Fais pointer un sous-domaine (ex. `phones.tondomaine.com`) vers l'IP du serveur
-2. Puis :
+2. Génère un hash pour protéger l'écran fluide (remplace `TON_TOKEN`) :
 
 ```bash
 apt install -y caddy
+caddy hash-password --plaintext 'TON_TOKEN'
+```
+
+📝 Copie le résultat (`$2a$14$...`).
+
+3. Puis (remplace `phones.tondomaine.com` et `LE_HASH_ICI`) :
+
+```bash
 cat >/etc/caddy/Caddyfile <<'EOF'
 phones.tondomaine.com {
-    reverse_proxy localhost:8787
+    # Agent (API pilotée par ScaleFlow)
+    reverse_proxy /health* /instances* localhost:8787
+
+    # Écran FLUIDE (ws-scrcpy) — protégé par mot de passe (ws-scrcpy n'a pas
+    # d'auth native). Utilisateur : phone · Mot de passe : ton token.
+    handle /live/* {
+        basicauth {
+            phone LE_HASH_ICI
+        }
+        uri strip_prefix /live
+        reverse_proxy localhost:8000
+    }
 }
 EOF
 systemctl restart caddy
 ```
 
-Ton agent est maintenant sur `https://phones.tondomaine.com`.
+Ton agent est maintenant sur `https://phones.tondomaine.com`, et l'écran fluide
+sur `https://phones.tondomaine.com/live/`.
 
 > Pas de domaine ? Dis-le moi, on passera par un relais côté ScaleFlow.
 

@@ -141,12 +141,33 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /
 apt update && apt install -y caddy
 ```
 
-**5.5** — Configure (remplace par TON sous-domaine) :
+**5.5** — Génère un hash pour protéger l'écran fluide (remplace `TON_TOKEN` par le
+token de l'étape 4) :
+
+```bash
+caddy hash-password --plaintext 'TON_TOKEN'
+```
+
+📝 Copie le résultat (commence par `$2a$14$...`).
+
+**5.6** — Configure (remplace `tonnom-phones.duckdns.org` par TON sous-domaine,
+et `LE_HASH_ICI` par le résultat de 5.5) :
 
 ```bash
 cat >/etc/caddy/Caddyfile <<'EOF'
 tonnom-phones.duckdns.org {
-    reverse_proxy localhost:8787
+    # Agent (API pilotée par ScaleFlow)
+    reverse_proxy /health* /instances* localhost:8787
+
+    # Écran FLUIDE (ws-scrcpy) — protégé par mot de passe (ws-scrcpy n'a pas
+    # d'auth native). Utilisateur : phone · Mot de passe : ton token.
+    handle /live/* {
+        basicauth {
+            phone LE_HASH_ICI
+        }
+        uri strip_prefix /live
+        reverse_proxy localhost:8000
+    }
 }
 EOF
 systemctl restart caddy
