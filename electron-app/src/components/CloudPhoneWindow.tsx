@@ -89,8 +89,21 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const serial = inst.serial || (inst.adbPort ? `127.0.0.1:${inst.adbPort}` : null)
   // `player=mse` : décodage H264 via MediaSource Extensions, supporté nativement
   // par Chrome/Edge (pas besoin du décodeur logiciel broadway, plus fluide).
+  // `ws` : l'URL du tunnel ADB-sur-WebSocket que ws-scrcpy ouvre en interne pour
+  // parler au scrcpy-server sur le téléphone — ws-scrcpy la construit d'habitude
+  // lui-même après une étape de sélection d'appareil (jamais exposée par un
+  // simple lien direct) ; on la reconstruit à la main :
+  // wss://<host>/?action=proxy-adb&remote=tcp:8886&udid=<serial>
+  // (8886 = SERVER_PORT, le port local du scrcpy-server côté téléphone).
   const fluidSrc = agentUrl && agentToken && serial
-    ? `${agentUrl}/?token=${encodeURIComponent(agentToken)}#!action=stream&udid=${encodeURIComponent(serial)}&player=mse`
+    ? (() => {
+        const host = new URL(agentUrl).host
+        const wsProto = agentUrl.startsWith('https') ? 'wss' : 'ws'
+        // Le tunnel WS passe aussi par le chemin "/" côté Caddy → il lui faut
+        // le même ?token= que la page, sinon la passerelle le bloque en 401.
+        const wsParam = `${wsProto}://${host}/?action=proxy-adb&remote=tcp:8886&udid=${encodeURIComponent(serial)}&token=${encodeURIComponent(agentToken)}`
+        return `${agentUrl}/?token=${encodeURIComponent(agentToken)}#!action=stream&udid=${encodeURIComponent(serial)}&player=mse&ws=${encodeURIComponent(wsParam)}`
+      })()
     : null
 
   return (
