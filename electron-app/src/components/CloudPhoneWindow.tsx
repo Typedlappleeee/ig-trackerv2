@@ -87,8 +87,10 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   // Chrome contrairement à des identifiants dans l'URL) ; le flux direct vers CE
   // téléphone se fait via le hash `#!action=stream&udid=...` propre à ws-scrcpy.
   const serial = inst.serial || (inst.adbPort ? `127.0.0.1:${inst.adbPort}` : null)
+  // `player=mse` : décodage H264 via MediaSource Extensions, supporté nativement
+  // par Chrome/Edge (pas besoin du décodeur logiciel broadway, plus fluide).
   const fluidSrc = agentUrl && agentToken && serial
-    ? `${agentUrl}/?token=${encodeURIComponent(agentToken)}#!action=stream&udid=${encodeURIComponent(serial)}`
+    ? `${agentUrl}/?token=${encodeURIComponent(agentToken)}#!action=stream&udid=${encodeURIComponent(serial)}&player=mse`
     : null
 
   return (

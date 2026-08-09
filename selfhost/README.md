@@ -146,7 +146,7 @@ systemctl restart caddy
 
 Ton agent est maintenant sur `https://phones.tondomaine.com`, et l'écran fluide
 (pour UN téléphone donné) sur
-`https://phones.tondomaine.com/?token=TON_TOKEN#!action=stream&udid=<serial>`
+`https://phones.tondomaine.com/?token=TON_TOKEN#!action=stream&udid=<serial>&player=mse`
 — ScaleFlow construit cette URL automatiquement, tu n'as rien à taper.
 
 > Pas de domaine ? Dis-le moi, on passera par un relais côté ScaleFlow.
