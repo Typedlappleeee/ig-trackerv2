@@ -15,6 +15,15 @@ interface Props {
 
 type Phase = 'fetching' | 'starting' | 'connecting' | 'ready' | 'error'
 
+// Hauteurs fixes du chrome (barre de titre / barre d'actions) et largeur réservée
+// à la barre d'outils native de ws-scrcpy. On DÉRIVE la hauteur de la fenêtre
+// depuis sa largeur (ratio téléphone 9:16) pour que le conteneur épouse la vidéo
+// → aucun gris. TOOLBAR est volontairement un poil surestimé : mieux vaut un fin
+// liseré sombre à droite que la vidéo rétrécie (gris haut/bas).
+const CP_TITLE = 42
+const CP_ACTION = 50
+const CP_TOOLBAR = 56
+
 // Catalogue d'apps à installer en 1 clic (ouvre la page dans Aurora Store sur le
 // tel). Pas Vinted (choix utilisateur).
 const APP_CATALOG: { pkg: string; label: string; icon: string }[] = [
@@ -27,9 +36,9 @@ const APP_CATALOG: { pkg: string; label: string; icon: string }[] = [
 
 export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Props) {
   const [pos, setPos] = useState({ x: 80 + offset * 28, y: 60 + offset * 24 })
-  const [size, setSize] = useState({ w: 400, h: 820 })   // fenêtre redimensionnable
+  const [winW, setWinW] = useState(392)   // largeur pilote ; la hauteur en découle
   const [maximized, setMaximized] = useState(false)
-  const prevBox = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
+  const prevBox = useRef<{ x: number; y: number; w: number } | null>(null)
   const dragRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
   const [phase, setPhase] = useState<Phase>('fetching')
   const [errMsg, setErrMsg] = useState('')
@@ -85,32 +94,39 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
   }
 
-  // Redimensionnement par la poignée en bas à droite.
+  // Largeur max pour que la fenêtre (hauteur dérivée) tienne dans l'écran.
+  const maxWidthForViewport = () => Math.round((window.innerHeight * 0.94 - CP_TITLE - CP_ACTION) * 9 / 16 + CP_TOOLBAR)
+
+  // Redimensionnement par la poignée en bas à droite : on ne pilote QUE la
+  // largeur (la hauteur suit le ratio téléphone) → aucun gris possible.
   const onResizeDown = (e: React.PointerEvent) => {
     e.stopPropagation(); onFocus()
     if (maximized) setMaximized(false)
-    const start = { w: size.w, h: size.h, px: e.clientX, py: e.clientY }
+    const start = { w: winW, px: e.clientX }
+    const cap = maxWidthForViewport()
     const onMove = (ev: PointerEvent) => {
-      setSize({ w: Math.max(300, start.w + (ev.clientX - start.px)), h: Math.max(460, start.h + (ev.clientY - start.py)) })
+      setWinW(Math.max(320, Math.min(cap, start.w + (ev.clientX - start.px))))
     }
     const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
   }
 
-  // Plein écran : agrandit au max de la hauteur dispo en gardant le ratio d'un
-  // téléphone (largeur ≈ hauteur × 9/16 + place pour la barre scrcpy).
+  // Plein écran : agrandit au max de la hauteur dispo (largeur dérivée).
   const toggleMax = () => {
     if (maximized && prevBox.current) {
       const b = prevBox.current
-      setPos({ x: b.x, y: b.y }); setSize({ w: b.w, h: b.h }); setMaximized(false)
+      setPos({ x: b.x, y: b.y }); setWinW(b.w); setMaximized(false)
     } else {
-      prevBox.current = { x: pos.x, y: pos.y, w: size.w, h: size.h }
-      const h = Math.max(560, Math.round(window.innerHeight * 0.92))
-      const w = Math.round((h - 92) * 9 / 16 + 48)
-      setPos({ x: Math.max(16, Math.round((window.innerWidth - w) / 2)), y: 16 })
-      setSize({ w, h }); setMaximized(true)
+      prevBox.current = { x: pos.x, y: pos.y, w: winW }
+      const w = maxWidthForViewport()
+      setPos({ x: Math.max(16, Math.round((window.innerWidth - w) / 2)), y: 14 })
+      setWinW(w); setMaximized(true)
     }
   }
+
+  // Dimensions dérivées : la hauteur épouse la vidéo (9:16) + le chrome.
+  const bodyH = Math.round((winW - CP_TOOLBAR) * 16 / 9)
+  const winH = CP_TITLE + bodyH + (phase === 'ready' ? CP_ACTION : 0)
 
   const onScreenClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     const img = imgRef.current
@@ -176,7 +192,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     <div
       onMouseDown={onFocus}
       style={{
-        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: size.w, height: size.h,
+        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: winW, height: winH,
         borderRadius: 16, overflow: 'hidden', background: '#0b0c12',
         border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 30px 70px -24px rgba(0,0,0,0.8)',
         display: 'flex', flexDirection: 'column',
@@ -225,7 +241,14 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
         )}
         {phase === 'ready' && (
           fluid && fluidSrc ? (
-            <iframe title={inst.name} src={fluidSrc} style={{ width: '100%', height: '100%', border: 'none' }} allow="clipboard-read; clipboard-write" />
+            <>
+              <iframe title={inst.name} src={fluidSrc} style={{ width: '100%', height: '100%', border: 'none' }} allow="clipboard-read; clipboard-write" />
+              {/* Masque la barre d'outils native de ws-scrcpy (colonne grise, non
+                  restylable car iframe cross-origin) par un bord sombre net,
+                  aligné pile sur la zone réservée. Les contrôles essentiels sont
+                  repris dans notre barre du bas. */}
+              <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: CP_TOOLBAR, background: '#0b0c12', borderLeft: '1px solid rgba(255,255,255,0.05)' }} />
+            </>
           ) : snap ? (
             <img ref={imgRef} src={snap} alt="écran" draggable={false} onClick={onScreenClick}
               style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair' }} />
@@ -244,6 +267,11 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
               <TinyBtn onClick={() => quickKey('4')} title="Retour">◁</TinyBtn>
               <TinyBtn onClick={() => quickKey('3')} title="Accueil">○</TinyBtn>
               <TinyBtn onClick={() => quickKey('187')} title="Applis récentes">▢</TinyBtn>
+            </span>
+            <span style={{ display: 'inline-flex', gap: 6, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.04)' }}>
+              <TinyBtn onClick={() => quickKey('26')} title="Marche/veille">⏻</TinyBtn>
+              <TinyBtn onClick={() => quickKey('25')} title="Volume −">🔉</TinyBtn>
+              <TinyBtn onClick={() => quickKey('24')} title="Volume +">🔊</TinyBtn>
             </span>
             <span style={{ flex: 1 }} />
             <TinyBtn onClick={() => setShowApps(v => !v)} active={showApps}>📥 Apps</TinyBtn>
