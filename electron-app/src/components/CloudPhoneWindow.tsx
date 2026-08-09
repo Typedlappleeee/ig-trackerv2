@@ -4,6 +4,7 @@
 // photo, rotation, power…). Plusieurs fenêtres indépendantes en même temps.
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cloudPhones, getCloudAgent, type CpInstance } from '@/lib/cloudPhones'
+import { postReel } from '@/lib/igFlows'
 
 interface Props {
   inst: CpInstance
@@ -14,7 +15,7 @@ interface Props {
 }
 
 type Phase = 'fetching' | 'starting' | 'connecting' | 'ready' | 'error'
-type Panel = null | 'apps' | 'upload' | 'sound' | 'more'
+type Panel = null | 'apps' | 'upload' | 'sound' | 'more' | 'auto'
 
 // Hauteur indicative de la barre de titre (pour borner la fenêtre à l'écran) et
 // largeur de la barre latérale d'actions. La hauteur du corps, elle, est DÉRIVÉE
@@ -70,6 +71,9 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const [busyMsg, setBusyMsg] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [kbOn, setKbOn] = useState(false)
+  const [autoCaption, setAutoCaption] = useState('')
+  const [autoLog, setAutoLog] = useState<string[]>([])
+  const [autoRunning, setAutoRunning] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
   const pollRef = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -347,6 +351,16 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     flash('✓ Dump UI enregistré')
   }
 
+  // Lance le flow « Poster un Reel » et journalise chaque étape. Si ça bloque,
+  // on capture automatiquement l'écran (dump UI) pour corriger le sélecteur.
+  const runPostReel = async () => {
+    setAutoLog([]); setAutoRunning(true)
+    const res = await postReel(inst.id, { caption: autoCaption, log: (m) => setAutoLog(l => [...l, m]) })
+    setAutoRunning(false)
+    if (res.ok) setAutoLog(l => [...l, '✅ Terminé'])
+    else { setAutoLog(l => [...l, `❌ Bloqué à : ${res.failedAt}`, '📸 Capture de l\'écran pour debug…']); dumpUiFile() }
+  }
+
   const restart = async () => {
     if (!window.confirm('Redémarrer le téléphone ?')) return
     setPanel(null); flash('Redémarrage…', 0)
@@ -442,6 +456,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
             <span style={{ fontSize: 8.5, fontWeight: 800, color: pingColor, lineHeight: 1 }}>{pingLabel}</span>
             <span style={{ fontSize: 7, color: '#6b6b7c', lineHeight: 1 }}>ms</span>
           </div>
+          <RailBtn icon="🤖" label="Auto" active={panel === 'auto'} onClick={() => togglePanel('auto')} disabled={phase !== 'ready'} />
           <RailBtn icon="⌨️" label="Clavier" active={kbOn} onClick={toggleKeyboard} disabled={phase !== 'ready'} />
           <RailBtn icon="📤" label="Upload" active={panel === 'upload'} onClick={() => togglePanel('upload')} disabled={phase !== 'ready'} />
           <RailBtn icon="📲" label="Apps"   active={panel === 'apps'}   onClick={() => togglePanel('apps')}   disabled={phase !== 'ready'} />
@@ -522,6 +537,20 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
                       style={{ width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.35)', color: '#E9E9F2', marginBottom: 8 }} />
                     <button onClick={installApk} style={primaryBtn}>Installer l'APK</button>
                   </>
+                )}
+              </>
+            )}
+            {panel === 'auto' && (
+              <>
+                <PanelTitle>🤖 Automatisation</PanelTitle>
+                <p style={{ fontSize: 10.5, color: '#8a8a9c', margin: '0 0 8px', lineHeight: 1.5 }}>Poste un Reel avec la 1ʳᵉ vidéo de la galerie (celle uploadée). Bêta — on affine les étapes ensemble.</p>
+                <input value={autoCaption} onChange={e => setAutoCaption(e.target.value)} placeholder="Légende (optionnelle, emoji ok)"
+                  style={{ width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.35)', color: '#E9E9F2', marginBottom: 8 }} />
+                <button onClick={runPostReel} disabled={autoRunning} style={{ ...primaryBtn, opacity: autoRunning ? 0.6 : 1 }}>{autoRunning ? '⏳ En cours…' : '▶️ Poster un Reel'}</button>
+                {autoLog.length > 0 && (
+                  <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,0,0,0.35)', maxHeight: 160, overflowY: 'auto', fontSize: 10, lineHeight: 1.5, color: '#c8c8d8', fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre-wrap' }}>
+                    {autoLog.map((l, i) => <div key={i} style={{ color: l.startsWith('✅') ? '#34D399' : l.startsWith('❌') ? '#F87171' : l.startsWith('  ✗') ? '#FBBF24' : '#c8c8d8' }}>{l}</div>)}
+                  </div>
                 )}
               </>
             )}
