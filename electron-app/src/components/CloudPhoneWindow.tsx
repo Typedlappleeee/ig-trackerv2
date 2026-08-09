@@ -81,7 +81,15 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const quickKey = async (key: string) => { await cloudPhones.shell(inst.id, `input keyevent ${key}`) }
 
   const { url: agentUrl, token: agentToken } = getCloudAgent()
-  const fluidSrc = agentUrl && agentToken ? `${agentUrl}/live/?token=${encodeURIComponent(agentToken)}` : null
+  // ws-scrcpy sert son SPA à la racine (chemins d'assets absolus) — on ne peut
+  // pas la monter sous un préfixe /live/ sans casser le chargement des assets
+  // (écran noir). Le token protège la page d'accueil (query, jamais tronqué par
+  // Chrome contrairement à des identifiants dans l'URL) ; le flux direct vers CE
+  // téléphone se fait via le hash `#!action=stream&udid=...` propre à ws-scrcpy.
+  const serial = inst.serial || (inst.adbPort ? `127.0.0.1:${inst.adbPort}` : null)
+  const fluidSrc = agentUrl && agentToken && serial
+    ? `${agentUrl}/?token=${encodeURIComponent(agentToken)}#!action=stream&udid=${encodeURIComponent(serial)}`
+    : null
 
   return (
     <div

@@ -141,35 +141,39 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /
 apt update && apt install -y caddy
 ```
 
-**5.5** — Génère un hash pour protéger l'écran fluide (remplace `TON_TOKEN` par le
-token de l'étape 4) :
+**5.5** — Configure Caddy pour utiliser le token de l'étape 4 (remplace
+`tonnom-phones.duckdns.org` par TON sous-domaine, et `TON_TOKEN` par le token) :
 
 ```bash
-caddy hash-password --plaintext 'TON_TOKEN'
-```
+mkdir -p /etc/systemd/system/caddy.service.d
+cat >/etc/systemd/system/caddy.service.d/override.conf <<EOF
+[Service]
+Environment=SCALEFLOW_TOKEN=TON_TOKEN
+EOF
 
-📝 Copie le résultat (commence par `$2a$14$...`).
-
-**5.6** — Configure (remplace `tonnom-phones.duckdns.org` par TON sous-domaine,
-et `LE_HASH_ICI` par le résultat de 5.5) :
-
-```bash
 cat >/etc/caddy/Caddyfile <<'EOF'
 tonnom-phones.duckdns.org {
     # Agent (API pilotée par ScaleFlow)
-    reverse_proxy /health* /instances* localhost:8787
+    reverse_proxy /health* localhost:8787
+    reverse_proxy /instances* localhost:8787
 
-    # Écran FLUIDE (ws-scrcpy) — protégé par mot de passe (ws-scrcpy n'a pas
-    # d'auth native). Utilisateur : phone · Mot de passe : ton token.
-    handle /live/* {
-        basicauth {
-            phone LE_HASH_ICI
-        }
-        uri strip_prefix /live
-        reverse_proxy localhost:8000
+    # Écran FLUIDE (ws-scrcpy) — servi À LA RACINE du domaine (ws-scrcpy génère
+    # des chemins d'assets absolus ; le monter sous /live/ avec strip_prefix
+    # casse leur chargement → écran noir). ws-scrcpy n'a pas d'auth native, donc
+    # seule la page d'accueil (/) est gardée par un token en query string (jamais
+    # tronqué par Chrome, contrairement à des identifiants dans l'URL) — les
+    # assets et le flux WebSocket qu'elle charge ensuite restent ouverts sur ce
+    # sous-domaine à part (résiduel acceptable pour un usage admin uniquement).
+    @sansToken {
+        path /
+        not query token={$SCALEFLOW_TOKEN}
     }
+    respond @sansToken "Non autorisé" 401
+
+    reverse_proxy localhost:8000
 }
 EOF
+systemctl daemon-reload
 systemctl restart caddy
 ```
 
@@ -181,7 +185,7 @@ Attends ~30 secondes (génération du certificat), puis :
 curl -H "Authorization: Bearer TON_TOKEN" https://tonnom-phones.duckdns.org/health
 ```
 
-✅ **Tu dois voir :** `{"ok":true,"image":"redroid/redroid:13.0.0-arm64"}`
+✅ **Tu dois voir :** `{"ok":true,"image":"redroid/redroid:13.0.0-latest"}`
 
 ❌ Erreur de certificat → attends 1 min, réessaie. Toujours en erreur → envoie-moi
 la sortie de `journalctl -u caddy -n 30 --no-pager`.

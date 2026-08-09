@@ -106,39 +106,48 @@ ScaleFlow tourne en HTTPS : il ne peut pas appeler un serveur en `http://` simpl
 Le plus simple — un nom de domaine + Caddy (certificat automatique) :
 
 1. Fais pointer un sous-domaine (ex. `phones.tondomaine.com`) vers l'IP du serveur
-2. Génère un hash pour protéger l'écran fluide (remplace `TON_TOKEN`) :
+2. Choisis un token pour protéger l'écran fluide (remplace `TON_TOKEN` — réutilise
+   par exemple le contenu de `/opt/scaleflow-agent/token`) :
+
+3. Puis (remplace `phones.tondomaine.com` et `TON_TOKEN`) :
 
 ```bash
-apt install -y caddy
-caddy hash-password --plaintext 'TON_TOKEN'
-```
+mkdir -p /etc/systemd/system/caddy.service.d
+cat >/etc/systemd/system/caddy.service.d/override.conf <<EOF
+[Service]
+Environment=SCALEFLOW_TOKEN=TON_TOKEN
+EOF
 
-📝 Copie le résultat (`$2a$14$...`).
-
-3. Puis (remplace `phones.tondomaine.com` et `LE_HASH_ICI`) :
-
-```bash
 cat >/etc/caddy/Caddyfile <<'EOF'
 phones.tondomaine.com {
     # Agent (API pilotée par ScaleFlow)
-    reverse_proxy /health* /instances* localhost:8787
+    reverse_proxy /health* localhost:8787
+    reverse_proxy /instances* localhost:8787
 
-    # Écran FLUIDE (ws-scrcpy) — protégé par mot de passe (ws-scrcpy n'a pas
-    # d'auth native). Utilisateur : phone · Mot de passe : ton token.
-    handle /live/* {
-        basicauth {
-            phone LE_HASH_ICI
-        }
-        uri strip_prefix /live
-        reverse_proxy localhost:8000
+    # Écran FLUIDE (ws-scrcpy) — servi À LA RACINE du domaine (ws-scrcpy génère
+    # des chemins d'assets absolus ; le monter sous /live/ avec strip_prefix
+    # casse leur chargement → écran noir). ws-scrcpy n'a pas d'auth native, donc
+    # seule la page d'accueil (/) est gardée par un token en query string (jamais
+    # tronqué par Chrome, contrairement à des identifiants dans l'URL) — les
+    # assets et le flux WebSocket qu'elle charge ensuite restent ouverts sur ce
+    # sous-domaine à part (résiduel acceptable pour un usage admin uniquement).
+    @sansToken {
+        path /
+        not query token={$SCALEFLOW_TOKEN}
     }
+    respond @sansToken "Non autorisé" 401
+
+    reverse_proxy localhost:8000
 }
 EOF
+systemctl daemon-reload
 systemctl restart caddy
 ```
 
 Ton agent est maintenant sur `https://phones.tondomaine.com`, et l'écran fluide
-sur `https://phones.tondomaine.com/live/`.
+(pour UN téléphone donné) sur
+`https://phones.tondomaine.com/?token=TON_TOKEN#!action=stream&udid=<serial>`
+— ScaleFlow construit cette URL automatiquement, tu n'as rien à taper.
 
 > Pas de domaine ? Dis-le moi, on passera par un relais côté ScaleFlow.
 
