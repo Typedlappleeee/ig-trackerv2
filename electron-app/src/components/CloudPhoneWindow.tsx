@@ -15,6 +15,16 @@ interface Props {
 
 type Phase = 'fetching' | 'starting' | 'connecting' | 'ready' | 'error'
 
+// Catalogue d'apps à installer en 1 clic (ouvre la page dans Aurora Store sur le
+// tel). Pas Vinted (choix utilisateur).
+const APP_CATALOG: { pkg: string; label: string; icon: string }[] = [
+  { pkg: 'com.instagram.android',   label: 'Instagram', icon: '📸' },
+  { pkg: 'com.facebook.katana',     label: 'Facebook',  icon: '📘' },
+  { pkg: 'com.twitter.android',     label: 'X',         icon: '🐦' },
+  { pkg: 'com.instagram.barcelona', label: 'Threads',   icon: '🧵' },
+  { pkg: 'com.zhiliaoapp.musically', label: 'TikTok',   icon: '🎵' },
+]
+
 export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Props) {
   const [pos, setPos] = useState({ x: 80 + offset * 28, y: 70 + offset * 24 })
   const dragRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
@@ -24,6 +34,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const [fluid, setFluid] = useState(true)
   const [installing, setInstalling] = useState(false)
   const [installMsg, setInstallMsg] = useState('')
+  const [showApps, setShowApps] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
   const pollRef = useRef<number | null>(null)
 
@@ -90,6 +101,17 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     setInstalling(false)
     setInstallMsg(r.ok ? '✓ Installé' : `Échec : ${r.error ?? 'inconnu'}`)
     window.setTimeout(() => setInstallMsg(''), 4000)
+  }
+
+  // Ouvre la page d'une app dans Aurora Store (déjà installé) sur le téléphone :
+  // Aurora enregistre le schéma market:// → un simple intent VIEW l'ouvre sur la
+  // bonne app, il ne reste qu'à taper « Installer ». Plus fiable que de sourcer
+  // l'APK propriétaire côté serveur (miroirs bloqués/périmés).
+  const openInStore = async (app: { pkg: string; label: string }) => {
+    setInstallMsg(`Ouverture de ${app.label} dans le store…`)
+    await cloudPhones.shell(inst.id, `am start -a android.intent.action.VIEW -d "market://details?id=${app.pkg}"`)
+    if (!fluid) window.setTimeout(async () => { const r2 = await cloudPhones.screenshot(inst.id); if (r2.ok && r2.data?.dataUrl) setSnap(r2.data.dataUrl) }, 800)
+    window.setTimeout(() => setInstallMsg(''), 3000)
   }
 
   const { url: agentUrl, token: agentToken } = getCloudAgent()
@@ -181,9 +203,18 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
             <TinyBtn onClick={() => quickKey('3')}>⌂</TinyBtn>
             <TinyBtn onClick={() => quickKey('4')}>←</TinyBtn>
             <TinyBtn onClick={() => quickKey('187')}>▢</TinyBtn>
-            <TinyBtn onClick={installApk} active={installing}>{installing ? '… Installation' : '📦 Installer APK'}</TinyBtn>
+            <TinyBtn onClick={() => setShowApps(v => !v)} active={showApps}>📥 Apps</TinyBtn>
+            <TinyBtn onClick={installApk} active={installing}>{installing ? '… Installation' : '📦 APK'}</TinyBtn>
           </div>
-          {installMsg && <span style={{ fontSize: 10.5, color: installMsg.startsWith('✓') ? '#34D399' : '#F87171' }}>{installMsg}</span>}
+          {/* Catalogue : 1 clic ouvre l'app dans Aurora Store sur le tel */}
+          {showApps && (
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', paddingTop: 2 }}>
+              {APP_CATALOG.map(app => (
+                <TinyBtn key={app.pkg} onClick={() => openInStore(app)}>{app.icon} {app.label}</TinyBtn>
+              ))}
+            </div>
+          )}
+          {installMsg && <span style={{ fontSize: 10.5, color: installMsg.startsWith('✓') ? '#34D399' : '#c8c8d8' }}>{installMsg}</span>}
         </div>
       )}
       <style>{`@keyframes cp-spin { to { transform: rotate(360deg) } }`}</style>
