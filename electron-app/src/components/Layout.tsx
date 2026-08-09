@@ -77,6 +77,7 @@ export type Page =
   | 'blowsome'
   | 'automation'
   | 'activity'
+  | 'cloudphones'
 
 interface LayoutProps {
   user:      User
@@ -166,6 +167,7 @@ const ICONS = {
   settings:  'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
   building:  'M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4',
   shield:    'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+  server:    'M5 3h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1zM7 7h.01M7 17h.01',
   bell:      'M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9',
   chevronDown:  'M19 9l-7 7-7-7',
   chevronRight: 'M9 18l6-6-6-6',
@@ -770,7 +772,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       return true
     }
     // Pages internes / superadmin ScaleFlow uniquement (Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth' || id === 'cloudphones') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Permissions par membre : un membre/lecteur d'une orga ne voit que les onglets
@@ -1084,6 +1086,18 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             >
               <span className="sf-sidebar-icon"><NavIcon d={ICONS.shield} size={17} /></span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
+            </button>
+          )}
+
+          {license.isSuperAdmin && (
+            <button
+              className={`sf-sidebar-item${page === 'cloudphones' ? ' is-active' : ''}`}
+              onClick={() => { playNav(); onNavigate('cloudphones') }}
+              style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+              title={tr('Cloud Phones', 'Cloud Phones')}
+            >
+              <span className="sf-sidebar-icon"><NavIcon d={ICONS.server} size={17} /></span>
+              {!collapsed && <span style={{ flex: 1 }}>{tr('Cloud Phones', 'Cloud Phones')}</span>}
             </button>
           )}
 
