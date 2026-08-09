@@ -24,6 +24,7 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
   const [log, setLog] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Visibility>('private')
   const imgRef = useRef<HTMLImageElement>(null)
+  const gestureRef = useRef<{ x: number; y: number; t: number } | null>(null)
 
   useEffect(() => { setPhoneId(p => p || phones[0]?.id || '') }, [phones])
 
@@ -49,21 +50,53 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
     setLabels(v => { const a = [...v];[a[i], a[j]] = [a[j], a[i]]; return a })
   }
 
-  // Clic sur l'écran : capture l'élément sous le doigt → étape « tap {élément} »,
-  // et exécute le tap pour avancer d'écran (si en mode enregistrement).
-  const onScreenClick = async (e: React.MouseEvent<HTMLImageElement>) => {
+  // L'aperçu est une VRAIE télécommande : chaque geste agit sur le tel (tap =
+  // clic bref, swipe = glisser). En mode enregistrement, on capture en plus :
+  //   • un tap → étape « taper {élément} » (on lit l'ÉLÉMENT, pas la position),
+  //   • un swipe → étape « swipe » (le défilement est positionnel par nature).
+  const toDevice = (clientX: number, clientY: number) => {
     const img = imgRef.current
-    if (!img || !img.naturalWidth || !phoneId) return
-    const rect = img.getBoundingClientRect()
-    const x = Math.round((e.clientX - rect.left) / rect.width * img.naturalWidth)
-    const y = Math.round((e.clientY - rect.top) / rect.height * img.naturalHeight)
-    setBusy('Lecture de l’élément…')
-    const nodes = await dumpUi(phoneId)
-    const hit = matcherAt(nodes, x, y)
-    setBusy('')
-    if (!hit) { setBusy('Aucun élément identifiable ici (essaie sur le bouton/texte)'); window.setTimeout(() => setBusy(''), 2500); return }
-    addStep({ do: 'tap', any: [hit.matcher], label: hit.label }, `Taper ${hit.label}`)
-    if (recording) { await cloudPhones.shell(phoneId, `input tap ${x} ${y}`); window.setTimeout(refreshSnap, 900) }
+    if (!img || !img.naturalWidth) return null
+    const r = img.getBoundingClientRect()
+    return { x: Math.round((clientX - r.left) / r.width * img.naturalWidth), y: Math.round((clientY - r.top) / r.height * img.naturalHeight) }
+  }
+  const onDown = (e: React.PointerEvent<HTMLImageElement>) => {
+    const p = toDevice(e.clientX, e.clientY)
+    if (p) gestureRef.current = { ...p, t: performance.now() }
+  }
+  const onUp = async (e: React.PointerEvent<HTMLImageElement>) => {
+    const start = gestureRef.current; gestureRef.current = null
+    const end = toDevice(e.clientX, e.clientY)
+    if (!start || !end || !phoneId) return
+    const dist = Math.hypot(end.x - start.x, end.y - start.y)
+    if (dist < 18) {
+      // TAP : agit toujours ; capture l'élément si enregistrement
+      await cloudPhones.shell(phoneId, `input tap ${start.x} ${start.y}`)
+      if (recording) {
+        setBusy('Lecture de l’élément…')
+        const hit = matcherAt(await dumpUi(phoneId), start.x, start.y)
+        setBusy('')
+        if (hit) addStep({ do: 'tap', any: [hit.matcher], label: hit.label }, `Taper ${hit.label}`)
+        else { setBusy('Élément non identifié — étape non ajoutée'); window.setTimeout(() => setBusy(''), 2200) }
+      }
+    } else {
+      // SWIPE : navigue toujours ; enregistre le geste si enregistrement
+      const dur = Math.min(600, Math.max(120, Math.round(performance.now() - start.t)))
+      await cloudPhones.shell(phoneId, `input swipe ${start.x} ${start.y} ${end.x} ${end.y} ${dur}`)
+      if (recording) addStep({ do: 'swipe', x1: start.x, y1: start.y, x2: end.x, y2: end.y, ms: dur }, 'Swipe')
+    }
+    window.setTimeout(refreshSnap, 650)
+  }
+  // Défilement rapide (boutons) : swipe vertical centré, relatif à la résolution.
+  const scroll = (dir: 'down' | 'up') => {
+    const img = imgRef.current
+    if (!img?.naturalWidth || !phoneId) return
+    const W = img.naturalWidth, H = img.naturalHeight, cx = Math.round(W / 2)
+    const y1 = Math.round(H * (dir === 'down' ? 0.72 : 0.28))
+    const y2 = Math.round(H * (dir === 'down' ? 0.28 : 0.72))
+    cloudPhones.shell(phoneId, `input swipe ${cx} ${y1} ${cx} ${y2} 300`)
+    if (recording) addStep({ do: 'swipe', x1: cx, y1, x2: cx, y2, ms: 300 }, dir === 'down' ? 'Défiler ↓' : 'Défiler ↑')
+    window.setTimeout(refreshSnap, 650)
   }
 
   const addType = () => { const t = window.prompt('Texte à écrire (emoji ok) :'); if (t) addStep({ do: 'type', text: t }, `Écrire « ${t} »`) }
@@ -104,14 +137,23 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
         </select>
         <div style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)', background: '#050609', aspectRatio: '9/16', display: 'grid', placeItems: 'center' }}>
           {snap
-            ? <img ref={imgRef} src={snap} alt="écran" onClick={onScreenClick} style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair' }} />
+            ? <img ref={imgRef} src={snap} alt="écran" draggable={false} onPointerDown={onDown} onPointerUp={onUp}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'crosshair', touchAction: 'none', userSelect: 'none' }} />
             : <span style={{ fontSize: 11, color: '#6b6b7c' }}>…</span>}
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, color: '#c8c8d8', cursor: 'pointer' }}>
+        {/* Navigation : défilement + retour/accueil + rafraîchir */}
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          <TB onClick={() => scroll('down')}>⬇︎ Défiler</TB>
+          <TB onClick={() => scroll('up')}>⬆︎ Défiler</TB>
+          <TB onClick={() => { if (phoneId) cloudPhones.shell(phoneId, 'input keyevent 4'); window.setTimeout(refreshSnap, 650) }}>◁ Retour</TB>
+          <TB onClick={() => { if (phoneId) cloudPhones.shell(phoneId, 'input keyevent 3'); window.setTimeout(refreshSnap, 650) }}>○ Accueil</TB>
+          <TB onClick={refreshSnap}>↻</TB>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, color: recording ? '#34D399' : '#c8c8d8', cursor: 'pointer', fontWeight: recording ? 800 : 400 }}>
           <input type="checkbox" checked={recording} onChange={e => setRecording(e.target.checked)} />
-          Mode enregistrement (le clic agit sur le tel + ajoute l’étape)
+          🔴 Mode enregistrement {recording ? '(ON — tes gestes créent des étapes)' : '(OFF)'}
         </label>
-        <p style={{ fontSize: 10.5, color: '#6b6b7c', margin: '6px 0 0', lineHeight: 1.5 }}>Clique un bouton à l’écran → on capture <b>l’élément</b> (pas la position). Coche « enregistrement » pour avancer d’écran en écran.</p>
+        <p style={{ fontSize: 10.5, color: '#6b6b7c', margin: '6px 0 0', lineHeight: 1.5 }}>L’écran est une télécommande live : <b>clique</b> = tap, <b>glisse</b> = swipe. En mode enregistrement, un tap capture <b>l’élément</b> (pas la position) → robuste au rejeu.</p>
       </div>
 
       {/* Étapes + actions */}
