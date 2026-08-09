@@ -20,7 +20,7 @@ type Panel = null | 'apps' | 'upload' | 'sound' | 'more'
 // largeur de la barre latérale d'actions. La hauteur du corps, elle, est DÉRIVÉE
 // du vrai ratio du téléphone (lu depuis la capture) → le conteneur épouse pile
 // la vidéo, aucun gris.
-const CP_TITLE = 42
+const CP_TITLE = 54
 const CP_RAIL = 54
 
 // Catalogue d'apps à installer en 1 clic (ouvre la page dans Aurora Store sur le
@@ -53,6 +53,8 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const [installed, setInstalled] = useState<Set<string>>(new Set())
   const [rotation, setRotation] = useState(0)
   const [uploadUrl, setUploadUrl] = useState('')
+  const [appsTab, setAppsTab] = useState<'store' | 'apk'>('store')
+  const [apkUrl, setApkUrl] = useState('')
   const [busyMsg, setBusyMsg] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -202,11 +204,11 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   }
 
   const installApk = async () => {
-    const url = window.prompt('URL directe de l\'APK à installer (ex: APKMirror) :')
-    if (!url || !url.trim()) return
+    const url = apkUrl.trim()
+    if (!/^https?:\/\//i.test(url)) { flash('Colle une URL http(s) directe vers l\'APK'); return }
     flash('Téléchargement + installation de l\'APK…', 0)
-    const r = await cloudPhones.install(inst.id, url.trim())
-    flash(r.ok ? '✓ APK installé' : `Échec : ${r.error ?? 'inconnu'}`)
+    const r = await cloudPhones.install(inst.id, url)
+    if (r.ok) { flash('✓ APK installé'); setApkUrl('') } else flash(`Échec : ${r.error ?? 'inconnu'}`)
   }
 
   // Envoie une vidéo (par URL directe) dans /sdcard/Movies du tel + indexation.
@@ -305,12 +307,12 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
       {/* Barre de titre — déplaçable */}
       <div onPointerDown={onTitleDown} onDoubleClick={toggleMax}
         style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 8px 0 12px', height: CP_TITLE, flexShrink: 0, background: 'linear-gradient(135deg,#1c1d2a,#131420)', cursor: 'grab', userSelect: 'none', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-        <span style={{ width: 20, height: 20, borderRadius: 6, background: 'linear-gradient(135deg,#818CF8,#6366F1)', display: 'grid', placeItems: 'center', fontSize: 11, flexShrink: 0 }}>📱</span>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-          <span style={{ fontSize: 12.5, fontWeight: 800, color: '#F0F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1.2 }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: '#F0F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</span>
+          <span style={{ fontSize: 9.5, color: '#8a8a9c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.id}</span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: running ? '#34D399' : '#8a8a9c' }}>
-            <span style={{ width: 6, height: 6, borderRadius: 99, background: running ? '#34D399' : '#6b6b7c', boxShadow: running ? '0 0 5px #34D399' : 'none' }} />
-            {running ? 'En ligne' : 'Arrêté'}{inst.adbPort ? ` · :${inst.adbPort}` : ''}
+            <span style={{ width: 7, height: 7, borderRadius: 99, background: running ? '#34D399' : '#6b6b7c', boxShadow: running ? '0 0 6px #34D399' : 'none' }} />
+            {running ? 'En ligne' : 'Arrêté'}
           </span>
         </div>
         <button onClick={toggleMax} title={maximized ? 'Réduire' : 'Plein écran'} style={titleBtn}>{maximized ? '❐' : '⛶'}</button>
@@ -390,21 +392,35 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
             {panel === 'apps' && (
               <>
                 <PanelTitle>📲 Applications</PanelTitle>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                  {APP_CATALOG.map(app => {
-                    const isIn = installed.has(app.pkg)
-                    return (
-                      <div key={app.pkg} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 9, background: 'rgba(255,255,255,0.04)' }}>
-                        <span style={{ fontSize: 16 }}>{app.icon}</span>
-                        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: '#E9E9F2' }}>{app.label}</span>
-                        {isIn
-                          ? <button onClick={() => launchApp(app)} style={ghostBtn}>Ouvrir</button>
-                          : <button onClick={() => openInStore(app)} style={miniPrimary}>Installer</button>}
-                      </div>
-                    )
-                  })}
+                {/* Deux choix : installer depuis le tel (store) ou pousser un APK */}
+                <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 9, background: 'rgba(0,0,0,0.3)', marginBottom: 10 }}>
+                  <button onClick={() => setAppsTab('store')} style={{ ...tabBtn, ...(appsTab === 'store' ? tabBtnOn : {}) }}>📱 Depuis le tel</button>
+                  <button onClick={() => setAppsTab('apk')} style={{ ...tabBtn, ...(appsTab === 'apk' ? tabBtnOn : {}) }}>📦 APK</button>
                 </div>
-                <button onClick={installApk} style={ghostBtnWide}>📦 Installer depuis un lien APK</button>
+                {appsTab === 'store' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {APP_CATALOG.map(app => {
+                      const isIn = installed.has(app.pkg)
+                      return (
+                        <div key={app.pkg} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 9, background: 'rgba(255,255,255,0.04)' }}>
+                          <span style={{ fontSize: 16 }}>{app.icon}</span>
+                          <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: '#E9E9F2' }}>{app.label}</span>
+                          {isIn
+                            ? <button onClick={() => launchApp(app)} style={ghostBtn}>Ouvrir</button>
+                            : <button onClick={() => openInStore(app)} style={miniPrimary}>Installer</button>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {appsTab === 'apk' && (
+                  <>
+                    <p style={{ fontSize: 10.5, color: '#8a8a9c', margin: '0 0 8px', lineHeight: 1.5 }}>Installe un APK sur le téléphone depuis une URL directe (APKMirror, APKPure…).</p>
+                    <input value={apkUrl} onChange={e => setApkUrl(e.target.value)} placeholder="https://…/app.apk"
+                      style={{ width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.35)', color: '#E9E9F2', marginBottom: 8 }} />
+                    <button onClick={installApk} style={primaryBtn}>Installer l'APK</button>
+                  </>
+                )}
               </>
             )}
             {panel === 'sound' && (
@@ -465,6 +481,8 @@ const miniPrimary: React.CSSProperties = { fontSize: 10.5, fontWeight: 800, padd
 const ghostBtn: React.CSSProperties = { fontSize: 10.5, fontWeight: 700, padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#d2d2e0', cursor: 'pointer' }
 const ghostBtnWide: React.CSSProperties = { ...ghostBtn, width: '100%', textAlign: 'center', padding: '7px 10px' }
 const softBtn: React.CSSProperties = { flex: 1, fontSize: 10.5, fontWeight: 700, padding: '8px 4px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#d2d2e0', cursor: 'pointer' }
+const tabBtn: React.CSSProperties = { flex: 1, fontSize: 10.5, fontWeight: 800, padding: '6px 6px', borderRadius: 7, border: 'none', background: 'transparent', color: '#8a8a9c', cursor: 'pointer' }
+const tabBtnOn: React.CSSProperties = { background: 'rgba(129,140,248,0.18)', color: '#C7D2FE' }
 
 function PanelTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 12, fontWeight: 800, color: '#F0F0F7', marginBottom: 8 }}>{children}</div>
