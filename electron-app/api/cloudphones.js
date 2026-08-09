@@ -2,13 +2,15 @@
 // TON agent auto-hébergé (voir selfhost/agent/server.js). Contourne CORS et la CSP
 // connect-src du navigateur ; le token de l'agent transite dans le corps POST
 // (jamais exposé dans une URL/log).
-module.exports.config = { maxDuration: 60 }
+// install (téléchargement + adb install sur l'agent) peut prendre plusieurs
+// minutes pour un gros APK — budget bien plus large que les autres opérations.
+module.exports.config = { maxDuration: 280 }
 
 const { hostIsPrivate } = require('./_ssrf')
 
-async function relay(agentUrl, agentToken, path, method = 'GET', body) {
+async function relay(agentUrl, agentToken, path, method = 'GET', body, timeoutMs = 45000) {
   const u = new URL(path, agentUrl)
-  const opts = { method, headers: { Authorization: `Bearer ${agentToken}` }, signal: AbortSignal.timeout(45000) }
+  const opts = { method, headers: { Authorization: `Bearer ${agentToken}` }, signal: AbortSignal.timeout(timeoutMs) }
   if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body) }
   const r = await fetch(u, opts)
   let data = null
@@ -19,7 +21,7 @@ async function relay(agentUrl, agentToken, path, method = 'GET', body) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
 
-  const { op, agentUrl, agentToken, id, name, cmd, timeout } = req.body ?? {}
+  const { op, agentUrl, agentToken, id, name, cmd, timeout, url } = req.body ?? {}
   if (!agentUrl || !agentToken) return res.status(200).json({ ok: false, error: 'Agent non configuré (URL/token manquant)' })
 
   // Garde-fou : n'autorise pas de cibler une IP interne (SSRF) — l'agent doit
@@ -40,6 +42,7 @@ module.exports = async (req, res) => {
       case 'stop':        r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/stop`, 'POST'); break
       case 'shell':        r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/shell`, 'POST', { cmd, timeout }); break
       case 'screenshot':  r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/screenshot`); break
+      case 'install':      r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/install`, 'POST', { url }, 270000); break
       default: return res.status(400).json({ ok: false, error: `op inconnu: ${op}` })
     }
     // Les données de l'agent restent rangées sous `data` (pas dépliées à plat) —

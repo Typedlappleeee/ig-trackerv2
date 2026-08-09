@@ -58,4 +58,5 @@ export const cloudPhones = {
   stop: (id: string) => call('stop', { id }),
   shell: (id: string, cmd: string, timeout?: number) => call<{ output: string }>('shell', { id, cmd, timeout }),
   screenshot: (id: string) => call<{ dataUrl: string }>('screenshot', { id }),
+  install: (id: string, url: string) => call<{ output: string }>('install', { id, url }),
 }

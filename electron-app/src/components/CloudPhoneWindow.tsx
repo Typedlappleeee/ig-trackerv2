@@ -22,6 +22,8 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const [errMsg, setErrMsg] = useState('')
   const [snap, setSnap] = useState<string | null>(null)
   const [fluid, setFluid] = useState(true)
+  const [installing, setInstalling] = useState(false)
+  const [installMsg, setInstallMsg] = useState('')
   const imgRef = useRef<HTMLImageElement>(null)
   const pollRef = useRef<number | null>(null)
 
@@ -79,6 +81,16 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     if (!fluid) window.setTimeout(async () => { const r2 = await cloudPhones.screenshot(inst.id); if (r2.ok && r2.data?.dataUrl) setSnap(r2.data.dataUrl) }, 350)
   }
   const quickKey = async (key: string) => { await cloudPhones.shell(inst.id, `input keyevent ${key}`) }
+
+  const installApk = async () => {
+    const url = window.prompt('URL directe de l\'APK à installer (ex: APKMirror) :')
+    if (!url || !url.trim()) return
+    setInstalling(true); setInstallMsg('Téléchargement + installation…')
+    const r = await cloudPhones.install(inst.id, url.trim())
+    setInstalling(false)
+    setInstallMsg(r.ok ? '✓ Installé' : `Échec : ${r.error ?? 'inconnu'}`)
+    window.setTimeout(() => setInstallMsg(''), 4000)
+  }
 
   const { url: agentUrl, token: agentToken } = getCloudAgent()
   // ws-scrcpy sert son SPA à la racine (chemins d'assets absolus) — on ne peut
@@ -163,11 +175,15 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
 
       {/* Barre d'actions */}
       {phase === 'ready' && (
-        <div style={{ display: 'flex', gap: 5, padding: 8, background: '#0d0e14', flexWrap: 'wrap' }}>
-          <TinyBtn onClick={() => setFluid(v => !v)} active={fluid}>{fluid ? '🎥 Fluide' : '📷 Capture'}</TinyBtn>
-          <TinyBtn onClick={() => quickKey('3')}>⌂</TinyBtn>
-          <TinyBtn onClick={() => quickKey('4')}>←</TinyBtn>
-          <TinyBtn onClick={() => quickKey('187')}>▢</TinyBtn>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: 8, background: '#0d0e14' }}>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            <TinyBtn onClick={() => setFluid(v => !v)} active={fluid}>{fluid ? '🎥 Fluide' : '📷 Capture'}</TinyBtn>
+            <TinyBtn onClick={() => quickKey('3')}>⌂</TinyBtn>
+            <TinyBtn onClick={() => quickKey('4')}>←</TinyBtn>
+            <TinyBtn onClick={() => quickKey('187')}>▢</TinyBtn>
+            <TinyBtn onClick={installApk} active={installing}>{installing ? '… Installation' : '📦 Installer APK'}</TinyBtn>
+          </div>
+          {installMsg && <span style={{ fontSize: 10.5, color: installMsg.startsWith('✓') ? '#34D399' : '#F87171' }}>{installMsg}</span>}
         </div>
       )}
       <style>{`@keyframes cp-spin { to { transform: rotate(360deg) } }`}</style>
