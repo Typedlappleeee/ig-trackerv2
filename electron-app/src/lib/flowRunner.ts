@@ -41,6 +41,8 @@ export interface Flow {
 export interface FlowResult { ok: boolean; failedAt?: string }
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
+// Remplace les {{clé}} par les valeurs saisies (ex: {{username}} → nike).
+const interp = (s: string, vars: Record<string, string>) => s.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? '')
 
 // Essaie plusieurs sélecteurs pour une même étape (fallbacks FR/EN/id).
 async function tapAny(id: string, matchers: Matcher[], label: string, log: Logger, required = true): Promise<boolean> {
@@ -71,7 +73,7 @@ export async function runFlow(id: string, flow: Flow, opts: { log?: Logger; vars
     for (const s of flow.steps) {
       switch (s.do) {
         case 'open': log('Ouverture de l’app…'); await openApp(id, s.pkg); await wait(5000); await dismissPopups(id); break
-        case 'link': log('Ouvrir un lien'); await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d '${s.url.replace(/'/g, "")}'`); await wait(3500); await dismissPopups(id); break
+        case 'link': { log('Ouvrir un lien'); const u = interp(s.url, vars).replace(/'/g, ''); await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d '${u}'`); await wait(3500); await dismissPopups(id); break }
         case 'wait': await wait(s.ms); break
         case 'popups': await dismissPopups(id); break
         case 'key': await keys[s.key](id); break
@@ -85,7 +87,7 @@ export async function runFlow(id: string, flow: Flow, opts: { log?: Logger; vars
           if (!await tapAny(id, s.any, s.label, log, s.required !== false) && s.required !== false) throw new Error(s.label)
           break
         case 'type': {
-          const t = s.var ? (vars[s.var] || '') : (s.text || '')
+          const t = s.var ? (vars[s.var] || '') : interp(s.text || '', vars)
           if (t.trim()) { log('Écrire le texte'); await typeText(id, t.trim()); await wait(500) }
           break
         }
