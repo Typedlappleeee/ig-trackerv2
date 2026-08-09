@@ -60,6 +60,24 @@ export function parseNodes(xml: string): UiNode[] {
 
 const norm = (s: string) => s.toLowerCase().trim()
 
+// Cœur du sélecteur visuel : à partir d'un POINT cliqué (coords écran du tel) et
+// de l'arbre UI courant, renvoie le MEILLEUR sélecteur d'élément (pas une
+// coordonnée !). On prend le plus petit nœud sous le doigt, et on choisit le
+// critère le plus stable dispo : texte > description > resource-id. C'est ce qui
+// rend un flow enregistré robuste (il retrouve le bouton par son sens au rejeu).
+export function matcherAt(nodes: UiNode[], x: number, y: number): { matcher: Matcher; label: string } | null {
+  const inside = nodes.filter(n => x >= n.x && x <= n.x + n.w && y >= n.y && y <= n.y + n.h)
+  if (!inside.length) return null
+  const byArea = inside.slice().sort((a, b) => (a.w * a.h) - (b.w * b.h))  // plus petit d'abord (plus précis)
+  const withText = byArea.find(n => n.text.trim())
+  if (withText) return { matcher: { text: withText.text.trim() }, label: `texte « ${withText.text.trim()} »` }
+  const withDesc = byArea.find(n => n.desc.trim())
+  if (withDesc) return { matcher: { desc: withDesc.desc.trim() }, label: `desc « ${withDesc.desc.trim()} »` }
+  const withId = byArea.find(n => n.id.trim())
+  if (withId) { const short = withId.id.split('/').pop() || withId.id; return { matcher: { id: short }, label: `id « ${short} »` } }
+  return null
+}
+
 // Trouve le 1er nœud correspondant au critère.
 export function find(nodes: UiNode[], m: Matcher): UiNode | null {
   return nodes.find(n => {
