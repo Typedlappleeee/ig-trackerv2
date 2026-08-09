@@ -52,6 +52,11 @@ cat >/opt/scaleflow-agent/server.js <<'SFAGENT_EOF'
 //   GET    /instances/:id/screenshot   → capture PNG (base64)
 //   POST   /instances/:id/install { url } → télécharge un APK et l'installe (sideload)
 //
+// Chaque nouveau téléphone (Android 16, image officielle redroid) reçoit
+// automatiquement Aurora Store dès que le boot est fini (voir
+// provisionAuroraStore) — l'équivalent open-source du Play Store, sans compte
+// Google ni image tierce à risque.
+//
 // Démarrage : AGENT_TOKEN=... node server.js   (voir README.md)
 
 const http = require('http')
@@ -64,15 +69,20 @@ const execFileAsync = promisify(execFile)
 
 const PORT = Number(process.env.PORT || 8787)
 const TOKEN = process.env.AGENT_TOKEN || ''
-// Image avec GApps (Play Store, Gmail, Play Services) intégrés — build tiers
-// (edwardzhouquan), pas l'éditeur officiel redroid. Choisie explicitement par
-// l'admin pour avoir un Play Store fonctionnel ; à surveiller (mainteneur
-// inconnu, tourne en --privileged). https://hub.docker.com/r/edwardzhouquan/redroid-mindthegapps-arm64
+// Image officielle redroid (éditeur officiel, pas de GApps intégré). Android 16
+// par défaut — Play Store remplacé par Aurora Store (open-source, catalogue Play
+// complet, sans compte Google), auto-installé sur chaque nouveau téléphone
+// juste après son 1er boot (voir provisionNewPhone). Pas de dépendance à une
+// image tierce inconnue tournant en --privileged.
+const IMAGE_DEFAULT = 'redroid/redroid:16.0.0-latest'
+// Variantes GApps (Play Store/Gmail réels) — build tiers (edwardzhouquan), pas
+// l'éditeur officiel ; option explicite via androidVersion pour qui les préfère
+// à Aurora Store. https://hub.docker.com/r/edwardzhouquan/redroid-mindthegapps-arm64
 const GAPPS_IMAGES = {
   '13.0.0': 'edwardzhouquan/redroid-mindthegapps-arm64:13.0.0-arm64_only',
   '14.0.0': 'edwardzhouquan/redroid-mindthegapps-arm64:14.0.0-arm64_only',
 }
-const IMAGE = process.env.REDROID_IMAGE || GAPPS_IMAGES['13.0.0']
+const IMAGE = process.env.REDROID_IMAGE || IMAGE_DEFAULT
 const DATA_ROOT = process.env.DATA_ROOT || '/var/lib/scaleflow-phones'
 const PORT_BASE = Number(process.env.PORT_BASE || 5600)   // port ADB de la 1re instance
 
@@ -141,7 +151,12 @@ async function createInstance({ name, androidVersion }) {
     '-p', `${port}:5555`,
     image, ...props,
   ], 180000)
-  return { id: name, adbPort: port, serial: `127.0.0.1:${port}`, fingerprint: m }
+  const serial = `127.0.0.1:${port}`
+  // Ne bloque pas la réponse HTTP : le boot Android + l'installation d'Aurora
+  // Store prennent 1-2 min, en tâche de fond pendant que l'UI affiche déjà le
+  // téléphone (en cours de connexion).
+  provisionAuroraStore(serial).catch((e) => console.error(`[provision ${name}]`, e?.message || e))
+  return { id: name, adbPort: port, serial, fingerprint: m }
 }
 
 async function connectAdb(serial) {
@@ -168,6 +183,32 @@ async function installApk(serial, apkUrl) {
   } finally {
     fs.unlink(tmpFile, () => {})
   }
+}
+
+// Résout toujours la dernière version d'Aurora Store via l'API F-Droid (évite
+// de coder en dur un numéro de version qui périmerait). Aurora Store = client
+// Play Store open-source/anonyme (catalogue Google Play complet, sans compte
+// Google) — notre "app store par défaut" à la place de GApps/Play Store réel.
+async function latestAuroraStoreUrl() {
+  const r = await fetch('https://f-droid.org/api/v1/packages/com.aurora.store', { signal: AbortSignal.timeout(15000) })
+  if (!r.ok) throw new Error(`F-Droid injoignable (HTTP ${r.status})`)
+  const { suggestedVersionCode } = await r.json()
+  return `https://f-droid.org/repo/com.aurora.store_${suggestedVersionCode}.apk`
+}
+
+// Attend que le téléphone ait fini de booter (jusqu'à ~2 min) puis installe
+// Aurora Store — tourne en tâche de fond, jamais devant l'appel HTTP de create.
+async function provisionAuroraStore(serial) {
+  for (let i = 0; i < 60; i++) {
+    await connectAdb(serial)
+    try {
+      const out = await adb(['-s', serial, 'shell', 'getprop', 'sys.boot_completed'], 10000)
+      if (out.trim() === '1') break
+    } catch { /* ADB pas encore prêt */ }
+    await new Promise((res) => setTimeout(res, 2000))
+  }
+  const url = await latestAuroraStoreUrl()
+  await installApk(serial, url)
 }
 
 const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) }

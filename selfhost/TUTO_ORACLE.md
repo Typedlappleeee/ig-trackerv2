@@ -185,7 +185,7 @@ Attends ~30 secondes (génération du certificat), puis :
 curl -H "Authorization: Bearer TON_TOKEN" https://tonnom-phones.duckdns.org/health
 ```
 
-✅ **Tu dois voir :** `{"ok":true,"image":"edwardzhouquan/redroid-mindthegapps-arm64:13.0.0-arm64_only"}`
+✅ **Tu dois voir :** `{"ok":true,"image":"redroid/redroid:16.0.0-latest"}`
 
 ❌ Erreur de certificat → attends 1 min, réessaie. Toujours en erreur → envoie-moi
 la sortie de `journalctl -u caddy -n 30 --no-pager`.

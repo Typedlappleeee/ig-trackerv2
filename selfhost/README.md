@@ -53,13 +53,15 @@ Si `lsmod | grep binder` n'affiche **rien**, arrête-toi et dis-le moi.
 
 L'agent est le petit service qui permet à ScaleFlow de piloter les téléphones.
 
-> ⚠️ **Image par défaut = GApps (Play Store, Gmail)**. Par défaut, l'agent crée
-> les téléphones avec `edwardzhouquan/redroid-mindthegapps-arm64` — une image
-> Docker **tierce** (pas l'éditeur officiel redroid), qui tourne en
-> `--privileged` (accès quasi complet à la machine). Choix assumé pour avoir un
-> Play Store fonctionnel, mais à savoir si tu veux revenir à l'image officielle
-> (sans GApps, plus sûre) : mets `REDROID_IMAGE=redroid/redroid:13.0.0-latest`
-> dans le service systemd de l'agent.
+> ℹ️ **Image par défaut = Android 16 officiel + Aurora Store**. Par défaut,
+> l'agent crée les téléphones avec l'image **officielle** redroid
+> (`redroid/redroid:16.0.0-latest`, éditeur officiel, pas de dépendance à une
+> image tierce). Aurora Store (client Play Store open-source/anonyme,
+> catalogue Google Play complet, pas de compte requis) s'installe tout seul
+> juste après le 1er boot. Pour un vrai Play Store/Gmail (GApps), une variante
+> **tierce** existe (`edwardzhouquan/redroid-mindthegapps-arm64`, Android
+> 13/14 seulement, tourne en `--privileged`) — passe `androidVersion: "13.0.0"`
+> ou `"14.0.0"` à la création pour l'utiliser à la place.
 
 ```bash
 # Node.js
