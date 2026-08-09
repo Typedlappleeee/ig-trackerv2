@@ -110,7 +110,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     <div
       onMouseDown={onFocus}
       style={{
-        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: 300,
+        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: fluid && phase === 'ready' ? 380 : 300,
         borderRadius: 14, overflow: 'hidden', background: '#0d0e14',
         border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 60px -20px rgba(0,0,0,0.7)',
         display: 'flex', flexDirection: 'column',
@@ -123,8 +123,11 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
         <button onClick={onClose} style={{ width: 20, height: 20, borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.06)', color: '#9a9ab0', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}>✕</button>
       </div>
 
-      {/* Corps */}
-      <div style={{ background: '#08090d', aspectRatio: '9/16', display: 'grid', placeItems: 'center', position: 'relative' }}>
+      {/* Corps — l'écran fluide (ws-scrcpy) a besoin de plus de large que le
+          9:16 pur : il affiche sa propre barre d'outils (icônes power/volume/
+          home…) à droite du flux vidéo, prévue pour un onglet de navigateur
+          normal. Forcer un cadre 9:16 étroit dessus écrase la vidéo. */}
+      <div style={{ background: '#08090d', ...(fluid && phase === 'ready' ? { height: 680 } : { aspectRatio: '9/16' }), display: 'grid', placeItems: 'center', position: 'relative' }}>
         {phase !== 'ready' && phase !== 'error' && (
           <div style={{ textAlign: 'center', padding: 24 }}>
             <div style={{ width: 40, height: 40, margin: '0 auto 16px', borderRadius: '50%', border: '3px solid rgba(129,140,248,0.25)', borderTopColor: '#818CF8', animation: 'cp-spin 0.9s linear infinite' }} />
