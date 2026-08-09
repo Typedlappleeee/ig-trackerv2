@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { activateKey } from '@/lib/license'
 import { useOrg } from '@/lib/orgContext'
+import { useTr } from '@/lib/i18n'
 
 interface Props {
   userId: string
@@ -20,9 +21,12 @@ const PLANS = [
     name:    'Standard',
     price:   '$49.99',
     credits: '3 750',
-    perAccount: '~25 comptes · 2,00$/compte',
-    phones:  '100 téléphones',
-    posting: 'Mass posting 10 comptes',
+    perAccount:   '~25 comptes · 2,00$/compte',
+    perAccountEn: '~25 accounts · $2.00/account',
+    phones:   '100 téléphones',
+    phonesEn: '100 phones',
+    posting:   'Mass posting 10 comptes',
+    postingEn: 'Mass posting 10 accounts',
     accent:  '#818CF8',
   },
   {
@@ -30,20 +34,28 @@ const PLANS = [
     price:         '$99.99',
     credits:       '11 250',
     perAccount:    '~75 comptes · 1,33$/compte',
+    perAccountEn:  '~75 accounts · $1.33/account',
     phones:        '200 téléphones',
+    phonesEn:      '200 phones',
     posting:       'Mass posting illimité',
+    postingEn:     'Unlimited mass posting',
     accent:        '#c084fc',
     popular:       true,
   },
   {
     name:          'Organisation',
+    nameEn:        'Organization',
     price:         '$149.99',
     credits:       '22 500',
     perAccount:    '150 comptes · 1,00$/compte',
+    perAccountEn:  '150 accounts · $1.00/account',
     phones:        'Téléphones illimités',
+    phonesEn:      'Unlimited phones',
     posting:       'Mass posting illimité',
+    postingEn:     'Unlimited mass posting',
     accent:        '#34d399',
     extra:         'Support 24/7 prioritaire · Proposition d’ajouts',
+    extraEn:       'Priority 24/7 support · Feature requests',
   },
 ]
 
@@ -69,6 +81,7 @@ const Logo = ({ gradId }: { gradId: string }) => (
 )
 
 export function LicenseGate({ userId, email: _email, onActivated, initialStep = 'gate' }: Props) {
+  const tr = useTr()
   const { myOrgs, switchOrg } = useOrg()
   const [step, setStep]       = useState<Step>(initialStep)
   const [view, setView]       = useState<'home' | 'join' | 'create'>('home')
@@ -122,7 +135,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
       }
       setStep('create_org')
     } else {
-      setKeyErr(res.error ?? 'Erreur inconnue')
+      setKeyErr(res.error ?? tr('Erreur inconnue', 'Unknown error'))
     }
     setKeyLoading(false)
   }
@@ -141,9 +154,9 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
     const { data, error } = await supabase.rpc('accept_org_invite', { p_token: code.trim() })
     setOrgLoading(false)
     if (error) {
-      const msg = /invite_not_found/.test(error.message)    ? 'Code invalide ou expiré'
-                : /invite_already_used/.test(error.message) ? 'Ce code a déjà été utilisé'
-                : /invite_expired/.test(error.message)      ? 'Code expiré'
+      const msg = /invite_not_found/.test(error.message)    ? tr('Code invalide ou expiré', 'Invalid or expired code')
+                : /invite_already_used/.test(error.message) ? tr('Ce code a déjà été utilisé', 'This code has already been used')
+                : /invite_expired/.test(error.message)      ? tr('Code expiré', 'Code expired')
                 : error.message
       setOrgErr(msg)
     } else {
@@ -169,7 +182,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
       className="fixed bottom-5 right-6 z-[10000] px-3 py-1.5 rounded-lg text-xs text-[#a89bd4] hover:text-white transition-colors"
       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)' }}
     >
-      Se déconnecter →
+      {tr('Se déconnecter →', 'Sign out →')}
     </button>
   )
 
@@ -185,7 +198,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
             <h1 className="text-2xl font-black text-white tracking-tight">
               Scale<span style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
             </h1>
-            <p className="text-[11px] text-[#7a3f3f] uppercase tracking-widest mt-1">Abonnement expiré</p>
+            <p className="text-[11px] text-[#7a3f3f] uppercase tracking-widest mt-1">{tr('Abonnement expiré', 'Subscription expired')}</p>
           </div>
 
           <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -196,8 +209,8 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
                 <div>
-                  <p className="text-white text-sm font-bold">Votre clé a expiré</p>
-                  <p className="text-[11px] text-[#9a6060] mt-0.5">Renouvelez votre abonnement pour continuer</p>
+                  <p className="text-white text-sm font-bold">{tr('Votre clé a expiré', 'Your key has expired')}</p>
+                  <p className="text-[11px] text-[#9a6060] mt-0.5">{tr('Renouvelez votre abonnement pour continuer', 'Renew your subscription to continue')}</p>
                 </div>
               </div>
 
@@ -212,15 +225,15 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
                 </svg>
                 <div>
-                  <div className="text-white text-sm font-bold">Renouveler via Telegram</div>
-                  <div className="text-[11px]" style={{ color: '#29b6f6' }}>Contacte {TELEGRAM_HANDLE} pour renouveler</div>
+                  <div className="text-white text-sm font-bold">{tr('Renouveler via Telegram', 'Renew via Telegram')}</div>
+                  <div className="text-[11px]" style={{ color: '#29b6f6' }}>{tr(`Contacte ${TELEGRAM_HANDLE} pour renouveler`, `Contact ${TELEGRAM_HANDLE} to renew`)}</div>
                 </div>
                 <div className="ml-auto text-[#29b6f6] text-lg">→</div>
               </a>
 
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.15)' }} />
-                <span className="text-[10px] text-[#4a3f7a]">déjà une nouvelle clé ?</span>
+                <span className="text-[10px] text-[#4a3f7a]">{tr('déjà une nouvelle clé ?', 'already have a new key?')}</span>
                 <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.15)' }} />
               </div>
 
@@ -241,12 +254,12 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   disabled={keyLoading || !key.trim()}
                   className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
                   style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>
-                  {keyLoading ? 'Vérification…' : 'Activer la clé →'}
+                  {keyLoading ? tr('Vérification…', 'Verifying…') : tr('Activer la clé →', 'Activate key →')}
                 </button>
               </form>
             </div>
           </div>
-          <p className="text-[10px] text-[#2a1f48] text-center mt-4">ScaleFlow — Accès restreint aux comptes autorisés</p>
+          <p className="text-[10px] text-[#2a1f48] text-center mt-4">{tr('ScaleFlow — Accès restreint aux comptes autorisés', 'ScaleFlow — Access restricted to authorized accounts')}</p>
         </div>
         <SignOutButton />
       </div>
@@ -265,20 +278,20 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
             <h1 className="text-2xl font-black text-white tracking-tight">
               Scale<span style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
             </h1>
-            <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">Créer mon organisation</p>
+            <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">{tr('Créer mon organisation', 'Create my organization')}</p>
           </div>
           <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
             <div className="p-6 space-y-4">
               <p className="text-xs text-[#6b5fa0] text-center">
-                Ton abonnement est activé ! 🎉<br/>
-                Crée ton organisation pour commencer.
+                {tr('Ton abonnement est activé ! 🎉', 'Your subscription is active! 🎉')}<br/>
+                {tr('Crée ton organisation pour commencer.', 'Create your organization to get started.')}
               </p>
               <form onSubmit={handleCreateOrg} className="space-y-3">
                 <input
                   name="org-name"
                   value={orgName}
                   onChange={e => setOrgName(e.target.value)}
-                  placeholder="Nom de l’organisation"
+                  placeholder={tr('Nom de l’organisation', 'Organization name')}
                   className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm placeholder:text-[#3a2f58] focus:outline-none focus:border-[#6366F1] transition-colors"
                   spellCheck={false}
                   autoComplete="off"
@@ -291,12 +304,12 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
                   style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}
                 >
-                  {orgCreateLoading ? 'Création…' : 'Créer mon organisation →'}
+                  {orgCreateLoading ? tr('Création…', 'Creating…') : tr('Créer mon organisation →', 'Create my organization →')}
                 </button>
               </form>
             </div>
           </div>
-          <p className="text-[10px] text-[#2a1f48] text-center mt-4">ScaleFlow — Accès restreint aux comptes autorisés</p>
+          <p className="text-[10px] text-[#2a1f48] text-center mt-4">{tr('ScaleFlow — Accès restreint aux comptes autorisés', 'ScaleFlow — Access restricted to authorized accounts')}</p>
         </div>
         <SignOutButton />
       </div>
@@ -316,7 +329,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
           <h1 className="text-2xl font-black text-white tracking-tight">
             Scale<span style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
           </h1>
-          <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">Accès requis</p>
+          <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">{tr('Accès requis', 'Access required')}</p>
         </div>
 
         {/* Home: 2 options */}
@@ -324,7 +337,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
           <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
             <div className="p-6 space-y-3">
               <p className="text-xs text-[#6b5fa0] text-center mb-5">
-                Bienvenue sur ScaleFlow. Comment veux-tu accéder ?
+                {tr('Bienvenue sur ScaleFlow. Comment veux-tu accéder ?', 'Welcome to ScaleFlow. How do you want to access it?')}
               </p>
               <button
                 onClick={() => setView('join')}
@@ -334,8 +347,8 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01" /></svg>
                 </div>
                 <div>
-                  <div className="text-white text-sm font-bold">Rejoindre une orga</div>
-                  <div className="text-[11px] text-[#6b5fa0] mt-0.5">Tu as un code d’invitation</div>
+                  <div className="text-white text-sm font-bold">{tr('Rejoindre une orga', 'Join an org')}</div>
+                  <div className="text-[11px] text-[#6b5fa0] mt-0.5">{tr('Tu as un code d’invitation', 'You have an invite code')}</div>
                 </div>
                 <div className="ml-auto text-[#3b82f6] text-lg">→</div>
               </button>
@@ -343,13 +356,13 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 onClick={() => setView('create')}
                 className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.02] flex items-center gap-4 relative overflow-hidden"
                 style={{ background: 'linear-gradient(130deg,rgba(99,102,241,0.18),rgba(233,234,240,0.18))', border: '1px solid rgba(168,85,247,0.40)' }}>
-                <div className="absolute top-2 right-2 text-[9px] font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>NOUVEAU</div>
+                <div className="absolute top-2 right-2 text-[9px] font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>{tr('NOUVEAU', 'NEW')}</div>
                 <div style={{ color: '#a855f7' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
                 </div>
                 <div>
-                  <div className="text-white text-sm font-bold">Créer une orga</div>
-                  <div className="text-[11px] text-[#6b5fa0] mt-0.5">Clé de licence via Telegram</div>
+                  <div className="text-white text-sm font-bold">{tr('Créer une orga', 'Create an org')}</div>
+                  <div className="text-[11px] text-[#6b5fa0] mt-0.5">{tr('Clé de licence via Telegram', 'License key via Telegram')}</div>
                 </div>
                 <div className="ml-auto text-[#a855f7] text-lg">→</div>
               </button>
@@ -362,11 +375,11 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
           <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
             <div className="p-6 space-y-4">
               <button onClick={() => setView('home')} className="flex items-center gap-1 text-[11px] text-[#4a3f7a] hover:text-[#6366F1] transition-colors mb-2">
-                ← Retour
+                {tr('← Retour', '← Back')}
               </button>
               {myOrgs.length > 0 && (
                 <div className="space-y-2 mb-2">
-                  <p className="text-[10px] text-[#4a3f7a] uppercase tracking-widest text-center">Tes organisations</p>
+                  <p className="text-[10px] text-[#4a3f7a] uppercase tracking-widest text-center">{tr('Tes organisations', 'Your organizations')}</p>
                   {myOrgs.map(({ org }) => (
                     <button
                       key={org.id}
@@ -377,24 +390,24 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01" /></svg>
                       </span>
                       <span className="flex-1 text-left truncate">{org.name}</span>
-                      <span className="text-[11px] text-blue-400">Accéder →</span>
+                      <span className="text-[11px] text-blue-400">{tr('Accéder →', 'Open →')}</span>
                     </button>
                   ))}
                   <div className="flex items-center gap-2 py-1">
                     <div className="flex-1 h-px" style={{ background: 'rgba(74,63,122,0.4)' }} />
-                    <span className="text-[10px] text-[#3a2f58]">ou code d’invitation</span>
+                    <span className="text-[10px] text-[#3a2f58]">{tr('ou code d’invitation', 'or invite code')}</span>
                     <div className="flex-1 h-px" style={{ background: 'rgba(74,63,122,0.4)' }} />
                   </div>
                 </div>
               )}
               <p className="text-xs text-[#6b5fa0] text-center">
-                Entre ton code d’invitation.<br/>
-                Tant que l’owner de l’orga a un abonnement actif, tu as accès.
+                {tr('Entre ton code d’invitation.', 'Enter your invite code.')}<br/>
+                {tr('Tant que l’owner de l’orga a un abonnement actif, tu as accès.', 'As long as the org owner has an active subscription, you have access.')}
               </p>
               {orgSuccess ? (
                 <div className="text-center py-4">
-                  <p className="text-green-400 font-semibold text-sm">✓ Organisation rejointe !</p>
-                  <p className="text-xs text-[#6b5fa0] mt-1">Chargement en cours…</p>
+                  <p className="text-green-400 font-semibold text-sm">{tr('✓ Organisation rejointe !', '✓ Organization joined!')}</p>
+                  <p className="text-xs text-[#6b5fa0] mt-1">{tr('Chargement en cours…', 'Loading…')}</p>
                 </div>
               ) : (
                 <form onSubmit={handleOrgJoin} className="space-y-3">
@@ -402,7 +415,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     name="invite-code"
                     value={code}
                     onChange={e => setCode(e.target.value)}
-                    placeholder="Code d’invitation"
+                    placeholder={tr('Code d’invitation', 'Invite code')}
                     className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono placeholder:text-[#3a2f58] focus:outline-none focus:border-[#6366F1] transition-colors text-center"
                     spellCheck={false}
                     autoComplete="off"
@@ -414,7 +427,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     disabled={orgLoading || !code.trim()}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
                     style={{ background: 'linear-gradient(130deg,#1d4ed8,#6366F1)' }}>
-                    {orgLoading ? 'Vérification…' : 'Rejoindre →'}
+                    {orgLoading ? tr('Vérification…', 'Verifying…') : tr('Rejoindre →', 'Join →')}
                   </button>
                 </form>
               )}
@@ -428,13 +441,13 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
             <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}>
               <div className="p-6 space-y-4">
                 <button onClick={() => setView('home')} className="flex items-center gap-1 text-[11px] text-[#4a3f7a] hover:text-[#6366F1] transition-colors">
-                  ← Retour
+                  {tr('← Retour', '← Back')}
                 </button>
 
                 {/* Plans */}
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-[#4a3f7a] uppercase tracking-widest">Choisir un plan</p>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40% jusqu’au 1er juillet</span>
+                  <p className="text-[10px] text-[#4a3f7a] uppercase tracking-widest">{tr('Choisir un plan', 'Choose a plan')}</p>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>{tr('🔥 -40% jusqu’au 1er juillet', '🔥 -40% until July 1st')}</span>
                 </div>
                 <div className="space-y-2">
                   {PLANS.map(p => (
@@ -442,25 +455,31 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                       className="rounded-xl p-3.5 relative"
                       style={{ background: p.popular ? 'linear-gradient(130deg,rgba(99,102,241,0.15),rgba(233,234,240,0.15))' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.popular ? 'rgba(168,85,247,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
                       {p.popular && (
-                        <div className="absolute -top-2.5 right-4 text-[9px] font-black text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>POPULAIRE</div>
+                        <div className="absolute -top-2.5 right-4 text-[9px] font-black text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>{tr('POPULAIRE', 'POPULAR')}</div>
                       )}
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-black" style={{ color: p.accent }}>{p.name}</span>
+                        <span className="text-sm font-black" style={{ color: p.accent }}>{tr(p.name, (p as any).nameEn ?? p.name)}</span>
                         <span className="flex items-baseline gap-1.5">
                           {(p as any).originalPrice && (
                             <span className="text-[11px] line-through" style={{ color: '#4a3f7a' }}>{(p as any).originalPrice}</span>
                           )}
-                          <span className="text-white font-black text-sm">{p.price}<span className="text-[10px] text-[#6b5fa0] font-normal">/mois</span></span>
+                          <span className="text-white font-black text-sm">{p.price}<span className="text-[10px] text-[#6b5fa0] font-normal">{tr('/mois', '/mo')}</span></span>
                         </span>
                       </div>
                       {(p as any).perAccount && (
                         <div className="text-[11px] font-bold mb-1.5 px-2 py-1 rounded-md inline-block"
                           style={{ color: '#c4b5fd', background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.3)' }}>
-                          {(p as any).perAccount}
+                          {tr((p as any).perAccount, (p as any).perAccountEn ?? (p as any).perAccount)}
                         </div>
                       )}
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                        {[`${p.credits} crédits/mois`, p.phones, p.posting, 'Support 24/7', ...(p.extra ? [p.extra] : [])].filter(Boolean).map(f => (
+                        {[
+                          tr(`${p.credits} crédits/mois`, `${p.credits} credits/mo`),
+                          tr(p.phones, (p as any).phonesEn ?? p.phones),
+                          tr(p.posting, (p as any).postingEn ?? p.posting),
+                          tr('Support 24/7', '24/7 support'),
+                          ...(p.extra ? [tr(p.extra, (p as any).extraEn ?? p.extra)] : []),
+                        ].filter(Boolean).map(f => (
                           <span key={f} className="text-[10px]" style={{ color: '#6b5fa0' }}>· {f}</span>
                         ))}
                       </div>
@@ -469,7 +488,10 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 </div>
 
                 <p className="text-[9.5px] mt-2 px-1" style={{ color: '#6b5fa0', fontStyle: 'italic', lineHeight: 1.5 }}>
-                  * Estimation comptes : utilisation standard 2 posts + 1 story / jour / compte (≈ 150 crédits/compte/mois). Crédits cumulables d'un mois sur l'autre.
+                  {tr(
+                    "* Estimation comptes : utilisation standard 2 posts + 1 story / jour / compte (≈ 150 crédits/compte/mois). Crédits cumulables d'un mois sur l'autre.",
+                    '* Account estimate: standard use of 2 posts + 1 story / day / account (≈ 150 credits/account/month). Credits roll over from one month to the next.'
+                  )}
                 </p>
 
                 {/* Telegram CTA */}
@@ -483,15 +505,15 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
                   </svg>
                   <div>
-                    <div className="text-white text-sm font-bold">Obtenir ma clé via Telegram</div>
-                    <div className="text-[11px]" style={{ color: '#29b6f6' }}>Contacte {TELEGRAM_HANDLE} pour souscrire</div>
+                    <div className="text-white text-sm font-bold">{tr('Obtenir ma clé via Telegram', 'Get my key via Telegram')}</div>
+                    <div className="text-[11px]" style={{ color: '#29b6f6' }}>{tr(`Contacte ${TELEGRAM_HANDLE} pour souscrire`, `Contact ${TELEGRAM_HANDLE} to subscribe`)}</div>
                   </div>
                   <div className="ml-auto text-[#29b6f6] text-lg">→</div>
                 </a>
 
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.15)' }} />
-                  <span className="text-[10px] text-[#4a3f7a]">déjà une clé ?</span>
+                  <span className="text-[10px] text-[#4a3f7a]">{tr('déjà une clé ?', 'already have a key?')}</span>
                   <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.15)' }} />
                 </div>
 
@@ -512,7 +534,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                     disabled={keyLoading || !key.trim()}
                     className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
                     style={{ background: 'linear-gradient(130deg,#6366F1,#818CF8)' }}>
-                    {keyLoading ? 'Vérification…' : 'Activer la clé →'}
+                    {keyLoading ? tr('Vérification…', 'Verifying…') : tr('Activer la clé →', 'Activate key →')}
                   </button>
                 </form>
               </div>
@@ -521,7 +543,7 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
         )}
 
         <p className="text-[10px] text-[#2a1f48] text-center mt-4">
-          ScaleFlow — Accès restreint aux comptes autorisés
+          {tr('ScaleFlow — Accès restreint aux comptes autorisés', 'ScaleFlow — Access restricted to authorized accounts')}
         </p>
       </div>
       <SignOutButton />

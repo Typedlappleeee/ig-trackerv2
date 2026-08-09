@@ -16,9 +16,29 @@ export interface PostingOpts {
   rotatingProxy: boolean  // raccourci : force 1 téléphone à la fois
   maxConcurrent: number   // nb de téléphones simultanés (0 = tous d'un coup)
   deleteAfterPost: boolean // usage unique : supprime la vidéo de la banque après publication
+  // Proxys à roter pour CE lancement (sous-ensemble des proxys configurés). Vide =
+  // tous. Permet de lancer plusieurs postings en parallèle, chacun sur son proxy.
+  rotateProxyUrls: string[]
 }
 
 const KEY = 'sf_posting_opts'
+
+// Migration one-shot : un défaut bugué avait posé « Téléphones simultanés » = 1,
+// qui s'est enregistré en localStorage → le posting restait en série même sans
+// proxy rotatif. On remet 1 → 0 (« Tous ») une seule fois, sur les deux clés
+// (posting + story). Ne touche jamais une valeur volontaire ≥ 2.
+export function migrateConcurrencyOnce() {
+  try {
+    if (localStorage.getItem('sf-conc-reset-v1')) return
+    localStorage.setItem('sf-conc-reset-v1', '1')
+    const raw = localStorage.getItem(KEY)
+    if (raw) {
+      const o = JSON.parse(raw)
+      if (o && o.maxConcurrent === 1) { o.maxConcurrent = 0; localStorage.setItem(KEY, JSON.stringify(o)) }
+    }
+    if (localStorage.getItem('sf-story-maxconc') === '1') localStorage.setItem('sf-story-maxconc', '0')
+  } catch { /* localStorage indispo — best effort */ }
+}
 
 const DEFAULTS: PostingOpts = {
   intervalMode: 'none',
@@ -27,11 +47,13 @@ const DEFAULTS: PostingOpts = {
   reelsTrial:   false,
   alsoStory:    false,
   rotatingProxy: false,
-  maxConcurrent: 0,
+  maxConcurrent: 0,   // 0 = « Tous » (tous les téléphones d'un coup) par défaut
   deleteAfterPost: false,
+  rotateProxyUrls: [],
 }
 
 export function loadPostingOpts(): PostingOpts {
+  migrateConcurrencyOnce()
   // intervalMode always starts as 'none' (off) — only numeric values are restored
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}')
@@ -43,6 +65,7 @@ export function loadPostingOpts(): PostingOpts {
       rotatingProxy:   saved.rotatingProxy   ?? DEFAULTS.rotatingProxy,
       maxConcurrent:   saved.maxConcurrent   ?? DEFAULTS.maxConcurrent,
       deleteAfterPost: saved.deleteAfterPost ?? DEFAULTS.deleteAfterPost,
+      rotateProxyUrls: Array.isArray(saved.rotateProxyUrls) ? saved.rotateProxyUrls : DEFAULTS.rotateProxyUrls,
       intervalMode:  'none',
     }
   } catch { return { ...DEFAULTS } }

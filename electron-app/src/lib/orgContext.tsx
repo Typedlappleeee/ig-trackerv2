@@ -4,6 +4,10 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type Organization, type OrgMember, type OrgRole, type PermOverrides } from './supabase'
 
 const LS_KEY = 'ig-tracker-current-org'
+// Référence STABLE pour l'absence de permissions : `?? {}` créerait un nouvel objet
+// à chaque render → `perms` changerait d'identité et casserait les useEffect/useMemo
+// qui en dépendent (boucle de re-fetch). On réutilise donc toujours le même objet.
+const EMPTY_PERMS: PermOverrides = {}
 
 interface OrgContextValue {
   myOrgs:        { org: Organization; member: OrgMember }[]
@@ -100,22 +104,36 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
     return () => { supabase.removeChannel(ch) }
   }, [currentId, user.id])
 
-  // Safety net — re-validate membership every 15s in case the broadcast was
-  // missed (member was on another tab/org). If the row is gone, drop access.
+  // Filet de sécurité — re-valide l'appartenance périodiquement au cas où le
+  // broadcast « member_removed » aurait été manqué. NE recharge la page QUE si le
+  // retrait est certain, sinon on provoquait un reload intempestif après une longue
+  // inactivité : session Supabase expirée/en refresh → requête vide (sans erreur) →
+  // faux « membre retiré » → reload. Garde-fous : onglet visible + session valide +
+  // 2 résultats vides consécutifs.
   useEffect(() => {
     if (!currentId) return
+    let emptyStreak = 0
     const id = setInterval(async () => {
+      // Onglet en arrière-plan : timers throttlés + session peut-être en refresh → on
+      // ne conclut rien (c'est aussi ce qui déclenchait le reload au réveil de l'onglet).
+      if (typeof document !== 'undefined' && document.hidden) { emptyStreak = 0; return }
+      // Session absente/expirée → problème d'AUTH, pas un retrait → jamais de reload ici.
+      const { data: sess } = await supabase.auth.getSession()
+      if (!sess?.session) { emptyStreak = 0; return }
       const { data, error } = await supabase
         .from('organization_members')
         .select('id')
         .eq('org_id', currentId)
         .eq('user_id', user.id)
         .maybeSingle()
-      if (!error && !data) {
+      if (error) { emptyStreak = 0; return }   // erreur réseau → on ne conclut rien
+      if (data) { emptyStreak = 0; return }
+      // Vide AVEC session valide : on exige 2 fois d'affilée pour éviter tout transitoire.
+      if (++emptyStreak >= 2) {
         if (localStorage.getItem(LS_KEY) === currentId) localStorage.removeItem(LS_KEY)
         window.location.reload()
       }
-    }, 15000)
+    }, 30000)
     return () => clearInterval(id)
   }, [currentId, user.id])
 
@@ -132,7 +150,7 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
     currentOrg:   current?.org ?? null,
     myMembership: current?.member ?? null,
     role:         current?.member.role ?? null,
-    perms:        current?.member.perm_overrides ?? {},
+    perms:        current?.member.perm_overrides ?? EMPTY_PERMS,
     loading,
     loadError,
     switchOrg,

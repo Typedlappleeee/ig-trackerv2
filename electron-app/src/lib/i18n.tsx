@@ -5,17 +5,26 @@ export type Lang = 'fr' | 'en'
 const LS_KEY = 'scaleflow-lang'
 
 function detectLang(): Lang {
-  const saved = localStorage.getItem(LS_KEY) as Lang | null
-  if (saved === 'fr' || saved === 'en') return saved
-  return navigator.language?.startsWith('en') ? 'en' : 'fr'
+  // Protégé : appelé aussi au chargement du module (init de _currentLang) → doit
+  // survivre à un environnement sans DOM (tests Node, SSR).
+  try {
+    const saved = localStorage.getItem(LS_KEY) as Lang | null
+    if (saved === 'fr' || saved === 'en') return saved
+    return navigator.language?.startsWith('en') ? 'en' : 'fr'
+  } catch { return 'fr' }
 }
+
+// Miroir module-level de la langue courante, pour les contextes HORS composant
+// (handlers async, toasts, fonctions de lib) où on ne peut pas appeler de hook.
+let _currentLang: Lang = detectLang()
+export function currentLang(): Lang { return _currentLang }
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: 'fr', setLang: () => {} })
 
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(detectLang)
-  function setLang(l: Lang) { localStorage.setItem(LS_KEY, l); setLangState(l) }
-  useEffect(() => { document.documentElement.lang = lang }, [lang])
+  function setLang(l: Lang) { localStorage.setItem(LS_KEY, l); _currentLang = l; setLangState(l) }
+  useEffect(() => { _currentLang = lang; document.documentElement.lang = lang }, [lang])
   return <Ctx.Provider value={{ lang, setLang }}>{children}</Ctx.Provider>
 }
 
@@ -25,6 +34,18 @@ export function useLang() { return useContext(Ctx) }
 export function useT() {
   const { lang } = useLang()
   return (key: keyof typeof EN) => lang === 'en' ? EN[key] : (FR[key] ?? EN[key])
+}
+
+// ── Traduction INLINE bilingue (sans clé centrale) ───────────────────────────
+// Pour tout le texte en dur : `tr('Texte FR', 'English text')`.
+//  - `useTr()` dans un composant → re-render au changement de langue.
+//  - `tr(fr, en)` statique → handlers async / toasts / libs (langue courante).
+export function useTr() {
+  const { lang } = useLang()
+  return (fr: string, en: string) => (lang === 'en' ? en : fr)
+}
+export function tr(fr: string, en: string): string {
+  return _currentLang === 'en' ? en : fr
 }
 
 // ── English strings (canonical) ──────────────────────────────────────────────
@@ -37,6 +58,8 @@ export const EN = {
   navHistory: 'History',
   navReports: 'Reports',
   navLibrary: 'Library',
+  navOrganization: 'My organization',
+  navProxyHealth: 'Proxy health',
   navMontage: 'Montage',
 
   navTikTokPosting: 'TikTok Posting',
@@ -102,6 +125,9 @@ export const EN = {
   navStoryLink: 'Story',
   navBank: 'Bank',
   navWarmup: 'Account Warmup',
+  navBlowsome: 'Blowsome',
+  navAutomation: 'Automation',
+  navActivity: 'Activity',
   navAiTools: 'AI Tools',
   navRemix: 'Remix Video',
   navRepurpose: 'CloneVid',
@@ -1590,6 +1616,8 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   navHistory: 'Historique',
   navReports: 'Rapports',
   navLibrary: 'Bibliothèque',
+  navOrganization: 'Mon organisation',
+  navProxyHealth: 'Santé proxys',
   navMontage: 'Montage',
 
   navTikTokPosting: 'TikTok Posting',
@@ -1655,6 +1683,9 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   navStoryLink: 'Story',
   navBank: 'Banque',
   navWarmup: 'Warmup Compte',
+  navBlowsome: 'Blowsome',
+  navAutomation: 'Automatisation',
+  navActivity: 'Activité',
   navAiTools: 'Outils IA',
   navRemix: 'Remix vidéo',
   navRepurpose: 'CloneVid',

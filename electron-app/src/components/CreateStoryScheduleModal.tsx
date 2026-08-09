@@ -12,7 +12,8 @@ import { fetchAllPhones, type GeelarkPhone } from '@/lib/geelark'
 import { createScheduledPost, defaultSchedValue } from '@/lib/schedulerService'
 import { checkAndDeductCredits, refundCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { BankPicker } from '@/pages/Bank'
-import { ACCENT, ACCENT_L, ACCENT_D, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
+import { ACCENT, ACCENT_L, TEXT_1, HAIR, BG_2 } from '@/lib/theme'
+import { useTr } from '@/lib/i18n'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type PoolPhoto    = { url: string; name: string }
@@ -91,6 +92,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
   onClose:   () => void
 }) {
   const { currentOrg, role, perms } = useOrg()
+  const tr      = useTr()
   const conns   = useConnections(user)
   const bearer  = conns.bearer ?? ''
   const credits = useCredits()
@@ -140,8 +142,10 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
   useEffect(() => {
     if (!bearer || conns.loading) return
     setLoading(true)
-    fetchAllPhones(bearer).then(list => {
+    fetchAllPhones(bearer).then(raw => {
       if (!mountedRef.current) return
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      const list = role ? raw.filter(p => canAccessPhoneGroup(role, perms, p.group?.name ?? p.groupName ?? null)) : raw
       setPhones(list)
       const gs = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...gs])
@@ -191,13 +195,13 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
     try {
       const when = new Date(schedAt)
       if (isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
-        setSchedErr('Choisis une date au moins 1 minute dans le futur.')
+        setSchedErr(tr('Choisis une date au moins 1 minute dans le futur.', 'Pick a date at least 1 minute in the future.'))
         return
       }
       const cost = selectedIds.length * CREDIT_COSTS.story
       const cr   = await checkAndDeductCredits(credits.ownerId, cost)
       if (!cr.ok) {
-        setSchedErr(`${cr.error ?? 'Crédits insuffisants'} (requis : ${cost} crédits)`)
+        setSchedErr(`${cr.error ?? tr('Crédits insuffisants', 'Insufficient credits')} ${tr(`(requis : ${cost} crédits)`, `(required: ${cost} credits)`)}`)
         return
       }
       if (typeof cr.balance === 'number') credits.setBalance(cr.balance)
@@ -239,7 +243,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
         throw e
       }
 
-      setSchedDone(`${asgns.length} story${asgns.length > 1 ? 's' : ''} programmée${asgns.length > 1 ? 's' : ''} pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`)
+      setSchedDone(tr(`${asgns.length} story${asgns.length > 1 ? 's' : ''} programmée${asgns.length > 1 ? 's' : ''} pour le ${when.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`, `${asgns.length} story${asgns.length > 1 ? 's' : ''} scheduled for ${when.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}`))
       setTimeout(() => { if (mountedRef.current) onCreated() }, 2000)
     } catch (e) {
       setSchedErr(e instanceof Error ? e.message : String(e))
@@ -276,7 +280,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
       <div
         style={{
           position: 'fixed', inset: 0, zIndex: 9000,
-          background: 'rgba(6,6,8,0.88)', backdropFilter: 'blur(12px)',
+          background: 'rgba(2,2,6,0.82)', backdropFilter: 'var(--blur-md)', WebkitBackdropFilter: 'var(--blur-md)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
         }}
         onClick={e => { if (e.target === e.currentTarget && !submitting) onClose() }}
@@ -289,38 +293,47 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
           style={{
             width: '100%', maxWidth: 740, maxHeight: '90vh',
             background: BG_2, border: `1px solid ${HAIR}`,
-            borderRadius: 14, overflow: 'hidden',
-            boxShadow: '0 40px 100px rgba(0,0,0,0.7)',
+            borderRadius: 'var(--r-xl)', overflow: 'hidden',
+            boxShadow: 'var(--elev-3)',
             display: 'flex', flexDirection: 'column',
           }}
         >
-          {/* ── Header ─────────────────────────────────────────────────────── */}
-          <div style={{
-            flexShrink: 0, padding: '16px 22px',
-            borderBottom: `1px solid ${HAIR}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                Programmer une Story
-                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(99,102,241,0.12)', border: `1px solid ${HAIR}`, color: ACCENT_L }}>📸 Instagram</span>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, color: 'rgba(233,234,240,0.3)' }}>🎵 TikTok · bientôt</span>
-              </p>
-              <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'rgba(233,234,240,0.42)' }}>
-                Photos + sticker lien • automation GéeLark • app doit être ouverte à l'heure
-              </p>
+          {/* ── Header (pattern v2 : tuile-icône + titre + sous-titre + actions) ── */}
+          <div
+            className="sf-page-header"
+            style={{
+              flexShrink: 0, padding: '18px 22px 16px', margin: 0,
+              borderRadius: 0, borderBottom: `1px solid ${HAIR}`,
+              // @ts-expect-error CSS custom prop — teinte ambre « Story »
+              '--icon-grad': 'linear-gradient(135deg,#F59E0B,#F97316)',
+            }}
+          >
+            <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+              <div className="sf-page-icon sf-page-icon-sm sf-anim-scale-spring">
+                <IcoPhoto />
+              </div>
+              <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+                <h1 className="sf-page-title" style={{ fontSize: 17, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {tr('Programmer une Story', 'Schedule a Story')}
+                  <span className="sf-badge sf-badge-accent">📸 Instagram</span>
+                  <span className="sf-badge sf-badge-muted">{tr('🎵 TikTok · bientôt', '🎵 TikTok · soon')}</span>
+                </h1>
+                <p className="sf-page-sub" style={{ marginTop: 3 }}>
+                  {tr('Photos + sticker lien · automation GéeLark · app ouverte à l\'heure', 'Photos + link sticker · GeeLark automation · app open at scheduled time')}
+                </p>
+              </div>
             </div>
-            <button
-              onClick={onClose}
-              disabled={submitting}
-              style={{
-                width: 30, height: 30, borderRadius: 8, cursor: 'pointer',
-                background: 'transparent', border: 'none', color: 'rgba(233,234,240,0.42)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <IcoClose size={12} />
-            </button>
+            <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+              <button
+                onClick={onClose}
+                disabled={submitting}
+                className="sf-btn sf-btn-ghost sf-btn-icon"
+                aria-label={tr('Fermer', 'Close')}
+                style={{ width: 30, height: 30 }}
+              >
+                <IcoClose size={12} />
+              </button>
+            </div>
           </div>
 
           {/* ── Success state ──────────────────────────────────────────────── */}
@@ -329,7 +342,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
               <p style={{ fontSize: 32, margin: '0 0 12px' }}>✅</p>
               <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0 }}>{schedDone}</p>
               <p style={{ fontSize: 12, color: 'rgba(233,234,240,0.42)', margin: '8px 0 0' }}>
-                Retrouve-la dans l'onglet Programmation.
+                {tr('Retrouve-la dans l\'onglet Programmation.', 'Find it in the Schedule tab.')}
               </p>
             </div>
           ) : (
@@ -346,15 +359,11 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                 <div style={{ flexShrink: 0, padding: '12px 12px 8px', borderBottom: `1px solid ${HAIR}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                      Comptes
+                      {tr('Comptes', 'Accounts')}
                     </span>
                     {selected.size > 0 && (
-                      <span style={{
-                        background: 'rgba(99,102,241,0.15)', color: ACCENT,
-                        border: '1px solid rgba(99,102,241,0.3)',
-                        borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700,
-                      }}>
-                        {selected.size} sél.
+                      <span className="sf-badge sf-badge-accent">
+                        {tr(`${selected.size} sél.`, `${selected.size} sel.`)}
                       </span>
                     )}
                   </div>
@@ -377,7 +386,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                     <input
                       value={phoneSearch}
                       onChange={e => setSearch(e.target.value)}
-                      placeholder="Rechercher…"
+                      placeholder={tr('Rechercher…', 'Search…')}
                       className="sf-input"
                       style={{ height: 28, paddingLeft: 28, fontSize: 11 }}
                     />
@@ -388,30 +397,35 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       onClick={() => setSelected(new Set(visible.map(p => p.id)))}
                       className="sf-btn sf-btn-secondary sf-btn-sm"
                       style={{ flex: 1, cursor: 'pointer', fontSize: 10.5, padding: '4px 0' }}
-                    >Tout</button>
+                    >{tr('Tout', 'All')}</button>
                     <button
                       onClick={() => setSelected(new Set())}
                       className="sf-btn sf-btn-ghost sf-btn-sm"
                       style={{ flex: 1, cursor: 'pointer', fontSize: 10.5, padding: '4px 0' }}
-                    >Aucun</button>
+                    >{tr('Aucun', 'None')}</button>
                   </div>
                 </div>
 
                 {/* Phone list */}
                 <div className="sf-scroll" style={{ flex: 1, padding: '5px 7px' }}>
                   {loadingPhones ? (
-                    <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                      <div className="sf-spinner" />
-                      <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)' }}>Chargement…</p>
+                    <div style={{ padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {Array.from({ length: 7 }).map((_, i) => (
+                        <div key={i} className="sf-skeleton sf-skeleton-line" style={{ height: 34, borderRadius: 8, opacity: 1 - i * 0.1 }} />
+                      ))}
                     </div>
                   ) : !bearer ? (
-                    <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', padding: '20px 0', textAlign: 'center' }}>
-                      Connecte GéeLark dans les Paramètres
-                    </p>
+                    <div style={{ padding: '28px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: 'rgba(148,163,184,0.5)' }}><IcoSearch /></span>
+                      <p style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-3)', margin: 0 }}>{tr('GéeLark non connecté', 'GeeLark not connected')}</p>
+                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0, lineHeight: 1.4 }}>{tr('Connecte-le dans les Paramètres.', 'Connect it in Settings.')}</p>
+                    </div>
                   ) : visible.length === 0 ? (
-                    <p style={{ fontSize: 11, color: 'rgba(233,234,240,0.3)', padding: '20px 0', textAlign: 'center' }}>
-                      Aucun compte
-                    </p>
+                    <div style={{ padding: '28px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: 'rgba(148,163,184,0.5)' }}><IcoSearch /></span>
+                      <p style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-3)', margin: 0 }}>{tr('Aucun compte', 'No accounts')}</p>
+                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: 0, lineHeight: 1.4 }}>{phoneSearch ? tr('Aucun résultat pour cette recherche.', 'No match for this search.') : tr('Aucun compte dans ce groupe.', 'No account in this group.')}</p>
+                    </div>
                   ) : visible.map(p => {
                     const sel = selected.has(p.id)
                     const link = getLink(p.id).trim()
@@ -420,13 +434,14 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       <button
                         key={p.id}
                         onClick={() => setSelected(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
+                        className="sf-press"
                         style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
+                          padding: '7px 9px', borderRadius: 'var(--r-sm)', cursor: 'pointer',
                           textAlign: 'left', marginBottom: 1,
-                          background: sel ? 'rgba(99,102,241,0.1)' : 'transparent',
-                          border: `1px solid ${sel ? 'rgba(99,102,241,0.3)' : 'transparent'}`,
-                          transition: 'all 0.14s',
+                          background: sel ? 'var(--accent-dim)' : 'transparent',
+                          border: `1px solid ${sel ? 'var(--border-accent-strong)' : 'transparent'}`,
+                          transition: 'background var(--t-fast), border-color var(--t-fast)',
                         }}
                       >
                         <span style={{
@@ -448,7 +463,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                           {grp && <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.25)', margin: '1px 0 0' }}>{grp}</p>}
                         </div>
                         {sel && (
-                          <span title={link ? `Lien: ${link}` : 'Lien manquant'} style={{ flexShrink: 0 }}>
+                          <span title={link ? tr(`Lien: ${link}`, `Link: ${link}`) : tr('Lien manquant', 'Missing link')} style={{ flexShrink: 0 }}>
                             <span style={{ color: link ? '#22c55e' : '#fbbf24', fontSize: 9 }}>
                               {link ? '●' : '○'}
                             </span>
@@ -469,7 +484,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ color: ACCENT_L }}><IcoPhoto /></span>
                       <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                        Pool de photos
+                        {tr('Pool de photos', 'Photo pool')}
                       </span>
                     </div>
                     <button
@@ -477,7 +492,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       className="sf-btn sf-btn-secondary sf-btn-sm"
                       style={{ cursor: 'pointer', fontSize: 11 }}
                     >
-                      <IcoPlus /> Ajouter
+                      <IcoPlus /> {tr('Ajouter', 'Add')}
                     </button>
                   </div>
 
@@ -493,7 +508,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       }}
                     >
                       <IcoPhoto />
-                      Aucune photo — cliquer pour en ajouter depuis la banque
+                      {tr('Aucune photo — cliquer pour en ajouter depuis la banque', 'No photos — click to add from the bank')}
                     </button>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -525,7 +540,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                         className="sf-btn sf-btn-ghost sf-btn-sm"
                         style={{ cursor: 'pointer', border: '1px dashed rgba(99,102,241,0.22)', color: ACCENT_L, fontSize: 11 }}
                       >
-                        <IcoPlus /> Ajouter
+                        <IcoPlus /> {tr('Ajouter', 'Add')}
                       </button>
                     </div>
                   )}
@@ -535,7 +550,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                 <section>
                   <div style={{ marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                      Texte sticker (optionnel)
+                      {tr('Texte sticker (optionnel)', 'Text sticker (optional)')}
                     </span>
                   </div>
                   {textPool.length > 0 && (
@@ -567,7 +582,7 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                           setEditText('')
                         }
                       }}
-                      placeholder='Ex: "Regarde ici" puis Entrée…'
+                      placeholder={tr('Ex: "Regarde ici" puis Entrée…', 'e.g. "Look here" then Enter…')}
                       className="sf-input"
                       style={{ flex: 1, height: 32, fontSize: 12 }}
                     />
@@ -584,24 +599,25 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                 <section>
                   <div style={{ marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                      Distribution photos
+                      {tr('Distribution photos', 'Photo distribution')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {([
-                      { k: 'rotation' as const, label: 'Rotation', desc: 'A → B → C → A…' },
-                      { k: 'random'   as const, label: 'Aléatoire', desc: 'Mélangé' },
+                      { k: 'rotation' as const, label: tr('Rotation', 'Rotation'), desc: 'A → B → C → A…' },
+                      { k: 'random'   as const, label: tr('Aléatoire', 'Random'), desc: tr('Mélangé', 'Shuffled') },
                     ]).map(m => {
                       const active = distrib === m.k
                       return (
                         <button
                           key={m.k}
                           onClick={() => setDistrib(m.k)}
+                          className="sf-press"
                           style={{
-                            flex: 1, padding: '10px 12px', borderRadius: 9, textAlign: 'left', cursor: 'pointer',
-                            background: active ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
-                            border: `1px solid ${active ? 'rgba(99,102,241,0.35)' : HAIR}`,
-                            transition: 'all 0.15s',
+                            flex: 1, padding: '10px 12px', borderRadius: 'var(--r-md)', textAlign: 'left', cursor: 'pointer',
+                            background: active ? 'var(--accent-dim)' : 'rgba(255,255,255,0.02)',
+                            border: `1px solid ${active ? 'var(--border-accent-strong)' : HAIR}`,
+                            transition: 'background var(--t-fast), border-color var(--t-fast)',
                           }}
                         >
                           <p style={{ fontSize: 12.5, fontWeight: 700, color: active ? ACCENT_L : 'rgba(233,234,240,0.5)', margin: '0 0 2px' }}>{m.label}</p>
@@ -619,28 +635,18 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ color: ACCENT_L }}><IcoLink /></span>
                         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-                          Liens (1 par compte)
+                          {tr('Liens (1 par compte)', 'Links (1 per account)')}
                         </span>
                       </div>
-                      <span style={{
-                        borderRadius: 20, padding: '1px 8px', fontSize: 10, fontWeight: 700,
-                        background: missingLinks.length > 0 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.1)',
-                        color: missingLinks.length > 0 ? '#fbbf24' : '#22c55e',
-                        border: `1px solid ${missingLinks.length > 0 ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.2)'}`,
-                      }}>
-                        {selectedIds.length - missingLinks.length}/{selectedIds.length} remplis
+                      <span className={`sf-badge ${missingLinks.length > 0 ? 'sf-badge-warn' : 'sf-badge-ok'}`}>
+                        {tr(`${selectedIds.length - missingLinks.length}/${selectedIds.length} remplis`, `${selectedIds.length - missingLinks.length}/${selectedIds.length} filled`)}
                       </span>
                     </div>
 
                     {missingLinks.length > 0 && (
-                      <div style={{
-                        marginBottom: 10, padding: '8px 11px', borderRadius: 8,
-                        background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)',
-                        display: 'flex', alignItems: 'flex-start', gap: 7,
-                        color: 'rgba(251,191,36,0.9)', fontSize: 11.5,
-                      }}>
-                        <span style={{ flexShrink: 0, marginTop: 1, color: '#fbbf24' }}><IcoWarn /></span>
-                        {missingLinks.length} compte{missingLinks.length > 1 ? 's' : ''} sans lien — requis pour publier.
+                      <div className="sf-banner is-warn" style={{ marginBottom: 10, alignItems: 'flex-start', fontSize: 11.5 }}>
+                        <span style={{ flexShrink: 0, marginTop: 1 }}><IcoWarn /></span>
+                        {tr(`${missingLinks.length} compte${missingLinks.length > 1 ? 's' : ''} sans lien — requis pour publier.`, `${missingLinks.length} account${missingLinks.length > 1 ? 's' : ''} without a link — required to publish.`)}
                       </div>
                     )}
 
@@ -669,11 +675,8 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                                 value={link}
                                 onChange={e => setLink(id, e.target.value)}
                                 placeholder="https://…"
-                                className="sf-input"
-                                style={{
-                                  height: 30, paddingLeft: 26, fontSize: 11.5, borderRadius: 8,
-                                  borderColor: hasLink ? 'rgba(99,102,241,0.28)' : 'rgba(245,158,11,0.28)',
-                                }}
+                                className={`sf-input${hasLink ? '' : ' is-invalid'}`}
+                                style={{ height: 30, paddingLeft: 26, fontSize: 11.5, borderRadius: 'var(--r-sm)' }}
                               />
                             </div>
                           </div>
@@ -689,11 +692,11 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                   background: 'rgba(99,102,241,0.05)', border: `1px solid rgba(99,102,241,0.14)`,
                 }}>
                   <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: ACCENT }}>
-                    Programmation
+                    {tr('Programmation', 'Scheduling')}
                   </p>
 
                   <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>Date et heure</label>
+                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>{tr('Date et heure', 'Date and time')}</label>
                     <input
                       type="datetime-local"
                       value={schedAt}
@@ -704,49 +707,42 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>Délai entre comptes</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <label style={{ display: 'block', fontSize: 11, color: 'rgba(233,234,240,0.42)', marginBottom: 5 }}>{tr('Délai entre comptes', 'Delay between accounts')}</label>
+                    <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
                       {[0, 2, 5, 10, 15].map(m => (
                         <button
                           key={m}
                           onClick={() => setDelay(m)}
-                          style={{
-                            flex: 1, height: 32, borderRadius: 7, cursor: 'pointer',
-                            fontSize: 12, fontWeight: 600,
-                            background: delay === m ? 'rgba(99,102,241,0.15)' : 'transparent',
-                            border: `1px solid ${delay === m ? 'rgba(99,102,241,0.4)' : HAIR}`,
-                            color: delay === m ? ACCENT_L : 'rgba(233,234,240,0.35)',
-                            transition: 'all 0.15s',
-                          }}
-                        >{m === 0 ? 'Aucun' : `${m} min`}</button>
+                          className={`sf-segment-item sf-press${delay === m ? ' is-active' : ''}`}
+                          style={{ flex: 1, textAlign: 'center', justifyContent: 'center' }}
+                        >{m === 0 ? tr('Aucun', 'None') : `${m} min`}</button>
                       ))}
                     </div>
                   </div>
 
                   <p style={{ margin: '10px 0 0', fontSize: 11, color: 'rgba(233,234,240,0.3)', lineHeight: 1.55 }}>
-                    ⚠ L'automation des stories nécessite que l'app soit ouverte à l'heure programmée.
+                    {tr('⚠ L\'automation des stories nécessite que l\'app soit ouverte à l\'heure programmée.', '⚠ Story automation requires the app to be open at the scheduled time.')}
                   </p>
                 </section>
 
                 {/* ── Cost info ─────────────────────────────────────────────── */}
                 {selectedIds.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(233,234,240,0.42)' }}>
-                    <span>Coût :</span>
+                    <span>{tr('Coût :', 'Cost:')}</span>
                     <span style={{ fontWeight: 700, color: ACCENT_L }}>
-                      {selectedIds.length * CREDIT_COSTS.story} crédit{selectedIds.length * CREDIT_COSTS.story > 1 ? 's' : ''}
+                      {tr(`${selectedIds.length * CREDIT_COSTS.story} crédit${selectedIds.length * CREDIT_COSTS.story > 1 ? 's' : ''}`, `${selectedIds.length * CREDIT_COSTS.story} credit${selectedIds.length * CREDIT_COSTS.story > 1 ? 's' : ''}`)}
                     </span>
                     <span>·</span>
-                    <span>Solde actuel : <strong style={{ color: TEXT_1 }}>{credits.balance}</strong></span>
+                    <span>{tr('Solde actuel :', 'Current balance:')} <strong style={{ color: TEXT_1 }}>{credits.balance}</strong></span>
                   </div>
                 )}
 
                 {/* ── Error ─────────────────────────────────────────────────── */}
                 {schedErr && (
-                  <p style={{
-                    fontSize: 12, color: '#f87171', margin: 0, padding: '9px 12px',
-                    background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
-                    borderRadius: 8,
-                  }}>{schedErr}</p>
+                  <div className="sf-banner is-danger sf-anim-slide-up" style={{ alignItems: 'flex-start', fontSize: 12 }}>
+                    <span style={{ flexShrink: 0, marginTop: 1 }}><IcoWarn /></span>
+                    <span>{schedErr}</span>
+                  </div>
                 )}
 
                 {/* ── Footer buttons ────────────────────────────────────────── */}
@@ -756,23 +752,17 @@ export function CreateStoryScheduleModal({ user, onCreated, onClose }: {
                     disabled={submitting}
                     className="sf-btn sf-btn-secondary"
                     style={{ flex: 1, cursor: 'pointer', justifyContent: 'center' }}
-                  >Annuler</button>
+                  >{tr('Annuler', 'Cancel')}</button>
                   <button
                     onClick={submit}
                     disabled={!canSubmit}
-                    className="sf-btn"
-                    style={{
-                      flex: 2, cursor: canSubmit ? 'pointer' : 'not-allowed', justifyContent: 'center',
-                      background: canSubmit ? (submitting ? ACCENT_D : ACCENT) : 'rgba(99,102,241,0.2)',
-                      color: canSubmit ? '#fff' : 'rgba(233,234,240,0.3)',
-                      border: 'none', gap: 8,
-                      opacity: canSubmit ? 1 : 0.6,
-                    }}
+                    className="sf-btn sf-btn-primary"
+                    style={{ flex: 2, justifyContent: 'center', gap: 8 }}
                   >
                     {submitting ? (
-                      <><span className="sf-spinner" style={{ width: 13, height: 13 }} /> Programmation…</>
+                      <><span className="sf-spinner" style={{ width: 13, height: 13 }} /> {tr('Programmation…', 'Scheduling…')}</>
                     ) : (
-                      <>Programmer {selectedIds.length > 0 ? `${selectedIds.length} story${selectedIds.length > 1 ? 's' : ''}` : 'les stories'}</>
+                      <>{tr('Programmer', 'Schedule')} {selectedIds.length > 0 ? tr(`${selectedIds.length} story${selectedIds.length > 1 ? 's' : ''}`, `${selectedIds.length} story${selectedIds.length > 1 ? 's' : ''}`) : tr('les stories', 'the stories')}</>
                     )}
                   </button>
                 </div>

@@ -15,6 +15,7 @@ import {
 } from '@/lib/drive'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/Toast'
+import { useTr, tr } from '@/lib/i18n'
 
 interface Props {
   user:        User
@@ -45,14 +46,15 @@ const ICONS = {
 
 function statusColor(s: DriveConnection['status']): { c: string; bg: string; label: string } {
   switch (s) {
-    case 'active': return { c: '#059669', bg: 'rgba(5,150,105,0.1)',  label: 'Active' }
-    case 'paused': return { c: '#94a3b8', bg: 'rgba(148,163,184,0.1)', label: 'En pause' }
-    case 'error':  return { c: '#DC2626', bg: 'rgba(220,38,38,0.1)',  label: 'Erreur' }
+    case 'active': return { c: '#059669', bg: 'rgba(5,150,105,0.1)',  label: tr('Active', 'Active') }
+    case 'paused': return { c: '#94a3b8', bg: 'rgba(148,163,184,0.1)', label: tr('En pause', 'Paused') }
+    case 'error':  return { c: '#DC2626', bg: 'rgba(220,38,38,0.1)',  label: tr('Erreur', 'Error') }
   }
 }
 
 export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onClose, onSynced }: Props) {
   const toast = useToast()
+  const tr = useTr()
   const [conns, setConns]       = useState<DriveConnection[]>([])
   const [loading, setLoading]   = useState(true)
   const [syncing, setSyncing]   = useState(false)
@@ -81,7 +83,7 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
     try {
       setConns(await listDriveConnections({ orgId, userId: user.id }))
     } catch (e) {
-      toast.show({ title: 'Chargement échoué', body: e instanceof Error ? e.message : String(e), kind: 'error' })
+      toast.show({ title: tr('Chargement échoué', 'Load failed'), body: e instanceof Error ? e.message : String(e), kind: 'error' })
     } finally {
       setLoading(false)
     }
@@ -103,9 +105,9 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
       })
       setName(''); setFolderId(''); setTarget(''); setRecursive(true); setShowForm(false)
       await load()
-      toast.show({ title: 'Connexion ajoutée', body: 'Lance une synchro pour importer les vidéos.', kind: 'ok' })
+      toast.show({ title: tr('Connexion ajoutée', 'Connection added'), body: tr('Lance une synchro pour importer les vidéos.', 'Run a sync to import the videos.'), kind: 'ok' })
     } catch (e) {
-      toast.show({ title: 'Enregistrement échoué', body: e instanceof Error ? e.message : String(e), kind: 'error' })
+      toast.show({ title: tr('Enregistrement échoué', 'Save failed'), body: e instanceof Error ? e.message : String(e), kind: 'error' })
     } finally {
       setSaving(false)
     }
@@ -116,7 +118,7 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
       await deleteDriveConnection(id)
       await load()
     } catch (e) {
-      toast.show({ title: 'Suppression échouée', body: e instanceof Error ? e.message : String(e), kind: 'error' })
+      toast.show({ title: tr('Suppression échouée', 'Delete failed'), body: e instanceof Error ? e.message : String(e), kind: 'error' })
     }
   }
 
@@ -125,7 +127,7 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
       await setDriveConnectionStatus(c.id, c.status === 'paused' ? 'active' : 'paused')
       await load()
     } catch (e) {
-      toast.show({ title: 'Action échouée', body: e instanceof Error ? e.message : String(e), kind: 'error' })
+      toast.show({ title: tr('Action échouée', 'Action failed'), body: e instanceof Error ? e.message : String(e), kind: 'error' })
     }
   }
 
@@ -135,14 +137,14 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
       const res = await triggerDriveSync()
       await load()
       if (res.imported > 0) onSynced()
-      const errPart = res.errors?.length ? ` — ${res.errors.length} erreur(s)` : ''
+      const errPart = res.errors?.length ? tr(` — ${res.errors.length} erreur(s)`, ` — ${res.errors.length} error(s)`) : ''
       toast.show({
-        title: 'Synchro terminée',
-        body: `${res.imported} vidéo(s) importée(s)${errPart}`,
+        title: tr('Synchro terminée', 'Sync complete'),
+        body: tr(`${res.imported} vidéo(s) importée(s)${errPart}`, `${res.imported} video(s) imported${errPart}`),
         kind: res.errors?.length ? 'error' : 'ok',
       })
     } catch (e) {
-      toast.show({ title: 'Synchro échouée', body: e instanceof Error ? e.message : String(e), kind: 'error' })
+      toast.show({ title: tr('Synchro échouée', 'Sync failed'), body: e instanceof Error ? e.message : String(e), kind: 'error' })
     } finally {
       setSyncing(false)
     }
@@ -182,7 +184,7 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
               Google Drive
             </h2>
             <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>
-              Importe automatiquement les vidéos de tes dossiers Drive
+              {tr('Importe automatiquement les vidéos de tes dossiers Drive', 'Automatically import videos from your Drive folders')}
             </p>
           </div>
           <button onClick={onClose} style={{
@@ -210,7 +212,7 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
             >
               <span style={{ fontSize: 16 }}>💡</span>
               <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                Comment connecter ton Drive ?
+                {tr('Comment connecter ton Drive ?', 'How to connect your Drive?')}
               </span>
               <span style={{
                 display: 'inline-flex', transform: showGuide ? 'rotate(180deg)' : 'none',
@@ -225,10 +227,10 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
                 {/* Étape 1 — partager */}
                 <div>
                   <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>
-                    1. Partage ton dossier Drive
+                    {tr('1. Partage ton dossier Drive', '1. Share your Drive folder')}
                   </p>
                   <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 6px', lineHeight: 1.5 }}>
-                    Dans Google Drive : clic droit sur ton dossier → <b>Partager</b> → colle cet email en accès <b>Lecteur</b> :
+                    {tr('Dans Google Drive : clic droit sur ton dossier →', 'In Google Drive: right-click your folder →')} <b>{tr('Partager', 'Share')}</b> {tr('→ colle cet email en accès', '→ paste this email with')} <b>{tr('Lecteur', 'Viewer')}</b> {tr('access :', 'access:')}
                   </p>
                   {serviceEmail ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -239,26 +241,26 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
                       }}>{serviceEmail}</code>
                       <button onClick={copyEmail} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
                         style={{ flexShrink: 0, color: copied ? '#059669' : undefined }}>
-                        {copied ? '✓ Copié' : 'Copier'}
+                        {copied ? tr('✓ Copié', '✓ Copied') : tr('Copier', 'Copy')}
                       </button>
                     </div>
                   ) : (
                     <p style={{ fontSize: 11.5, color: '#f59e0b', margin: 0 }}>
-                      (Email du compte de service à configurer côté admin — variable VITE_DRIVE_SERVICE_EMAIL.)
+                      {tr('(Email du compte de service à configurer côté admin — variable VITE_DRIVE_SERVICE_EMAIL.)', '(Service account email to be configured by the admin — VITE_DRIVE_SERVICE_EMAIL variable.)')}
                     </p>
                   )}
                 </div>
                 {/* Étape 2 — coller le lien */}
                 <div>
                   <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>
-                    2. Copie le lien du dossier
+                    {tr('2. Copie le lien du dossier', '2. Copy the folder link')}
                   </p>
                   <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0, lineHeight: 1.5 }}>
-                    Clic droit sur le dossier → <b>Copier le lien</b>, puis colle-le ci-dessous dans « Ajouter un dossier Drive ».
+                    {tr('Clic droit sur le dossier →', 'Right-click the folder →')} <b>{tr('Copier le lien', 'Copy link')}</b>{tr(', puis colle-le ci-dessous dans « Ajouter un dossier Drive ».', ', then paste it below in “Add a Drive folder”.')}
                   </p>
                 </div>
                 <p style={{ fontSize: 11.5, color: 'var(--text2)', margin: 0, fontStyle: 'italic' }}>
-                  C'est tout — tes vidéos arrivent dans la banque et se mettent à jour toutes les heures.
+                  {tr("C'est tout — tes vidéos arrivent dans la banque et se mettent à jour toutes les heures.", 'That’s it — your videos land in the bank and refresh every hour.')}
                 </p>
               </div>
             )}
@@ -267,14 +269,14 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
           {/* Connexions existantes */}
           {loading ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text2)', fontSize: 13 }}>
-              Chargement…
+              {tr('Chargement…', 'Loading…')}
             </div>
           ) : conns.length === 0 ? (
             <div style={{
               padding: '28px 20px', textAlign: 'center', color: 'var(--text2)', fontSize: 13,
               border: '1px dashed var(--border)', borderRadius: 12, marginBottom: 16,
             }}>
-              Aucun dossier connecté. Ajoute-en un ci-dessous.
+              {tr('Aucun dossier connecté. Ajoute-en un ci-dessous.', 'No folder connected. Add one below.')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
@@ -297,8 +299,8 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
                         }}>{sc.label}</span>
                       </div>
                       <p style={{ fontSize: 11, color: 'var(--text2)', margin: '3px 0 0' }}>
-                        {c.target_folder ? `→ ${c.target_folder}` : '→ racine'}
-                        {' · '}{c.synced_count} importée(s)
+                        {c.target_folder ? `→ ${c.target_folder}` : tr('→ racine', '→ root')}
+                        {' · '}{tr(`${c.synced_count} importée(s)`, `${c.synced_count} imported`)}
                         {c.last_sync_at && ` · ${new Date(c.last_sync_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
                       </p>
                       {c.status === 'error' && c.last_error && (
@@ -307,13 +309,13 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
                         </p>
                       )}
                     </div>
-                    <button onClick={() => handleToggle(c)} title={c.status === 'paused' ? 'Réactiver' : 'Mettre en pause'} style={{
+                    <button onClick={() => handleToggle(c)} title={c.status === 'paused' ? tr('Réactiver', 'Resume') : tr('Mettre en pause', 'Pause')} style={{
                       background: 'transparent', border: '1px solid var(--border)', borderRadius: 8,
                       padding: '5px 7px', cursor: 'pointer', color: 'var(--text2)', display: 'flex',
                     }}>
                       <Icon d={c.status === 'paused' ? ICONS.play : ICONS.pause} size={13} />
                     </button>
-                    <button onClick={() => handleDelete(c.id)} title="Supprimer" style={{
+                    <button onClick={() => handleDelete(c.id)} title={tr('Supprimer', 'Delete')} style={{
                       background: 'transparent', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 8,
                       padding: '5px 7px', cursor: 'pointer', color: '#DC2626', display: 'flex',
                     }}>
@@ -332,18 +334,18 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
               background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: 12,
             }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }}>Nom</label>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="Mon Drive marketing"
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }}>{tr('Nom', 'Name')}</label>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder={tr('Mon Drive marketing', 'My marketing Drive')}
                   className="sf-input" style={{ width: '100%' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }}>ID ou URL du dossier Drive</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }}>{tr('ID ou URL du dossier Drive', 'Drive folder ID or URL')}</label>
                 <input value={folderId} onChange={e => setFolderId(e.target.value)} placeholder="https://drive.google.com/drive/folders/…"
                   className="sf-input" style={{ width: '100%' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }}>Dossier de banque cible (optionnel)</label>
-                <input value={target} onChange={e => setTarget(e.target.value)} placeholder="racine" list="sf-drive-folders"
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 5 }}>{tr('Dossier de banque cible (optionnel)', 'Target bank folder (optional)')}</label>
+                <input value={target} onChange={e => setTarget(e.target.value)} placeholder={tr('racine', 'root')} list="sf-drive-folders"
                   className="sf-input" style={{ width: '100%' }} />
                 <datalist id="sf-drive-folders">
                   {folders.map(f => <option key={f} value={f} />)}
@@ -351,12 +353,12 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={recursive} onChange={e => setRecursive(e.target.checked)} />
-                Inclure les sous-dossiers
+                {tr('Inclure les sous-dossiers', 'Include subfolders')}
               </label>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button onClick={() => setShowForm(false)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">Annuler</button>
+                <button onClick={() => setShowForm(false)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{tr('Annuler', 'Cancel')}</button>
                 <Button onClick={handleSave} disabled={!folderId.trim() || saving} className="sf-btn-sm">
-                  {saving ? 'Enregistrement…' : 'Enregistrer'}
+                  {saving ? tr('Enregistrement…', 'Saving…') : tr('Enregistrer', 'Save')}
                 </Button>
               </div>
             </div>
@@ -364,7 +366,7 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
             <button onClick={() => setShowForm(true)} className="sf-btn sf-btn-ghost cursor-pointer"
               style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'center' }}>
               <Icon d={ICONS.plus} size={14} />
-              Ajouter un dossier Drive
+              {tr('Ajouter un dossier Drive', 'Add a Drive folder')}
             </button>
           )}
         </div>
@@ -375,14 +377,14 @@ export function DriveConnectionsModal({ user, orgId, folders, serviceEmail, onCl
           padding: '14px 20px', borderTop: '1px solid var(--border)',
         }}>
           <span style={{ fontSize: 11, color: 'var(--text2)' }}>
-            Synchro automatique toutes les heures
+            {tr('Synchro automatique toutes les heures', 'Automatic sync every hour')}
           </span>
           <Button onClick={handleSync} disabled={syncing || conns.length === 0}
             style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className={syncing ? 'animate-spin' : ''} style={{ display: 'inline-flex' }}>
               <Icon d={ICONS.refresh} size={14} />
             </span>
-            {syncing ? 'Synchronisation…' : 'Synchroniser maintenant'}
+            {syncing ? tr('Synchronisation…', 'Syncing…') : tr('Synchroniser maintenant', 'Sync now')}
           </Button>
         </div>
       </div>

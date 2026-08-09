@@ -2181,16 +2181,16 @@ html[data-glass="off"] #root::after { display: none; }
               inset 0 0 0 1px rgba(165,180,252,0.40),
               inset 0 1px 0 rgba(255,255,255,0.12);
 }
-/* Animated accent dot */
+/* Animated accent rail — clear "actif" cue on the left edge */
 .sf-sidebar-item.is-active::before {
   content: '';
   position: absolute;
-  left: 4px; top: 50%;
-  width: 3px; height: 3px;
-  margin-top: -1.5px;
-  border-radius: 50%;
-  background: #C7D2FE;
-  box-shadow: 0 0 10px 1px rgba(129,140,248,0.9);
+  left: 0; top: 50%;
+  width: 3px; height: 18px;
+  margin-top: -9px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, #C7D2FE 0%, #818CF8 55%, #6366F1 100%);
+  box-shadow: 0 0 10px 0 rgba(129,140,248,0.75);
   animation: sf-nav-active 0.26s cubic-bezier(0.22,1,0.36,1) both;
 }
 
@@ -2507,3 +2507,511 @@ textarea:focus-visible {
      charges (titre 14/700, description 12.5 discrète). — */
 .sf-empty-title { font-size: 14px; font-weight: 700; }
 .sf-empty-desc  { font-size: 12.5px; color: var(--text-3); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM v2 — couche additive (tokens + utilitaires)
+   ════════════════════════════════════════════════════════════════════════════
+   100% ADDITIF & rétro-compatible : aucun token ni classe existant n'est
+   renommé/supprimé. On comble les trous du contrat v2 :
+     • échelle d'espacement (--sp-*)         • élévation nommée (--elev-*)
+     • blur nommé (--blur-*)                 • bordure accent forte
+     • tuile-icône d'en-tête (.sf-page-icon) • bandeaux d'état (.sf-banner)
+     • contrôle segmenté (.sf-segment)       • chip/dot de statut live
+     • squelettes géométriques               • erreur inline sous champ
+     • helpers de densité (cluster/stack/field) + détails (kbd/hint/scroll-x)
+   Tout repose sur les variables déjà définies (--surface, --border, --accent,
+   --text-*, --r-*, --t-*, tokens d'état). Aucune couleur hors palette.
+   Les keyframes infinies ci-dessous sont neutralisées par les règles globales
+   `@media (prefers-reduced-motion)` et `html.no-animations *` (sélecteurs `*`).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* — Échelle d'espacement canonique (remplace les 8/10/12/14 magiques) — */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+
+  /* — Élévation : 3 niveaux nommés (repos / hover / flottant) — */
+  --elev-1:
+    0 1px 2px rgba(0,0,0,0.3),
+    0 6px 18px -10px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  --elev-2:
+    0 2px 6px rgba(0,0,0,0.32),
+    0 12px 34px -12px rgba(0,0,0,0.62),
+    0 0 26px -10px rgba(99,102,241,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  --elev-3:
+    0 24px 80px -16px rgba(0,0,0,0.8),
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 0 80px -24px rgba(99,102,241,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+
+  /* — Halo accent (alias sémantique de --shadow-glow) — */
+  --glow-accent: 0 0 28px -6px rgba(99,102,241,0.45);
+
+  /* — Bordure accent forte (valeur de hover déjà utilisée partout en dur) — */
+  --border-accent-strong: rgba(99,102,241,0.28);
+
+  /* — Verre / blur : 3 intensités nommées — */
+  --blur-sm: blur(12px);
+  --blur-md: blur(20px) saturate(1.2);
+  --blur-lg: blur(28px) saturate(1.2);
+
+  /* — Dégradé de tuile-icône d'en-tête (surchargeable par --icon-grad inline
+       avec la couleur SUBTOOL_COLOR de l'outil) — */
+  --icon-grad: linear-gradient(135deg, #6366F1, #8B5CF6);
+}
+
+/* ── Élévation : classes utilitaires ─────────────────────────────────────── */
+.sf-elev-1 { box-shadow: var(--elev-1); }
+.sf-elev-2 { box-shadow: var(--elev-2); }
+.sf-elev-3 { box-shadow: var(--elev-3); }
+.sf-elevated { box-shadow: var(--elev-1); border: 1px solid var(--border); }
+
+/* ── Densité / layout helpers ────────────────────────────────────────────── */
+.sf-cluster { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.sf-stack   { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sf-field   { display: flex; flex-direction: column; gap: 6px; }
+.sf-field > label,
+.sf-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+/* ── En-tête de page : tuile-icône + actions ─────────────────────────────── */
+.sf-page-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  background: var(--icon-grad);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow:
+    0 10px 24px -8px rgba(99,102,241,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.sf-page-icon-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+}
+.sf-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Sur-titre (date, catégorie, salutation) */
+.sf-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(99,102,241,0.6);
+}
+
+/* Variante héro (Hub) : pas de tuile, eyebrow + titre XL dégradé */
+.sf-page-header.is-hero { align-items: flex-end; }
+.sf-page-header.is-hero .sf-page-title {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+/* ── Bandeau d'état (.sf-banner) — remplace les encarts stylés inline ─────── */
+.sf-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border-md);
+}
+.sf-banner .sf-banner-action { margin-left: auto; flex-shrink: 0; }
+.sf-banner.is-accent {
+  background: var(--accent-dim);
+  border-color: var(--border-accent);
+  color: var(--accent-glow);
+}
+.sf-banner.is-warn {
+  background: var(--warn-dim);
+  border-color: rgba(245,158,11,0.22);
+  color: var(--warn);
+}
+.sf-banner.is-danger {
+  background: var(--danger-dim);
+  border-color: rgba(239,68,68,0.22);
+  color: var(--danger);
+}
+
+/* ── Chip / dot de statut "live" (.sf-status-chip) ───────────────────────── */
+.sf-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2.5px 9px;
+  border-radius: 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-md);
+  white-space: nowrap;
+}
+.sf-status-chip.is-live   { color: var(--ok);     background: var(--ok-dim);     border-color: rgba(34,197,94,0.22); }
+.sf-status-chip.is-idle   { color: var(--text-3); }
+.sf-status-chip.is-accent { color: var(--accent-lt); background: var(--accent-dim); border-color: var(--border-accent); }
+.sf-status-dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.sf-status-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 currentColor;
+  animation: sf-status-pulse 1.7s ease-out infinite;
+}
+@keyframes sf-status-pulse {
+  0%   { box-shadow: 0 0 0 0 currentColor; opacity: 0.7; }
+  70%  { box-shadow: 0 0 0 5px transparent; opacity: 0; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 0; }
+}
+
+/* ── Ligne de run du widget flottant (ActivePostingsWidget) ──────────────── */
+.sf-widget-row { position: relative; }
+.sf-widget-row:hover { background: rgba(99,102,241,0.05); }
+.sf-widget-row.cursor-pointer:hover::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--accent);
+}
+
+/* ── Contrôle segmenté (.sf-segment) — canonise les toggles seq/random ────── */
+.sf-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
+}
+.sf-segment-item {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: calc(var(--r-md) - 2px);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+}
+.sf-segment-item:hover:not(.is-active) {
+  color: var(--text-2);
+  background: rgba(255,255,255,0.04);
+}
+.sf-segment-item.is-active {
+  background: linear-gradient(140deg, rgba(99,102,241,0.22), rgba(99,102,241,0.1));
+  color: #EDE8FF;
+  font-weight: 600;
+  box-shadow:
+    inset 0 0 0 1px rgba(99,102,241,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.sf-segment-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.55);
+}
+
+/* ── Squelettes géométriques (même géométrie que le contenu final) ───────── */
+.sf-skeleton-text,
+.sf-skeleton-line,
+.sf-skeleton-card {
+  background: linear-gradient(100deg,
+    rgba(255,255,255,0.03) 20%,
+    rgba(99,102,241,0.08) 50%,
+    rgba(255,255,255,0.03) 80%);
+  background-size: 200% 100%;
+  animation: sf-shimmer 1.6s ease-in-out infinite;
+}
+.sf-skeleton-text { height: 12px; border-radius: var(--r-xs); width: 100%; }
+.sf-skeleton-line { height: 34px; border-radius: var(--r-md); width: 100%; }
+.sf-skeleton-card { height: 120px; border-radius: var(--r-lg); width: 100%; }
+
+/* ── Erreur inline sous champ + champ invalide / désactivé ───────────────── */
+.sf-field-error {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--danger);
+}
+.sf-input.is-invalid,
+.sf-textarea.is-invalid,
+select.sf-input.is-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-dim);
+}
+.sf-input:disabled,
+.sf-textarea:disabled,
+select.sf-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Stat : pastille d'icône + chip de tendance ──────────────────────────── */
+.sf-stat-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent-glow);
+  background: var(--accent-dim);
+}
+.sf-stat-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sf-stat-delta.up   { color: var(--ok);     background: var(--ok-dim); }
+.sf-stat-delta.down { color: var(--danger); background: var(--danger-dim); }
+.sf-stat-delta.flat { color: var(--text-3); background: rgba(255,255,255,0.04); }
+
+/* ── Détails : touche clavier, aide, filet, conteneur scroll-x ───────────── */
+.sf-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 20px;
+  padding: 0 5px;
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--surface-3);
+  border: 1px solid var(--border-md);
+  border-radius: var(--r-xs);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.25);
+}
+.sf-hint {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+.sf-hairline { height: 1px; background: var(--border); border: none; }
+.sf-scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99,102,241,0.25) transparent;
+  max-width: 100%;
+}
+.sf-scroll-x::-webkit-scrollbar { height: 6px; }
+.sf-scroll-x::-webkit-scrollbar-thumb {
+  background: rgba(99,102,241,0.25);
+  border-radius: 99px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM LAYER v3 — remonte le niveau de tous les onglets (inspiré Blowsome).
+   Appended en fin de fichier : ces règles priment sur les définitions de base.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --sf-grad: linear-gradient(100deg, #818CF8, #8B5CF6 52%, #6366F1);
+  --sf-grad-soft: linear-gradient(100deg, rgba(99,102,241,0.14), rgba(139,92,246,0.12), rgba(99,102,241,0.12));
+  --sf-glow: 0 14px 40px -18px rgba(139,92,246,0.6);
+}
+
+@keyframes sf-grad-flow { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+@keyframes sf-page-in { from{opacity:0; transform: translateY(10px)} to{opacity:1; transform:none} }
+@keyframes sf-float-y { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+/* Entrée de page fluide */
+.sf-page { animation: sf-page-in .42s cubic-bezier(.16,1,.3,1) both; }
+
+/* Boutons primaires — dégradé tri-color premium + halo */
+.sf-btn-primary {
+  background: linear-gradient(100deg, #818CF8, #8B5CF6 50%, #6366F1) !important;
+  background-size: 180% auto !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 14px 30px -14px rgba(139,92,246,0.7),
+              inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+.sf-btn-primary:hover {
+  background-position: 100% 0 !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3), 0 18px 40px -12px rgba(99,102,241,0.7),
+              inset 0 1px 0 rgba(255,255,255,0.24) !important;
+  transform: translateY(-1px);
+}
+
+/* Icônes d'en-tête de page — dégradé premium par défaut + halo + flottement doux */
+.sf-page-icon {
+  background: var(--icon-grad, linear-gradient(135deg, #818CF8, #8B5CF6 55%, #6366F1)) !important;
+  box-shadow: 0 12px 28px -12px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.32) !important;
+}
+
+/* Barre d'accent des en-têtes — tri-color */
+.sf-page-header::before {
+  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.5) 35%, rgba(139,92,246,0.6) 50%, rgba(99,102,241,0.5) 65%, transparent) !important;
+}
+
+/* Titre en dégradé animé (opt-in) */
+.sf-title-grad {
+  background: linear-gradient(100deg, #A5B4FC, #C4B5FD 50%, #93C5FD);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: sf-grad-flow 6s linear infinite;
+}
+
+/* Cartes — profondeur + liseré supérieur subtil, halo d'accent au survol */
+.sf-card {
+  position: relative;
+  box-shadow: 0 10px 30px -20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+.sf-card:hover {
+  border-color: rgba(139,92,246,0.3) !important;
+  box-shadow: 0 16px 40px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(139,92,246,0.12),
+              inset 0 1px 0 rgba(255,255,255,0.07) !important;
+}
+
+/* Chip "live"/statut — dégradé doux */
+.sf-status-chip.is-live { background: var(--sf-grad-soft) !important; border-color: rgba(139,92,246,0.35) !important; }
+
+/* Utilitaires premium (pour les vagues de refonte par page) */
+.sf-glass {
+  background: linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-lg);
+  backdrop-filter: blur(12px);
+}
+.sf-glow-accent { box-shadow: var(--sf-glow); }
+.sf-grad-text {
+  background: var(--sf-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.sf-hero {
+  position: relative; overflow: hidden;
+  background: linear-gradient(150deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06) 45%, rgba(99,102,241,0.06));
+  border: 1px solid rgba(139,92,246,0.2);
+  border-radius: var(--r-lg);
+}
+.sf-hero::before {
+  content: ''; position: absolute; top: -60px; right: -40px; width: 260px; height: 260px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(139,92,246,0.25), transparent 66%); pointer-events: none;
+}
+.sf-float { animation: sf-float-y 6s ease-in-out infinite; }
+
+/* Barre latérale — état actif premium (accent dégradé) */
+.sf-sidebar-item { position: relative; }
+.sf-sidebar-item.is-active {
+  background: linear-gradient(100deg, rgba(99,102,241,0.16), rgba(139,92,246,0.07)) !important;
+}
+.sf-sidebar-item.is-active::before {
+  content: ''; position: absolute; left: 0; top: 18%; bottom: 18%; width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, #818CF8, #8B5CF6);
+  box-shadow: 0 0 10px 0 rgba(99,102,241,0.6);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PERF v1 — réduire le coût GPU des animations décoratives (anti-lag).
+   Les gros halos floutés ANIMÉS en boucle (blur + keyframe infinie) forcent un
+   recompositing permanent → principale cause de ralentissement. On les fige :
+   le rendu flouté est peint UNE fois puis mis en cache (look identique, 0 coût
+   continu). On garde les animations d'ENTRÉE (jouées une seule fois).
+   ═══════════════════════════════════════════════════════════════════════════ */
+[style*="hub-float"], [style*="sch-float"], [style*="blow-orb"],
+[style*="hub-kpi-flow"], [style*="hub-shimmer"], [style*="hub-pulse-bg"],
+[style*="blow-glow"], [style*="blow-orb"] {
+  animation: none !important;
+}
+/* Titres en dégradé : shimmer figé (plus de repaint permanent du texte). */
+.sf-title-grad, .sf-grad-text { animation: none !important; }
+/* Halo d'accent des cartes actives : conservé, mais les ombres restent statiques. */
+
+/* Accessibilité + perf : respecte « réduire les animations » du système. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* PERF v1 (suite) — gèle TOUTES les animations décoratives en boucle repérées
+   (halos floutés *-float, points lumineux *-flow, shimmers et maquettes des hubs).
+   On NE gèle PAS les indicateurs fonctionnels : sf-ping (téléphone en ligne),
+   wf-rotate (tâche active), spinners — ils restent animés. */
+[style*="-float"], [style*="-flow"],
+[style*="hub-shimmer"], [style*="hub-check"], [style*="hub-bar"],
+[style*="hub-tilt"], [style*="hub-rise"], [style*="hub-scan"], [style*="hub-word"],
+[style*="blow-orb"], [style*="blow-glow"], [style*="hub-pulse"] {
+  animation: none !important;
+}
+
+/* Fond statique plus riche — évite l'effet "vide/plat" maintenant que les halos
+   ne sont plus animés. Deux lueurs douces (haut + bas) peintes une seule fois. */
+.sf-page {
+  background:
+    radial-gradient(760px 440px at 88% 106%, rgba(139,92,246,0.07), transparent 72%),
+    radial-gradient(680px 380px at 8% 96%, rgba(99,102,241,0.05), transparent 72%),
+    radial-gradient(1100px 380px at 50% -12%, rgba(99,102,241,0.06), transparent 70%),
+    var(--base) !important;
+}
+
+/* Fond moins "fade" : grille très discrète + lueurs un peu plus présentes.
+   100% statique (aucune animation) → aucun impact perf. Grille = texture/
+   profondeur qui fait "designé" au lieu de "vide". */
+.sf-page {
+  background-color: var(--base) !important;
+  background-image:
+    radial-gradient(780px 480px at 88% 106%, rgba(139,92,246,0.11), transparent 68%),
+    radial-gradient(680px 420px at 6% 92%, rgba(99,102,241,0.09), transparent 70%),
+    radial-gradient(1100px 420px at 50% -10%, rgba(99,102,241,0.09), transparent 68%),
+    linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px) !important;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 46px 46px, 46px 46px !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat !important;
+}
+

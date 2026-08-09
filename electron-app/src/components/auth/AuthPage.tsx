@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { useTr, tr } from '@/lib/i18n'
 
 type Tab = 'login' | 'register' | 'forgot' | 'reset'
 
@@ -43,6 +44,7 @@ interface AuthPageProps {
 }
 
 export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
+  const tr = useTr()
   const [tab, setTab]           = useState<Tab>(initialTab ?? 'login')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -65,12 +67,12 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
         if (error) throw error
 
       } else if (tab === 'register') {
-        if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.')
-        if (password.length < 6) throw new Error('Le mot de passe doit faire au moins 6 caractères.')
+        if (password !== confirm) throw new Error(tr('Les mots de passe ne correspondent pas.', 'Passwords do not match.'))
+        if (password.length < 6) throw new Error(tr('Le mot de passe doit faire au moins 6 caractères.', 'Password must be at least 6 characters.'))
         const { data, error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
         if (data.user && !data.session) {
-          setSuccess('Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse.')
+          setSuccess(tr('Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse.', 'Account created! Check your inbox to confirm your address.'))
         }
 
       } else if (tab === 'forgot') {
@@ -78,21 +80,21 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
           redirectTo: window.location.origin,
         })
         if (error) throw error
-        setSuccess('Email envoyé ! Clique sur le lien dans ta boîte mail pour réinitialiser ton mot de passe.')
+        setSuccess(tr('Email envoyé ! Clique sur le lien dans ta boîte mail pour réinitialiser ton mot de passe.', 'Email sent! Click the link in your inbox to reset your password.'))
 
       } else if (tab === 'reset') {
-        if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.')
-        if (password.length < 6) throw new Error('Le mot de passe doit faire au moins 6 caractères.')
+        if (password !== confirm) throw new Error(tr('Les mots de passe ne correspondent pas.', 'Passwords do not match.'))
+        if (password.length < 6) throw new Error(tr('Le mot de passe doit faire au moins 6 caractères.', 'Password must be at least 6 characters.'))
         const { error } = await supabase.auth.updateUser({ password })
         if (error) throw error
-        setSuccess('Mot de passe mis à jour ! Connexion en cours…')
+        setSuccess(tr('Mot de passe mis à jour ! Connexion en cours…', 'Password updated! Signing in…'))
         setTimeout(() => {
           onResetDone?.()
           switchTab('login')
         }, 2000)
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Une erreur est survenue.'
+      const msg = err instanceof Error ? err.message : tr('Une erreur est survenue.', 'Something went wrong.')
       setError(friendlyError(msg))
     } finally {
       setLoading(false)
@@ -158,26 +160,16 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
         >
           {/* Tabs — hidden on forgot/reset */}
           {!isForgotOrReset && (
-            <div
-              className="flex rounded-xl p-1 mb-6"
-              style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}
-            >
+            <div className="sf-segment mb-6" style={{ display: 'flex', width: '100%' }}>
               {(['login', 'register'] as Tab[]).map(t => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => switchTab(t)}
-                  className="flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200"
-                  style={
-                    tab === t
-                      ? {
-                          background: 'linear-gradient(130deg, #6366F1, #818CF8)',
-                          color: '#fff',
-                          boxShadow: '0 2px 12px -2px rgba(99,102,241,0.5)',
-                        }
-                      : { color: 'rgba(233,234,240,0.6)' }
-                  }
+                  className={`sf-segment-item${tab === t ? ' is-active' : ''}`}
+                  style={{ flex: 1, height: 36 }}
                 >
-                  {t === 'login' ? 'Se connecter' : 'Créer un compte'}
+                  {t === 'login' ? tr('Se connecter', 'Sign in') : tr('Créer un compte', 'Create account')}
                 </button>
               ))}
             </div>
@@ -187,19 +179,20 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
           {isForgotOrReset && (
             <div className="mb-6">
               <button
+                type="button"
                 onClick={() => switchTab('login')}
-                className="flex items-center gap-1.5 text-xs mb-4 transition-opacity hover:opacity-100 opacity-60"
-                style={{ color: 'rgba(233,234,240,0.8)' }}
+                className="sf-press flex items-center gap-1.5 text-xs mb-4 transition-opacity hover:opacity-100 opacity-60"
+                style={{ color: 'var(--text-2)' }}
               >
-                ← Retour à la connexion
+                {tr('← Retour à la connexion', '← Back to sign in')}
               </button>
-              <p className="text-sm font-semibold text-white">
-                {tab === 'forgot' ? 'Mot de passe oublié' : 'Nouveau mot de passe'}
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>
+                {tab === 'forgot' ? tr('Mot de passe oublié', 'Forgot password') : tr('Nouveau mot de passe', 'New password')}
               </p>
-              <p className="text-xs mt-1" style={{ color: 'rgba(233,234,240,0.45)' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>
                 {tab === 'forgot'
-                  ? 'Entre ton email — on t\'envoie un lien de réinitialisation.'
-                  : 'Choisis un nouveau mot de passe pour ton compte.'}
+                  ? tr('Entre ton email — on t\'envoie un lien de réinitialisation.', 'Enter your email — we\'ll send you a reset link.')
+                  : tr('Choisis un nouveau mot de passe pour ton compte.', 'Choose a new password for your account.')}
               </p>
             </div>
           )}
@@ -211,9 +204,9 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
             {tab !== 'reset' && (
               <div className="anim-page" style={{ animationDelay: '0.18s' }}>
                 <Input
-                  label="Email"
+                  label={tr('Email', 'Email')}
                   type="email"
-                  placeholder="ton@email.com"
+                  placeholder={tr('ton@email.com', 'you@email.com')}
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
@@ -227,14 +220,14 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
               <div className="anim-page" style={{ animationDelay: '0.24s' }}>
                 <div className="relative">
                   <Input
-                    label={tab === 'reset' ? 'Nouveau mot de passe' : 'Mot de passe'}
+                    label={tab === 'reset' ? tr('Nouveau mot de passe', 'New password') : tr('Mot de passe', 'Password')}
                     type={showPwd ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     required
                     autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-                    hint={tab !== 'login' ? '6 caractères minimum' : undefined}
+                    hint={tab !== 'login' ? tr('6 caractères minimum', '6 characters minimum') : undefined}
                   />
                   <button
                     type="button"
@@ -256,7 +249,7 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
             {(tab === 'register' || tab === 'reset') && (
               <div className="anim-slide-down">
                 <Input
-                  label="Confirmer le mot de passe"
+                  label={tr('Confirmer le mot de passe', 'Confirm password')}
                   type={showPwd ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={confirm}
@@ -273,37 +266,36 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
                 <button
                   type="button"
                   onClick={() => switchTab('forgot')}
-                  className="text-xs transition-opacity hover:opacity-100 opacity-60"
-                  style={{ color: 'rgba(99,102,241,0.9)' }}
+                  className="text-xs transition-opacity hover:opacity-100 opacity-70"
+                  style={{ color: 'var(--accent-lt)' }}
                 >
-                  Mot de passe oublié ?
+                  {tr('Mot de passe oublié ?', 'Forgot password?')}
                 </button>
               </div>
             )}
 
             {error && (
               <div
-                className="px-4 py-3 rounded-xl text-sm anim-slide-down flex items-start gap-2"
-                style={{
-                  background: 'rgba(240,61,85,0.08)',
-                  border: '1px solid rgba(240,61,85,0.25)',
-                  color: '#f87171',
-                }}
+                className="sf-banner is-danger anim-slide-down"
+                style={{ alignItems: 'flex-start' }}
+                role="alert"
               >
-                <span className="flex-shrink-0 mt-0.5">⚠</span>
+                <span className="flex-shrink-0" style={{ marginTop: 1 }} aria-hidden>⚠</span>
                 <span>{error}</span>
               </div>
             )}
             {success && (
               <div
-                className="px-4 py-3 rounded-xl text-sm anim-slide-down flex items-start gap-2"
+                className="sf-banner anim-slide-down"
                 style={{
-                  background: 'rgba(52,211,153,0.08)',
-                  border: '1px solid rgba(52,211,153,0.25)',
-                  color: '#34d399',
+                  alignItems: 'flex-start',
+                  background: 'var(--ok-dim)',
+                  borderColor: 'rgba(34,197,94,0.22)',
+                  color: 'var(--ok)',
                 }}
+                role="status"
               >
-                <span className="flex-shrink-0 mt-0.5">✓</span>
+                <span className="flex-shrink-0" style={{ marginTop: 1 }} aria-hidden>✓</span>
                 <span>{success}</span>
               </div>
             )}
@@ -316,17 +308,17 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
                 loading={loading}
                 className="mt-2"
               >
-                {tab === 'login'    ? 'Se connecter'
-                 : tab === 'register' ? 'Créer mon compte'
-                 : tab === 'forgot'   ? 'Envoyer le lien'
-                 : 'Enregistrer le mot de passe'}
+                {tab === 'login'    ? tr('Se connecter', 'Sign in')
+                 : tab === 'register' ? tr('Créer mon compte', 'Create my account')
+                 : tab === 'forgot'   ? tr('Envoyer le lien', 'Send link')
+                 : tr('Enregistrer le mot de passe', 'Save password')}
               </Button>
             </div>
           </form>
         </div>
 
         <p className="text-center text-xs mt-6 anim-page" style={{ animationDelay: '0.35s', color: 'rgba(99,102,241,0.45)' }}>
-          Tes données sont synchronisées et sécurisées.
+          {tr('Tes données sont synchronisées et sécurisées.', 'Your data is synced and secure.')}
         </p>
       </div>
     </div>
@@ -335,19 +327,24 @@ export function AuthPage({ initialTab, onResetDone }: AuthPageProps = {}) {
 
 function friendlyError(raw: string): string {
   const r = raw.toLowerCase()
+  // Client-side validation messages (checked first to avoid the generic 'password' match below)
+  if (r.includes('ne correspondent pas') || r.includes('do not match'))
+    return tr('Les mots de passe ne correspondent pas.', 'Passwords do not match.')
+  if (r.includes('au moins 6') || r.includes('at least 6'))
+    return tr('Le mot de passe doit faire au moins 6 caractères.', 'Password must be at least 6 characters.')
   if (r.includes('invalid login') || r.includes('invalid credentials'))
-    return 'Email ou mot de passe incorrect.'
+    return tr('Email ou mot de passe incorrect.', 'Incorrect email or password.')
   if (r.includes('email not confirmed'))
-    return 'Email non confirmé — vérifie ta boîte mail.'
+    return tr('Email non confirmé — vérifie ta boîte mail.', 'Email not confirmed — check your inbox.')
   if (r.includes('user already registered') || r.includes('already registered'))
-    return 'Un compte existe déjà avec cet email.'
+    return tr('Un compte existe déjà avec cet email.', 'An account already exists with this email.')
   if (r.includes('password'))
-    return 'Mot de passe trop court (6 caractères minimum).'
+    return tr('Mot de passe trop court (6 caractères minimum).', 'Password too short (6 characters minimum).')
   if (r.includes('rate limit'))
-    return 'Trop de tentatives. Réessaie dans quelques minutes.'
+    return tr('Trop de tentatives. Réessaie dans quelques minutes.', 'Too many attempts. Try again in a few minutes.')
   if (r.includes('network') || r.includes('fetch'))
-    return 'Erreur réseau. Vérifie ta connexion internet.'
+    return tr('Erreur réseau. Vérifie ta connexion internet.', 'Network error. Check your internet connection.')
   if (r.includes('expired') || r.includes('invalid') || r.includes('otp'))
-    return 'Lien expiré ou invalide. Redemande un nouveau lien.'
+    return tr('Lien expiré ou invalide. Redemande un nouveau lien.', 'Link expired or invalid. Request a new one.')
   return raw
 }

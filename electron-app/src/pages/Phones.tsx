@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { igImg } from '@/lib/igimg'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type Phone } from '@/lib/supabase'
+import { supabase, fetchAllRows, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
-import { useT, useLang } from '@/lib/i18n'
-import { canAccessPhoneGroup, canDoAction } from '@/lib/permissions'
+import { useT, useLang, useTr } from '@/lib/i18n'
+import { canAccessPhoneGroup, canDoAction, filterAccessiblePhones } from '@/lib/permissions'
 import { fetchAllPhones, geelarkStatusLabel, stopPhones } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
@@ -242,6 +242,7 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
 
 // ── Detail panel : Lien OnlyFans / sticker ────────────────────────────────────
 function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, link: string) => Promise<void> }) {
+  const tr = useTr()
   // DB d'abord, sinon valeur héritée de l'onglet Story (localStorage)
   const initial = phone.link ?? localStorage.getItem(`sf-story-link-${phone.id}`) ?? ''
   const [value, setValue] = useState(initial)
@@ -267,7 +268,7 @@ function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, 
   return (
     <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }}>
       <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }}>
-        Lien OnlyFans
+        {tr('Lien OnlyFans', 'OnlyFans link')}
       </p>
       <div style={{ display: 'flex', gap: 6 }}>
         <input
@@ -294,7 +295,7 @@ function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, 
         </button>
       </div>
       <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', margin: '7px 0 0' }}>
-        Utilisé par les Stories et les tâches automatiques.
+        {tr('Utilisé par les Stories et les tâches automatiques.', 'Used by Stories and automatic tasks.')}
       </p>
     </div>
   )
@@ -352,6 +353,7 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
 
 // ── Link cell (OnlyFans / story link) ────────────────────────────────────────
 function LinkCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
+  const tr = useTr()
   const [editing, setEditing] = useState(false)
   const [value, setValue]     = useState(phone.link ?? '')
   const [saving, setSaving]   = useState(false)
@@ -397,7 +399,7 @@ function LinkCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
           {phone.link}
         </span>
       ) : (
-        <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)', fontStyle: 'normal' }}>— Ajouter un lien</span>
+        <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)', fontStyle: 'normal' }}>{tr('— Ajouter un lien', '— Add a link')}</span>
       )}
     </button>
   )
@@ -560,6 +562,7 @@ const PhoneCard = memo(function PhoneCard({
   saveLink: (id: string, v: string) => Promise<void>
 }) {
   const t = useT()
+  const tr = useTr()
   const [hover, setHover] = useState(false)
   const online  = phone.status === 'online'
   const warming = phone.status === 'warming'
@@ -633,7 +636,7 @@ const PhoneCard = memo(function PhoneCard({
           )}
           {/* Pastille statut compte */}
           {(phone.account_state === 'banned' || phone.account_state === 'shadow') && (
-            <span title={phone.account_state === 'banned' ? 'Compte non joignable (banni ?)' : 'Portée faible (shadowban ?)'} style={{
+            <span title={phone.account_state === 'banned' ? tr('Compte non joignable (banni ?)', 'Account unreachable (banned?)') : tr('Portée faible (shadowban ?)', 'Low reach (shadowban?)')} style={{
               position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9,
               background: phone.account_state === 'banned' ? '#ef4444' : '#fbbf24',
@@ -679,7 +682,7 @@ const PhoneCard = memo(function PhoneCard({
         border: `1px solid ${phone.link ? 'rgba(34,211,238,0.2)' : HAIR}`,
       }} onClick={e => e.stopPropagation()}>
         <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(233,234,240,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>
-          Lien OnlyFans
+          {tr('Lien OnlyFans', 'OnlyFans link')}
         </p>
         <LinkCell phone={phone} onSave={saveLink} />
       </div>
@@ -782,14 +785,21 @@ export function Phones({ user }: PhonesProps) {
     setError(null)
     if (!bearer) { setPhones([]); setLoading(false); return }
     setLoading(true)
-    let q = supabase.from('phones').select('*').order('phone_name')
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data, error: err } = await q
-    if (err) setError('Error loading phones.')
-    else setPhones(data ?? [])
+    try {
+      const data = await fetchAllRows<Phone>((from, to) => {
+        let q = supabase.from('phones').select('*').order('phone_name').range(from, to)
+        q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+        return q
+      })
+      // 🔒 Filtre à la source : le membre ne voit que les téléphones des groupes
+      // auxquels il a accès — aucun autre groupe ne peut apparaître, quoi qu'il arrive.
+      setPhones(filterAccessiblePhones(data, role, perms))
+    } catch {
+      setError(fr('Erreur de chargement des téléphones.', 'Error loading phones.'))
+    }
     setLoading(false)
     poller.pollNow()
-  }, [bearer, currentOrg, user.id])
+  }, [bearer, currentOrg, user.id, role, perms, fr])
 
   useEffect(() => {
     if (conns.loading) return
@@ -854,7 +864,7 @@ export function Phones({ user }: PhonesProps) {
       await loadPhones()
       setLastUpdated(new Date())
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Sync error.')
+      setError(e instanceof Error ? e.message : fr('Erreur de synchronisation.', 'Sync error.'))
     }
     setSyncing(false)
   }, [bearer, user.id, currentOrg, phoneLimit, license, t, toast, fr, loadPhones])
@@ -1158,26 +1168,21 @@ export function Phones({ user }: PhonesProps) {
         {/* ── Page header ─────────────────────────────────────────────────── */}
         <div className="sf-page-header">
           {/* Left: icon + title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            <div className="sf-anim-scale-spring" style={{
-              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-              boxShadow: '0 10px 24px -8px rgba(99,102,241,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-            }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-page-icon sf-anim-scale-spring">
               <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="6" y="2" width="12" height="20" rx="3"/>
                 <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>
               </svg>
             </div>
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <h1 className="sf-page-title">{t('phonesHeading')}</h1>
+              <h1 className="sf-page-title sf-title-grad">{t('phonesHeading')}</h1>
               <p className="sf-page-sub">{t('phonesSubtitle')}</p>
             </div>
           </div>
 
           {/* Right: auto-refresh + sync */}
-          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
 
             {/* Auto-refresh toggle pill */}
             <div style={{
@@ -1187,31 +1192,19 @@ export function Phones({ user }: PhonesProps) {
             }}>
               <button
                 onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
-                style={{
-                  position: 'relative', width: 28, height: 15, borderRadius: 99,
-                  background: autoRefresh ? 'var(--ok)' : 'rgba(233,234,240,0.2)',
-                  border: 'none', cursor: 'pointer', padding: 0, transition: 'background 0.2s', flexShrink: 0,
-                }}
+                className={`sf-toggle-track ${autoRefresh ? 'on' : 'off'}`}
+                style={{ width: 28, height: 15 }}
                 aria-label={fr(`Activer/désactiver l'actualisation automatique`, 'Toggle auto-refresh')}
               >
-                <span style={{
-                  position: 'absolute', top: 2.5, width: 10, height: 10,
-                  background: 'var(--ivory)', borderRadius: 99, boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-                  transition: 'left 0.2s', left: autoRefresh ? 15 : 2.5,
-                }} />
+                <span className="sf-toggle-thumb" style={{ width: 10, height: 10, left: autoRefresh ? 15 : 2.5 }} />
               </button>
               <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(233,234,240,0.52)', whiteSpace: 'nowrap' }}>{t('phonesAutoLabel')}</span>
               {autoRefresh && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '2px 3px' }}>
+                <div className="sf-segment" style={{ padding: 2 }}>
                   {INTERVALS.map(({ label, value }) => (
                     <button key={value} onClick={() => changeInterval(value)}
-                      style={{
-                        padding: '3px 7px', borderRadius: 5, fontSize: 10, border: 'none', cursor: 'pointer',
-                        background: intervalSec === value ? 'var(--ivory)' : 'transparent',
-                        color: intervalSec === value ? '#0F1014' : 'rgba(233,234,240,0.52)',
-                        fontWeight: intervalSec === value ? 700 : 400,
-                        transition: 'all 0.15s', whiteSpace: 'nowrap',
-                      }}>{label}</button>
+                      className={`sf-segment-item ${intervalSec === value ? 'is-active' : ''}`}
+                      style={{ height: 22, padding: '0 8px', fontSize: 10 }}>{label}</button>
                   ))}
                 </div>
               )}
@@ -1330,11 +1323,7 @@ export function Phones({ user }: PhonesProps) {
           {(!bearer || error || pollError) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
               {!bearer && (
-                <div className="sf-anim-slide-up" style={{
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)',
-                  color: 'var(--warn)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                }}>
+                <div className="sf-banner is-warn sf-anim-slide-up">
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
                     <path d="M7.5 1L14 13.5H1L7.5 1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
                     <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -1344,25 +1333,17 @@ export function Phones({ user }: PhonesProps) {
                 </div>
               )}
               {error && (
-                <div className="sf-anim-slide-up" style={{
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.2)',
-                  color: 'var(--err)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                }}>
+                <div className="sf-banner is-danger sf-anim-slide-up">
                   <span>{error}</span>
-                  <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
+                  <button className="sf-banner-action" onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   </button>
                 </div>
               )}
               {pollError && (
-                <div className="sf-anim-slide-up" style={{
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)',
-                  color: 'var(--warn)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                }}>
+                <div className="sf-banner is-warn sf-anim-slide-up">
                   <span>{pollError}</span>
-                  <button onClick={() => setPollError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
+                  <button className="sf-banner-action" onClick={() => setPollError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: 0 }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   </button>
                 </div>
@@ -1435,18 +1416,13 @@ export function Phones({ user }: PhonesProps) {
                 </select>
 
                 {/* Status filter pills */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
+                <div className="sf-segment" style={{ flexShrink: 0 }}>
                   {(['all', 'online', 'offline'] as const).map(v => (
                     <button
                       key={v}
                       onClick={() => setFilter(v)}
-                      style={{
-                        padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                        border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                        background: filter === v ? 'var(--ivory)' : 'transparent',
-                        color: filter === v ? '#0F1014' : 'rgba(233,234,240,0.52)',
-                        letterSpacing: '0.06em', textTransform: 'uppercase',
-                      }}
+                      className={`sf-segment-item ${filter === v ? 'is-active' : ''}`}
+                      style={{ padding: '0 12px', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase' }}
                     >
                       {v === 'all' ? t('phonesFilterAll') : v === 'online' ? t('phonesFilterOnline') : t('phonesFilterOffline')}
                     </button>
@@ -1454,7 +1430,7 @@ export function Phones({ user }: PhonesProps) {
                 </div>
 
                 {/* View mode toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(10,10,12,0.8)', border: `1px solid ${HAIR}`, borderRadius: 8, padding: '3px 4px', flexShrink: 0 }}>
+                <div className="sf-segment" style={{ flexShrink: 0 }}>
                   {([
                     { mode: 'table' as const, title: fr('Vue tableau', 'Table view'), icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M1.5 5.5h11M1.5 8.5h11M5 5.5V12" stroke="currentColor" strokeWidth="1.3"/></svg> },
                     { mode: 'grid' as const,  title: fr('Vue grille', 'Grid view'),  icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="8" y="1.5" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="1.5" y="8" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><rect x="8" y="8" width="4.5" height="4.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/></svg> },
@@ -1463,12 +1439,8 @@ export function Phones({ user }: PhonesProps) {
                       key={mode}
                       onClick={() => changeViewMode(mode)}
                       title={title}
-                      style={{
-                        width: 30, height: 24, borderRadius: 6, border: 'none', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
-                        background: viewMode === mode ? 'rgba(99,102,241,0.18)' : 'transparent',
-                        color: viewMode === mode ? 'var(--accent-l)' : 'rgba(233,234,240,0.45)',
-                      }}
+                      className={`sf-segment-item ${viewMode === mode ? 'is-active' : ''}`}
+                      style={{ width: 34, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >{icon}</button>
                   ))}
                 </div>
@@ -1513,8 +1485,8 @@ export function Phones({ user }: PhonesProps) {
                         <th style={{ ...TH_BASE, width: 44 }}></th>
                         <th style={TH_BASE}>{t('phonesDetailModel')}</th>
                         <th style={{ ...TH_BASE, width: 120 }}>{t('phonesDetailGroup')}</th>
-                        <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
-                        <th style={{ ...TH_BASE, width: 150 }}>Note</th>
+                        <th style={{ ...TH_BASE, width: 200 }}>{fr('Lien OnlyFans', 'OnlyFans link')}</th>
+                        <th style={{ ...TH_BASE, width: 150 }}>{fr('Note', 'Note')}</th>
                         <th style={{ ...TH_BASE, width: 90 }}></th>
                       </tr>
                     </thead>
@@ -1555,7 +1527,7 @@ export function Phones({ user }: PhonesProps) {
                   </div>
                   <p className="sf-empty-title">{t('phonesNoConfigured')}</p>
                   <p className="sf-empty-desc">
-                    {bearer ? t('phonesNoConfiguredDesc') : 'Connecte d’abord ton compte GéeLark (token) dans les Réglages, puis synchronise tes téléphones.'}
+                    {bearer ? t('phonesNoConfiguredDesc') : fr('Connecte d’abord ton compte GéeLark (token) dans les Réglages, puis synchronise tes téléphones.', 'First connect your GeeLark account (token) in Settings, then sync your phones.')}
                   </p>
                   {bearer ? (
                     <button
@@ -1576,7 +1548,7 @@ export function Phones({ user }: PhonesProps) {
                       className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
                       style={{ display: 'flex', alignItems: 'center', gap: 8 }}
                     >
-                      Connecter GéeLark dans les Réglages
+                      {fr('Connecter GéeLark dans les Réglages', 'Connect GeeLark in Settings')}
                     </button>
                   )}
                 </div>
@@ -1646,8 +1618,8 @@ export function Phones({ user }: PhonesProps) {
                         {sortTh(t('phonesDetailModel'), 'name')}
                         {/* Group sort */}
                         {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
-                        <th style={{ ...TH_BASE, width: 200 }}>Lien OnlyFans</th>
-                        <th style={{ ...TH_BASE, width: 150 }}>Note</th>
+                        <th style={{ ...TH_BASE, width: 200 }}>{fr('Lien OnlyFans', 'OnlyFans link')}</th>
+                        <th style={{ ...TH_BASE, width: 150 }}>{fr('Note', 'Note')}</th>
                         <th style={{ ...TH_BASE, width: 100 }}></th>
                       </tr>
                     </thead>
@@ -1963,6 +1935,7 @@ function IgBulkModal({ phones, saveIgUsername, onClose }: {
   saveIgUsername: (id: string, u: string) => Promise<void>
   onClose: () => void
 }) {
+  const tr = useTr()
   const [vals, setVals]       = useState<Record<string, string>>(() => Object.fromEntries(phones.map(p => [p.id, p.ig_username ?? ''])))
   const [search, setSearch]   = useState('')
   const [saving, setSaving]   = useState(false)
@@ -1990,13 +1963,13 @@ function IgBulkModal({ phones, saveIgUsername, onClose }: {
       <div onClick={e => e.stopPropagation()} className="sf-card" style={{ width: '100%', maxWidth: 560, maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div>
-            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>@ Comptes Instagram</p>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' }}>Renseigne le @ de chaque compte — le suivi (Stats / Rapports) s'appuie dessus.</p>
+            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{tr('@ Comptes Instagram', '@ Instagram accounts')}</p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' }}>{tr('Renseigne le @ de chaque compte — le suivi (Stats / Rapports) s\'appuie dessus.', 'Set the @ for each account — tracking (Stats / Reports) relies on it.')}</p>
           </div>
           <button onClick={onClose} className="cursor-pointer" style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
         <div style={{ padding: '12px 20px 8px' }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un téléphone…" className="sf-input" style={{ width: '100%' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher un téléphone…', 'Search a phone…')} className="sf-input" style={{ width: '100%' }} />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {visible.map(p => (
@@ -2008,9 +1981,9 @@ function IgBulkModal({ phones, saveIgUsername, onClose }: {
           ))}
         </div>
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, alignItems: 'center' }}>
-          {savedCount !== null && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ {savedCount} mis à jour</span>}
-          <button onClick={onClose} className="sf-btn sf-btn-ghost cursor-pointer">Fermer</button>
-          <button onClick={saveAll} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer">{saving ? 'Enregistrement…' : 'Tout enregistrer'}</button>
+          {savedCount !== null && <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ {tr(`${savedCount} mis à jour`, `${savedCount} updated`)}</span>}
+          <button onClick={onClose} className="sf-btn sf-btn-ghost cursor-pointer">{tr('Fermer', 'Close')}</button>
+          <button onClick={saveAll} disabled={saving} className="sf-btn sf-btn-primary cursor-pointer">{saving ? tr('Enregistrement…', 'Saving…') : tr('Tout enregistrer', 'Save all')}</button>
         </div>
       </div>
     </div>,

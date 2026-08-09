@@ -80,7 +80,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Page } from '@/components/Layout'
 import { supabase }   from '@/lib/supabase'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { useToast }   from '@/components/Toast'
 import { useOrg }     from '@/lib/orgContext'
 import { useLicense } from '@/lib/license'
@@ -216,6 +216,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
   onDelete: (id: string) => void; onMute?: (uid: string, name: string) => void
 }) {
   const t = useT()
+  const tr = useTr()
   return (
     <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'}`}>
       <div style={{ width: 34, flexShrink: 0 }}>
@@ -268,7 +269,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             {isAdmin && !isOwn && onMute && (
               <button onClick={() => onMute(msg.user_id, msg.display_name)}
                 className="w-5 h-5 flex items-center justify-center rounded sf-press"
-                style={{ color: 'rgba(251,191,36,0.6)' }} title="Masquer" aria-label="Masquer">
+                style={{ color: 'rgba(251,191,36,0.6)' }} title={tr('Masquer', 'Mute')} aria-label={tr('Masquer', 'Mute')}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
                 </svg>
@@ -277,7 +278,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
                 className="sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
-                aria-label="Supprimer">
+                aria-label={tr('Supprimer', 'Delete')}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
@@ -296,6 +297,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
   msg: Message; isAdmin: boolean; compact: boolean; onDelete: (id: string) => void
 }) {
   const t = useT()
+  const tr = useTr()
   const isAdminMsg = msg.is_admin
   return (
     <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'} ${isAdminMsg ? 'flex-row-reverse' : ''}`}>
@@ -319,7 +321,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
                 className="opacity-0 group-hover:opacity-100 transition-opacity sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
-                aria-label="Supprimer">
+                aria-label={tr('Supprimer', 'Delete')}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
@@ -348,6 +350,7 @@ function MuteModal({ targetName, onMute, onClose }: {
   targetName: string; onMute: (minutes: number) => void; onClose: () => void
 }) {
   const t = useT()
+  const tr = useTr()
   const [custom, setCustom] = useState('')
   const DURATIONS = [
     { label: t('communityMute30min'), minutes: 30 },
@@ -368,7 +371,7 @@ function MuteModal({ targetName, onMute, onClose }: {
             <p className="font-black text-white text-[14px]">{t('communityMuteTitle')} {targetName}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>{t('communityMuteDuration')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -401,6 +404,7 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
   profile: Profile; userId: string; isAdmin: boolean; onClose: () => void; onSaved: (p: Profile) => void
 }) {
   const t = useT()
+  const tr = useTr()
   const [name, setName]        = useState(profile.display_name)
   const [avatarUrl, setAUrl]   = useState(profile.avatar_url)
   const [uploading, setUpload]   = useState(false)
@@ -459,7 +463,7 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
             <p className="font-black text-white text-[15px]">{t('communityProfileTitle')}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(233,234,240,0.45)' }}>{t('communityProfileVisible')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -535,6 +539,7 @@ function CreateTopicModal({ onClose, onCreate }: {
   onCreate: (topic: { name: string; description: string; emoji: string }) => Promise<void>
 }) {
   const t = useT()
+  const tr = useTr()
   const [name, setName]     = useState('')
   const [desc, setDesc]     = useState('')
   const [emoji, setEmoji]   = useState('💬')
@@ -559,7 +564,7 @@ function CreateTopicModal({ onClose, onCreate }: {
             <p className="font-black text-white text-[15px]">{t('communityCreateTitle')}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(233,234,240,0.45)' }}>{t('communityCreateVisible')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(233,234,240,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -800,6 +805,7 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
 
 export function Community({ user, onNavigate }: CommunityProps) {
   const t = useT()
+  const tr = useTr()
   const { currentOrg } = useOrg()
   useLicense()
   const toast = useToast()
@@ -1035,7 +1041,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url }).select().single()
     if (error) {
       setMessages(prev => prev.filter(m => m.id !== optId))
-      toast.show({ title: 'Erreur publication', body: error.message, kind: 'error' })
+      toast.show({ title: tr('Erreur publication', 'Publishing error'), body: error.message, kind: 'error' })
       setNewsSend(false)
       return
     }
@@ -1285,23 +1291,17 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 sf-topbar">
         <div className="flex items-center gap-3.5" style={{ minWidth: 0 }}>
-          <div className="sf-anim-scale-spring" style={{
-            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)',
-            border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1',
-          }}>
+          <div className="sf-page-icon sf-anim-scale-spring sf-float">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
             <div className="flex items-center gap-2.5">
-              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('communityTitle')}</h1>
+              <h1 className="sf-page-title sf-title-grad">{t('communityTitle')}</h1>
               {uniqueUserCount > 0 && (
-                <span className="sf-badge sf-badge-accent flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+                <span className="sf-status-chip is-live sf-tabular">
+                  <span className="sf-status-dot" />
                   {uniqueUserCount}
                 </span>
               )}
@@ -1311,8 +1311,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
             </p>
           </div>
         </div>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
         <button onClick={() => setShowProfile(true)}
-          className="sf-btn sf-btn-ghost flex items-center gap-2.5 cursor-pointer sf-anim-slide-up sf-d100"
+          className="sf-btn sf-btn-ghost flex items-center gap-2.5 cursor-pointer"
           style={{ height: 'auto', padding: '7px 12px 7px 8px' }}>
           <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
           <div className="text-left">
@@ -1328,12 +1329,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
             </svg>
           </span>
         </button>
+        </div>
       </div>
 
       {/* ── Muted banner ─────────────────────────────────────────────────────── */}
       {isMuted && (
-        <div className="flex-shrink-0 mx-5 mt-3 px-4 py-2.5 rounded-xl flex items-center gap-2.5 sf-anim-slide-up"
-          style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', boxShadow: '0 0 0 1px rgba(245,158,11,0.06)' }}>
+        <div className="sf-banner is-warn flex-shrink-0 mx-5 mt-3 sf-anim-slide-up">
           <span className="flex items-center flex-shrink-0 text-warn" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
           </span>
@@ -1391,8 +1392,18 @@ export function Community({ user, onNavigate }: CommunityProps) {
           <div ref={listRef} className="flex-1 overflow-y-auto">
             <div className="p-5 space-y-4 max-w-3xl anim-stagger">
               {loading ? (
-                <div className="flex items-center justify-center py-20">
-                  <Spinner size="lg" />
+                <div className="space-y-4">
+                  <div className="sf-skeleton sf-skeleton-card" style={{ height: 220 }} />
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="sf-card flex items-start gap-3 p-4">
+                      <div className="sf-skeleton" style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0 }} />
+                      <div className="flex-1 space-y-2 py-0.5">
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: '45%' }} />
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: '85%' }} />
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: '30%' }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <>
@@ -1404,7 +1415,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       className="sf-btn sf-btn-ghost w-full cursor-pointer"
                       style={{ opacity: loadingMore ? 0.5 : 1 }}
                     >
-                      {loadingMore ? 'Chargement…' : '↑ Charger les messages plus anciens'}
+                      {loadingMore ? tr('Chargement…', 'Loading…') : tr('↑ Charger les messages plus anciens', '↑ Load older messages')}
                     </button>
                   )}
 
@@ -1463,7 +1474,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             </button>
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); setConfirmDeleteMsg(featuredMsg.id) }}
-                                className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label="Supprimer">
+                                className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label={tr('Supprimer', 'Delete')}>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                 </svg>
@@ -1593,7 +1604,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); setConfirmDeleteMsg(msg.id) }}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1 sf-btn sf-btn-danger sf-btn-sm cursor-pointer"
-                                aria-label="Supprimer">
+                                aria-label={tr('Supprimer', 'Delete')}>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                 </svg>
@@ -1607,7 +1618,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
                   {newsMessages.length === 0 && !isAdmin && (
                     <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 sf-glow-accent sf-float"
                         style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--accent-l)' }}>
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
@@ -1751,7 +1762,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
                 {topics.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 sf-glow-accent sf-float"
                       style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--accent-l)' }}>
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
@@ -1805,7 +1816,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           {canDelete && (
                             <button onClick={e => { e.stopPropagation(); setConfirmDeleteTopic(topic.id) }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
-                              aria-label="Supprimer">
+                              aria-label={tr('Supprimer', 'Delete')}>
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                               </svg>
@@ -1906,7 +1917,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div ref={topicListRef} className="flex-1 overflow-y-auto px-5 py-4">
                 {topicMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 sf-glow-accent sf-float"
                       style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)' }}>
                       {selectedTopic?.emoji}
                     </div>
@@ -1961,7 +1972,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                   {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'var(--muted)' }}>{timeAgo(msg.created_at)}</span>}
                                   <button onClick={() => setConfirmDeleteTopicMsg(msg.id)}
                                     className="sf-btn sf-btn-danger sf-btn-sm sf-btn-icon cursor-pointer"
-                                    aria-label="Supprimer">
+                                    aria-label={tr('Supprimer', 'Delete')}>
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                       <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                     </svg>
@@ -2047,7 +2058,19 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     style={{ color: 'rgba(99,102,241,0.5)' }}>
                     {t('communityAdminTickets')} ({threadList.length})
                   </p>
-                  {loading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+                  {loading ? (
+                    <div className="space-y-1.5">
+                      {[0, 1, 2, 3].map(i => (
+                        <div key={i} className="flex items-center gap-2.5 px-2.5 py-2.5">
+                          <div className="sf-skeleton" style={{ width: 28, height: 28, borderRadius: 9, flexShrink: 0 }} />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="sf-skeleton sf-skeleton-text" style={{ width: '60%', height: 9 }} />
+                            <div className="sf-skeleton sf-skeleton-text" style={{ width: '85%', height: 8 }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
                   : threadList.length === 0 ? (
                     <div className="flex flex-col items-center py-8 gap-2 text-center">
                       <span style={{ color: 'var(--accent-l)' }} aria-hidden="true">
@@ -2181,7 +2204,16 @@ export function Community({ user, onNavigate }: CommunityProps) {
             /* User view */
             <div className="flex-1 flex flex-col overflow-hidden">
               <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
-                {loading ? <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
+                {loading ? (
+                  <div className="space-y-4 pt-2">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className={`flex gap-3 ${i % 2 ? 'flex-row-reverse' : ''}`}>
+                        <div className="sf-skeleton" style={{ width: 34, height: 34, borderRadius: 11, flexShrink: 0 }} />
+                        <div className="sf-skeleton" style={{ height: 40, width: i % 2 ? '55%' : '68%', borderRadius: 12 }} />
+                      </div>
+                    ))}
+                  </div>
+                )
                 : myThreadMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
                     <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
@@ -2299,7 +2331,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div className="flex items-center gap-2">
                 {isAdmin && (
                   <button onClick={() => setConfirmDeleteMsg(selectedPost.id)}
-                    className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label="Supprimer">
+                    className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer" aria-label={tr('Supprimer', 'Delete')}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                     </svg>
@@ -2357,9 +2389,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Confirm: delete message ───────────────────────────────────────────── */}
       <ConfirmDialog
         open={confirmDeleteMsg !== null}
-        title="Supprimer ce message ?"
-        message="Cette action est irréversible."
-        confirmLabel="Supprimer"
+        title={tr('Supprimer ce message ?', 'Delete this message?')}
+        message={tr('Cette action est irréversible.', 'This action cannot be undone.')}
+        confirmLabel={tr('Supprimer', 'Delete')}
         danger
         onConfirm={() => {
           if (confirmDeleteMsg) {
@@ -2374,9 +2406,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Confirm: delete topic ─────────────────────────────────────────────── */}
       <ConfirmDialog
         open={confirmDeleteTopic !== null}
-        title="Supprimer ce topic ?"
-        message="Le topic et tous ses messages seront définitivement supprimés."
-        confirmLabel="Supprimer"
+        title={tr('Supprimer ce topic ?', 'Delete this topic?')}
+        message={tr('Le topic et tous ses messages seront définitivement supprimés.', 'The topic and all its messages will be permanently deleted.')}
+        confirmLabel={tr('Supprimer', 'Delete')}
         danger
         onConfirm={() => {
           if (confirmDeleteTopic) deleteTopic(confirmDeleteTopic)
@@ -2388,9 +2420,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Confirm: delete topic message ────────────────────────────────────── */}
       <ConfirmDialog
         open={confirmDeleteTopicMsg !== null}
-        title="Supprimer ce message ?"
-        message="Cette action est irréversible."
-        confirmLabel="Supprimer"
+        title={tr('Supprimer ce message ?', 'Delete this message?')}
+        message={tr('Cette action est irréversible.', 'This action cannot be undone.')}
+        confirmLabel={tr('Supprimer', 'Delete')}
         danger
         onConfirm={() => {
           if (confirmDeleteTopicMsg) deleteTopicMessage(confirmDeleteTopicMsg)

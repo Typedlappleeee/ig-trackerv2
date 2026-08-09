@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase'
 import { uploadVideoFromBlob, getSignedUrl, deleteStorageObjects } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { BankPicker } from '@/pages/Bank'
-import { ACCENT, ACCENT_L, TEXT_1, TEXT_2, TEXT_3, HAIR, BG_2, OK, WARN, ERR } from '@/lib/theme'
+import { ACCENT, ACCENT_L, TEXT_1, TEXT_2, TEXT_3, HAIR, BG_2 } from '@/lib/theme'
+import { useTr } from '@/lib/i18n'
 
 interface SubtitlesProps { user: User }
 
@@ -68,6 +69,7 @@ function formatTime(s: number): string {
 const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI
 
 export function Subtitles({ user }: SubtitlesProps) {
+  const tr      = useTr()
   const conns   = useConnections(user)
   const groqKey = conns.groq
   const { currentOrg } = useOrg()
@@ -103,6 +105,8 @@ export function Subtitles({ user }: SubtitlesProps) {
   const [outputUrl,  setOutputUrl]  = useState<string | null>(null)
   const [outputPath, setOutputPath] = useState<string | null>(null)
   const [error,      setError]      = useState('')
+  const cancelRef                   = useRef(false)   // « Annuler » : stoppe le traitement en cours
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => () => {
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
@@ -171,11 +175,12 @@ export function Subtitles({ user }: SubtitlesProps) {
   // ── Main generation ──────────────────────────────────────────────────────────
   async function generate() {
     if (!['idle', 'error', 'done'].includes(phase)) return
-    if (!groqKey) { setError('Clé API Groq manquante — configure-la dans Paramètres'); return }
-    if (!videoSrc) { setError('Sélectionne une vidéo'); return }
+    if (!groqKey) { setError(tr('Clé API Groq manquante — configure-la dans Paramètres', 'Groq API key missing — set it up in Settings')); return }
+    if (!videoSrc) { setError(tr('Sélectionne une vidéo', 'Select a video')); return }
 
+    cancelRef.current = false; setCancelling(false)
     setPhase('transcribing')
-    setStatus('Préparation…')
+    setStatus(tr('Préparation…', 'Preparing…'))
     setError('')
     setSegments([])
 
@@ -188,7 +193,7 @@ export function Subtitles({ user }: SubtitlesProps) {
       // Bank URL → pass URL to server proxy (no bytes sent from client)
       // Local file → read bytes here and send as base64 through proxy
       setPhase('transcribing')
-      setStatus('Transcription de l\'audio…')
+      setStatus(tr('Transcription de l\'audio…', 'Transcribing audio…'))
 
       const filename = videoName || 'video.mp4'
       let transcriptRes: { ok: boolean; data?: unknown; error?: string }
@@ -206,7 +211,7 @@ export function Subtitles({ user }: SubtitlesProps) {
         // Bank URL (web or Electron): let the proxy/IPC download it server-side.
         // Avoids sending large video bytes over the network from the client.
         console.log('[Subtitles] → chemin videoUrl (bank URL, aucun octet envoyé côté client)')
-        setStatus('Transcription de l\'audio…')
+        setStatus(tr('Transcription de l\'audio…', 'Transcribing audio…'))
         transcriptRes = await (window.electronAPI as any).groqTranscription({
           apiKey:   groqKey,
           videoUrl: videoSrc,
@@ -218,14 +223,14 @@ export function Subtitles({ user }: SubtitlesProps) {
         // /api/groq returns 413. Instead, upload the file to Storage and hand the
         // proxy a signed URL it can fetch server-side (no body size limit).
         console.log('[Subtitles] → chemin upload+URL (web, fichier local)')
-        setStatus('Envoi de la vidéo…')
+        setStatus(tr('Envoi de la vidéo…', 'Uploading video…'))
         let blob: Blob
         if (fileRef.current) blob = fileRef.current
         else if (videoSrc) {
           const r = await fetch(videoSrc)
-          if (!r.ok) throw new Error('Téléchargement de la vidéo échoué')
+          if (!r.ok) throw new Error(tr('Téléchargement de la vidéo échoué', 'Video download failed'))
           blob = await r.blob()
-        } else throw new Error('Aucune source vidéo')
+        } else throw new Error(tr('Aucune source vidéo', 'No video source'))
 
         const scope = currentOrg?.id
           ? { mode: 'org' as const, id: currentOrg.id }
@@ -233,8 +238,8 @@ export function Subtitles({ user }: SubtitlesProps) {
         const { storagePath, thumbnailPath } = await uploadVideoFromBlob(blob, filename, scope)
         tempPaths.push(storagePath, thumbnailPath)
         const signed = await getSignedUrl(storagePath)
-        if (!signed) throw new Error('Préparation de la vidéo impossible')
-        setStatus('Transcription de l\'audio…')
+        if (!signed) throw new Error(tr('Préparation de la vidéo impossible', 'Could not prepare the video'))
+        setStatus(tr('Transcription de l\'audio…', 'Transcribing audio…'))
         transcriptRes = await (window.electronAPI as any).groqTranscription({
           apiKey:   groqKey,
           videoUrl: signed,
@@ -249,20 +254,20 @@ export function Subtitles({ user }: SubtitlesProps) {
           audioBytes = await fileRef.current.arrayBuffer()
           console.log('[Subtitles] audioBytes depuis fileRef.current:', (audioBytes.byteLength / 1024 / 1024).toFixed(1), 'MB')
         } else if (videoSrc) {
-          setStatus('Lecture de la vidéo…')
+          setStatus(tr('Lecture de la vidéo…', 'Reading video…'))
           // readFileBytes only works for local paths, not for URLs
           if (window.electronAPI && !videoSrc.startsWith('http')) {
             const r = await window.electronAPI.readFileBytes(videoSrc)
-            if (!r.ok || !r.bytes) throw new Error((r as any).error ?? 'Lecture échouée')
+            if (!r.ok || !r.bytes) throw new Error((r as any).error ?? tr('Lecture échouée', 'Read failed'))
             audioBytes = r.bytes as ArrayBuffer
           } else {
             const r = await fetch(videoSrc)
-            if (!r.ok) throw new Error('Téléchargement de la vidéo échoué')
+            if (!r.ok) throw new Error(tr('Téléchargement de la vidéo échoué', 'Video download failed'))
             audioBytes = await r.arrayBuffer()
           }
-          setStatus('Transcription de l\'audio…')
+          setStatus(tr('Transcription de l\'audio…', 'Transcribing audio…'))
         } else {
-          throw new Error('Aucune source vidéo')
+          throw new Error(tr('Aucune source vidéo', 'No video source'))
         }
         transcriptRes = await window.electronAPI!.groqTranscription({
           apiKey: groqKey, audioBytes, filename,
@@ -270,24 +275,28 @@ export function Subtitles({ user }: SubtitlesProps) {
         })
       }
       if (!transcriptRes.ok || !transcriptRes.data) {
-        throw new Error(transcriptRes.error ?? 'Transcription échouée')
+        throw new Error(transcriptRes.error ?? tr('Transcription échouée', 'Transcription failed'))
       }
       const words = ((transcriptRes.data as Record<string, unknown>).words as WordToken[] | undefined) ?? []
-      if (words.length === 0) throw new Error('Aucun mot détecté dans la vidéo')
+      if (words.length === 0) throw new Error(tr('Aucun mot détecté dans la vidéo', 'No words detected in the video'))
 
       const segs = groupWords(words, perGroup)
       setSegments(segs)
 
+      if (cancelRef.current) { setStatus(''); setPhase('idle'); return }
+
       // ── Step 3: burn subtitles via FFmpeg ────────────────────────────────────
       setPhase('burning')
-      setStatus(`Incrustation de ${segs.length} segments…`)
+      setStatus(tr(`Incrustation de ${segs.length} segments…`, `Burning ${segs.length} segments…`))
 
       const ffRes = await window.electronAPI!.runFfmpegSubtitles({
         sourcePath: videoSrc,
         segments:   segs,
         fontSize, fontColor, position, style, preset,
       })
-      if (!ffRes.ok || !ffRes.outputPath) throw new Error(ffRes.error ?? 'L\'incrustation des sous-titres a échoué')
+      if (!ffRes.ok || !ffRes.outputPath) throw new Error(ffRes.error ?? tr('L\'incrustation des sous-titres a échoué', 'Subtitle burn-in failed'))
+
+      if (cancelRef.current) { setStatus(''); setPhase('idle'); return }
 
       // Load result for preview
       if (!isWeb && window.electronAPI?.readLocalVideo) {
@@ -298,15 +307,19 @@ export function Subtitles({ user }: SubtitlesProps) {
       }
       setOutputPath(ffRes.outputPath)
       setPhase('done')
-      setStatus(`Terminé — ${segs.length} sous-titres incrustés`)
+      setStatus(tr(`Terminé — ${segs.length} sous-titres incrustés`, `Done — ${segs.length} subtitles burned in`))
 
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setPhase('error')
     } finally {
+      setCancelling(false)
       if (tempPaths.length) deleteStorageObjects(tempPaths).catch(() => {})
     }
   }
+
+  // Annule la génération en cours (stoppe avant l'enregistrement du résultat).
+  function cancelGenerate() { cancelRef.current = true; setCancelling(true) }
 
   async function download() {
     // Web: outputUrl is a blob/data/http URL → trigger a browser download.
@@ -332,7 +345,7 @@ export function Subtitles({ user }: SubtitlesProps) {
     setSaving(true)
     try {
       const resp = await fetch(src)
-      if (!resp.ok) throw new Error('Lecture de la vidéo générée impossible')
+      if (!resp.ok) throw new Error(tr('Lecture de la vidéo générée impossible', 'Could not read the generated video'))
       const blob = await resp.blob()
       const title = videoName.replace(/\.[^.]+$/, '') + '_sous-titres'
       const scope = currentOrg?.id
@@ -350,7 +363,7 @@ export function Subtitles({ user }: SubtitlesProps) {
       if (error) throw new Error(error.message)
       setSavedToBank(true)
     } catch (err) {
-      setError('Enregistrement dans la banque : ' + (err instanceof Error ? err.message : String(err)))
+      setError(tr('Enregistrement dans la banque : ', 'Saving to bank: ') + (err instanceof Error ? err.message : String(err)))
     } finally {
       setSaving(false)
     }
@@ -364,33 +377,35 @@ export function Subtitles({ user }: SubtitlesProps) {
     <div className="flex flex-col h-full overflow-y-auto sf-anim-slide-up" style={{ padding: 24, gap: 20, maxWidth: 1100, margin: '0 auto', width: '100%' }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap" style={{ gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
-            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-            background: 'linear-gradient(135deg,#F59E0B,#FBBF24)',
-            boxShadow: '0 10px 24px -8px rgba(251,191,36,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-          }}>
+      <div className="sf-page-header" style={{ ['--icon-grad' as any]: 'linear-gradient(135deg,#F59E0B,#FBBF24)' }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ boxShadow: '0 10px 24px -8px rgba(251,191,36,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="4" width="20" height="16" rx="3"/><path d="M6 14h4"/><path d="M13 14h5"/><path d="M6 17h2"/><path d="M11 17h7"/>
             </svg>
           </div>
-          <div>
-            <h1 style={{ fontSize: 21, fontWeight: 800, color: TEXT_1, letterSpacing: '-0.01em' }}>Sous-titres Auto</h1>
-            <p style={{ fontSize: 13, color: TEXT_2, marginTop: 2 }}>
-              Groq Whisper transcrit · FFmpeg incruste
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title sf-title-grad">{tr('Sous-titres Auto', 'Auto Subtitles')}</h1>
+            <p className="sf-page-sub">
+              {tr('Groq Whisper transcrit · FFmpeg incruste', 'Groq Whisper transcribes · FFmpeg burns in')}
             </p>
           </div>
         </div>
-        <span className="sf-badge sf-badge-accent">Powered by Groq Whisper</span>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          {isRunning
+            ? <span className="sf-status-chip is-live"><span className="sf-status-dot" />{tr('En cours', 'Running')}</span>
+            : phase === 'done'
+              ? <span className="sf-status-chip is-live">{tr('Terminé', 'Done')}</span>
+              : <span className="sf-status-chip is-idle">{tr('Prêt', 'Ready')}</span>}
+          <span className="sf-badge sf-badge-accent">Powered by Groq Whisper</span>
+        </div>
       </div>
 
       {/* Groq key warning */}
       {!groqKey && (
-        <div className="flex items-center" style={{ gap: 12, padding: '12px 16px', borderRadius: 12, fontSize: 13, background: 'rgba(251,191,36,0.08)', border: `1px solid rgba(251,191,36,0.22)`, color: WARN }}>
+        <div className="sf-banner is-warn sf-anim-slide-up">
           <WarningIcon />
-          Clé Groq manquante — ajoute-la dans <strong style={{ margin: '0 4px' }}>Paramètres → API</strong>
+          <span>{tr('Clé Groq manquante — ajoute-la dans', 'Groq key missing — add it in')} <strong style={{ margin: '0 4px' }}>{tr('Paramètres → API', 'Settings → API')}</strong></span>
         </div>
       )}
 
@@ -403,12 +418,14 @@ export function Subtitles({ user }: SubtitlesProps) {
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
             onClick={pickFile}
-            className="cursor-pointer transition-all"
+            className="cursor-pointer sf-press"
             style={{
               minHeight: 200,
-              borderRadius: 14,
-              border: dragging ? `2px solid ${ACCENT}` : `2px dashed rgba(99,102,241,0.22)`,
+              borderRadius: 'var(--r-lg)',
+              border: dragging ? `2px solid ${ACCENT}` : `2px dashed var(--border-accent)`,
               background: dragging ? 'rgba(99,102,241,0.07)' : previewUrl ? 'transparent' : 'rgba(255,255,255,0.02)',
+              boxShadow: dragging ? 'var(--glow-accent)' : 'none',
+              transition: 'border-color var(--t-base), background var(--t-fast), box-shadow var(--t-base)',
               overflow: 'hidden',
             }}
           >
@@ -416,17 +433,17 @@ export function Subtitles({ user }: SubtitlesProps) {
               <video
                 key={previewUrl}
                 src={previewUrl}
-                style={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 14 }}
+                style={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 'var(--r-lg)' }}
                 controls muted
               />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full select-none" style={{ gap: 12, padding: '48px 0' }}>
-                <div className="flex items-center justify-center" style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(99,102,241,0.1)', border: `1px solid rgba(99,102,241,0.2)` }}>
+              <div className="sf-empty flex flex-col items-center justify-center h-full select-none" style={{ gap: 12, padding: '48px 0' }}>
+                <div className="sf-empty-icon flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: 'var(--r-md)', background: 'linear-gradient(135deg, rgba(129,140,248,0.16), rgba(139,92,246,0.08))', border: `1px solid rgba(139,92,246,0.25)`, boxShadow: '0 12px 30px -12px rgba(139,92,246,0.5), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
                   <VideoIcon />
                 </div>
                 <div className="text-center">
-                  <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1 }}>Dépose ta vidéo ici</p>
-                  <p style={{ fontSize: 12.5, color: TEXT_3, marginTop: 2 }}>ou clique pour choisir</p>
+                  <p className="sf-empty-title" style={{ fontSize: 14, fontWeight: 700, color: TEXT_1 }}>{tr('Dépose ta vidéo ici', 'Drop your video here')}</p>
+                  <p className="sf-empty-desc" style={{ fontSize: 12.5, color: TEXT_3, marginTop: 2 }}>{tr('ou clique pour choisir', 'or click to choose')}</p>
                 </div>
               </div>
             )}
@@ -441,7 +458,7 @@ export function Subtitles({ user }: SubtitlesProps) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
             </svg>
-            Depuis la banque
+            {tr('Depuis la banque', 'From the bank')}
           </button>
 
           {videoName && (
@@ -452,64 +469,56 @@ export function Subtitles({ user }: SubtitlesProps) {
 
         {/* ── Right: options ── */}
         <div className="flex flex-col" style={{ gap: 16 }}>
-          <SectionCard title="Paramètres">
+          <SectionCard title={tr('Paramètres', 'Settings')}>
 
-            <Row label="Langue">
+            <Row label={tr('Langue', 'Language')}>
               <select value={lang} onChange={e => setLang(e.target.value as Lang)} className="sf-input text-sm" style={{ flex: 1 }}>
                 {(Object.keys(LANG_LABELS) as Lang[]).map(l => (
-                  <option key={l} value={l}>{LANG_LABELS[l]}</option>
+                  <option key={l} value={l}>{l === 'auto' ? tr('Auto-détect', 'Auto-detect') : LANG_LABELS[l]}</option>
                 ))}
               </select>
             </Row>
 
-            <Row label="Mots / segment">
-              <div className="flex" style={{ gap: 6 }}>
+            <Row label={tr('Mots / segment', 'Words / segment')}>
+              <div className="sf-segment" role="group">
                 {[1, 2, 3, 4, 5].map(n => (
-                  <button key={n} onClick={() => setPerGroup(n)} className="transition-all cursor-pointer"
-                    style={perGroup === n
-                      ? { width: 36, height: 36, borderRadius: 9, fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
-                      : { width: 36, height: 36, borderRadius: 9, fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', background: 'rgba(255,255,255,0.03)', color: TEXT_2, border: `1px solid ${HAIR}` }
-                    }>{n}</button>
+                  <button key={n} onClick={() => setPerGroup(n)}
+                    className={`sf-segment-item sf-tabular${perGroup === n ? ' is-active' : ''}`}
+                    style={{ padding: '0 14px' }}>{n}</button>
                 ))}
               </div>
             </Row>
 
-            <Row label="Style">
-              <div className="flex" style={{ gap: 8 }}>
+            <Row label={tr('Style', 'Style')}>
+              <div className="sf-segment" role="group">
                 {(['box', 'outline', 'shadow'] as Style[]).map(s => {
-                  const labels = { box: 'Fond noir', outline: 'Contour', shadow: 'Ombre' }
+                  const labels = { box: tr('Fond noir', 'Black box'), outline: tr('Contour', 'Outline'), shadow: tr('Ombre', 'Shadow') }
                   return (
-                    <button key={s} onClick={() => setStyle(s)} className="transition-all cursor-pointer"
-                      style={style === s
-                        ? { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
-                        : { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.03)', color: TEXT_2, border: `1px solid ${HAIR}` }
-                      }>{labels[s]}</button>
+                    <button key={s} onClick={() => setStyle(s)}
+                      className={`sf-segment-item${style === s ? ' is-active' : ''}`}>{labels[s]}</button>
                   )
                 })}
               </div>
             </Row>
 
-            <Row label="Position">
-              <div className="flex" style={{ gap: 8 }}>
+            <Row label={tr('Position', 'Position')}>
+              <div className="sf-segment" role="group">
                 {(['top', 'center', 'bottom'] as Position[]).map(p => {
-                  const labels = { top: 'Haut', center: 'Centre', bottom: 'Bas' }
+                  const labels = { top: tr('Haut', 'Top'), center: tr('Centre', 'Center'), bottom: tr('Bas', 'Bottom') }
                   return (
-                    <button key={p} onClick={() => setPosition(p)} className="transition-all cursor-pointer"
-                      style={position === p
-                        ? { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
-                        : { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.03)', color: TEXT_2, border: `1px solid ${HAIR}` }
-                      }>{labels[p]}</button>
+                    <button key={p} onClick={() => setPosition(p)}
+                      className={`sf-segment-item${position === p ? ' is-active' : ''}`}>{labels[p]}</button>
                   )
                 })}
               </div>
             </Row>
 
-            <Row label={`Taille: ${fontSize}px`}>
+            <Row label={tr(`Taille: ${fontSize}px`, `Size: ${fontSize}px`)}>
               <input type="range" min={36} max={120} step={4} value={fontSize}
                 onChange={e => setFontSize(+e.target.value)} className="w-full accent-indigo-500" />
             </Row>
 
-            <Row label="Couleur">
+            <Row label={tr('Couleur', 'Color')}>
               <div className="flex gap-2 items-center">
                 {['#ffffff', '#ffff00', '#00ff88', '#ff6b6b'].map(c => (
                   <button key={c} onClick={() => setFontColor(c)} className="w-7 h-7 rounded-full transition-all cursor-pointer flex-shrink-0"
@@ -520,20 +529,17 @@ export function Subtitles({ user }: SubtitlesProps) {
               </div>
             </Row>
 
-            <Row label="Format">
-              <div className="flex flex-wrap" style={{ gap: 6 }}>
+            <Row label={tr('Format', 'Format')}>
+              <div className="sf-segment" role="group">
                 {(['keep', '9:16', '1:1', '16:9'] as const).map(p => (
-                  <button key={p} onClick={() => setPreset(p)} className="transition-all cursor-pointer"
-                    style={preset === p
-                      ? { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
-                      : { padding: '6px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', background: 'rgba(255,255,255,0.03)', color: TEXT_2, border: `1px solid ${HAIR}` }
-                    }>{p === 'keep' ? 'Original' : p}</button>
+                  <button key={p} onClick={() => setPreset(p)}
+                    className={`sf-segment-item sf-tabular${preset === p ? ' is-active' : ''}`}>{p === 'keep' ? tr('Original', 'Original') : p}</button>
                 ))}
               </div>
             </Row>
 
             <div style={{ marginTop: 4, paddingTop: 16, borderTop: `1px solid ${HAIR}` }}>
-              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de destination" />
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label={tr('Dossier de destination', 'Destination folder')} />
             </div>
           </SectionCard>
         </div>
@@ -544,52 +550,63 @@ export function Subtitles({ user }: SubtitlesProps) {
         className="sf-btn sf-btn-primary sf-btn-lg"
         style={{ width: '100%' }}
       >
-        {phase === 'fetching'      ? 'Lecture vidéo…' :
-         phase === 'transcribing'  ? 'Transcription Whisper…' :
-         phase === 'burning'       ? 'Incrustation FFmpeg…' :
-         'Générer les sous-titres →'}
+        {phase === 'fetching'      ? tr('Lecture vidéo…', 'Reading video…') :
+         phase === 'transcribing'  ? tr('Transcription Whisper…', 'Whisper transcription…') :
+         phase === 'burning'       ? tr('Incrustation FFmpeg…', 'FFmpeg burn-in…') :
+         tr('Générer les sous-titres →', 'Generate subtitles →')}
       </button>
+
+      {/* Cancel */}
+      {isRunning && (
+        <button onClick={cancelGenerate} disabled={cancelling}
+          className="sf-btn sf-btn-lg"
+          style={{ width: '100%', background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.4)', color: '#F87171', fontWeight: 700 }}>
+          {cancelling ? tr('Annulation…', 'Cancelling…') : tr('Annuler', 'Cancel')}
+        </button>
+      )}
 
       {/* Status */}
       {isRunning && (
-        <div className="flex items-center sf-anim-slide-up" style={{ gap: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(99,102,241,0.07)', border: `1px solid rgba(99,102,241,0.15)` }}>
+        <div className="sf-banner is-accent sf-anim-slide-up">
           <SpinnerIcon />
-          <span style={{ fontSize: 13, color: TEXT_1 }}>{status}</span>
+          <span>{status}</span>
         </div>
       )}
 
       {/* Error */}
       {phase === 'error' && error && (
-        <div className="sf-anim-slide-up" style={{ padding: '12px 16px', borderRadius: 12, fontSize: 13, background: 'rgba(248,113,113,0.08)', border: `1px solid rgba(248,113,113,0.22)`, color: ERR }}>
-          {error}
+        <div className="sf-banner is-danger sf-anim-slide-up">
+          <WarningIcon />
+          <span>{error}</span>
         </div>
       )}
 
       {/* Result */}
       {phase === 'done' && (
         <div className="flex flex-col sf-anim-slide-up" style={{ gap: 16 }}>
-          <div className="flex items-center justify-between flex-wrap" style={{ gap: 12, padding: '10px 16px', borderRadius: 12, background: 'rgba(52,211,153,0.07)', border: `1px solid rgba(52,211,153,0.22)` }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: OK }}>{status}</span>
-            <button onClick={download} className="sf-btn sf-btn-sm" style={{ background: OK, color: '#06140d', fontWeight: 700 }}>
-              <DownloadIcon /> Télécharger
+          <div className="sf-banner is-accent" style={{ background: 'var(--ok-dim)', borderColor: 'rgba(34,197,94,0.22)', color: 'var(--ok)' }}>
+            <CheckIcon />
+            <span style={{ fontWeight: 600 }}>{status}</span>
+            <button onClick={download} className="sf-btn sf-btn-primary sf-btn-sm sf-banner-action">
+              <DownloadIcon /> {tr('Télécharger', 'Download')}
             </button>
           </div>
 
           {/* Save to bank */}
           <div className="flex items-center flex-wrap sf-card" style={{ gap: 12, padding: 16 }}>
             <div style={{ flex: 1, fontSize: 12.5, color: TEXT_2 }}>
-              <span style={{ color: TEXT_3 }}>Dossier : </span>
-              <span style={{ color: ACCENT_L, fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
+              <span style={{ color: TEXT_3 }}>{tr('Dossier : ', 'Folder: ')}</span>
+              <span style={{ color: ACCENT_L, fontWeight: 600 }}>{saveFolder ?? tr('Racine', 'Root')}</span>
             </div>
             {savedToBank ? (
               <span className="sf-badge sf-badge-ok" style={{ height: 28 }}>
-                <CheckIcon /> Enregistré dans la banque
+                <CheckIcon /> {tr('Enregistré dans la banque', 'Saved to bank')}
               </span>
             ) : (
               <button onClick={saveToBank} disabled={saving} className="sf-btn sf-btn-secondary sf-btn-sm">
                 {saving
-                  ? <><span style={{ width: 13, height: 13, borderRadius: '50%', border: `2px solid rgba(129,140,248,0.3)`, borderTopColor: ACCENT_L, animation: 'spin 0.9s linear infinite', display: 'inline-block' }} /> Enregistrement…</>
-                  : <><SaveIcon /> Enregistrer dans la banque</>
+                  ? <><span style={{ width: 13, height: 13, borderRadius: '50%', border: `2px solid rgba(129,140,248,0.3)`, borderTopColor: ACCENT_L, animation: 'spin 0.9s linear infinite', display: 'inline-block' }} /> {tr('Enregistrement…', 'Saving…')}</>
+                  : <><SaveIcon /> {tr('Enregistrer dans la banque', 'Save to bank')}</>
                 }
               </button>
             )}
@@ -597,15 +614,15 @@ export function Subtitles({ user }: SubtitlesProps) {
 
           <div className="grid" style={{ gridTemplateColumns: outputUrl ? '1fr 1fr' : '1fr', gap: 16 }}>
             {outputUrl && (
-              <div className="overflow-hidden" style={{ borderRadius: 14, border: `1px solid ${HAIR}`, background: BG_2 }}>
-                <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: TEXT_2, padding: '12px 12px 8px' }}>Aperçu</p>
+              <div className="overflow-hidden" style={{ borderRadius: 'var(--r-lg)', border: `1px solid ${HAIR}`, background: BG_2 }}>
+                <p className="sf-section-label" style={{ padding: '14px 14px 8px' }}>{tr('Aperçu', 'Preview')}</p>
                 <video src={outputUrl} controls style={{ width: '100%', maxHeight: 300, objectFit: 'contain', background: '#000' }} />
               </div>
             )}
             {segments.length > 0 && (
               <div className="flex flex-col overflow-y-auto sf-card" style={{ gap: 6, padding: 16, maxHeight: 300 }}>
-                <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: TEXT_2, marginBottom: 8 }}>
-                  Transcription · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{segments.length}</span> segments
+                <p className="sf-section-label" style={{ marginBottom: 8 }}>
+                  {tr('Transcription', 'Transcript')} · <span className="sf-tabular">{segments.length}</span> {tr('segments', 'segments')}
                 </p>
                 {segments.map((seg, i) => (
                   <div key={i} className="flex items-baseline" style={{ gap: 12 }}>
@@ -639,7 +656,7 @@ export function Subtitles({ user }: SubtitlesProps) {
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="sf-card flex flex-col" style={{ gap: 16, padding: 20 }}>
-      <p style={{ fontSize: 13, fontWeight: 700, color: TEXT_1 }}>{title}</p>
+      <p className="sf-section-label">{title}</p>
       {children}
     </div>
   )

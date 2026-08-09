@@ -731,12 +731,22 @@ ipcMain.handle('adspower-request', (_event, opts: {
 // ── IPC: rotation d'IP proxy ─────────────────────────────────────────────────
 // GET direct sur le "Change IP URL" du fournisseur (Prox'Easy…) via le module
 // Node https/http — net.fetch rejette ces hôtes ("Forbidden URL"). Best-effort.
-ipcMain.handle('rotate-proxy', (_event, url: string) => {
-  return new Promise<{ ok: boolean; status?: number; body?: string; error?: string }>((resolve) => {
+ipcMain.handle('rotate-proxy', async (_event, url: string) => {
+  // Beaucoup d'endpoints de rotation sont des boîtiers auto-hébergés (*.ddns.net)
+  // avec un certificat SSL auto-signé/expiré → un GET standard échoue alors que le
+  // proxy est bon. On tente : (1) TLS vérifié, (2) TLS ignoré si erreur de cert,
+  // (3) repli http://. Sûr : simple GET de déclenchement, aucune donnée sensible.
+  type RawRes = { ok?: boolean; status?: number; body?: string; error?: string; code?: string }
+  const rawGet = (target: string, insecure = false): Promise<RawRes> => new Promise((resolve) => {
     try {
-      const u = new URL(url)
+      const u = new URL(target)
       const mod = u.protocol === 'http:' ? http : https
-      const req = mod.request(url, { method: 'GET', timeout: 12000 }, (res) => {
+      const opts: https.RequestOptions = {
+        method: 'GET', timeout: 12000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ScaleFlow/1.0)' },
+      }
+      if (mod === https && insecure) opts.rejectUnauthorized = false
+      const req = mod.request(target, opts, (res) => {
         let raw = ''
         res.setEncoding('utf8')
         res.on('data', (c) => { raw += c })
@@ -745,13 +755,24 @@ ipcMain.handle('rotate-proxy', (_event, url: string) => {
           resolve({ ok: code >= 200 && code < 400, status: code, body: raw.slice(0, 300) })
         })
       })
-      req.on('error', (e) => resolve({ ok: false, error: e.message }))
-      req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }) })
+      req.on('error', (e: NodeJS.ErrnoException) => resolve({ error: e.message, code: e.code }))
+      req.on('timeout', () => { req.destroy(); resolve({ error: 'timeout' }) })
       req.end()
     } catch (e) {
-      resolve({ ok: false, error: e instanceof Error ? e.message : String(e) })
+      resolve({ error: e instanceof Error ? e.message : String(e) })
     }
   })
+  const isCertErr = (c?: string) => typeof c === 'string' && /CERT|SELF_SIGNED|UNABLE_TO_VERIFY|TLS|SSL|ALTNAME|DEPTH_ZERO/i.test(c)
+
+  let r = await rawGet(url)
+  if (r.error && (isCertErr(r.code) || isCertErr(r.error)) && /^https:/i.test(url)) {
+    r = await rawGet(url, true)
+  }
+  if (r.error && /^https:/i.test(url)) {
+    const httpTry = await rawGet(url.replace(/^https:/i, 'http:'))
+    if (!httpTry.error) r = httpTry
+  }
+  return r.error ? { ok: false, error: r.error } : { ok: r.ok, status: r.status, body: r.body }
 })
 
 // ── CORS proxy for AdsPower (allows web app to reach local.adspower.net) ────
@@ -821,9 +842,12 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS)
   try {
-    // Step 1: get presigned upload URL. Le type de fichier est déduit de
-    // l'extension (mp4 par défaut) → gère aussi les images (jpg/png/…).
-    const ext = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+    // Step 1: get presigned upload URL. Une IMAGE garde sa vraie extension (encodée
+    // dans la resourceUrl) ; une VIDÉO force 'mp4' — les templates RPA Insta/TikTok/
+    // Threads rejettent 'mov'/'webm'. (Doit rester aligné sur webAPI.ts.)
+    const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heif', 'heic']
+    const realExt = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+    const ext = IMAGE_EXTS.includes(realExt) ? realExt : 'mp4'
     const urlRes = await net.fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
       headers: {
@@ -866,7 +890,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     const isTimeout = abort.signal.aborted || msg.includes('abort') || msg.includes('Abort')
-    return { ok: false, error: isTimeout ? `Upload timeout (90s dépassé)` : msg }
+    return { ok: false, error: isTimeout ? `Upload timeout (${Math.round(TIMEOUT_MS / 1000)}s dépassé)` : msg }
   } finally {
     clearTimeout(timer)
   }

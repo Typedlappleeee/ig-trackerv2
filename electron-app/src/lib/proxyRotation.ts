@@ -19,7 +19,11 @@ import { useOrg } from './orgContext'
 export interface ProxyRotationConfig {
   enabled: boolean
   urls:    string[]
+  names?:  string[]   // libellé optionnel par proxy, aligné sur urls[] (ex. « Dongle salon »)
 }
+
+// Un proxy configuré, prêt à être affiché/choisi (URL valide + libellé lisible).
+export interface RotationProxy { url: string; label: string }
 
 const EMPTY: ProxyRotationConfig = { enabled: false, urls: [] }
 
@@ -34,6 +38,33 @@ export function activeRotationUrls(): string[] {
   return _cache.enabled ? _cache.urls.filter(u => /^https?:\/\//i.test(u.trim())) : []
 }
 
+// Libellé par défaut d'un proxy quand aucun nom n'est saisi : son hostname.
+function hostLabel(url: string, i: number): string {
+  try { return new URL(url).hostname.replace(/^www\./, '') } catch { return `Proxy ${i + 1}` }
+}
+
+// Liste des proxies configurés (actifs), avec leur libellé — pour le sélecteur.
+// Vide si la rotation n'est pas activée (rien à choisir).
+export function listRotationProxies(): RotationProxy[] {
+  const c = _cache
+  if (!c.enabled) return []
+  return c.urls
+    .map((u, i) => ({ url: u.trim(), label: (c.names?.[i]?.trim()) || hostLabel(u.trim(), i) }))
+    .filter(p => /^https?:\/\//i.test(p.url))
+}
+
+// Résout les URLs à roter pour UN lancement précis selon la sélection de proxies.
+// `selected` vide/absent = tous les proxies actifs (rétro-compatible). Sinon on ne
+// rote QUE les proxies choisis → permet plusieurs postings en parallèle sur des
+// proxies différents sans qu'un run change l'IP d'un proxy utilisé par un autre.
+export function resolveRotationUrls(selected?: string[] | null): string[] {
+  const all = activeRotationUrls()
+  if (!selected || selected.length === 0) return all
+  const set = new Set(selected.map(s => s.trim()))
+  const picked = all.filter(u => set.has(u.trim()))
+  return picked.length ? picked : all   // sélection qui ne matche rien → repli sur tout
+}
+
 function parse(raw: string | null | undefined): ProxyRotationConfig {
   if (!raw) return { ...EMPTY }
   const s = raw.trim()
@@ -41,14 +72,27 @@ function parse(raw: string | null | undefined): ProxyRotationConfig {
   try {
     const j = JSON.parse(s)
     if (j && typeof j === 'object' && Array.isArray(j.urls)) {
-      return { enabled: !!j.enabled, urls: j.urls.filter((u: unknown) => typeof u === 'string') }
+      const urls = j.urls.filter((u: unknown) => typeof u === 'string') as string[]
+      const names = Array.isArray(j.names)
+        ? urls.map((_, i) => (typeof j.names[i] === 'string' ? j.names[i] : ''))
+        : undefined
+      return { enabled: !!j.enabled, urls, names }
     }
   } catch { /* pas du JSON → ancienne valeur texte = 1 URL */ }
   return /^https?:\/\//i.test(s) ? { enabled: true, urls: [s] } : { ...EMPTY }
 }
 
+// Zippe url+nom et retire les lignes vides EN GARDANT l'alignement url↔nom.
+function cleanPairs(cfg: ProxyRotationConfig): { urls: string[]; names: string[] } {
+  const pairs = cfg.urls
+    .map((u, i) => ({ u: u.trim(), n: (cfg.names?.[i] ?? '').trim() }))
+    .filter(p => p.u)
+  return { urls: pairs.map(p => p.u), names: pairs.map(p => p.n) }
+}
+
 function serialize(cfg: ProxyRotationConfig): string {
-  return JSON.stringify({ enabled: cfg.enabled, urls: cfg.urls.map(u => u.trim()).filter(Boolean) })
+  const { urls, names } = cleanPairs(cfg)
+  return JSON.stringify({ enabled: cfg.enabled, urls, names })
 }
 
 export async function loadProxyRotation(orgId: string | null, userId: string): Promise<ProxyRotationConfig> {
@@ -66,7 +110,8 @@ export async function loadProxyRotation(orgId: string | null, userId: string): P
 }
 
 export async function saveProxyRotation(orgId: string | null, userId: string, cfg: ProxyRotationConfig): Promise<void> {
-  const clean: ProxyRotationConfig = { enabled: cfg.enabled, urls: cfg.urls.map(u => u.trim()).filter(Boolean) }
+  const { urls, names } = cleanPairs(cfg)
+  const clean: ProxyRotationConfig = { enabled: cfg.enabled, urls, names }
   _cache = clean
   const proxy = serialize(clean)
   if (orgId) {

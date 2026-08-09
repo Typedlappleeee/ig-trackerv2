@@ -9,24 +9,28 @@ const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true, subtitles: true, spoof: true,
+    history: true, library: true, reports: true,
     settings: true,
   },
   admin: {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true, subtitles: true, spoof: true,
+    history: true, library: true, reports: true,
     settings: true,
   },
   member: {
     phones: true,
     posting: true, massposting: true, scheduler: true, tasks: true, storylink: true, bank: true, captionbank: true, warmup: true, aitools: true,
     remix: true, repurpose: true, montage: true, mixer: true, subtitles: false, spoof: true,
+    history: true, library: true, reports: true,
     settings: false,
   },
   viewer: {
     phones: true,
     posting: false, massposting: false, scheduler: false, tasks: false, storylink: false, bank: true, captionbank: true, warmup: false, aitools: false,
     remix: false, repurpose: false, montage: false, mixer: false, subtitles: false, spoof: false,
+    history: true, library: false, reports: true,
     settings: false,
   },
 }
@@ -35,6 +39,31 @@ export function canSeeTab(role: OrgRole, overrides: PermOverrides | undefined, t
   const o = overrides?.tabs?.[tab]
   if (typeof o === 'boolean') return o
   return ROLE_TABS[role][tab]
+}
+
+// Filtre une liste de téléphones aux SEULS groupes auxquels le membre a accès.
+// En mode perso (role null/undefined) : tout est accessible. owner/admin : tout.
+// À appliquer À LA SOURCE (juste après le chargement / en useMemo) pour qu'aucune
+// liste dérivée (filtres de groupe, sélecteurs) ne fuite un groupe interdit.
+export function filterAccessiblePhones<T extends { group_name?: string | null }>(
+  phones: T[],
+  role: OrgRole | null | undefined,
+  overrides: PermOverrides | undefined,
+): T[] {
+  if (!role) return phones
+  return phones.filter(p => canAccessPhoneGroup(role, overrides, p.group_name ?? null))
+}
+
+// Liste triée des noms de groupes VISIBLES par le membre (déduits de ses téléphones
+// accessibles). '(sans groupe)' n'est PAS renvoyé (les téléphones sans groupe ne
+// forment pas un groupe nommé sélectionnable).
+export function accessibleGroupNames(
+  phones: { group_name?: string | null }[],
+  role: OrgRole | null | undefined,
+  overrides: PermOverrides | undefined,
+): string[] {
+  const accessible = filterAccessiblePhones(phones, role, overrides)
+  return [...new Set(accessible.map(p => p.group_name).filter((g): g is string => Boolean(g)))].sort()
 }
 
 export function canAccessBankFolder(
@@ -100,6 +129,9 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string; group: strin
   { key: 'phones',      label: 'Téléphones',      icon: '📱', group: 'Principal' },
   { key: 'bank',        label: 'Banque vidéos',   icon: '🗂', group: 'Principal' },
   { key: 'captionbank', label: 'Banque captions', icon: '💬', group: 'Principal' },
+  { key: 'library',     label: 'Bibliothèque',    icon: '📚', group: 'Principal' },
+  { key: 'history',     label: 'Historique',      icon: '🕑', group: 'Principal' },
+  { key: 'reports',     label: 'Rapports',        icon: '📊', group: 'Principal' },
   // Instagram
   { key: 'storylink',   label: 'Story / Link',    icon: '🔗', group: 'Instagram' },
   { key: 'posting',     label: 'Posting',         icon: '🚀', group: 'Instagram' },

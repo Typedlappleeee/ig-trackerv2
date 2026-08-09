@@ -72,13 +72,7 @@ export function Skeleton({ width = '100%', height = 16, radius = 8, style }: {
   width?: number | string; height?: number | string; radius?: number; style?: CSSProperties
 }) {
   return (
-    <div style={{
-      width, height, borderRadius: radius,
-      background: 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%)',
-      backgroundSize: '200% 100%',
-      animation: 'shimmer 1.5s ease-in-out infinite',
-      ...style,
-    }} />
+    <div className="sf-skeleton" style={{ width, height, borderRadius: radius, ...style }} />
   )
 }
 
@@ -90,12 +84,13 @@ export function SkeletonGrid({ count = 6, cardHeight = 160, minWidth = 260 }: {
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))`, gap: 16 }}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} style={{
-          height: cardHeight, borderRadius: 16,
-          background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)',
-          padding: 18, display: 'flex', flexDirection: 'column', gap: 12,
+          height: cardHeight, borderRadius: 'var(--r-lg)',
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+          boxShadow: 'var(--elev-1)',
+          padding: 'var(--sp-5)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)',
           animation: `hub-card-in 0.4s ease both`, animationDelay: `${i * 0.05}s`,
         }}>
-          <Skeleton width={44} height={44} radius={12} />
+          <Skeleton width={44} height={44} radius={11} />
           <Skeleton width="70%" height={14} />
           <Skeleton width="90%" height={10} />
           <Skeleton width="50%" height={10} />

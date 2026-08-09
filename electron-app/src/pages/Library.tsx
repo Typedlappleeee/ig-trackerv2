@@ -5,10 +5,54 @@ import { useConnections } from '@/lib/connections'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import {
   fetchAllPhones, startPhones, stopPhone, warmupAccountNative, editInstagramProfileNative,
-  warmupTikTokNative, editTikTokProfileNative, forceInstagramEnglish, postInstagramStory,
+  warmupTikTokNative, editTikTokProfileNative, forceInstagramEnglish, geelarkUploadMediaToPhone,
   getPhonePublicIp, waitForPhoneConnectivity, shellExec, type GeelarkPhone,
 } from '@/lib/geelark'
 import { startRun, setRunPhase, finishRun } from '@/lib/activeRuns'
+import { useOrg } from '@/lib/orgContext'
+import { canAccessPhoneGroup } from '@/lib/permissions'
+import { useTr, tr } from '@/lib/i18n'
+import { BankPicker } from './Bank'
+import type { ContentItem } from '@/lib/supabase'
+
+// Un média sélectionné à pousser dans la galerie d'un téléphone.
+export interface PushMedia { url: string; name: string; fileType: 1 | 2 }
+
+// Déduit le type (1=image, 2=vidéo) + un nom de fichier propre depuis l'item de
+// banque. Le préfixe sf_<i>_ évite les collisions quand on envoie plusieurs médias.
+function mediaMeta(it: ContentItem | undefined, url: string, i: number): PushMedia {
+  const src = it?.storage_path || it?.title || url
+  const m = /\.(mp4|mov|webm|mkv|avi|m4v|jpe?g|png|webp|gif|heic)(?:\?|$)/i.exec(src)
+  let ext = m ? m[1].toLowerCase().replace('jpeg', 'jpg') : ''
+  const isVideo = /^(mp4|mov|webm|mkv|avi|m4v)$/.test(ext) || (it?.duration != null && it.duration > 0)
+  if (!ext) ext = isVideo ? 'mp4' : 'jpg'
+  const base = (it?.title || 'media').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 32) || 'media'
+  return { url, name: `sf_${i}_${base}.${ext}`, fileType: isVideo ? 2 : 1 }
+}
+
+// Pousse une liste de médias dans la galerie (/sdcard/DCIM/Camera) d'un téléphone
+// via l'API GéeLark (material center → phone/file/upload), puis rescanne le
+// MediaStore pour qu'ils apparaissent dans la galerie.
+async function pushMediaToPhone(
+  bearer: string, phoneId: string, items: PushMedia[], log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!await ensureOn(bearer, phoneId, log)) return { ok: false, error: tr('téléphone injoignable', 'phone unreachable') }
+  let done = 0
+  for (const m of items) {
+    log(`📤 ${m.name}`)
+    const r = await geelarkUploadMediaToPhone(bearer, phoneId, m.url, {
+      fileType: m.fileType, fileName: m.name, dir: '/sdcard/DCIM/Camera', log,
+    })
+    if (r.ok) done++
+    else log(`✕ ${m.name} — ${r.error ?? tr('échec', 'failed')}`)
+  }
+  // Rescan pour que la galerie affiche les nouveaux fichiers immédiatement.
+  await shellExec(bearer, phoneId,
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera 2>/dev/null; ` +
+    `am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard 2>/dev/null; true`).catch(() => {})
+  if (done === 0) return { ok: false, error: tr('aucun média transféré', 'no media transferred') }
+  return { ok: true, error: done < items.length ? tr(`${done}/${items.length} transféré(s)`, `${done}/${items.length} transferred`) : undefined }
+}
 
 // Allume le téléphone et attend qu'il réponde — pour les tâches shell brutes
 // (les warmup/édition gèrent déjà le démarrage en interne).
@@ -22,11 +66,12 @@ async function ensureOn(bearer: string, id: string, log: (m: string) => void): P
 // sur les tels (avec suivi par téléphone). Utilisateurs : écran « Bientôt ».
 
 type FieldType = 'text' | 'number' | 'bool'
-interface Field { key: string; label: string; type: FieldType; placeholder?: string; def?: string | number | boolean; required?: boolean }
+interface Field { key: string; label: string; labelEn: string; type: FieldType; placeholder?: string; placeholderEn?: string; def?: string | number | boolean; required?: boolean }
 interface Task {
-  key: string; title: string; desc: string; emoji: string; accent: string; grad: string; glow: string
+  key: string; title: string; titleEn: string; desc: string; descEn: string; emoji: string; accent: string; grad: string; glow: string
   superOnly?: boolean
   danger?: boolean
+  pickMedia?: boolean   // ouvre le sélecteur de médias (banque) au lieu du formulaire
   fields?: Field[]
   run: (bearer: string, phoneId: string, cfg: Record<string, string>, log: (m: string) => void) => Promise<{ ok: boolean; error?: string }>
 }
@@ -35,102 +80,78 @@ const GRAD = {
   green: { grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
   slate: { grad: 'linear-gradient(135deg,#64748B,#475569)', glow: 'rgba(148,163,184,0.4)', accent: '#94A3B8' },
   amber: { grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
-  pink:  { grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)',  accent: '#F472B6' },
+  pink:  { grad: 'linear-gradient(135deg,#A78BFA,#7C3AED)', glow: 'rgba(167,139,250,0.5)',  accent: '#C4B5FD' },
   cyan:  { grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.42)', accent: '#22D3EE' },
   indigo:{ grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)',  accent: '#818CF8' },
   violet:{ grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
 }
-const IG = 'com.instagram.android'
-const TT = 'com.zhiliaoapp.musically'
-const openApp = (pkg: string) => `monkey -p ${pkg} -c android.intent.category.LAUNCHER 1`
 const isOn = (cfg: Record<string, string>, k: string) => cfg[k] === 'true'
 
 const TASKS: Task[] = [
   // ── Cycle de vie ──
-  { key: 'power_on', title: 'Allumer', desc: 'Démarre les téléphones sélectionnés.', emoji: '🔌', ...GRAD.green,
-    run: async (bearer, id) => { const n = await startPhones(bearer, [id]); return { ok: n > 0, error: n > 0 ? undefined : 'démarrage refusé' } } },
-  { key: 'power_off', title: 'Éteindre', desc: 'Stoppe les téléphones (libère le proxy).', emoji: '⏻', ...GRAD.slate,
+  { key: 'power_on', title: 'Allumer', titleEn: 'Power on', desc: 'Démarre les téléphones sélectionnés.', descEn: 'Starts the selected phones.', emoji: '🔌', ...GRAD.green,
+    run: async (bearer, id) => { const n = await startPhones(bearer, [id]); return { ok: n > 0, error: n > 0 ? undefined : tr('démarrage refusé', 'startup refused') } } },
+  { key: 'power_off', title: 'Éteindre', titleEn: 'Power off', desc: 'Stoppe les téléphones (libère le proxy).', descEn: 'Stops the phones (frees the proxy).', emoji: '⏻', ...GRAD.slate,
     run: async (bearer, id) => { await stopPhone(bearer, id); return { ok: true } } },
-  { key: 'reboot', title: 'Redémarrer', desc: 'Éteint puis rallume le téléphone.', emoji: '🔁', ...GRAD.slate,
-    run: async (bearer, id, _c, log) => { await stopPhone(bearer, id); log('éteint, rallumage…'); await new Promise(r => setTimeout(r, 4000)); const on = await ensureOn(bearer, id, log); return { ok: on, error: on ? undefined : 'ne répond pas' } } },
+  { key: 'reboot', title: 'Redémarrer', titleEn: 'Restart', desc: 'Éteint puis rallume le téléphone.', descEn: 'Powers the phone off then on.', emoji: '🔁', ...GRAD.slate,
+    run: async (bearer, id, _c, log) => { await stopPhone(bearer, id); log(tr('éteint, rallumage…', 'powered off, restarting…')); await new Promise(r => setTimeout(r, 4000)); const on = await ensureOn(bearer, id, log); return { ok: on, error: on ? undefined : tr('ne répond pas', 'not responding') } } },
+
+  // ── Médias ──
+  { key: 'push_media', title: 'Envoyer des médias', titleEn: 'Send media', desc: 'Choisis des photos/vidéos dans ta banque → elles sont déposées dans la galerie des téléphones.', descEn: 'Pick photos/videos from your bank → they are dropped into the phones\' gallery.', emoji: '📥', ...GRAD.violet, pickMedia: true,
+    run: async () => ({ ok: true }) },   // routé spécialement (sélecteur de médias)
 
   // ── Warmup ──
-  { key: 'warmup_ig', title: 'Warmup Instagram', desc: 'Navigation IA naturelle dans le feed pour chauffer le compte.', emoji: '🔥', ...GRAD.amber,
+  { key: 'warmup_ig', title: 'Warmup Instagram', titleEn: 'Instagram warmup', desc: 'Navigation IA naturelle dans le feed pour chauffer le compte.', descEn: 'Natural AI feed browsing to warm up the account.', emoji: '🔥', ...GRAD.amber,
     fields: [
-      { key: 'browseVideo', label: 'Nombre de vidéos à parcourir', type: 'number', def: 15 },
-      { key: 'keyword', label: 'Mot-clé (optionnel)', type: 'text', placeholder: 'ex. fitness' },
+      { key: 'browseVideo', label: 'Nombre de vidéos à parcourir', labelEn: 'Number of videos to browse', type: 'number', def: 15 },
+      { key: 'keyword', label: 'Mot-clé (optionnel)', labelEn: 'Keyword (optional)', type: 'text', placeholder: 'ex. fitness', placeholderEn: 'e.g. fitness' },
     ],
     run: (bearer, id, cfg, log) => warmupAccountNative(bearer, id, { browseVideo: Number(cfg.browseVideo) || 15, keyword: cfg.keyword?.trim() || undefined }, log) },
-  { key: 'warmup_tt', title: 'Warmup TikTok', desc: 'Parcourt le feed TikTok + like/follow/commentaires IA optionnels.', emoji: '🎵', ...GRAD.cyan,
+  { key: 'warmup_tt', title: 'Warmup TikTok', titleEn: 'TikTok warmup', desc: 'Parcourt le feed TikTok + like/follow/commentaires IA optionnels.', descEn: 'Browses the TikTok feed + optional AI like/follow/comments.', emoji: '🎵', ...GRAD.cyan,
     fields: [
-      { key: 'durationMin', label: 'Durée (minutes)', type: 'number', def: 10 },
-      { key: 'keyword', label: 'Mot-clé (optionnel)', type: 'text', placeholder: 'ex. gym' },
-      { key: 'like', label: 'Liker aléatoirement', type: 'bool', def: true },
-      { key: 'follow', label: 'Suivre aléatoirement', type: 'bool', def: false },
-      { key: 'comment', label: 'Commenter (IA)', type: 'bool', def: false },
+      { key: 'durationMin', label: 'Durée (minutes)', labelEn: 'Duration (minutes)', type: 'number', def: 10 },
+      { key: 'keyword', label: 'Mot-clé (optionnel)', labelEn: 'Keyword (optional)', type: 'text', placeholder: 'ex. gym', placeholderEn: 'e.g. gym' },
+      { key: 'like', label: 'Liker aléatoirement', labelEn: 'Like randomly', type: 'bool', def: true },
+      { key: 'follow', label: 'Suivre aléatoirement', labelEn: 'Follow randomly', type: 'bool', def: false },
+      { key: 'comment', label: 'Commenter (IA)', labelEn: 'Comment (AI)', type: 'bool', def: false },
     ],
     run: (bearer, id, cfg, log) => warmupTikTokNative(bearer, id, { durationMin: Number(cfg.durationMin) || 10, keyword: cfg.keyword?.trim() || undefined, like: isOn(cfg, 'like'), follow: isOn(cfg, 'follow'), comment: isOn(cfg, 'comment') }, log) },
 
   // ── Profil ──
-  { key: 'edit_ig', title: 'Éditer profil IG', desc: 'Change nom, bio, lien et photo du profil Instagram.', emoji: '✏️', ...GRAD.pink,
+  { key: 'edit_ig', title: 'Éditer profil IG', titleEn: 'Edit IG profile', desc: 'Change nom, bio, lien et photo du profil Instagram.', descEn: 'Change the Instagram profile name, bio, link and photo.', emoji: '✏️', ...GRAD.pink,
     fields: [
-      { key: 'nickname', label: 'Nom affiché', type: 'text', placeholder: 'laisser vide = inchangé' },
-      { key: 'biography', label: 'Bio', type: 'text', placeholder: 'laisser vide = inchangé' },
-      { key: 'linkURL', label: 'Lien', type: 'text', placeholder: 'https://…' },
-      { key: 'avatarUrl', label: 'Photo de profil (URL)', type: 'text', placeholder: 'https://…/photo.jpg' },
+      { key: 'nickname', label: 'Nom affiché', labelEn: 'Display name', type: 'text', placeholder: 'laisser vide = inchangé', placeholderEn: 'leave empty = unchanged' },
+      { key: 'biography', label: 'Bio', labelEn: 'Bio', type: 'text', placeholder: 'laisser vide = inchangé', placeholderEn: 'leave empty = unchanged' },
+      { key: 'linkURL', label: 'Lien', labelEn: 'Link', type: 'text', placeholder: 'https://…' },
+      { key: 'avatarUrl', label: 'Photo de profil (URL)', labelEn: 'Profile photo (URL)', type: 'text', placeholder: 'https://…/photo.jpg' },
     ],
     run: (bearer, id, cfg, log) => editInstagramProfileNative(bearer, id, { nickname: cfg.nickname?.trim() || undefined, biography: cfg.biography?.trim() || undefined, linkURL: cfg.linkURL?.trim() || undefined, avatarUrl: cfg.avatarUrl?.trim() || undefined }, log) },
-  { key: 'edit_tt', title: 'Éditer profil TikTok', desc: 'Change nom, bio, site et photo du profil TikTok.', emoji: '🎬', ...GRAD.pink,
+  { key: 'edit_tt', title: 'Éditer profil TikTok', titleEn: 'Edit TikTok profile', desc: 'Change nom, bio, site et photo du profil TikTok.', descEn: 'Change the TikTok profile name, bio, site and photo.', emoji: '🎬', ...GRAD.pink,
     fields: [
-      { key: 'nickName', label: 'Nom affiché', type: 'text', placeholder: 'laisser vide = inchangé' },
-      { key: 'bio', label: 'Bio', type: 'text', placeholder: 'laisser vide = inchangé' },
-      { key: 'site', label: 'Site', type: 'text', placeholder: 'https://…' },
-      { key: 'avatarUrl', label: 'Photo de profil (URL)', type: 'text', placeholder: 'https://…/photo.jpg' },
+      { key: 'nickName', label: 'Nom affiché', labelEn: 'Display name', type: 'text', placeholder: 'laisser vide = inchangé', placeholderEn: 'leave empty = unchanged' },
+      { key: 'bio', label: 'Bio', labelEn: 'Bio', type: 'text', placeholder: 'laisser vide = inchangé', placeholderEn: 'leave empty = unchanged' },
+      { key: 'site', label: 'Site', labelEn: 'Site', type: 'text', placeholder: 'https://…' },
+      { key: 'avatarUrl', label: 'Photo de profil (URL)', labelEn: 'Profile photo (URL)', type: 'text', placeholder: 'https://…/photo.jpg' },
     ],
     run: (bearer, id, cfg, log) => editTikTokProfileNative(bearer, id, { nickName: cfg.nickName?.trim() || undefined, bio: cfg.bio?.trim() || undefined, site: cfg.site?.trim() || undefined, avatarUrl: cfg.avatarUrl?.trim() || undefined }, log) },
 
-  // ── Publication ──
-  { key: 'story', title: 'Poster une story', desc: 'Publie une image en story Instagram avec un sticker lien cliquable.', emoji: '📖', ...GRAD.amber,
-    fields: [
-      { key: 'imageUrl', label: 'Image (URL publique)', type: 'text', placeholder: 'https://…/image.jpg', required: true },
-      { key: 'linkUrl', label: 'Lien du sticker', type: 'text', placeholder: 'https://…', required: true },
-      { key: 'linkText', label: 'Texte du sticker (optionnel)', type: 'text', placeholder: 'ex. Voir plus' },
-    ],
-    run: (bearer, id, cfg, log) => {
-      const imageUrl = cfg.imageUrl?.trim(), linkUrl = cfg.linkUrl?.trim()
-      if (!imageUrl || !linkUrl) return Promise.resolve({ ok: false, error: 'image + lien requis' })
-      return postInstagramStory(bearer, id, { imageUrl, linkUrl, linkText: cfg.linkText?.trim() || undefined }, log)
-    } },
-
   // ── Apps ──
-  { key: 'open_ig', title: 'Ouvrir Instagram', desc: 'Lance l\'app Instagram sur le téléphone.', emoji: '📸', ...GRAD.indigo,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, openApp(IG)); return { ok: true } } },
-  { key: 'open_tt', title: 'Ouvrir TikTok', desc: 'Lance l\'app TikTok sur le téléphone.', emoji: '🎶', ...GRAD.indigo,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, openApp(TT)); return { ok: true } } },
-  { key: 'restart_ig', title: 'Redémarrer Instagram', desc: 'Ferme puis relance Instagram (débloque l\'app figée).', emoji: '♻️', ...GRAD.indigo,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${IG}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(IG)); return { ok: true } } },
-  { key: 'restart_tt', title: 'Redémarrer TikTok', desc: 'Ferme puis relance TikTok (débloque l\'app figée).', emoji: '🔂', ...GRAD.indigo,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `am force-stop ${TT}`); await new Promise(r => setTimeout(r, 1500)); await shellExec(bearer, id, openApp(TT)); return { ok: true } } },
-  { key: 'ig_english', title: 'Instagram en anglais', desc: 'Force la langue d\'Instagram en anglais (RPA plus fiable).', emoji: '🇬🇧', ...GRAD.violet,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await forceInstagramEnglish(bearer, id); log('langue forcée en anglais'); return { ok: true } } },
+  { key: 'ig_english', title: 'Instagram en anglais', titleEn: 'Instagram in English', desc: 'Force la langue d\'Instagram en anglais (RPA plus fiable).', descEn: 'Forces Instagram\'s language to English (more reliable RPA).', emoji: '🇬🇧', ...GRAD.violet,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: tr('téléphone injoignable', 'phone unreachable') }; await forceInstagramEnglish(bearer, id); log(tr('langue forcée en anglais', 'language forced to English')); return { ok: true } } },
 
   // ── Diagnostic ──
-  { key: 'check_ip', title: 'Vérifier l\'IP', desc: 'Affiche l\'IP publique actuelle du téléphone (proxy).', emoji: '🌍', ...GRAD.green,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; const ip = await getPhonePublicIp(bearer, id); log(ip ? `IP : ${ip}` : 'IP introuvable'); return { ok: !!ip, error: ip ? undefined : 'IP introuvable' } } },
+  { key: 'check_ip', title: 'Vérifier l\'IP', titleEn: 'Check IP', desc: 'Affiche l\'IP publique actuelle du téléphone (proxy).', descEn: 'Shows the phone\'s current public IP (proxy).', emoji: '🌍', ...GRAD.green,
+    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: tr('téléphone injoignable', 'phone unreachable') }; const ip = await getPhonePublicIp(bearer, id); log(ip ? `IP : ${ip}` : tr('IP introuvable', 'IP not found')); return { ok: !!ip, error: ip ? undefined : tr('IP introuvable', 'IP not found') } } },
 
   // ── Avancé (superadmin) ──
-  { key: 'clear_ig', title: 'Vider le cache IG', desc: 'Efface les données d\'Instagram (⚠ déconnecte le compte).', emoji: '🗑️', ...GRAD.slate, superOnly: true, danger: true,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `pm clear ${IG}`); log('données Instagram effacées'); return { ok: true } } },
-  { key: 'clear_tt', title: 'Vider le cache TikTok', desc: 'Efface les données de TikTok (⚠ déconnecte le compte).', emoji: '🧽', ...GRAD.slate, superOnly: true, danger: true,
-    run: async (bearer, id, _c, log) => { if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }; await shellExec(bearer, id, `pm clear ${TT}`); log('données TikTok effacées'); return { ok: true } } },
-  { key: 'shell', title: 'Commande ADB', desc: 'Exécute une commande Android brute (avancé).', emoji: '⌨️', ...GRAD.cyan, superOnly: true, danger: true,
-    fields: [{ key: 'cmd', label: 'Commande shell', type: 'text', placeholder: 'ex. input keyevent 3', required: true }],
+  { key: 'shell', title: 'Commande ADB', titleEn: 'ADB command', desc: 'Exécute une commande Android brute (avancé).', descEn: 'Runs a raw Android command (advanced).', emoji: '⌨️', ...GRAD.cyan, superOnly: true, danger: true,
+    fields: [{ key: 'cmd', label: 'Commande shell', labelEn: 'Shell command', type: 'text', placeholder: 'ex. input keyevent 3', placeholderEn: 'e.g. input keyevent 3', required: true }],
     run: async (bearer, id, cfg, log) => {
       const cmd = cfg.cmd?.trim()
-      if (!cmd) return { ok: false, error: 'commande vide' }
-      if (!await ensureOn(bearer, id, log)) return { ok: false, error: 'téléphone injoignable' }
+      if (!cmd) return { ok: false, error: tr('commande vide', 'empty command') }
+      if (!await ensureOn(bearer, id, log)) return { ok: false, error: tr('téléphone injoignable', 'phone unreachable') }
       const r = await shellExec(bearer, id, cmd)
-      log(`↳ ${(r.output || '(vide)').slice(0, 300)}`)
+      log(`↳ ${(r.output || tr('(vide)', '(empty)')).slice(0, 300)}`)
       return { ok: true }
     } },
 ]
@@ -140,8 +161,12 @@ const CSS = `
 @keyframes lib-pulse { 0%,100%{opacity:.45} 50%{opacity:1} }
 @keyframes lib-float-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(38px,26px)} }
 @keyframes lib-float-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-30px,36px)} }
-.libtask { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s, border-color .25s; }
-.libtask:hover:not(:disabled) { transform: translateY(-3px); }
+.libtask { transition: transform var(--t-smooth), box-shadow var(--t-base), border-color var(--t-base); box-shadow: var(--elev-1); }
+.libtask:hover:not(:disabled) { transform: translateY(-2px); box-shadow: var(--elev-2); border-color: var(--border-accent-strong) !important; }
+.libtask:active:not(:disabled) { transform: scale(.985); }
+.libphone-row { transition: background var(--t-fast); }
+.libphone-row:hover { background: rgba(99,102,241,0.05) !important; }
+@media (prefers-reduced-motion: reduce) { .libtask, .libphone-row { transition-duration: .001ms !important; } }
 `
 
 type JobStatus = 'idle' | 'running' | 'done' | 'error'
@@ -159,30 +184,31 @@ const phoneName = (p: GeelarkPhone) => p.serialName ?? p.name ?? p.serialNo ?? p
 
 // ── Écran « Bientôt » (utilisateurs non-admin) ───────────────────────────────
 const TEASERS = [
-  { emoji: '🔌', title: 'Allumer / Éteindre', desc: 'Démarre et arrête tes cloud phones en un clic.', grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
-  { emoji: '🔥', title: 'Warmup automatique', desc: 'Chauffe les comptes de façon naturelle avant de publier.', grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
-  { emoji: '✏️', title: 'Édition de profil', desc: 'Nom, bio et lien mis à jour en masse sur tous les comptes.', grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6' },
-  { emoji: '🔄', title: 'Séquences complètes', desc: 'Enchaîner warmup, édition et posting dans un workflow.', grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.45)', accent: '#22D3EE' },
+  { emoji: '🔌', title: 'Allumer / Éteindre', titleEn: 'Power on / off', desc: 'Démarre et arrête tes cloud phones en un clic.', descEn: 'Start and stop your cloud phones in one click.', grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.45)', accent: '#34D399' },
+  { emoji: '🔥', title: 'Warmup automatique', titleEn: 'Automatic warmup', desc: 'Chauffe les comptes de façon naturelle avant de publier.', descEn: 'Warm up accounts naturally before posting.', grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.45)', accent: '#FBBF24' },
+  { emoji: '✏️', title: 'Édition de profil', titleEn: 'Profile editing', desc: 'Nom, bio et lien mis à jour en masse sur tous les comptes.', descEn: 'Name, bio and link updated in bulk across all accounts.', grad: 'linear-gradient(135deg,#A78BFA,#7C3AED)', glow: 'rgba(167,139,250,0.5)', accent: '#C4B5FD' },
+  { emoji: '📥', title: 'Envoyer des médias', titleEn: 'Send media', desc: 'Dépose des photos/vidéos de ta banque dans la galerie des téléphones.', descEn: 'Drop photos/videos from your bank into the phones\' gallery.', grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(167,139,250,0.45)', accent: '#A78BFA' },
 ]
 function ComingSoon() {
+  const tr = useTr()
   return (
     <div style={{ position: 'relative', zIndex: 1, maxWidth: 980, margin: '0 auto', paddingTop: 24 }}>
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 18, fontSize: 11, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: '#818CF8' }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#818CF8', animation: 'lib-pulse 2s ease-in-out infinite' }} />
-          Bibliothèque · Bientôt
+          {tr('Bibliothèque · Bientôt', 'Library · Soon')}
         </div>
-        <h1 style={{ margin: '0 0 14px', fontSize: 'clamp(34px, 5.6vw, 58px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff' }}>Une bibliothèque d'automatisations</h1>
+        <h1 className="sf-title-grad" style={{ margin: '0 0 14px', fontSize: 'clamp(34px, 5.6vw, 58px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0 }}>{tr("Une bibliothèque d'automatisations", 'A library of automations')}</h1>
         <p style={{ margin: '0 auto', maxWidth: 560, fontSize: 15.5, color: 'rgba(233,234,240,0.6)', lineHeight: 1.65 }}>
-          Bientôt : lance des tâches sur tes téléphones en un clic — allumage, warmup, édition de profil et plus.
+          {tr('Bientôt : lance des tâches sur tes téléphones en un clic — allumage, warmup, édition de profil et plus.', 'Coming soon: run tasks on your phones in one click — power on, warmup, profile editing and more.')}
         </p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
         {TEASERS.map((t, i) => (
           <div key={i} style={{ position: 'relative', overflow: 'hidden', padding: 22, borderRadius: 18, minHeight: 150, background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))', border: `1px solid ${t.accent}26`, animation: `lib-rise .5s ease both ${i * 0.07}s`, display: 'flex', flexDirection: 'column', gap: 11 }}>
             <div style={{ width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, background: t.grad, boxShadow: `0 10px 24px -8px ${t.glow}` }}>{t.emoji}</div>
-            <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff' }}>{t.title}</h4>
-            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: 'rgba(233,234,240,0.55)' }}>{t.desc}</p>
+            <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff' }}>{tr(t.title, t.titleEn)}</h4>
+            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: 'rgba(233,234,240,0.55)' }}>{tr(t.desc, t.descEn)}</p>
           </div>
         ))}
       </div>
@@ -193,7 +219,9 @@ function ComingSoon() {
 // ── Lanceur (superadmin) ─────────────────────────────────────────────────────
 function GeelarkLauncher({ user }: { user: User }) {
   const { bearer } = useConnections(user)
+  const { role, perms } = useOrg()
   const isSuper = useLicense()?.isSuperAdmin === true
+  const tr = useTr()
 
   const [phones, setPhones] = useState<GeelarkPhone[]>([])
   const [loading, setLoading] = useState(false)
@@ -204,6 +232,7 @@ function GeelarkLauncher({ user }: { user: User }) {
   const [search, setSearch] = useState('')
 
   const [modalTask, setModalTask] = useState<Task | null>(null)
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
   const [cfgVals, setCfgVals] = useState<Record<string, string>>({})
   const [running, setRunning] = useState(false)
   const [jobs, setJobs] = useState<Record<string, Job>>({})
@@ -212,7 +241,11 @@ function GeelarkLauncher({ user }: { user: User }) {
   async function loadPhones() {
     if (!bearer) return
     setLoading(true); setErr(null)
-    try { setPhones(await fetchAllPhones(bearer)) }
+    try {
+      const raw = await fetchAllPhones(bearer)
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      setPhones(role ? raw.filter(p => canAccessPhoneGroup(role, perms, p.group?.name ?? p.groupName ?? null)) : raw)
+    }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
     setLoading(false)
   }
@@ -229,25 +262,26 @@ function GeelarkLauncher({ user }: { user: User }) {
   const tasks = TASKS.filter(t => !t.superOnly || isSuper)
 
   function openTask(t: Task) {
-    if (!selected.size) return
+    if (!selected.size || running) return
+    if (t.pickMedia) { setMediaPickerOpen(true); return }   // → sélecteur de médias
     setModalTask(t)
     const init: Record<string, string> = {}
     for (const f of t.fields ?? []) init[f.key] = f.def != null ? String(f.def) : ''
     setCfgVals(init)
   }
 
-  async function launch() {
-    const task = modalTask
-    if (!task || !bearer) return
+  // Exécute un worker sur chaque téléphone sélectionné, avec suivi (jobs + carte « en cours »).
+  async function runOnPhones(label: string, worker: (b: string, id: string, log: (m: string) => void) => Promise<{ ok: boolean; error?: string }>) {
+    if (!bearer) return
     const targets = phones.filter(p => selected.has(p.id))
     if (!targets.length) return
-    setModalTask(null); setRunning(true); setLogs([])
+    setRunning(true); setLogs([])
     setJobs(Object.fromEntries(targets.map(p => [p.id, { status: 'idle' as JobStatus }])))
     const addLog = (m: string) => setLogs(l => [...l.slice(-200), m])
 
     const runId = `lib-${Date.now()}`
     startRun({
-      id: runId, type: 'warmup', label: `${task.emoji} ${task.title} · ${targets.length} tél.`,
+      id: runId, type: 'warmup', label: tr(`${label} · ${targets.length} tél.`, `${label} · ${targets.length} phone(s)`),
       proxyKeys: [], done: 0, total: targets.length, page: 'library',
       phones: targets.map(p => ({ id: p.id, name: phoneName(p), status: 'idle' })),
     })
@@ -257,8 +291,8 @@ function GeelarkLauncher({ user }: { user: User }) {
       setJobs(j => ({ ...j, [phone.id]: { status: 'running' } }))
       setRunPhase(runId, phone.id, 'running')
       try {
-        const r = await task.run(bearer, phone.id, cfgVals, m => addLog(`${phoneName(phone)}: ${m}`))
-        if (r.ok) { ok++; setJobs(j => ({ ...j, [phone.id]: { status: 'done' } })); setRunPhase(runId, phone.id, 'done') }
+        const r = await worker(bearer, phone.id, m => addLog(`${phoneName(phone)}: ${m}`))
+        if (r.ok) { ok++; setJobs(j => ({ ...j, [phone.id]: { status: 'done', detail: r.error } })); setRunPhase(runId, phone.id, 'done') }
         else { setJobs(j => ({ ...j, [phone.id]: { status: 'error', detail: r.error } })); setRunPhase(runId, phone.id, 'error') }
       } catch (e) {
         setJobs(j => ({ ...j, [phone.id]: { status: 'error', detail: e instanceof Error ? e.message : String(e) } }))
@@ -267,7 +301,23 @@ function GeelarkLauncher({ user }: { user: User }) {
     })
     finishRun(runId)
     setRunning(false)
-    addLog(`✓ Terminé — ${ok}/${targets.length} réussi(s)`)
+    addLog(tr(`✓ Terminé — ${ok}/${targets.length} réussi(s)`, `✓ Done — ${ok}/${targets.length} succeeded`))
+  }
+
+  async function launch() {
+    const task = modalTask
+    if (!task) return
+    const cfg = { ...cfgVals }
+    setModalTask(null)
+    await runOnPhones(`${task.emoji} ${tr(task.title, task.titleEn)}`, (b, id, log) => task.run(b, id, cfg, log))
+  }
+
+  // Médias choisis dans la banque → dépôt dans la galerie de chaque téléphone.
+  async function launchPushMedia(paths: string[], items?: ContentItem[]) {
+    setMediaPickerOpen(false)
+    const media: PushMedia[] = paths.map((url, i) => mediaMeta(items?.[i], url, i))
+    if (!media.length) return
+    await runOnPhones(tr('📥 Envoi de médias', '📥 Sending media'), (b, id, log) => pushMediaToPhone(b, id, media, log))
   }
 
   const doneN = Object.values(jobs).filter(j => j.status === 'done').length
@@ -276,36 +326,45 @@ function GeelarkLauncher({ user }: { user: User }) {
 
   return (
     <div style={{ position: 'relative', zIndex: 1, maxWidth: 1120, margin: '0 auto' }}>
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 12, fontSize: 11, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(233,234,240,0.42)' }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399' }} />
-          Bibliothèque d'automatisations
+      <div className="sf-page-header" style={{ marginBottom: 22 }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring sf-float" style={{ ['--icon-grad' as string]: 'linear-gradient(135deg,#10B981,#059669)' }} aria-hidden>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+          </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title sf-title-grad">{tr('Lance une tâche sur tes téléphones', 'Run a task on your phones')}</h1>
+            <p className="sf-page-sub">{tr("Sélectionne des téléphones, choisis une action — elle s'exécute sur chacun, suivi en direct.", 'Select phones, choose an action — it runs on each one, tracked live.')}</p>
+          </div>
         </div>
-        <h1 style={{ margin: '0 0 8px', fontSize: 'clamp(28px, 4.4vw, 42px)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff' }}>Lance une tâche sur tes téléphones</h1>
-        <p style={{ margin: 0, fontSize: 14.5, color: 'rgba(233,234,240,0.55)', maxWidth: 640, lineHeight: 1.6 }}>
-          Sélectionne des téléphones, choisis une action, et elle s'exécute sur chacun. Le suivi apparaît en direct (et dans le widget « en cours »).
-        </p>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          {selected.size > 0 && (
+            <span className="sf-status-chip"><span className="sf-status-dot" />{tr(`${selected.size} sélectionné${selected.size > 1 ? 's' : ''}`, `${selected.size} selected`)}</span>
+          )}
+          <button onClick={loadPhones} disabled={loading} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">{loading ? tr('Chargement…', 'Loading…') : tr('Rafraîchir', 'Refresh')}</button>
+        </div>
       </div>
 
       {!bearer ? (
-        <div className="sf-card" style={{ padding: 24, maxWidth: 480 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--warn)', margin: '0 0 6px' }}>Connexion GéeLark manquante</p>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Ajoute ton token GéeLark dans les Réglages pour lancer des tâches.</p>
+        <div className="sf-banner is-warn" style={{ maxWidth: 560 }}>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 3 }}>{tr('Connexion GéeLark manquante', 'GeeLark connection missing')}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{tr('Ajoute ton token GéeLark dans les Réglages pour lancer des tâches.', 'Add your GeeLark token in Settings to run tasks.')}</div>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 380px) 1fr', gap: 20, alignItems: 'start' }}>
           {/* Colonne gauche : téléphones */}
           <div className="sf-card" style={{ overflow: 'hidden', padding: 0 }}>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Téléphones {phones.length > 0 && <span className="sf-badge sf-badge-accent">{phones.length}</span>}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{tr('Téléphones', 'Phones')} {phones.length > 0 && <span className="sf-badge sf-badge-accent">{phones.length}</span>}</span>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setSelected(new Set(visible.map(p => p.id)))} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">Tout</button>
-                <button onClick={() => setSelected(new Set())} disabled={!selected.size} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: selected.size ? 1 : 0.4 }}>Aucun</button>
+                <button onClick={() => setSelected(new Set(visible.map(p => p.id)))} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">{tr('Tout', 'All')}</button>
+                <button onClick={() => setSelected(new Set())} disabled={!selected.size} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ opacity: selected.size ? 1 : 0.4 }}>{tr('Aucun', 'None')}</button>
                 <button onClick={loadPhones} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">↻</button>
               </div>
             </div>
             <div style={{ padding: '8px 12px', display: 'flex', gap: 8, borderBottom: '1px solid var(--border)' }}>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…" className="sf-input" style={{ flex: 1, height: 30, fontSize: 12 }} />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')} className="sf-input" style={{ flex: 1, height: 30, fontSize: 12 }} />
               {groups.length > 1 && (
                 <select value={groupFilter} onChange={e => setGroup(e.target.value)} className="sf-input cursor-pointer" style={{ width: 'auto', height: 30, fontSize: 12 }}>
                   {groups.map(g => <option key={g} value={g}>{g}</option>)}
@@ -313,15 +372,36 @@ function GeelarkLauncher({ user }: { user: User }) {
               )}
             </div>
             <div style={{ maxHeight: '52vh', overflowY: 'auto' }}>
-              {loading ? <div style={{ padding: 16, fontSize: 12.5, color: 'var(--text-3)' }}>Chargement…</div>
-                : err ? <div style={{ padding: 16, fontSize: 12.5, color: 'var(--err)' }}>{err}</div>
-                : visible.length === 0 ? <div style={{ padding: 16, fontSize: 12.5, color: 'var(--text-4)' }}>Aucun téléphone.</div>
-                : visible.map(p => {
+              {loading ? (
+                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="sf-skeleton" style={{ width: 16, height: 16, borderRadius: 'var(--r-xs)', flexShrink: 0 }} />
+                      <div className="sf-skeleton" style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0 }} />
+                      <div className="sf-skeleton sf-skeleton-text" style={{ flex: 1, width: `${55 + (i % 3) * 12}%` }} />
+                    </div>
+                  ))}
+                </div>
+              ) : err ? (
+                <div className="sf-banner is-danger" style={{ margin: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{tr('Erreur de chargement', 'Failed to load')}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', wordBreak: 'break-word' }}>{err}</div>
+                  </div>
+                  <button onClick={loadPhones} className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" style={{ flexShrink: 0 }}>{tr('Réessayer', 'Retry')}</button>
+                </div>
+              ) : visible.length === 0 ? (
+                <div className="sf-empty" style={{ padding: '28px 16px' }}>
+                  <div className="sf-empty-icon" style={{ fontSize: 26 }}>📱</div>
+                  <div className="sf-empty-title">{tr('Aucun téléphone', 'No phones')}</div>
+                  <div className="sf-empty-desc">{search || groupFilter !== 'Tous' ? tr('Aucun résultat pour ce filtre.', 'No result for this filter.') : tr('Ajoute des cloud phones dans GéeLark pour commencer.', 'Add cloud phones in GeeLark to get started.')}</div>
+                </div>
+              ) : visible.map(p => {
                   const sel = selected.has(p.id)
                   const online = p.status === 0 || p.status === 2
                   const job = jobs[p.id]
                   return (
-                    <div key={p.id} onClick={() => toggle(p.id)} className="cursor-pointer" style={{ padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)', background: sel ? 'rgba(99,102,241,0.09)' : 'transparent' }}>
+                    <div key={p.id} onClick={() => toggle(p.id)} className="cursor-pointer libphone-row" style={{ padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)', background: sel ? 'rgba(99,102,241,0.09)' : 'transparent' }}>
                       <div style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, border: `1.5px solid ${sel ? 'var(--accent)' : 'rgba(99,102,241,0.3)'}`, background: sel ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2"><path d="M20 6 9 17l-5-5" /></svg>}
                       </div>
@@ -341,41 +421,57 @@ function GeelarkLauncher({ user }: { user: User }) {
           {/* Colonne droite : actions + suivi */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {selected.size === 0 && (
-              <div className="sf-card" style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-3)' }}>
-                👈 Sélectionne un ou plusieurs téléphones pour activer les actions.
+              <div className="sf-banner is-accent">
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{tr('Sélectionne un ou plusieurs téléphones à gauche pour activer les actions.', 'Select one or more phones on the left to enable the actions.')}</div>
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 12 }}>
+            <div className="sf-section-label" style={{ margin: '2px 0 -4px' }}>{tr('Actions disponibles', 'Available actions')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 14 }}>
               {tasks.map(t => (
                 <button key={t.key} onClick={() => openTask(t)} disabled={!selected.size || running} className="libtask cursor-pointer" style={{
-                  textAlign: 'left', padding: 16, borderRadius: 16, minHeight: 128,
+                  textAlign: 'left', padding: 'var(--sp-4)', borderRadius: 'var(--r-lg)', minHeight: 128,
                   background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
-                  border: `1px solid ${t.danger ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.09)'}`,
+                  border: `1px solid ${t.danger ? 'rgba(239,68,68,0.28)' : 'var(--border-md)'}`,
                   opacity: (!selected.size || running) ? 0.5 : 1, cursor: (!selected.size || running) ? 'not-allowed' : 'pointer',
                   display: 'flex', flexDirection: 'column', gap: 9,
                 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, background: t.grad, boxShadow: `0 10px 22px -8px ${t.glow}` }}>{t.emoji}</div>
-                  <div style={{ fontSize: 14.5, fontWeight: 800, color: '#fff' }}>{t.title}</div>
-                  <div style={{ fontSize: 12, lineHeight: 1.45, color: 'rgba(233,234,240,0.55)', flex: 1 }}>{t.desc}</div>
-                  {selected.size > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: t.accent }}>Lancer sur {selected.size} tél. →</div>}
+                  <div style={{ width: 42, height: 42, borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, background: t.grad, boxShadow: `0 10px 22px -8px ${t.glow}` }}>{t.emoji}</div>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--text-1)' }}>{tr(t.title, t.titleEn)}</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--text-3)', flex: 1 }}>{tr(t.desc, t.descEn)}</div>
+                  {selected.size > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: t.accent }}>{tr(`Lancer sur ${selected.size} tél. →`, `Run on ${selected.size} phone(s) →`)}</div>}
                 </button>
               ))}
             </div>
 
             {/* Suivi */}
             {(running || totalJobs > 0) && (
-              <div className="sf-card" style={{ padding: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{running ? 'En cours…' : 'Terminé'}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>✓ {doneN} · ✕ {errN} · {totalJobs} total</span>
+              <div className="sf-card" style={{ padding: 'var(--sp-4)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+                  {running
+                    ? <span className="sf-status-chip"><span className="sf-status-dot" />{tr('En cours…', 'Running…')}</span>
+                    : <span className="sf-badge sf-badge-ok">{tr('Terminé', 'Done')}</span>}
+                  <span className="sf-tabular" style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    <span style={{ color: 'var(--ok)' }}>✓ {doneN}</span> · <span style={{ color: 'var(--danger)' }}>✕ {errN}</span> · {totalJobs} {tr('total', 'total')}
+                  </span>
                 </div>
-                <div style={{ maxHeight: 200, overflowY: 'auto', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {logs.length === 0 ? <span style={{ color: 'var(--text-4)' }}>…</span> : logs.map((l, i) => <div key={i}>{l}</div>)}
+                <div style={{ maxHeight: 200, overflowY: 'auto', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', display: 'flex', flexDirection: 'column', gap: 2, background: 'var(--surface)', borderRadius: 'var(--r-md)', padding: '10px 12px', border: '1px solid var(--border)' }}>
+                  {logs.length === 0 ? <span style={{ color: 'var(--text-4)' }}>{tr('En attente des premières lignes…', 'Waiting for first output…')}</span> : logs.map((l, i) => <div key={i}>{l}</div>)}
                 </div>
               </div>
             )}
           </div>
         </div>
+      )}
+
+      {/* Sélecteur de médias (banque) → envoi dans la galerie */}
+      {mediaPickerOpen && (
+        <BankPicker
+          user={user}
+          mode="multi"
+          resolveMode="signed-url"
+          onClose={() => setMediaPickerOpen(false)}
+          onSelect={(paths, _titles, _descs, items) => { launchPushMedia(paths, items) }}
+        />
       )}
 
       {/* Modal de config + lancement */}
@@ -385,27 +481,31 @@ function GeelarkLauncher({ user }: { user: User }) {
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, background: modalTask.grad }}>{modalTask.emoji}</div>
               <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-1)' }}>{modalTask.title}</h3>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-3)' }}>Sur {selected.size} téléphone{selected.size > 1 ? 's' : ''}</p>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-1)' }}>{tr(modalTask.title, modalTask.titleEn)}</h3>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-3)' }}>{tr(`Sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`, `On ${selected.size} phone${selected.size > 1 ? 's' : ''}`)}</p>
               </div>
             </div>
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
               {(modalTask.fields ?? []).map(f => f.type === 'bool' ? (
                 <label key={f.key} className="cursor-pointer" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-2)' }}>
                   <input type="checkbox" checked={cfgVals[f.key] === 'true'} onChange={e => setCfgVals(v => ({ ...v, [f.key]: e.target.checked ? 'true' : 'false' }))} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />
-                  {f.label}
+                  {tr(f.label, f.labelEn)}
                 </label>
               ) : (
                 <div key={f.key}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 5 }}>{f.label}</label>
-                  <input type={f.type} value={cfgVals[f.key] ?? ''} onChange={e => setCfgVals(v => ({ ...v, [f.key]: e.target.value }))} placeholder={f.placeholder} className="sf-input" style={{ width: '100%', height: 36 }} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 5 }}>{tr(f.label, f.labelEn)}</label>
+                  <input type={f.type} value={cfgVals[f.key] ?? ''} onChange={e => setCfgVals(v => ({ ...v, [f.key]: e.target.value }))} placeholder={f.placeholder ? tr(f.placeholder, f.placeholderEn ?? f.placeholder) : undefined} className="sf-input" style={{ width: '100%', height: 36 }} />
                 </div>
               ))}
-              {modalTask.danger && <p style={{ fontSize: 11.5, color: 'var(--warn)', margin: 0 }}>⚠ Commande brute exécutée telle quelle sur chaque téléphone.</p>}
-              {!modalTask.fields?.length && <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0 }}>Aucun réglage — clique pour lancer.</p>}
+              {modalTask.danger && (
+                <div className="sf-banner is-danger" style={{ margin: 0 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{tr('Commande brute exécutée telle quelle sur chaque téléphone.', 'Raw command executed as-is on each phone.')}</div>
+                </div>
+              )}
+              {!modalTask.fields?.length && !modalTask.danger && <p className="sf-hint" style={{ margin: 0 }}>{tr('Aucun réglage — clique pour lancer.', 'No settings — click to run.')}</p>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button onClick={() => setModalTask(null)} className="sf-btn sf-btn-ghost cursor-pointer">Annuler</button>
-                <button onClick={launch} className="sf-btn sf-btn-primary cursor-pointer">Lancer sur {selected.size} tél.</button>
+                <button onClick={() => setModalTask(null)} className="sf-btn sf-btn-ghost cursor-pointer">{tr('Annuler', 'Cancel')}</button>
+                <button onClick={launch} className="sf-btn sf-btn-primary cursor-pointer">{tr(`Lancer sur ${selected.size} tél.`, `Run on ${selected.size} phone(s)`)}</button>
               </div>
             </div>
           </div>

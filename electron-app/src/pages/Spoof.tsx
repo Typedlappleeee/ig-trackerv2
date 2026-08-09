@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
 import { useOrg } from '@/lib/orgContext'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { useTr } from '@/lib/i18n'
+import { nextScaleflowNumber, scaleflowName } from '@/lib/bankNaming'
 
 const PRESETS: Record<string, string> = {
   iphone17pro: 'iPhone 17 Pro',
@@ -12,35 +14,73 @@ const PRESETS: Record<string, string> = {
   iphone16:    'iPhone 16',
   iphone15pro: 'iPhone 15 Pro',
   iphone15:    'iPhone 15',
+  s24ultra:    'Galaxy S24 Ultra',
+  s23ultra:    'Galaxy S23 Ultra',
+  pixel8pro:   'Pixel 8 Pro',
+  pixel9pro:   'Pixel 9 Pro',
 }
 
 // International locations grouped by country (label includes a flag).
-const GPS_GROUPS: { country: string; cities: Record<string, string> }[] = [
-  { country: '🇫🇷 France', cities: {
+// `id` sert de clé stable pour l'option « 🎲 Aléatoire <région> ».
+const GPS_GROUPS: { id: string; country: string; cities: Record<string, string> }[] = [
+  { id: 'france', country: '🇫🇷 France', cities: {
     paris: 'Paris', marseille: 'Marseille', lyon: 'Lyon', toulouse: 'Toulouse', nice: 'Nice', bordeaux: 'Bordeaux',
   }},
-  { country: '🇬🇧 Royaume-Uni / 🇮🇪 Irlande', cities: {
+  { id: 'uk', country: '🇬🇧 Royaume-Uni / 🇮🇪 Irlande', cities: {
     london: 'Londres', manchester: 'Manchester', dublin: 'Dublin',
   }},
-  { country: '🇪🇸 Espagne / 🇵🇹 Portugal', cities: {
+  { id: 'iberia', country: '🇪🇸 Espagne / 🇵🇹 Portugal', cities: {
     madrid: 'Madrid', barcelona: 'Barcelone', lisbon: 'Lisbonne',
   }},
-  { country: '🇮🇹 Italie', cities: {
+  { id: 'italy', country: '🇮🇹 Italie', cities: {
     rome: 'Rome', milan: 'Milan',
   }},
-  { country: '🇩🇪 Europe centrale', cities: {
+  { id: 'central-eu', country: '🇩🇪 Europe centrale', cities: {
     berlin: 'Berlin', munich: 'Munich', amsterdam: 'Amsterdam', brussels: 'Bruxelles', zurich: 'Zurich', geneva: 'Genève',
   }},
-  { country: '🌎 Amériques', cities: {
+  { id: 'americas', country: '🌎 Amériques', cities: {
     newyork: 'New York', losangeles: 'Los Angeles', miami: 'Miami', toronto: 'Toronto', montreal: 'Montréal', mexico: 'Mexico', saopaulo: 'São Paulo',
   }},
-  { country: '🌏 Asie / Moyen-Orient / Océanie', cities: {
+  { id: 'asia', country: '🌏 Asie / Moyen-Orient / Océanie', cities: {
     dubai: 'Dubaï', istanbul: 'Istanbul', tokyo: 'Tokyo', singapore: 'Singapour', sydney: 'Sydney',
   }},
 ]
 
 const GPS_CITY_KEYS = GPS_GROUPS.flatMap(g => Object.keys(g.cities))
 const FRANCE_CITY_KEYS = Object.keys(GPS_GROUPS[0].cities) // GPS_GROUPS[0] is France
+// Villes par région → clé « random_region:<id> » pour un aléatoire limité à une région.
+const REGION_CITY_KEYS: Record<string, string[]> = Object.fromEntries(
+  GPS_GROUPS.map(g => [`random_region:${g.id}`, Object.keys(g.cities)]),
+)
+const PRESET_KEYS = Object.keys(PRESETS)
+const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+
+// Résout une sélection de ville (éventuellement aléatoire) en une ville concrète.
+function resolveCity(sel: string): string {
+  if (sel === 'random') return pickRandom(GPS_CITY_KEYS)
+  if (sel === 'random_france') return pickRandom(FRANCE_CITY_KEYS)
+  if (REGION_CITY_KEYS[sel]) return pickRandom(REGION_CITY_KEYS[sel])
+  return sel
+}
+
+// Journal discret (jamais affiché dans l'UI) : anneau borné en localStorage +
+// console.debug. Sert à diagnostiquer les erreurs de spoof après coup sans rien
+// montrer à l'utilisateur. Récupérable via window.spoofLogs() dans la console.
+function spoofLog(evt: string, data?: unknown) {
+  try {
+    const KEY = 'sf-spoof-log'
+    const arr = JSON.parse(localStorage.getItem(KEY) || '[]') as unknown[]
+    arr.push({ t: new Date().toISOString(), evt, data })
+    while (arr.length > 200) arr.shift()
+    localStorage.setItem(KEY, JSON.stringify(arr))
+    console.debug('[spoof]', evt, data ?? '')
+  } catch { /* le logging ne doit jamais casser le flow */ }
+}
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { spoofLogs?: () => unknown }).spoofLogs = () => {
+    try { return JSON.parse(localStorage.getItem('sf-spoof-log') || '[]') } catch { return [] }
+  }
+}
 
 type JobStatus = 'queued' | 'processing' | 'done' | 'error'
 
@@ -70,6 +110,7 @@ function todayStr() {
 }
 
 export function Spoof({ user }: { user: User }) {
+  const tr = useTr()
   const credits = useCredits()
   const { currentOrg } = useOrg()
 
@@ -77,8 +118,9 @@ export function Spoof({ user }: { user: User }) {
   const [saveFolder, setSaveFolder]       = useState<string | null>(null)
   const [savingAll, setSavingAll]         = useState(false)
   const [selectedVideos, setSelectedVideos] = useState<SelectedVideo[]>([])
-  const [preset, setPreset]               = useState('iphone17pro')
+  const [preset, setPreset]               = useState('random')
   const [gpsCity, setGpsCity]             = useState('random')
+  const [showCustomize, setShowCustomize] = useState(false)
   const [customDate, setCustomDate]       = useState(todayStr)
   const [showAdjustments, setShowAdjustments] = useState(false)
   const [brightness, setBrightness]       = useState(0)
@@ -91,7 +133,35 @@ export function Spoof({ user }: { user: User }) {
   const [copies, setCopies]               = useState(1)
   const [jobs, setJobs]                   = useState<SpoofJob[]>([])
   const [running, setRunning]             = useState(false)
-  const [autoMode, setAutoMode]           = useState(false)
+  const cancelRef                         = useRef(false)   // « Annuler » : stoppe le traitement en cours
+  // Compteur de nommage « scaleflowN.mp4 ». Réservé avant le lot puis incrémenté
+  // à chaque sauvegarde : JS est mono-thread → pas de doublon entre les workers.
+  const bankNum                           = useRef(1)
+  const [cancelling, setCancelling]       = useState(false)
+  const [autoMode, setAutoMode]           = useState(true)
+  const [randomDate, setRandomDate]       = useState(false)
+  const [randomDateDays, setRandomDateDays] = useState(30) // fenêtre (jours) pour la date aléatoire
+  const [showDebug, setShowDebug]         = useState(false)
+  const [debugLogs, setDebugLogs]         = useState<unknown[]>([])
+
+  // Panneau debug caché : Ctrl+Shift+D affiche les logs discrets (aucune trace UI).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault()
+        try { setDebugLogs(JSON.parse(localStorage.getItem('sf-spoof-log') || '[]')) } catch { setDebugLogs([]) }
+        setShowDebug(v => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Tire une date aléatoire dans les `days` derniers jours, au format YYYY-MM-DD.
+  const randomDateStr = (days: number) => {
+    const d = new Date(Date.now() - Math.floor(Math.random() * days) * 86400000)
+    return d.toISOString().slice(0, 10)
+  }
 
   // Réglages aléatoires (modérés) générés PAR VIDÉO en mode automatique.
   // Objectif : un max de petits détails uniques entre chaque vidéo SANS jamais
@@ -121,9 +191,10 @@ export function Spoof({ user }: { user: User }) {
 
   async function saveJobToBank(job: SpoofJob): Promise<boolean> {
     if (!job.storagePath || job.savedToBank) return false
+    const n = await nextScaleflowNumber(user.id, currentOrg?.id ?? null)
     const { error } = await supabase.from('content_bank').insert({
       user_id: user.id, org_id: currentOrg?.id ?? null,
-      title: `Spoof — ${job.name}`,
+      title: scaleflowName(n),
       file_url: null,
       storage_path: job.storagePath,
       thumbnail_path: null,
@@ -131,7 +202,7 @@ export function Spoof({ user }: { user: User }) {
       tags: ['spoof', ...(job.meta ? [job.meta.model, job.meta.city].filter(Boolean) : [])],
       notes: '',
     })
-    if (error) { alert('Échec de l\'enregistrement : ' + error.message); return false }
+    if (error) { alert(tr('Échec de l\'enregistrement : ', 'Save failed: ') + error.message); return false }
     updateJob(job.id, { savedToBank: true })
     return true
   }
@@ -147,8 +218,13 @@ export function Spoof({ user }: { user: User }) {
     }
   }
 
+  // Annule la tâche en cours : on arrête de lancer de nouveaux spoofs.
+  function cancelSpoof() { cancelRef.current = true; setCancelling(true) }
+
   async function runSpoof() {
     if (!selectedVideos.length || running) return
+    cancelRef.current = false; setCancelling(false)
+    bankNum.current = await nextScaleflowNumber(user.id, currentOrg?.id ?? null)   // numérotation du lot
 
     const totalOutputs = selectedVideos.length * copies
     const creditCost = totalOutputs * CREDIT_COSTS.clone_vid
@@ -156,7 +232,7 @@ export function Spoof({ user }: { user: User }) {
       const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
         const balance = creditRes.balance ?? credits.balance
-        alert(`Crédits insuffisants — ${creditCost} crédits requis. Solde: ${balance}`)
+        alert(tr(`Crédits insuffisants — ${creditCost} crédits requis. Solde: ${balance}`, `Insufficient credits — ${creditCost} credits required. Balance: ${balance}`))
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
@@ -167,7 +243,7 @@ export function Spoof({ user }: { user: User }) {
     const initialJobs: SpoofJob[] = selectedVideos.flatMap((v, vi) =>
       Array.from({ length: copies }, (_, c) => ({
         id: `${Date.now()}_${vi}_${c}`,
-        name: copies > 1 ? `${v.name} (copie ${c + 1}/${copies})` : v.name,
+        name: copies > 1 ? tr(`${v.name} (copie ${c + 1}/${copies})`, `${v.name} (copy ${c + 1}/${copies})`) : v.name,
         url: v.url,
         status: 'queued' as JobStatus,
       })),
@@ -176,20 +252,31 @@ export function Spoof({ user }: { user: User }) {
     setRunning(true)
 
     const { data: { session } } = await supabase.auth.getSession()
+    spoofLog('run:start', { jobs: initialJobs.length, preset, gpsCity, autoMode, copies })
 
-    try {
-      for (const job of initialJobs) {
-        updateJob(job.id, { status: 'processing' })
+    // Traite UN job (1 vidéo → 1 sortie spoofée) avec auto-retry.
+    const processJob = async (job: SpoofJob) => {
+      updateJob(job.id, { status: 'processing' })
 
-        // Mode automatique : chaque vidéo/copie reçoit ses propres réglages aléatoires.
-        const adj = autoMode ? randomAdjustments() : { brightness, saturation, contrast, noise, vignette, flipH, zoomPct }
+      // Mode automatique : chaque vidéo/copie reçoit ses propres réglages aléatoires.
+      const adj = autoMode ? randomAdjustments() : { brightness, saturation, contrast, noise, vignette, flipH, zoomPct }
+      // Résolution PAR JOB : téléphone + ville peuvent être aléatoires → chaque
+      // sortie a un device et une localisation différents (empreinte plus variée).
+      const resolvedPreset = preset === 'random' ? pickRandom(PRESET_KEYS) : preset
+      const resolvedCity   = resolveCity(gpsCity)
+      // Date : fixe (customDate) ou aléatoire dans les N derniers jours, PAR job.
+      const resolvedDate   = randomDate ? randomDateStr(randomDateDays) : customDate
+      spoofLog('job:start', { id: job.id, name: job.name, resolvedPreset, resolvedCity, resolvedDate })
 
-        const resolvedCity = gpsCity === 'random'
-          ? GPS_CITY_KEYS[Math.floor(Math.random() * GPS_CITY_KEYS.length)]
-          : gpsCity === 'random_france'
-          ? FRANCE_CITY_KEYS[Math.floor(Math.random() * FRANCE_CITY_KEYS.length)]
-          : gpsCity
-
+      // Auto-retry : les échecs du spoof sont surtout transitoires (timeout 60s
+      // Vercel + cold start, hoquet réseau) → re-tenter suffit presque toujours.
+      // Jusqu'à 3 tentatives avec backoff. Pas de risque de double débit (le
+      // spoof est gratuit) ; une tentative qui a timeout n'a rien enregistré en
+      // banque côté client, donc on ne crée pas de doublon.
+      const MAX_TRIES = 3
+      let lastErr = tr('Erreur inconnue', 'Unknown error')
+      let succeeded = false
+      for (let attempt = 1; attempt <= MAX_TRIES && !succeeded; attempt++) {
         try {
           const res = await fetch('/api/repurpose', {
             method: 'POST',
@@ -198,15 +285,15 @@ export function Spoof({ user }: { user: User }) {
               sourceUrl: job.url,
               userId: user.id,
               mode: 'spoof',
-              preset,
+              preset: resolvedPreset,
               gpsCity: resolvedCity,
-              customDate: customDate.replace(/-/g, ':'),
+              customDate: resolvedDate.replace(/-/g, ':'),
               adjustments: adj,
               supabaseToken: session?.access_token,
               supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
             }),
           })
-          const data = await res.json()
+          const data = await res.json().catch(() => ({ ok: false, error: tr(`Réponse serveur invalide (HTTP ${res.status})`, `Invalid server response (HTTP ${res.status})`) }))
           if (data.ok) {
             // Auto-enregistrement dans la banque dès qu'une vidéo est prête
             // (dossier choisi, ou racine si aucun) — plus besoin de cliquer.
@@ -214,7 +301,7 @@ export function Spoof({ user }: { user: User }) {
             if (data.storagePath) {
               const { error: bankErr } = await supabase.from('content_bank').insert({
                 user_id: user.id, org_id: currentOrg?.id ?? null,
-                title: `Spoof — ${job.name}`,
+                title: scaleflowName(bankNum.current++),
                 file_url: null, storage_path: data.storagePath, thumbnail_path: null,
                 folder: saveFolder,
                 // meta dans les tags (pas dans notes, qui sert de description/légende).
@@ -222,18 +309,45 @@ export function Spoof({ user }: { user: User }) {
                 notes: '',
               })
               savedOk = !bankErr
-              if (bankErr) console.error('[Spoof] auto-save bank failed', bankErr)
+              if (bankErr) { console.error('[Spoof] auto-save bank failed', bankErr); spoofLog('job:bank-error', { id: job.id, error: bankErr.message }) }
             }
             updateJob(job.id, { status: 'done', outputUrl: data.url, storagePath: data.storagePath, meta: data.appliedMeta, savedToBank: savedOk })
+            succeeded = true
+            spoofLog('job:done', { id: job.id, attempt, savedOk })
           } else {
-            updateJob(job.id, { status: 'error', error: data.error ?? 'Erreur inconnue' })
+            lastErr = data.error ?? tr('Erreur inconnue', 'Unknown error')
           }
         } catch (err) {
-          updateJob(job.id, { status: 'error', error: String(err) })
+          lastErr = String(err)
+        }
+        if (!succeeded && attempt < MAX_TRIES) {
+          spoofLog('job:retry', { id: job.id, attempt, error: lastErr })
+          updateJob(job.id, { status: 'processing', error: tr(`nouvelle tentative ${attempt + 1}/${MAX_TRIES}…`, `retry ${attempt + 1}/${MAX_TRIES}…`) })
+          await new Promise(r => setTimeout(r, 2500 * attempt))
         }
       }
+      if (!succeeded) { updateJob(job.id, { status: 'error', error: lastErr }); spoofLog('job:error', { id: job.id, error: lastErr }) }
+    }
+
+    try {
+      // Parallélisme : chaque job = 1 requête vers /api/repurpose, donc 1 instance
+      // serverless Vercel séparée (pas de contention CPU entre elles). On lance un
+      // pool borné (3) pour aller bien plus vite sans saturer. Chaque sortie reste
+      // 100 % indépendante → aucun risque de "tout casser".
+      const CONCURRENCY = Math.min(5, initialJobs.length)
+      let cursor = 0
+      const worker = async () => {
+        while (cursor < initialJobs.length) {
+          if (cancelRef.current) break   // annulé → on ne lance plus de nouveaux jobs
+          const job = initialJobs[cursor++]
+          await processJob(job)
+        }
+      }
+      await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+      if (cancelRef.current) setJobs(prev => prev.map(j => (j.status === 'queued' || j.status === 'processing') ? { ...j, status: 'error', error: 'annulé' } : j))
+      spoofLog('run:end', { jobs: initialJobs.length })
     } finally {
-      setRunning(false)
+      setRunning(false); setCancelling(false)
     }
   }
 
@@ -263,32 +377,67 @@ export function Spoof({ user }: { user: User }) {
         />
       )}
 
+      {/* ── Panneau debug caché (Ctrl+Shift+D) — diagnostic des erreurs de spoof ── */}
+      {showDebug && (
+        <div
+          onClick={() => setShowDebug(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="sf-card"
+            style={{ width: 'min(720px, 92vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: 16, gap: 10 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <strong style={{ fontSize: 13, color: 'var(--ivory)' }}>{tr('🕵️ Journal spoof (debug)', '🕵️ Spoof log (debug)')}</strong>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="sf-btn sf-btn-secondary cursor-pointer" style={{ fontSize: 11 }}
+                  onClick={() => { try { navigator.clipboard?.writeText(JSON.stringify(debugLogs, null, 2)) } catch { /* noop */ } }}
+                >{tr('Copier', 'Copy')}</button>
+                <button
+                  className="sf-btn sf-btn-secondary cursor-pointer" style={{ fontSize: 11 }}
+                  onClick={() => { localStorage.removeItem('sf-spoof-log'); setDebugLogs([]) }}
+                >{tr('Vider', 'Clear')}</button>
+                <button className="sf-btn sf-btn-ghost cursor-pointer" style={{ fontSize: 11 }} onClick={() => setShowDebug(false)}>✕</button>
+              </div>
+            </div>
+            <div style={{ overflow: 'auto', background: '#0b0b12', borderRadius: 8, padding: 10, fontFamily: 'monospace', fontSize: 11, color: '#c8c8e0', whiteSpace: 'pre-wrap', flex: 1 }}>
+              {debugLogs.length === 0
+                ? tr('Aucun log pour le moment.', 'No logs yet.')
+                : (debugLogs as { t: string; evt: string; data?: unknown }[]).slice().reverse().map((l, i) => (
+                    <div key={i} style={{ marginBottom: 4 }}>
+                      <span style={{ color: '#6b7280' }}>{(l.t || '').slice(11, 19)}</span>{' '}
+                      <span style={{ color: l.evt?.includes('error') ? '#f87171' : l.evt?.includes('done') ? '#34d399' : '#818cf8' }}>{l.evt}</span>{' '}
+                      {l.data ? JSON.stringify(l.data) : ''}
+                    </div>
+                  ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Header ── */}
-      <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
-        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg,#10B981,#059669)',
-            boxShadow: '0 10px 24px -8px rgba(16,185,129,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-          }}>
+      <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'var(--blur-md)' }}>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{ '--icon-grad': 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 10px 24px -8px rgba(16,185,129,0.5), inset 0 1px 0 0 rgba(255,255,255,0.35)' } as CSSProperties}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h1 className="sf-page-title">Spoof</h1>
-              {running && (
-                <span className="sf-badge sf-badge-accent" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  Traitement…
-                </span>
-              )}
-            </div>
-            <p className="sf-page-sub">Métadonnées iPhone authentiques + GPS multi-pays · chaque export est unique</p>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">Spoof</h1>
+            <p className="sf-page-sub">{tr('Métadonnées iPhone authentiques + GPS multi-pays · chaque export est unique', 'Authentic iPhone metadata + multi-country GPS · every export is unique')}</p>
           </div>
         </div>
+        {running && (
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+            <span className="sf-status-chip">
+              <span className="sf-status-dot" />
+              {tr('Traitement…', 'Processing…')}
+            </span>
+          </div>
+        )}
       </header>
 
       {/* ── Spoof body ── */}
@@ -300,7 +449,7 @@ export function Spoof({ user }: { user: User }) {
 
             {/* Source videos */}
             <div style={{ padding: '16px 16px 0' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>Vidéos source</div>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Vidéos source', 'Source videos')}</div>
 
               <button
                 onClick={() => setShowBank(true)}
@@ -310,8 +459,8 @@ export function Spoof({ user }: { user: User }) {
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M10 12h4"/></svg>
                 {selectedVideos.length
-                  ? `${selectedVideos.length} vidéo${selectedVideos.length > 1 ? 's' : ''} · Ajouter`
-                  : 'Ajouter vidéos'}
+                  ? tr(`${selectedVideos.length} vidéo${selectedVideos.length > 1 ? 's' : ''} · Ajouter`, `${selectedVideos.length} video${selectedVideos.length > 1 ? 's' : ''} · Add`)
+                  : tr('Ajouter vidéos', 'Add videos')}
               </button>
 
               {selectedVideos.length > 0 && (
@@ -337,35 +486,87 @@ export function Spoof({ user }: { user: User }) {
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
 
-            {/* iPhone model */}
+            {/* Mode automatique — contrôle principal, tout le reste est optionnel */}
             <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>Modèle iPhone</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              <button onClick={() => setAutoMode(v => !v)} disabled={running} className="cursor-pointer"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: 11, background: autoMode ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)', border: `1px solid ${autoMode ? 'rgba(99,102,241,0.35)' : 'var(--border)'}` }}>
+                <div style={{ textAlign: 'left' }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{tr('⚡ Automatique', '⚡ Automatic')}</p>
+                  <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>{tr('Recommandé · chaque vidéo unique, réglé pour toi', 'Recommended · every video unique, tuned for you')}</p>
+                </div>
+                <span className={`sf-toggle-track ${autoMode ? 'on' : 'off'}`} style={{ flexShrink: 0 }}>
+                  <span className="sf-toggle-thumb" />
+                </span>
+              </button>
+            </div>
+
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
+
+            {/* Personnaliser (device, lieu, date) — replié par défaut pour rester épuré */}
+            <div style={{ padding: '0 16px' }}>
+              <button
+                onClick={() => setShowCustomize(v => !v)}
+                className="cursor-pointer"
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                  borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', textAlign: 'left',
+                  background: showCustomize ? 'rgba(99,102,241,0.1)' : 'var(--surface-2)',
+                  color: showCustomize ? '#6366F1' : 'var(--text-2)',
+                  outline: showCustomize ? '1px solid rgba(99,102,241,0.25)' : '1px solid var(--border)',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                {tr('Personnaliser (appareil, lieu, date)', 'Customize (device, location, date)')}
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                  style={{ marginLeft: 'auto', transform: showCustomize ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              {!showCustomize && (
+                <p style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 2px 0' }}>
+                  {tr('Par défaut : appareil + lieu aléatoires. Ouvre pour fixer un modèle précis.', 'Default: random device + location. Open to pin a specific one.')}
+                </p>
+              )}
+            </div>
+
+            {showCustomize && (<>
+
+            <div className="sf-divider" style={{ margin: '16px 0' }} />
+
+            {/* Device model */}
+            <div style={{ padding: '0 16px' }}>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Appareil', 'Device')}</div>
+              <div className="sf-segment" style={{ flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setPreset('random')}
+                  disabled={running}
+                  className={`sf-segment-item cursor-pointer${preset === 'random' ? ' is-active' : ''}`}
+                >
+                  {tr('🎲 Aléatoire', '🎲 Random')}
+                </button>
                 {Object.entries(PRESETS).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => setPreset(key)}
                     disabled={running}
-                    className="cursor-pointer"
-                    style={{
-                      padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
-                      background: preset === key ? 'rgba(99,102,241,0.15)' : 'var(--surface-2)',
-                      color: preset === key ? '#6366F1' : 'var(--text-3)',
-                      outline: preset === key ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-                      transition: 'all 0.15s',
-                    }}
+                    className={`sf-segment-item cursor-pointer${preset === key ? ' is-active' : ''}`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
+              {preset === 'random' && (
+                <p style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 2px 0' }}>
+                  {tr('Chaque vidéo reçoit un modèle différent au hasard (iPhone + Android).', 'Each video gets a different random model (iPhone + Android).')}
+                </p>
+              )}
             </div>
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* GPS location */}
             <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>🏙 Localisation GPS</div>
+              <div className="sf-section-label" style={{ marginBottom: 8 }}>{tr('🏙 Localisation GPS', '🏙 GPS location')}</div>
               <select
                 value={gpsCity}
                 onChange={e => setGpsCity(e.target.value)}
@@ -373,8 +574,14 @@ export function Spoof({ user }: { user: User }) {
                 className="sf-input"
                 style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
               >
-                <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>🎲 Aléatoire (tous pays)</option>
-                <option value="random_france" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>🇫🇷 Aléatoire France uniquement</option>
+                <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{tr('🎲 Aléatoire (tous pays)', '🎲 Random (all countries)')}</option>
+                <optgroup label={tr('🎲 Aléatoire par région', '🎲 Random by region')} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
+                  {GPS_GROUPS.map(group => (
+                    <option key={`rnd-${group.id}`} value={`random_region:${group.id}`} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>
+                      {tr('🎲 ', '🎲 ')}{group.country}
+                    </option>
+                  ))}
+                </optgroup>
                 {GPS_GROUPS.map(group => (
                   <optgroup key={group.country} label={group.country} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
                     {Object.entries(group.cities).map(([key, label]) => (
@@ -389,24 +596,47 @@ export function Spoof({ user }: { user: User }) {
 
             {/* Custom date */}
             <div style={{ padding: '0 16px' }}>
-              <div className="sf-section-label" style={{ marginBottom: 8 }}>Date de création</div>
-              <input
-                type="date"
-                value={customDate}
-                onChange={e => setCustomDate(e.target.value)}
-                disabled={running}
-                className="sf-input"
-                style={{ width: '100%', fontSize: 12 }}
-              />
+              <div className="sf-section-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>{tr('Date de création', 'Creation date')}</span>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--muted)', cursor: running ? 'default' : 'pointer', textTransform: 'none', letterSpacing: 0 }}>
+                  <input type="checkbox" checked={randomDate} disabled={running} onChange={e => setRandomDate(e.target.checked)} style={{ cursor: 'inherit' }} />
+                  {tr('🎲 Aléatoire', '🎲 Random')}
+                </label>
+              </div>
+              {randomDate ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="number" min={1} max={365} value={randomDateDays}
+                    onChange={e => setRandomDateDays(Math.max(1, Math.min(365, Number(e.target.value) || 1)))}
+                    disabled={running}
+                    className="sf-input"
+                    style={{ width: 72, fontSize: 12 }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {tr(`derniers jours (date tirée au hasard par vidéo)`, `last days (random date per video)`)}
+                  </span>
+                </div>
+              ) : (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={e => setCustomDate(e.target.value)}
+                  disabled={running}
+                  className="sf-input"
+                  style={{ width: '100%', fontSize: 12 }}
+                />
+              )}
             </div>
+
+            </>)}
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
 
             {/* Copies per video */}
             <div style={{ padding: '0 16px' }}>
               <div className="sf-section-label" style={{ marginBottom: 8 }}>
-                Copies par vidéo
-                <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>chaque copie = métadonnées uniques</span>
+                {tr('Copies par vidéo', 'Copies per video')}
+                <span style={{ fontWeight: 400, color: 'var(--text-4)', marginLeft: 6 }}>{tr('chaque copie = métadonnées uniques', 'each copy = unique metadata')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
@@ -425,7 +655,7 @@ export function Spoof({ user }: { user: User }) {
               </div>
               {selectedVideos.length > 0 && (
                 <div style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 6, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                  {selectedVideos.length} vidéo{selectedVideos.length > 1 ? 's' : ''} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> export{totalOutputs > 1 ? 's' : ''}
+                  {selectedVideos.length} {tr(`vidéo${selectedVideos.length > 1 ? 's' : ''}`, `video${selectedVideos.length > 1 ? 's' : ''}`)} × {copies} = <b style={{ color: '#818CF8' }}>{totalOutputs}</b> {tr(`export${totalOutputs > 1 ? 's' : ''}`, `export${totalOutputs > 1 ? 's' : ''}`)}
                 </div>
               )}
             </div>
@@ -434,7 +664,7 @@ export function Spoof({ user }: { user: User }) {
 
             {/* Bank destination */}
             <div style={{ padding: '0 16px' }}>
-              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label="Dossier de destination" />
+              <BankFolderSelect value={saveFolder} onChange={setSaveFolder} userId={user.id} orgId={currentOrg?.id} label={tr('Dossier de destination', 'Destination folder')} />
             </div>
 
             <div className="sf-divider" style={{ margin: '16px 0' }} />
@@ -454,7 +684,7 @@ export function Spoof({ user }: { user: User }) {
                 }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-                Ajustements visuels
+                {tr('Réglages manuels (avancé)', 'Manual settings (advanced)')}
                 <svg
                   width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
                   style={{ marginLeft: 'auto', transform: showAdjustments ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
@@ -465,30 +695,19 @@ export function Spoof({ user }: { user: User }) {
 
               {showAdjustments && (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {/* Mode automatique : réglages aléatoires par vidéo */}
-                  <button onClick={() => setAutoMode(v => !v)} disabled={running} className="cursor-pointer"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 11px', borderRadius: 9, background: autoMode ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)', border: `1px solid ${autoMode ? 'rgba(99,102,241,0.35)' : 'var(--border)'}` }}>
-                    <div style={{ textAlign: 'left' }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>⚡ Automatique</p>
-                      <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>Réglages aléatoires différents pour chaque vidéo</p>
-                    </div>
-                    <span style={{ width: 32, height: 18, borderRadius: 99, position: 'relative', background: autoMode ? 'var(--accent)' : 'rgba(255,255,255,0.12)', flexShrink: 0 }}>
-                      <span style={{ position: 'absolute', top: 2, left: autoMode ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
-                    </span>
-                  </button>
                   {autoMode && (
-                    <p style={{ fontSize: 11, color: 'var(--accent-l)', margin: '0 0 2px', lineHeight: 1.5 }}>
-                      Chaque vidéo reçoit ses propres micro-variations (luminosité, gamma, teinte, saturation, contraste, grain/pixels, netteté, zoom, recadrage, micro-vitesse, vignette). Pas de miroir → le texte à l'écran reste intact. Les réglages manuels ci-dessous sont ignorés.
-                    </p>
+                    <div className="sf-banner is-accent" style={{ fontSize: 11, lineHeight: 1.5 }}>
+                      {tr("Mode Automatique actif → ces réglages manuels sont ignorés. Désactive l'Automatique en haut pour les utiliser.", 'Automatic mode is on → these manual settings are ignored. Turn off Automatic at the top to use them.')}
+                    </div>
                   )}
 
                   {/* Sliders */}
                   {([
-                    { label: 'Luminosité', value: brightness, set: setBrightness, min: -50, max: 50 },
-                    { label: 'Saturation', value: saturation, set: setSaturation, min: -50, max: 50 },
-                    { label: 'Contraste',  value: contrast,   set: setContrast,   min: -50, max: 50 },
-                    { label: 'Grain/Bruit', value: noise,     set: setNoise,      min: 0,   max: 30 },
-                    { label: 'Zoom (%)',   value: zoomPct,    set: setZoomPct,    min: 0,   max: 15 },
+                    { label: tr('Luminosité', 'Brightness'), value: brightness, set: setBrightness, min: -50, max: 50 },
+                    { label: tr('Saturation', 'Saturation'), value: saturation, set: setSaturation, min: -50, max: 50 },
+                    { label: tr('Contraste', 'Contrast'),  value: contrast,   set: setContrast,   min: -50, max: 50 },
+                    { label: tr('Grain/Bruit', 'Grain/Noise'), value: noise,     set: setNoise,      min: 0,   max: 30 },
+                    { label: tr('Zoom (%)', 'Zoom (%)'),   value: zoomPct,    set: setZoomPct,    min: 0,   max: 15 },
                   ] as const).map(({ label, value, set, min, max }) => (
                     <div key={label}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -510,21 +729,15 @@ export function Spoof({ user }: { user: User }) {
                   {/* Toggles */}
                   <div style={{ display: 'flex', gap: 8 }}>
                     {([
-                      { label: 'Flip H', value: flipH, set: setFlipH },
-                      { label: 'Vignette', value: vignette, set: setVignette },
+                      { label: tr('Flip H', 'Flip H'), value: flipH, set: setFlipH },
+                      { label: tr('Vignette', 'Vignette'), value: vignette, set: setVignette },
                     ] as const).map(({ label, value, set }) => (
                       <button
                         key={label}
                         onClick={() => (set as (v: boolean) => void)(!value)}
                         disabled={running || autoMode}
-                        className="cursor-pointer"
-                        style={{
-                          flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
-                          background: value ? 'rgba(99,102,241,0.15)' : 'var(--surface-2)',
-                          color: value ? '#6366F1' : 'var(--text-3)',
-                          outline: value ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-                          transition: 'all 0.15s',
-                        }}
+                        className={`sf-btn sf-btn-sm cursor-pointer ${value ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
+                        style={{ flex: 1, justifyContent: 'center' }}
                       >
                         {label}
                       </button>
@@ -539,36 +752,34 @@ export function Spoof({ user }: { user: User }) {
               {selectedVideos.length > 0 && !running && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   <span className="sf-badge sf-badge-accent" style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
-                    {creditCost} crédit{creditCost > 1 ? 's' : ''} · {totalOutputs} export{totalOutputs > 1 ? 's' : ''}
+                    {creditCost} {tr(`crédit${creditCost > 1 ? 's' : ''}`, `credit${creditCost > 1 ? 's' : ''}`)} · {totalOutputs} {tr(`export${totalOutputs > 1 ? 's' : ''}`, `export${totalOutputs > 1 ? 's' : ''}`)}
                   </span>
                 </div>
               )}
               <button
                 onClick={runSpoof}
                 disabled={!selectedVideos.length || running}
-                className="sf-btn sf-btn-lg cursor-pointer"
-                style={{
-                  width: '100%',
-                  background: !selectedVideos.length ? 'var(--surface-2)' : running ? 'rgba(239,68,68,0.12)' : 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
-                  color: !selectedVideos.length ? 'var(--text-4)' : running ? '#f87171' : '#6366F1',
-                  border: selectedVideos.length ? `1px solid ${running ? 'rgba(239,68,68,0.28)' : 'rgba(99,102,241,0.32)'}` : '1px solid var(--border)',
-                  boxShadow: selectedVideos.length && !running ? '0 0 24px rgba(99,102,241,0.14)' : 'none',
-                  cursor: selectedVideos.length ? 'pointer' : 'not-allowed',
-                  justifyContent: 'center',
-                }}
+                className={`sf-btn sf-btn-lg cursor-pointer ${running ? 'sf-btn-danger' : 'sf-btn-primary'}`}
+                style={{ width: '100%', justifyContent: 'center' }}
               >
                 {running ? (
                   <>
-                    <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(248,113,113,0.3)', borderTopColor: '#f87171', animation: 'spin 0.9s linear infinite' }} />
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>Traitement {doneCount}/{totalOutputs}…</span>
+                    <span className="sf-spinner" />
+                    <span className="sf-tabular">{tr(`Traitement ${doneCount}/${totalOutputs}…`, `Processing ${doneCount}/${totalOutputs}…`)}</span>
                   </>
                 ) : (
                   <>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    Spoofing {totalOutputs > 0 ? `(${totalOutputs})` : ''}
+                    {tr('Spoofing', 'Spoofing')} {totalOutputs > 0 ? `(${totalOutputs})` : ''}
                   </>
                 )}
               </button>
+              {running && (
+                <button onClick={cancelSpoof} disabled={cancelling} className="sf-btn cursor-pointer"
+                  style={{ width: '100%', justifyContent: 'center', background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.4)', color: '#F87171', fontWeight: 700 }}>
+                  {cancelling ? tr('Annulation…', 'Cancelling…') : tr('Annuler', 'Cancel')}
+                </button>
+              )}
             </div>
           </div>
 
@@ -585,10 +796,10 @@ export function Spoof({ user }: { user: User }) {
                     </svg>
                   </div>
                 </div>
-                <p className="sf-empty-title">Aucune vidéo traitée</p>
-                <p className="sf-empty-desc">Sélectionne <b>2 vidéos ou plus</b> depuis la banque pour les spoofer<br />et comparer les métadonnées injectées côte à côte.</p>
+                <p className="sf-empty-title">{tr('Aucune vidéo traitée', 'No video processed')}</p>
+                <p className="sf-empty-desc">{tr('Sélectionne ', 'Select ')}<b>{tr('2 vidéos ou plus', '2 or more videos')}</b>{tr(' depuis la banque pour les spoofer', ' from the bank to spoof them')}<br />{tr('et comparer les métadonnées injectées côte à côte.', 'and compare the injected metadata side by side.')}</p>
                 <div style={{ display: 'flex', gap: 7, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {['Métadonnées iPhone', 'GPS multi-pays', 'Altitude + objectif', 'ID caméra unique'].map(pill => (
+                  {[tr('Métadonnées iPhone', 'iPhone metadata'), tr('GPS multi-pays', 'Multi-country GPS'), tr('Altitude + objectif', 'Altitude + lens'), tr('ID caméra unique', 'Unique camera ID')].map(pill => (
                     <span key={pill} className="sf-badge" style={{ padding: '4px 10px', background: 'rgba(99,102,241,0.05)', color: 'rgba(99,102,241,0.65)', border: '1px solid rgba(99,102,241,0.12)', fontSize: 10 }}>
                       {pill}
                     </span>
@@ -599,28 +810,18 @@ export function Spoof({ user }: { user: User }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {/* Save-to-bank bar */}
                 {doneCount > 0 && (
-                  <div className="sf-card" style={{
-                    padding: '10px 14px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10,
-                    flexWrap: 'wrap', borderColor: 'rgba(99,102,241,0.18)', background: 'rgba(99,102,241,0.04)',
-                  }}>
-                    <div style={{ flex: 1, fontSize: 11, color: 'var(--text-3)' }}>
-                      Dossier : <span style={{ color: '#818CF8', fontWeight: 600 }}>{saveFolder ?? 'Racine'}</span>
+                  <div className="sf-banner is-accent">
+                    <div style={{ flex: 1, fontSize: 12, color: 'var(--text-3)' }}>
+                      {tr('Dossier : ', 'Folder: ')}<span style={{ color: 'var(--accent-lt)', fontWeight: 600 }}>{saveFolder ?? tr('Racine', 'Root')}</span>
                     </div>
                     <button
                       onClick={saveAllToBank}
                       disabled={savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')}
-                      className="sf-btn cursor-pointer"
-                      style={{
-                        height: 32, padding: '0 14px', fontSize: 11, fontWeight: 700, borderRadius: 8,
-                        background: 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.22))',
-                        color: '#818CF8', border: '1px solid rgba(99,102,241,0.32)',
-                        display: 'inline-flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums',
-                        opacity: (savingAll || jobs.every(j => j.savedToBank || j.status !== 'done')) ? 0.5 : 1,
-                      }}
+                      className="sf-btn sf-btn-sm sf-btn-primary sf-banner-action cursor-pointer sf-tabular"
                     >
                       {savingAll
-                        ? <><div style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid rgba(129,140,248,0.3)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} /> Enregistrement…</>
-                        : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> Tout enregistrer ({doneCount})</>
+                        ? <><span className="sf-spinner" /> {tr('Enregistrement…', 'Saving…')}</>
+                        : <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16"/><path d="M4 12v4h4l4-4 4 4h4v-4"/><path d="M12 4v12"/></svg> {tr(`Tout enregistrer (${doneCount})`, `Save all (${doneCount})`)}</>
                       }
                     </button>
                   </div>
@@ -641,6 +842,7 @@ export function Spoof({ user }: { user: User }) {
 }
 
 function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
+  const tr = useTr()
   const isDone = job.status === 'done'
   const isErr  = job.status === 'error'
   const isProc = job.status === 'processing'
@@ -665,25 +867,25 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
   }
 
   const META_ROWS: { label: string; key: keyof AppliedMeta }[] = [
-    { label: 'Appareil',    key: 'model' },
-    { label: 'Marque',      key: 'make' },
-    { label: 'Logiciel',    key: 'software' },
-    { label: 'Objectif',    key: 'lens' },
-    { label: 'Localisation',key: 'city' },
-    { label: 'GPS',         key: 'gps' },
-    { label: 'Altitude',    key: 'altitude' },
-    { label: 'Date',        key: 'creationDate' },
-    { label: 'Fuseau',      key: 'timezone' },
-    { label: 'ID Caméra',   key: 'cameraId' },
-    { label: 'ISO',         key: 'iso' },
-    { label: 'Exposition',  key: 'exposure' },
-    { label: 'Ouverture',   key: 'aperture' },
-    { label: 'Focale',      key: 'focal' },
-    { label: 'Encodeur',    key: 'encoder' },
-    { label: 'CRF',         key: 'crf' },
-    { label: 'Audio',       key: 'audioBitrate' },
-    { label: 'GOP',         key: 'gopSize' },
-    { label: 'Colorimétrie',key: 'colorSpace' },
+    { label: tr('Appareil', 'Device'),    key: 'model' },
+    { label: tr('Marque', 'Make'),      key: 'make' },
+    { label: tr('Logiciel', 'Software'),    key: 'software' },
+    { label: tr('Objectif', 'Lens'),    key: 'lens' },
+    { label: tr('Localisation', 'Location'),key: 'city' },
+    { label: tr('GPS', 'GPS'),         key: 'gps' },
+    { label: tr('Altitude', 'Altitude'),    key: 'altitude' },
+    { label: tr('Date', 'Date'),        key: 'creationDate' },
+    { label: tr('Fuseau', 'Timezone'),      key: 'timezone' },
+    { label: tr('ID Caméra', 'Camera ID'),   key: 'cameraId' },
+    { label: tr('ISO', 'ISO'),         key: 'iso' },
+    { label: tr('Exposition', 'Exposure'),  key: 'exposure' },
+    { label: tr('Ouverture', 'Aperture'),   key: 'aperture' },
+    { label: tr('Focale', 'Focal length'),      key: 'focal' },
+    { label: tr('Encodeur', 'Encoder'),    key: 'encoder' },
+    { label: tr('CRF', 'CRF'),         key: 'crf' },
+    { label: tr('Audio', 'Audio'),       key: 'audioBitrate' },
+    { label: tr('GOP', 'GOP'),         key: 'gopSize' },
+    { label: tr('Colorimétrie', 'Color space'),key: 'colorSpace' },
   ]
 
   return (
@@ -730,10 +932,10 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
             {job.name}
           </div>
           <div style={{ fontSize: 10, color: isDone ? 'rgba(99,102,241,0.7)' : isErr ? '#f87171' : 'var(--text-4)', marginTop: 2 }}>
-            {isQ && 'En attente…'}
-            {isProc && 'Traitement en cours…'}
-            {isDone && (job.meta ? `📱 ${job.meta.model} · 📍 ${job.meta.city}` : 'Spoofing terminé')}
-            {isErr && (job.error?.slice(0, 60) ?? 'Erreur')}
+            {isQ && tr('En attente…', 'Queued…')}
+            {isProc && tr('Traitement en cours…', 'Processing…')}
+            {isDone && (job.meta ? `📱 ${job.meta.model} · 📍 ${job.meta.city}` : tr('Spoofing terminé', 'Spoofing done'))}
+            {isErr && (job.error?.slice(0, 60) ?? tr('Erreur', 'Error'))}
           </div>
         </div>
 
@@ -746,7 +948,7 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
               style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 7, gap: 5 }}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-              Télécharger
+              {tr('Télécharger', 'Download')}
             </button>
             {job.storagePath && (
               job.savedToBank ? (
@@ -755,7 +957,7 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
                   style={{ height: 30, fontSize: 10, padding: '0 10px', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  Enregistré
+                  {tr('Enregistré', 'Saved')}
                 </span>
               ) : (
                 <button
@@ -764,7 +966,7 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
                   style={{ height: 30, fontSize: 10, padding: '0 10px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-3)', border: '1px solid var(--border)', borderRadius: 7, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                  Enregistrer
+                  {tr('Enregistrer', 'Save')}
                 </button>
               )
             )}
@@ -793,27 +995,28 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
   )
 }
 
-const COMPARE_ROWS: { label: string; key: keyof AppliedMeta; unique?: boolean }[] = [
-  { label: 'Appareil',    key: 'model' },
-  { label: 'Logiciel',    key: 'software' },
-  { label: 'Localisation', key: 'city',        unique: true },
-  { label: 'GPS',         key: 'gps',          unique: true },
-  { label: 'Altitude',    key: 'altitude',     unique: true },
-  { label: 'Date / heure', key: 'creationDate', unique: true },
-  { label: 'Fuseau',      key: 'timezone' },
-  { label: 'Objectif',    key: 'lens' },
-  { label: 'ISO',         key: 'iso',          unique: true },
-  { label: 'Exposition',  key: 'exposure',     unique: true },
-  { label: 'Ouverture',   key: 'aperture' },
-  { label: 'ID Caméra',   key: 'cameraId',     unique: true },
-  { label: 'Encodeur',    key: 'encoder' },
-  { label: 'CRF',         key: 'crf',          unique: true },
-  { label: 'Audio',       key: 'audioBitrate', unique: true },
-  { label: 'GOP',         key: 'gopSize',      unique: true },
-  { label: 'Colorimétrie', key: 'colorSpace' },
+const COMPARE_ROWS: { label: string; en: string; key: keyof AppliedMeta; unique?: boolean }[] = [
+  { label: 'Appareil',    en: 'Device',    key: 'model' },
+  { label: 'Logiciel',    en: 'Software',    key: 'software' },
+  { label: 'Localisation', en: 'Location', key: 'city',        unique: true },
+  { label: 'GPS',         en: 'GPS',         key: 'gps',          unique: true },
+  { label: 'Altitude',    en: 'Altitude',    key: 'altitude',     unique: true },
+  { label: 'Date / heure', en: 'Date / time', key: 'creationDate', unique: true },
+  { label: 'Fuseau',      en: 'Timezone',      key: 'timezone' },
+  { label: 'Objectif',    en: 'Lens',    key: 'lens' },
+  { label: 'ISO',         en: 'ISO',         key: 'iso',          unique: true },
+  { label: 'Exposition',  en: 'Exposure',  key: 'exposure',     unique: true },
+  { label: 'Ouverture',   en: 'Aperture',   key: 'aperture' },
+  { label: 'ID Caméra',   en: 'Camera ID',   key: 'cameraId',     unique: true },
+  { label: 'Encodeur',    en: 'Encoder',    key: 'encoder' },
+  { label: 'CRF',         en: 'CRF',         key: 'crf',          unique: true },
+  { label: 'Audio',       en: 'Audio',       key: 'audioBitrate', unique: true },
+  { label: 'GOP',         en: 'GOP',         key: 'gopSize',      unique: true },
+  { label: 'Colorimétrie', en: 'Color space', key: 'colorSpace' },
 ]
 
 function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
+  const tr = useTr()
   const done = jobs.filter(j => j.status === 'done' && j.meta)
   if (done.length < 2) return null
 
@@ -825,29 +1028,29 @@ function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
-          Comparaison — {done.length} vidéos spoofées avec des métadonnées différentes
+          {tr(`Comparaison — ${done.length} vidéos spoofées avec des métadonnées différentes`, `Comparison — ${done.length} videos spoofed with different metadata`)}
         </span>
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', color: 'var(--text-4)', fontWeight: 600, paddingBottom: 8, paddingRight: 12, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Champ</th>
+              <th style={{ textAlign: 'left', color: 'var(--text-4)', fontWeight: 600, paddingBottom: 8, paddingRight: 12, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{tr('Champ', 'Field')}</th>
               {done.map((j, i) => (
                 <th key={j.id} style={{ textAlign: 'left', color: '#6366F1', fontWeight: 700, paddingBottom: 8, paddingLeft: 8, fontSize: 10, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-                  Vidéo {i + 1} — {j.name.slice(0, 18)}{j.name.length > 18 ? '…' : ''}
+                  {tr('Vidéo', 'Video')} {i + 1} — {j.name.slice(0, 18)}{j.name.length > 18 ? '…' : ''}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {COMPARE_ROWS.map(({ label, key, unique }) => {
+            {COMPARE_ROWS.map(({ label, en, key, unique }) => {
               const vals = done.map(j => String(j.meta![key] ?? '—'))
               const allSame = vals.every(v => v === vals[0])
               return (
                 <tr key={key} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                   <td style={{ padding: '5px 12px 5px 0', color: 'var(--text-4)', fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'top' }}>
-                    {label}
+                    {tr(label, en)}
                   </td>
                   {vals.map((val, i) => (
                     <td key={i} style={{
@@ -867,7 +1070,7 @@ function ComparePanel({ jobs }: { jobs: SpoofJob[] }) {
         </table>
       </div>
       <div style={{ marginTop: 12, fontSize: 10, color: 'var(--text-4)', fontStyle: 'italic' }}>
-        Les champs en vert <span style={{ color: '#22c55e' }}>✓</span> sont différents entre chaque vidéo — GPS, horodatage, ID caméra, encodage vidéo, etc.
+        {tr('Les champs en vert ', 'The fields in green ')}<span style={{ color: '#22c55e' }}>✓</span>{tr(' sont différents entre chaque vidéo — GPS, horodatage, ID caméra, encodage vidéo, etc.', ' differ between each video — GPS, timestamp, camera ID, video encoding, etc.')}
       </div>
     </div>
   )

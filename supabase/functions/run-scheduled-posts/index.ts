@@ -417,14 +417,26 @@ Deno.serve(async (req) => {
         if (!byBearer.has(bearer)) byBearer.set(bearer, [])
         byBearer.get(bearer)!.push(row.geelark_id)
       }
-      let stopped = 0
+      const stoppedIds: string[] = []
       for (const [bearer, ids] of byBearer) {
-        await gPost(bearer, '/phone/stop', { ids }).catch(() => {})
-        stopped += ids.length
+        try {
+          const r = await gPost(bearer, '/phone/stop', { ids })
+          // On ne considère « traité » (→ supprimable) QUE si GeeLark a répondu OK.
+          if (r && (r.code === 0 || r.code === undefined)) stoppedIds.push(...ids)
+        } catch { /* réseau : on GARDE la ligne → réessai au prochain tick */ }
       }
-      // Purge les lignes traitées (qu'on ait pu résoudre le bearer ou non)
-      await db.from('phone_power_watch').delete().in('geelark_id', due.map(r => r.geelark_id))
-      summary['watchdog'] = `éteint ${stopped} téléphone(s) en dépassement (5 min)`
+      // ⚠️ On ne supprime QUE les lignes réellement éteintes. Avant, on supprimait
+      // TOUTES les lignes dues même si le bearer était introuvable ou le stop en
+      // échec → le téléphone restait allumé pour toujours (jamais réessayé). C'est
+      // ce qui laissait des tél allumés très longtemps.
+      if (stoppedIds.length > 0) {
+        await db.from('phone_power_watch').delete().in('geelark_id', stoppedIds)
+      }
+      // Les lignes dont le bearer est introuvable depuis > 1 h sont abandonnées
+      // (compte supprimé/token retiré) pour ne pas boucler indéfiniment.
+      const orphanCutoff = new Date(Date.now() - 60 * 60_000).toISOString()
+      await db.from('phone_power_watch').delete().lt('stop_at', orphanCutoff)
+      summary['watchdog'] = `éteint ${stoppedIds.length}/${due.length} téléphone(s) en dépassement`
     }
   } catch (err) {
     summary['watchdog'] = `error: ${err instanceof Error ? err.message : String(err)}`
@@ -554,10 +566,18 @@ Deno.serve(async (req) => {
     .eq('status', 'running')
     .eq('type', 'story')
     .or(`executed_at.lt.${storyCutoff},and(executed_at.is.null,created_at.lt.${storyCutoff})`)
+  // ⚠️ On ne re-met en file QUE les stories que le SERVEUR traitait réellement,
+  // reconnaissables à leur `result.story_progress` (le serveur re-remet en pending
+  // par téléphone avec un executed_at frais → une story serveur saine ne paraît
+  // jamais bloquée). Une story pilotée CÔTÉ CLIENT n'écrit pas story_progress :
+  // la re-mettre en pending ici la ferait re-traiter par la boucle serveur avec un
+  // doneSet vide → double publication sur tous les comptes. On l'exclut donc ; sa
+  // reprise est gérée côté client, et le failsafe > 6 h l'attrape si vraiment morte.
   await db.from('scheduled_posts')
     .update({ status: 'pending' })
     .eq('status', 'running')
     .eq('type', 'story')
+    .not('result->story_progress', 'is', null)
     .lt('executed_at', storyStale)
     .gte('executed_at', storyCutoff)
 
@@ -682,6 +702,11 @@ Deno.serve(async (req) => {
     const { data: dueTasks } = await claimQuery
 
     for (const task of dueTasks ?? []) {
+     // Isolé par tâche : si une tâche plante après le claim (+999h sentinelle), on
+     // remet son next_run_at à maintenant (catch ci-dessous) pour qu'elle re-fire
+     // au prochain tick, au lieu de rester bloquée ~41 jours — et les autres tâches
+     // du lot continuent.
+     try {
       const phones: unknown[] = typeof task.phones === 'string' ? JSON.parse(task.phones) : (task.phones ?? [])
       const phoneCount = phones.length
       const perRunCost = phoneCount * 2  // même logique que mass_posting
@@ -697,7 +722,11 @@ Deno.serve(async (req) => {
           p_amount:  totalCost,
         })
         if (!creditRes?.ok) {
-          await db.from('recurring_tasks').update({ status: 'paused' }).eq('id', task.id)
+          // ⚠️ Le claim atomique a posé next_run_at à +999h (sentinelle). Si on met
+          // juste en pause sans le remettre, la tâche est morte : même réactivée,
+          // elle ne re-fire pas avant ~41 jours. On remet next_run_at à « maintenant »
+          // → dès réactivation, le prochain tick la voit due (et re-vérifie les crédits).
+          await db.from('recurring_tasks').update({ status: 'paused', next_run_at: nowIso }).eq('id', task.id)
           summary[`task:${task.id}`] = `paused — crédits insuffisants (${creditRes?.error ?? ''})`
           await notifyOwner(db, { userId: task.user_id, orgId: task.org_id },
             'task_paused',
@@ -780,6 +809,10 @@ Deno.serve(async (req) => {
         run_count:   (Number(task.run_count) || 0) + 1,
       }).eq('id', task.id)
       summary[`task:${task.id}`] = insErr ? `task insert failed: ${insErr.message}` : `task queued (−${totalCost} crédits, type=${effectiveType})`
+     } catch (taskErr) {
+       try { await db.from('recurring_tasks').update({ next_run_at: nowIso }).eq('id', task.id) } catch { /* ignore */ }
+       summary[`task:${task.id}`] = `error: ${taskErr instanceof Error ? taskErr.message : String(taskErr)}`
+     }
     }
   } catch (err) {
     summary['recurring_tasks'] = `error: ${err instanceof Error ? err.message : String(err)}`
@@ -809,10 +842,18 @@ Deno.serve(async (req) => {
 
     const logs: string[] = []
     const log = (m: string) => logs.push(m)
+    // Hissés hors du try : le catch en a besoin pour ÉTEINDRE les téléphones déjà
+    // démarrés si l'exécution échoue (sinon ils restent allumés = facturation
+    // GeeLark en continu).
+    let bearer = ''
+    let geelarkIds: string[] = []
+    // Devient true dès qu'au moins une tâche RPA a été créée : le catch NE DOIT PAS
+    // éteindre les téléphones dans ce cas (ça tuerait des reels en cours). Le stop
+    // n'est un filet de sécurité que pour l'échec AVANT création (upload raté, etc.).
+    let tasksCreated = false
 
     try {
       // 4. Résolution du bearer (jamais stocké dans la ligne)
-      let bearer = ''
       if (post.org_id) {
         const { data } = await db.from('org_config')
           .select('bearer_token').eq('org_id', post.org_id).maybeSingle()
@@ -829,7 +870,7 @@ Deno.serve(async (req) => {
 
       const phones: PhoneRec[] = typeof post.phones === 'string' ? JSON.parse(post.phones) : post.phones
       const videos: VideoRec[] = typeof post.videos === 'string' ? JSON.parse(post.videos) : post.videos
-      const geelarkIds = phones.map(p => p.geelark_id)
+      geelarkIds = phones.map(p => p.geelark_id)
       const delayMin: number = post.delay_minutes ?? 0
       log(`🗓 Exécution serveur — ${post.platform ?? 'instagram'} · ${phones.length} compte(s) · ${videos.length} vidéo(s)${delayMin ? ` · ${delayMin} min d'écart` : ''}.`)
 
@@ -894,8 +935,18 @@ Deno.serve(async (req) => {
           } catch (e) {
             log(`   ❌ ${name} : ${e instanceof Error ? e.message : String(e)}`)
           } finally {
-            await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] }).catch(() => {})
-            await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+            // On ne supprime la ligne de surveillance QUE si l'extinction a réussi.
+            // Sinon (stop en échec / réseau) on la GARDE → le watchdog réessaiera
+            // d'éteindre le téléphone (au lieu de le laisser allumé ~30 min jusqu'à
+            // l'arrêt auto GeeLark, comme observé).
+            let stopped = false
+            try {
+              const sr = await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] })
+              stopped = !!sr && (sr.code === 0 || sr.code === undefined)
+            } catch { /* garde la ligne pour réessai */ }
+            if (stopped) {
+              await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+            }
           }
           doneSet.add(phone.geelark_id)
           processedThisRun++
@@ -963,6 +1014,7 @@ Deno.serve(async (req) => {
         const ids: string[] = res.data?.taskIds ?? []
         if (res.code === 0 && Array.isArray(ids) && ids.length > 0) {
           ids.forEach((tid, idx) => { taskIds.push(tid); if (phones[idx]) taskPhoneMap.set(tid, phones[idx]) })
+          tasksCreated = true
           log(`✅ ${ids.length} tâche(s) TikTok créée(s)`)
         } else {
           failedCount = phones.length
@@ -990,7 +1042,7 @@ Deno.serve(async (req) => {
         })
         const taskId = res.data?.id ?? res.data?.taskId ?? null
         if (res.code === 0) {
-          if (taskId) { taskIds.push(taskId); taskPhoneMap.set(taskId, phone) }
+          if (taskId) { taskIds.push(taskId); taskPhoneMap.set(taskId, phone); tasksCreated = true }
           log(`✅ Tâche créée : ${phone.ig_username ?? phone.phone_name}${delayMin && i ? ` (départ +${i * delayMin} min)` : ''}`)
         } else {
           failedCount++
@@ -1134,6 +1186,15 @@ Deno.serve(async (req) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logs.push(`❌ Erreur : ${msg}`)
+      // Filet de sécurité : éteindre les téléphones déjà démarrés avant l'échec —
+      // sinon ils restent allumés indéfiniment (facturation GeeLark). Best-effort.
+      // MAIS uniquement si AUCUNE tâche RPA n'a été créée : sinon on tuerait des
+      // reels en cours (le sweep stop_phones_at / phone_power_watch les éteindra
+      // proprement une fois publiés).
+      if (bearer && geelarkIds.length > 0 && !tasksCreated) {
+        try { await gPost(bearer, '/phone/stop', { ids: geelarkIds }); logs.push(`🔌 ${geelarkIds.length} téléphone(s) éteint(s) après erreur (aucune tâche créée).`) }
+        catch { /* le garde-fou phone_power_watch rattrapera */ }
+      }
       await db.from('scheduled_posts').update({
         status: 'failed', result: { logs }, error_msg: msg,
       }).eq('id', post.id)
@@ -1155,11 +1216,14 @@ Deno.serve(async (req) => {
   // restent gérées côté client). filterUserId limite au client authentifié.
   // ───────────────────────────────────────────────────────────────────────────
   try {
+    // ⚠️ On traite TOUTES les stories « plates » programmées (avec OU sans task_id).
+    // Avant, le filtre `.not('task_id', is null)` excluait les stories programmées à
+    // l'UNITÉ (via l'onglet Story) → PC éteint, elles ne partaient JAMAIS côté serveur.
+    // Le claim atomique + le skip client des stories rotatif évitent le double-post.
     let storyQuery = db.from('scheduled_posts')
       .select('*')
       .eq('status', 'pending')
       .eq('type', 'story')
-      .not('task_id', 'is', null)
       .lte('scheduled_at', nowIso)
       .order('scheduled_at', { ascending: true })
       .limit(3)
@@ -1206,7 +1270,12 @@ Deno.serve(async (req) => {
         const storyTexts: string[] = Array.isArray(existingResult?.story_texts) ? existingResult!.story_texts : []
         const mode: string = post.mode ?? 'seq'
 
-        if (!images.length) throw new Error('Aucune image dans la story')
+        // Deux formats de story supportés :
+        //  - TÂCHE récurrente : `post.videos` = pool d'images partagé + `phones[].link`.
+        //  - StoryLink (à l'unité) : chaque `phones[]` porte story_photo/story_link/story_text
+        //    et `post.videos` est vide.
+        const hasPerPhoneImg = phones.some(p => Boolean((p as { story_photo?: string }).story_photo))
+        if (!images.length && !hasPerPhoneImg) throw new Error('Aucune image dans la story')
 
         // Proxy rotatif : URLs de rotation (org/user) → nouvelle IP avant chaque
         // boot de téléphone, comme le fait l'app côté client.
@@ -1214,15 +1283,24 @@ Deno.serve(async (req) => {
         if (rotationUrls.length) log(`🔄 Proxy rotatif serveur : ${rotationUrls.length} URL(s) de rotation`)
 
         // Traite un téléphone : image → watchdog → automation story → extinction.
-        const processPhone = async (phone: PhoneRec & { link?: string }, i: number) => {
+        const processPhone = async (phone: PhoneRec & { link?: string; story_link?: string; story_photo?: string; story_text?: string }, i: number) => {
           const name = phone.ig_username ?? phone.phone_name
-          const link = (phone.link ?? '').trim()
+          // Lien : par-compte (story_link, format StoryLink) sinon `link` (format tâche).
+          const link = (phone.link ?? phone.story_link ?? '').trim()
           if (!link) { log(`❌ ${name} : aucun lien configuré`); doneSet.add(phone.geelark_id); return }
-          const imgIdx = mode === 'random' ? Math.floor(Math.random() * images.length) : i % images.length
-          const imageUrl = await resolveImageUrl(db, images[imgIdx])
-          const linkText = storyTexts.length
+          // Image : par-compte (story_photo) sinon pool partagé (post.videos).
+          let imageUrl: string
+          if (phone.story_photo) {
+            imageUrl = await resolveImageUrl(db, { token: phone.story_photo, title: phone.story_photo } as VideoRec)
+          } else {
+            if (!images.length) { log(`❌ ${name} : aucune image`); doneSet.add(phone.geelark_id); return }
+            const imgIdx = mode === 'random' ? Math.floor(Math.random() * images.length) : i % images.length
+            imageUrl = await resolveImageUrl(db, images[imgIdx])
+          }
+          // Texte sticker : par-compte (story_text) sinon pool distribué.
+          const linkText = phone.story_text ?? (storyTexts.length
             ? (mode === 'random' ? storyTexts[Math.floor(Math.random() * storyTexts.length)] : storyTexts[i % storyTexts.length])
-            : undefined
+            : undefined)
           log(`▶ [serveur] Story ${name}…`)
           await db.from('phone_power_watch').upsert(
             [{ geelark_id: phone.geelark_id, org_id: post.org_id, user_id: post.user_id, reason: 'server_story', stop_at: new Date(Date.now() + 5 * 60_000).toISOString() }],
@@ -1235,8 +1313,18 @@ Deno.serve(async (req) => {
           } catch (e) {
             log(`❌ ${name} : ${e instanceof Error ? e.message : String(e)}`)
           } finally {
-            await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] }).catch(() => {})
-            await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+            // On ne supprime la ligne de surveillance QUE si l'extinction a réussi.
+            // Sinon (stop en échec / réseau) on la GARDE → le watchdog réessaiera
+            // d'éteindre le téléphone (au lieu de le laisser allumé ~30 min jusqu'à
+            // l'arrêt auto GeeLark, comme observé).
+            let stopped = false
+            try {
+              const sr = await gPost(bearer, '/phone/stop', { ids: [phone.geelark_id] })
+              stopped = !!sr && (sr.code === 0 || sr.code === undefined)
+            } catch { /* garde la ligne pour réessai */ }
+            if (stopped) {
+              await db.from('phone_power_watch').delete().eq('geelark_id', phone.geelark_id).then(() => {}, () => {})
+            }
           }
           doneSet.add(phone.geelark_id)
         }

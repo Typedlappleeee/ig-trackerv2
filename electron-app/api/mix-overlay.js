@@ -9,6 +9,7 @@ const sharp      = require('sharp')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { createClient } = require('@supabase/supabase-js')
+const { assertAllowedMediaUrl, fetchMediaFollow, isOwnStoragePath } = require('./_ssrf')
 const fs   = require('fs')
 const path = require('path')
 const os   = require('os')
@@ -137,8 +138,173 @@ function buildAssFile(caption, fontSize, fontColor, position) {
   )
 }
 
+// ── Incrustation d'un MÉDIA (image/vidéo) positionné + timé ──────────────────
+// Position (x,y) et largeur (w) en FRACTIONS de la vidéo de sortie (0..1) → placement
+// précis indépendant de la résolution. Timing : apparaît entre `start` et start+duration.
+async function handleMediaOverlay(req, res) {
+  const {
+    videoUrl, overlayUrl, overlayType = 'image', userId, bucket = 'content',
+    x = 0.1, y = 0.1, w = 0.3, h, start = 0, duration = 5,
+    supabaseToken, supabaseAnonKey,
+  } = req.body ?? {}
+  if (!videoUrl || !overlayUrl) return res.status(400).json({ ok: false, error: 'Missing videoUrl or overlayUrl' })
+
+  const supabase = getSupabaseAdmin({ supabaseToken, supabaseAnonKey })
+  const ts = Date.now(); const tmpDir = os.tmpdir()
+  const inPath  = path.join(tmpDir, `movl_in_${ts}.mp4`)
+  const ovPath  = path.join(tmpDir, `movl_ov_${ts}`)
+  const outPath = path.join(tmpDir, `movl_out_${ts}.mp4`)
+  const thumbPath = path.join(tmpDir, `movl_th_${ts}.jpg`)
+  try {
+    const r1 = await fetchMediaFollow(videoUrl, { timeoutMs: 120000 })  // gros fichiers (banque 100 Mo)
+    if (!r1.ok) return res.status(400).json({ ok: false, error: `base ${r1.status}` })
+    fs.writeFileSync(inPath, Buffer.from(await r1.arrayBuffer()))
+    const r2 = await fetchMediaFollow(overlayUrl, { timeoutMs: 60000 })
+    if (!r2.ok) return res.status(400).json({ ok: false, error: `overlay ${r2.status}` })
+    fs.writeFileSync(ovPath, Buffer.from(await r2.arrayBuffer()))
+
+    const clamp = (v, lo, hi) => Math.min(Math.max(Number(v), lo), hi)
+    const fx = clamp(x || 0, 0, 1), fy = clamp(y || 0, 0, 1), fw = clamp(w || 0.3, 0.02, 1)
+    const st = Math.max(Number(start) || 0, 0)
+    const dur = Math.max(Number(duration) || 3, 0.03)  // autorise des flashs très courts (0.1s et moins)
+    const end = (st + dur).toFixed(3)
+    const ox = Math.round(fx * VW), oy = Math.round(fy * VH), ow = Math.round(fw * VW)
+    const isVideo = overlayType === 'video'
+
+    // Hauteur : si le client l'envoie (nouveau composer), on redimensionne l'image
+    // pour REMPLIR exactement la zone dessinée (cover + crop, comme l'aperçu) → le
+    // plein écran fonctionne. Sinon (anciens appels), largeur seule, ratio conservé.
+    const hasH = h !== undefined && h !== null && Number(h) > 0
+    const oh = hasH ? Math.round(clamp(h, 0.02, 1) * VH) : 0
+    // `cover` : on agrandit à la plus grande dimension puis on recadre à ow×oh (pas de déformation).
+    const sizeChain = hasH
+      ? `scale=${ow}:${oh}:force_original_aspect_ratio=increase,crop=${ow}:${oh}`
+      : `scale=${ow}:-1`
+
+    const bg = `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg]`
+    const ovChain = isVideo
+      ? `[1:v]${sizeChain},setpts=PTS-STARTPTS+${st}/TB[ov]`  // vidéo overlay démarre à `start`
+      : `[1:v]${sizeChain}[ov]`
+    // Flash noir optionnel : un cache noir apparaît JUSTE AVANT et JUSTE APRÈS
+    // l'incrustation (durée très courte, ex. 0.1-0.2 s), à la même position/taille.
+    const bDur = clamp(req.body?.blackDur ?? 0.15, 0.02, 1)
+    const bx = hasH ? ox : 0, by = hasH ? oy : 0
+    const bw = hasH ? ow : VW, bh = hasH ? oh : VH
+    // Un drawbox SÉPARÉ par fenêtre (plus sûr qu'une expression combinée), et on
+    // n'ajoute une fenêtre que si elle a une durée réelle (st=0 → pas de "avant").
+    // Quotes simples uniquement (même écriture que l'`enable` de l'overlay qui marche).
+    const boxAt = (s, e) => `,drawbox=x=${bx}:y=${by}:w=${bw}:h=${bh}:color=black:t=fill:enable='between(t,${s.toFixed(3)},${e.toFixed(3)})'`
+    let blackChain = ''
+    if (req.body?.blackFlash) {
+      const preS = Math.max(st - bDur, 0)
+      if (st - preS > 0.01) blackChain += boxAt(preS, st)          // cache AVANT
+      blackChain += boxAt(st + dur, st + dur + bDur)               // cache APRÈS
+    }
+    // IMAGE : une seule frame, répétée par l'overlay (`repeat`) → elle reste
+    //   affichable pendant toute la fenêtre `enable`. Surtout PAS de `-loop 1`
+    //   (le fichier n'a pas d'extension → démuxeur png_pipe, `-loop` ignoré → 1
+    //   seule frame) ni de `-shortest` (qui couperait la sortie à cette frame).
+    // VIDÉO : `pass` → une fois l'overlay terminé, la vidéo de base continue.
+    // Dans les deux cas la sortie s'arrête avec la vidéo de BASE.
+    const eof = isVideo ? 'pass' : 'repeat'
+    const vFilter = `${bg};${ovChain};[bg][ov]overlay=${ox}:${oy}:enable='between(t,${st},${end})':eof_action=${eof}${blackChain}[out]`
+    const inputs = ['-i', inPath, '-i', ovPath]
+
+    // ── Son « cling » joué AU MOMENT où l'image apparaît (optionnel) ──────────
+    // On décale le son à `start` (adelay) puis on le mixe à la piste d'origine.
+    // Si la vidéo de base n'a PAS d'audio, on ne mixe pas : le son devient la
+    // piste (sinon amix échoue sur une entrée inexistante).
+    const clingPath = path.join(__dirname, 'assets', 'cling.mp3')
+    const wantSound = !!req.body?.overlaySound && fs.existsSync(clingPath)
+    let srcHasAudio = false
+    if (wantSound) {
+      try { await execFileAsync(ffmpegPath, ['-nostdin', '-i', inPath], { maxBuffer: 8 * 1024 * 1024, timeout: 15000 }) }
+      // `ffmpeg -i` sans sortie termine toujours en erreur : les infos sont sur stderr.
+      // Test volontairement large : si on rate la détection, on garderait le son
+      // « cling » SEUL et on perdrait la bande-son d'origine.
+      catch (p) { srcHasAudio = /Audio:/.test(p.stderr ?? '') }
+    }
+    let aFilter = '', audioMaps = ['-map', '0:a?']
+    if (wantSound) {
+      inputs.push('-i', clingPath)
+      const delayMs = Math.round(st * 1000)
+      const vol = clamp(req.body?.soundVolume ?? 1, 0.05, 3)
+      const snd = `[2:a]adelay=${delayMs}|${delayMs},volume=${vol.toFixed(2)}[snd]`
+      aFilter = srcHasAudio
+        ? `;${snd};[0:a][snd]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]`
+        : `;${snd}`
+      audioMaps = ['-map', srcHasAudio ? '[aout]' : '[snd]']
+    }
+    const filter = `${vFilter}${aFilter}`
+
+    const ffArgs = [
+      '-nostdin', '-threads', '0', ...inputs,
+      '-filter_complex', filter,
+      '-map', '[out]', ...audioMaps,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+      // PAS de -level codé en dur : un level fixe (4.0) est violé par une source
+      // 1080p60/4K → fichier non conforme, lu comme "0 seconde / noir".
+      '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
+      '-c:a', 'aac', '-b:a', '128k',
+      // PAS de -shortest : la longueur suit la vidéo de BASE (sinon un overlay
+      // court — ou une image d'une frame — tronquait toute la sortie).
+      '-movflags', '+faststart', '-y', outPath,
+    ]
+    try {
+      await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 290000, killSignal: 'SIGKILL' })
+    } catch (ffErr) {
+      const stderr = (ffErr.stderr ?? '').slice(-800)
+      throw new Error(`FFmpeg: ${stderr || ffErr.message}`)
+    }
+
+    // Garde-fou : on vérifie que la sortie est une VRAIE vidéo (durée > 0) avant
+    // de l'envoyer dans la banque — sinon on remonte l'erreur au lieu d'y stocker
+    // un fichier vide/noir.
+    const outStat = fs.existsSync(outPath) ? fs.statSync(outPath) : { size: 0 }
+    let outDur = 0
+    try {
+      // `ffmpeg -i <file>` sort en code 1 mais écrit les infos sur stderr.
+      await execFileAsync(ffmpegPath, ['-nostdin', '-i', outPath], { maxBuffer: 8 * 1024 * 1024, timeout: 15000 })
+    } catch (probeErr) {
+      const m = /Duration:\s*(\d+):(\d+):(\d+\.?\d*)/.exec(probeErr.stderr ?? '')
+      if (m) outDur = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3])
+    }
+    if (outStat.size < 8000 || (outDur > 0 && outDur < 0.2)) {
+      throw new Error(`sortie invalide (${Math.round(outStat.size / 1024)} Ko, ${outDur.toFixed(2)}s) — vérifie que le média de base est bien une vidéo`)
+    }
+
+    const rand = Math.random().toString(36).slice(2)
+    const resultPath = userId ? `videos/users/${userId}/overlay-${ts}_${rand}.mp4` : `mix-results/${ts}_${rand}.mp4`
+    const outBuf = fs.readFileSync(outPath)
+    const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, { contentType: 'video/mp4', upsert: true })
+    if (upErr) throw new Error(upErr.message)
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
+
+    // Miniature prise PENDANT la fenêtre d'incrustation → la banque montre bien la
+    // vidéo AVEC l'image dessus (et pas la 1re frame sans overlay). Best-effort.
+    let thumbnailPath = null
+    try {
+      const at = Math.min(st + dur / 2, Math.max(st + 0.03, 0.1))
+      await execFileAsync(ffmpegPath, ['-nostdin', '-ss', String(at), '-i', outPath, '-vframes', '1', '-q:v', '3', '-y', thumbPath], { maxBuffer: 20 * 1024 * 1024, timeout: 15000 })
+      const thBuf = fs.readFileSync(thumbPath)
+      const thPath = resultPath.replace(/\.mp4$/, '_thumb.jpg')
+      const { error: thErr } = await supabase.storage.from(bucket).upload(thPath, thBuf, { contentType: 'image/jpeg', upsert: true })
+      if (!thErr) thumbnailPath = thPath
+    } catch { /* miniature best-effort */ }
+
+    res.json({ ok: true, url: publicUrl, storagePath: resultPath, thumbnailPath })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: (err instanceof Error ? err.message : String(err)).slice(0, 1000) })
+  } finally {
+    fs.rmSync(inPath, { force: true }); fs.rmSync(ovPath, { force: true }); fs.rmSync(outPath, { force: true }); fs.rmSync(thumbPath, { force: true })
+  }
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
+
+  // Nouveau mode : incrustation d'une image/vidéo positionnée + timée.
+  if (req.body && req.body.mode === 'media') return handleMediaOverlay(req, res)
 
   const {
     videoUrl, storagePath, caption, userId,
@@ -163,10 +329,13 @@ module.exports = async (req, res) => {
   try {
     // ── Download source video ────────────────────────────────────────────────
     if (videoUrl) {
-      const resp = await fetch(videoUrl)
+      // anti-SSRF : uniquement une URL de la banque Supabase ; suit les
+      // redirections (Supabase → CDN) en re-validant chaque saut.
+      const resp = await fetchMediaFollow(videoUrl, { timeoutMs: 120000 })
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch video: ${resp.status}` })
       fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {
+      if (!isOwnStoragePath(storagePath)) return res.status(400).json({ ok: false, error: 'chemin storage non autorisé' })
       const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
       if (dlErr) return res.status(400).json({ ok: false, error: dlErr.message })
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
@@ -203,7 +372,7 @@ module.exports = async (req, res) => {
         '-i', inputPath, '-i', overlayPath,
         '-filter_complex', filterComplex,
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+        '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
         '-c:a', 'aac', '-b:a', '128k',
         '-movflags', '+faststart',
         '-y', outPath,
@@ -224,7 +393,7 @@ module.exports = async (req, res) => {
         '-i', inputPath,
         '-vf', vf,
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+        '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
         '-c:a', 'aac', '-b:a', '128k',
         '-movflags', '+faststart',
         '-y', outPath,
@@ -261,4 +430,4 @@ module.exports = async (req, res) => {
   }
 }
 
-module.exports.config = { maxDuration: 60 }
+module.exports.config = { maxDuration: 300, memory: 3008 }

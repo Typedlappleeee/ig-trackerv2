@@ -20,6 +20,7 @@ import {
   executeScheduledPost, finishScheduledPost,
   type ScheduledPost,
 } from '@/lib/schedulerService'
+import { loadProxyRotation } from '@/lib/proxyRotation'
 
 // ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
 function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
@@ -594,13 +595,21 @@ const Scheduler      = lazyWithReload(() => import('@/pages/Scheduler').then(m =
 const Tasks          = lazyWithReload(() => import('@/pages/Tasks').then(m => ({ default: m.Tasks })))
 const Warmup         = lazyWithReload(() => import('@/pages/Warmup').then(m => ({ default: m.Warmup })))
 const VideoRepurpose = lazyWithReload(() => import('@/pages/VideoRepurpose').then(m => ({ default: m.VideoRepurpose })))
+const MassUnique     = lazyWithReload(() => import('@/pages/MassUnique').then(m => ({ default: m.MassUnique })))
 const Mixer          = lazyWithReload(() => import('@/pages/Mixer').then(m => ({ default: m.Mixer })))
 const Spoof          = lazyWithReload(() => import('@/pages/Spoof').then(m => ({ default: m.Spoof })))
 const Licences       = lazyWithReload(() => import('@/pages/Licences').then(m => ({ default: m.Licences })))
+const CloudPhones    = lazyWithReload(() => import('@/pages/CloudPhones').then(m => ({ default: m.CloudPhones })))
+const AutomationLab  = lazyWithReload(() => import('@/pages/AutomationLab').then(m => ({ default: m.AutomationLab })))
 const Support        = lazyWithReload(() => import('@/pages/Support').then(m => ({ default: m.Support })))
 const History        = lazyWithReload(() => import('@/pages/History').then(m => ({ default: m.History })))
 const Reports        = lazyWithReload(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
+const Automation     = lazyWithReload(() => import('@/pages/Automation').then(m => ({ default: m.Automation })))
+const Activity       = lazyWithReload(() => import('@/pages/Activity').then(m => ({ default: m.Activity })))
+const Blowsome       = lazyWithReload(() => import('@/pages/Blowsome').then(m => ({ default: m.Blowsome })))
+const BlowsomeApp    = lazyWithReload(() => import('@/blowsome/BlowsomeApp').then(m => ({ default: m.BlowsomeApp })))
 const Library        = lazyWithReload(() => import('@/pages/Library').then(m => ({ default: m.Library })))
+const Organization   = lazyWithReload(() => import('@/pages/Organization').then(m => ({ default: m.Organization })))
 const Community      = lazyWithReload(() => import('@/pages/Community').then(m => ({ default: m.Community })))
 const ScaleIA        = lazyWithReload(() => import('@/pages/ScaleIA'))
 const StoryLink      = lazyWithReload(() => import('@/pages/StoryLink'))
@@ -633,6 +642,8 @@ function AppContent({ user }: { user: User }) {
       ensureWebhookRegistered(conns.bearer)).catch(() => {})
   }, [conns.bearer])
   const [page, setPage]                     = useState<Page>('hub')
+  // Deep-link « nouvel onglet » Phone Farm (#pf-fs=<id>) → on démarre dans Blowsome.
+  const [appMode, setAppMode]               = useState<'main' | 'blowsome'>(() => (typeof location !== 'undefined' && /pf-fs=/.test(location.hash)) ? 'blowsome' : 'main')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showTour, setShowTour]             = useState(() => !!localStorage.getItem(TOUR_KEY))
@@ -691,7 +702,7 @@ function AppContent({ user }: { user: User }) {
     let cancelled = false
     // 8s timeout — if checkLicense hangs, fail open so the user isn't locked out
     const fallback = setTimeout(() => {
-      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }); setCreditLoading(false) }
     }, 8000)
     Promise.resolve(checkLicense(user.id, currentOrg?.id ?? null)).then(async l => {
       clearTimeout(fallback)
@@ -711,7 +722,7 @@ function AppContent({ user }: { user: User }) {
       if (!cancelled) { setCreditBalance(bal); setCreditLoading(false) }
     }).catch(() => {
       clearTimeout(fallback)
-      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+      if (!cancelled) { setLicense({ valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }); setCreditLoading(false) }
     })
     return () => { cancelled = true; clearTimeout(fallback) }
   }, [user.id, currentOrg?.id, currentOrg?.owner_id])
@@ -743,6 +754,20 @@ function AppContent({ user }: { user: User }) {
     const run = async (post: ScheduledPost) => {
       if (running.has(post.id)) return
       running.add(post.id)
+      // ⚠️ Si la rotation d'IP est configurée, on LAISSE le serveur exécuter ce post.
+      // Le rotatif est SÉRIEL (1 tél à la fois, ~2 min/tél) : si le daemon client le
+      // pilote et que l'utilisateur ferme l'app en cours, le posting s'arrête et les
+      // téléphones restants ne postent jamais. Le serveur (edge function) fait le
+      // rotatif 1 tél/invocation et survit au PC éteint → c'est le but de « Programmer ».
+      // Concerne les types exécutables serveur (mass_posting + story « plate »).
+      const serverCapable = post.type === 'mass_posting'
+        || (post.type === 'story' && !((post.result as { steps?: unknown } | null)?.steps))
+      if (serverCapable) {
+        const rotEnabled = await loadProxyRotation(post.org_id ?? null, post.user_id)
+          .then(c => c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim())))
+          .catch(() => false)
+        if (rotEnabled) { running.delete(post.id); return }  // le serveur s'en charge
+      }
       const claimed = await claimScheduledPost(post.id)
       if (!claimed) { running.delete(post.id); return }
       const logs: string[] = []
@@ -838,6 +863,12 @@ function AppContent({ user }: { user: User }) {
   }
 
   function handleNavigate(p: Page, tab?: string) {
+    // Blowsome est une SOUS-APPLICATION : on n'ouvre pas une page dans le shell
+    // ScaleFlow, on bascule tout l'écran sur le shell Blowsome (réservé VIP).
+    if (p === 'blowsome') {
+      if (license?.blowsome) { setAppMode('blowsome'); return }
+      return // pas d'accès → on ignore
+    }
     setPage(p)
     setSettingsPanel(tab)
   }
@@ -890,6 +921,19 @@ function AppContent({ user }: { user: User }) {
     )
   }
 
+  // ── Sous-application Blowsome (VIP) : prend tout l'écran, hors shell ScaleFlow ──
+  if (appMode === 'blowsome' && license.blowsome) {
+    return (
+      <LicenseContext.Provider value={license}>
+      <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
+        <Suspense fallback={<FullPageLoader />}>
+          <BlowsomeApp user={user} onExit={() => setAppMode('main')} />
+        </Suspense>
+      </CreditContext.Provider>
+      </LicenseContext.Provider>
+    )
+  }
+
   const content = (() => {
     switch (page) {
       case 'phones':          return <Phones          user={user} key={refreshTick} />
@@ -900,6 +944,8 @@ function AppContent({ user }: { user: User }) {
       case 'massposting':  return <Publish     user={user} />  // alias historique
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'tasks':        return <Tasks       user={user} />
+      case 'automation':   return <Automation  user={user} onNavigate={(p) => handleNavigate(p as Page)} showRecurring={true} />
+      case 'activity':     return <Activity    user={user} onNavigate={handleNavigate} />
       case 'storylink':    return <StoryLink   user={user} />
       case 'bank':         return <BankHub     user={user} initialTab="videos" />
       case 'warmup':       return <Warmup      user={user} />
@@ -912,6 +958,7 @@ function AppContent({ user }: { user: User }) {
       case 'mixer':        return <Mixer        user={user} />
       case 'subtitles':    return <Subtitles    user={user} />
       case 'spoof':        return <Spoof        user={user} />
+      case 'massunique':   return <MassUnique   user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
@@ -920,9 +967,13 @@ function AppContent({ user }: { user: User }) {
       case 'scaleia':      return <ScaleIA />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
+      case 'cloudphones':  return <CloudPhones user={user} />
+      case 'flows':        return <AutomationLab user={user} />
       case 'history':      return <History     user={user} onNavigate={handleNavigate} />
       case 'reports':      return <Reports     user={user} />
+      case 'blowsome':     return <Blowsome    />
       case 'library':      return <Library     user={user} />
+      case 'organization': return <Organization user={user} />
 
     }
   })()

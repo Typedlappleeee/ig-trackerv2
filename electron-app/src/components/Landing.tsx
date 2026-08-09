@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useTr } from '@/lib/i18n'
 
 const TELEGRAM_URL = 'https://t.me/justquentin'
 
@@ -331,6 +332,7 @@ const SHOWCASE_VIDEOS: string[] = []
 
 // ── Mini-téléphone qui poste tout seul ───────────────────────────────────────
 function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: string }) {
+  const tr = useTr()
   const cycle = 6                       // durée d'un cycle (s)
   const delay = -(i * 0.85)             // décalage → effet de vague
   const a = (name: string) => `${name} ${cycle}s linear ${delay}s infinite`
@@ -368,7 +370,7 @@ function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: strin
           </div>
           {/* statut "en cours" */}
           <div style={{ position: 'absolute', bottom: 10, left: 8, right: 8, animation: a('sf-uploading') }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 4, letterSpacing: '0.03em' }}>PUBLICATION…</div>
+            <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 4, letterSpacing: '0.03em' }}>{tr('PUBLICATION…', 'POSTING…')}</div>
             <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
               <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#6366F1,#a855f7)', animation: a('sf-upbar') }} />
             </div>
@@ -376,7 +378,7 @@ function AutoPhone({ i, grad, handle }: { i: number; grad: string; handle: strin
           {/* statut "publié" */}
           <div style={{ position: 'absolute', bottom: 12, left: 8, right: 8, display: 'flex', alignItems: 'center', gap: 5, animation: a('sf-posted') }}>
             <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#22c55e', color: '#fff', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
-            <span style={{ fontSize: 9, fontWeight: 800, color: '#22c55e' }}>Publié</span>
+            <span style={{ fontSize: 9, fontWeight: 800, color: '#22c55e' }}>{tr('Publié', 'Posted')}</span>
           </div>
         </div>
       </div>
@@ -424,11 +426,12 @@ function CountUp({ to, prefix = '', suffix = '', duration = 1900 }: { to: number
 
 // ── Bandeau de stats animées ──────────────────────────────────────────────────
 function StatsBanner() {
+  const tr = useTr()
   const stats = [
-    { to: 500, suffix: '+', label: 'comptes pilotés en parallèle' },
-    { to: 1200, suffix: '+', label: 'publications automatisées / jour' },
-    { to: 100, suffix: '%', label: 'autonome — même PC éteint' },
-    { to: 24, suffix: '/7', label: 'cloud phones qui tournent' },
+    { to: 500, suffix: '+', label: tr('comptes pilotés en parallèle', 'accounts driven in parallel') },
+    { to: 1200, suffix: '+', label: tr('publications automatisées / jour', 'automated posts / day') },
+    { to: 100, suffix: '%', label: tr('autonome — même PC éteint', 'autonomous — even with your PC off') },
+    { to: 24, suffix: '/7', label: tr('cloud phones qui tournent', 'cloud phones running') },
   ]
   return (
     <section style={{ position: 'relative', padding: '70px 24px', background: BG, borderTop: `1px solid ${HAIR}`, borderBottom: `1px solid ${HAIR}` }}>
@@ -451,6 +454,7 @@ function StatsBanner() {
 
 // ── Stage 1 — Entrée cinématique ─────────────────────────────────────────────
 function TunnelHero({ onEnter }: { onEnter: () => void }) {
+  const tr = useTr()
   const [hover, setHover] = useState(false)
 
   return (
@@ -510,7 +514,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           color: MUTED, margin: '16px 0 52px', letterSpacing: '0.01em',
           animation: 'sf-fade-in 1.4s ease 1s both',
         }}>
-          L’usine de contenu des marques qui dominent Instagram &amp; TikTok.
+          {tr('L’usine de contenu des marques qui dominent Instagram & TikTok.', 'The content factory behind the brands that dominate Instagram & TikTok.')}
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', animation: 'sf-fade-up 0.9s cubic-bezier(0.16,1,0.3,1) 1.25s both' }}>
@@ -530,7 +534,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
               transition: 'all 0.45s cubic-bezier(0.16,1,0.3,1)',
             }}
           >
-            Entrer
+            {tr('Entrer', 'Enter')}
           </button>
         </div>
       </div>
@@ -551,6 +555,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
 
 // ── Stage 2 — Choix (Découvrir / Studio) avec inversion ivoire ───────────────
 function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStudio: () => void }) {
+  const tr = useTr()
   const [hoverTop, setHoverTop] = useState(false)
   const [hoverBot, setHoverBot] = useState(false)
   const [visible,  setVisible]  = useState(false)
@@ -650,11 +655,11 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
         <Wordmark size={14} />
       </div>
 
-      {half(hoverTop, setHoverTop, onDiscover, '— 01', 'DÉCOUVRIR', 'ScaleFlow', 'Manifeste · Fonctionnalités · Tarifs', '0.15s')}
+      {half(hoverTop, setHoverTop, onDiscover, '— 01', tr('DÉCOUVRIR', 'DISCOVER'), 'ScaleFlow', tr('Manifeste · Fonctionnalités · Tarifs', 'Manifesto · Features · Pricing'), '0.15s')}
 
       <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${HAIR} 20%, rgba(99,102,241,0.35) 50%, ${HAIR} 80%, transparent)`, flexShrink: 0, zIndex: 10 }} />
 
-      {half(hoverBot, setHoverBot, onStudio, '— 02', 'LE', 'Studio', 'Connexion · Mass Posting · Cloud Phones', '0.28s')}
+      {half(hoverBot, setHoverBot, onStudio, '— 02', tr('LE', 'THE'), 'Studio', tr('Connexion · Mass Posting · Cloud Phones', 'Login · Mass Posting · Cloud Phones'), '0.28s')}
     </div>
   )
 }
@@ -687,6 +692,7 @@ function Marquee({ items, dark = false }: { items: string[]; dark?: boolean }) {
 
 // ── Hero du site (page Découvrir) ────────────────────────────────────────────
 function SiteHero({ onStudio }: { onStudio: () => void }) {
+  const tr = useTr()
   const [ctaHover, setCtaHover] = useState(false)
 
   const CARDS = [
@@ -722,7 +728,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
             <svg width="8" height="8" viewBox="0 0 24 24" fill={GOLD}><path d="M8 5v14l11-7z"/></svg>
             <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 700, color: IVORY, letterSpacing: '0.04em' }}>{c.views}</span>
-            <span style={{ fontFamily: SANS, fontSize: 8, fontWeight: 600, color: FAINT, letterSpacing: '0.18em', marginLeft: 'auto', textTransform: 'uppercase' }}>vues</span>
+            <span style={{ fontFamily: SANS, fontSize: 8, fontWeight: 600, color: FAINT, letterSpacing: '0.18em', marginLeft: 'auto', textTransform: 'uppercase' }}>{tr('vues', 'views')}</span>
           </div>
         </div>
       ))}
@@ -733,27 +739,26 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
       {/* Center content */}
       <div style={{ position: 'relative', zIndex: 10, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '64px 24px 40px' }}>
         <FadeIn>
-          <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 34 }}>Le studio nouvelle génération</MicroLabel>
+          <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 34 }}>{tr('Le studio nouvelle génération', 'The next-generation studio')}</MicroLabel>
         </FadeIn>
 
         <FadeIn delay={0.08}>
           <h1 style={{ margin: 0, lineHeight: 1.0, letterSpacing: '-0.04em', maxWidth: 1040 }}>
             <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(40px, 6.6vw, 92px)', color: IVORY }}>
-              L’automatisation
+              {tr('L’automatisation', 'Instagram & TikTok')}
             </span>
             <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(40px, 6.6vw, 92px)', color: IVORY }}>
-              Instagram &amp; TikTok,
+              {tr('Instagram & TikTok,', 'automation,')}
             </span>
             <span className="sf-serif-shimmer" style={{ display: 'block', fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(44px, 7vw, 100px)', color: GOLD, letterSpacing: '-0.005em', marginTop: '0.06em' }}>
-              élevée au rang d’art.
+              {tr('élevée au rang d’art.', 'elevated to an art.')}
             </span>
           </h1>
         </FadeIn>
 
         <FadeIn delay={0.16}>
           <p style={{ fontFamily: SANS, fontSize: 15, color: MUTED, margin: '30px auto 44px', lineHeight: 1.8, maxWidth: 480, fontWeight: 400 }}>
-            Des dizaines de comptes. Des centaines de publications.
-            Une seule interface — pensée pour ceux qui voient grand.
+            {tr('Des dizaines de comptes. Des centaines de publications. Une seule interface — pensée pour ceux qui voient grand.', 'Dozens of accounts. Hundreds of posts. One interface — built for those who think big.')}
           </p>
         </FadeIn>
 
@@ -772,7 +777,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
                 cursor: 'pointer',
                 transition: 'all 0.4s cubic-bezier(0.16,1,0.3,1)',
               }}>
-              Entrer au Studio <Icon name="arrow-right" size={14} />
+              {tr('Entrer au Studio', 'Enter the Studio')} <Icon name="arrow-right" size={14} />
             </button>
             <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" className="sf-shine"
               style={{
@@ -787,7 +792,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
               }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(233,234,240,0.6)' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(233,234,240,0.25)' }}>
-              Acheter une clé
+              {tr('Acheter une clé', 'Buy a key')}
             </a>
           </div>
         </FadeIn>
@@ -796,9 +801,9 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
         <FadeIn delay={0.34}>
           <div style={{ display: 'flex', gap: 0, marginTop: 70, flexWrap: 'wrap', justifyContent: 'center' }}>
             {[
-              { node: <CountUp to={50} suffix="+" />,  l: 'Téléphones pilotés en parallèle' },
-              { node: <CountUp to={10} suffix="K" />,  l: 'Publications chaque mois' },
-              { node: <>24/7</>,                        l: 'Scheduler autonome dans le cloud' },
+              { node: <CountUp to={50} suffix="+" />,  l: tr('Téléphones pilotés en parallèle', 'Phones driven in parallel') },
+              { node: <CountUp to={10} suffix="K" />,  l: tr('Publications chaque mois', 'Posts every month') },
+              { node: <>24/7</>,                        l: tr('Scheduler autonome dans le cloud', 'Autonomous scheduler in the cloud') },
             ].map((s, i, a) => (
               <div key={i} style={{ padding: '0 44px', textAlign: 'center', borderRight: i < a.length - 1 ? `1px solid ${HAIR}` : 'none' }}>
                 <div style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 'clamp(30px, 3.4vw, 44px)', color: IVORY, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.node}</div>
@@ -811,23 +816,24 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
 
       {/* Marquee bottom */}
       <div style={{ position: 'relative', zIndex: 10 }}>
-        <Marquee items={['Mass Posting', 'Précision', 'Multi-Comptes', 'Élégance', 'Reels & Stories', 'Échelle', 'Cloud Phones', 'Autonomie', 'Intelligence Artificielle', 'Vitesse']} />
+        <Marquee items={[tr('Mass Posting', 'Mass Posting'), tr('Précision', 'Precision'), tr('Multi-Comptes', 'Multi-Account'), tr('Élégance', 'Elegance'), tr('Reels & Stories', 'Reels & Stories'), tr('Échelle', 'Scale'), tr('Cloud Phones', 'Cloud Phones'), tr('Autonomie', 'Autonomy'), tr('Intelligence Artificielle', 'Artificial Intelligence'), tr('Vitesse', 'Speed')]} />
       </div>
     </section>
   )
 }
 
 // ── Features — liste éditoriale numérotée ────────────────────────────────────
-const FEATURES: { num: string; title: string; serif: string; text: string; icon: IconName }[] = [
-  { num: '01', title: 'Mass',      serif: 'Posting',   icon: 'send',            text: "Des dizaines de comptes Instagram & TikTok publient en parallèle. Sélectionne, lance — chaque téléphone s’éteint après sa publication. Sans surveillance." },
-  { num: '02', title: 'Banque de', serif: 'contenu',   icon: 'folder-archive',  text: 'Ta vidéothèque cloud, organisée par dossiers et partagée avec ton organisation. Import drag & drop, miniatures automatiques.' },
-  { num: '03', title: 'Remix &',   serif: 'Spoof',     icon: 'shuffle',         text: 'Des copies uniques générées par FFmpeg : luminosité, grain, zoom, recadrage, teinte. Le duplicate content ne te concerne plus.' },
-  { num: '04', title: 'Outils',    serif: 'IA',        icon: 'bot',             text: 'Scripts, hooks, captions virales, analyse de miniatures. Llama et Claude Vision intégrés directement dans ton flux de travail.' },
-  { num: '05', title: 'Program',   serif: 'mation',    icon: 'calendar',        text: "Planifie tes publications à l’avance. Le scheduler s’exécute dans le cloud, même application fermée." },
-  { num: '06', title: 'Suivi',     serif: 'temps réel',icon: 'smartphone',      text: 'Le statut de chaque cloud phone, en direct. Sessions Instagram, groupes, batteries — tout sous contrôle.' },
+const FEATURES: { num: string; title: string; titleEn: string; serif: string; serifEn: string; text: string; textEn: string; icon: IconName }[] = [
+  { num: '01', title: 'Mass',      titleEn: 'Mass',       serif: 'Posting',    serifEn: 'Posting',    icon: 'send',            text: "Des dizaines de comptes Instagram & TikTok publient en parallèle. Sélectionne, lance — chaque téléphone s’éteint après sa publication. Sans surveillance.", textEn: 'Dozens of Instagram & TikTok accounts post in parallel. Select, launch — each phone shuts down after its post. No supervision.' },
+  { num: '02', title: 'Banque de', titleEn: 'Content',    serif: 'contenu',    serifEn: 'bank',       icon: 'folder-archive',  text: 'Ta vidéothèque cloud, organisée par dossiers et partagée avec ton organisation. Import drag & drop, miniatures automatiques.', textEn: 'Your cloud video library, organized by folders and shared with your organization. Drag & drop import, automatic thumbnails.' },
+  { num: '03', title: 'Remix &',   titleEn: 'Remix &',    serif: 'Spoof',      serifEn: 'Spoof',      icon: 'shuffle',         text: 'Des copies uniques générées par FFmpeg : luminosité, grain, zoom, recadrage, teinte. Le duplicate content ne te concerne plus.', textEn: 'Unique copies generated by FFmpeg: brightness, grain, zoom, cropping, hue. Duplicate content is no longer your problem.' },
+  { num: '04', title: 'Outils',    titleEn: 'AI',         serif: 'IA',         serifEn: 'tools',      icon: 'bot',             text: 'Scripts, hooks, captions virales, analyse de miniatures. Llama et Claude Vision intégrés directement dans ton flux de travail.', textEn: 'Scripts, hooks, viral captions, thumbnail analysis. Llama and Claude Vision built right into your workflow.' },
+  { num: '05', title: 'Program',   titleEn: 'Sched',      serif: 'mation',     serifEn: 'uling',      icon: 'calendar',        text: "Planifie tes publications à l’avance. Le scheduler s’exécute dans le cloud, même application fermée.", textEn: 'Schedule your posts in advance. The scheduler runs in the cloud, even with the app closed.' },
+  { num: '06', title: 'Suivi',     titleEn: 'Real-time',  serif: 'temps réel', serifEn: 'monitoring', icon: 'smartphone',      text: 'Le statut de chaque cloud phone, en direct. Sessions Instagram, groupes, batteries — tout sous contrôle.', textEn: 'The status of every cloud phone, live. Instagram sessions, groups, batteries — all under control.' },
 ]
 
 function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number }) {
+  const tr = useTr()
   const [hover, setHover] = useState(false)
   const [pos, setPos] = useState({ x: 50, y: 50 })
   return (
@@ -866,13 +872,13 @@ function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number })
 
         <div>
           <h3 style={{ margin: '0 0 8px', lineHeight: 1 }}>
-            <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 'clamp(22px, 2.6vw, 34px)', letterSpacing: '-0.03em', color: IVORY }}>{f.title}</span>
-            <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(24px, 2.8vw, 37px)', color: hover ? GOLD : 'rgba(99,102,241,0.75)', marginLeft: '0.18em', transition: 'color 0.3s' }}>{f.serif}</span>
+            <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 'clamp(22px, 2.6vw, 34px)', letterSpacing: '-0.03em', color: IVORY }}>{tr(f.title, f.titleEn)}</span>
+            <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(24px, 2.8vw, 37px)', color: hover ? GOLD : 'rgba(99,102,241,0.75)', marginLeft: '0.18em', transition: 'color 0.3s' }}>{tr(f.serif, f.serifEn)}</span>
           </h3>
           <p style={{
             fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.75, margin: 0, maxWidth: 560,
             opacity: hover ? 1 : 0.65, transition: 'opacity 0.35s',
-          }}>{f.text}</p>
+          }}>{tr(f.text, f.textEn)}</p>
         </div>
 
         <div style={{
@@ -892,80 +898,81 @@ function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number })
 }
 
 // ── Pricing data ──────────────────────────────────────────────────────────────
-type PlanFeature = { text: string; included: boolean }
+type PlanFeature = { text: string; textEn: string; included: boolean }
 interface PlanDef {
-  name: string; tagline: string
-  credits: string
-  perAccount: string
+  name: string; nameEn: string; tagline: string; taglineEn: string
+  credits: string; creditsEn: string
+  perAccount: string; perAccountEn: string
   monthlyPrice: string; yearlyPrice: string
-  originalMonthly: string; discount: string; yearlyBilled: string
+  originalMonthly: string; discount: string; yearlyBilled: string; yearlyBilledEn: string
   popular?: boolean; bestValue?: boolean
-  btnLabel: string
+  btnLabel: string; btnLabelEn: string
   features: PlanFeature[]
 }
 const PLANS: PlanDef[] = [
   {
-    name: 'Standard', tagline: 'Pour débuter',
-    credits: '3 750 crédits / mois',
-    perAccount: '≈ 25 comptes · 2,00$ / compte',
+    name: 'Standard', nameEn: 'Standard', tagline: 'Pour débuter', taglineEn: 'To get started',
+    credits: '3 750 crédits / mois', creditsEn: '3,750 credits / month',
+    perAccount: '≈ 25 comptes · 2,00$ / compte', perAccountEn: '≈ 25 accounts · $2.00 / account',
     monthlyPrice: '49,99$', yearlyPrice: '49,99$',
-    originalMonthly: '', discount: '', yearlyBilled: '',
-    btnLabel: 'Choisir Standard',
+    originalMonthly: '', discount: '', yearlyBilled: '', yearlyBilledEn: '',
+    btnLabel: 'Choisir Standard', btnLabelEn: 'Choose Standard',
     features: [
-      { text: '100 téléphones max',              included: true  },
-      { text: 'Accès aux outils de base',       included: true  },
-      { text: 'Mass Posting (10 comptes max)',   included: true  },
-      { text: 'Création de contenu (Remix, Spoof…)', included: false },
-      { text: 'Support prioritaire',             included: false },
-      { text: 'Organisations multi-membres',     included: false },
+      { text: '100 téléphones max',              textEn: 'Up to 100 phones',            included: true  },
+      { text: 'Accès aux outils de base',       textEn: 'Access to core tools',        included: true  },
+      { text: 'Mass Posting (10 comptes max)',   textEn: 'Mass Posting (up to 10 accounts)', included: true  },
+      { text: 'Création de contenu (Remix, Spoof…)', textEn: 'Content creation (Remix, Spoof…)', included: false },
+      { text: 'Support prioritaire',             textEn: 'Priority support',            included: false },
+      { text: 'Organisations multi-membres',     textEn: 'Multi-member organizations',  included: false },
     ],
   },
   {
-    name: 'Pro', tagline: 'Scale ton agence',
-    credits: '11 250 crédits / mois',
-    perAccount: '≈ 75 comptes · 1,33$ / compte',
+    name: 'Pro', nameEn: 'Pro', tagline: 'Scale ton agence', taglineEn: 'Scale your agency',
+    credits: '11 250 crédits / mois', creditsEn: '11,250 credits / month',
+    perAccount: '≈ 75 comptes · 1,33$ / compte', perAccountEn: '≈ 75 accounts · $1.33 / account',
     monthlyPrice: '99,99$', yearlyPrice: '59,99$',
-    originalMonthly: '99,99$', discount: '−40%', yearlyBilled: '719,88$ facturé annuellement',
+    originalMonthly: '99,99$', discount: '−40%', yearlyBilled: '719,88$ facturé annuellement', yearlyBilledEn: '$719.88 billed annually',
     popular: true,
-    btnLabel: 'Choisir Pro',
+    btnLabel: 'Choisir Pro', btnLabelEn: 'Choose Pro',
     features: [
-      { text: '200 téléphones max',              included: true  },
-      { text: 'Accès à tous les outils',         included: true  },
-      { text: 'Création de contenu (Remix, Spoof…) — gratuit', included: true  },
-      { text: 'Mass Posting illimité',            included: true  },
-      { text: 'Support prioritaire',              included: true  },
-      { text: 'Organisations multi-membres',      included: true  },
+      { text: '200 téléphones max',              textEn: 'Up to 200 phones',            included: true  },
+      { text: 'Accès à tous les outils',         textEn: 'Access to all tools',         included: true  },
+      { text: 'Création de contenu (Remix, Spoof…) — gratuit', textEn: 'Content creation (Remix, Spoof…) — free', included: true  },
+      { text: 'Mass Posting illimité',            textEn: 'Unlimited Mass Posting',      included: true  },
+      { text: 'Support prioritaire',              textEn: 'Priority support',            included: true  },
+      { text: 'Organisations multi-membres',      textEn: 'Multi-member organizations',  included: true  },
     ],
   },
   {
-    name: 'Organisation', tagline: 'Puissance illimitée',
-    credits: '22 500 crédits / mois',
-    perAccount: '150 comptes · 1,00$ / compte',
+    name: 'Organisation', nameEn: 'Organization', tagline: 'Puissance illimitée', taglineEn: 'Unlimited power',
+    credits: '22 500 crédits / mois', creditsEn: '22,500 credits / month',
+    perAccount: '150 comptes · 1,00$ / compte', perAccountEn: '150 accounts · $1.00 / account',
     monthlyPrice: '149,99$', yearlyPrice: '89,99$',
-    originalMonthly: '149,99$', discount: '−40%', yearlyBilled: '1 079,88$ facturé annuellement',
+    originalMonthly: '149,99$', discount: '−40%', yearlyBilled: '1 079,88$ facturé annuellement', yearlyBilledEn: '$1,079.88 billed annually',
     bestValue: true,
-    btnLabel: 'Choisir Organisation',
+    btnLabel: 'Choisir Organisation', btnLabelEn: 'Choose Organization',
     features: [
-      { text: 'Téléphones illimités',            included: true  },
-      { text: 'Accès à tous les outils',         included: true  },
-      { text: 'Création de contenu (Remix, Spoof…) — gratuit', included: true  },
-      { text: 'Mass Posting illimité',            included: true  },
-      { text: 'Support prioritaire 24/7',         included: true  },
-      { text: 'Organisations multi-membres',      included: true  },
+      { text: 'Téléphones illimités',            textEn: 'Unlimited phones',            included: true  },
+      { text: 'Accès à tous les outils',         textEn: 'Access to all tools',         included: true  },
+      { text: 'Création de contenu (Remix, Spoof…) — gratuit', textEn: 'Content creation (Remix, Spoof…) — free', included: true  },
+      { text: 'Mass Posting illimité',            textEn: 'Unlimited Mass Posting',      included: true  },
+      { text: 'Support prioritaire 24/7',         textEn: '24/7 priority support',       included: true  },
+      { text: 'Organisations multi-membres',      textEn: 'Multi-member organizations',  included: true  },
     ],
   },
 ]
 
 const CREDIT_PACKS = [
-  { name: 'Mini',  credits: '1 000',  price: '12,99$',  note: '~6 comptes / mois'   },
-  { name: 'Plus',  credits: '2 500',  price: '27,99$',  note: '~16 comptes / mois'  },
-  { name: 'Mega',  credits: '6 000',  price: '54,99$',  note: '40 comptes · Populaire' },
-  { name: 'Giga',  credits: '15 000', price: '119,99$', note: '100 comptes / mois'  },
-  { name: 'Ultra', credits: '40 000', price: '289,99$', note: '266 comptes · Top valeur' },
+  { name: 'Mini',  credits: '1 000',  price: '12,99$',  note: '~6 comptes / mois',   noteEn: '~6 accounts / month'   },
+  { name: 'Plus',  credits: '2 500',  price: '27,99$',  note: '~16 comptes / mois',  noteEn: '~16 accounts / month'  },
+  { name: 'Mega',  credits: '6 000',  price: '54,99$',  note: '40 comptes · Populaire', noteEn: '40 accounts · Popular' },
+  { name: 'Giga',  credits: '15 000', price: '119,99$', note: '100 comptes / mois',  noteEn: '100 accounts / month'  },
+  { name: 'Ultra', credits: '40 000', price: '289,99$', note: '266 comptes · Top valeur', noteEn: '266 accounts · Best value' },
 ]
 
 // ── Pricing — luxe : carte "Pro" inversée en ivoire ──────────────────────────
 function PricingSection() {
+  const tr = useTr()
   const [yearly, setYearly] = useState(false)
 
   return (
@@ -975,16 +982,16 @@ function PricingSection() {
 
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>Investissement</MicroLabel>
+            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>{tr('Investissement', 'Investment')}</MicroLabel>
             <h2 style={{ margin: '0 0 34px', lineHeight: 1, letterSpacing: '-0.04em' }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 5vw, 62px)', color: IVORY }}>Trois plans. </span>
-              <span className="sf-serif-shimmer" style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 5.3vw, 66px)', color: GOLD }}>Zéro limite.</span>
+              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 5vw, 62px)', color: IVORY }}>{tr('Trois plans. ', 'Three plans. ')}</span>
+              <span className="sf-serif-shimmer" style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 5.3vw, 66px)', color: GOLD }}>{tr('Zéro limite.', 'Zero limits.')}</span>
             </h2>
             {/* Billing toggle */}
             <div style={{ display: 'inline-flex', border: `1px solid ${HAIR}`, padding: 3, gap: 0 }}>
               {[
-                { v: false, label: 'Mensuel' },
-                { v: true,  label: 'Annuel · −40%' },
+                { v: false, label: tr('Mensuel', 'Monthly') },
+                { v: true,  label: tr('Annuel · −40%', 'Yearly · −40%') },
               ].map(opt => (
                 <button key={String(opt.v)} onClick={() => setYearly(opt.v)} style={{
                   padding: '9px 26px', fontSize: 11, fontWeight: 700,
@@ -1026,13 +1033,13 @@ function PricingSection() {
                         borderBottom: `1px solid ${inverted ? '#0F1014' : 'rgba(99,102,241,0.5)'}`,
                         paddingBottom: 3,
                       }}>
-                        {p.popular ? 'Le plus choisi' : 'Meilleure valeur'}
+                        {p.popular ? tr('Le plus choisi', 'Most chosen') : tr('Meilleure valeur', 'Best value')}
                       </span>
                     )}
                   </div>
 
-                  <h3 style={{ margin: '0 0 4px', fontFamily: SANS, fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: inverted ? '#0F1014' : IVORY }}>{p.name}</h3>
-                  <p style={{ margin: '0 0 30px', fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: inverted ? 'rgba(10,10,12,0.55)' : MUTED }}>{p.tagline}</p>
+                  <h3 style={{ margin: '0 0 4px', fontFamily: SANS, fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: inverted ? '#0F1014' : IVORY }}>{tr(p.name, p.nameEn)}</h3>
+                  <p style={{ margin: '0 0 30px', fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: inverted ? 'rgba(10,10,12,0.55)' : MUTED }}>{tr(p.tagline, p.taglineEn)}</p>
 
                   {/* Price */}
                   <div style={{ marginBottom: 8, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
@@ -1042,16 +1049,16 @@ function PricingSection() {
                     <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 52, letterSpacing: '-0.05em', lineHeight: 1, color: inverted ? '#0F1014' : IVORY }}>
                       {yearly ? p.yearlyPrice : p.monthlyPrice}
                     </span>
-                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 16, color: inverted ? 'rgba(10,10,12,0.5)' : MUTED }}>/mois</span>
+                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 16, color: inverted ? 'rgba(10,10,12,0.5)' : MUTED }}>{tr('/mois', '/month')}</span>
                     {yearly && p.discount && (
                       <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: inverted ? '#0F1014' : GOLD }}>{p.discount}</span>
                     )}
                   </div>
                   <p style={{ margin: '0 0 6px', fontFamily: SANS, fontSize: 11, color: inverted ? 'rgba(10,10,12,0.45)' : FAINT, minHeight: 14 }}>
-                    {yearly && p.yearlyBilled ? p.yearlyBilled : ' '}
+                    {yearly && p.yearlyBilled ? tr(p.yearlyBilled, p.yearlyBilledEn) : ' '}
                   </p>
                   <p style={{ margin: '0 0 8px', fontFamily: SANS, fontSize: 11.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: inverted ? 'rgba(10,10,12,0.6)' : 'rgba(99,102,241,0.7)' }}>
-                    {p.credits}
+                    {tr(p.credits, p.creditsEn)}
                   </p>
                   <div style={{
                     margin: '0 0 10px', padding: '9px 12px', borderRadius: 10,
@@ -1059,11 +1066,11 @@ function PricingSection() {
                     border: `1px solid ${inverted ? 'rgba(10,10,12,0.15)' : 'rgba(99,102,241,0.3)'}`,
                   }}>
                     <p style={{ margin: 0, fontFamily: SANS, fontSize: 15, fontWeight: 900, color: inverted ? '#0F1014' : IVORY, lineHeight: 1.2 }}>
-                      {p.perAccount}
+                      {tr(p.perAccount, p.perAccountEn)}
                     </p>
                   </div>
                   <p style={{ margin: '0 0 24px', fontFamily: SANS, fontSize: 10.5, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT, lineHeight: 1.4 }}>
-                    Base : 2 posts + 1 story / jour / compte
+                    {tr('Base : 2 posts + 1 story / jour / compte', 'Basis: 2 posts + 1 story / day / account')}
                   </p>
 
                   <div style={{ height: 1, background: inverted ? 'rgba(10,10,12,0.12)' : HAIR, marginBottom: 24 }} />
@@ -1080,7 +1087,7 @@ function PricingSection() {
                         <span style={{
                           fontFamily: SANS, fontSize: 13,
                           color: f.included ? (inverted ? 'rgba(10,10,12,0.85)' : 'rgba(233,234,240,0.78)') : (inverted ? 'rgba(10,10,12,0.3)' : FAINT),
-                        }}>{f.text}</span>
+                        }}>{tr(f.text, f.textEn)}</span>
                       </li>
                     ))}
                   </ul>
@@ -1105,7 +1112,7 @@ function PricingSection() {
                       if (inverted) { e.currentTarget.style.background = '#0F1014'; e.currentTarget.style.borderColor = '#0F1014'; e.currentTarget.style.color = IVORY }
                       else { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = IVORY; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.3)' }
                     }}>
-                    {p.btnLabel}
+                    {tr(p.btnLabel, p.btnLabelEn)}
                   </a>
                 </div>
               </FadeIn>
@@ -1122,7 +1129,7 @@ function PricingSection() {
           }}>
             <span style={{ fontSize: 22, flexShrink: 0 }}>📊</span>
             <p style={{ textAlign: 'left', margin: 0, fontFamily: SANS, fontSize: 14, color: IVORY, lineHeight: 1.6 }}>
-              Estimation comptes basée sur une <strong style={{ color: GOLD }}>utilisation standard : 2 posts + 1 story par jour et par compte</strong> (≈ 150 crédits/compte/mois — 2 crédits/post, 1 crédit/story). Les outils vidéo (Remix, Spoof) sont <strong style={{ color: GOLD }}>gratuits</strong>, et les crédits non utilisés <strong style={{ color: GOLD }}>se cumulent</strong> d'un mois sur l'autre.
+              {tr('Estimation comptes basée sur une ', 'Account estimate based on ')}<strong style={{ color: GOLD }}>{tr('utilisation standard : 2 posts + 1 story par jour et par compte', 'standard usage: 2 posts + 1 story per day per account')}</strong>{tr(' (≈ 150 crédits/compte/mois — 2 crédits/post, 1 crédit/story). Les outils vidéo (Remix, Spoof) sont ', ' (≈ 150 credits/account/month — 2 credits/post, 1 credit/story). Video tools (Remix, Spoof) are ')}<strong style={{ color: GOLD }}>{tr('gratuits', 'free')}</strong>{tr(', et les crédits non utilisés ', ', and unused credits ')}<strong style={{ color: GOLD }}>{tr('se cumulent', 'roll over')}</strong>{tr(' d\'un mois sur l\'autre.', ' from one month to the next.')}
             </p>
           </div>
         </FadeIn>
@@ -1131,10 +1138,10 @@ function PricingSection() {
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
             <h3 style={{ margin: '0 0 10px', lineHeight: 1 }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(24px, 3.4vw, 40px)', letterSpacing: '-0.03em', color: IVORY }}>Packs de </span>
-              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(26px, 3.6vw, 43px)', color: GOLD }}>crédits</span>
+              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(24px, 3.4vw, 40px)', letterSpacing: '-0.03em', color: IVORY }}>{tr('Packs de ', 'Credit ')}</span>
+              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(26px, 3.6vw, 43px)', color: GOLD }}>{tr('crédits', 'packs')}</span>
             </h3>
-            <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: 0 }}>Recharge à tout moment — les crédits n’expirent jamais.</p>
+            <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: 0 }}>{tr('Recharge à tout moment — les crédits n’expirent jamais.', 'Top up anytime — credits never expire.')}</p>
           </div>
         </FadeIn>
 
@@ -1147,10 +1154,10 @@ function PricingSection() {
                 onMouseLeave={e => (e.currentTarget.style.background = BG)}
               >
                 <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.3em', textTransform: 'uppercase', color: pack.note ? GOLD : FAINT, margin: '0 0 18px', minHeight: 12 }}>
-                  {pack.note || pack.name}
+                  {pack.note ? tr(pack.note, pack.noteEn) : pack.name}
                 </p>
                 <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 42, color: IVORY, margin: '0 0 2px', lineHeight: 1 }}>{pack.credits}</p>
-                <p style={{ fontFamily: SANS, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: FAINT, margin: '0 0 22px' }}>crédits</p>
+                <p style={{ fontFamily: SANS, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: FAINT, margin: '0 0 22px' }}>{tr('crédits', 'credits')}</p>
                 <p style={{ fontFamily: SANS, fontWeight: 900, fontSize: 26, letterSpacing: '-0.03em', color: IVORY, margin: '0 0 24px' }}>{pack.price}</p>
                 <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
                   style={{
@@ -1161,7 +1168,7 @@ function PricingSection() {
                   }}
                   onMouseEnter={e => { e.currentTarget.style.color = GOLD; e.currentTarget.style.borderColor = GOLD }}
                   onMouseLeave={e => { e.currentTarget.style.color = IVORY; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.3)' }}>
-                  Acheter <Icon name="arrow-up-right" size={11} />
+                  {tr('Acheter', 'Buy')} <Icon name="arrow-up-right" size={11} />
                 </a>
               </div>
             </FadeIn>
@@ -1169,7 +1176,7 @@ function PricingSection() {
         </div>
 
         <p style={{ textAlign: 'center', fontFamily: SANS, fontSize: 10.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: FAINT, marginTop: 32 }}>
-          Activation via Telegram · Crypto ou virement · Immédiat
+          {tr('Activation via Telegram · Crypto ou virement · Immédiat', 'Activation via Telegram · Crypto or bank transfer · Instant')}
         </p>
       </div>
     </section>
@@ -1178,12 +1185,12 @@ function PricingSection() {
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
 const QA = [
-  { q: "C’est quoi ScaleFlow ?",          a: "Une app pour gérer en masse tes comptes Instagram : poster sur des dizaines de téléphones en parallèle, organiser ta banque de vidéos, voir les stats en temps réel, et automatiser les tâches répétitives." },
-  { q: "J’ai besoin de quoi ?",           a: "Un abonnement GéeLark (cloud phones) + ton bearer token. ScaleFlow se connecte à GéeLark pour piloter tes téléphones virtuels." },
-  { q: "Différence Standard vs Pro ?",   a: "Standard = 3 750 crédits/mois + outils de base. Pro = 11 250 crédits + Mass Posting illimité + organisations multi-membres + support prioritaire." },
-  { q: "C’est risqué pour mes comptes ?", a: "ScaleFlow utilise GéeLark qui simule de vrais devices avec leurs propres IPs/sessions. Warmup intégré pour respecter les rythmes humains." },
-  { q: "Version web ou téléchargement ?", a: "Les deux. L’Electron (.exe/.dmg) est plus rapide. La version web est accessible depuis n’importe où." },
-  { q: "Comment contacter le support ?",  a: "Via Telegram (@justquentin), réponse en moins d'1h. Ou via les tickets dans l’app." },
+  { q: "C’est quoi ScaleFlow ?",          qEn: 'What is ScaleFlow?',                a: "Une app pour gérer en masse tes comptes Instagram : poster sur des dizaines de téléphones en parallèle, organiser ta banque de vidéos, voir les stats en temps réel, et automatiser les tâches répétitives.", aEn: 'An app to manage your Instagram accounts at scale: post on dozens of phones in parallel, organize your video bank, see live stats, and automate repetitive tasks.' },
+  { q: "J’ai besoin de quoi ?",           qEn: 'What do I need?',                   a: "Un abonnement GéeLark (cloud phones) + ton bearer token. ScaleFlow se connecte à GéeLark pour piloter tes téléphones virtuels.", aEn: 'A GeeLark subscription (cloud phones) + your bearer token. ScaleFlow connects to GeeLark to drive your virtual phones.' },
+  { q: "Différence Standard vs Pro ?",   qEn: 'Standard vs Pro difference?',       a: "Standard = 3 750 crédits/mois + outils de base. Pro = 11 250 crédits + Mass Posting illimité + organisations multi-membres + support prioritaire.", aEn: 'Standard = 3,750 credits/month + core tools. Pro = 11,250 credits + unlimited Mass Posting + multi-member organizations + priority support.' },
+  { q: "C’est risqué pour mes comptes ?", qEn: 'Is it risky for my accounts?',      a: "ScaleFlow utilise GéeLark qui simule de vrais devices avec leurs propres IPs/sessions. Warmup intégré pour respecter les rythmes humains.", aEn: 'ScaleFlow uses GeeLark, which simulates real devices with their own IPs/sessions. Built-in warmup to respect human rhythms.' },
+  { q: "Version web ou téléchargement ?", qEn: 'Web version or download?',          a: "Les deux. L’Electron (.exe/.dmg) est plus rapide. La version web est accessible depuis n’importe où.", aEn: 'Both. The Electron app (.exe/.dmg) is faster. The web version is accessible from anywhere.' },
+  { q: "Comment contacter le support ?",  qEn: 'How do I contact support?',         a: "Via Telegram (@justquentin), réponse en moins d'1h. Ou via les tickets dans l’app.", aEn: 'Via Telegram (@justquentin), reply in under 1h. Or through the in-app tickets.' },
 ]
 
 // ── Telegram icon ─────────────────────────────────────────────────────────────
@@ -1195,6 +1202,7 @@ const TGIcon = ({ size = 14 }: { size?: number }) => (
 
 // ── Studio auth — split cinématique ───────────────────────────────────────────
 function StudioAuth({ onBack }: { onBack: () => void }) {
+  const tr = useTr()
   const [tab,      setTab]      = useState<'login'|'register'>('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -1216,20 +1224,20 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password })
         if (err) throw err
       } else {
-        if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.')
-        if (password.length < 6) throw new Error('Mot de passe trop court (6 caractères min).')
+        if (password !== confirm) throw new Error(tr('Les mots de passe ne correspondent pas.', 'Passwords do not match.'))
+        if (password.length < 6) throw new Error(tr('Mot de passe trop court (6 caractères min).', 'Password too short (6 characters min).'))
         const { data, error: err } = await supabase.auth.signUp({ email, password })
         if (err) throw err
-        if (data.user && !data.session) setSuccess('Compte créé ! Vérifie ta boîte mail.')
+        if (data.user && !data.session) setSuccess(tr('Compte créé ! Vérifie ta boîte mail.', 'Account created! Check your inbox.'))
       }
     } catch (err: any) {
       const raw = err instanceof Error ? err.message : String(err)
       const r = raw.toLowerCase()
       setError(
-        r.includes('invalid login') || r.includes('invalid credentials') ? 'Email ou mot de passe incorrect.' :
-        r.includes('email not confirmed') ? 'Email non confirmé — vérifie ta boîte mail.' :
-        r.includes('already registered') ? 'Un compte existe déjà avec cet email.' :
-        r.includes('rate limit') ? 'Trop de tentatives. Réessaie dans quelques minutes.' :
+        r.includes('invalid login') || r.includes('invalid credentials') ? tr('Email ou mot de passe incorrect.', 'Incorrect email or password.') :
+        r.includes('email not confirmed') ? tr('Email non confirmé — vérifie ta boîte mail.', 'Email not confirmed — check your inbox.') :
+        r.includes('already registered') ? tr('Un compte existe déjà avec cet email.', 'An account already exists with this email.') :
+        r.includes('rate limit') ? tr('Trop de tentatives. Réessaie dans quelques minutes.', 'Too many attempts. Try again in a few minutes.') :
         raw
       )
     } finally { setLoading(false) }
@@ -1237,12 +1245,12 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
 
   async function handleForgot() {
     setError(null); setSuccess(null)
-    if (!email.trim()) { setError('Entre ton email d’abord, puis clique sur « Mot de passe oublié ».'); return }
+    if (!email.trim()) { setError(tr('Entre ton email d’abord, puis clique sur « Mot de passe oublié ».', 'Enter your email first, then click "Forgot password".')); return }
     setLoading(true)
     try {
       const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin })
       if (err) throw err
-      setSuccess('Email de réinitialisation envoyé. Vérifie ta boîte mail.')
+      setSuccess(tr('Email de réinitialisation envoyé. Vérifie ta boîte mail.', 'Reset email sent. Check your inbox.'))
     } catch (err: any) {
       setError(err instanceof Error ? err.message : String(err))
     } finally { setLoading(false) }
@@ -1309,24 +1317,24 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
           }}
             onMouseEnter={e => (e.currentTarget.style.color = IVORY)}
             onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
-            <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}><Icon name="arrow-right" size={13} /></span> Retour
+            <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}><Icon name="arrow-right" size={13} /></span> {tr('Retour', 'Back')}
           </button>
 
           <div>
-            <MicroLabel style={{ marginBottom: 28 }}>Le Studio</MicroLabel>
+            <MicroLabel style={{ marginBottom: 28 }}>{tr('Le Studio', 'The Studio')}</MicroLabel>
             <h2 style={{ margin: 0, lineHeight: 1.04, letterSpacing: '-0.04em' }}>
-              <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 3.8vw, 58px)', color: IVORY }}>Là où les marques</span>
-              <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 4vw, 62px)', color: GOLD }}>passent à l’échelle.</span>
+              <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 3.8vw, 58px)', color: IVORY }}>{tr('Là où les marques', 'Where brands')}</span>
+              <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 4vw, 62px)', color: GOLD }}>{tr('passent à l’échelle.', 'go to scale.')}</span>
             </h2>
             <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.8, maxWidth: 380, margin: '24px 0 0' }}>
-              Mass posting, cloud phones, banque de contenu, IA — l’arsenal complet, derrière une seule porte.
+              {tr('Mass posting, cloud phones, banque de contenu, IA — l’arsenal complet, derrière une seule porte.', 'Mass posting, cloud phones, content bank, AI — the full arsenal, behind a single door.')}
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Wordmark size={13} />
             <span style={{ width: 3, height: 3, borderRadius: '50%', background: FAINT }} />
-            <span style={{ fontFamily: SANS, fontSize: 9, letterSpacing: '0.26em', textTransform: 'uppercase', color: FAINT }}>Accès privé</span>
+            <span style={{ fontFamily: SANS, fontSize: 9, letterSpacing: '0.26em', textTransform: 'uppercase', color: FAINT }}>{tr('Accès privé', 'Private access')}</span>
           </div>
         </div>
       </div>
@@ -1354,36 +1362,36 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
         <div style={{ width: '100%', maxWidth: 380 }}>
           <div style={{ marginBottom: 44 }}>
             <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 16, color: GOLD, margin: '0 0 14px' }}>
-              {tab === 'login' ? '— 01 / Connexion' : '— 02 / Inscription'}
+              {tab === 'login' ? tr('— 01 / Connexion', '— 01 / Login') : tr('— 02 / Inscription', '— 02 / Sign up')}
             </p>
             <h2 style={{ margin: '0 0 10px', fontFamily: SANS, fontWeight: 900, fontSize: 34, letterSpacing: '-0.04em', color: IVORY, lineHeight: 1.05 }}>
-              {tab === 'login' ? 'Bon retour.' : 'Bienvenue.'}
+              {tab === 'login' ? tr('Bon retour.', 'Welcome back.') : tr('Bienvenue.', 'Welcome.')}
             </h2>
             <p style={{ fontFamily: SANS, fontSize: 13, color: MUTED, margin: 0, lineHeight: 1.6 }}>
-              {tab === 'login' ? 'Le Studio t’attend.' : 'Crée ton accès en quelques secondes.'}
+              {tab === 'login' ? tr('Le Studio t’attend.', 'The Studio awaits.') : tr('Crée ton accès en quelques secondes.', 'Create your access in seconds.')}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
             <div>
-              <label style={fieldLabel} htmlFor="sf-email">Email</label>
+              <label style={fieldLabel} htmlFor="sf-email">{tr('Email', 'Email')}</label>
               <input id="sf-email" type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="vous@exemple.com" style={inputStyle}
+                placeholder={tr('vous@exemple.com', 'you@example.com')} style={inputStyle}
                 onFocus={e => (e.currentTarget.style.borderBottomColor = GOLD)}
                 onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(233,234,240,0.18)')} />
             </div>
 
             <div>
-              <label style={fieldLabel} htmlFor="sf-pass">Mot de passe</label>
+              <label style={fieldLabel} htmlFor="sf-pass">{tr('Mot de passe', 'Password')}</label>
               <div style={{ position: 'relative' }}>
                 <input id="sf-pass" type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }}
                   onFocus={e => (e.currentTarget.style.borderBottomColor = GOLD)}
                   onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(233,234,240,0.18)')} />
                 <button type="button" onClick={() => setShowPw(!showPw)}
-                  aria-label={showPw ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  aria-label={showPw ? tr('Masquer le mot de passe', 'Hide password') : tr('Afficher le mot de passe', 'Show password')}
                   style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: FAINT, padding: 4, display: 'flex', alignItems: 'center' }}>
-                  <Icon name={showPw ? 'eye-off' : 'eye'} size={17} label={showPw ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} />
+                  <Icon name={showPw ? 'eye-off' : 'eye'} size={17} label={showPw ? tr('Masquer le mot de passe', 'Hide password') : tr('Afficher le mot de passe', 'Show password')} />
                 </button>
               </div>
               {tab === 'login' && (
@@ -1392,14 +1400,14 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                     fontFamily: SANS, fontSize: 11.5, color: MUTED, transition: 'color 0.2s' }}
                   onMouseEnter={e => (e.currentTarget.style.color = IVORY)}
                   onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
-                  Mot de passe oublié ?
+                  {tr('Mot de passe oublié ?', 'Forgot password?')}
                 </button>
               )}
             </div>
 
             {tab === 'register' && (
               <div>
-                <label style={fieldLabel} htmlFor="sf-confirm">Confirmer</label>
+                <label style={fieldLabel} htmlFor="sf-confirm">{tr('Confirmer', 'Confirm')}</label>
                 <input id="sf-confirm" type="password" required value={confirm} onChange={e => setConfirm(e.target.value)}
                   placeholder="••••••••" style={inputStyle}
                   onFocus={e => (e.currentTarget.style.borderBottomColor = GOLD)}
@@ -1429,13 +1437,13 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
               }}
               onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD } }}
               onMouseLeave={e => { e.currentTarget.style.background = IVORY; e.currentTarget.style.borderColor = IVORY }}>
-              {loading ? '· · ·' : tab === 'login' ? 'Entrer au Studio' : 'Créer mon accès'}
+              {loading ? '· · ·' : tab === 'login' ? tr('Entrer au Studio', 'Enter the Studio') : tr('Créer mon accès', 'Create my access')}
             </button>
           </form>
 
           <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${HAIR}`, textAlign: 'center' }}>
             <span style={{ fontFamily: SANS, fontSize: 12, color: FAINT }}>
-              {tab === 'login' ? 'Pas encore de compte ?' : 'Déjà un compte ?'}
+              {tab === 'login' ? tr('Pas encore de compte ?', 'No account yet?') : tr('Déjà un compte ?', 'Already have an account?')}
             </span>
             <button onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(null); setSuccess(null); setPassword(''); setConfirm('') }}
               style={{
@@ -1443,7 +1451,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                 fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: GOLD,
                 borderBottom: '1px solid rgba(99,102,241,0.4)',
               }}>
-              {tab === 'login' ? "S’inscrire" : 'Se connecter'}
+              {tab === 'login' ? tr('S’inscrire', 'Sign up') : tr('Se connecter', 'Log in')}
             </button>
           </div>
         </div>
@@ -1463,6 +1471,7 @@ function stageFromHash(): Stage {
 }
 
 export function Landing() {
+  const tr = useTr()
   const [stage,   setStageRaw] = useState<Stage>(stageFromHash)
   const [faqOpen, setFaqOpen]  = useState<number | null>(null)
   useGlobalCSS()
@@ -1507,7 +1516,7 @@ export function Landing() {
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 28px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Wordmark size={16} onClick={() => goTo('tunnel')} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {[['#manifesto','Manifeste'], ['#features','Fonctionnalités'], ['#pricing','Tarifs'], ['#faq','FAQ']].map(([href, label]) => (
+            {[['#manifesto',tr('Manifeste','Manifesto')], ['#features',tr('Fonctionnalités','Features')], ['#pricing',tr('Tarifs','Pricing')], ['#faq','FAQ']].map(([href, label]) => (
               <a key={href} href={href} style={{ fontFamily: SANS, fontSize: 10.5, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: MUTED, textDecoration: 'none', padding: '8px 14px', transition: 'color 0.2s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = IVORY)} onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
                 {label}
@@ -1518,13 +1527,13 @@ export function Landing() {
             <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', background: 'transparent', border: `1px solid rgba(233,234,240,0.2)`, color: IVORY, textDecoration: 'none', transition: 'border-color 0.2s' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(233,234,240,0.55)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(233,234,240,0.2)')}>
-              <TGIcon size={12} /> Clé
+              <TGIcon size={12} /> {tr('Clé', 'Key')}
             </a>
             <button onClick={onStudio}
               style={{ padding: '9px 22px', background: IVORY, border: `1px solid ${IVORY}`, color: '#0F1014', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.3s' }}
               onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD }}
               onMouseLeave={e => { e.currentTarget.style.background = IVORY; e.currentTarget.style.borderColor = IVORY }}>
-              Studio
+              {tr('Studio', 'Studio')}
             </button>
           </div>
         </div>
@@ -1541,18 +1550,18 @@ export function Landing() {
         <Aurora />
         <div style={{ maxWidth: 880, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 1 }}>
           <FadeIn>
-            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 38 }}>Manifeste</MicroLabel>
+            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 38 }}>{tr('Manifeste', 'Manifesto')}</MicroLabel>
           </FadeIn>
           <FadeIn delay={0.1}>
             <p style={{ fontFamily: SERIF, fontSize: 'clamp(24px, 3.4vw, 40px)', lineHeight: 1.45, color: 'rgba(233,234,240,0.85)', margin: 0, fontWeight: 400 }}>
-              Pendant que d’autres publient un post par jour,
-              <span style={{ fontStyle: 'normal', color: GOLD }}> nos studios en orchestrent des centaines</span> —
-              sur des dizaines de comptes, sans lever le petit doigt.
+              {tr('Pendant que d’autres publient un post par jour,', 'While others publish one post a day,')}
+              <span style={{ fontStyle: 'normal', color: GOLD }}>{tr(' nos studios en orchestrent des centaines', ' our studios orchestrate hundreds')}</span> —
+              {tr(' sur des dizaines de comptes, sans lever le petit doigt.', ' across dozens of accounts, without lifting a finger.')}
             </p>
           </FadeIn>
           <FadeIn delay={0.2}>
             <p style={{ fontFamily: SANS, fontSize: 13, letterSpacing: '0.24em', textTransform: 'uppercase', color: FAINT, marginTop: 44 }}>
-              Le volume est une stratégie. ScaleFlow est l’outil.
+              {tr('Le volume est une stratégie. ScaleFlow est l’outil.', 'Volume is a strategy. ScaleFlow is the tool.')}
             </p>
           </FadeIn>
         </div>
@@ -1564,11 +1573,11 @@ export function Landing() {
           <FadeIn>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 30, flexWrap: 'wrap', gap: 16 }}>
               <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
-                <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(36px, 5.4vw, 66px)', color: IVORY }}>L’arsenal</span>
-                <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(38px, 5.7vw, 70px)', color: GOLD }}>complet.</span>
+                <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(36px, 5.4vw, 66px)', color: IVORY }}>{tr('L’arsenal', 'The complete')}</span>
+                <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(38px, 5.7vw, 70px)', color: GOLD }}>{tr('complet.', 'arsenal.')}</span>
               </h2>
               <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, maxWidth: 300, lineHeight: 1.7, margin: 0, paddingBottom: 8 }}>
-                Six pôles d’outils. Une interface. Plus besoin de jongler entre dix applications.
+                {tr('Six pôles d’outils. Une interface. Plus besoin de jongler entre dix applications.', 'Six tool hubs. One interface. No more juggling ten apps.')}
               </p>
             </div>
           </FadeIn>
@@ -1578,7 +1587,7 @@ export function Landing() {
         </div>
       </section>
 
-      <Marquee items={['Standard', 'Pro', 'Organisation', 'Crédits', 'Activation immédiate', 'Support 24/7']} dark />
+      <Marquee items={[tr('Standard', 'Standard'), tr('Pro', 'Pro'), tr('Organisation', 'Organization'), tr('Crédits', 'Credits'), tr('Activation immédiate', 'Instant activation'), tr('Support 24/7', '24/7 Support')]} dark />
 
       {/* ── Pricing ── */}
       <PricingSection />
@@ -1589,13 +1598,13 @@ export function Landing() {
           <div style={{ maxWidth: 1080, margin: '0 auto', border: `1px solid ${HAIR}`, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 300, background: 'radial-gradient(ellipse closest-side, rgba(99,102,241,0.06), transparent)', filter: 'blur(50px)', pointerEvents: 'none' }} />
             <div style={{ padding: '90px 40px', textAlign: 'center', position: 'relative' }}>
-              <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 30 }}>Accès</MicroLabel>
+              <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 30 }}>{tr('Accès', 'Access')}</MicroLabel>
               <h3 style={{ margin: '0 0 18px', lineHeight: 1.04, letterSpacing: '-0.04em' }}>
-                <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.6vw, 56px)', color: IVORY }}>Ta clé. </span>
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.9vw, 60px)', color: GOLD }}>Ton empire.</span>
+                <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.6vw, 56px)', color: IVORY }}>{tr('Ta clé. ', 'Your key. ')}</span>
+                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.9vw, 60px)', color: GOLD }}>{tr('Ton empire.', 'Your empire.')}</span>
               </h3>
               <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, margin: '0 0 44px', lineHeight: 1.8 }}>
-                Activation immédiate après paiement — crypto ou virement.<br />Réponse en moins d’une heure.
+                {tr('Activation immédiate après paiement — crypto ou virement.', 'Instant activation after payment — crypto or bank transfer.')}<br />{tr('Réponse en moins d’une heure.', 'Reply in under an hour.')}
               </p>
               <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
                 style={{
@@ -1607,7 +1616,7 @@ export function Landing() {
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD }}
                 onMouseLeave={e => { e.currentTarget.style.background = IVORY; e.currentTarget.style.borderColor = IVORY }}>
-                <TGIcon size={14} /> Obtenir ma clé
+                <TGIcon size={14} /> {tr('Obtenir ma clé', 'Get my key')}
               </a>
             </div>
           </div>
@@ -1619,10 +1628,10 @@ export function Landing() {
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
           <FadeIn>
             <div style={{ textAlign: 'center', marginBottom: 54 }}>
-              <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>Questions</MicroLabel>
+              <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>{tr('Questions', 'Questions')}</MicroLabel>
               <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
-                <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.4vw, 52px)', color: IVORY }}>On répond à </span>
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.7vw, 56px)', color: GOLD }}>tout.</span>
+                <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.4vw, 52px)', color: IVORY }}>{tr('On répond à ', 'We answer ')}</span>
+                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.7vw, 56px)', color: GOLD }}>{tr('tout.', 'everything.')}</span>
               </h2>
             </div>
           </FadeIn>
@@ -1635,13 +1644,13 @@ export function Landing() {
                     style={{ width: '100%', padding: '26px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 16 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 18 }}>
                       <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: faqOpen === i ? GOLD : FAINT, transition: 'color 0.25s', flexShrink: 0 }}>0{i + 1}</span>
-                      <span style={{ fontFamily: SANS, fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.01em', color: IVORY }}>{item.q}</span>
+                      <span style={{ fontFamily: SANS, fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.01em', color: IVORY }}>{tr(item.q, item.qEn)}</span>
                     </span>
                     <span aria-hidden style={{ color: faqOpen === i ? GOLD : FAINT, fontSize: 22, lineHeight: 1, flexShrink: 0, transition: 'transform 0.3s, color 0.3s', display: 'inline-block', transform: faqOpen === i ? 'rotate(45deg)' : 'none', fontWeight: 300 }}>+</span>
                   </button>
                   {faqOpen === i && (
                     <div style={{ padding: '0 8px 28px 50px', fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.85, animation: 'sf-fade-up 0.3s ease both' }}>
-                      {item.a}
+                      {tr(item.a, item.aEn)}
                     </div>
                   )}
                 </div>
@@ -1658,11 +1667,11 @@ export function Landing() {
             <div>
               <Wordmark size={18} />
               <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: MUTED, margin: '14px 0 0', maxWidth: 260, lineHeight: 1.6 }}>
-                L’usine de contenu des marques qui dominent Instagram.
+                {tr('L’usine de contenu des marques qui dominent Instagram.', 'The content factory behind the brands that dominate Instagram.')}
               </p>
             </div>
             <div style={{ display: 'flex', gap: 36 }}>
-              {[['#manifesto','Manifeste'], ['#features','Fonctionnalités'], ['#pricing','Tarifs'], ['#faq','FAQ'], [TELEGRAM_URL,'Telegram']].map(([href, label]) => (
+              {[['#manifesto',tr('Manifeste','Manifesto')], ['#features',tr('Fonctionnalités','Features')], ['#pricing',tr('Tarifs','Pricing')], ['#faq','FAQ'], [TELEGRAM_URL,'Telegram']].map(([href, label]) => (
                 <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
                   style={{ fontFamily: SANS, fontSize: 10, fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: FAINT, textDecoration: 'none', transition: 'color 0.2s' }}
                   onMouseEnter={e => (e.currentTarget.style.color = IVORY)} onMouseLeave={e => (e.currentTarget.style.color = FAINT as string)}>
@@ -1672,8 +1681,8 @@ export function Landing() {
             </div>
           </div>
           <div style={{ borderTop: `1px solid ${HAIR}`, paddingTop: 24, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>
-            <p style={{ fontFamily: SANS, fontSize: 10.5, letterSpacing: '0.14em', color: FAINT, margin: 0 }}>© {new Date().getFullYear()} SCALEFLOW — TOUS DROITS RÉSERVÉS</p>
-            <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 13, color: 'rgba(99,102,241,0.5)', margin: 0 }}>La révolution commence.</p>
+            <p style={{ fontFamily: SANS, fontSize: 10.5, letterSpacing: '0.14em', color: FAINT, margin: 0 }}>© {new Date().getFullYear()} {tr('SCALEFLOW — TOUS DROITS RÉSERVÉS', 'SCALEFLOW — ALL RIGHTS RESERVED')}</p>
+            <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 13, color: 'rgba(99,102,241,0.5)', margin: 0 }}>{tr('La révolution commence.', 'The revolution begins.')}</p>
           </div>
         </div>
         {/* Giant ghost wordmark */}

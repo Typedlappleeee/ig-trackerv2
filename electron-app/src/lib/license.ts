@@ -16,13 +16,24 @@ export interface LicenseStatus {
   // Org owner's plan — used for phone limits so a Pro member doesn't bypass a Standard org's limit.
   // null when not in org mode or when the user IS the org owner.
   orgOwnerPlan: Plan | null
+  // Add-on VIP "Blowsome" : true si la clé active du user porte le flag → débloque l'onglet Blowsome.
+  blowsome: boolean
 }
 
-const FAIL_OPEN: LicenseStatus = { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+const FAIL_OPEN: LicenseStatus = { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }
 
 const HARDCODED_SUPER_ADMINS = ['tintin.aunea@gmail.com']
 
 export async function checkLicense(userId: string, orgId?: string | null): Promise<LicenseStatus> {
+  // Accès complet garanti au superadmin, même si la BASE est injoignable :
+  // l'email vient de la SESSION d'auth (pas de la table profiles). Sans ça, une
+  // simple erreur sur `profiles` faisait retomber en "Free plan" sans Blowsome
+  // ni Studio vidéo.
+  const SUPERADMIN_FULL: LicenseStatus = { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null, blowsome: true }
+  let authEmail = ''
+  try { authEmail = (await supabase.auth.getUser()).data.user?.email ?? '' } catch { /* hors ligne */ }
+  if (HARDCODED_SUPER_ADMINS.includes(authEmail)) return SUPERADMIN_FULL
+
   try {
     // Super admin always valid
     const { data: profile, error: profileErr } = await supabase
@@ -36,10 +47,13 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
 
     const isSuperAdmin = profile?.is_super_admin ||
       HARDCODED_SUPER_ADMINS.includes(profile?.email ?? '') ||
-      HARDCODED_SUPER_ADMINS.includes((await supabase.auth.getUser()).data.user?.email ?? '')
+      HARDCODED_SUPER_ADMINS.includes(authEmail)
 
     if (isSuperAdmin) {
-      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null }
+      // Le superadmin (compte god) garde TOUJOURS l'accès Blowsome — c'est le compte
+      // qui gère/teste tout. Le verrouillage add-on ne concerne que les autres :
+      // un org-admin sans l'add-on ne verra pas Blowsome (gates basés sur license.blowsome).
+      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null, blowsome: true }
     }
 
     // Helper: resolve org owner plan (null if not in org mode or user is the owner).
@@ -47,7 +61,12 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
     // member can validate access via the OWNER's license without needing their
     // own key (you don't need a license to JOIN an org, only the org needs one).
     let orgOwnerPlan: LicenseStatus['plan'] = null
+    // Add-on Blowsome hérité de l'agence : un membre d'une orga dont l'OWNER a
+    // l'add-on Blowsome y a droit aussi. (RPC SECURITY DEFINER best-effort.)
+    let orgOwnerBlowsome = false
     if (orgId) {
+      const { data: rpcBlow } = await supabase.rpc('org_owner_blowsome', { p_org: orgId })
+      orgOwnerBlowsome = rpcBlow === true
       const { data: rpcPlan, error: rpcErr } = await supabase.rpc('org_owner_plan', { p_org: orgId })
       if (!rpcErr && rpcPlan) {
         orgOwnerPlan = rpcPlan as LicenseStatus['plan']
@@ -71,14 +90,19 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
           if (ownerProfileErr) return FAIL_OPEN
 
           if (ownerProfile?.is_super_admin) {
-            orgOwnerPlan = 'pro'
+            orgOwnerPlan = 'pro'; orgOwnerBlowsome = true
           } else {
-            const { data: ownerKey, error: ownerKeyErr } = await supabase
+            let ownerRes = await supabase
               .from('license_keys')
-              .select('expires_at, plan')
+              .select('expires_at, plan, blowsome')
               .eq('user_id', org.owner_id)
               .eq('is_active', true)
               .maybeSingle()
+            // La colonne blowsome peut manquer (migration non passée) → on réessaie sans.
+            if (ownerRes.error && /blowsome/.test(ownerRes.error.message)) {
+              ownerRes = await supabase.from('license_keys').select('expires_at, plan').eq('user_id', org.owner_id).eq('is_active', true).maybeSingle() as typeof ownerRes
+            }
+            const { data: ownerKey, error: ownerKeyErr } = ownerRes
 
             if (ownerKeyErr) return FAIL_OPEN
 
@@ -86,6 +110,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
               const exp = ownerKey.expires_at ? new Date(ownerKey.expires_at) : null
               if (!exp || exp > new Date()) {
                 orgOwnerPlan = (ownerKey.plan as LicenseStatus['plan']) ?? 'standard'
+                if ((ownerKey as { blowsome?: boolean }).blowsome === true) orgOwnerBlowsome = true
               }
             }
           }
@@ -93,12 +118,22 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       }
     }
 
-    // Check own active keys — pick the highest-plan valid key if multiple exist
-    const { data: ownKeys, error: ownErr } = await supabase
+    // Check own active keys — pick the highest-plan valid key if multiple exist.
+    // `blowsome` peut ne pas exister si la migration n'est pas passée → on retente
+    // sans la colonne pour ne rien casser (blowsome sera simplement false).
+    let ownKeysRes = await supabase
       .from('license_keys')
-      .select('expires_at, plan')
+      .select('expires_at, plan, blowsome')
       .eq('user_id', userId)
       .eq('is_active', true)
+    if (ownKeysRes.error && /blowsome/.test(ownKeysRes.error.message)) {
+      ownKeysRes = await supabase
+        .from('license_keys')
+        .select('expires_at, plan')
+        .eq('user_id', userId)
+        .eq('is_active', true) as typeof ownKeysRes
+    }
+    const { data: ownKeys, error: ownErr } = ownKeysRes
 
     if (ownErr) return FAIL_OPEN
 
@@ -116,15 +151,17 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
         const expiresAt = bestKey.expires_at ? new Date(bestKey.expires_at) : null
         const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
         const plan = (bestKey.plan as Plan) ?? 'standard'
-        return { valid: true, expired: false, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan, orgOwnerPlan }
+        // blowsome : true si AU MOINS une clé valide porte le flag, OU si l'agence l'a.
+        const blowsome = validKeys.some(k => (k as { blowsome?: boolean }).blowsome === true) || orgOwnerBlowsome
+        return { valid: true, expired: false, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan, orgOwnerPlan, blowsome }
       }
       // All keys are expired
-      return { valid: false, expired: true, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+      return { valid: false, expired: true, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }
     }
 
-    // Org owner has an active key → member gets access via org
+    // Org owner has an active key → member gets access via org (+ Blowsome si l'agence l'a)
     if (orgOwnerPlan) {
-      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan }
+      return { valid: true, expired: false, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan, blowsome: orgOwnerBlowsome }
     }
 
     // No active key found — check if user ever had one (active or deactivated) to distinguish
@@ -138,7 +175,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       .maybeSingle()
 
     const hadKey = !!anyKey
-    return { valid: false, expired: hadKey, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+    return { valid: false, expired: hadKey, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false }
   } catch {
     return FAIL_OPEN
   }
@@ -173,7 +210,7 @@ export function effectivePlan(license: LicenseStatus): Plan | null {
 }
 
 export const LicenseContext = createContext<LicenseStatus>({
-  valid: false, expired: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null,
+  valid: false, expired: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null, blowsome: false,
 })
 
 export function useLicense() {

@@ -18,6 +18,29 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 })
 
+// PostgREST/Supabase plafonne chaque requête à ~1000 lignes. Au-delà (grosses
+// orgs : >1000 téléphones/vidéos), des lignes disparaissent SILENCIEUSEMENT des
+// sélecteurs. Ce helper boucle par pages de 1000 pour tout charger. `makeQuery`
+// doit reconstruire une requête FRAÎCHE avec .range(from,to) à chaque page.
+export async function fetchAllRows<T>(
+  makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const all: T[] = []
+  let from = 0
+  // Garde-fou : borne dure pour éviter une boucle infinie si une page renvoie une
+  // taille inattendue.
+  for (let guard = 0; guard < 1000; guard++) {
+    const { data, error } = await makeQuery(from, from + pageSize - 1)
+    if (error) throw new Error(error.message)
+    const rows = data ?? []
+    all.push(...rows)
+    if (rows.length < pageSize) break
+    from += pageSize
+  }
+  return all
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface Profile {
@@ -44,6 +67,7 @@ export type PageKey =
   | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'warmup' | 'aitools' | 'storylink'
   | 'remix' | 'repurpose' | 'montage' | 'mixer' | 'subtitles' | 'spoof'
+  | 'history' | 'library' | 'reports'
   | 'settings'
 
 // Granular action permissions (on top of tab visibility).

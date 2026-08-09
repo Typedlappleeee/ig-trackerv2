@@ -35,12 +35,13 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
-import { canAccessPhoneGroup } from '@/lib/permissions'
+import { canAccessPhoneGroup, filterAccessiblePhones, accessibleGroupNames } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { postInstagramStory, stopPhone } from '@/lib/geelark'
 import { registerStartedPhones } from '@/lib/phoneWatch'
 import { pushNotification } from '@/lib/notificationStore'
 import { TaskWizard } from '@/components/TaskWizard'
+import { useTr, tr } from '@/lib/i18n'
 
 type TaskType = 'publication' | 'story'
 
@@ -145,16 +146,16 @@ interface SelVideo {
 
 function formatCountdown(nextRunAt: string): string {
   const diff = new Date(nextRunAt).getTime() - Date.now()
-  if (diff <= 0) return 'Maintenant'
+  if (diff <= 0) return tr('Maintenant', 'Now')
   const h = Math.floor(diff / (1000 * 60 * 60))
   const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
   if (h > 24) {
     const d = Math.floor(h / 24)
     const rh = h % 24
-    return `dans ${d}j ${rh}h`
+    return tr(`dans ${d}j ${rh}h`, `in ${d}d ${rh}h`)
   }
-  if (h > 0) return `dans ${h}h ${m}m`
-  return `dans ${m}m`
+  if (h > 0) return tr(`dans ${h}h ${m}m`, `in ${h}h ${m}m`)
+  return tr(`dans ${m}m`, `in ${m}m`)
 }
 
 // ── Client-side task execution (même logique que MassPosting) ──────────────────
@@ -192,7 +193,7 @@ async function resolveTaskVideoToken(bearer: string, video: TaskVideo): Promise<
   // Electron et Web : uploadVideoGeelark détecte https:// et route vers /api/geelark-upload (pas de CORS)
   if (window.electronAPI) {
     const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: signedUrl })
-    if (!up.ok || !up.token) throw new Error(`Erreur upload GeeLark: ${up.error ?? '?'}`)
+    if (!up.ok || !up.token) throw new Error(tr(`Erreur upload GeeLark: ${up.error ?? '?'}`, `GeeLark upload error: ${up.error ?? '?'}`))
     return up.token
   }
 
@@ -204,7 +205,7 @@ async function resolveTaskVideoToken(bearer: string, video: TaskVideo): Promise<
   })
   if (!r.ok) throw new Error(`Proxy HTTP ${r.status}`)
   const j = await r.json() as { ok: boolean; token?: string; error?: string }
-  if (!j.ok || !j.token) throw new Error(`Proxy upload échoué: ${j.error ?? 'no token'}`)
+  if (!j.ok || !j.token) throw new Error(tr(`Proxy upload échoué: ${j.error ?? 'no token'}`, `Proxy upload failed: ${j.error ?? 'no token'}`))
   return j.token
 }
 
@@ -331,7 +332,7 @@ async function executeUnit(
     await supabase.from('scheduled_posts').insert({
       user_id:         task.user_id,
       org_id:          task.org_id ?? null,
-      created_by_name: task.name || 'Tâche auto',
+      created_by_name: task.name || tr('Tâche auto', 'Auto task'),
       type:            unit.type === 'story' ? 'story' : 'mass_posting',
       status,
       scheduled_at:    nowIso,
@@ -351,18 +352,18 @@ async function executeUnit(
   }
 
   if (!bearer) {
-    log('❌ Configuration GéeLark manquante')
-    await saveResult('failed', 'bearer vide')
+    log(tr('❌ Configuration GéeLark manquante', '❌ Missing GeeLark configuration'))
+    await saveResult('failed', tr('bearer vide', 'empty bearer'))
     return
   }
   if (!task.phones.length) {
-    log('❌ Aucun téléphone dans la tâche')
-    await saveResult('failed', 'aucun téléphone')
+    log(tr('❌ Aucun téléphone dans la tâche', '❌ No phone in the task'))
+    await saveResult('failed', tr('aucun téléphone', 'no phone'))
     return
   }
   if (!unit.videos.length) {
-    log(unit.type === 'story' ? '❌ Aucune image dans la tâche' : '❌ Aucune vidéo dans la tâche')
-    await saveResult('failed', unit.type === 'story' ? 'aucune image' : 'aucune vidéo')
+    log(unit.type === 'story' ? tr('❌ Aucune image dans la tâche', '❌ No image in the task') : tr('❌ Aucune vidéo dans la tâche', '❌ No video in the task'))
+    await saveResult('failed', unit.type === 'story' ? tr('aucune image', 'no image') : tr('aucune vidéo', 'no video'))
     return
   }
 
@@ -375,20 +376,20 @@ async function executeUnit(
       const texts = Array.isArray(unit.story_texts) ? unit.story_texts.filter(Boolean) : []
 
       // Résolution des URLs d'images (re-signe les URLs Supabase)
-      log(`▶ Préparation de ${unit.videos.length} image(s)…`)
+      log(tr(`▶ Préparation de ${unit.videos.length} image(s)…`, `▶ Preparing ${unit.videos.length} image(s)…`))
       const imageUrls: (string | null)[] = []
       for (let i = 0; i < unit.videos.length; i++) {
         try {
           imageUrls.push(await resolveTaskMediaUrl(unit.videos[i]))
         } catch (err) {
-          log(`❌ Image indisponible (${unit.videos[i].title || '?'})`)
+          log(tr(`❌ Image indisponible (${unit.videos[i].title || '?'})`, `❌ Image unavailable (${unit.videos[i].title || '?'})`))
           imageUrls.push(null)
         }
       }
       const validImages = imageUrls.filter((u): u is string => Boolean(u))
       if (!validImages.length) {
-        log('❌ Aucune image exploitable')
-        await saveResult('failed', 'Aucune image exploitable')
+        log(tr('❌ Aucune image exploitable', '❌ No usable image'))
+        await saveResult('failed', tr('Aucune image exploitable', 'No usable image'))
         return
       }
 
@@ -398,18 +399,18 @@ async function executeUnit(
         name: phone.ig_username ?? phone.phone_name,
         link: (phone.link ?? '').trim(),
       }))
-      validPhones.filter(p => !p.link).forEach(p => log(`❌ ${p.name} : aucun lien configuré`))
+      validPhones.filter(p => !p.link).forEach(p => log(tr(`❌ ${p.name} : aucun lien configuré`, `❌ ${p.name}: no link configured`)))
       const phonesWithLink = validPhones.filter(p => p.link)
 
       // Démarrage groupé — UN seul appel /phone/start avec tous les IDs
       if (phonesWithLink.length > 0) {
-        log(`▶ Démarrage de ${phonesWithLink.length} téléphone(s)…`)
+        log(tr(`▶ Démarrage de ${phonesWithLink.length} téléphone(s)…`, `▶ Starting ${phonesWithLink.length} phone(s)…`))
         const storyIds = phonesWithLink.map(p => p.phone.geelark_id)
         const startRes = await glPost(bearer, '/phone/start', { ids: storyIds })
         const started = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
-        log(`  ${started} démarré(s)`)
+        log(tr(`  ${started} démarré(s)`, `  ${started} started`))
         registerStartedPhones(storyIds, { orgId: task.org_id ?? null, userId: task.user_id }, { reason: 'task_story' })
-        log('⏳ Attente 30s (démarrage)…')
+        log(tr('⏳ Attente 30s (démarrage)…', '⏳ Waiting 30s (startup)…'))
         await new Promise(r => setTimeout(r, 30_000))
       }
 
@@ -420,17 +421,17 @@ async function executeUnit(
         const linkText = texts.length
           ? (unit.mode === 'random' ? texts[Math.floor(Math.random() * texts.length)] : texts[i % texts.length])
           : undefined
-        log(`▶ Story ${name}…`)
+        log(tr(`▶ Story ${name}…`, `▶ Story ${name}…`))
         try {
           const res = await postInstagramStory(
             bearer, phone.geelark_id,
             { imageUrl, linkUrl: link, linkText },
             m => log(`  ${name}: ${m}`),
           )
-          if (res.ok) { log(`✅ ${name} — story publiée`); return true }
-          else { log(`❌ ${name} : ${res.error ?? 'échec'}`); return false }
+          if (res.ok) { log(tr(`✅ ${name} — story publiée`, `✅ ${name} — story published`)); return true }
+          else { log(tr(`❌ ${name} : ${res.error ?? 'échec'}`, `❌ ${name}: ${res.error ?? 'failed'}`)); return false }
         } catch (err) {
-          log(`❌ ${name} : échec de la story`)
+          log(tr(`❌ ${name} : échec de la story`, `❌ ${name}: story failed`))
           return false
         } finally {
           try { await stopPhone(bearer, phone.geelark_id) } catch { /* ignore */ }
@@ -438,11 +439,11 @@ async function executeUnit(
       }))
       const okN = results.filter(Boolean).length
 
-      log(`⏰ Prochaine story dans ${recurHours}h`)
-      await saveResult(okN > 0 ? 'done' : 'failed', okN > 0 ? undefined : 'Aucune story publiée')
+      log(tr(`⏰ Prochaine story dans ${recurHours}h`, `⏰ Next story in ${recurHours}h`))
+      await saveResult(okN > 0 ? 'done' : 'failed', okN > 0 ? undefined : tr('Aucune story publiée', 'No story published'))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      log('❌ Erreur inattendue')
+      log(tr('❌ Erreur inattendue', '❌ Unexpected error'))
       await saveResult('failed', msg)
     }
     return
@@ -461,46 +462,46 @@ async function executeUnit(
     // ── Step 1 : upload des vidéos vers GéeLark (séquentiel, AVANT le démarrage) ──
     // Exactement comme MassPosting : on upload d'abord, on démarre les téléphones
     // après. Sinon le téléphone reste inactif pendant l'upload et GéeLark l'éteint.
-    log(`📤 Envoi de ${unit.videos.length} vidéo(s)…`)
+    log(tr(`📤 Envoi de ${unit.videos.length} vidéo(s)…`, `📤 Uploading ${unit.videos.length} video(s)…`))
     const tokenByIndex: (string | null)[] = await Promise.all(
       unit.videos.map(async (v, i) => {
         try {
           const tok = await resolveTaskVideoToken(bearer, v)
-          log(`✅ Vidéo ${i + 1}/${unit.videos.length} prête`)
+          log(tr(`✅ Vidéo ${i + 1}/${unit.videos.length} prête`, `✅ Video ${i + 1}/${unit.videos.length} ready`))
           return tok
         } catch (err) {
-          log(`❌ Vidéo ${i + 1} indisponible (${v.title || '?'})`)
+          log(tr(`❌ Vidéo ${i + 1} indisponible (${v.title || '?'})`, `❌ Video ${i + 1} unavailable (${v.title || '?'})`))
           return null
         }
       })
     )
     const validTokens = tokenByIndex.filter((t): t is string => Boolean(t))
     if (!validTokens.length) {
-      const errMsg = 'Envoi de toutes les vidéos a échoué'
+      const errMsg = tr('Envoi de toutes les vidéos a échoué', 'Upload of all videos failed')
       log(`❌ ${errMsg}`)
       await saveResult('failed', errMsg)
       return
     }
 
     // ── Step 2 : démarrage des téléphones (après upload) ──────────────────────
-    log(`▶ Démarrage de ${phoneIds.length} téléphone(s)…`)
+    log(tr(`▶ Démarrage de ${phoneIds.length} téléphone(s)…`, `▶ Starting ${phoneIds.length} phone(s)…`))
     const startRes = await glPost(bearer, '/phone/start', { ids: phoneIds })
     const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
-    log(`  ${started} démarré(s)`)
+    log(tr(`  ${started} démarré(s)`, `  ${started} started`))
     registerStartedPhones(phoneIds, { orgId: task.org_id ?? null, userId: task.user_id }, { reason: 'task_publication' })
     if (started === 0) {
-      log('❌ Aucun téléphone démarré')
-      log(`⏰ Prochain post dans ${recurHours}h`)
-      await saveResult('failed', 'Aucun téléphone démarré')
+      log(tr('❌ Aucun téléphone démarré', '❌ No phone started'))
+      log(tr(`⏰ Prochain post dans ${recurHours}h`, `⏰ Next post in ${recurHours}h`))
+      await saveResult('failed', tr('Aucun téléphone démarré', 'No phone started'))
       return
     }
 
     // ── Step 3 : attente boot 20s ─────────────────────────────────────────────
-    log('⏳ Attente 20s (démarrage)…')
+    log(tr('⏳ Attente 20s (démarrage)…', '⏳ Waiting 20s (startup)…'))
     await new Promise(r => setTimeout(r, 20_000))
 
     // ── Step 4 : création des tâches RPA (séquentiel) ─────────────────────────
-    log(`▶ Lancement du posting sur ${task.phones.length} téléphone(s)…`)
+    log(tr(`▶ Lancement du posting sur ${task.phones.length} téléphone(s)…`, `▶ Starting posting on ${task.phones.length} phone(s)…`))
     const baseTs = Math.floor(Date.now() / 1000)
     const taskIdByGid: Record<string, string> = {}
     const rpaIds: string[] = []
@@ -516,7 +517,7 @@ async function executeUnit(
       const trialUnsupported = phoneFlags.get(phone.geelark_id) ?? false
       const useTrialReels = task.reels_trial && !trialUnsupported
       if (task.reels_trial && trialUnsupported)
-        log(`⚠ Trial Reels désactivé pour ${name} (compte non éligible)`)
+        log(tr(`⚠ Trial Reels désactivé pour ${name} (compte non éligible)`, `⚠ Trial Reels disabled for ${name} (account not eligible)`))
       const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
         id:          phone.geelark_id,
         scheduleAt:  baseTs + i * (unit.delay_minutes ?? 0) * 60,
@@ -539,23 +540,23 @@ async function executeUnit(
         console.log('[Task] instagramPubReels response data:', JSON.stringify(d))
         if (tid) { rpaIds.push(tid); taskIdByGid[phone.geelark_id] = tid }
         if (useTrialReels) trialReelsActive.add(phone.geelark_id)
-        log(`✅ Publication lancée : ${name}`)
+        log(tr(`✅ Publication lancée : ${name}`, `✅ Post started: ${name}`))
       } else {
         fails++
-        log(`❌ ${name} : ${res['msg'] ?? 'Instagram a refusé la publication'}`)
+        log(`❌ ${name} : ${res['msg'] ?? tr('Instagram a refusé la publication', 'Instagram refused the post')}`)
         // Task refused while trial reels was active → mark phone
         if (useTrialReels) {
           await supabase.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', phone.geelark_id)
-          log(`🔕 ${name} marqué : Trial Reels non supporté`)
+          log(tr(`🔕 ${name} marqué : Trial Reels non supporté`, `🔕 ${name} flagged: Trial Reels unsupported`))
           phoneFlags.set(phone.geelark_id, true)
         }
       }
     }
 
     if (rpaCreated === 0) {
-      log('❌ Aucune publication lancée')
-      log(`⏰ Prochain post dans ${recurHours}h`)
-      await saveResult('failed', 'Aucune tâche RPA créée')
+      log(tr('❌ Aucune publication lancée', '❌ No post started'))
+      log(tr(`⏰ Prochain post dans ${recurHours}h`, `⏰ Next post in ${recurHours}h`))
+      await saveResult('failed', tr('Aucune tâche RPA créée', 'No RPA task created'))
       await new Promise(r => setTimeout(r, 5_000))
       await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
       return
@@ -563,16 +564,16 @@ async function executeUnit(
 
     // Si tâches créées mais IDs non extraits → même logique qu'MassPosting : auto-stop 5 min
     if (rpaIds.length === 0) {
-      log(`⏳ ${rpaCreated} publication(s) lancée(s) — arrêt automatique dans 5 min…`)
+      log(tr(`⏳ ${rpaCreated} publication(s) lancée(s) — arrêt automatique dans 5 min…`, `⏳ ${rpaCreated} post(s) started — auto-stop in 5 min…`))
       await new Promise(r => setTimeout(r, 5 * 60 * 1000))
-      log(`⏰ Prochain post dans ${recurHours}h`)
+      log(tr(`⏰ Prochain post dans ${recurHours}h`, `⏰ Next post in ${recurHours}h`))
       await saveResult('done')
       await glPost(bearer, '/phone/stop', { ids: phoneIds }).catch(() => {})
       return
     }
 
     // ── Step 5 : poll jusqu'à complétion (max 8 min) — éteint chaque tél fini ──
-    log(`⏳ Suivi de ${rpaIds.length} publication(s)…`)
+    log(tr(`⏳ Suivi de ${rpaIds.length} publication(s)…`, `⏳ Tracking ${rpaIds.length} post(s)…`))
     let pollDone = 0
     let pollFail = 0
     const pending  = new Set(rpaIds)
@@ -580,7 +581,7 @@ async function executeUnit(
     const deadline = Date.now() + 8 * 60 * 1000
     const gidByTid = new Map<string, string>()
     for (const [gid, tid] of Object.entries(taskIdByGid)) gidByTid.set(tid, gid)
-    const STATUS: Record<number, string> = { 1: 'En attente', 2: 'En cours', 3: '✅ Terminé', 4: '❌ Échec', 7: 'Annulé' }
+    const STATUS: Record<number, string> = { 1: tr('En attente', 'Pending'), 2: tr('En cours', 'In progress'), 3: tr('✅ Terminé', '✅ Done'), 4: tr('❌ Échec', '❌ Failed'), 7: tr('Annulé', 'Cancelled') }
     while (pending.size > 0 && Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 10_000))
       let qRes: Record<string, unknown>
@@ -606,7 +607,7 @@ async function executeUnit(
             // If trial reels was used for this phone and it failed → mark as unsupported
             if (gid && trialReelsActive.has(gid) && !(phoneFlags.get(gid) ?? false)) {
               await supabase.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', gid)
-              log(`🔕 ${name} marqué : Trial Reels non supporté`)
+              log(tr(`🔕 ${name} marqué : Trial Reels non supporté`, `🔕 ${name} flagged: Trial Reels unsupported`))
               phoneFlags.set(gid, true)
             }
           }
@@ -618,21 +619,21 @@ async function executeUnit(
         }
       }
     }
-    if (pending.size > 0) log(`⚠ ${pending.size} tâche(s) non confirmée(s) après 8 min`)
+    if (pending.size > 0) log(tr(`⚠ ${pending.size} tâche(s) non confirmée(s) après 8 min`, `⚠ ${pending.size} task(s) not confirmed after 8 min`))
 
     // Arrêt des téléphones restants (timeout / pas de confirmation)
     const remaining = phoneIds.filter(id => !stopped.has(id))
     if (remaining.length > 0) {
-      log(`▶ Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
+      log(tr(`▶ Arrêt des ${remaining.length} téléphone(s) restant(s)…`, `▶ Stopping ${remaining.length} remaining phone(s)…`))
       await glPost(bearer, '/phone/stop', { ids: remaining }).catch(() => {})
     }
 
     const finalStatus = pollDone > 0 ? 'done' : (fails + pollFail >= task.phones.length ? 'failed' : 'done')
-    log(`⏰ Prochain post dans ${recurHours}h`)
-    await saveResult(finalStatus, finalStatus === 'failed' ? 'Aucun posting réussi' : undefined)
+    log(tr(`⏰ Prochain post dans ${recurHours}h`, `⏰ Next post in ${recurHours}h`))
+    await saveResult(finalStatus, finalStatus === 'failed' ? tr('Aucun posting réussi', 'No successful post') : undefined)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    log(`❌ Erreur inattendue: ${msg}`)
+    log(tr(`❌ Erreur inattendue: ${msg}`, `❌ Unexpected error: ${msg}`))
     await saveResult('failed', msg)
   }
 }
@@ -656,9 +657,9 @@ function taskNextRun(task: RecurringTask): string {
 }
 
 function formatInterval(hours: number): string {
-  if (hours < 1) return `toutes les ${Math.round(hours * 60)} min`
-  if (hours >= 24 && hours % 24 === 0) return `toutes les ${hours / 24}j`
-  return `toutes les ${hours}h`
+  if (hours < 1) return tr(`toutes les ${Math.round(hours * 60)} min`, `every ${Math.round(hours * 60)} min`)
+  if (hours >= 24 && hours % 24 === 0) return tr(`toutes les ${hours / 24}j`, `every ${hours / 24}d`)
+  return tr(`toutes les ${hours}h`, `every ${hours}h`)
 }
 
 function formatAbsolute(iso: string): string {
@@ -668,14 +669,14 @@ function formatAbsolute(iso: string): string {
 
 function formatRelativePast(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
-  if (diff < 0) return 'à venir'
+  if (diff < 0) return tr('à venir', 'upcoming')
   const m = Math.floor(diff / 60000)
-  if (m < 1) return "à l'instant"
-  if (m < 60) return `il y a ${m} min`
+  if (m < 1) return tr("à l'instant", 'just now')
+  if (m < 60) return tr(`il y a ${m} min`, `${m} min ago`)
   const h = Math.floor(m / 60)
-  if (h < 24) return `il y a ${h}h`
+  if (h < 24) return tr(`il y a ${h}h`, `${h}h ago`)
   const d = Math.floor(h / 24)
-  return `il y a ${d}j`
+  return tr(`il y a ${d}j`, `${d}d ago`)
 }
 
 // ── SVG Icons ──────────────────────────────────────────────────────────────────
@@ -803,6 +804,7 @@ function ConfirmDeleteDialog({
   onCancel: () => void
   busy: boolean
 }) {
+  const tr = useTr()
   return (
     <div
       style={{
@@ -826,11 +828,11 @@ function ConfirmDeleteDialog({
           <IconTrash size={18} />
         </div>
         <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: 'var(--ivory)' }}>
-          Supprimer cette tâche ?
+          {tr('Supprimer cette tâche ?', 'Delete this task?')}
         </p>
         <p style={{ margin: '0 0 22px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
           <span style={{ color: 'rgba(233,234,240,0.7)', fontWeight: 600 }}>"{taskName}"</span>{' '}
-          sera définitivement supprimée. Cette action est irréversible.
+          {tr('sera définitivement supprimée. Cette action est irréversible.', 'will be permanently deleted. This action cannot be undone.')}
         </p>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
@@ -839,7 +841,7 @@ function ConfirmDeleteDialog({
             className="sf-btn sf-btn-ghost cursor-pointer"
             style={{ flex: 1, opacity: busy ? 0.5 : 1 }}
           >
-            Annuler
+            {tr('Annuler', 'Cancel')}
           </button>
           <button
             onClick={onConfirm}
@@ -850,7 +852,7 @@ function ConfirmDeleteDialog({
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
           >
-            {busy ? 'Suppression…' : 'Supprimer'}
+            {busy ? tr('Suppression…', 'Deleting…') : tr('Supprimer', 'Delete')}
           </button>
         </div>
       </div>
@@ -871,6 +873,7 @@ interface CaptionBankPickerProps {
 interface CaptionPickerItem { id: string; title: string; content: string; folder: string | null }
 
 function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankPickerProps) {
+  const tr = useTr()
   const [items, setItems]   = useState<CaptionPickerItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -928,9 +931,9 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
         }}>
           <div>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#E9EAF0' }}>Banque de captions</p>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#E9EAF0' }}>{tr('Banque de captions', 'Caption bank')}</p>
             <p style={{ margin: 0, fontSize: 11, color: 'rgba(233,234,240,0.42)' }}>
-              {selected.size > 0 ? `${selected.size} caption${selected.size > 1 ? 's' : ''} sélectionnée${selected.size > 1 ? 's' : ''}` : 'Sélectionne les captions à ajouter au pool'}
+              {selected.size > 0 ? tr(`${selected.size} caption${selected.size > 1 ? 's' : ''} sélectionnée${selected.size > 1 ? 's' : ''}`, `${selected.size} caption${selected.size > 1 ? 's' : ''} selected`) : tr('Sélectionne les captions à ajouter au pool', 'Select the captions to add to the pool')}
             </p>
           </div>
           <button onClick={onClose} className="cursor-pointer"
@@ -943,7 +946,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
         <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(233,234,240,0.06)', flexShrink: 0 }}>
           <input
             type="text"
-            placeholder="Rechercher…"
+            placeholder={tr('Rechercher…', 'Search…')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             autoFocus
@@ -958,9 +961,9 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
         {/* Items list */}
         <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'thin', padding: '8px 12px' }}>
           {loading ? (
-            <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'rgba(233,234,240,0.4)' }}>Chargement…</div>
+            <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'rgba(233,234,240,0.4)' }}>{tr('Chargement…', 'Loading…')}</div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'rgba(233,234,240,0.4)' }}>Aucune caption trouvée</div>
+            <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'rgba(233,234,240,0.4)' }}>{tr('Aucune caption trouvée', 'No caption found')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {filtered.map(it => {
@@ -970,13 +973,13 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
                       padding: '9px 11px', borderRadius: 8, border: 'none',
-                      background: on ? 'rgba(244,114,182,0.08)' : 'rgba(233,234,240,0.02)',
-                      outline: on ? '1px solid rgba(244,114,182,0.3)' : '1px solid transparent',
+                      background: on ? 'rgba(139,92,246,0.1)' : 'rgba(233,234,240,0.02)',
+                      outline: on ? '1px solid rgba(139,92,246,0.32)' : '1px solid transparent',
                       transition: 'all 0.12s',
                     }}>
                     <div style={{
                       width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 2,
-                      background: on ? '#F472B6' : 'transparent',
+                      background: on ? 'linear-gradient(135deg,#818CF8,#8B5CF6)' : 'transparent',
                       border: on ? 'none' : '1px solid rgba(233,234,240,0.2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
@@ -1004,7 +1007,7 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
         }}>
           <button onClick={onClose} className="cursor-pointer"
             style={{ padding: '9px 16px', fontSize: 11, fontWeight: 700, background: 'transparent', color: 'rgba(233,234,240,0.42)', border: '1px solid rgba(233,234,240,0.08)', borderRadius: 8 }}>
-            Annuler
+            {tr('Annuler', 'Cancel')}
           </button>
           <button
             onClick={confirm}
@@ -1012,12 +1015,12 @@ function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: CaptionBankP
             className="cursor-pointer"
             style={{
               padding: '9px 20px', fontSize: 11, fontWeight: 800,
-              background: selected.size > 0 ? '#F472B6' : 'rgba(233,234,240,0.08)',
+              background: selected.size > 0 ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'rgba(233,234,240,0.08)',
               color: selected.size > 0 ? '#fff' : 'rgba(233,234,240,0.3)',
               border: 'none', borderRadius: 8,
             }}
           >
-            Ajouter {selected.size > 0 ? `(${selected.size})` : ''}
+            {tr('Ajouter', 'Add')} {selected.size > 0 ? `(${selected.size})` : ''}
           </button>
         </div>
       </div>
@@ -1117,6 +1120,7 @@ interface CreateTaskModalProps {
 }
 
 function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalProps) {
+  const tr = useTr()
   const { currentOrg, role, perms } = useOrg()
   const conns = useConnections(user)
   const bearer = conns.bearer ?? ''
@@ -1194,9 +1198,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       ? q.eq('org_id', currentOrg.id)
       : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ data }) => {
-      const ps = (data ?? []) as Phone[]
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      const ps = filterAccessiblePhones((data ?? []) as Phone[], role, perms)
       setPhones(ps)
-      const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
+      const grps = accessibleGroupNames(ps, role, perms)
       setGroups(['Tous', ...grps])
       // Auto-fill phone links from DB (phones.link column), unless already set by the editTask
       setPhoneLinks(prev => {
@@ -1259,6 +1264,15 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
     && segments.every(s => s.videos.length > 0)
     && (!anyStory || phonesWithLink === phoneList.length)
 
+  // Raison précise du blocage du bouton — affichée en tooltip + sous le bouton.
+  const disabledReason: string | null =
+    submitting ? null
+    : phoneList.length === 0 ? tr('Sélectionne au moins un téléphone', 'Select at least one phone')
+    : segments.length === 0 ? tr('Ajoute au moins une sous-tâche', 'Add at least one sub-task')
+    : segments.some(s => s.videos.length === 0) ? tr('Ajoute au moins un média à chaque sous-tâche', 'Add at least one media to every sub-task')
+    : (anyStory && phonesWithLink < phoneList.length) ? tr('Renseigne un lien de story pour chaque compte', 'Set a story link for every account')
+    : null
+
   const totalMedia = segments.reduce((n, s) => n + s.videos.length, 0)
 
   const labelStyle: React.CSSProperties = {
@@ -1280,7 +1294,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         const uploaded: TaskVideo[] = []
         for (let i = 0; i < seg.videos.length; i++) {
           const v = seg.videos[i]
-          setProgress(`Segment ${si + 1}/${segments.length} — ${isStory ? 'image' : 'vidéo'} ${i + 1}/${seg.videos.length}…`)
+          setProgress(tr(`Segment ${si + 1}/${segments.length} — ${isStory ? 'image' : 'vidéo'} ${i + 1}/${seg.videos.length}…`, `Segment ${si + 1}/${segments.length} — ${isStory ? 'image' : 'video'} ${i + 1}/${seg.videos.length}…`))
           if (isStory || v.filePath.startsWith('http://') || v.filePath.startsWith('https://')) {
             uploaded.push({ token: v.filePath, title: v.title })
             continue
@@ -1291,18 +1305,18 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           }
           const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: v.filePath })
           if (up && up.ok && up.token) uploaded.push({ token: up.token, title: v.title })
-          else throw new Error(`Upload "${v.title}" échoué : ${up?.error ?? 'erreur inconnue'}`)
+          else throw new Error(tr(`Upload "${v.title}" échoué : ${up?.error ?? 'erreur inconnue'}`, `Upload "${v.title}" failed: ${up?.error ?? 'unknown error'}`))
         }
         builtSegments.push(draftToSegment(seg, segUid(), uploaded))
       }
 
-      setProgress('Sauvegarde de la tâche…')
+      setProgress(tr('Sauvegarde de la tâche…', 'Saving task…'))
 
       const minNext = builtSegments.reduce(
         (min, s) => Math.min(min, new Date(s.next_run_at).getTime()), Infinity,
       )
       const first = builtSegments[0]
-      const autoName = `Tâche du ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}`
+      const autoName = tr(`Tâche du ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}`, `Task ${new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}`)
       const taskData = {
         user_id:       user.id,
         org_id:        currentOrg?.id ?? null,
@@ -1342,7 +1356,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         const { segments: _seg, ...fallback } = taskData
         ;({ error: err } = await saveTask(fallback))
         if (!err && builtSegments.length > 1) {
-          setError('⚠ Multi-segments non supporté tant que la migration SQL n\'est pas appliquée — seul le 1er segment a été sauvegardé.')
+          setError(tr('⚠ Multi-segments non supporté tant que la migration SQL n\'est pas appliquée — seul le 1er segment a été sauvegardé.', '⚠ Multi-segments not supported until the SQL migration is applied — only the 1st segment was saved.'))
         }
       }
       // Rétro-compat : colonnes task_type / story_texts manquantes
@@ -1359,7 +1373,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
       if (err && /recur_hours/i.test(err.message) && /integer/i.test(err.message)) {
         const rounded = { ...taskData, recur_hours: Math.max(1, Math.round(taskData.recur_hours)) }
         ;({ error: err } = await saveTask(rounded))
-        if (!err) setError('⚠ Intervalles en minutes non supportés tant que la migration SQL n\'est pas appliquée — sauvegardé en heures.')
+        if (!err) setError(tr('⚠ Intervalles en minutes non supportés tant que la migration SQL n\'est pas appliquée — sauvegardé en heures.', '⚠ Minute intervals not supported until the SQL migration is applied — saved in hours.'))
       }
       // Rétro-compat : colonne steps manquante
       if (err && /steps/i.test(err.message) && /column|schema|cache/i.test(err.message)) {
@@ -1413,7 +1427,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               <IconBolt size={16} color={GOLD} />
             </div>
             <span style={{ fontSize: 15, fontWeight: 700, color: IVORY }}>
-              {isEdit ? 'Modifier la tâche' : 'Nouvelle tâche automatique'}
+              {isEdit ? tr('Modifier la tâche', 'Edit task') : tr('Nouvelle tâche automatique', 'New automatic task')}
             </span>
           </div>
           <button
@@ -1431,26 +1445,41 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           display: 'flex', flexDirection: 'column', gap: 22, scrollbarWidth: 'thin',
         }}>
 
+          {/* ── Comment ça marche : guide express ── */}
+          <div style={{
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+            padding: '11px 14px', borderRadius: 10,
+            border: '1px solid rgba(99,102,241,0.22)', background: 'rgba(99,102,241,0.06)',
+          }}>
+            <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex', color: '#818CF8' }}><IconRepeat size={15} color="currentColor" /></span>
+            <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.6, color: 'rgba(233,234,240,0.72)' }}>
+              {tr(
+                'Une tâche republie automatiquement en boucle sur les téléphones choisis, à l’intervalle défini — elle tourne côté serveur, même ScaleFlow et PC éteints. Renseigne dans l’ordre : téléphones, puis chaque sous-tâche (médias, légende, intervalle).',
+                'A task automatically re-posts on a loop to the chosen phones at the interval you set — it runs on the server, even with ScaleFlow and your PC off. Fill in, in order: phones, then each sub-task (media, caption, interval).',
+              )}
+            </p>
+          </div>
+
           {!bearer && (
             <div style={{
               padding: '10px 14px', borderRadius: 8,
               border: '1px solid rgba(217,185,127,0.35)', fontSize: 12, color: '#D9B97F',
               background: 'rgba(217,185,127,0.06)',
             }}>
-              Token GéeLark manquant — configure-le dans Paramètres → Connexions.
+              {tr('Token GéeLark manquant — configure-le dans Paramètres → Connexions.', 'Missing GeeLark token — configure it in Settings → Connections.')}
             </div>
           )}
 
           {/* ── Nom ── */}
           <section>
             <span style={labelStyle}>
-              Nom de la tâche
-              <span style={{ color: MUTED, letterSpacing: 'normal', fontSize: 10, textTransform: 'none', fontWeight: 500 }}> — optionnel</span>
+              {tr('Nom de la tâche', 'Task name')}
+              <span style={{ color: MUTED, letterSpacing: 'normal', fontSize: 10, textTransform: 'none', fontWeight: 500 }}> {tr('— optionnel', '— optional')}</span>
             </span>
             <input
               type="text"
               className="sf-input"
-              placeholder="Ex : Posts quotidiens lifestyle…"
+              placeholder={tr('Ex : Posts quotidiens lifestyle…', 'e.g. Daily lifestyle posts…')}
               value={name}
               onChange={e => setName(e.target.value)}
               style={{ width: '100%', height: 38 }}
@@ -1460,12 +1489,15 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           {/* ── Téléphones ── */}
           <section>
             <span style={labelStyle}>
-              Téléphones{phoneList.length > 0 && (
+              {tr('Téléphones', 'Phones')}{phoneList.length > 0 && (
                 <span style={{ color: IVORY, letterSpacing: 'normal', fontSize: 11, textTransform: 'none', fontWeight: 500 }}>
-                  {' '}— {phoneList.length} sélectionné{phoneList.length > 1 ? 's' : ''}
+                  {' '}{tr(`— ${phoneList.length} sélectionné${phoneList.length > 1 ? 's' : ''}`, `— ${phoneList.length} selected`)}
                 </span>
               )}
             </span>
+            <p style={{ margin: '-2px 0 8px', fontSize: 11, color: MUTED }}>
+              {tr('Chaque compte coché recevra chaque exécution de la tâche (2 crédits par compte et par exécution).', 'Every selected account receives each run of the task (2 credits per account per run).')}
+            </p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
               {groups.length > 1 && (
                 <select
@@ -1479,13 +1511,13 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                   }}
                 >
                   {groups.map(g => (
-                    <option key={g} value={g} style={{ background: '#0F1014', color: IVORY }}>{g}</option>
+                    <option key={g} value={g} style={{ background: '#0F1014', color: IVORY }}>{g === 'Tous' ? tr('Tous', 'All') : g}</option>
                   ))}
                 </select>
               )}
               <input
                 type="text"
-                placeholder="Rechercher…"
+                placeholder={tr('Rechercher…', 'Search…')}
                 value={phoneSearch}
                 onChange={e => setPhoneSearch(e.target.value)}
                 style={{
@@ -1501,14 +1533,14 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 className="cursor-pointer"
                 style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: GOLD, background: 'none', border: 'none', padding: '0 4px' }}
               >
-                Tous
+                {tr('Tous', 'All')}
               </button>
               <button
                 onClick={() => setSelPhones(new Set())}
                 className="cursor-pointer"
                 style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: MUTED, background: 'none', border: 'none', padding: '0 4px' }}
               >
-                Aucun
+                {tr('Aucun', 'None')}
               </button>
             </div>
             {visiblePhones.length === 0 ? (
@@ -1516,7 +1548,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 padding: '24px 16px', fontSize: 12, color: MUTED, textAlign: 'center',
                 border: `1px solid ${HAIR}`, borderRadius: 10,
               }}>
-                Aucun téléphone
+                {tr('Aucun téléphone', 'No phone')}
               </div>
             ) : (
               <div style={{
@@ -1564,7 +1596,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                           color: checked ? 'rgba(129,140,248,0.8)' : MUTED,
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}>
-                          {phone.ig_username ? `@${phone.ig_username}` : (phone.group_name || 'sans groupe')}
+                          {phone.ig_username ? `@${phone.ig_username}` : (phone.group_name || tr('sans groupe', 'no group'))}
                         </p>
                       </div>
                       {/* Check indicator */}
@@ -1607,10 +1639,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 </div>
                 <div>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: sequenceMode ? IVORY : 'rgba(233,234,240,0.72)' }}>
-                    Mode séquence
+                    {tr('Mode séquence', 'Sequence mode')}
                   </p>
                   <p style={{ margin: 0, fontSize: 10.5, color: sequenceMode ? 'rgba(129,140,248,0.85)' : MUTED }}>
-                    Enchaîner plusieurs actions (publication, story, warmup…)
+                    {tr('Enchaîner plusieurs actions (publication, story, warmup…)', 'Chain multiple actions (post, story, warmup…)')}
                   </p>
                 </div>
                 <div style={{
@@ -1631,7 +1663,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           {/* ── Séquence builder ── */}
           {sequenceMode && (
             <section>
-              <span style={labelStyle}>Séquence d'actions</span>
+              <span style={labelStyle}>{tr("Séquence d'actions", 'Action sequence')}</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {steps.map((step, idx) => (
                   <StepEditor
@@ -1677,7 +1709,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                     transition: 'all 0.15s',
                   }}
                 >
-                  + Ajouter une étape
+                  {tr('+ Ajouter une étape', '+ Add a step')}
                 </button>
               </div>
             </section>
@@ -1688,7 +1720,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           {anyStory && phoneList.length > 0 && (
             <section>
               <span style={labelStyle}>
-                Lien par compte
+                {tr('Lien par compte', 'Link per account')}
                 <span style={{ color: phonesWithLink === phoneList.length ? '#34D399' : '#F59E0B', letterSpacing: 'normal', fontSize: 11, textTransform: 'none', fontWeight: 600 }}>
                   {' '}— {phonesWithLink}/{phoneList.length}
                 </span>
@@ -1714,7 +1746,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                         type="url"
                         value={link}
                         onChange={e => setPhoneLink(p.id, e.target.value)}
-                        placeholder="https://lien-de-ce-compte…"
+                        placeholder={tr('https://lien-de-ce-compte…', 'https://link-for-this-account…')}
                         style={{
                           flex: 1, height: 32, padding: '0 10px', fontSize: 12,
                           background: 'rgba(233,234,240,0.02)', color: IVORY,
@@ -1733,9 +1765,9 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
           <section>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div>
-                <span style={{ ...labelStyle, marginBottom: 2 }}>Sous-tâches</span>
+                <span style={{ ...labelStyle, marginBottom: 2 }}>{tr('Sous-tâches', 'Sub-tasks')}</span>
                 <p style={{ margin: 0, fontSize: 11, color: MUTED }}>
-                  Chaque sous-tâche s'exécute indépendamment sur les mêmes téléphones.
+                  {tr("Chaque sous-tâche s'exécute indépendamment sur les mêmes téléphones.", 'Each sub-task runs independently on the same phones.')}
                 </p>
               </div>
               <button
@@ -1749,7 +1781,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                   flexShrink: 0,
                 }}
               >
-                <IconPlus size={10} /> Nouvelle sous-tâche
+                <IconPlus size={10} /> {tr('Nouvelle sous-tâche', 'New sub-task')}
               </button>
             </div>
 
@@ -1757,10 +1789,10 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               {segments.map((seg, idx) => {
                 const isStory = seg.type === 'story'
                 const open = expandedIdx === idx
-                const storyAccent = '#F472B6'
+                const storyAccent = '#A78BFA'
                 const pubAccent   = '#818CF8'
                 const accent = isStory ? storyAccent : pubAccent
-                const accentAlpha = isStory ? 'rgba(244,114,182,' : 'rgba(129,140,248,'
+                const accentAlpha = isStory ? 'rgba(167,139,250,' : 'rgba(129,140,248,'
                 const intervalLabel = formatInterval(draftRecurHours(seg))
                 return (
                   <div key={idx} style={{
@@ -1786,13 +1818,13 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                         {/* Type pill */}
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5,
-                          background: isStory ? 'rgba(236,72,153,0.1)' : 'rgba(99,102,241,0.1)',
+                          background: isStory ? 'rgba(139,92,246,0.1)' : 'rgba(99,102,241,0.1)',
                           color: accent,
-                          border: `1px solid ${isStory ? 'rgba(236,72,153,0.28)' : 'rgba(99,102,241,0.28)'}`,
+                          border: `1px solid ${isStory ? 'rgba(139,92,246,0.28)' : 'rgba(99,102,241,0.28)'}`,
                           borderRadius: 8, padding: '3px 9px', fontSize: 10.5, fontWeight: 700, flexShrink: 0,
                         }}>
                           {isStory ? <IconLinkType size={11} /> : <IconVideo size={11} />}
-                          {isStory ? 'Story' : 'Publication'}
+                          {isStory ? tr('Story', 'Story') : tr('Publication', 'Post')}
                         </span>
                         {/* Summary */}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1800,7 +1832,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                             {intervalLabel}
                           </span>
                           <span style={{ fontSize: 11, color: MUTED, marginLeft: 8 }}>
-                            · {seg.videos.length} {isStory ? 'image' : 'vidéo'}{seg.videos.length !== 1 ? 's' : ''}
+                            · {seg.videos.length} {isStory ? tr('image', 'image') : tr('vidéo', 'video')}{seg.videos.length !== 1 ? 's' : ''}
                             {isStory && seg.story_texts.length > 0 && ` · ${seg.story_texts.length} caption${seg.story_texts.length > 1 ? 's' : ''}`}
                           </span>
                         </div>
@@ -1813,7 +1845,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                       {segments.length > 1 && (
                         <button
                           onClick={() => removeSegment(idx)}
-                          title="Supprimer cette sous-tâche"
+                          title={tr('Supprimer cette sous-tâche', 'Delete this sub-task')}
                           className="cursor-pointer"
                           style={{
                             width: 36, height: 36, flexShrink: 0,
@@ -1836,8 +1868,8 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                           <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>Type</p>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                             {([
-                              { k: 'publication' as const, title: 'Publication', sub: 'Reels Instagram', icon: <IconVideo size={16} color="currentColor" /> },
-                              { k: 'story'       as const, title: 'Story',       sub: 'Image + lien',  icon: <IconLinkType size={16} color="currentColor" /> },
+                              { k: 'publication' as const, title: tr('Publication', 'Post'), sub: tr('Reels Instagram', 'Instagram Reels'), icon: <IconVideo size={16} color="currentColor" /> },
+                              { k: 'story'       as const, title: tr('Story', 'Story'),       sub: tr('Image + lien', 'Image + link'),  icon: <IconLinkType size={16} color="currentColor" /> },
                             ]).map(opt => {
                               const active = seg.type === opt.k
                               const optAccent = opt.k === 'story' ? storyAccent : pubAccent
@@ -1848,21 +1880,21 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                   style={{
                                     display: 'flex', alignItems: 'center', gap: 11,
                                     padding: '11px 14px', borderRadius: 8,
-                                    border: `1px solid ${active ? (opt.k === 'story' ? 'rgba(244,114,182,0.45)' : 'rgba(99,102,241,0.45)') : HAIR}`,
-                                    background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.08)' : 'rgba(99,102,241,0.08)') : 'rgba(255,255,255,0.02)',
+                                    border: `1px solid ${active ? (opt.k === 'story' ? 'rgba(167,139,250,0.45)' : 'rgba(99,102,241,0.45)') : HAIR}`,
+                                    background: active ? (opt.k === 'story' ? 'rgba(167,139,250,0.08)' : 'rgba(99,102,241,0.08)') : 'rgba(255,255,255,0.02)',
                                     color: active ? optAccent : 'rgba(233,234,240,0.55)',
                                     transition: 'all 0.15s',
                                   }}>
                                   <span style={{
                                     width: 32, height: 32, borderRadius: 8, flexShrink: 0,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    background: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.12)' : 'rgba(99,102,241,0.12)') : 'rgba(255,255,255,0.04)',
+                                    background: active ? (opt.k === 'story' ? 'rgba(167,139,250,0.12)' : 'rgba(99,102,241,0.12)') : 'rgba(255,255,255,0.04)',
                                   }}>
                                     {opt.icon}
                                   </span>
                                   <div style={{ textAlign: 'left' }}>
                                     <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: active ? IVORY : 'rgba(233,234,240,0.6)' }}>{opt.title}</p>
-                                    <p style={{ margin: 0, fontSize: 10.5, color: active ? (opt.k === 'story' ? 'rgba(244,114,182,0.7)' : 'rgba(129,140,248,0.7)') : MUTED }}>{opt.sub}</p>
+                                    <p style={{ margin: 0, fontSize: 10.5, color: active ? (opt.k === 'story' ? 'rgba(167,139,250,0.7)' : 'rgba(129,140,248,0.7)') : MUTED }}>{opt.sub}</p>
                                   </div>
                                 </button>
                               )
@@ -1873,7 +1905,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                         {/* ── Médias ── */}
                         <div style={{ marginBottom: 18 }}>
                           <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>
-                            {isStory ? 'Images' : 'Vidéos'}
+                            {isStory ? tr('Images', 'Images') : tr('Vidéos', 'Videos')}
                             {seg.videos.length > 0 && <span style={{ color: IVORY, letterSpacing: 'normal', textTransform: 'none', fontWeight: 500, fontSize: 11 }}> — {seg.videos.length}</span>}
                           </p>
                           {seg.videos.length > 0 && (
@@ -1909,19 +1941,19 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               border: `1px solid ${accentAlpha + '0.28)'}`, borderRadius: 8,
                             }}
                           >
-                            <IconPlus size={10} /> Depuis la banque de médias
+                            <IconPlus size={10} /> {tr('Depuis la banque de médias', 'From the media bank')}
                           </button>
                         </div>
 
                         {/* ── Légende (Publication) ── */}
                         {!isStory && (
                           <div style={{ marginBottom: 18 }}>
-                            <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>Légende</p>
+                            <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>{tr('Légende', 'Caption')}</p>
                             <textarea
                               value={seg.caption}
                               onChange={e => patchSegment(idx, { caption: e.target.value })}
                               rows={3}
-                              placeholder="Description Instagram…"
+                              placeholder={tr('Description Instagram…', 'Instagram description…')}
                               style={{
                                 width: '100%', minHeight: 68, padding: '10px 12px', fontSize: 13, lineHeight: 1.6,
                                 background: 'rgba(233,234,240,0.02)', color: IVORY, resize: 'vertical',
@@ -1935,8 +1967,8 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                         {/* ── Pool de captions (Story) ── */}
                         {isStory && (
                           <div style={{ marginBottom: 18 }}>
-                            <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 4px' }}>Pool de captions</p>
-                            <p style={{ fontSize: 11, color: MUTED, margin: '0 0 10px' }}>Chaque compte pioche une caption aléatoire dans ce pool.</p>
+                            <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 4px' }}>{tr('Pool de captions', 'Caption pool')}</p>
+                            <p style={{ fontSize: 11, color: MUTED, margin: '0 0 10px' }}>{tr('Chaque compte pioche une caption aléatoire dans ce pool.', 'Each account picks a random caption from this pool.')}</p>
                             {/* Existing captions */}
                             {seg.story_texts.length > 0 && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
@@ -1947,7 +1979,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                     border: `1px solid ${HAIR}`,
                                     background: 'rgba(233,234,240,0.02)',
                                   }}>
-                                    <span style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(244,114,182,0.12)', color: storyAccent, fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                                    <span style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(167,139,250,0.12)', color: storyAccent, fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
                                     <span style={{ flex: 1, fontSize: 12, color: 'rgba(233,234,240,0.75)', lineHeight: 1.5, wordBreak: 'break-word' }}>{txt}</span>
                                     <button
                                       onClick={() => patchSegment(idx, { story_texts: seg.story_texts.filter((_, j) => j !== i) })}
@@ -1967,7 +1999,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 value={open ? storyTextDraft : ''}
                                 onChange={e => setStoryTextDraft(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStoryText(idx) } }}
-                                placeholder="Ex : Voir le lien en bio 👆"
+                                placeholder={tr('Ex : Voir le lien en bio 👆', 'e.g. See the link in bio 👆')}
                                 style={{
                                   flex: 1, height: 36, padding: '0 12px', fontSize: 13,
                                   background: 'rgba(233,234,240,0.02)', color: IVORY,
@@ -1980,13 +2012,13 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 className="cursor-pointer"
                                 style={{
                                   padding: '0 14px', fontSize: 11, fontWeight: 700,
-                                  background: storyTextDraft.trim() ? 'rgba(244,114,182,0.12)' : 'rgba(233,234,240,0.05)',
+                                  background: storyTextDraft.trim() ? 'rgba(167,139,250,0.12)' : 'rgba(233,234,240,0.05)',
                                   color: storyTextDraft.trim() ? storyAccent : MUTED,
-                                  border: `1px solid ${storyTextDraft.trim() ? 'rgba(244,114,182,0.3)' : HAIR}`,
+                                  border: `1px solid ${storyTextDraft.trim() ? 'rgba(167,139,250,0.3)' : HAIR}`,
                                   borderRadius: 8,
                                 }}
                               >
-                                Ajouter
+                                {tr('Ajouter', 'Add')}
                               </button>
                             </div>
                             {/* Import from caption bank */}
@@ -1996,22 +2028,22 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 7,
                                 padding: '7px 13px', fontSize: 11, fontWeight: 700,
-                                background: 'rgba(244,114,182,0.07)', color: storyAccent,
-                                border: '1px solid rgba(244,114,182,0.25)', borderRadius: 8,
+                                background: 'rgba(167,139,250,0.07)', color: storyAccent,
+                                border: '1px solid rgba(167,139,250,0.25)', borderRadius: 8,
                               }}
                             >
-                              <IconPlus size={10} /> Depuis la banque de captions
+                              <IconPlus size={10} /> {tr('Depuis la banque de captions', 'From the caption bank')}
                             </button>
                           </div>
                         )}
 
                         {/* ── Paramètres ── */}
                         <div>
-                          <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 12px' }}>Paramètres</p>
+                          <p style={{ fontSize: 10.5, fontWeight: 700, color: GOLD, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 12px' }}>{tr('Paramètres', 'Settings')}</p>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
                             {/* Intervalle */}
                             <div>
-                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Intervalle</p>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{tr('Intervalle', 'Interval')}</p>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <input type="number" min={1} max={9999} value={seg.recurValue}
                                   onChange={e => patchSegment(idx, { recurValue: Math.max(1, Number(e.target.value) || 24) })}
@@ -2022,22 +2054,22 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                   style={{ height: 34, padding: '0 6px', fontSize: 12, background: '#0F1014', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none' }}>
                                   <option value="minutes">min</option>
                                   <option value="heures">h</option>
-                                  <option value="jours">j</option>
+                                  <option value="jours">{tr('j', 'd')}</option>
                                 </select>
                               </div>
                             </div>
                             {/* Premier post */}
                             <div style={{ gridColumn: 'span 2' }}>
-                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Premier post</p>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{tr('Premier post', 'First post')}</p>
                               <input type="datetime-local" value={seg.next_run_at}
                                 onChange={e => patchSegment(idx, { next_run_at: e.target.value })}
                                 style={{ height: 34, padding: '0 10px', fontSize: 12, colorScheme: 'dark', background: 'rgba(233,234,240,0.02)', color: IVORY, border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none', width: '100%', boxSizing: 'border-box' }} />
                             </div>
                             {/* Mode */}
                             <div>
-                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Ordre médias</p>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{tr('Ordre médias', 'Media order')}</p>
                               <div style={{ display: 'flex', border: `1px solid ${HAIR}`, borderRadius: 8, overflow: 'hidden', height: 34 }}>
-                                {([{ k: 'seq', l: 'Seq.' }, { k: 'random', l: 'Aléa.' }] as const).map(m => (
+                                {([{ k: 'seq', l: tr('Seq.', 'Seq.') }, { k: 'random', l: tr('Aléa.', 'Rand.') }] as const).map(m => (
                                   <button key={m.k} onClick={() => patchSegment(idx, { mode: m.k })} className="cursor-pointer"
                                     style={{
                                       flex: 1, padding: '0 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
@@ -2052,7 +2084,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                             {/* Délai / compte (Publication) */}
                             {!isStory && (
                               <div>
-                                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Délai / compte</p>
+                                <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{tr('Délai / compte', 'Delay / account')}</p>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <input type="number" min={0} max={120} value={seg.delay_minutes}
                                     onChange={e => patchSegment(idx, { delay_minutes: Math.max(0, Math.min(120, Number(e.target.value) || 0)) })}
@@ -2067,17 +2099,17 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                                 <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Reels Trial</p>
                                 <button onClick={() => patchSegment(idx, { reels_trial: !seg.reels_trial })} className="cursor-pointer"
                                   style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.reels_trial ? GOLD : 'transparent', color: seg.reels_trial ? '#0A0B0E' : MUTED, border: seg.reels_trial ? 'none' : `1px solid ${HAIR}`, borderRadius: 8 }}>
-                                  {seg.reels_trial ? 'Activé' : 'Désactivé'}
+                                  {seg.reels_trial ? tr('Activé', 'On') : tr('Désactivé', 'Off')}
                                 </button>
                               </div>
                             )}
                             {/* Usage unique */}
                             <div>
-                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Usage unique</p>
+                              <p style={{ fontSize: 10.5, color: MUTED, margin: '0 0 6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{tr('Usage unique', 'Single use')}</p>
                               <button onClick={() => patchSegment(idx, { auto_remove_videos: !seg.auto_remove_videos })}
-                                title="Retire chaque média du pool après utilisation" className="cursor-pointer"
+                                title={tr('Retire chaque média du pool après utilisation', 'Removes each media from the pool after use')} className="cursor-pointer"
                                 style={{ height: 34, padding: '0 14px', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', background: seg.auto_remove_videos ? '#F59E0B' : 'transparent', color: seg.auto_remove_videos ? '#0A0B0E' : MUTED, border: seg.auto_remove_videos ? 'none' : `1px solid ${HAIR}`, borderRadius: 8 }}>
-                                {seg.auto_remove_videos ? 'Activé' : 'Désactivé'}
+                                {seg.auto_remove_videos ? tr('Activé', 'On') : tr('Désactivé', 'Off')}
                               </button>
                             </div>
                           </div>
@@ -2109,29 +2141,35 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
         }}>
           <div style={{ flex: 1, display: 'flex', gap: 16, alignItems: 'baseline' }}>
             <span style={{ fontSize: 11, color: MUTED }}>
-              <span style={{ fontSize: 16, color: phoneList.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{phoneList.length}</span> tél.
+              <span style={{ fontSize: 16, color: phoneList.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{phoneList.length}</span> {tr('tél.', 'ph.')}
             </span>
             {!sequenceMode && (
               <>
                 <span style={{ fontSize: 11, color: MUTED }}>
-                  <span style={{ fontSize: 16, color: segments.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{segments.length}</span> seg.
+                  <span style={{ fontSize: 16, color: segments.length ? GOLD : 'rgba(233,234,240,0.22)' }}>{segments.length}</span> {tr('seg.', 'seg.')}
                 </span>
                 <span style={{ fontSize: 11, color: MUTED }}>
-                  <span style={{ fontSize: 16, color: totalMedia ? GOLD : 'rgba(233,234,240,0.22)' }}>{totalMedia}</span> médias
+                  <span style={{ fontSize: 16, color: totalMedia ? GOLD : 'rgba(233,234,240,0.22)' }}>{totalMedia}</span> {tr('médias', 'media')}
                 </span>
                 {anyStory && phoneList.length > 0 && phonesWithLink < phoneList.length && (
                   <span style={{ fontSize: 11, color: '#F59E0B' }}>
-                    {phoneList.length - phonesWithLink} lien(s) manquant(s)
+                    {tr(`${phoneList.length - phonesWithLink} lien(s) manquant(s)`, `${phoneList.length - phonesWithLink} missing link(s)`)}
                   </span>
                 )}
                 {progress && <span style={{ fontSize: 11.5, color: GOLD }}>{progress}</span>}
               </>
             )}
+            {!submitting && disabledReason && (
+              <span style={{ fontSize: 11, color: '#F59E0B', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+                {disabledReason}
+              </span>
+            )}
             {phoneList.length > 0 && (
               <span style={{ fontSize: 11, color: MUTED }}
-                title="Coût : 2 crédits × nb téléphones à chaque exécution, plus 50 crédits/jour tant que la tâche est active.">
-                ≈ <span style={{ color: GOLD, fontWeight: 700 }}>{phoneList.length * 2}</span> cr/exéc
-                {' · '}<span style={{ color: GOLD, fontWeight: 700 }}>50</span> cr/jour
+                title={tr('Coût : 2 crédits × nb téléphones à chaque exécution, plus 50 crédits/jour tant que la tâche est active.', 'Cost: 2 credits × number of phones per run, plus 50 credits/day while the task is active.')}>
+                ≈ <span style={{ color: GOLD, fontWeight: 700 }}>{phoneList.length * 2}</span> {tr('cr/exéc', 'cr/run')}
+                {' · '}<span style={{ color: GOLD, fontWeight: 700 }}>50</span> {tr('cr/jour', 'cr/day')}
               </span>
             )}
           </div>
@@ -2147,11 +2185,12 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               opacity: submitting ? 0.4 : 1,
             }}
           >
-            Annuler
+            {tr('Annuler', 'Cancel')}
           </button>
           <button
             onClick={submit}
             disabled={!canSubmit}
+            title={disabledReason ?? (isEdit ? tr('Enregistrer les modifications', 'Save changes') : tr('Créer et activer la tâche', 'Create and activate the task'))}
             className="cursor-pointer"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -2160,6 +2199,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
               background: canSubmit ? GOLD : 'rgba(233,234,240,0.08)',
               color: canSubmit ? '#fff' : MUTED,
               border: 'none', borderRadius: 8, transition: 'all 0.18s',
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
             }}
             onMouseEnter={e => { if (canSubmit) e.currentTarget.style.background = '#818CF8' }}
             onMouseLeave={e => { if (canSubmit) e.currentTarget.style.background = canSubmit ? GOLD : 'rgba(233,234,240,0.08)' }}
@@ -2174,7 +2214,7 @@ function CreateTaskModal({ user, editTask, onSaved, onClose }: CreateTaskModalPr
                 flexShrink: 0,
               }} />
             )}
-            {submitting ? 'Sauvegarde…' : isEdit ? 'Enregistrer' : 'Créer la tâche'}
+            {submitting ? tr('Sauvegarde…', 'Saving…') : isEdit ? tr('Enregistrer', 'Save') : tr('Créer la tâche', 'Create task')}
           </button>
         </div>
       </div>
@@ -2284,6 +2324,7 @@ function StepEditor({
   onMoveDown: () => void
   onShowBankPicker: (target: 'images' | 'videos') => void
 }) {
+  const tr = useTr()
   const [storyTextDraft, setStoryTextDraft] = useState('')
 
   function addStoryText() {
@@ -2299,12 +2340,12 @@ function StepEditor({
     <div style={{
       border: `1px solid ${
         step.type === 'publication' ? 'rgba(99,102,241,0.25)'
-        : step.type === 'story' ? 'rgba(236,72,153,0.25)'
+        : step.type === 'story' ? 'rgba(139,92,246,0.25)'
         : 'rgba(245,158,11,0.25)'}`,
       borderRadius: 12,
       padding: '14px 16px',
       background: step.type === 'publication' ? 'rgba(99,102,241,0.04)'
-        : step.type === 'story' ? 'rgba(236,72,153,0.04)'
+        : step.type === 'story' ? 'rgba(139,92,246,0.04)'
         : 'rgba(245,158,11,0.04)',
       display: 'flex',
       flexDirection: 'column',
@@ -2331,17 +2372,17 @@ function StepEditor({
                 letterSpacing: '0.04em', textTransform: 'uppercase',
                 borderRadius: 8, border: '1px solid',
                 borderColor: step.type === t
-                  ? (t === 'publication' ? 'rgba(99,102,241,0.55)' : t === 'story' ? 'rgba(236,72,153,0.55)' : 'rgba(245,158,11,0.55)')
+                  ? (t === 'publication' ? 'rgba(99,102,241,0.55)' : t === 'story' ? 'rgba(139,92,246,0.55)' : 'rgba(245,158,11,0.55)')
                   : 'rgba(233,234,240,0.1)',
                 background: step.type === t
-                  ? (t === 'publication' ? 'rgba(99,102,241,0.18)' : t === 'story' ? 'rgba(236,72,153,0.18)' : 'rgba(245,158,11,0.18)')
+                  ? (t === 'publication' ? 'rgba(99,102,241,0.18)' : t === 'story' ? 'rgba(139,92,246,0.18)' : 'rgba(245,158,11,0.18)')
                   : 'transparent',
                 color: step.type === t
-                  ? (t === 'publication' ? '#818CF8' : t === 'story' ? '#F472B6' : '#F59E0B')
+                  ? (t === 'publication' ? '#818CF8' : t === 'story' ? '#A78BFA' : '#F59E0B')
                   : MUTED,
               }}
             >
-              {t === 'publication' ? 'Publication' : t === 'story' ? 'Story' : 'Warmup'}
+              {t === 'publication' ? tr('Publication', 'Post') : t === 'story' ? 'Story' : 'Warmup'}
             </button>
           ))}
         </div>
@@ -2366,7 +2407,7 @@ function StepEditor({
       {step.type === 'warmup' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11.5, color: MUTED }}>Durée :</span>
+            <span style={{ fontSize: 11.5, color: MUTED }}>{tr('Durée :', 'Duration:')}</span>
             <input
               type="number"
               min={1}
@@ -2382,7 +2423,7 @@ function StepEditor({
             <span style={{ fontSize: 11, color: MUTED }}>min</span>
           </div>
           <p style={{ margin: 0, fontSize: 11, color: 'rgba(245,158,11,0.7)', fontStyle: 'italic' }}>
-            Bientôt disponible — pause entre les étapes.
+            {tr('Bientôt disponible — pause entre les étapes.', 'Coming soon — pause between steps.')}
           </p>
         </div>
       )}
@@ -2391,7 +2432,7 @@ function StepEditor({
       {step.type !== 'warmup' && (
         <div>
           <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>
-            {step.type === 'story' ? 'Images' : 'Vidéos'}
+            {step.type === 'story' ? tr('Images', 'Images') : tr('Vidéos', 'Videos')}
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
             {mediaList.map((v, i) => (
@@ -2427,13 +2468,13 @@ function StepEditor({
                 background: GOLD, color: '#fff', border: 'none', borderRadius: 5,
               }}
             >
-              + Banque
+              {tr('+ Banque', '+ Bank')}
             </button>
           </div>
 
           {/* Mode de distribution (séquentiel / aléatoire) + usage unique */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10.5, color: MUTED }}>Distribution :</span>
+            <span style={{ fontSize: 10.5, color: MUTED }}>{tr('Distribution :', 'Distribution:')}</span>
             {(['seq', 'random'] as const).map(m => {
               const active = (step.mode ?? 'seq') === m
               return (
@@ -2448,14 +2489,14 @@ function StepEditor({
                     color: active ? '#818CF8' : MUTED,
                   }}
                 >
-                  {m === 'seq' ? 'Séquentiel' : 'Aléatoire'}
+                  {m === 'seq' ? tr('Séquentiel', 'Sequential') : tr('Aléatoire', 'Random')}
                 </button>
               )
             })}
             <button
               onClick={() => onChange({ ...step, auto_remove_videos: !step.auto_remove_videos })}
               className="cursor-pointer"
-              title="Retire les médias utilisés de la pool après chaque exécution"
+              title={tr('Retire les médias utilisés de la pool après chaque exécution', 'Removes used media from the pool after each run')}
               style={{
                 marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '4px 10px', fontSize: 10, fontWeight: 700,
@@ -2472,7 +2513,7 @@ function StepEditor({
               }}>
                 {step.auto_remove_videos && <IconCheck size={7} />}
               </span>
-              Usage unique
+              {tr('Usage unique', 'Single use')}
             </button>
           </div>
         </div>
@@ -2481,12 +2522,12 @@ function StepEditor({
       {/* Publication: caption */}
       {step.type === 'publication' && (
         <div>
-          <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>Légende</p>
+          <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>{tr('Légende', 'Caption')}</p>
           <textarea
             value={step.caption ?? ''}
             onChange={e => onChange({ ...step, caption: e.target.value })}
             rows={2}
-            placeholder="Description Instagram…"
+            placeholder={tr('Description Instagram…', 'Instagram description…')}
             style={{
               width: '100%', padding: '8px 10px',
               fontSize: 12, lineHeight: 1.5,
@@ -2502,7 +2543,7 @@ function StepEditor({
       {/* Story: per-phone links */}
       {step.type === 'story' && phones.length > 0 && (
         <div>
-          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>Liens par compte</p>
+          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>{tr('Liens par compte', 'Links per account')}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 160, overflowY: 'auto', scrollbarWidth: 'thin' }}>
             {phones.map(p => {
               const link = (step.phone_links ?? {})[p.id] ?? getPhoneLink(p.id)
@@ -2539,7 +2580,7 @@ function StepEditor({
       {step.type === 'story' && (
         <div>
           <p style={{ margin: '0 0 5px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>
-            Textes du sticker <span style={{ color: MUTED, fontWeight: 400, textTransform: 'none' }}>— optionnel</span>
+            {tr('Textes du sticker', 'Sticker texts')} <span style={{ color: MUTED, fontWeight: 400, textTransform: 'none' }}>{tr('— optionnel', '— optional')}</span>
           </p>
           <div style={{ display: 'flex', gap: 6, marginBottom: (step.story_texts ?? []).length ? 7 : 0 }}>
             <input
@@ -2547,7 +2588,7 @@ function StepEditor({
               value={storyTextDraft}
               onChange={e => setStoryTextDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStoryText() } }}
-              placeholder="Ex : Voir le lien 👆"
+              placeholder={tr('Ex : Voir le lien 👆', 'e.g. See the link 👆')}
               style={{
                 flex: 1, height: 30, padding: '0 10px', fontSize: 12,
                 background: 'rgba(233,234,240,0.02)', color: IVORY,
@@ -2596,7 +2637,7 @@ function StepEditor({
       {/* Delay after step (not last) */}
       {index < total - 1 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: MUTED }}>Attendre</span>
+          <span style={{ fontSize: 11, color: MUTED }}>{tr('Attendre', 'Wait')}</span>
           <input
             type="number"
             min={0}
@@ -2609,7 +2650,7 @@ function StepEditor({
               border: `1px solid ${HAIR}`, borderRadius: 8, outline: 'none',
             }}
           />
-          <span style={{ fontSize: 11, color: MUTED }}>min avant l'étape suivante</span>
+          <span style={{ fontSize: 11, color: MUTED }}>{tr("min avant l'étape suivante", 'min before the next step')}</span>
         </div>
       )}
     </div>
@@ -2651,6 +2692,7 @@ function FlowNode({ grad, glow, accent, label, sub, index, icon, onAdd, addTitle
   grad: string; glow: string; accent: string; label: string; sub: React.ReactNode
   index?: number; icon: React.ReactNode; onAdd?: () => void; addTitle?: string
 }) {
+  const tr = useTr()
   const [h, setH] = useState(false)
   return (
     <div
@@ -2677,7 +2719,7 @@ function FlowNode({ grad, glow, accent, label, sub, index, icon, onAdd, addTitle
         {onAdd && (
           <button
             onClick={e => { e.stopPropagation(); onAdd() }}
-            title={addTitle ?? 'Ajouter des médias'}
+            title={addTitle ?? tr('Ajouter des médias', 'Add media')}
             className="cursor-pointer"
             style={{
               width: 15, height: 15, borderRadius: 4, border: 'none',
@@ -2712,6 +2754,7 @@ function TaskCard({
   toggling: boolean
   deleting: boolean
 }) {
+  const tr = useTr()
   const [hovered, setHovered] = useState(false)
   const isActive = task.status === 'active'
   const hasSegments = !!task.segments && task.segments.length > 0
@@ -2749,7 +2792,7 @@ function TaskCard({
             fontSize: 15.5, fontWeight: 800, color: '#F3F4F6',
             letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {task.name || 'Workflow sans nom'}
+            {task.name || tr('Workflow sans nom', 'Untitled workflow')}
           </p>
 
           {/* Badge statut */}
@@ -2761,7 +2804,7 @@ function TaskCard({
             border: `1px solid ${isActive ? 'rgba(52,211,153,0.28)' : 'rgba(255,255,255,0.1)'}`,
           }}>
             {isActive && <span style={{ width: 6, height: 6, borderRadius: 999, background: '#34D399', boxShadow: '0 0 6px rgba(52,211,153,0.8)', animation: 'wf-pulse 2s ease-in-out infinite' }} />}
-            {isActive ? 'Actif' : 'En pause'}
+            {isActive ? tr('Actif', 'Active') : tr('En pause', 'Paused')}
           </span>
 
           {/* Chip prochain run (niveau tâche, mode plat) */}
@@ -2781,7 +2824,7 @@ function TaskCard({
             <button
               onClick={onRunNow}
               disabled={toggling}
-              title="Lancer maintenant"
+              title={tr('Lancer maintenant', 'Run now')}
               className="cursor-pointer"
               style={{
                 width: 32, height: 32, borderRadius: 10, border: 'none',
@@ -2796,7 +2839,7 @@ function TaskCard({
             </button>
             <button
               onClick={onDuplicate}
-              title="Dupliquer"
+              title={tr('Dupliquer', 'Duplicate')}
               className="cursor-pointer"
               style={{
                 width: 32, height: 32, borderRadius: 10, border: 'none',
@@ -2812,7 +2855,7 @@ function TaskCard({
             <button
               onClick={onToggle}
               disabled={toggling}
-              title={isActive ? 'Mettre en pause' : 'Reprendre'}
+              title={isActive ? tr('Mettre en pause', 'Pause') : tr('Reprendre', 'Resume')}
               className="cursor-pointer"
               style={{
                 width: 32, height: 32, borderRadius: 10, border: 'none',
@@ -2828,7 +2871,7 @@ function TaskCard({
             </button>
             <button
               onClick={onEdit}
-              title="Modifier"
+              title={tr('Modifier', 'Edit')}
               className="cursor-pointer"
               style={{
                 width: 32, height: 32, borderRadius: 10, border: 'none',
@@ -2844,7 +2887,7 @@ function TaskCard({
             <button
               onClick={onDelete}
               disabled={deleting}
-              title="Supprimer"
+              title={tr('Supprimer', 'Delete')}
               className="cursor-pointer"
               style={{
                 width: 32, height: 32, borderRadius: 10, border: 'none',
@@ -2871,7 +2914,7 @@ function TaskCard({
           {/* Nœud trigger */}
           <FlowNode
             grad="linear-gradient(135deg,#6366F1,#8B5CF6)" glow="rgba(139,92,246,0.4)" accent="#A5B4FC"
-            label="Déclencheur"
+            label={tr('Déclencheur', 'Trigger')}
             sub={<span style={{ fontVariantNumeric: 'tabular-nums' }}>↻ {formatInterval(task.recur_hours)}</span>}
             icon={<IconClock size={22} color="#fff" />}
           />
@@ -2887,12 +2930,12 @@ function TaskCard({
                   <FlowNode
                     grad={meta.grad} glow={meta.glow} accent={meta.accent} label={meta.label} index={i + 1}
                     sub={<>
-                      <span>{seg.videos.length} {story ? 'image' : 'vidéo'}{seg.videos.length > 1 ? 's' : ''}</span>
+                      <span>{seg.videos.length} {story ? tr('image', 'image') : tr('vidéo', 'video')}{seg.videos.length > 1 ? 's' : ''}</span>
                       {isActive && <span style={{ color: '#A5B4FC', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>· {formatCountdown(seg.next_run_at)}</span>}
                     </>}
                     icon={story ? <IconLinkType size={20} color="#fff" /> : <IconVideo size={20} color="#fff" />}
                     onAdd={() => onOpenAddVideos(seg.id)}
-                    addTitle="Ajouter des médias à cette étape"
+                    addTitle={tr('Ajouter des médias à cette étape', 'Add media to this step')}
                   />
                 </React.Fragment>
               )
@@ -2906,7 +2949,7 @@ function TaskCard({
                   <FlowConnector active={isActive} from="#8B5CF6" to={meta.accent} flowDelay={0} />
                   <FlowNode
                     grad={meta.grad} glow={meta.glow} accent={meta.accent} label={meta.label}
-                    sub={<span>{task.videos.length} {story ? 'image' : 'vidéo'}{task.videos.length > 1 ? 's' : ''}</span>}
+                    sub={<span>{task.videos.length} {story ? tr('image', 'image') : tr('vidéo', 'video')}{task.videos.length > 1 ? 's' : ''}</span>}
                     icon={story ? <IconLinkType size={20} color="#fff" /> : <IconVideo size={20} color="#fff" />}
                     onAdd={() => onOpenAddVideos()}
                   />
@@ -2926,7 +2969,7 @@ function TaskCard({
             }}>
               <IconRepeat size={15} color="currentColor" />
             </div>
-            <span style={{ fontSize: 9.5, color: 'rgba(233,234,240,0.35)', fontWeight: 700 }}>en boucle</span>
+            <span style={{ fontSize: 9.5, color: 'rgba(233,234,240,0.35)', fontWeight: 700 }}>{tr('en boucle', 'looping')}</span>
           </div>
         </div>
 
@@ -2937,18 +2980,18 @@ function TaskCard({
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <IconPhone size={12} color="rgba(233,234,240,0.4)" />
-            {task.phones.length} téléphone{task.phones.length > 1 ? 's' : ''}
+            {task.phones.length} {tr('téléphone', 'phone')}{task.phones.length > 1 ? 's' : ''}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <IconBolt size={12} color="rgba(233,234,240,0.4)" />
-            <span style={{ color: '#FBBF24', fontWeight: 700 }}>~{creditsPerRun} crédits</span>/run
+            <span style={{ color: '#FBBF24', fontWeight: 700 }}>{tr(`~${creditsPerRun} crédits`, `~${creditsPerRun} credits`)}</span>/run
           </span>
           {(task.run_count ?? 0) > 0 && (
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>{task.run_count} run{(task.run_count ?? 0) > 1 ? 's' : ''}</span>
           )}
           {task.last_run_at && (
             <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontVariantNumeric: 'tabular-nums' }}>
-              Dernier run : {formatRelativePast(task.last_run_at)}
+              {tr('Dernier run :', 'Last run:')} {formatRelativePast(task.last_run_at)}
               <span style={{ color: '#34D399', display: 'inline-flex' }}><IconCheck size={9} /></span>
             </span>
           )}
@@ -2966,8 +3009,8 @@ function TaskSkeleton() {
       {[0, 1, 2, 3].map(i => (
         <div
           key={i}
-          className="sf-skeleton"
-          style={{ height: 148, borderRadius: 14, opacity: 1 - i * 0.15 }}
+          className="sf-skeleton sf-skeleton-card"
+          style={{ height: 148, opacity: 1 - i * 0.15 }}
         />
       ))}
     </div>
@@ -2977,6 +3020,7 @@ function TaskSkeleton() {
 // ── Empty state ────────────────────────────────────────────────────────────────
 
 function EmptyState({ onNew }: { onNew: () => void }) {
+  const tr = useTr()
   // Pipeline fantôme animé : vend la promesse du workflow avant même d'en créer un.
   const ghostTiles = [
     { grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', icon: <IconClock size={19} color="#fff" /> },
@@ -3023,10 +3067,10 @@ function EmptyState({ onNew }: { onNew: () => void }) {
       </div>
 
       <p style={{ fontSize: 19, fontWeight: 800, color: '#F3F4F6', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-        Crée ton premier workflow
+        {tr('Crée ton premier workflow', 'Create your first workflow')}
       </p>
       <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'rgba(233,234,240,0.5)', margin: '0 0 26px', maxWidth: 420 }}>
-        Enchaîne warmup, Reels et Stories sur tous tes téléphones, en boucle, sans lever le petit doigt.
+        {tr('Enchaîne warmup, Reels et Stories sur tous tes téléphones, en boucle, sans lever le petit doigt.', 'Chain warmup, Reels and Stories across all your phones, on a loop, without lifting a finger.')}
       </p>
 
       <button
@@ -3040,7 +3084,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
         }}
       >
         <IconPlus size={11} />
-        Créer mon premier workflow
+        {tr('Créer mon premier workflow', 'Create my first workflow')}
       </button>
     </div>
   )
@@ -3049,6 +3093,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
 // ── Upcoming run row ───────────────────────────────────────────────────────────
 
 function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
+  const tr = useTr()
   const segs = task.segments ?? []
   const nextSeg = segs.length > 0
     ? [...segs].sort((a, b) => new Date(a.next_run_at).getTime() - new Date(b.next_run_at).getTime())[0]
@@ -3059,7 +3104,7 @@ function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
   const effInterval = nextSeg ? nextSeg.recur_hours : task.recur_hours
   const diff = new Date(effNextRun).getTime() - Date.now()
   const imminent = diff <= 60 * 60 * 1000 // within 1h
-  const accent = imminent ? '#34d399' : '#818CF8'
+  const accent = imminent ? 'var(--ok)' : 'var(--accent-lt)'
 
   return (
     <div
@@ -3104,16 +3149,16 @@ function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           {effType === 'story' && (
-            <span style={{ display: 'inline-flex', color: '#F472B6' }} title="Story"><IconLinkType size={13} /></span>
+            <span style={{ display: 'inline-flex', color: '#A78BFA' }} title="Story"><IconLinkType size={13} /></span>
           )}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.name || 'Tâche sans nom'}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.name || tr('Tâche sans nom', 'Untitled task')}</span>
           {segs.length > 1 && (
             <span style={{
               flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#818CF8',
               background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
               borderRadius: 5, padding: '1px 6px',
             }}>
-              {segs.length} segments
+              {segs.length} {tr('segments', 'segments')}
             </span>
           )}
         </p>
@@ -3136,16 +3181,17 @@ function UpcomingRow({ task, index }: { task: RecurringTask; index: number }) {
 // ── History run row ────────────────────────────────────────────────────────────
 
 function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
+  const tr = useTr()
   const [showLogs, setShowLogs] = useState(false)
   const logs = run.result?.logs ?? []
 
   const cfg = {
-    done:      { color: '#34d399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.25)', label: 'Réussi' },
-    failed:    { color: '#F87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)', label: 'Échoué' },
-    running:   { color: '#818CF8', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.25)', label: 'En cours' },
-    pending:   { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', label: 'En attente' },
-    cancelled: { color: 'rgba(148,163,184,0.7)', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)', label: 'Annulé' },
-  }[run.status] ?? { color: 'var(--muted)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)', label: run.status }
+    done:      { color: 'var(--ok)',     bg: 'var(--ok-dim)',     border: 'rgba(34,197,94,0.25)',  label: tr('Réussi', 'Succeeded') },
+    failed:    { color: 'var(--danger)', bg: 'var(--danger-dim)', border: 'rgba(239,68,68,0.25)',   label: tr('Échoué', 'Failed') },
+    running:   { color: 'var(--accent-lt)', bg: 'var(--accent-dim)', border: 'var(--border-accent)', label: tr('En cours', 'In progress') },
+    pending:   { color: 'var(--warn)',   bg: 'var(--warn-dim)',   border: 'rgba(245,158,11,0.25)', label: tr('En attente', 'Pending') },
+    cancelled: { color: 'var(--text-3)', bg: 'rgba(255,255,255,0.04)', border: 'var(--border-md)', label: tr('Annulé', 'Cancelled') },
+  }[run.status] ?? { color: 'var(--text-3)', bg: 'rgba(255,255,255,0.04)', border: 'var(--border-md)', label: run.status }
 
   const when = run.executed_at ?? run.scheduled_at
 
@@ -3178,7 +3224,7 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
             margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: 'var(--ivory)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
-            {run.created_by_name || 'Tâche'}
+            {run.created_by_name || tr('Tâche', 'Task')}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span className="sf-badge" style={{
@@ -3204,7 +3250,7 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
               background: 'none', border: 'none', padding: '4px 8px',
             }}
           >
-            {showLogs ? 'Masquer' : `Logs (${logs.length})`}
+            {showLogs ? tr('Masquer', 'Hide') : tr(`Logs (${logs.length})`, `Logs (${logs.length})`)}
           </button>
         )}
       </div>
@@ -3213,7 +3259,7 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
       {run.error_msg && run.status === 'failed' && !showLogs && (
         <p style={{
           margin: 0, padding: '0 16px 12px 60px',
-          fontSize: 11.5, color: '#F0A0AB', fontFamily: 'ui-monospace, monospace',
+          fontSize: 11.5, color: 'var(--danger)', fontFamily: 'ui-monospace, monospace',
         }}>
           {run.error_msg}
         </p>
@@ -3229,7 +3275,7 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
           {logs.map((l, i) => (
             <div key={i} style={{
               fontFamily: 'ui-monospace, monospace', fontSize: 11.5, lineHeight: 1.7,
-              color: l.startsWith('❌') ? '#F0A0AB' : l.startsWith('✅') ? '#34d399' : 'rgba(148,163,184,0.7)',
+              color: l.startsWith('❌') ? 'var(--danger)' : l.startsWith('✅') ? 'var(--ok)' : 'var(--text-3)',
               whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             }}>
               {l}
@@ -3246,6 +3292,7 @@ function HistoryRow({ run, index }: { run: TaskRun; index: number }) {
 type TaskTab = 'upcoming' | 'tasks' | 'history'
 
 export function Tasks({ user }: { user: User }) {
+  const tr = useTr()
   const { currentOrg } = useOrg()
   const conns = useConnections(user)
 
@@ -3399,7 +3446,7 @@ export function Tasks({ user }: { user: User }) {
         : []
       const copy: Record<string, unknown> = {
         user_id: user.id, org_id: currentOrg?.id ?? null,
-        name: `${task.name ?? 'Tâche'} (copie)`, status: 'paused',
+        name: tr(`${task.name ?? 'Tâche'} (copie)`, `${task.name ?? 'Task'} (copy)`), status: 'paused',
         task_type: task.task_type, phones: task.phones, videos: task.videos,
         caption: task.caption, story_texts: task.story_texts, mode: task.mode,
         delay_minutes: task.delay_minutes, recur_hours: recur,
@@ -3490,9 +3537,9 @@ export function Tasks({ user }: { user: User }) {
   const nextRun      = upcoming[0] ? taskNextRun(upcoming[0]) : undefined
 
   const TABS: { id: TaskTab; label: string; count: number }[] = [
-    { id: 'upcoming', label: 'À venir',    count: upcoming.length },
-    { id: 'tasks',    label: 'Tâches',     count: tasks.length },
-    { id: 'history',  label: 'Historique', count: history.length },
+    { id: 'upcoming', label: tr('À venir', 'Upcoming'),    count: upcoming.length },
+    { id: 'tasks',    label: tr('Tâches', 'Tasks'),     count: tasks.length },
+    { id: 'history',  label: tr('Historique', 'History'), count: history.length },
   ]
 
   return (
@@ -3514,50 +3561,37 @@ export function Tasks({ user }: { user: User }) {
         flexDirection: 'column', alignItems: 'stretch', gap: 0,
         padding: '24px 28px 0', borderBottom: 'none',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18, gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-            <div className="sf-anim-scale-spring" style={{
-              width: 52, height: 52, borderRadius: 15, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-              boxShadow: '0 12px 28px -8px rgba(99,102,241,0.6), inset 0 1px 0 0 rgba(255,255,255,0.35)',
-            }}>
-              <IconBolt size={25} color="#fff" />
+        <div className="sf-cluster" style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, gap: 16 }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-page-icon sf-anim-scale-spring">
+              <IconBolt size={24} color="#fff" />
             </div>
-            <div className="sf-anim-slide-up sf-d50">
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.75)', marginBottom: 3 }}>Automatisation</div>
-              <h1 style={{
-                margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0,
-                background: 'linear-gradient(100deg,#fff 18%,#a5b4fc 52%,#c4b5fd 86%)', backgroundSize: '200% auto',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'wf-shimmer 7s linear infinite',
-              }}>
-                Workflows d'automatisation
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+              <div className="sf-eyebrow" style={{ marginBottom: 4 }}>{tr('Automatisation', 'Automation')}</div>
+              <h1 className="sf-page-title sf-title-grad">
+                {tr("Workflows d'automatisation", 'Automation workflows')}
               </h1>
-              <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(233,234,240,0.5)' }}>
-                Tes chaînes de publication tournent toutes seules, en boucle.
+              <p className="sf-page-sub">
+                {tr('Tes chaînes de publication tournent toutes seules, en boucle.', 'Your posting chains run on their own, on a loop.')}
               </p>
             </div>
           </div>
 
-          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={() => { setEditTask(null); setShowWizard(true) }}
-              className="sf-btn sf-btn-lg cursor-pointer"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff',
-                background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-                boxShadow: '0 12px 28px -10px rgba(99,102,241,0.7), inset 0 1px 0 0 rgba(255,255,255,0.3)',
-              }}
-            >
-              <IconPlus />
-              Nouveau workflow
-            </button>
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
             <button
               onClick={() => { setEditTask(null); setShowCreate(true) }}
               className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
-              title="Mode avancé : séquences multi-étapes (publication + story + warmup)"
+              title={tr('Mode avancé : séquences multi-étapes (publication + story + warmup)', 'Advanced mode: multi-step sequences (post + story + warmup)')}
             >
-              Avancé
+              {tr('Avancé', 'Advanced')}
+            </button>
+            <button
+              onClick={() => { setEditTask(null); setShowWizard(true) }}
+              className="sf-btn sf-btn-primary sf-btn-lg cursor-pointer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            >
+              <IconPlus />
+              {tr('Nouveau workflow', 'New workflow')}
             </button>
           </div>
         </div>
@@ -3565,9 +3599,9 @@ export function Tasks({ user }: { user: User }) {
         {/* ── Stats strip — pills premium ─────────────────────────────────── */}
         <div className="sf-anim-slide-up sf-d150" style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
           {[
-            { label: 'workflows actifs', value: activeTasks.length, color: '#34D399', pulse: activeTasks.length > 0 },
-            { label: 'en pause', value: pausedTasks.length, color: '#94A3B8', pulse: false },
-            { label: 'publications', value: totalRuns, color: '#818CF8', pulse: false },
+            { label: tr('workflows actifs', 'active workflows'), value: activeTasks.length, color: 'var(--ok)', pulse: activeTasks.length > 0 },
+            { label: tr('en pause', 'paused'), value: pausedTasks.length, color: 'var(--text-3)', pulse: false },
+            { label: tr('publications', 'posts'), value: totalRuns, color: 'var(--accent-lt)', pulse: false },
           ].map(stat => (
             <div key={stat.label} style={{
               display: 'inline-flex', alignItems: 'center', gap: 9, height: 36, padding: '0 15px 0 12px',
@@ -3592,7 +3626,7 @@ export function Tasks({ user }: { user: User }) {
               borderRadius: 999, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
             }}>
               <IconClock size={12} color="#A5B4FC" />
-              <span style={{ fontSize: 12, color: 'rgba(165,180,252,0.8)', fontWeight: 600 }}>Prochain run</span>
+              <span style={{ fontSize: 12, color: 'rgba(165,180,252,0.8)', fontWeight: 600 }}>{tr('Prochain run', 'Next run')}</span>
               <span style={{ fontSize: 12.5, fontWeight: 800, color: '#A5B4FC', fontVariantNumeric: 'tabular-nums' }}>
                 {formatCountdown(nextRun).replace('dans ', '')}
               </span>
@@ -3601,29 +3635,21 @@ export function Tasks({ user }: { user: User }) {
         </div>
 
         {/* ── Tabs ────────────────────────────────────────────────────────── */}
-        <div className="sf-anim-slide-up sf-d200" style={{
-          display: 'flex', gap: 0, borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}>
+        <div className="sf-tabs sf-anim-slide-up sf-d200">
           {TABS.map(tabItem => (
             <button
               key={tabItem.id}
               onClick={() => setTab(tabItem.id)}
-              className="cursor-pointer"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '10px 18px', background: 'transparent', border: 'none',
-                borderBottom: tab === tabItem.id ? '2px solid var(--accent)' : '2px solid transparent',
-                color: tab === tabItem.id ? 'var(--ivory)' : 'rgba(148,163,184,0.45)',
-                fontSize: 13, fontWeight: tab === tabItem.id ? 600 : 500,
-                transition: 'color 0.15s, border-color 0.15s', marginBottom: -1, outline: 'none',
-              }}
+              className={`sf-tab cursor-pointer${tab === tabItem.id ? ' active' : ''}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               {tabItem.label}
               {tabItem.count > 0 && (
                 <span style={{
-                  background: tab === tabItem.id ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)',
-                  color: tab === tabItem.id ? 'var(--accent)' : 'rgba(148,163,184,0.4)',
+                  background: tab === tabItem.id ? 'var(--accent-dim)' : 'rgba(255,255,255,0.05)',
+                  color: tab === tabItem.id ? 'var(--accent-lt)' : 'var(--text-4)',
                   borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+                  fontVariantNumeric: 'tabular-nums',
                 }}>
                   {tabItem.count}
                 </span>
@@ -3646,8 +3672,8 @@ export function Tasks({ user }: { user: User }) {
           upcoming.length === 0 ? (
             <EmptyTab
               icon={<IconClock size={34} color="rgba(99,102,241,0.55)" />}
-              title="Aucune exécution prévue"
-              text="Active une tâche pour voir ses prochaines publications ici."
+              title={tr('Aucune exécution prévue', 'No scheduled run')}
+              text={tr('Active une tâche pour voir ses prochaines publications ici.', 'Activate a task to see its upcoming posts here.')}
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -3659,8 +3685,8 @@ export function Tasks({ user }: { user: User }) {
           tasks.length === 0 ? (
             <EmptyTab
               icon={<IconBolt size={34} color="rgba(99,102,241,0.55)" />}
-              title="Aucune tâche"
-              text="Crée ta première tâche automatique."
+              title={tr('Aucune tâche', 'No task')}
+              text={tr('Crée ta première tâche automatique.', 'Create your first automatic task.')}
               onNew={() => { setEditTask(null); setShowWizard(true) }}
             />
           ) : (
@@ -3668,16 +3694,16 @@ export function Tasks({ user }: { user: User }) {
               {(activeTasks.length > 0 || pausedTasks.length > 0) && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)', marginRight: 'auto' }}>
-                    {activeTasks.length} active{activeTasks.length > 1 ? 's' : ''} · {pausedTasks.length} en pause
+                    {tr(`${activeTasks.length} active${activeTasks.length > 1 ? 's' : ''} · ${pausedTasks.length} en pause`, `${activeTasks.length} active · ${pausedTasks.length} paused`)}
                   </span>
                   {activeTasks.length > 0 && (
                     <button onClick={() => void pauseAllTasks()} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">
-                      ⏸ Tout mettre en pause
+                      {tr('⏸ Tout mettre en pause', '⏸ Pause all')}
                     </button>
                   )}
                   {pausedTasks.length > 0 && (
                     <button onClick={() => void resumeAllTasks()} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">
-                      ▶ Tout reprendre
+                      {tr('▶ Tout reprendre', '▶ Resume all')}
                     </button>
                   )}
                 </div>
@@ -3704,8 +3730,8 @@ export function Tasks({ user }: { user: User }) {
           history.length === 0 ? (
             <EmptyTab
               icon={<IconCheck size={30} />}
-              title="Aucun historique"
-              text="Les publications exécutées par tes tâches apparaîtront ici."
+              title={tr('Aucun historique', 'No history')}
+              text={tr('Les publications exécutées par tes tâches apparaîtront ici.', 'Posts run by your tasks will appear here.')}
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -3715,18 +3741,12 @@ export function Tasks({ user }: { user: User }) {
         )}
 
         {/* Info banner */}
-        <div className="sf-reveal sf-d300" style={{
-          marginTop: 28,
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-          padding: '12px 16px',
-          background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.14)',
-          borderRadius: 11,
-        }}>
-          <span style={{ flexShrink: 0, marginTop: 1 }}>
-            <IconRepeat size={14} color="rgba(52,211,153,0.7)" />
+        <div className="sf-banner is-accent sf-reveal sf-d300" style={{ marginTop: 28, alignItems: 'flex-start' }}>
+          <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex' }}>
+            <IconRepeat size={14} color="currentColor" />
           </span>
-          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', margin: 0 }}>
-            Les tâches s'exécutent automatiquement sur le serveur, <strong style={{ color: 'rgba(233,234,240,0.7)' }}>même ScaleFlow fermé</strong>. Chaque publication apparaît dans l'historique.
+          <p style={{ fontSize: 12.5, lineHeight: 1.6, margin: 0, fontWeight: 500 }}>
+            {tr('Les tâches s\'exécutent automatiquement sur le serveur, ', 'Tasks run automatically on the server, ')}<strong style={{ color: 'var(--text-1)' }}>{tr('même ScaleFlow fermé', 'even when ScaleFlow is closed')}</strong>{tr('. Chaque publication apparaît dans l\'historique.', '. Every post appears in the history.')}
           </p>
         </div>
       </div>
@@ -3787,6 +3807,7 @@ function EmptyTab({ icon, title, text, onNew }: {
   text: string
   onNew?: () => void
 }) {
+  const tr = useTr()
   return (
     <div className="sf-card" style={{
       marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -3805,7 +3826,7 @@ function EmptyTab({ icon, title, text, onNew }: {
       {onNew && (
         <button onClick={onNew} className="sf-btn sf-btn-primary cursor-pointer"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <IconPlus size={11} /> Nouvelle tâche
+          <IconPlus size={11} /> {tr('Nouvelle tâche', 'New task')}
         </button>
       )}
     </div>

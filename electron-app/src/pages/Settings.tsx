@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr, tr as trStatic } from '@/lib/i18n'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/Toast'
-import { OrganizationPanel } from '@/components/OrganizationPanel'
 import { NotificationChannels } from '@/components/NotificationChannels'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
@@ -271,6 +270,7 @@ function SettingToggle({ label, sub, checked, onChange, first }: {
 
 export function Settings({ user, initialPanel, initialTab, onNavigate }: SettingsProps) {
   const t = useT()
+  const tr = useTr()
   const { lang, setLang: setAppLang } = useLang()
   const { role, perms, currentOrg, myOrgs } = useOrg()
   const license = useLicense()
@@ -348,7 +348,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   const [webhookBusy, setWebhookBusy]   = useState(false)
 
   async function registerWebhook() {
-    if (!bearer) { setWebhookMsg({ ok: false, text: 'Renseigne d\'abord ton token GéeLark.' }); return }
+    if (!bearer) { setWebhookMsg({ ok: false, text: tr('Renseigne d\'abord ton token GéeLark.', 'Enter your GeeLark token first.') }); return }
     setWebhookBusy(true); setWebhookMsg(null)
     try {
       const callbackUrl = `${window.location.origin}/api/geelark-callback`
@@ -364,10 +364,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       })
       const j = await r.json()
       const code = j?.data?.code ?? j?.code
-      if (j.ok && (code === 0 || code === undefined)) setWebhookMsg({ ok: true, text: `Webhook activé → ${callbackUrl}` })
-      else setWebhookMsg({ ok: false, text: `Échec : ${j?.data?.msg ?? j?.error ?? 'erreur inconnue'}` })
+      if (j.ok && (code === 0 || code === undefined)) setWebhookMsg({ ok: true, text: tr(`Webhook activé → ${callbackUrl}`, `Webhook enabled → ${callbackUrl}`) })
+      else setWebhookMsg({ ok: false, text: tr(`Échec : ${j?.data?.msg ?? j?.error ?? 'erreur inconnue'}`, `Failed: ${j?.data?.msg ?? j?.error ?? 'unknown error'}`) })
     } catch (e) {
-      setWebhookMsg({ ok: false, text: `Erreur réseau : ${e instanceof Error ? e.message : String(e)}` })
+      setWebhookMsg({ ok: false, text: tr(`Erreur réseau : ${e instanceof Error ? e.message : String(e)}`, `Network error: ${e instanceof Error ? e.message : String(e)}`) })
     } finally {
       setWebhookBusy(false)
     }
@@ -621,40 +621,43 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     { k: 'general' as Panel,      l: t('panelGeneral') },
     { k: 'profile' as Panel,      l: t('panelProfile') },
     ...(canSeeConnexions ? [{ k: 'connexions' as Panel, l: t('panelConnexions') }] : []),
-    { k: 'organization' as Panel, l: t('panelOrganization') },
     ...(license.isSuperAdmin ? [{ k: 'admin' as Panel, l: t('panelAdmin') }] : []),
     { k: 'abonnement' as Panel,   l: t('panelPlan') },
     { k: 'desktop' as Panel,      l: t('panelDesktop') },
   ]
 
   if (loading) return (
-    <div className="flex flex-col h-full anim-page" style={{ background: S.base }}>
-      {/* Loading header — mirrors real header */}
-      <div className="flex items-center gap-4 px-8 py-5 border-b border-border flex-shrink-0"
-        style={{ background: 'linear-gradient(90deg,rgba(99,102,241,0.06) 0%,transparent 55%)' }}>
-        <div className="sf-anim-scale-spring" style={{
-          width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(99,102,241,0.08)',
-          border: '1px solid rgba(99,102,241,0.28)',
-          color: '#6366F1',
-        }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </div>
-        <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-          <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
-            {t('settingsTitle')}
-          </h1>
-          <p className="sf-page-sub">{user.email}</p>
+    <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: S.base }}>
+      {/* Loading header — mirrors real header (v2 pattern) */}
+      <div className="sf-page-header">
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title sf-title-grad">{t('settingsTitle')}</h1>
+            <p className="sf-page-sub">{user.email}</p>
+          </div>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center gap-3">
-        <span className="sf-spinner" />
-        <p className="text-[13px] m-0" style={{ color: S.text3 }}>{t('settingsLoading')}</p>
+      {/* Skeleton body — same geometry as the settings cards */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+        <div className="sf-anim-slide-up sf-d100" style={{ width: 204, flexShrink: 0, borderRight: `1px solid ${S.border}`, padding: '14px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="sf-skeleton-line" style={{ height: 34, borderRadius: 8, opacity: 1 - i * 0.06 }} />)}
+        </div>
+        <div className="sf-anim-slide-up sf-d150" style={{ flex: 1, padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="sf-skeleton-text" style={{ height: 18, width: '38%' }} />
+            <div className="sf-skeleton-text" style={{ width: '62%' }} />
+          </div>
+          <div className="sf-skeleton-card" style={{ height: 150 }} />
+          <div className="sf-skeleton-card" style={{ height: 220 }} />
+        </div>
       </div>
+      <span className="sr-only">{t('settingsLoading')}</span>
     </div>
   )
 
@@ -662,26 +665,11 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   return (
     <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: S.base }}>
 
-      {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div style={{
-        flexShrink: 0, padding: '18px 28px 16px',
-        borderBottom: `1px solid ${S.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'linear-gradient(90deg,rgba(99,102,241,0.06) 0%,transparent 55%)',
-        position: 'relative',
-      }}>
-        {/* Subtle top-edge glow line */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg,transparent,rgba(99,102,241,0.35),transparent)', pointerEvents: 'none' }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          {/* Gear icon */}
-          <div className="sf-anim-scale-spring" style={{
-            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(99,102,241,0.08)',
-            border: '1px solid rgba(99,102,241,0.28)',
-            color: '#6366F1',
-          }}>
+      {/* ── Page header (v2 pattern) ─────────────────────────────────────── */}
+      <div className="sf-page-header">
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          {/* Gear icon tile */}
+          <div className="sf-page-icon sf-anim-scale-spring">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
               <circle cx="12" cy="12" r="3"/>
@@ -689,16 +677,16 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
           </div>
 
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>{t('settingsTitle')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{t('settingsTitle')}</h1>
             <p className="sf-page-sub">{user.email}</p>
           </div>
         </div>
 
         {/* Right — saved indicator + save button */}
-        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
           {saved && (
-            <span className="sf-badge sf-badge-ok anim-scale-in" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span className="sf-status-chip is-live anim-scale-in">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               {t('settingsSaved')}
             </span>
           )}
@@ -782,7 +770,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     {/* Section header */}
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('appearanceTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('appearanceTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('appearanceSub')}</p>
                     </div>
 
@@ -877,7 +865,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'sons' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('soundsTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('soundsTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('soundsSub')}</p>
                     </div>
 
@@ -938,7 +926,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'notifications' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('notificationsTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('notificationsTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('notificationsSub')}</p>
                     </div>
 
@@ -991,7 +979,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'langue' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('languageTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('languageTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('languageSub')}</p>
                     </div>
 
@@ -1033,7 +1021,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'securite' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('securityTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('securityTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('securitySub')}</p>
                     </div>
 
@@ -1089,10 +1077,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                           </button>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px', borderRadius: 10, background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
-                            <input type="password" className="sf-input" placeholder={t('newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
-                            <input type="password" className="sf-input" placeholder={t('confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
-                            {pwError && <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>{pwError}</p>}
-                            {pwOk && <p style={{ fontSize: 12, color: '#22c55e', margin: 0 }}>{t('passwordChanged')}</p>}
+                            <input type="password" className={`sf-input ${pwError ? 'is-invalid' : ''}`} placeholder={t('newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
+                            <input type="password" className={`sf-input ${pwError ? 'is-invalid' : ''}`} placeholder={t('confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
+                            {pwError && <p className="sf-field-error" style={{ margin: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>{pwError}</p>}
+                            {pwOk && <p className="sf-field-error" style={{ margin: 0, color: 'var(--ok)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{t('passwordChanged')}</p>}
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button onClick={() => { setPwChangeOpen(false); setNewPw(''); setConfirmPw(''); setPwError(null); setPwOk(false) }} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1 }}>{t('cancel')}</button>
                               <button onClick={async () => {
@@ -1116,7 +1104,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'avance' && (
                   <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div style={{ paddingBottom: 4 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('advancedTitle')}</h2>
+                      <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('advancedTitle')}</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('advancedSub')}</p>
                     </div>
 
@@ -1220,7 +1208,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {panel === 'profile' && (
                 <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div style={{ paddingBottom: 4 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('profileTitle')}</h2>
+                    <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('profileTitle')}</h2>
                     <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('profileSub')}</p>
                   </div>
 
@@ -1277,7 +1265,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     </button>
                   </div>
 
-                  {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
+                  {error && <div className="sf-banner is-danger anim-scale-in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>{error}</span></div>}
                 </div>
               )}
 
@@ -1285,22 +1273,17 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {panel === 'connexions' && canSeeConnexions && (
                 <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div style={{ paddingBottom: 4 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('connexionsTitle')}</h2>
+                    <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>{t('connexionsTitle')}</h2>
                     <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('connexionsSub')}</p>
                   </div>
 
                   {/* Org / solo mode banner */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, fontSize: 12,
-                    ...(currentOrg
-                      ? { background: 'rgba(99,102,241,0.09)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
-                      : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
-                  }}>
+                  <div className={`sf-banner ${currentOrg ? 'is-accent' : ''}`} style={{ fontSize: 12 }}>
                     {currentOrg ? (
                       <>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
                         <span>{t('orgMode')} — <strong style={{ color: S.text }}>{currentOrg.name}</strong>
-                          {!canEditOrgConnexions && <span style={{ color: '#F59E0B' }}> · {t('readOnly')}</span>}
+                          {!canEditOrgConnexions && <span style={{ color: 'var(--warn)' }}> · {t('readOnly')}</span>}
                         </span>
                       </>
                     ) : (
@@ -1332,28 +1315,43 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                   {!currentOrg || canEditOrgConnexions ? (() => {
                     const cfg = proxyRot.cfg
                     const canEdit = !currentOrg || canEditOrgConnexions
-                    const setUrls = (urls: string[]) => proxyRot.setCfg({ ...cfg, urls })
+                    const patchCfg = (p: Partial<typeof cfg>) => proxyRot.setCfg({ ...cfg, ...p })
+                    const setUrls = (urls: string[]) => patchCfg({ urls })
+                    const setName = (i: number, val: string) => {
+                      const names = [...(cfg.names ?? [])]
+                      while (names.length <= i) names.push('')
+                      names[i] = val
+                      patchCfg({ names })
+                    }
+                    const addRow = () => patchCfg({
+                      urls:  [...(cfg.urls.length ? cfg.urls : ['']), ''],
+                      names: [...(cfg.names ?? (cfg.urls.length ? cfg.urls.map(() => '') : [''])), ''],
+                    })
+                    const removeRow = (i: number) => patchCfg({
+                      urls:  cfg.urls.filter((_, j) => j !== i),
+                      names: (cfg.names ?? []).filter((_, j) => j !== i),
+                    })
                     const testUrl = async (i: number) => {
                       const url = (cfg.urls[i] ?? '').trim()
                       if (!url) return
                       setRotTest(p => ({ ...p, [i]: { busy: true } }))
                       const r = await rotateProxyIp(url)
-                      setRotTest(p => ({ ...p, [i]: { ok: r.ok, msg: r.ok ? 'Connexion au proxy réussie, l’IP peut être changée ✓' : `Le proxy n’a pas répondu correctement : ${r.detail}` } }))
+                      setRotTest(p => ({ ...p, [i]: { ok: r.ok, msg: r.ok ? tr('Connexion au proxy réussie, l’IP peut être changée ✓', 'Proxy connection successful, the IP can be rotated ✓') : tr(`Le proxy n’a pas répondu correctement : ${r.detail}`, `The proxy did not respond correctly: ${r.detail}`) } }))
                     }
                     const saveRot = async () => {
                       setRotSaving(true)
-                      try { await proxyRot.save({ enabled: cfg.enabled, urls: cfg.urls.map(u => u.trim()).filter(Boolean) }); setRotSaved(true); setTimeout(() => setRotSaved(false), 2500) }
+                      try { await proxyRot.save(cfg); setRotSaved(true); setTimeout(() => setRotSaved(false), 2500) }
                       finally { setRotSaving(false) }
                     }
                     return (
                     <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                        <h3 className="text-[11px] font-semibold uppercase" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid #FB923C', paddingLeft: 8, margin: 0 }}>Rotation d'IP proxy</h3>
+                        <h3 className="text-[11px] font-semibold uppercase" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid #FB923C', paddingLeft: 8, margin: 0 }}>{tr("Rotation d'IP proxy", 'Proxy IP rotation')}</h3>
                         {/* Toggle */}
                         <button
                           onClick={() => canEdit && proxyRot.setCfg({ ...cfg, enabled: !cfg.enabled })}
                           disabled={!canEdit}
-                          aria-label="Activer la rotation d'IP"
+                          aria-label={tr("Activer la rotation d'IP", 'Enable IP rotation')}
                           style={{ position: 'relative', width: 42, height: 24, borderRadius: 99, border: 'none', cursor: canEdit ? 'pointer' : 'default', flexShrink: 0, background: cfg.enabled ? 'linear-gradient(135deg,#EA580C,#FB923C)' : 'rgba(255,255,255,0.14)', transition: 'background 0.2s' }}
                         >
                           <span style={{ position: 'absolute', top: 3, left: cfg.enabled ? 21 : 3, width: 18, height: 18, borderRadius: 99, background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.4)', transition: 'left 0.2s' }} />
@@ -1361,9 +1359,9 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       </div>
 
                       <p style={{ fontSize: 12.5, color: S.text3, lineHeight: 1.6, margin: 0 }}>
-                        Quand c'est activé, ScaleFlow <strong style={{ color: S.text }}>change l'IP de ton proxy avant chaque post</strong> (mass posting, story, reels Instagram & TikTok, et programmation) → une IP fraîche à chaque publication, comme si chaque post venait d'un appareil différent.
+                        {tr("Quand c'est activé, ScaleFlow ", 'When enabled, ScaleFlow ')}<strong style={{ color: S.text }}>{tr("change l'IP de ton proxy avant chaque post", 'rotates your proxy IP before every post')}</strong>{tr(" (mass posting, story, reels Instagram & TikTok, et programmation) → une IP fraîche à chaque publication, comme si chaque post venait d'un appareil différent.", ' (mass posting, story, Instagram & TikTok reels, and scheduling) → a fresh IP for every post, as if each one came from a different device.')}
                         <br /><br />
-                        Colle ici le <strong style={{ color: S.text }}>« Change IP URL »</strong> de ton fournisseur (ex. Prox'Easy → onglet <em>IP Management</em>). Tu peux en ajouter plusieurs si tu as plusieurs proxies. <strong style={{ color: S.text }}>Configuré une seule fois</strong> — c'est mémorisé pour toute l'organisation.
+                        {tr('Colle ici le ', "Paste your provider's ")}<strong style={{ color: S.text }}>{tr('« Change IP URL »', '"Change IP URL"')}</strong>{tr(" de ton fournisseur (ex. Prox'Easy → onglet ", " here (e.g. Prox'Easy → ")}<em>IP Management</em>{tr('). Tu peux en ajouter plusieurs si tu as plusieurs proxies. ', ' tab). You can add several if you have multiple proxies. ')}<strong style={{ color: S.text }}>{tr('Configuré une seule fois', 'Set up once')}</strong>{tr(" — c'est mémorisé pour toute l'organisation.", ' — it is saved for the whole organization.')}
                       </p>
 
                       {cfg.enabled && (
@@ -1372,29 +1370,35 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                 <input
+                                  className="sf-input" placeholder={tr(`Nom (ex. Dongle ${i + 1})`, `Name (e.g. Dongle ${i + 1})`)} value={cfg.names?.[i] ?? ''}
+                                  disabled={!canEdit}
+                                  onChange={e => setName(i, e.target.value)}
+                                  style={{ width: 180, flexShrink: 0, fontSize: 12 }}
+                                />
+                                <input
                                   className="sf-input" placeholder="https://…/changeip?u=…" value={url}
                                   disabled={!canEdit}
                                   onChange={e => { const next = [...(cfg.urls.length ? cfg.urls : [''])]; next[i] = e.target.value; setUrls(next); setRotTest(p => ({ ...p, [i]: {} })) }}
                                   style={{ flex: 1, fontFamily: 'ui-monospace, monospace', fontSize: 12 }}
                                 />
                                 <button onClick={() => testUrl(i)} disabled={!canEdit || !url.trim() || rotTest[i]?.busy} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flexShrink: 0, opacity: (!url.trim() || rotTest[i]?.busy) ? 0.5 : 1 }}>
-                                  {rotTest[i]?.busy ? 'Test…' : 'Tester'}
+                                  {rotTest[i]?.busy ? tr('Test…', 'Testing…') : tr('Tester', 'Test')}
                                 </button>
                                 {canEdit && (cfg.urls.length > 1) && (
-                                  <button onClick={() => setUrls(cfg.urls.filter((_, j) => j !== i))} title="Retirer" className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" style={{ flexShrink: 0, color: '#F87171' }}>
+                                  <button onClick={() => removeRow(i)} title={tr('Retirer', 'Remove')} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" style={{ flexShrink: 0, color: '#F87171' }}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                                   </button>
                                 )}
                               </div>
                               {rotTest[i]?.msg && (
-                                <span style={{ fontSize: 11.5, fontWeight: 600, color: rotTest[i]?.ok ? '#34D399' : '#F87171' }}>{rotTest[i]?.msg}</span>
+                                <span style={{ fontSize: 11.5, fontWeight: 600, color: rotTest[i]?.ok ? 'var(--ok)' : 'var(--danger)' }}>{rotTest[i]?.msg}</span>
                               )}
                             </div>
                           ))}
                           {canEdit && (
-                            <button onClick={() => setUrls([...(cfg.urls.length ? cfg.urls : ['']), ''])} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <button onClick={addRow} className="sf-btn sf-btn-ghost sf-btn-sm" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-                              Ajouter un proxy
+                              {tr('Ajouter un proxy', 'Add a proxy')}
                             </button>
                           )}
                         </div>
@@ -1403,10 +1407,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       {canEdit && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${S.border}`, paddingTop: 14 }}>
                           <button onClick={saveRot} disabled={rotSaving} className="sf-btn sf-btn-primary sf-btn-sm" style={{ opacity: rotSaving ? 0.6 : 1 }}>
-                            {rotSaving ? 'Enregistrement…' : 'Enregistrer la rotation'}
+                            {rotSaving ? tr('Enregistrement…', 'Saving…') : tr('Enregistrer la rotation', 'Save rotation')}
                           </button>
-                          {rotSaved && <span style={{ fontSize: 12, fontWeight: 600, color: '#34D399' }}>Enregistré ✓</span>}
-                          <span style={{ fontSize: 11.5, color: S.text3, marginLeft: 'auto' }}>⚡ Poste 1 tél. à la fois quand activé</span>
+                          {rotSaved && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ok)' }}>{tr('Enregistré ✓', 'Saved ✓')}</span>}
+                          <span style={{ fontSize: 11.5, color: S.text3, marginLeft: 'auto' }}>{tr('⚡ Poste 1 tél. à la fois quand activé', '⚡ Posts 1 phone at a time when enabled')}</span>
                         </div>
                       )}
                     </div>
@@ -1418,14 +1422,14 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <h3 className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: '0.12em', color: 'var(--muted)', borderLeft: '2px solid var(--accent)', paddingLeft: 8 }}>Webhooks GéeLark</h3>
                       <p style={{ fontSize: 12.5, color: S.text3, lineHeight: 1.5, margin: 0 }}>
-                        Quand une tâche se termine, GéeLark prévient ScaleFlow instantanément → les téléphones s'éteignent plus vite (le garde-fou serveur reste actif en secours).
+                        {tr("Quand une tâche se termine, GéeLark prévient ScaleFlow instantanément → les téléphones s'éteignent plus vite (le garde-fou serveur reste actif en secours).", 'When a task finishes, GeeLark notifies ScaleFlow instantly → phones shut down faster (the server safeguard stays active as a backup).')}
                       </p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <button onClick={registerWebhook} disabled={webhookBusy} className="sf-btn sf-btn-primary sf-btn-sm" style={{ opacity: webhookBusy ? 0.6 : 1 }}>
-                          {webhookBusy ? 'Activation…' : 'Activer les webhooks'}
+                          {webhookBusy ? tr('Activation…', 'Enabling…') : tr('Activer les webhooks', 'Enable webhooks')}
                         </button>
                         {webhookMsg && (
-                          <span style={{ fontSize: 12, fontWeight: 600, color: webhookMsg.ok ? '#34D399' : '#F87171' }}>{webhookMsg.text}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: webhookMsg.ok ? 'var(--ok)' : 'var(--danger)' }}>{webhookMsg.text}</span>
                         )}
                       </div>
                     </div>
@@ -1449,14 +1453,24 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     </div>
                   </div>
 
-                  {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
+                  {error && <div className="sf-banner is-danger anim-scale-in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>{error}</span></div>}
                 </div>
               )}
 
-              {/* Organisation */}
+              {/* Organisation — désormais dans son propre onglet « Mon organisation ».
+                  On garde un renvoi gracieux au cas où un ancien lien pointe encore ici. */}
               {panel === 'organization' && (
                 <div className="sf-anim-slide-up" style={{ maxWidth: 720 }}>
-                  <OrganizationPanel user={user} />
+                  <div className="sf-card" style={{ padding: '32px 24px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 30, marginBottom: 10 }}>🏢</div>
+                    <p style={{ fontSize: 15, fontWeight: 700, margin: '0 0 6px' }}>{t('navOrganization')}</p>
+                    <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.5 }}>
+                      {tr("La gestion de l'équipe (membres, invitations, rôles & permissions) a désormais son propre onglet dans le menu.", 'Team management (members, invitations, roles & permissions) now has its own tab in the menu.')}
+                    </p>
+                    <button onClick={() => onNavigate?.('organization')} className="sf-btn sf-btn-primary cursor-pointer">
+                      {tr(`Ouvrir « ${t('navOrganization')} »`, `Open "${t('navOrganization')}"`)}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1478,9 +1492,9 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {panel === 'desktop' && <DesktopDownloadPanel S={S} />}
 
               {error && panel !== 'profile' && panel !== 'connexions' && (
-                <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 10, fontSize: 12, color: '#EF4444', maxWidth: 540,
-                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                  {error}
+                <div className="sf-banner is-danger anim-scale-in" style={{ marginTop: 16, maxWidth: 540 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <span>{error}</span>
                 </div>
               )}
             </div>
@@ -1504,7 +1518,7 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
   return (
     <div className="sf-anim-slide-up anim-stagger" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20, padding: '28px 28px 0' }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('desktopTitle')}</h2>
+        <h2 className="sf-grad-text" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t('desktopTitle')}</h2>
         <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>
           {isElectron ? t('desktopAlready') : t('desktopSub')}
         </p>
@@ -1576,11 +1590,11 @@ interface LicenseKey {
 }
 
 const DURATIONS = [
-  { label: '7j',   days: 7 },
-  { label: '30j',  days: 30 },
-  { label: '90j',  days: 90 },
-  { label: '1 an', days: 365 },
-  { label: '∞ vie', days: null },
+  { label: '7j',   en: '7d',        days: 7 },
+  { label: '30j',  en: '30d',       days: 30 },
+  { label: '90j',  en: '90d',       days: 90 },
+  { label: '1 an', en: '1 year',    days: 365 },
+  { label: '∞ vie', en: '∞ lifetime', days: null },
 ]
 
 function genKey() {
@@ -1590,9 +1604,9 @@ function genKey() {
 }
 
 function daysLeft(exp: string | null) {
-  if (!exp) return '∞ vie'
+  if (!exp) return trStatic('∞ vie', '∞ lifetime')
   const d = Math.ceil((new Date(exp).getTime() - Date.now()) / 86_400_000)
-  return d < 0 ? 'Expiré' : d === 0 ? 'Expire auj.' : `${d}j`
+  return d < 0 ? trStatic('Expiré', 'Expired') : d === 0 ? trStatic('Expire auj.', 'Expires today') : trStatic(`${d}j`, `${d}d`)
 }
 
 function daysColor(exp: string | null) {
@@ -1603,6 +1617,7 @@ function daysColor(exp: string | null) {
 
 function AdminPanel({ user: _user }: { user: User }) {
   const t = useT()
+  const tr = useTr()
   const [keys, setKeys]       = useState<LicenseKey[]>([])
   const [loading, setLoading] = useState(true)
   const [newKey, setNewKey]   = useState(genKey)
@@ -1696,7 +1711,7 @@ function AdminPanel({ user: _user }: { user: User }) {
           {DURATIONS.map(d => (
             <button key={d.label} onClick={() => setDuration(d.days)}
               className={`sf-btn sf-btn-sm ${duration === d.days ? 'sf-btn-primary' : 'sf-btn-secondary'}`}>
-              {d.label}
+              {tr(d.label, d.en)}
             </button>
           ))}
         </div>

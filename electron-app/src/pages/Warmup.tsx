@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { Button } from '@/components/ui/Button'
@@ -11,7 +11,7 @@ import {
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
 import { logActivity } from '@/lib/activityLog'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { activeRotationUrls, getProxyRotation } from '@/lib/proxyRotation'
 import { startRun, setRunPhase, finishRun } from '@/lib/activeRuns'
 import { Toggle } from '@/components/ui/Toggle'
@@ -124,6 +124,7 @@ function IconCircle({ size = 14 }: { size?: number }) {
 // Bandeau « Proxy rotatif » : quand activé, l'édition/warmup se fait EN SÉRIE
 // (1 téléphone à la fois) avec rotation d'IP avant chaque démarrage.
 function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => void }) {
+  const tr = useTr()
   const cfg = getProxyRotation()
   const configured = cfg.enabled && cfg.urls.length > 0
   return (
@@ -132,11 +133,11 @@ function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => voi
         on={on}
         onChange={setOn}
         warn={!configured}
-        warnTitle="Rotation non configurée — Réglages → Connexions → Rotation d'IP proxy"
-        label="Proxy rotatif"
+        warnTitle={tr("Rotation non configurée — Réglages → Connexions → Rotation d'IP proxy", 'Rotation not configured — Settings → Connections → Proxy IP rotation')}
+        label={tr('Proxy rotatif', 'Rotating proxy')}
         hint={on
-          ? (configured ? 'Traitement 1 par 1 · nouvelle IP avant chaque téléphone' : '⚠ Aucune URL de rotation — configure-la dans les Réglages')
-          : 'Traitement en parallèle · sans rotation d’IP'}
+          ? (configured ? tr('Traitement 1 par 1 · nouvelle IP avant chaque téléphone', 'One at a time · fresh IP before each phone') : tr('⚠ Aucune URL de rotation — configure-la dans les Réglages', '⚠ No rotation URL — configure it in Settings'))
+          : tr('Traitement en parallèle · sans rotation d’IP', 'Parallel processing · no IP rotation')}
       />
     </div>
   )
@@ -144,6 +145,7 @@ function ProxyRotToggle({ on, setOn }: { on: boolean; setOn: (v: boolean) => voi
 
 export function Warmup({ user }: WarmupProps) {
   const t = useT()
+  const tr = useTr()
   const { lang } = useLang()
   const conns  = useConnections(user)
   const bearer = conns.bearer
@@ -220,7 +222,9 @@ export function Warmup({ user }: WarmupProps) {
     if (!bearer) return
     setLoadingPhones(true); setPhonesError(null)
     try {
-      const list = await fetchAllPhones(bearer)
+      const raw = await fetchAllPhones(bearer)
+      // 🔒 Filtre à la source : le membre ne voit que ses groupes autorisés.
+      const list = role ? raw.filter(p => canAccessPhoneGroup(role, perms, p.group?.name ?? p.groupName ?? null)) : raw
       setPhones(list)
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
@@ -242,6 +246,9 @@ export function Warmup({ user }: WarmupProps) {
     }
     return true
   })
+
+  // Lookup O(1) — évite un jobs.find() O(n) dans le .map de la liste (rendu O(n²)).
+  const jobByPhone = useMemo(() => new Map(jobs.map(j => [j.phone.id, j])), [jobs])
 
   function togglePhone(id: string) {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -315,16 +322,16 @@ export function Warmup({ user }: WarmupProps) {
       action: 'login_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets, `Login · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
+    initJobs(targets, tr(`Login · ${targets.length} compte${targets.length > 1 ? 's' : ''}`, `Login · ${targets.length} account${targets.length > 1 ? 's' : ''}`))
 
     await pLimit(targets, MAX_CONCURRENCY, async phone => {
       if (abortRef.current.abort) {
-        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        updateJob(phone.id, { status: 'error', error: tr('Annulé', 'Cancelled') })
         return
       }
       const cred = loginCreds[phone.id]
       if (!cred?.email || !cred?.password) {
-        updateJob(phone.id, { status: 'error', error: 'Identifiants manquants' })
+        updateJob(phone.id, { status: 'error', error: tr('Identifiants manquants', 'Missing credentials') })
         return
       }
       updateJob(phone.id, { status: 'running' })
@@ -335,7 +342,7 @@ export function Warmup({ user }: WarmupProps) {
         cred.totpSecret || undefined,
       )
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-      addLog(phone.id, 'Extinction du téléphone…')
+      addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
     })
 
@@ -351,7 +358,7 @@ export function Warmup({ user }: WarmupProps) {
       action: 'mass_edit_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets, `Édition profil · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
+    initJobs(targets, tr(`Édition profil · ${targets.length} compte${targets.length > 1 ? 's' : ''}`, `Profile edit · ${targets.length} account${targets.length > 1 ? 's' : ''}`))
 
     const config = {
       profileName:   editName.trim()    || undefined,
@@ -366,7 +373,7 @@ export function Warmup({ user }: WarmupProps) {
 
     await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
-        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        updateJob(phone.id, { status: 'error', error: tr('Annulé', 'Cancelled') })
         return
       }
       updateJob(phone.id, { status: 'running' })
@@ -399,7 +406,7 @@ export function Warmup({ user }: WarmupProps) {
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
-      addLog(phone.id, 'Extinction du téléphone…')
+      addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
     })
 
@@ -415,7 +422,7 @@ export function Warmup({ user }: WarmupProps) {
       action: 'warmup_launched',
       details: { phones: targets.map(p => p.serialName ?? p.name ?? p.id), count: targets.length },
     })
-    initJobs(targets, `Warmup · ${targets.length} compte${targets.length > 1 ? 's' : ''}`)
+    initJobs(targets, tr(`Warmup · ${targets.length} compte${targets.length > 1 ? 's' : ''}`, `Warmup · ${targets.length} account${targets.length > 1 ? 's' : ''}`))
 
     // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
     const rotationUrls = rotProxy ? activeRotationUrls() : []
@@ -424,7 +431,7 @@ export function Warmup({ user }: WarmupProps) {
 
     await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
-        updateJob(phone.id, { status: 'error', error: 'Annulé' })
+        updateJob(phone.id, { status: 'error', error: tr('Annulé', 'Cancelled') })
         return
       }
       updateJob(phone.id, { status: 'running' })
@@ -436,7 +443,7 @@ export function Warmup({ user }: WarmupProps) {
           ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
           : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)), rotationUrls }, msg => addLog(phone.id, msg))
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-      addLog(phone.id, 'Extinction du téléphone…')
+      addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
     })
 
@@ -458,12 +465,27 @@ export function Warmup({ user }: WarmupProps) {
   if (conns.loading) {
     return (
       <div className="sf-page anim-page">
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div className="sf-card" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 16 }}>
-              <div className="sf-spinner" />
+        <div className="sf-page-header">
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-skeleton sf-skeleton-card" style={{ width: 46, height: 46, borderRadius: 13 }} />
+            <div className="sf-stack" style={{ gap: 8 }}>
+              <div className="sf-skeleton sf-skeleton-text" style={{ width: 180, height: 20 }} />
+              <div className="sf-skeleton sf-skeleton-text" style={{ width: 240 }} />
             </div>
-            <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 500 }}>{t('loading')}</span>
+          </div>
+        </div>
+        <div className="sf-page-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 20, maxWidth: 1140 }}>
+            <div className="sf-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="sf-skeleton sf-skeleton-line" style={{ height: 48 }} />
+              ))}
+            </div>
+            <div className="sf-stack" style={{ gap: 12 }}>
+              <div className="sf-skeleton sf-skeleton-line" />
+              <div className="sf-skeleton sf-skeleton-card" style={{ height: 220 }} />
+              <div className="sf-skeleton sf-skeleton-card" style={{ height: 44 }} />
+            </div>
           </div>
         </div>
       </div>
@@ -476,29 +498,23 @@ export function Warmup({ user }: WarmupProps) {
     return (
       <div className="sf-page anim-page">
         <div className="sf-page-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            <div style={{
-              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.28)', color: 'var(--accent)',
-            }}>
+          <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+            <div className="sf-page-icon sf-anim-scale-spring">
               <IconBolt size={22} />
             </div>
             <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-              <h1 className="sf-page-title">{t('warmupPageTitle')}</h1>
+              <h1 className="sf-page-title sf-title-grad">{t('warmupPageTitle')}</h1>
               <p className="sf-page-sub">{t('warmupPageSub')}</p>
             </div>
           </div>
         </div>
         <div className="sf-page-body">
-          <div className="sf-card" style={{ maxWidth: 480, padding: '20px 24px', borderColor: 'rgba(245,158,11,0.22)', background: 'rgba(245,158,11,0.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--warn)' }}>
-                <IconAlertTriangle size={15} />
-              </div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--warn)' }}>{t('warmupMissingToken')}</p>
+          <div className="sf-banner is-warn sf-anim-slide-up sf-d50" style={{ maxWidth: 480, alignItems: 'flex-start' }}>
+            <span style={{ flexShrink: 0, marginTop: 1, display: 'flex' }}><IconAlertTriangle size={16} /></span>
+            <div>
+              <p style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>{t('warmupMissingToken')}</p>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', lineHeight: 1.6, fontWeight: 500 }}>{t('warmupMissingTokenDesc')}</p>
             </div>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6 }}>{t('warmupMissingTokenDesc')}</p>
           </div>
         </div>
       </div>
@@ -527,21 +543,21 @@ export function Warmup({ user }: WarmupProps) {
             borderRadius: 20, overflow: 'hidden',
             boxShadow: '0 40px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}>
-            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(251,146,60,0.14), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', top: -70, left: '30%', width: 300, height: 180, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(139,92,246,0.18), transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: '24px 24px 4px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(251,146,60,0.8)' }}>Warmup</p>
-              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>Quelle plateforme ?</h2>
-              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>Choisis la plateforme pour cette session.</p>
+              <p style={{ margin: '0 0 4px', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#A5B4FC' }}>Warmup</p>
+              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>{tr('Quelle plateforme ?', 'Which platform?')}</h2>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>{tr('Choisis la plateforme pour cette session.', 'Choose the platform for this session.')}</p>
             </div>
             <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: 22 }}>
               {([
                 {
                   k: 'instagram', label: 'Instagram', desc: 'Login + Mass Edit + Warmup',
-                  grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accent: '#F472B6',
+                  grad: 'linear-gradient(135deg,#8B5CF6,#6366F1)', glow: 'rgba(139,92,246,0.5)', accent: '#A5B4FC',
                   icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="#fff" stroke="none"/></svg>,
                 },
                 {
-                  k: 'tiktok', label: 'TikTok', desc: 'Mass Edit + Warmup (login bientôt)',
+                  k: 'tiktok', label: 'TikTok', desc: tr('Mass Edit + Warmup (login bientôt)', 'Mass Edit + Warmup (login soon)'),
                   grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)', glow: 'rgba(34,211,238,0.5)', accent: '#22D3EE',
                   icon: <svg width="21" height="21" viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.4 2 4.1 4.5 4.4v3c-1.7.1-3.2-.4-4.6-1.3v6.2c0 3.6-2.7 5.9-6 5.9-3.2 0-5.6-2.5-5.6-5.5 0-3.4 2.9-5.9 6.4-5.3v3.1c-.4-.1-.9-.2-1.3-.2-1.4 0-2.4 1-2.4 2.4 0 1.4 1 2.4 2.5 2.4 1.6 0 2.6-1.1 2.6-2.9V3h3.9z"/></svg>,
                 },
@@ -591,55 +607,41 @@ export function Warmup({ user }: WarmupProps) {
 
       {/* ── Page header ───────────────────────────────────────────────────────── */}
       <div className="sf-page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          <div style={{
-            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-            background: 'linear-gradient(135deg,#EA580C,#FB923C)',
-            boxShadow: '0 10px 24px -8px rgba(251,146,60,0.55), inset 0 1px 0 0 rgba(255,255,255,0.35)',
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon sf-anim-scale-spring" style={{
             position: 'relative', overflow: 'hidden',
           }}>
             <IconBolt size={22} />
             {running && (
               <div style={{
-                position: 'absolute', inset: 0, borderRadius: 13,
-                background: 'linear-gradient(135deg,#fff,#FDBA74)',
-                opacity: 0.25, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
+                position: 'absolute', inset: 0, borderRadius: 'inherit',
+                background: 'linear-gradient(135deg,#fff,#A5B4FC)',
+                opacity: 0.28, animation: 'sf-ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
               }} />
             )}
           </div>
           <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title">{t('warmupPageTitle')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{t('warmupPageTitle')}</h1>
             <p className="sf-page-sub">{t('warmupPageSub')}</p>
           </div>
         </div>
 
-        {/* Header right: status pills */}
-        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="sf-card" style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 10 }}>
-            {onlineCount > 0
-              ? <span className="sf-ping-dot" />
-              : <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />}
-            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-              <span style={{ color: onlineCount > 0 ? 'var(--ok)' : 'var(--text-4)', fontWeight: 700 }}>{onlineCount}</span>
-              /{phones.length} {t('warmupOnline')}
-            </span>
-          </div>
+        {/* Header right: status chips */}
+        <div className="sf-page-header-actions sf-anim-slide-up sf-d100">
+          <span className={`sf-status-chip ${onlineCount > 0 ? 'is-live' : 'is-idle'}`} style={{ fontFamily: 'monospace' }}>
+            <span className="sf-status-dot" style={onlineCount > 0 ? undefined : { animation: 'none' }} />
+            <span className="sf-tabular"><span style={{ fontWeight: 700 }}>{onlineCount}</span>/{phones.length}</span> {t('warmupOnline')}
+          </span>
           {selected.size > 0 && (
-            <span className="sf-badge sf-badge-accent" style={{ fontSize: 12, padding: '4px 10px', fontVariantNumeric: 'tabular-nums' }}>
+            <span className="sf-badge sf-badge-accent sf-tabular" style={{ fontSize: 12, padding: '4px 10px' }}>
               {selected.size} {t('warmupSelected')}{lang === 'fr' && selected.size !== 1 ? 's' : ''}
             </span>
           )}
           {running && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', borderRadius: 10,
-              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-            }}>
-              <div className="sf-spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} />
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--accent-l)', fontWeight: 600 }}>
-                {activeTab === 'login' ? t('warmupLoginRunning') : activeTab === 'massEdit' ? t('warmupMassEditRunning') : t('warmupWarmupRunning')}
-              </span>
-            </div>
+            <span className="sf-status-chip is-accent" style={{ fontFamily: 'monospace', padding: '4px 10px' }}>
+              <div className="sf-spinner" style={{ width: 11, height: 11, borderWidth: 1.5 }} />
+              {activeTab === 'login' ? t('warmupLoginRunning') : activeTab === 'massEdit' ? t('warmupMassEditRunning') : t('warmupWarmupRunning')}
+            </span>
           )}
         </div>
       </div>
@@ -668,7 +670,7 @@ export function Warmup({ user }: WarmupProps) {
                   <button onClick={deselectAll} disabled={selected.size === 0}
                     className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
                     style={selected.size === 0 ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}>
-                    Tout désélectionner
+                    {tr('Tout désélectionner', 'Deselect all')}
                   </button>
                   <button onClick={loadPhones} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
                     style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -710,13 +712,9 @@ export function Warmup({ user }: WarmupProps) {
 
               {/* Error state */}
               {phonesError && (
-                <div style={{
-                  margin: '10px 14px', padding: '10px 14px', borderRadius: 8,
-                  background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.18)',
-                  display: 'flex', alignItems: 'center', gap: 8,
-                }}>
-                  <span style={{ color: 'var(--err)', display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={14} /></span>
-                  <p style={{ fontSize: 12, color: 'var(--err)', fontFamily: 'monospace' }}>{phonesError}</p>
+                <div className="sf-banner is-danger" style={{ margin: '10px 14px' }}>
+                  <span style={{ display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={15} /></span>
+                  <p style={{ fontSize: 12.5, fontFamily: 'monospace', fontWeight: 500 }}>{phonesError}</p>
                 </div>
               )}
 
@@ -729,11 +727,19 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
               )}
 
-              {/* Loading */}
-              {loadingPhones && (
-                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className="sf-spinner" />
-                  <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-3)' }}>{t('warmupScanning')}</span>
+              {/* Loading — skeleton rows matching phone-row geometry */}
+              {loadingPhones && phones.length === 0 && (
+                <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0' }}>
+                      <div className="sf-skeleton" style={{ width: 8, height: 8, borderRadius: '50%' }} />
+                      <div className="sf-skeleton" style={{ width: 17, height: 17, borderRadius: 4 }} />
+                      <div className="sf-stack" style={{ gap: 6, flex: 1 }}>
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: `${50 + (i % 3) * 15}%`, height: 11 }} />
+                        <div className="sf-skeleton sf-skeleton-text" style={{ width: 70, height: 9 }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -742,7 +748,7 @@ export function Warmup({ user }: WarmupProps) {
                 {visiblePhones.map(phone => {
                   const online = isOnline(phone)
                   const sel    = selected.has(phone.id)
-                  const job    = jobs.find(j => j.phone.id === phone.id)
+                  const job    = jobByPhone.get(phone.id)
                   const grp    = phone.group?.name ?? phone.groupName
                   return (
                     <div key={phone.id}
@@ -872,7 +878,8 @@ export function Warmup({ user }: WarmupProps) {
                       <div style={{
                         height: '100%', borderRadius: 99,
                         width: `${progress}%`,
-                        background: 'var(--ok)',
+                        background: 'linear-gradient(90deg,#6366F1,#8B5CF6)',
+                        boxShadow: '0 0 12px -2px rgba(139,92,246,0.6)',
                         transition: 'width 300ms ease',
                       }} />
                     </div>
@@ -955,34 +962,31 @@ export function Warmup({ user }: WarmupProps) {
               </div>
             )}
 
-            {/* ── Pill tab switcher ── */}
-            <div style={{
-              display: 'flex', gap: 4, padding: 4,
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-            }}>
-              {TABS.map(tab => {
-                const active = activeTab === tab.id
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className="cursor-pointer"
-                    style={{
-                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      height: 34, borderRadius: 9, fontSize: 12, fontWeight: 600,
-                      border: 'none', cursor: 'pointer',
-                      transition: 'all 160ms',
-                      background: active ? 'var(--accent)' : 'transparent',
-                      color: active ? '#fff' : 'var(--text-3)',
-                      boxShadow: active ? '0 2px 12px rgba(99,102,241,0.35)' : 'none',
-                    }}>
-                    {tab.icon} {tab.label}
-                  </button>
-                )
-              })}
+            {/* ── Segmented tab switcher ── */}
+            <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`sf-segment-item cursor-pointer ${activeTab === tab.id ? 'is-active' : ''}`}
+                  style={{ flex: 1, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
             </div>
+
+            {/* Guidance : rôle de l'onglet actif + rappel de sélectionner les comptes */}
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', lineHeight: 1.5, margin: '-2px 2px 0', display: 'flex', gap: 6 }}>
+              <span style={{ color: 'var(--accent-l)', flexShrink: 0, fontWeight: 700 }}>→</span>
+              <span>
+                {activeTab === 'login'
+                  ? tr('Connecte tes comptes Instagram sur les téléphones sélectionnés (email : mot de passe : 2FA).', 'Log your Instagram accounts in on the selected phones (email : password : 2FA).')
+                  : activeTab === 'massEdit'
+                    ? tr('Modifie en une fois le profil (nom, pseudo, bio, photo) des comptes sélectionnés.', 'Edit the profile (name, username, bio, picture) of the selected accounts in one go.')
+                    : tr('Simule une activité humaine (navigation, likes, reels) pour réchauffer les comptes avant de poster.', 'Simulates human activity (browsing, likes, reels) to warm up the accounts before posting.')}
+                {' '}{tr('Sélectionne d’abord les comptes à gauche.', 'First select the accounts on the left.')}
+              </span>
+            </p>
 
             {/* ── LOG IN tab ── */}
             {activeTab === 'login' && (
@@ -993,9 +997,9 @@ export function Warmup({ user }: WarmupProps) {
                   <div style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--border)' }}>
                     <span style={{ color: 'var(--accent-l)', display: 'flex' }}><IconPaperclip size={13} /></span>
                     <div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>Import en masse</p>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>{tr('Import en masse', 'Bulk import')}</p>
                       <p style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 1 }}>
-                        email:password:2fa par ligne — appliqué aux téléphones sélectionnés dans l'ordre
+                        {tr("email:password:2fa par ligne — appliqué aux téléphones sélectionnés dans l'ordre", 'email:password:2fa per line — applied to the selected phones in order')}
                       </p>
                     </div>
                   </div>
@@ -1018,7 +1022,7 @@ export function Warmup({ user }: WarmupProps) {
                         cursor: !bulkCreds.trim() || selectedPhones.length === 0 ? 'not-allowed' : 'pointer',
                       }}
                     >
-                      Appliquer ({Math.min(bulkCreds.split('\n').filter(l => l.trim()).length, selectedPhones.length)})
+                      {tr('Appliquer', 'Apply')} ({Math.min(bulkCreds.split('\n').filter(l => l.trim()).length, selectedPhones.length)})
                     </button>
                   </div>
                 </div>
@@ -1075,7 +1079,7 @@ export function Warmup({ user }: WarmupProps) {
                             <div>
                               <input
                                 type="text"
-                                placeholder="Secret 2FA optionnel — ex: JBSWY3DPEHPK3PXP"
+                                placeholder={tr('Secret 2FA optionnel — ex: JBSWY3DPEHPK3PXP', 'Optional 2FA secret — e.g. JBSWY3DPEHPK3PXP')}
                                 value={cred.totpSecret}
                                 onChange={e => setLoginCred(phone.id, 'totpSecret', e.target.value)}
                                 className="sf-input"
@@ -1100,18 +1104,19 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
 
                 {/* Warning */}
-                <div style={{
-                  padding: '12px 16px', borderRadius: 10,
-                  background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)',
-                  display: 'flex', alignItems: 'flex-start', gap: 10,
-                }}>
-                  <span style={{ color: 'var(--warn)', flexShrink: 0, marginTop: 1, display: 'flex' }}><IconAlertTriangle size={14} /></span>
-                  <p style={{ fontSize: 11, fontFamily: 'monospace', lineHeight: 1.6, color: 'rgba(245,158,11,0.8)' }}>{t('warmupLoginWarning')}</p>
+                <div className="sf-banner is-warn" style={{ alignItems: 'flex-start' }}>
+                  <span style={{ flexShrink: 0, marginTop: 1, display: 'flex' }}><IconAlertTriangle size={15} /></span>
+                  <p style={{ fontSize: 11.5, fontFamily: 'monospace', lineHeight: 1.6, fontWeight: 500 }}>{t('warmupLoginWarning')}</p>
                 </div>
 
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"
                   style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
+                  title={
+                    selectedPhones.length === 0 ? tr('Sélectionne au moins un compte à gauche', 'Select at least one account on the left')
+                    : selectedPhones.some(p => !loginCreds[p.id]?.email || !loginCreds[p.id]?.password) ? tr('Renseigne email + mot de passe pour chaque compte sélectionné', 'Enter email + password for every selected account')
+                    : tr('Connecter les comptes sélectionnés', 'Log in the selected accounts')
+                  }
                   disabled={selectedPhones.length === 0 || running ||
                     selectedPhones.some(p => !loginCreds[p.id]?.email || !loginCreds[p.id]?.password)}
                   loading={running}
@@ -1130,7 +1135,7 @@ export function Warmup({ user }: WarmupProps) {
 
                 {/* Note : la photo doit être une URL d'image accessible */}
                 <p style={{ fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.5, padding: '0 2px' }}>
-                  La photo de profil doit être une <b>URL d'image</b> accessible.
+                  {tr('La photo de profil doit être une ', 'The profile picture must be an accessible ')}<b>{tr("URL d'image", 'image URL')}</b>{tr(' accessible.', '.')}
                 </p>
 
                 {/* Profile fields card */}
@@ -1153,7 +1158,7 @@ export function Warmup({ user }: WarmupProps) {
                       <label style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', marginBottom: 6, fontFamily: 'monospace' }}>
                         {t('warmupProfileName')}
                       </label>
-                      <input type="text" placeholder="Ex: Marie Fitness | Coach Minceur"
+                      <input type="text" placeholder={tr('Ex: Marie Fitness | Coach Minceur', 'e.g. Marie Fitness | Weight-loss Coach')}
                         value={editName} onChange={e => setEditName(e.target.value)}
                         className="sf-input" style={{ fontSize: 12 }}
                       />
@@ -1192,14 +1197,14 @@ export function Warmup({ user }: WarmupProps) {
                         {t('warmupProfilePic')}
                       </label>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input type="text" placeholder="Choisir depuis la banque →"
+                        <input type="text" placeholder={tr('Choisir depuis la banque →', 'Pick from the bank →')}
                           value={editPicUrl} onChange={e => { setEditPicUrl(e.target.value); setEditPicFile(null) }}
                           className="sf-input" style={{ flex: 1, fontSize: 12 }}
                         />
                         <button onClick={() => setShowAvatarPicker(true)}
                           className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
                           style={{ flexShrink: 0, gap: 5 }}>
-                          <IconFolderOpen size={14} /> Banque
+                          <IconFolderOpen size={14} /> {tr('Banque', 'Bank')}
                         </button>
                         {!isWeb && (
                           <button onClick={async () => {
@@ -1228,6 +1233,11 @@ export function Warmup({ user }: WarmupProps) {
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"
                   style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
+                  title={
+                    selectedPhones.length === 0 ? tr('Sélectionne au moins un compte à gauche', 'Select at least one account on the left')
+                    : (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim()) ? tr('Remplis au moins un champ à modifier (nom, pseudo, bio ou photo)', 'Fill at least one field to change (name, username, bio or picture)')
+                    : tr('Appliquer les modifications aux comptes sélectionnés', 'Apply the edits to the selected accounts')
+                  }
                   disabled={selectedPhones.length === 0 || running ||
                     (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim())}
                   loading={running}
@@ -1263,14 +1273,14 @@ export function Warmup({ user }: WarmupProps) {
 
                     {/* Bandeau plateforme + bouton changer */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Plateforme :</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{tr('Plateforme :', 'Platform:')}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
                         {warmupPlatform === 'tiktok' ? '🎵 TikTok' : '📸 Instagram'}
                       </span>
                       <button onClick={() => setWarmupPlatformChosen(false)}
                         className="cursor-pointer"
                         style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.28)', color: 'var(--accent-l)' }}>
-                        Changer
+                        {tr('Changer', 'Change')}
                       </button>
                     </div>
 
@@ -1278,13 +1288,13 @@ export function Warmup({ user }: WarmupProps) {
                     {warmupPlatform === 'tiktok' && (
                       <div>
                         <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
-                          Engagement (optionnel)
+                          {tr('Engagement (optionnel)', 'Engagement (optional)')}
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {([
-                            { v: ttLike,    set: setTtLike,    icon: <IconHeart size={15} />,    label: 'J\'aime aléatoires', desc: 'Like des vidéos parcourues' },
-                            { v: ttFollow,  set: setTtFollow,  icon: <IconUserPlus size={15} />, label: 'Abonnements aléatoires', desc: 'Suit quelques comptes' },
-                            { v: ttComment, set: setTtComment, icon: <IconSparkles size={15} />, label: 'Commentaires IA', desc: 'Commente avec une IA' },
+                            { v: ttLike,    set: setTtLike,    icon: <IconHeart size={15} />,    label: tr('J\'aime aléatoires', 'Random likes'), desc: tr('Like des vidéos parcourues', 'Likes videos it scrolls') },
+                            { v: ttFollow,  set: setTtFollow,  icon: <IconUserPlus size={15} />, label: tr('Abonnements aléatoires', 'Random follows'), desc: tr('Suit quelques comptes', 'Follows a few accounts') },
+                            { v: ttComment, set: setTtComment, icon: <IconSparkles size={15} />, label: tr('Commentaires IA', 'AI comments'), desc: tr('Commente avec une IA', 'Comments using an AI') },
                           ]).map((a, i) => (
                             <button key={i} onClick={() => a.set(!a.v)} className="cursor-pointer"
                               style={{
@@ -1363,13 +1373,9 @@ export function Warmup({ user }: WarmupProps) {
 
                     {/* Duration zero warning */}
                     {browseMinutes === 0 && (
-                      <div style={{
-                        padding: '10px 12px', borderRadius: 8,
-                        background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)',
-                        display: 'flex', alignItems: 'center', gap: 8,
-                      }}>
-                        <span style={{ color: 'var(--warn)', display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={14} /></span>
-                        <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(245,158,11,0.78)' }}>{t('warmupDurationZero')}</p>
+                      <div className="sf-banner is-warn">
+                        <span style={{ display: 'flex', flexShrink: 0 }}><IconAlertTriangle size={15} /></span>
+                        <p style={{ fontSize: 11.5, fontFamily: 'monospace', fontWeight: 500 }}>{t('warmupDurationZero')}</p>
                       </div>
                     )}
                   </div>
@@ -1406,6 +1412,11 @@ export function Warmup({ user }: WarmupProps) {
                     cursor: selectedPhones.length === 0 || running || browseMinutes === 0 ? 'not-allowed' : 'pointer',
                   }}
                   disabled={selectedPhones.length === 0 || running || browseMinutes === 0}
+                  title={
+                    selectedPhones.length === 0 ? tr('Sélectionne au moins un compte à gauche', 'Select at least one account on the left')
+                    : browseMinutes === 0 ? tr('Choisis une durée de navigation supérieure à 0', 'Pick a browsing duration above 0')
+                    : tr('Lancer le warmup sur les comptes sélectionnés', 'Start warmup on the selected accounts')
+                  }
                   onClick={launchWarmup}
                 >
                   {running

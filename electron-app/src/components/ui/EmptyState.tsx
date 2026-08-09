@@ -12,39 +12,33 @@ interface EmptyStateProps {
 }
 
 /**
- * État vide unifié (icône + titre + description + CTA). Remplace les ~10 blocs
- * « Aucun … » codés à la main, souvent sans icône ni action.
+ * État vide unifié v2 (icône flottante + halo + titre + description + CTA).
+ * Repose sur les classes canoniques `.sf-empty*` d'index.css (tuile flottante,
+ * halo radial, titre 14/700, description discrète) plutôt que sur des styles
+ * inline. API inchangée — aucun appelant impacté.
  */
 export function EmptyState({ icon, title, description, action, secondary, compact }: EmptyStateProps) {
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      textAlign: 'center', gap: 10, padding: compact ? '32px 20px' : '56px 24px',
-    }}>
+    <div
+      className="sf-empty sf-anim-slide-up"
+      style={compact ? { padding: 'var(--sp-7) var(--sp-5)', gap: 'var(--sp-3)' } : undefined}
+    >
       {icon && (
-        <div style={{
-          width: 52, height: 52, borderRadius: 'var(--r-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--accent-dim)', border: '1px solid var(--border-accent)', color: 'var(--accent-lt)', marginBottom: 2,
-        }}>
+        <div className="sf-empty-icon" style={{ color: 'var(--accent-lt)' }}>
           {icon}
         </div>
       )}
-      <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{title}</p>
+      <p className="sf-empty-title" style={{ margin: 0 }}>{title}</p>
       {description && (
-        <p style={{ fontSize: 12.5, color: 'var(--text-3)', maxWidth: 340, lineHeight: 1.5, margin: 0 }}>{description}</p>
+        <p className="sf-empty-desc" style={{ margin: 0 }}>{description}</p>
       )}
       {(action || secondary) && (
-        <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div className="sf-cluster" style={{ marginTop: 'var(--sp-1)', justifyContent: 'center' }}>
           {action && (
             <button
               onClick={action.onClick}
               disabled={action.disabled}
-              className={action.disabled ? '' : 'cursor-pointer'}
-              style={{
-                padding: '9px 16px', borderRadius: 'var(--r-md)', fontSize: 12.5, fontWeight: 600, border: 'none',
-                background: 'linear-gradient(130deg,var(--accent),var(--accent-lt))', color: '#fff',
-                opacity: action.disabled ? 0.5 : 1, cursor: action.disabled ? 'not-allowed' : 'pointer',
-              }}
+              className="sf-btn sf-btn-primary"
             >
               {action.label}
             </button>
@@ -52,11 +46,7 @@ export function EmptyState({ icon, title, description, action, secondary, compac
           {secondary && (
             <button
               onClick={secondary.onClick}
-              className="cursor-pointer"
-              style={{
-                padding: '9px 16px', borderRadius: 'var(--r-md)', fontSize: 12.5, fontWeight: 600,
-                background: 'transparent', color: 'var(--text-2)', border: '1px solid var(--border-md)',
-              }}
+              className="sf-btn sf-btn-secondary"
             >
               {secondary.label}
             </button>

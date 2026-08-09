@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { useT, useLang } from '@/lib/i18n'
+import { useT, useLang, useTr } from '@/lib/i18n'
 import { playNav, playTick } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { useCredits } from '@/lib/credits'
@@ -60,6 +60,10 @@ const HUB_CSS = `
   @keyframes hub-float-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(34px,24px)} }
   @keyframes hub-float-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-28px,30px)} }
   @keyframes hub-line-grow { from{transform:scaleX(0)} to{transform:scaleX(1)} }
+  .hub-row { transition: background 0.22s ease, padding-left 0.22s ease; position: relative; }
+  .hub-row::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px; background:linear-gradient(180deg,#818CF8,#8B5CF6); opacity:0; transform:scaleY(0.4); transition:opacity 0.22s ease, transform 0.22s ease; }
+  .hub-row:hover { background: rgba(139,92,246,0.05); padding-left: 24px; }
+  .hub-row:hover::before { opacity:1; transform:scaleY(1); }
 `
 function useHubCSS() {
   useEffect(() => {
@@ -84,15 +88,15 @@ function KpiCard({ label, value, icon, loading, delay = 0, grad, glow, accentCol
       onMouseLeave={() => setHover(false)}
       style={{
         flex: 1, minWidth: 190,
-        padding: 20, borderRadius: 16,
-        background: 'linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012))',
-        border: '1px solid rgba(255,255,255,0.08)',
+        padding: '22px 22px 24px', borderRadius: 18,
+        background: 'linear-gradient(160deg, rgba(255,255,255,0.06), rgba(255,255,255,0.014))',
+        border: `1px solid ${hover ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.08)'}`,
         animation: `hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) ${delay}s both`,
-        transform: hover ? 'translateY(-4px)' : 'none',
+        transform: hover ? 'translateY(-5px)' : 'none',
         boxShadow: hover
-          ? `0 26px 54px -26px ${glow}, inset 0 1px 0 0 rgba(255,255,255,0.1)`
-          : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 8px 26px -18px rgba(0,0,0,0.6)',
-        transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s',
+          ? `0 30px 60px -28px ${glow}, 0 0 0 1px rgba(139,92,246,0.1), inset 0 1px 0 0 rgba(255,255,255,0.12)`
+          : 'inset 0 1px 0 0 rgba(255,255,255,0.05), 0 10px 30px -20px rgba(0,0,0,0.6)',
+        transition: 'transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s, border-color 0.35s',
         position: 'relative', overflow: 'hidden', isolation: 'isolate',
       }}
     >
@@ -111,10 +115,7 @@ function KpiCard({ label, value, icon, loading, delay = 0, grad, glow, accentCol
         </span>
       </div>
       {loading ? (
-        <div style={{
-          height: 30, width: 60, borderRadius: 6, background: HAIR,
-          animation: 'hub-pulse-bg 1.4s ease-in-out infinite',
-        }} />
+        <div className="sf-skeleton" style={{ height: 30, width: 64, borderRadius: 8 }} />
       ) : (
         <p style={{
           position: 'relative', zIndex: 1,
@@ -179,11 +180,11 @@ function ToolChip({ label, icon, onClick }: { label: string; icon: string; onCli
 function SectionHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <div style={{
-      padding: '16px 20px',
+      padding: '17px 20px',
       borderBottom: `1px solid ${HAIR}`,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: IVORY, fontFamily: SANS }}>{title}</span>
+      <span style={{ fontSize: 13.5, fontWeight: 700, color: IVORY, fontFamily: SANS, letterSpacing: '-0.01em' }}>{title}</span>
       {action && onAction && (
         <button
           onClick={onAction}
@@ -197,9 +198,31 @@ function SectionHead({ title, action, onAction }: { title: string; action?: stri
   )
 }
 
+// ── List skeleton (même géométrie que les lignes réelles) ───────────────────────
+function ListSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{
+          padding: '12px 20px',
+          borderBottom: i < rows - 1 ? `1px solid ${HAIR}` : 'none',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div className="sf-skeleton" style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <div className="sf-skeleton sf-skeleton-text" style={{ width: `${70 - i * 12}%` }} />
+            <div className="sf-skeleton sf-skeleton-text" style={{ width: `${44 - i * 6}%`, height: 10 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Main Hub page ──────────────────────────────────────────────────────────────
 export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: Page) => void }) {
   const t = useT()
+  const tr = useTr()
   const { balance, loading: credLoading } = useCredits()
   const { currentOrg, role, perms } = useOrg()
   const license = useLicense()
@@ -210,6 +233,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const [phoneCount, setPhoneCount]   = useState(0)
   const [videoCount, setVideoCount]   = useState(0)
   const [weekPosts,  setWeekPosts]    = useState(0)
+  const [runningCount, setRunningCount] = useState(0)   // posts programmés en cours
+  const [failedCount,  setFailedCount]  = useState(0)   // échecs des dernières 24 h (à traiter)
   const [upcoming,   setUpcoming]     = useState<ScheduledPost[]>([])
   const [recent,     setRecent]       = useState<Array<{ kind: 'scheduled'; data: ScheduledPost } | { kind: 'run'; data: { id: string; type: string; ok_count: number; err_count: number; total: number; created_at: string } }>>([])
 
@@ -217,15 +242,22 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   const load = useCallback(async () => {
     setLoading(true)
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const phonesQ = currentOrg
+    const dayAgo  = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    // 🔒 KPI téléphones : si le membre est restreint à certains groupes, on ne
+    // compte QUE ceux-là (sinon le compteur laisse deviner l'existence des autres).
+    const restrictedGroups = (role && role !== 'owner' && role !== 'admin' && perms?.phone_groups?.mode === 'allow')
+      ? (perms.phone_groups.list ?? [])
+      : null
+    let phonesQ = currentOrg
       ? supabase.from('phones').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
       : supabase.from('phones').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
+    if (restrictedGroups) phonesQ = phonesQ.in('group_name', restrictedGroups)
     const bankQ = currentOrg
       ? supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
       : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
     const spQ  = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const prQ  = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes, directRunsRes] = await Promise.all([
+    const [phonesRes, videosRes, weekRes, runsRes, upcomingRes, recentRes, directRunsRes, runningRes, failed24Res] = await Promise.all([
       phonesQ,
       bankQ,
       spQ(supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }))
@@ -246,12 +278,21 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
       prQ(supabase.from('post_runs').select('*'))
         .order('created_at', { ascending: false })
         .limit(8),
+      // Santé : posts programmés en cours d'exécution (running)
+      spQ(supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }))
+        .in('status', ['running']),
+      // Santé : échecs des dernières 24 h (à traiter)
+      spQ(supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }))
+        .eq('status', 'failed')
+        .gte('created_at', dayAgo),
     ])
     setPhoneCount(phonesRes.count ?? 0)
     setVideoCount(videosRes.count ?? 0)
     const runPosts = ((runsRes.data ?? []) as Array<{ ok_count: number | null }>)
       .reduce((sum, r) => sum + (r.ok_count ?? 0), 0)
     setWeekPosts((weekRes.count ?? 0) + runPosts)
+    setRunningCount(runningRes.count ?? 0)
+    setFailedCount(failed24Res.count ?? 0)
     setUpcoming((upcomingRes.data ?? []) as ScheduledPost[])
 
     // Merge scheduled posts + direct runs, sort by date, keep 5 most recent
@@ -260,7 +301,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     const merged = [...recentScheduled, ...recentRuns].sort((a, b) => b._date.localeCompare(a._date)).slice(0, 5)
     setRecent(merged.map(({ kind, data }) => ({ kind, data } as typeof merged[number])))
     setLoading(false)
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, role, perms])
 
   useEffect(() => { load() }, [load])
 
@@ -290,7 +331,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
   const { lang } = useLang()
   const locale = lang === 'en' ? 'en-US' : 'fr-FR'
-  const firstName = displayName ?? (user.email?.split('@')[0] ?? 'créateur').replace(/[._]/g, ' ')
+  const firstName = displayName ?? (user.email?.split('@')[0] ?? tr('créateur', 'creator')).replace(/[._]/g, ' ')
   const greeting = (() => {
     const h = new Date().getHours()
     if (h < 6)  return t('hubGreetingNight')
@@ -331,60 +372,88 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
       {/* ambient animated glows */}
       <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
         <div style={{
-          position: 'absolute', top: -120, left: '18%', width: 560, height: 420,
-          background: 'radial-gradient(ellipse, rgba(99,102,241,0.13), transparent 66%)',
-          filter: 'blur(70px)', animation: 'hub-float-a 20s ease-in-out infinite',
+          position: 'absolute', top: -140, left: '14%', width: 620, height: 460,
+          background: 'radial-gradient(ellipse, rgba(99,102,241,0.16), transparent 66%)',
+          filter: 'blur(78px)', animation: 'hub-float-a 20s ease-in-out infinite',
         }} />
         <div style={{
-          position: 'absolute', top: 40, right: '6%', width: 460, height: 380,
-          background: 'radial-gradient(ellipse, rgba(16,185,129,0.09), transparent 68%)',
-          filter: 'blur(72px)', animation: 'hub-float-b 24s ease-in-out infinite',
+          position: 'absolute', top: 20, right: '4%', width: 500, height: 420,
+          background: 'radial-gradient(ellipse, rgba(139,92,246,0.13), transparent 68%)',
+          filter: 'blur(80px)', animation: 'hub-float-b 24s ease-in-out infinite',
         }} />
       </div>
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1120, margin: '0 auto' }}>
 
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
-          gap: 10, marginBottom: 24,
-          animation: 'hub-fade-up 0.45s cubic-bezier(0.16,1,0.3,1) both',
+        {/* ── Header (héro — panneau glass premium) ───────────────────────── */}
+        <div className="sf-hero sf-page-header is-hero sf-anim-slide-up sf-d50" style={{
+          marginBottom: 28, padding: '30px 32px', gap: 20,
+          border: '1px solid rgba(139,92,246,0.22)',
+          boxShadow: '0 24px 60px -34px rgba(99,102,241,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
         }}>
-          <div>
-            <p style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: '0.04em',
-              textTransform: 'uppercase', color: 'rgba(99,102,241,0.6)',
-              margin: '0 0 6px', fontFamily: SANS,
-            }}>{dateLabel}</p>
-            <h1 style={{
-              margin: 0, fontSize: 34, fontWeight: 900, letterSpacing: '-0.045em',
-              color: IVORY, fontFamily: SANS, lineHeight: 1.02,
-            }}>
-              {greeting},&nbsp;
-              <span style={{
-                background: 'linear-gradient(100deg,#818CF8 10%,#c4b5fd 50%,#6ee7b7 90%)',
-                backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text', animation: 'hub-shimmer 6s linear infinite',
-              }}>{firstName}</span>
+          <div style={{ minWidth: 0, position: 'relative', zIndex: 1 }}>
+            <p className="sf-eyebrow" style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span aria-hidden style={{ width: 6, height: 6, borderRadius: 99, background: '#818CF8', boxShadow: '0 0 10px 2px rgba(129,140,248,0.7)' }} />
+              {dateLabel}
+            </p>
+            <h1 className="sf-page-title" style={{ margin: 0, fontSize: 'clamp(26px, 4vw, 38px)', letterSpacing: '-0.03em', lineHeight: 1.05 }}>
+              <span style={{ color: 'var(--text-2)', fontWeight: 700 }}>{greeting},&nbsp;</span>
+              <span className="sf-title-grad" style={{ fontWeight: 900 }}>{firstName}</span>
             </h1>
           </div>
-          <button
-            onClick={load}
-            className="sf-btn sf-btn-secondary sf-btn-sm"
-            style={{ gap: 7 }}
-          >
-            <SvgIcon d={ICONS.refresh} size={13} color="currentColor" />
-            {t('hubRefresh')}
-          </button>
+          <div className="sf-page-header-actions sf-anim-slide-up sf-d100" style={{ position: 'relative', zIndex: 1 }}>
+            <span className={`sf-status-chip ${loading ? 'is-accent' : 'is-live'}`}>
+              <span className="sf-status-dot" />
+              {loading ? t('hubLoading') : tr('En direct', 'Live')}
+            </span>
+            <button
+              onClick={load}
+              className="sf-btn sf-btn-secondary sf-btn-sm"
+              style={{ gap: 7 }}
+            >
+              <SvgIcon d={ICONS.refresh} size={13} color="currentColor" />
+              {t('hubRefresh')}
+            </button>
+          </div>
         </div>
 
+        {/* ── Centre de santé : compteurs "en cours" + "à traiter" ───────── */}
+        {!loading && (runningCount > 0 || failedCount > 0) && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.02s both' }}>
+            {runningCount > 0 && (
+              <button
+                onClick={() => { playNav(); onNavigate('activity') }}
+                className="sf-card"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderRadius: 12, cursor: 'pointer', border: '1px solid rgba(52,211,153,0.28)', background: 'rgba(52,211,153,0.06)' }}
+              >
+                <span className="sf-status-dot" style={{ background: '#34D399' }} />
+                <span style={{ fontSize: 15, fontWeight: 900, color: '#34D399', fontVariantNumeric: 'tabular-nums' }}>{runningCount}</span>
+                <span style={{ fontSize: 12.5, color: IVORY, fontFamily: SANS }}>{tr('en cours', 'running')}</span>
+              </button>
+            )}
+            {failedCount > 0 && (
+              <button
+                onClick={() => { playNav(); onNavigate('activity') }}
+                className="sf-card"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderRadius: 12, cursor: 'pointer', border: '1px solid rgba(248,113,113,0.32)', background: 'rgba(248,113,113,0.07)' }}
+              >
+                <SvgIcon d={ICONS.x} size={15} color="#F87171" strokeWidth={2.6} />
+                <span style={{ fontSize: 15, fontWeight: 900, color: '#F87171', fontVariantNumeric: 'tabular-nums' }}>{failedCount}</span>
+                <span style={{ fontSize: 12.5, color: IVORY, fontFamily: SANS }}>{tr('échec(s) à traiter · 24 h', 'failure(s) to handle · 24h')}</span>
+                <span style={{ fontSize: 11.5, color: '#F87171', fontWeight: 700, marginLeft: 2 }}>{tr('Voir →', 'View →')}</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* ── KPI row — reliée par un flux lumineux ───────────────────────── */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="sf-section-label" style={{ marginBottom: 12 }}>{tr('Aperçu', 'Overview')}</div>
+        <div style={{ display: 'flex', gap: 0, marginBottom: 28, flexWrap: 'wrap', alignItems: 'center' }}>
           {([
-            { label: t('hubKpiPhones'),    value: loading ? '…' : phoneCount, icon: 'phone',    delay: 0.05, grad: 'linear-gradient(135deg,#6366F1,#8B5CF6)', glow: 'rgba(99,102,241,0.5)', accentColor: '#fff', c: '#818CF8' },
-            { label: t('hubKpiVideos'),    value: loading ? '…' : videoCount, icon: 'video',    delay: 0.10, grad: 'linear-gradient(135deg,#EC4899,#8B5CF6)', glow: 'rgba(236,72,153,0.5)', accentColor: '#fff', c: '#F472B6' },
-            { label: t('hubKpiWeekPosts'), value: loading ? '…' : weekPosts,  icon: 'send',     delay: 0.15, grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.5)', accentColor: '#fff', c: '#34D399' },
-            { label: t('hubKpiCredits'),   value: credLoading ? '…' : balance.toLocaleString(locale), icon: 'sparkles', delay: 0.20, grad: 'linear-gradient(135deg,#F59E0B,#EF4444)', glow: 'rgba(245,158,11,0.5)', accentColor: '#FBBF24', c: '#FBBF24' },
+            { label: t('hubKpiPhones'),    value: phoneCount, load: loading,     icon: 'phone',    delay: 0.05, grad: 'linear-gradient(135deg,#6366F1,#818CF8)', glow: 'rgba(99,102,241,0.5)', accentColor: '#fff', c: '#818CF8' },
+            { label: t('hubKpiVideos'),    value: videoCount, load: loading,     icon: 'video',    delay: 0.10, grad: 'linear-gradient(135deg,#8B5CF6,#A5B4FC)', glow: 'rgba(139,92,246,0.5)', accentColor: '#fff', c: '#A5B4FC' },
+            { label: t('hubKpiWeekPosts'), value: weekPosts,  load: loading,     icon: 'send',     delay: 0.15, grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.5)', accentColor: '#fff', c: '#34D399' },
+            { label: t('hubKpiCredits'),   value: balance.toLocaleString(locale), load: credLoading, icon: 'sparkles', delay: 0.20, grad: 'linear-gradient(135deg,#F59E0B,#F59E0B)', glow: 'rgba(245,158,11,0.5)', accentColor: '#FBBF24', c: '#FBBF24' },
           ]).map((k, i, arr) => (
             <Fragment key={k.label}>
               {i > 0 && (
@@ -396,51 +465,53 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                   </div>
                 </div>
               )}
-              <KpiCard label={k.label} value={k.value} icon={k.icon} delay={k.delay}
+              <KpiCard label={k.label} value={k.value} icon={k.icon} delay={k.delay} loading={k.load}
                        grad={k.grad} glow={k.glow} accentColor={k.accentColor} />
             </Fragment>
           ))}
         </div>
 
         {/* ── Quick actions ──────────────────────────────────────────────── */}
+        <div className="sf-section-label" style={{ marginBottom: 12 }}>{tr('Actions rapides', 'Quick actions')}</div>
         <div style={{
-          display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap',
+          display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap',
           animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both',
         }}>
           <QuickBtn label="Mass Posting"  icon="zap"      primary onClick={() => { playNav(); onNavigate('massposting') }} />
-          <QuickBtn label={t('hubQuickSchedule')} icon="calendar" onClick={() => { playNav(); onNavigate('scheduler') }} />
+          <QuickBtn label={t('hubQuickSchedule')} icon="calendar" onClick={() => { playNav(); onNavigate('automation') }} />
           <QuickBtn label={t('hubQuickBank')}     icon="video"    onClick={() => { playNav(); onNavigate('bank') }} />
           <QuickBtn label={t('hubKpiPhones')}     icon="phone"    onClick={() => { playNav(); onNavigate('phones') }} />
         </div>
 
         {/* ── Two-column: Upcoming + Recent ─────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, marginBottom: 24 }}>
 
           {/* Upcoming posts */}
           <div className="sf-card" style={{
-            padding: 0, borderRadius: 12, overflow: 'hidden',
+            padding: 0, borderRadius: 16, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.30s both',
           }}>
-            <SectionHead title={t('hubUpcoming')} action={t('hubSeeAll')} onAction={() => { playNav(); onNavigate('scheduler') }} />
+            <SectionHead title={t('hubUpcoming')} action={t('hubSeeAll')} onAction={() => { playNav(); onNavigate('automation') }} />
             {loading ? (
-              <div style={{ padding: '24px 20px', color: FAINT, fontSize: 13, fontFamily: SANS }}>{t('hubLoading')}</div>
+              <ListSkeleton rows={3} />
             ) : upcoming.length === 0 ? (
-              <div style={{ padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                <span style={{ color: 'rgba(233,234,240,0.18)' }}>
-                  <SvgIcon d={ICONS.calendar} size={26} color="currentColor" strokeWidth={1.4} />
-                </span>
-                <p style={{ color: FAINT, fontSize: 12.5, margin: 0, fontFamily: SANS }}>{t('hubNoUpcoming')}</p>
+              <div className="sf-empty" style={{ padding: '32px 20px' }}>
+                <div className="sf-empty-icon">
+                  <SvgIcon d={ICONS.calendar} size={24} color="currentColor" strokeWidth={1.6} />
+                </div>
+                <p className="sf-empty-title">{t('hubNoUpcoming')}</p>
                 <button
-                  onClick={() => { playNav(); onNavigate('scheduler') }}
+                  onClick={() => { playNav(); onNavigate('automation') }}
                   className="sf-btn sf-btn-secondary sf-btn-sm"
+                  style={{ marginTop: 4 }}
                 >{t('hubSchedulePost')}</button>
               </div>
             ) : (
               upcoming.map((post, i) => {
                 const phones = Array.isArray(post.phones) ? post.phones : []
                 return (
-                  <div key={post.id} style={{
-                    padding: '12px 20px',
+                  <div key={post.id} className="hub-row" style={{
+                    padding: '13px 20px',
                     borderBottom: i < upcoming.length - 1 ? `1px solid ${HAIR}` : 'none',
                     display: 'flex', alignItems: 'center', gap: 12,
                   }}>
@@ -472,18 +543,18 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
           {/* Recent activity */}
           <div className="sf-card" style={{
-            padding: 0, borderRadius: 12, overflow: 'hidden',
+            padding: 0, borderRadius: 16, overflow: 'hidden',
             animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.35s both',
           }}>
-            <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('history') }} />
+            <SectionHead title={t('hubActivity')} action={t('hubHistory')} onAction={() => { playNav(); onNavigate('activity') }} />
             {loading ? (
-              <div style={{ padding: '24px 20px', color: FAINT, fontSize: 13, fontFamily: SANS }}>{t('hubLoading')}</div>
+              <ListSkeleton rows={4} />
             ) : recent.length === 0 ? (
-              <div style={{ padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                <span style={{ color: 'rgba(233,234,240,0.18)' }}>
-                  <SvgIcon d={ICONS.layers} size={26} color="currentColor" strokeWidth={1.4} />
-                </span>
-                <p style={{ color: FAINT, fontSize: 12.5, margin: 0, fontFamily: SANS }}>{t('hubNoActivity')}</p>
+              <div className="sf-empty" style={{ padding: '32px 20px' }}>
+                <div className="sf-empty-icon">
+                  <SvgIcon d={ICONS.layers} size={24} color="currentColor" strokeWidth={1.6} />
+                </div>
+                <p className="sf-empty-title">{t('hubNoActivity')}</p>
               </div>
             ) : (
               recent.map((item, i) => {
@@ -493,15 +564,15 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                       const phones = Array.isArray(item.data.phones) ? item.data.phones : []
                       return `${phones.length} ${t('hubAccounts')}${item.data.caption ? ` · ${item.data.caption.slice(0, 34)}${item.data.caption.length > 34 ? '…' : ''}` : ''}`
                     })()
-                  : `${item.data.ok_count}/${item.data.total} compte${item.data.total > 1 ? 's' : ''} · Direct`
+                  : tr(`${item.data.ok_count}/${item.data.total} compte${item.data.total > 1 ? 's' : ''} · Direct`, `${item.data.ok_count}/${item.data.total} account${item.data.total > 1 ? 's' : ''} · Direct`)
                 const date = item.kind === 'scheduled'
                   ? fmtScheduledTime(item.data.executed_at ?? item.data.created_at)
                   : fmtScheduledTime(item.data.created_at)
                 const status = item.kind === 'scheduled' ? item.data.status : (ok ? 'done' : 'failed')
                 const key = item.kind === 'scheduled' ? `sp-${item.data.id}` : `pr-${item.data.id}`
                 return (
-                  <div key={key} style={{
-                    padding: '12px 20px',
+                  <div key={key} className="hub-row" style={{
+                    padding: '13px 20px',
                     borderBottom: i < recent.length - 1 ? `1px solid ${HAIR}` : 'none',
                     display: 'flex', alignItems: 'center', gap: 12,
                   }}>
@@ -534,13 +605,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
         {/* ── Tool shortcuts ─────────────────────────────────────────────── */}
         <div style={{ animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.4s both' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <span style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: '0.04em',
-              textTransform: 'uppercase', color: MUTED, fontFamily: SANS,
-            }}>{t('hubAllTools')}</span>
-            <div style={{ flex: 1, height: 1, background: HAIR }} />
-          </div>
+          <div className="sf-section-label" style={{ marginBottom: 12 }}>{t('hubAllTools')}</div>
           <div className="anim-stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {TOOL_SHORTCUTS.map(tool => (
               <ToolChip

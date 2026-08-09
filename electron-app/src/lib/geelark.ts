@@ -1,4 +1,5 @@
 import { registerStartedPhonesAuto, unregisterPhones } from './phoneWatch'
+import storyFlowDef from './geelarkStoryFlow.json'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -73,7 +74,17 @@ export interface RotationResult { ok: boolean; detail: string }
 // type {"result":"1","message":"Success"}) en un message clair pour l'utilisateur.
 // Les logs sont vus par des clients : jamais de JSON ni de jargon.
 function friendlyRotation(ok: boolean, rawBody?: string, status?: number, error?: string): { ok: boolean; msg: string } {
-  if (error) return { ok: false, msg: `impossible de joindre le proxy` }
+  if (error) {
+    // Raison lisible plutôt qu'un code technique. Le serveur retente déjà en
+    // ignorant les certificats auto-signés + repli http:// ; si on arrive ici,
+    // c'est un vrai échec réseau.
+    const e = String(error).toLowerCase()
+    if (/timeout|délai/.test(e)) return { ok: false, msg: 'le proxy n’a pas répondu (délai dépassé) — vérifie qu’il est allumé' }
+    if (/enotfound|getaddrinfo|dns/.test(e)) return { ok: false, msg: 'adresse introuvable (DNS) — vérifie l’URL du proxy' }
+    if (/econnrefused|refus/.test(e)) return { ok: false, msg: 'connexion refusée par le proxy — vérifie le port/l’URL' }
+    if (/cert|ssl|tls/.test(e)) return { ok: false, msg: 'certificat SSL du proxy invalide (réessaie, on l’ignore désormais)' }
+    return { ok: false, msg: `impossible de joindre le proxy (${e.slice(0, 60)})` }
+  }
   const body = (rawBody ?? '').trim()
   let parsed: Record<string, unknown> | null = null
   try { parsed = JSON.parse(body) } catch { /* réponse en texte simple */ }
@@ -130,10 +141,16 @@ export async function rotateAllProxies(urls: string[], log?: (m: string) => void
   const list = (urls ?? []).map(u => (u ?? '').trim()).filter(u => /^https?:\/\//i.test(u))
   if (list.length === 0) return
   await Promise.all(list.map(u => rotateProxyIp(u, log)))
-  // Laisse le(s) dongle(s) couper l'ancienne IP avant le check de connectivité.
-  // (Le waitForPhoneConnectivity qui suit fait de toute façon office de filet.)
-  await sleep(4000)
+  // Temps de réattribution de la NOUVELLE IP. 4 s était trop court : la plupart
+  // des fournisseurs (quantumhproxy, dongles 4G…) mettent 10-20 s à réattribuer.
+  // Continuer trop tôt = le téléphone boote sans connexion et reste hors-ligne.
+  // (waitForPhoneConnectivity reste le filet de sécurité derrière.)
+  log?.('⏳ Nouvelle IP en cours d’attribution — attente 12 s…')
+  await sleep(ROTATION_SETTLE_MS)
 }
+
+// Délai laissé au fournisseur pour attribuer la nouvelle IP après une rotation.
+export const ROTATION_SETTLE_MS = 12000
 
 // Rote l'IP proxy (si configurée) AVANT d'allumer le téléphone — pour qu'il boote
 // sur la nouvelle IP — puis démarre le téléphone et logue l'IP obtenue. Utilisé par
@@ -697,8 +714,20 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
 
 async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
-  const { output } = await shellExec(bearer, phoneId, `uiautomator dump ${f} && cat ${f}`)
-  return output
+  // Sous charge, `uiautomator dump` peut échouer/renvoyer un XML vide ou tronqué
+  // → findByText/findByResourceId ne trouve rien → on tape une coordonnée de repli
+  // au mauvais endroit → story ratée par intermittence. On valide la présence de la
+  // racine <hierarchy et on retente le dump (lire l'UI est idempotent, aucun risque).
+  let last = ''
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { output } = await shellExec(bearer, phoneId, `rm -f ${f}; uiautomator dump ${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`)
+      last = output
+      if (output.includes('<hierarchy') && output.includes('</hierarchy>')) return output
+    } catch { /* retry */ }
+    if (attempt < 2) await sleep(1200)
+  }
+  return last   // dernier recours : renvoie ce qu'on a (comportement d'avant)
 }
 
 // Find every EditText node in the dump, with its current text and center point.
@@ -1155,7 +1184,9 @@ async function withPhoneAutoStop<T>(
   log: (m: string) => void,
   fn: () => Promise<T>,
 ): Promise<T> {
+  let timedOut = false
   const timer = setTimeout(() => {
+    timedOut = true
     log(`⏱ Timeout ${label} — arrêt automatique du téléphone`)
     stopPhone(bearer, phoneId).catch(() => {})
   }, ms)
@@ -1163,6 +1194,11 @@ async function withPhoneAutoStop<T>(
     return await fn()
   } finally {
     clearTimeout(timer)
+    // Éteint le téléphone une fois l'opération finie (succès OU échec) — sinon les
+    // chemins RPA (story, cross-posting) qui ne stoppent pas eux-mêmes laissent le
+    // téléphone allumé = facturation GeeLark. Le timeout ci-dessus a déjà stoppé le
+    // cas « hang », inutile de redoubler.
+    if (!timedOut) stopPhone(bearer, phoneId).catch(() => {})
   }
 }
 
@@ -1172,7 +1208,11 @@ export async function postInstagramStory(
   config: StoryConfig,
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
-  return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
+  // Budget 10 min : sous charge, boot (jusqu'à ~4 min) + connectivité + ~40 actions
+  // ADB peut dépasser 5 min → l'ancien timer coupait le téléphone EN PLEINE story
+  // (échecs aléatoires « certains OK, d'autres KO »). runOne éteint déjà le tél dans
+  // son finally, donc ce timer n'est qu'un garde anti-blocage : l'allonger est sûr.
+  return withPhoneAutoStop(bearer, phoneId, 10 * 60_000, '10min', log,
     () => _postInstagramStoryInner(bearer, phoneId, config, log))
 }
 
@@ -1582,8 +1622,9 @@ async function _postInstagramStoryInner(
   log('🔗 Ajout du sticker lien…')
   xml = await dumpXml(bearer, phoneId)
   const stickerBtn =
-    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button') ??
-    findByText(xml, 'Sticker', 'Autocollant', 'Stickers')
+    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button', 'sticker') ??
+    findByText(xml, 'Sticker', 'Autocollant', 'Stickers') ??
+    findByTextPartial(xml, 'sticker', 'autocollant')   // capte « Add sticker », « Stickers, GIFs… »
   if (stickerBtn) {
     await shellExec(bearer, phoneId, `input tap ${stickerBtn[0]} ${stickerBtn[1]}`)
   } else {
@@ -1616,8 +1657,13 @@ async function _postInstagramStoryInner(
         findByTextPartial(xml2, 'link', 'lien') ??
         findByResourceId(xml2, 'link_sticker', 'sticker_link')
       if (!lk2) {
-        // Clear and try English "link"
-        await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long del to clear
+        // Vide le champ puis essaie l'anglais « link ». `input keyevent --longpress 67`
+        // n'injecte qu'UN seul DEL (le flag longpress ne maintient pas la touche) →
+        // « lien » restait et « link » s'ajoutait → recherche cassée. On sélectionne
+        // tout (Ctrl+A) puis on supprime, avec un filet de plusieurs DEL.
+        await shellExec(bearer, phoneId, 'input keyevent KEYCODE_MOVE_END')
+        await sleep(200)
+        await shellExec(bearer, phoneId, 'input keyevent ' + Array(24).fill('67').join(' '))
         await sleep(400)
         await shellExec(bearer, phoneId, `input text "link"`)
         await sleep(2000)
@@ -1825,11 +1871,24 @@ async function _postInstagramStoryInner(
   // after a successful publish IG returns to the home feed, whose story tray
   // contains "Your story" — matching it produced false "failed" results on
   // stories that were actually published.
-  const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
-  const stillEditing = /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text/.test(finalXml)
+  //
+  // ANTI FAUX-NÉGATIF : on a DÉJÀ tapé « Partager ». On ne compte en échec QUE si
+  // on détecte POSITIVEMENT qu'on est encore dans l'éditeur. Si le dump de
+  // vérification plante (shell « pas prêt » sous charge) ou est inconclusif, on
+  // considère la story comme publiée — sinon des stories réellement postées sont
+  // comptées « échec » (et re-tenter risquerait un double post).
+  let stillEditing = false
+  try {
+    const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
+    if (finalXml.trim()) {
+      stillEditing = /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text/.test(finalXml)
+    }
+  } catch {
+    log('   ⚠️ Vérification impossible (shell occupé) — story considérée publiée.')
+  }
   if (stillEditing) {
-    log('   ⚠️ L\'éditeur semble encore ouvert — vérifie manuellement.')
-    return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }
+    log('   ⚠️ L\'éditeur est encore ouvert — publication non aboutie.')
+    return { ok: false, error: 'Éditeur encore ouvert — story non publiée' }
   }
 
   log('✅ Story publiée !')
@@ -2016,24 +2075,19 @@ async function runWarmupActions(
 }
 
 // Escape text for use inside an Android `input text "..."` shell command.
-// Rules: the string is passed as a double-quoted shell argument, so only
-// the chars special in that context need escaping.  Single quote ' is
-// NOT special inside double quotes — escaping it as \' would inject a
-// literal backslash which Android keyboards often map to / or other chars.
+// Rules: the string is passed as a DOUBLE-QUOTED shell argument. Inside "…",
+// a POSIX shell only consumes a backslash before  \  "  `  $  (and newline).
+// Devant &  ;  !  <  >  |  le backslash reste LITTÉRAL → il était TAPÉ tel quel
+// dans le champ (URL type https://x?a=1\&b=2 = lien cassé). On n'échappe donc QUE
+// les 4 caractères réellement spéciaux entre guillemets doubles + l'espace (%s).
+// (Le shell GéeLark /shell/execute est non-interactif → pas d'expansion `!`.)
 function escapeForInputText(text: string): string {
   return text
     .replace(/\\/g, '\\\\')  // \ → \\ (must be first)
     .replace(/"/g,  '\\"')   // " → \"
-    // ' is literal inside "…" — no escaping needed
-    .replace(/&/g,  '\\&')
-    .replace(/</g,  '\\<')
-    .replace(/>/g,  '\\>')
-    .replace(/\|/g, '\\|')
-    .replace(/;/g,  '\\;')
-    .replace(/`/g,  '\\`')
-    .replace(/\$/g, '\\$')
-    .replace(/!/g,  '\\!')
-    .replace(/ /g,  '%s')
+    .replace(/`/g,  '\\`')   // ` → \`
+    .replace(/\$/g, '\\$')   // $ → \$
+    .replace(/ /g,  '%s')    // espace → %s (convention Android input text)
 }
 
 // Strip diacritics (é→e, à→a…) and drop any remaining non-ASCII (emojis).
@@ -2612,6 +2666,138 @@ export async function geelarkUploadForRpa(
     log?.(`   ⚠ upload média échoué : ${e instanceof Error ? e.message : String(e)}`)
     return null
   }
+}
+
+// ── Story via RPA custom GeeLark (remplace l'automation ADB fragile) ─────────
+// Le flow « Story Scaleflow » est importé AUTOMATIQUEMENT dans le compte GeeLark
+// (une seule fois), puis exécuté par téléphone via /task/rpa/add. C'est GeeLark
+// qui pilote la RPA en natif (clics par élément) → bien plus fiable + empreinte
+// plus propre que nos `input tap` + `uiautomator dump`.
+const STORY_FLOW_TITLE = (storyFlowDef as { title: string }).title   // « Story Scaleflow »
+// Bump à CHAQUE modification du flow JSON. Comme l'update-en-place (import avec `id`)
+// s'est révélé peu fiable, un changement de version → on RÉ-IMPORTE un flow frais
+// (garanti à jour). L'ancien flow devient orphelin (à supprimer 1 fois côté GeeLark).
+const STORY_FLOW_VERSION = '7'   // v7 = drag bas-droite SANS dump (evite le double), swipe long 2s
+const _storyFlowIdCache = new Map<string, Promise<string | null>>()
+
+// Persistance par compte GeeLark (suffixe du token). On mémorise le flowId EN DUR
+// une fois importé → on ne ré-importe JAMAIS (même après reload) → pas de doublons.
+function storyFlowLsKey(bearer: string): string { return `sf-story-flowid:${bearer.slice(-14)}` }
+function storyFlowVerKey(bearer: string): string { return `sf-story-flowver:${bearer.slice(-14)}` }
+function readStoredFlowId(bearer: string): string | null {
+  try { return localStorage.getItem(storyFlowLsKey(bearer)) || null } catch { return null }
+}
+function writeStoredFlow(bearer: string, id: string): void {
+  try { localStorage.setItem(storyFlowLsKey(bearer), id); localStorage.setItem(storyFlowVerKey(bearer), STORY_FLOW_VERSION) } catch { /* ignore */ }
+}
+// Oublie le flowId mémorisé (flow supprimé côté GeeLark → on ré-importera).
+export function forgetStoryFlowId(bearer: string): void {
+  try { localStorage.removeItem(storyFlowLsKey(bearer)); localStorage.removeItem(storyFlowVerKey(bearer)) } catch { /* ignore */ }
+  _storyFlowIdCache.delete(bearer)
+}
+
+async function ensureStoryFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
+  const cached = _storyFlowIdCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    // Réutilisation rapide UNIQUEMENT si le flowId mémorisé est de la BONNE version.
+    // Sinon (rien de mémorisé, ou version périmée) → on importe un flow frais et à jour.
+    const stored = readStoredFlowId(bearer)
+    let storedVer: string | null = null
+    try { storedVer = localStorage.getItem(storyFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && storedVer === STORY_FLOW_VERSION) return stored
+
+    // Import d'un flow frais (gal = définition en STRING). Garanti à la bonne version.
+    log?.(stored ? '🔄 Mise à jour du flow « Story Scaleflow » (nouvel import)…'
+                 : '📥 Import du flow « Story Scaleflow » dans GeeLark…')
+    try {
+      const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(storyFlowDef) }, bearer)
+      if (res['code'] !== 0) { log?.(`⚠ Import du flow story : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { writeStoredFlow(bearer, id); return id }
+      return null
+    } catch (e) { log?.(`⚠ Import du flow story : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _storyFlowIdCache.set(bearer, p)
+  p.then(v => { if (!v) _storyFlowIdCache.delete(bearer) }).catch(() => _storyFlowIdCache.delete(bearer))
+  return p
+}
+
+export interface StoryRpaConfig {
+  imageUrl:            string
+  linkUrl:             string
+  linkText?:           string
+  addToHighlights?:    boolean
+  createHighlight?:    string   // nom d'un highlight à CRÉER (prioritaire)
+  addToHighlightName?: string   // nom d'un highlight EXISTANT où ajouter
+  rotationUrls?:       string[]
+}
+
+export async function postInstagramStoryRpa(
+  bearer: string,
+  phoneId: string,
+  config: StoryRpaConfig,
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  // Budget = boot (rotation + connectivité, ~1-3 min) + poll RPA (10 min ci-dessous)
+  // + marge. 12 min était trop juste → le téléphone était coupé EN PLEINE story.
+  return withPhoneAutoStop(bearer, phoneId, 15 * 60_000, '15min', log, async () => {
+    // 1. flowId (import auto la 1re fois, mis en cache ensuite)
+    const flowId = await ensureStoryFlowId(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow story RPA indisponible (import GeeLark échoué)' }
+
+    // 2. Rotation IP éventuelle + démarrage du téléphone
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+
+    // 3. Upload de l'image vers GeeLark. On passe par window.electronAPI.uploadVideoGeelark
+    //    (proxy serveur /api/geelark-upload sur le web → PAS de blocage CORS sur le PUT OSS ;
+    //    natif sur desktop). geelarkUploadForRpa faisait le PUT directement depuis le
+    //    navigateur → « Failed to fetch » (CORS). Repli direct hors navigateur.
+    log('📤 Préparation de l\'image…')
+    let mediaResourceUrl: string | null = null
+    if (window.electronAPI?.uploadVideoGeelark) {
+      const up = await window.electronAPI.uploadVideoGeelark({ bearer, filePath: config.imageUrl })
+      if (up?.ok && up.token) mediaResourceUrl = up.token
+      else if (up?.error) log(`   ⚠ upload : ${up.error}`)
+    }
+    if (!mediaResourceUrl) {
+      const up = await geelarkUploadForRpa(bearer, config.imageUrl, log)
+      if (up) mediaResourceUrl = up.resourceUrl
+    }
+    if (!mediaResourceUrl) return { ok: false, error: 'Image non préparée (upload GeeLark)' }
+
+    // 4. Création de la tâche RPA (paramMap = variables du flow)
+    const addHl = !!config.addToHighlights
+    const paramMap: Record<string, unknown> = {
+      Media:              [mediaResourceUrl],
+      Link:               config.linkUrl ?? '',
+      NameLink:           config.linkText ?? '',
+      AddtoHighlights:    addHl,
+      CreateHighlights:   addHl ? (config.createHighlight ?? '') : '',
+      AddtoHighlightName: addHl ? (config.addToHighlightName ?? '') : '',
+    }
+    log('🚀 Lancement de la story (RPA GeeLark)…')
+    const addTask = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
+      id: phoneId, flowId: fid, scheduleAt: Math.floor(Date.now() / 1000) + 3,
+      name: 'Story Scaleflow'.slice(0, 128), paramMap,
+    }, bearer)
+    let res = await addTask(flowId)
+    // flowId mémorisé mais flow supprimé côté GeeLark → code EXACT 48002 « flow not
+    // found » uniquement (pas de regex large) : la tâche n'a PAS été créée (code≠0),
+    // donc ré-essayer ne peut PAS doubler le post. On ré-importe une fois et on relance.
+    if (res['code'] !== 0 && Number(res['code']) === 48002) {
+      log('   ↻ Flow introuvable — ré-import puis nouvelle tentative…')
+      forgetStoryFlowId(bearer)
+      const fresh = await ensureStoryFlowId(bearer, log)
+      if (fresh) res = await addTask(fresh)
+    }
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark story RPA : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log('   Tâche créée — story en cours…')
+    return pollRpaTask(bearer, taskId, log, 10 * 60_000)
+  })
 }
 
 export async function publishVideoCrossPlatform(

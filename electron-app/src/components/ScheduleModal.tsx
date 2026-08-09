@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTr } from '@/lib/i18n'
 
 interface Props {
   type:        'posting' | 'mass_posting'
@@ -41,6 +42,7 @@ function startOfDay(d: Date) {
 }
 
 export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, creditCost, onConfirm, onClose }: Props) {
+  const tr = useTr()
   // Ticker 30 s : garde le countdown et la validation à jour si le modal reste ouvert
   const [nowTs, setNowTs] = useState(() => Date.now())
   useEffect(() => {
@@ -52,10 +54,10 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1)
 
   const QUICK_DATES = [
-    { label: "Aujourd’hui", date: startOfDay(now) },
-    { label: 'Demain',      date: startOfDay(tomorrow) },
-    { label: 'Dans 2 jours', date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 2); return d })() },
-    { label: 'Dans 3 jours', date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 3); return d })() },
+    { label: tr("Aujourd’hui", 'Today'), date: startOfDay(now) },
+    { label: tr('Demain', 'Tomorrow'),      date: startOfDay(tomorrow) },
+    { label: tr('Dans 2 jours', 'In 2 days'), date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 2); return d })() },
+    { label: tr('Dans 3 jours', 'In 3 days'), date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 3); return d })() },
   ]
 
   // Défaut : heure actuelle +1 h ; si on passe minuit (23h+), basculer sur demain
@@ -79,14 +81,14 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
   const invalid  = isInPast || isTooFar
 
   function countdown() {
-    if (isInPast) return 'Heure déjà passée'
-    if (isTooFar) return `Maximum ${MAX_DAYS_AHEAD} jours à l’avance — les tâches GeeLark expirent après 30 jours`
-    if (diffMin < 60) return `dans ${diffMin} min`
+    if (isInPast) return tr('Heure déjà passée', 'Time already passed')
+    if (isTooFar) return tr(`Maximum ${MAX_DAYS_AHEAD} jours à l’avance — les tâches GeeLark expirent après 30 jours`, `Maximum ${MAX_DAYS_AHEAD} days ahead — GeeLark tasks expire after 30 days`)
+    if (diffMin < 60) return tr(`dans ${diffMin} min`, `in ${diffMin} min`)
     const h = Math.floor(diffMin / 60)
     const m = diffMin % 60
-    if (h < 24) return `dans ${h}h${m ? ` ${m}min` : ''}`
+    if (h < 24) return tr(`dans ${h}h${m ? ` ${m}min` : ''}`, `in ${h}h${m ? ` ${m}min` : ''}`)
     const d = Math.floor(h / 24)
-    return `dans ${d}j${h % 24 ? ` ${h % 24}h` : ''}`
+    return tr(`dans ${d}j${h % 24 ? ` ${h % 24}h` : ''}`, `in ${d}d${h % 24 ? ` ${h % 24}h` : ''}`)
   }
 
   function adjustHour(delta: number) {
@@ -112,61 +114,68 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
     }
   }
 
+  const customMissing = useCustom && !customDate
+
   return (
-    <div className="fixed inset-0 z-[9990] flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)' }}
+    <div className="sf-modal-bg fixed inset-0 z-[9990] flex items-center justify-center"
       onClick={e => e.target === e.currentTarget && onClose()}>
 
-      <div className="w-full max-w-[400px] mx-4 rounded-2xl overflow-hidden anim-scale-in"
-        style={{ background: '#13141A', border: '1px solid rgba(79,70,229,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+      <div className="sf-modal w-full max-w-[400px] mx-4 overflow-hidden"
+        style={{
+          background: 'linear-gradient(180deg,var(--surface-2),var(--surface))',
+          border: '1px solid var(--border-accent)',
+          borderRadius: 'var(--r-xl)',
+        }}>
 
-        {/* Header */}
-        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#4F46E5,#6366F1)' }} />
-        <div className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.2),rgba(99,102,241,0.12))', border: '1px solid rgba(79,70,229,0.25)' }}>
-              <MIcon d={MPATHS.calendar} size={18} color="#818CF8" />
+        {/* Liseré supérieur lumineux */}
+        <div style={{ height: 3, background: 'linear-gradient(90deg,var(--accent-dk,#4F46E5),var(--accent))' }} />
+
+        {/* Header — pattern v2 (tuile-icône + titre + sous-titre + close) */}
+        <div className="flex items-center justify-between"
+          style={{ padding: 'var(--sp-4) var(--sp-5)', borderBottom: '1px solid var(--border)' }}>
+          <div className="flex items-center" style={{ gap: 'var(--sp-3)', minWidth: 0 }}>
+            <div className="sf-page-icon sf-page-icon-sm sf-anim-scale-spring">
+              <MIcon d={MPATHS.calendar} size={18} color="#fff" />
             </div>
-            <div>
-              <p className="font-black text-white text-[14px] leading-tight">Programmer ce post</p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'rgba(233,234,240,0.4)' }}>
-                {type === 'mass_posting' ? 'Mass Posting' : 'Posting'} · {phonesCount} tél. · {videosCount} vidéo{videosCount > 1 ? 's' : ''}
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+              <p className="sf-page-title" style={{ fontSize: 15 }}>{tr('Programmer ce post', 'Schedule this post')}</p>
+              <p className="sf-page-sub" style={{ fontSize: 11.5 }}>
+                {type === 'mass_posting' ? 'Mass Posting' : 'Posting'} · {tr(`${phonesCount} tél.`, `${phonesCount} phones`)} · {tr(`${videosCount} vidéo${videosCount > 1 ? 's' : ''}`, `${videosCount} video${videosCount > 1 ? 's' : ''}`)}
               </p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fermer"
-            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] transition-all cursor-pointer"
-            style={{ color: 'rgba(233,234,240,0.4)' }}><MIcon d={MPATHS.x} size={15} /></button>
+          <button onClick={onClose} aria-label={tr('Fermer', 'Close')}
+            className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm">
+            <MIcon d={MPATHS.x} size={15} />
+          </button>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div style={{ padding: 'var(--sp-5)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-5)' }}>
 
           {/* Summary chip */}
           {videoTitle && (
-            <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <span className="flex-shrink-0" style={{ color: 'rgba(233,234,240,0.7)' }}><MIcon d={MPATHS.video} size={16} /></span>
-              <p className="text-[12px] font-semibold truncate" style={{ color: 'rgba(233,234,240,0.7)' }}>{videoTitle}</p>
+            <div className="flex items-center"
+              style={{
+                gap: 'var(--sp-2)', padding: '10px 14px',
+                background: 'var(--surface-2)', border: '1px solid var(--border-md)',
+                borderRadius: 'var(--r-md)',
+              }}>
+              <span className="flex-shrink-0" style={{ color: 'var(--text-3)' }}><MIcon d={MPATHS.video} size={16} /></span>
+              <p className="text-[12.5px] font-semibold truncate" style={{ color: 'var(--text-2)' }}>{videoTitle}</p>
             </div>
           )}
 
           {/* Date selection */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] font-black mb-2.5" style={{ color: 'rgba(79,70,229,0.8)' }}>
-              Jour
-            </p>
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            <p className="sf-section-label" style={{ marginBottom: 'var(--sp-3)' }}>{tr('Jour', 'Day')}</p>
+            <div className="grid grid-cols-2 mb-2" style={{ gap: 'var(--sp-2)' }}>
               {QUICK_DATES.map(q => {
                 const active = !useCustom && q.date.toDateString() === selectedDay.toDateString()
                 return (
                   <button key={q.label}
                     onClick={() => { setSelectedDay(q.date); setUseCustom(false) }}
-                    className="py-2.5 rounded-xl text-[12px] font-bold transition-all"
-                    style={active
-                      ? { background: 'linear-gradient(130deg,#4F46E5,#6366F1)', color: 'white', boxShadow: '0 2px 12px rgba(79,70,229,0.35)' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    className={`sf-btn ${active ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
+                    style={{ height: 36, width: '100%' }}>
                     {q.label}
                   </button>
                 )
@@ -175,131 +184,114 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, cred
             {/* Custom date */}
             <button
               onClick={() => setUseCustom(true)}
-              className="w-full py-2.5 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-2"
-              style={useCustom
-                ? { background: 'linear-gradient(130deg,#4F46E5,#6366F1)', color: 'white' }
-                : { background: 'rgba(255,255,255,0.03)', color: 'rgba(233,234,240,0.45)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-              <MIcon d={MPATHS.calendar} size={14} /> Choisir une date précise
+              className={`sf-btn ${useCustom ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
+              style={{ height: 36, width: '100%', ...(useCustom ? {} : { borderStyle: 'dashed' }) }}>
+              <MIcon d={MPATHS.calendar} size={14} /> {tr('Choisir une date précise', 'Pick a specific date')}
             </button>
             {useCustom && (
               <input type="date" value={customDate}
                 onChange={e => setCustomDate(e.target.value)}
                 min={new Date().toISOString().slice(0, 10)}
                 max={new Date(Date.now() + MAX_AHEAD_MS).toISOString().slice(0, 10)}
-                className="w-full mt-2 rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input" />
+                className={`sf-input w-full mt-2${customMissing ? ' is-invalid' : ''}`} />
+            )}
+            {customMissing && (
+              <p className="sf-field-error"><MIcon d={MPATHS.warn} size={12} /> {tr('Sélectionnez une date', 'Select a date')}</p>
             )}
           </div>
 
           {/* Time selection */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] font-black mb-2.5" style={{ color: 'rgba(79,70,229,0.8)' }}>
-              Heure locale
-            </p>
+            <p className="sf-section-label" style={{ marginBottom: 'var(--sp-3)' }}>{tr('Heure locale', 'Local time')}</p>
             <div className="flex items-center justify-center gap-4">
               {/* Hour */}
               <div className="flex flex-col items-center gap-1.5">
-                <button onClick={() => adjustHour(1)}
-                  className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
-                  style={{ color: 'rgba(233,234,240,0.5)', background: 'rgba(255,255,255,0.04)' }}>▲</button>
-                <div className="w-16 h-12 rounded-xl flex items-center justify-center font-black text-2xl text-white"
-                  style={{ background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)' }}>
+                <button onClick={() => adjustHour(1)} aria-label={tr('Heure +1', 'Hour +1')}
+                  className="sf-btn sf-btn-ghost sf-press" style={{ width: 40, height: 30 }}>▲</button>
+                <div className="flex items-center justify-center font-black sf-tabular"
+                  style={{ width: 64, height: 48, fontSize: 26, color: 'var(--text-1)', background: 'var(--accent-dim)', border: '1px solid var(--border-accent)', borderRadius: 'var(--r-md)' }}>
                   {pad(hour)}
                 </div>
-                <button onClick={() => adjustHour(-1)}
-                  className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
-                  style={{ color: 'rgba(233,234,240,0.5)', background: 'rgba(255,255,255,0.04)' }}>▼</button>
-                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(233,234,240,0.3)' }}>heure</span>
+                <button onClick={() => adjustHour(-1)} aria-label={tr('Heure -1', 'Hour -1')}
+                  className="sf-btn sf-btn-ghost sf-press" style={{ width: 40, height: 30 }}>▼</button>
+                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'var(--text-4)' }}>{tr('heure', 'hour')}</span>
               </div>
 
-              <span className="text-3xl font-black pb-6" style={{ color: 'rgba(233,234,240,0.3)' }}>:</span>
+              <span className="text-3xl font-black pb-6" style={{ color: 'var(--text-4)' }}>:</span>
 
               {/* Minute */}
               <div className="flex flex-col items-center gap-1.5">
-                <button onClick={() => adjustMinute(5)}
-                  className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
-                  style={{ color: 'rgba(233,234,240,0.5)', background: 'rgba(255,255,255,0.04)' }}>▲</button>
-                <div className="w-16 h-12 rounded-xl flex items-center justify-center font-black text-2xl text-white"
-                  style={{ background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)' }}>
+                <button onClick={() => adjustMinute(5)} aria-label={tr('Minute +5', 'Minute +5')}
+                  className="sf-btn sf-btn-ghost sf-press" style={{ width: 40, height: 30 }}>▲</button>
+                <div className="flex items-center justify-center font-black sf-tabular"
+                  style={{ width: 64, height: 48, fontSize: 26, color: 'var(--text-1)', background: 'var(--accent-dim)', border: '1px solid var(--border-accent)', borderRadius: 'var(--r-md)' }}>
                   {pad(minute)}
                 </div>
-                <button onClick={() => adjustMinute(-5)}
-                  className="w-10 h-8 rounded-lg flex items-center justify-center text-sm transition-all hover:bg-white/[0.08]"
-                  style={{ color: 'rgba(233,234,240,0.5)', background: 'rgba(255,255,255,0.04)' }}>▼</button>
-                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(233,234,240,0.3)' }}>min</span>
+                <button onClick={() => adjustMinute(-5)} aria-label={tr('Minute -5', 'Minute -5')}
+                  className="sf-btn sf-btn-ghost sf-press" style={{ width: 40, height: 30 }}>▼</button>
+                <span className="text-[9px] uppercase tracking-widest" style={{ color: 'var(--text-4)' }}>min</span>
               </div>
             </div>
 
             {/* Quick time presets */}
-            <div className="flex gap-2 mt-3 flex-wrap">
-              <button
-                onClick={setNowPlus30}
-                className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                style={{ background: 'rgba(79,70,229,0.08)', color: 'rgba(147,197,253,0.7)', border: '1px solid rgba(79,70,229,0.12)' }}>
-                Maintenant +30min
+            <div className="flex gap-2 mt-3 flex-wrap justify-center">
+              <button onClick={setNowPlus30} className="sf-btn sf-btn-secondary sf-btn-sm">
+                {tr('Maintenant +30min', 'Now +30min')}
               </button>
               {[
                 { label: '08:00', h: 8,  m: 0 },
                 { label: '12:00', h: 12, m: 0 },
                 { label: '18:00', h: 18, m: 0 },
                 { label: '21:00', h: 21, m: 0 },
-              ].map(t => (
-                <button key={t.label}
-                  onClick={() => { setHour(t.h); setMinute(t.m) }}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                  style={{ background: 'rgba(79,70,229,0.08)', color: 'rgba(147,197,253,0.7)', border: '1px solid rgba(79,70,229,0.12)' }}>
-                  {t.label}
-                </button>
-              ))}
+              ].map(t => {
+                const on = hour === t.h && minute === t.m
+                return (
+                  <button key={t.label}
+                    onClick={() => { setHour(t.h); setMinute(t.m) }}
+                    className={`sf-btn sf-btn-sm ${on ? 'sf-btn-primary' : 'sf-btn-secondary'} sf-tabular`}>
+                    {t.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          {/* Preview */}
-          <div className="px-4 py-3 rounded-xl flex items-center gap-3"
-            style={{
-              background: invalid ? 'rgba(239,68,68,0.06)' : 'rgba(79,70,229,0.06)',
-              border: `1px solid ${invalid ? 'rgba(239,68,68,0.2)' : 'rgba(79,70,229,0.15)'}`,
-            }}>
-            <span className="flex-shrink-0" style={{ color: invalid ? '#f87171' : '#818CF8' }}>
+          {/* Preview — bandeau d'état v2 */}
+          <div className={`sf-banner ${invalid ? 'is-danger' : 'is-accent'}`}>
+            <span className="flex-shrink-0">
               {invalid ? <MIcon d={MPATHS.warn} size={18} /> : <MIcon d={MPATHS.clock} size={18} />}
             </span>
-            <div>
-              <p className="text-[13px] font-black" style={{ color: invalid ? '#f87171' : 'white' }}>
-                {scheduled.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à {pad(hour)}h{pad(minute)}
+            <div style={{ minWidth: 0 }}>
+              <p className="text-[13px] font-black" style={{ color: invalid ? 'var(--danger)' : 'var(--text-1)' }}>
+                {scheduled.toLocaleDateString(tr('fr-FR', 'en-US'), { weekday: 'long', day: 'numeric', month: 'long' })} {tr('à', 'at')} {pad(hour)}h{pad(minute)}
               </p>
-              <p className="text-[10px] mt-0.5" style={{ color: invalid ? 'rgba(248,113,113,0.7)' : 'rgba(147,197,253,0.6)' }}>
-                {countdown()}
-              </p>
+              <p className="text-[11px] mt-0.5" style={{ opacity: 0.75 }}>{countdown()}</p>
             </div>
           </div>
 
-          {/* Credit cost */}
+          {/* Credit cost — bandeau warn v2 */}
           {typeof creditCost === 'number' && creditCost > 0 && (
-            <div className="px-4 py-2.5 rounded-xl flex items-center gap-2.5"
-              style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}>
-              <span className="flex-shrink-0" style={{ color: '#F59E0B' }}>
-                <MIcon d={MPATHS.coins} size={15} />
-              </span>
-              <p className="text-[11px] leading-snug" style={{ color: 'rgba(233,234,240,0.65)', margin: 0 }}>
-                <span style={{ color: '#F59E0B', fontWeight: 700 }}>{creditCost} crédit{creditCost > 1 ? 's' : ''}</span>
-                {' '}seront débités maintenant — remboursés si annulation
+            <div className="sf-banner is-warn">
+              <span className="flex-shrink-0"><MIcon d={MPATHS.coins} size={15} /></span>
+              <p className="text-[11.5px] leading-snug" style={{ margin: 0, color: 'var(--text-2)' }}>
+                <span style={{ color: 'var(--warn)', fontWeight: 700 }}>{tr(`${creditCost} crédit${creditCost > 1 ? 's' : ''}`, `${creditCost} credit${creditCost > 1 ? 's' : ''}`)}</span>
+                {' '}{tr('seront débités maintenant — remboursés si annulation', 'will be charged now — refunded if cancelled')}
               </p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 flex gap-2.5">
-          <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
-            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(233,234,240,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            Annuler
+        <div className="flex" style={{ padding: '0 var(--sp-5) var(--sp-5)', gap: 'var(--sp-2)' }}>
+          <button onClick={onClose} className="sf-btn sf-btn-secondary" style={{ flex: 1 }}>
+            {tr('Annuler', 'Cancel')}
           </button>
           <button
             onClick={() => !invalid && onConfirm(scheduled)}
-            disabled={invalid || (useCustom && !customDate)}
-            className="flex-[2] py-2.5 rounded-xl text-[12px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center gap-1.5"
-            style={{ background: 'linear-gradient(130deg,#4F46E5,#6366F1)', boxShadow: '0 4px 20px -4px rgba(79,70,229,0.5)' }}>
-            <MIcon d={MPATHS.calendar} size={15} color="#fff" /> Confirmer — {pad(hour)}h{pad(minute)}
+            disabled={invalid || customMissing}
+            className="sf-btn sf-btn-primary sf-tabular"
+            style={{ flex: 2 }}>
+            <MIcon d={MPATHS.calendar} size={15} color="#fff" /> {tr('Confirmer', 'Confirm')} — {pad(hour)}h{pad(minute)}
           </button>
         </div>
       </div>

@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import type { PageKey } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
+import { canSeeTab } from '@/lib/permissions'
 import { ActivePostingsWidget } from '@/components/ActivePostingsWidget'
-import { useT } from '@/lib/i18n'
+import { CommandPalette, type CommandItem } from '@/components/CommandPalette'
+import { useT, useTr, tr as trStatic } from '@/lib/i18n'
 import { useToast }  from '@/components/Toast'
 import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
@@ -60,15 +63,22 @@ export type Page =
   | 'stats'
   | 'posting' | 'massposting' | 'scheduler' | 'tasks' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
   | 'publishhub' | 'photoposting'
-  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof' | 'videostudio'
+  | 'montage' | 'remix' | 'repurpose' | 'mixer' | 'subtitles' | 'spoof' | 'videostudio' | 'massunique'
   | 'community' | 'support'
   | 'library'
   | 'settings' | 'licences'
+  | 'organization'
   | 'scaleia'
   | 'history'
   | 'reports'
   | 'tiktokposting'
   | 'crossposting'
+  | 'proxyhealth'
+  | 'blowsome'
+  | 'automation'
+  | 'activity'
+  | 'cloudphones'
+  | 'flows'
 
 interface LayoutProps {
   user:      User
@@ -91,8 +101,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'phones',      label: 'navPhones',       icon: '📱' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'library',     label: 'navLibrary',      icon: '📚', isNew: true },
-      { id: 'history',     label: 'navHistory',      icon: '🕑' },
-      { id: 'reports',     label: 'navReports',      icon: '📊', beta: true },
+      { id: 'activity',    label: 'navActivity',     icon: '📊' },
     ],
   },
   {
@@ -100,8 +109,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'publishhub',  label: 'navPublishVideo', icon: '🚀' },
-      { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'tasks',       label: 'navTasks',        icon: '⚡', beta: true },
+      { id: 'automation',  label: 'navAutomation',   icon: '📅' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥' },
     ],
   },
@@ -112,7 +120,37 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'videostudio', label: 'navVideoStudio',  icon: '🎬' },
     ],
   },
+  // Section admin (super-admin uniquement — items filtrés par isVisibleTab, la
+  // section entière disparaît pour les non-admins).
+  {
+    title: 'Cloud',
+    defaultOpen: true,
+    items: [
+      { id: 'cloudphones', label: 'Cloud Phones',   icon: '📱' },
+      { id: 'flows',       label: 'Automatisation',  icon: '🤖' },
+    ],
+  },
 ]
+
+// Libellés anglais des sections de nav (titres FR en dur ci-dessus).
+const SECTION_LABEL_EN: Record<string, string> = {
+  'Principal': 'Main',
+  'Publier': 'Publish',
+  'Studio vidéo': 'Video Studio',
+  'Cloud': 'Cloud',
+}
+
+// Correspondance onglet de nav (Page) → clé de permission (PageKey). Seules les
+// pages présentes ici sont soumises aux permissions par membre ; les hubs de
+// navigation (publishhub, videostudio, hub…) et les pages superadmin ne le sont
+// pas. Les clés absentes = visibles pour tout le monde.
+const PAGE_PERM_KEY: Partial<Record<Page, PageKey>> = {
+  phones: 'phones', bank: 'bank', captionbank: 'captionbank', library: 'library',
+  history: 'history', reports: 'reports', storylink: 'storylink', posting: 'posting',
+  massposting: 'massposting', scheduler: 'scheduler', warmup: 'warmup', aitools: 'aitools',
+  remix: 'remix', repurpose: 'repurpose', montage: 'montage', mixer: 'mixer',
+  subtitles: 'subtitles', spoof: 'spoof',
+}
 
 // ── SVG Icon helper ──────────────────────────────────────────────────────────
 function NavIcon({ d, size = 16, color = 'currentColor' }: { d: string; size?: number; color?: string }) {
@@ -141,6 +179,7 @@ const ICONS = {
   settings:  'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
   building:  'M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4',
   shield:    'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+  server:    'M5 3h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1zM7 7h.01M7 17h.01',
   bell:      'M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9',
   chevronDown:  'M19 9l-7 7-7-7',
   chevronRight: 'M9 18l6-6-6-6',
@@ -154,6 +193,10 @@ type IconKey = keyof typeof ICONS
 // Map page id -> icon key
 const PAGE_ICON: Record<string, IconKey> = {
   phones:          'phone',
+  blowsome:        'sparkles',
+  automation:      'calendar',
+  activity:        'monitor',
+  proxyhealth:     'refresh',
   stats:           'monitor',
   monitor:         'monitor',
   posting:         'send',
@@ -226,19 +269,18 @@ function SidebarDivider() {
 // ── Badge global « config recommandée » (topbar) ────────────────────────────
 // Affiché partout dans l'app : rappelle la config fiable pour l'automatisation
 // (Stories, etc.) + bouton « copier » pour transmettre la consigne aux agences.
-const RECO_LINES = [
-  'Reels / Posts : fiables sur toutes les versions (automation native GeeLark)',
-  'Story : préférer Android 13-15 + cloud phone en anglais',
-  'Éviter Android 16 pour les stories (automation encore instable)',
-]
-const RECO_TEXT =
-  'ℹ️ Compatibilité de l\'automatisation :\n' +
-  RECO_LINES.map(l => `• ${l}`).join('\n') +
-  '\n\nLe posting Reels marche partout. La Story pilote l\'app pas-à-pas et peut casser sur les tout nouveaux Android (ex. 16) — on ajuste au fil des versions.'
-
 function RecoBadge() {
+  const tr = useTr()
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const RECO_LINES = [
+    tr('Reels / Posts : fiables sur toutes les versions (automation native GeeLark)', 'Reels / Posts: reliable on all versions (native GeeLark automation)'),
+    tr('Story : fiable sur Android 13 à 16 + cloud phone en anglais', 'Story: reliable on Android 13 to 16 + English cloud phone'),
+  ]
+  const RECO_TEXT =
+    tr('ℹ️ Compatibilité de l\'automatisation :', 'ℹ️ Automation compatibility:') + '\n' +
+    RECO_LINES.map(l => `• ${l}`).join('\n') +
+    '\n\n' + tr('Le posting Reels marche partout. La Story pilote l\'app pas-à-pas et tourne désormais bien de Android 13 à 16 (cloud phone en anglais recommandé).', 'Reels posting works everywhere. Story drives the app step-by-step and now runs well on Android 13 to 16 (English cloud phone recommended).')
   const copy = () => {
     navigator.clipboard?.writeText(RECO_TEXT).then(() => {
       setCopied(true)
@@ -253,7 +295,7 @@ function RecoBadge() {
     >
       <button
         onClick={() => setOpen(v => !v)}
-        aria-label="Compatibilité de l'automatisation"
+        aria-label={tr("Compatibilité de l'automatisation", 'Automation compatibility')}
         className="cursor-pointer"
         style={{
           width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
@@ -277,7 +319,7 @@ function RecoBadge() {
         >
           <div style={{ fontSize: 13, fontWeight: 800, color: '#F1F0F7', marginBottom: 9, display: 'flex', alignItems: 'center', gap: 7 }}>
             <span style={{ fontSize: 15 }}>ℹ️</span>
-            Compatibilité
+            {tr('Compatibilité', 'Compatibility')}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {RECO_LINES.map(l => (
@@ -288,7 +330,7 @@ function RecoBadge() {
             ))}
           </div>
           <div style={{ fontSize: 11, color: 'rgba(233,234,240,0.45)', marginTop: 10, lineHeight: 1.5 }}>
-            Reels : OK partout. Story : pilotage pas-à-pas, sensible aux tout nouveaux Android (ex. 16).
+            {tr('Reels : OK partout. Story : pilotage pas-à-pas, sensible aux tout nouveaux Android (ex. 16).', 'Reels: OK everywhere. Story: step-by-step control, sensitive to brand-new Android versions (e.g. 16).')}
           </div>
           <button
             onClick={copy}
@@ -300,7 +342,7 @@ function RecoBadge() {
               color: copied ? '#22c55e' : '#818CF8',
             }}
           >
-            {copied ? '✓ Consigne copiée' : 'Copier la consigne à envoyer'}
+            {copied ? tr('✓ Consigne copiée', '✓ Instructions copied') : tr('Copier la consigne à envoyer', 'Copy the instructions to send')}
           </button>
         </div>
       )}
@@ -323,6 +365,7 @@ interface SidebarNavItemProps {
 }
 
 function SidebarNavItem({ id, label, iconKey, color, beta, isNew, dev, active, collapsed, onNavigate }: SidebarNavItemProps) {
+  const tr = useTr()
   const [hovered, setHovered] = useState(false)
   const [tooltipY, setTooltipY] = useState(0)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -352,13 +395,13 @@ function SidebarNavItem({ id, label, iconKey, color, beta, isNew, dev, active, c
           <>
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
             {beta && (
-              <span title="Fonctionnalité en test — comportement susceptible d'évoluer" className="sf-badge sf-badge-beta" style={{ fontSize: 9, letterSpacing: '0.08em' }}>BETA</span>
+              <span title={tr("Fonctionnalité en test — comportement susceptible d'évoluer", 'Feature in testing — behavior may change')} className="sf-badge sf-badge-beta" style={{ fontSize: 9, letterSpacing: '0.08em' }}>BETA</span>
             )}
             {isNew && (
-              <span title="Nouvelle fonctionnalité" className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.08em' }}>NEW</span>
+              <span title={tr('Nouvelle fonctionnalité', 'New feature')} className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.08em' }}>NEW</span>
             )}
             {dev && (
-              <span title="En cours de développement — des bugs peuvent survenir" className="sf-badge sf-badge-warn" style={{ fontSize: 9, letterSpacing: '0.08em' }}>EN DEV</span>
+              <span title={tr('En cours de développement — des bugs peuvent survenir', 'Under development — bugs may occur')} className="sf-badge sf-badge-warn" style={{ fontSize: 9, letterSpacing: '0.08em' }}>{tr('EN DEV', 'IN DEV')}</span>
             )}
           </>
         )}
@@ -369,7 +412,7 @@ function SidebarNavItem({ id, label, iconKey, color, beta, isNew, dev, active, c
           {label}
           {beta && <span style={{ marginLeft: 6, fontSize: 9, color: 'rgba(148,163,184,0.5)' }}>BETA</span>}
           {isNew && <span style={{ marginLeft: 6, fontSize: 9, color: '#34d399' }}>NEW</span>}
-          {dev && <span style={{ marginLeft: 6, fontSize: 9, color: '#F59E0B' }}>EN DEV</span>}
+          {dev && <span style={{ marginLeft: 6, fontSize: 9, color: '#F59E0B' }}>{tr('EN DEV', 'IN DEV')}</span>}
         </div>
       )}
     </div>
@@ -379,6 +422,7 @@ function SidebarNavItem({ id, label, iconKey, color, beta, isNew, dev, active, c
 
 export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const t = useT()
+  const tr = useTr()
   const toast = useToast()
   const [collapsed, setCollapsed]         = useState(() => {
     const v = localStorage.getItem('sf-sidebar')
@@ -498,8 +542,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
         const ok     = ps.logs.filter(l => l.level === 'ok').length
         if (ok > 0 || errors > 0) {
           pushNotification({
-            title: errors === 0 ? 'Post publié' : `Post terminé avec ${errors} erreur${errors > 1 ? 's' : ''}`,
-            body:  errors === 0 ? 'Ton Reel a été posté avec succès.' : `${ok} succès · ${errors} erreur${errors > 1 ? 's' : ''}`,
+            title: errors === 0 ? trStatic('Post publié', 'Post published') : trStatic(`Post terminé avec ${errors} erreur${errors > 1 ? 's' : ''}`, `Post finished with ${errors} error${errors > 1 ? 's' : ''}`),
+            body:  errors === 0 ? trStatic('Ton Reel a été posté avec succès.', 'Your Reel was posted successfully.') : trStatic(`${ok} succès · ${errors} erreur${errors > 1 ? 's' : ''}`, `${ok} success · ${errors} error${errors > 1 ? 's' : ''}`),
             level: errors === 0 ? 'ok' : 'warn',
             page:  'posting',
           })
@@ -512,8 +556,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
         const errCount  = statuses.filter(s => s.status === 'error').length
         if (doneCount > 0 || errCount > 0) {
           pushNotification({
-            title: errCount === 0 ? 'Mass Posting terminé' : `Mass Posting: ${errCount} erreur${errCount > 1 ? 's' : ''}`,
-            body:  `${doneCount} succès · ${errCount} erreur${errCount > 1 ? 's' : ''} · ${statuses.length} téléphone${statuses.length > 1 ? 's' : ''}`,
+            title: errCount === 0 ? trStatic('Mass Posting terminé', 'Mass Posting finished') : trStatic(`Mass Posting: ${errCount} erreur${errCount > 1 ? 's' : ''}`, `Mass Posting: ${errCount} error${errCount > 1 ? 's' : ''}`),
+            body:  trStatic(`${doneCount} succès · ${errCount} erreur${errCount > 1 ? 's' : ''} · ${statuses.length} téléphone${statuses.length > 1 ? 's' : ''}`, `${doneCount} success · ${errCount} error${errCount > 1 ? 's' : ''} · ${statuses.length} phone${statuses.length > 1 ? 's' : ''}`),
             level: errCount === 0 ? 'ok' : 'warn',
             page:  'massposting',
           })
@@ -549,7 +593,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
         const msg = payload.new as any
         if (msg?.is_admin) {
           pushNotification({
-            title: '📢 Nouvelle actualité',
+            title: trStatic('📢 Nouvelle actualité', '📢 New announcement'),
             body: msg.title || msg.content?.slice(0, 80) || undefined,
             level: 'info',
             page: 'community',
@@ -583,19 +627,19 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       const n = parsePhones(row.phones).length
       const ok = row.status === 'done'
       const isTask = !!row.task_id
-      const typeLabel = isTask ? 'Tâche automatique'
-        : row.type === 'story'        ? 'Story programmée'
-        : row.type === 'mass_posting' ? 'Mass posting programmé'
-        :                               'Publication programmée'
-      const accounts = `${n} compte${n > 1 ? 's' : ''}`
+      const typeLabel = isTask ? trStatic('Tâche automatique', 'Automatic task')
+        : row.type === 'story'        ? trStatic('Story programmée', 'Scheduled story')
+        : row.type === 'mass_posting' ? trStatic('Mass posting programmé', 'Scheduled mass posting')
+        :                               trStatic('Publication programmée', 'Scheduled post')
+      const accounts = trStatic(`${n} compte${n > 1 ? 's' : ''}`, `${n} account${n > 1 ? 's' : ''}`)
       pushNotification({
-        title: ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`,
+        title: ok ? trStatic(`${typeLabel} terminé ✓`, `${typeLabel} finished ✓`) : trStatic(`${typeLabel} échoué`, `${typeLabel} failed`),
         body:  `${accounts}${row.created_by_name ? ' · ' + row.created_by_name : ''}`,
         level: ok ? 'ok' : 'error',
         page:  isTask ? 'tasks' : 'scheduler',
       })
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification(ok ? `${typeLabel} terminé ✓` : `${typeLabel} échoué`, {
+        new Notification(ok ? trStatic(`${typeLabel} terminé ✓`, `${typeLabel} finished ✓`) : trStatic(`${typeLabel} échoué`, `${typeLabel} failed`), {
           body: `${accounts} — ScaleFlow`,
         })
       }
@@ -698,7 +742,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     setSwitchErr(null)
     const r = await switchToAccount(a)
     if (!r.ok) {
-      setSwitchErr(r.error ?? 'Session expirée — reconnecte-toi avec ton mot de passe.')
+      setSwitchErr(r.error ?? tr('Session expirée — reconnecte-toi avec ton mot de passe.', 'Session expired — sign in again with your password.'))
       setRecentAccounts(getRecentAccounts().filter(x => x.user_id !== user.id))
       return
     }
@@ -725,13 +769,60 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const hasContentCreation = effectiveSuperAdmin || planNow === 'pro' || planNow === 'organisation'
 
   const isVisibleTab = (id: Page): boolean => {
-    // Pages internes / superadmin ScaleFlow uniquement (Rapports + Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'reports' || id === 'tasks') return effectiveSuperAdmin
+    // Onglet Blowsome (agence VIP) : visible UNIQUEMENT si la clé porte l'add-on
+    // blowsome (ou superadmin, qui l'a d'office).
+    if (id === 'blowsome') return license?.blowsome === true
+    // Onglets fusionnés : hérite des permissions des sous-vues.
+    // Automatisation = Programmé (scheduler) [+ Récurrent superadmin].
+    if (id === 'automation') {
+      if (role && role !== 'owner' && role !== 'admin' && !canSeeTab(role, perms, 'scheduler')) return false
+      return true
+    }
+    // Activité = Journal (history) + Comptes/Stats (reports) : visible si au moins une l'est.
+    if (id === 'activity') {
+      if (role && role !== 'owner' && role !== 'admin' && !canSeeTab(role, perms, 'history') && !canSeeTab(role, perms, 'reports')) return false
+      return true
+    }
+    // Pages internes / superadmin ScaleFlow uniquement (Tâches inclus).
+    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth' || id === 'cloudphones' || id === 'flows') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
-    // Tous les autres onglets sont visibles pour tout le monde.
+    // Permissions par membre : un membre/lecteur d'une orga ne voit que les onglets
+    // que son rôle (ou ses overrides) autorisent. Owner/admin voient tout ; en solo
+    // (role === null) aucune restriction. C'est ce qui donne enfin de l'effet réel à
+    // la matrice de permissions de « Mon organisation ».
+    if (role && role !== 'owner' && role !== 'admin') {
+      const pk = PAGE_PERM_KEY[id]
+      if (pk && !canSeeTab(role, perms, pk)) return false
+    }
+    // Tous les autres onglets sont visibles pour tout le monce.
     return true
   }
+
+  // ── Palette de commandes (Cmd/Ctrl+K) — liste des destinations navigables ──
+  const paletteItems: CommandItem[] = (() => {
+    const CANDIDATES: { id: Page; label: string; group: string; emoji: string; keywords?: string }[] = [
+      { id: 'hub',         label: t('navHub'),        group: tr('Principal', 'Main'),      emoji: '🏠' },
+      { id: 'phones',      label: t('navPhones'),     group: tr('Principal', 'Main'),      emoji: '📱' },
+      { id: 'bank',        label: t('navBank'),       group: tr('Principal', 'Main'),      emoji: '🗂' },
+      { id: 'captionbank', label: t('navCaptionBank'),group: tr('Principal', 'Main'),      emoji: '💬' },
+      { id: 'library',     label: t('navLibrary'),    group: tr('Principal', 'Main'),      emoji: '📚' },
+      { id: 'activity',    label: t('navActivity'),   group: tr('Principal', 'Main'),      emoji: '📊', keywords: 'historique rapports stats comptes history reports' },
+      { id: 'posting',     label: tr('Publier une vidéo', 'Publish a video'), group: tr('Publier', 'Publish'), emoji: '🚀' },
+      { id: 'massposting', label: t('navMassPosting'),group: tr('Publier', 'Publish'),     emoji: '⚡' },
+      { id: 'storylink',   label: t('navStoryLink'),  group: tr('Publier', 'Publish'),     emoji: '🔗' },
+      { id: 'automation',  label: t('navAutomation'), group: tr('Publier', 'Publish'),     emoji: '📅', keywords: 'programmation tâches scheduler tasks récurrent programmé' },
+      { id: 'warmup',      label: t('navWarmup'),     group: tr('Publier', 'Publish'),     emoji: '🔥' },
+      { id: 'remix',       label: t('navRemix'),      group: tr('Studio vidéo', 'Video Studio'), emoji: '🎞' },
+      { id: 'spoof',       label: 'Spoof',            group: tr('Studio vidéo', 'Video Studio'), emoji: '🛡' },
+      { id: 'subtitles',   label: t('navSubtitles'),  group: tr('Studio vidéo', 'Video Studio'), emoji: '💬' },
+      { id: 'mixer',       label: 'Mixer',            group: tr('Studio vidéo', 'Video Studio'), emoji: '🎚' },
+      { id: 'montage',     label: 'Montage',          group: tr('Studio vidéo', 'Video Studio'), emoji: '✂️' },
+      { id: 'settings',    label: t('navSettings'),   group: tr('Compte', 'Account'),      emoji: '⚙️' },
+      { id: 'organization',label: t('navOrganization'), group: tr('Compte', 'Account'),    emoji: '🏢' },
+    ]
+    return CANDIDATES.filter(c => isVisibleTab(c.id)).map(c => ({ id: c.id, label: c.label, group: c.group, emoji: c.emoji, keywords: c.keywords }))
+  })()
 
   // Auto-redirect to the hub when the current page isn’t accessible in this org
   useEffect(() => {
@@ -762,9 +853,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   const userName = userDisplayName
   const planLabel = license.isSuperAdmin
     ? 'Super Admin'
-    : license.plan === 'organisation' ? 'Organisation'
-    : license.plan === 'pro'          ? 'Plan Pro'
-    : license.plan === 'standard'     ? 'Plan Standard'
+    : license.plan === 'organisation' ? tr('Organisation', 'Organization')
+    : license.plan === 'pro'          ? tr('Plan Pro', 'Pro plan')
+    : license.plan === 'standard'     ? tr('Plan Standard', 'Standard plan')
     : 'Free plan'
 
   const pageLabels: Record<string, string> = {
@@ -785,9 +876,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     repurpose:   t('navRepurpose'),
     mixer:       t('navMixer'),
     subtitles:   t('navSubtitles'),
-    videostudio: 'Studio vidéo',
-    publishhub:  'Publication',
-    photoposting: 'Publication photo',
+    videostudio: tr('Studio vidéo', 'Video Studio'),
+    publishhub:  tr('Publication', 'Publish'),
+    photoposting: tr('Publication photo', 'Photo post'),
     textcopy:    t('pageTextcopy'),
     community:   t('pageCommunity'),
     support:     t('pageSupport'),
@@ -795,6 +886,10 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     licences:    t('pageLicences'),
     reports:     t('navReports'),
     library:     t('navLibrary'),
+    organization: t('navOrganization'),
+    proxyhealth: t('navProxyHealth'),
+    automation:  t('navAutomation'),
+    activity:    t('navActivity'),
   }
 
   return (
@@ -863,6 +958,28 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           </button>
         </div>
 
+        {/* ── Recherche / palette de commandes (⌘K) ─────────────────────── */}
+        <div style={{ padding: '2px 10px 8px', flexShrink: 0 }}>
+          <button
+            onClick={() => { playNav(); window.dispatchEvent(new Event('sf:cmdk')) }}
+            title={tr('Rechercher — Ctrl/Cmd + K', 'Search — Ctrl/Cmd + K')}
+            aria-label={tr('Rechercher', 'Search')}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              height: 36, padding: collapsed ? 0 : '0 11px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(233,234,240,0.09)',
+              color: 'rgba(233,234,240,0.55)', fontSize: 13, fontWeight: 500, transition: 'all .15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; e.currentTarget.style.color = 'rgba(241,240,247,0.85)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.09)'; e.currentTarget.style.color = 'rgba(233,234,240,0.55)' }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+            {!collapsed && <span style={{ flex: 1, textAlign: 'left' }}>{tr('Rechercher…', 'Search…')}</span>}
+            {!collapsed && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(233,234,240,0.1)', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>Ctrl K</span>}
+          </button>
+        </div>
+
         {/* ── Nav ───────────────────────────────────────────────────────── */}
         <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 6px 8px' }}>
 
@@ -877,6 +994,29 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
             </button>
           </div>
+
+          {/* Lanceur de la sous-application Blowsome (VIP) — pas un simple onglet :
+              un bouton "espace" distinct, visible seulement avec l'add-on blowsome. */}
+          {(license?.blowsome === true) && (
+            <div style={{ margin: '6px 0 2px' }}>
+              <button
+                onClick={() => { playNav(); onNavigate('blowsome') }}
+                title="Blowsome — espace VIP"
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  padding: collapsed ? '10px 0' : '11px 12px', borderRadius: 12, border: '1px solid rgba(168,85,247,0.4)', cursor: 'pointer',
+                  color: '#fff', fontWeight: 800, fontSize: 13.5,
+                  background: 'linear-gradient(100deg, rgba(236,72,153,0.9), rgba(168,85,247,0.9), rgba(99,102,241,0.9))',
+                  backgroundSize: '180% auto', boxShadow: '0 10px 26px -12px rgba(168,85,247,0.9)',
+                }}
+              >
+                <span style={{ display: 'grid', placeItems: 'center', width: 20, fontSize: 15 }}>✦</span>
+                {!collapsed && <span style={{ flex: 1, textAlign: 'left' }}>Blowsome</span>}
+                {!collapsed && <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.08em', padding: '2px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.2)' }}>VIP</span>}
+              </button>
+            </div>
+          )}
 
           <SidebarDivider />
 
@@ -895,7 +1035,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                       className={`sf-sidebar-section${isOpen ? '' : ' is-closed'}`}
                       onClick={() => toggleSection(section.title)}
                     >
-                      <span className="sf-sidebar-section-label">{section.title}</span>
+                      <span className="sf-sidebar-section-label">{tr(section.title, SECTION_LABEL_EN[section.title] ?? section.title)}</span>
                       <span className="sf-sidebar-section-line" />
                       <span className="sf-sidebar-section-arrow">
                         <NavIcon d={ICONS.chevronDown} size={10} />
@@ -929,6 +1069,17 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
         {/* ── Bottom section ────────────────────────────────────────────── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
 
+          {/* Mon organisation */}
+          <button
+            className={`sf-sidebar-item${page === 'organization' ? ' is-active' : ''}`}
+            onClick={() => { playNav(); onNavigate('organization') }}
+            style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+            title={t('navOrganization')}
+          >
+            <span className="sf-sidebar-icon"><NavIcon d={ICONS.building} size={17} /></span>
+            {!collapsed && <span style={{ flex: 1 }}>{t('navOrganization')}</span>}
+          </button>
+
           {/* Settings */}
           <button
             className={`sf-sidebar-item${page === 'settings' ? ' is-active' : ''}`}
@@ -950,14 +1101,26 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             </button>
           )}
 
+          {license.isSuperAdmin && (
+            <button
+              className={`sf-sidebar-item${page === 'cloudphones' ? ' is-active' : ''}`}
+              onClick={() => { playNav(); onNavigate('cloudphones') }}
+              style={{ gap: collapsed ? 0 : 10, justifyContent: collapsed ? 'center' : 'flex-start' }}
+              title={tr('Cloud Phones', 'Cloud Phones')}
+            >
+              <span className="sf-sidebar-icon"><NavIcon d={ICONS.server} size={17} /></span>
+              {!collapsed && <span style={{ flex: 1 }}>{tr('Cloud Phones', 'Cloud Phones')}</span>}
+            </button>
+          )}
+
           {/* Org switcher — compact icon button when collapsed */}
           {collapsed ? (
             <button
               ref={orgTriggerRef}
               onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
-              aria-label={currentOrg?.name ?? 'Organisation'}
+              aria-label={currentOrg?.name ?? tr('Organisation', 'Organization')}
               aria-expanded={orgMenuOpen}
-              title={currentOrg?.name ?? 'Organisation'}
+              title={currentOrg?.name ?? tr('Organisation', 'Organization')}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: '100%', padding: '7px 0', borderRadius: 8,
@@ -975,7 +1138,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             <button
               ref={orgTriggerRef}
               onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
-              aria-label={currentOrg?.name ?? 'Organisation'}
+              aria-label={currentOrg?.name ?? tr('Organisation', 'Organization')}
               aria-expanded={orgMenuOpen}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -992,7 +1155,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                 <NavIcon d={ICONS.building} size={14} />
               </span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(241,240,247,0.8)', fontSize: 12, filter: demoMode ? 'blur(6px)' : 'none', userSelect: demoMode ? 'none' : 'auto' }}>
-                {currentOrg?.name ?? 'Organisation'}
+                {currentOrg?.name ?? tr('Organisation', 'Organization')}
               </span>
               <span style={{ color: 'rgba(233,234,240,0.32)', flexShrink: 0, display: 'flex' }}>
                 <NavIcon d={ICONS.chevronDown} size={12} />
@@ -1061,15 +1224,15 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
             {(() => {
               const backTo: { hub: Page; label: string } | null =
-                (['posting', 'storylink', 'photoposting'] as Page[]).includes(page) ? { hub: 'publishhub', label: 'Publication' }
-                : (['remix', 'spoof', 'subtitles', 'mixer'] as Page[]).includes(page) ? { hub: 'videostudio', label: 'Studio Vidéo' }
+                (['posting', 'storylink', 'photoposting'] as Page[]).includes(page) ? { hub: 'publishhub', label: tr('Publication', 'Publish') }
+                : (['remix', 'spoof', 'subtitles', 'mixer'] as Page[]).includes(page) ? { hub: 'videostudio', label: tr('Studio Vidéo', 'Video Studio') }
                 : null
               if (!backTo) return null
               const c = SUBTOOL_COLOR[page]
               return (
                 <button
                   onClick={() => onNavigate(backTo.hub)}
-                  title={`Retour à ${backTo.label}`}
+                  title={tr(`Retour à ${backTo.label}`, `Back to ${backTo.label}`)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
                     background: c ? `${c}1a` : 'rgba(255,255,255,0.05)', border: `1px solid ${c ? `${c}59` : 'rgba(255,255,255,0.1)'}`,
@@ -1109,18 +1272,15 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             ))}
           </div>
 
-          {/* Middle: active task pill */}
+          {/* Middle: active task pill — canonical live status chip */}
           {activeTask && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-              background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
-              color: '#6366F1', flexShrink: 0,
-            }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse flex-shrink-0" />
-              {activeTask.kind === 'mass'
-                ? `${activeTask.done}/${activeTask.total} • ${activeTask.progress}%`
-                : `${activeTask.progress}%`}
+            <div className="sf-status-chip is-accent" style={{ flexShrink: 0 }}>
+              <span className="sf-status-dot" />
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {activeTask.kind === 'mass'
+                  ? `${activeTask.done}/${activeTask.total} · ${activeTask.progress}%`
+                  : `${activeTask.progress}%`}
+              </span>
             </div>
           )}
 
@@ -1171,8 +1331,8 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                 {/* + button */}
                 <button
                   onClick={() => onNavigate('settings', 'abonnement')}
-                  title="Acheter des crédits"
-                  aria-label="Acheter des crédits"
+                  title={tr('Acheter des crédits', 'Buy credits')}
+                  aria-label={tr('Acheter des crédits', 'Buy credits')}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 26, height: 30, borderRadius: '0 8px 8px 0',
@@ -1195,7 +1355,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             {license?.isSuperAdmin === true && (
               <button
                 onClick={() => setDemoMode(d => !d)}
-                title={demoMode ? 'Quitter le mode démo' : 'Activer la vue utilisateur (démo)'}
+                title={demoMode ? tr('Quitter le mode démo', 'Exit demo mode') : tr('Activer la vue utilisateur (démo)', 'Enable user view (demo)')}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '0 10px', height: 32, borderRadius: 8,
@@ -1212,7 +1372,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
-                {demoMode ? 'Vue démo' : 'Démo'}
+                {demoMode ? tr('Vue démo', 'Demo view') : tr('Démo', 'Demo')}
               </button>
             )}
 
@@ -1370,13 +1530,13 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
               </svg>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#FB923C', flex: 1 }}>
-                Mode démo — vue utilisateur (membre)
+                {tr('Mode démo — vue utilisateur (membre)', 'Demo mode — user view (member)')}
               </span>
               <button
                 onClick={() => setDemoMode(false)}
                 style={{ fontSize: 11, color: 'rgba(251,146,60,0.7)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 8px', borderRadius: 6 }}
               >
-                Quitter
+                {tr('Quitter', 'Exit')}
               </button>
             </div>
           )}
@@ -1458,11 +1618,11 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               </button>
             ))}
             <button
-              onClick={() => { setOrgMenuOpen(false); onNavigate('settings', 'organization') }}
+              onClick={() => { setOrgMenuOpen(false); onNavigate('organization') }}
               className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-white/[0.04] border-t text-left transition-colors flex items-center gap-2"
               style={{ borderColor: 'rgba(99,102,241,0.12)' }}
             >
-              <NavIcon d={ICONS.settings} size={11} color="currentColor" />
+              <NavIcon d={ICONS.building} size={11} color="currentColor" />
               {t('manageOrganizations')}
             </button>
           </div>
@@ -1557,9 +1717,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             { id: 'videostudio', iconKey: 'video', label: 'Studio' },
             { id: 'bank',     iconKey: 'video',    label: 'Bank'     },
             { id: 'phones',   iconKey: 'phone',    label: 'Phones'   },
-            { id: 'scheduler',iconKey: 'calendar', label: 'Planif.'  },
+            { id: 'scheduler',iconKey: 'calendar', label: tr('Planif.', 'Sched.')  },
             { id: 'settings', iconKey: 'settings', label: 'Config'   },
-          ] as Array<{ id: Page; iconKey: IconKey; label: string }>).map(item => {
+          ] as Array<{ id: Page; iconKey: IconKey; label: string }>).filter(item => isVisibleTab(item.id)).map(item => {
             const active = page === item.id
             return (
               <button
@@ -1600,7 +1760,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           <div style={{ position: 'relative', width: '100%', maxWidth: 420 }}>
             <button
               onClick={() => setShowAddAccount(false)}
-              aria-label="Fermer"
+              aria-label={tr('Fermer', 'Close')}
               style={{ position: 'absolute', top: -14, right: -14, zIndex: 10, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#12121c', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(148,163,184,0.7)', cursor: 'pointer', fontSize: 14 }}
             >✕</button>
             <AuthPage />
@@ -1610,6 +1770,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
       {/* Suivi global des postings en cours (visible partout, survit au refresh) */}
       <ActivePostingsWidget onOpen={p => onNavigate(p as Page)} orgId={currentOrg?.id ?? null} userId={user.id} />
+
+      {/* Palette de commandes — Cmd/Ctrl+K, navigation instantanée */}
+      <CommandPalette items={paletteItems} onSelect={id => onNavigate(id as Page)} />
     </div>
   )
 }

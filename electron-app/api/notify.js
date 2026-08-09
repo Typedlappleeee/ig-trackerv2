@@ -18,8 +18,31 @@ async function sendTelegram(token, chat, subject, message) {
   return { ok: res.ok, status: res.status }
 }
 
+// Vérifie un access_token Supabase (le client l'envoie). Empêche que cet endpoint
+// serve de relais ouvert (spam email via la clé Resend). Best-effort côté client
+// (les notifs sont non bloquantes) → un token absent/invalide = 401, pas d'envoi.
+async function verifySupabaseToken(token) {
+  if (!token) return false
+  const url  = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) return false
+  try {
+    const r = await fetch(`${url}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: anon },
+      signal: AbortSignal.timeout(8000),
+    })
+    return r.ok
+  } catch { return false }
+}
+
 async function sendDiscord(webhook, subject, message) {
   if (!webhook) return null
+  // Anti-SSRF : un webhook Discord est toujours sur discord(app).com. Sinon cet
+  // endpoint devient une primitive POST vers n'importe quel hôte interne/externe.
+  try {
+    const h = new URL(webhook).hostname.toLowerCase()
+    if (!/(^|\.)discord(app)?\.com$/.test(h)) return { ok: false, error: 'webhook non autorisé' }
+  } catch { return { ok: false, error: 'webhook invalide' } }
   const res = await fetch(webhook, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -51,7 +74,12 @@ module.exports = async (req, res) => {
   if (req.method === 'GET') return res.status(200).json({ ok: true })
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
   try {
-    const { settings = {}, subject = 'ScaleFlow', message = '' } = req.body ?? {}
+    const { settings = {}, subject = 'ScaleFlow', message = '', supabaseToken } = req.body ?? {}
+    // Auth requise : sans utilisateur Supabase valide, on refuse (anti-relais).
+    const token = supabaseToken || (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+    if (!(await verifySupabaseToken(token))) {
+      return res.status(401).json({ ok: false, error: 'non authentifié' })
+    }
     const results = {}
     const [tg, dc, em] = await Promise.all([
       sendTelegram(settings.telegram_token, settings.telegram_chat, subject, message).catch(e => ({ ok: false, error: String(e?.message ?? e) })),
