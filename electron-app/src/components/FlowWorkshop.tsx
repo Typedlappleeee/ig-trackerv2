@@ -12,6 +12,20 @@ import { upsertFlow, newFlowId, type Visibility } from '@/lib/flowStore'
 
 interface Props { phones: CpInstance[]; userId: string; orgId: string | null; onSaved: () => void }
 
+// Actions "ouvrir un lien" prêtes à l'emploi (deep links Instagram) → l'utilisateur
+// choisit l'action, on génère l'URL. `ask` = ce qu'on demande (pseudo/hashtag/lien).
+interface LinkPreset { label: string; icon: string; ask?: 'username' | 'hashtag' | 'url' | 'raw'; build: (v: string) => string }
+const LINK_PRESETS: LinkPreset[] = [
+  { label: 'Ouvrir un profil', icon: '👤', ask: 'username', build: v => `instagram://user?username=${v}` },
+  { label: 'Ouvrir un hashtag', icon: '#️⃣', ask: 'hashtag', build: v => `instagram://tag?name=${v}` },
+  { label: 'Caméra story', icon: '📸', build: () => 'instagram://story-camera' },
+  { label: 'Explorer', icon: '🧭', build: () => 'instagram://explore' },
+  { label: 'Messages (DM)', icon: '✉️', build: () => 'instagram://direct-inbox' },
+  { label: 'Accueil (feed)', icon: '🏠', build: () => 'instagram://feed' },
+  { label: 'Un post / une page (lien)', icon: '🔗', ask: 'url', build: v => v },
+  { label: 'Lien personnalisé', icon: '⚙️', ask: 'raw', build: v => v },
+]
+
 // Apps connues → on choisit dans une liste (plus besoin de connaître le package).
 const KNOWN_APPS: { label: string; pkg: string; icon: string }[] = [
   { label: 'Instagram', pkg: 'com.instagram.android',    icon: '📸' },
@@ -34,6 +48,7 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
   const [log, setLog] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Visibility>('private')
   const [showApps, setShowApps] = useState(false)
+  const [showLinks, setShowLinks] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
   const gestureRef = useRef<{ x: number; y: number; t: number } | null>(null)
 
@@ -127,12 +142,18 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
     chooseApp(p.trim(), p.trim())
   }
   // Deep link / URL (façon GeeLark) : saute direct à un écran via am start.
-  const addLink = async () => {
-    const url = window.prompt('Lien à ouvrir (deep link ou URL) :\n\nExemples Instagram :\n• instagram://user?username=nike (un profil)\n• instagram://story-camera (caméra story)\n• instagram://explore (explorer)\n• https://instagram.com/p/XXXX (un post)')
-    if (!url?.trim()) return
-    const u = url.trim()
-    addStep({ do: 'link', url: u }, `Ouvrir le lien « ${u} »`)
+  const runLink = async (u: string, label: string) => {
+    addStep({ do: 'link', url: u }, label)
     if (phoneId) { await cloudPhones.shell(phoneId, `am start -a android.intent.action.VIEW -d '${u.replace(/'/g, '')}'`); window.setTimeout(refreshSnap, 1600) }
+  }
+  // L'utilisateur choisit une ACTION (pas une URL) ; on génère le lien pour lui.
+  const choosePreset = async (p: LinkPreset) => {
+    setShowLinks(false)
+    if (!p.ask) { runLink(p.build(''), p.label); return }
+    const msg = p.ask === 'username' ? 'Nom d’utilisateur (sans @) :' : p.ask === 'hashtag' ? 'Hashtag (sans #) :' : p.ask === 'url' ? 'Colle le lien (post, page…) :' : 'Lien / deep link personnalisé :'
+    const v = window.prompt(msg); if (!v?.trim()) return
+    const clean = v.trim().replace(/^[@#]/, '')
+    runLink(p.build(clean), `${p.label}${p.ask === 'username' ? ` @${clean}` : p.ask === 'hashtag' ? ` #${clean}` : ''}`)
   }
   const addPopups = async () => { addStep({ do: 'popups' }, 'Fermer les popups'); if (phoneId) { await dismissPopups(phoneId); window.setTimeout(refreshSnap, 650) } }
   const addBack = async () => { addStep({ do: 'key', key: 'back' }, 'Retour'); if (phoneId) { await cloudPhones.shell(phoneId, 'input keyevent 4'); window.setTimeout(refreshSnap, 650) } }
@@ -194,8 +215,8 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <TB onClick={addType}>➕ Écrire</TB>
             <TB onClick={addWait}>➕ Attendre</TB>
-            <TB onClick={() => setShowApps(v => !v)}>➕ Ouvrir app ▾</TB>
-            <TB onClick={addLink}>➕ Ouvrir un lien</TB>
+            <TB onClick={() => { setShowApps(v => !v); setShowLinks(false) }}>➕ Ouvrir app ▾</TB>
+            <TB onClick={() => { setShowLinks(v => !v); setShowApps(false) }}>➕ Ouvrir un écran ▾</TB>
             <TB onClick={addBack}>➕ Retour</TB>
             <TB onClick={addPopups}>➕ Fermer popups</TB>
           </div>
@@ -207,6 +228,16 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
                 </button>
               ))}
               <button onClick={chooseAppOther} style={{ gridColumn: '1 / -1', padding: '7px 9px', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent', color: '#8a8a9c', cursor: 'pointer', fontSize: 11.5 }}>Autre (package)…</button>
+            </div>
+          )}
+          {showLinks && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20, padding: 8, borderRadius: 10, background: 'rgba(17,18,26,0.98)', border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 16px 40px -14px rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', gap: 5, width: 250 }}>
+              <div style={{ fontSize: 9.5, color: '#6b6b7c', fontWeight: 700, padding: '2px 4px' }}>Sauter direct à un écran (deep link)</div>
+              {LINK_PRESETS.map(p => (
+                <button key={p.label} onClick={() => choosePreset(p)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#E9E9F2', cursor: 'pointer', fontSize: 12, fontWeight: 700, textAlign: 'left' }}>
+                  <span>{p.icon}</span>{p.label}
+                </button>
+              ))}
             </div>
           )}
         </div>
