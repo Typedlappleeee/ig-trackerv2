@@ -328,14 +328,21 @@ if [ -d /opt/ws-scrcpy ]; then
   # fenêtre + barre en doublon. On écrase ces règles À LA SOURCE (avant `npm run
   # dist`) : fond sombre assorti à l'app + barre native masquée (nos propres
   # contrôles sont dans la barre du bas de l'app). Injecté une seule fois.
-  if [ -f src/style/app.css ] && ! grep -q 'scaleflow-fill' src/style/app.css; then
+  if [ -f src/style/app.css ]; then
+    # On repart propre : on retire un éventuel ancien bloc puis on réinjecte.
+    sed -i '/scaleflow-fill/,$d' src/style/app.css
     cat >> src/style/app.css <<'CSS'
 
-/* scaleflow-fill — écran plein & propre dans l'iframe de l'app */
-body.stream { background-color: #0b0c12 !important; }
+/* scaleflow-fill — écran plein, centré & propre dans l'iframe de l'app.
+   ws-scrcpy floate la vidéo à droite sur un fond gris 85 % : on passe le
+   fond en sombre, on masque sa barre native (.control-buttons-list) et on
+   CENTRE la vidéo (flex) en la laissant remplir tout en gardant le ratio. */
+body.stream { background: #0b0c12 !important; margin: 0 !important; height: 100vh !important;
+  display: flex !important; align-items: center !important; justify-content: center !important; }
 .control-buttons-list { display: none !important; }
-.device-view { float: none !important; text-align: center !important; }
-.device-view .video { float: none !important; display: inline-block !important; }
+.device-view { float: none !important; margin: auto !important; max-width: 100% !important; max-height: 100% !important; }
+.device-view .video, .video, .device-view video, .device-view canvas {
+  float: none !important; max-width: 100% !important; max-height: 100% !important; }
 CSS
   fi
   npm install --no-audit --no-fund >/dev/null 2>&1 && npm run dist >/dev/null 2>&1 \
