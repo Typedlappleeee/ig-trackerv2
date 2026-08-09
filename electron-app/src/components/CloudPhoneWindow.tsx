@@ -40,9 +40,10 @@ const APP_CATALOG: { pkg: string; label: string; icon: string }[] = [
 // stable), pas via le store du tel. ADBKeyBoard = clavier texte/emoji piloté par
 // ADB (légendes propres). F-Droid = store open-source d'où viennent AutoX.js,
 // Material Files… (à installer ensuite depuis F-Droid sur le tel).
-const TOOLS_CATALOG: { pkg: string; label: string; icon: string; apk: string; note: string }[] = [
-  { pkg: 'com.android.adbkeyboard', label: 'ADBKeyBoard', icon: '⌨️', apk: 'https://github.com/senzhk/ADBKeyBoard/raw/master/ADBKeyboard.apk', note: 'clavier texte/emoji via ADB' },
-  { pkg: 'org.fdroid.fdroid',       label: 'F-Droid',     icon: '🤖', apk: 'https://f-droid.org/F-Droid.apk', note: 'store open-source (AutoX.js, Material Files…)' },
+const TOOLS_CATALOG: { pkg: string; label: string; icon: string; note: string; apk?: string; fdroid?: string }[] = [
+  { pkg: 'com.android.adbkeyboard',  label: 'ADBKeyBoard',   icon: '⌨️', apk: 'https://github.com/senzhk/ADBKeyBoard/raw/master/ADBKeyboard.apk', note: 'clavier texte/emoji via ADB' },
+  { pkg: 'me.zhanghai.android.files', label: 'Material Files', icon: '📁', fdroid: 'me.zhanghai.android.files', note: 'gestionnaire de fichiers' },
+  { pkg: 'org.fdroid.fdroid',        label: 'F-Droid',       icon: '🤖', apk: 'https://f-droid.org/F-Droid.apk', note: 'store open-source' },
 ]
 
 export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Props) {
@@ -68,6 +69,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const [apkUrl, setApkUrl] = useState('')
   const [busyMsg, setBusyMsg] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [kbOn, setKbOn] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
   const pollRef = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -128,6 +130,40 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     const id = window.setInterval(tick, 4000)
     return () => { alive = false; window.clearInterval(id) }
   }, [phase, inst.id])
+
+  // Clavier PC → téléphone : quand actif, on capture les frappes et on les envoie
+  // via ADBKeyBoard (texte/emoji en base64 = fiable sur tout caractère), Entrée /
+  // Retour / Tab en keyevent. Nécessite ADBKeyBoard installé + clavier par défaut
+  // (le bouton l'active automatiquement).
+  useEffect(() => {
+    if (!kbOn || phase !== 'ready') return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return  // laisse taper dans nos champs
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === 'Enter') { e.preventDefault(); cloudPhones.shell(inst.id, 'input keyevent 66') }
+      else if (e.key === 'Backspace') { e.preventDefault(); cloudPhones.shell(inst.id, 'input keyevent 67') }
+      else if (e.key === 'Tab') { e.preventDefault(); cloudPhones.shell(inst.id, 'input keyevent 61') }
+      else if (e.key.length === 1) {
+        e.preventDefault()
+        const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(e.key)))
+        cloudPhones.shell(inst.id, `am broadcast -a ADB_INPUT_B64 --es msg ${b64}`)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [kbOn, phase, inst.id])
+
+  // Active/coupe le clavier PC (et met ADBKeyBoard par défaut à l'activation).
+  const toggleKeyboard = async () => {
+    const next = !kbOn
+    setKbOn(next)
+    if (next) {
+      await cloudPhones.shell(inst.id, 'ime enable com.android.adbkeyboard/.AdbIME')
+      await cloudPhones.shell(inst.id, 'ime set com.android.adbkeyboard/.AdbIME')
+      flash('⌨️ Clavier PC actif — tape, ça s\'écrit sur le tel')
+    } else flash('Clavier PC coupé')
+  }
 
   // Déplacement de la fenêtre par la barre de titre.
   const onTitleDown = (e: React.PointerEvent) => {
@@ -204,10 +240,12 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     if (next === 'apps') refreshInstalled()
   }
 
-  // Installe un outil hors-Play depuis son APK direct (ADBKeyBoard, F-Droid…).
-  const installTool = async (t: { label: string; apk: string }) => {
+  // Installe un outil : soit par APK direct (ADBKeyBoard, F-Droid), soit par
+  // paquet F-Droid résolu à la dernière version (Material Files…).
+  const installTool = async (t: { label: string; apk?: string; fdroid?: string }) => {
     flash(`Installation de ${t.label}…`, 0)
-    const r = await cloudPhones.install(inst.id, t.apk)
+    const r = t.fdroid ? await cloudPhones.installFdroid(inst.id, t.fdroid)
+      : await cloudPhones.install(inst.id, t.apk ?? '')
     if (r.ok) { flash(`✓ ${t.label} installé`); refreshInstalled() }
     else flash(`Échec : ${r.error ?? 'inconnu'}`)
   }
@@ -389,6 +427,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
             <span style={{ fontSize: 8.5, fontWeight: 800, color: pingColor, lineHeight: 1 }}>{pingLabel}</span>
             <span style={{ fontSize: 7, color: '#6b6b7c', lineHeight: 1 }}>ms</span>
           </div>
+          <RailBtn icon="⌨️" label="Clavier" active={kbOn} onClick={toggleKeyboard} disabled={phase !== 'ready'} />
           <RailBtn icon="📤" label="Upload" active={panel === 'upload'} onClick={() => togglePanel('upload')} disabled={phase !== 'ready'} />
           <RailBtn icon="📲" label="Apps"   active={panel === 'apps'}   onClick={() => togglePanel('apps')}   disabled={phase !== 'ready'} />
           <RailBtn icon="🔊" label="Son"    active={panel === 'sound'}  onClick={() => togglePanel('sound')}  disabled={phase !== 'ready'} />

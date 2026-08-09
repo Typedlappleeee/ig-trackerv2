@@ -180,10 +180,21 @@ async function pushVideo(serial, videoUrl) {
 // Play Store open-source/anonyme (catalogue Google Play complet, sans compte
 // Google) — notre "app store par défaut" à la place de GApps/Play Store réel.
 async function latestAuroraStoreUrl() {
-  const r = await fetch('https://f-droid.org/api/v1/packages/com.aurora.store', { signal: AbortSignal.timeout(15000) })
-  if (!r.ok) throw new Error(`F-Droid injoignable (HTTP ${r.status})`)
+  return fdroidApkUrl('com.aurora.store')
+}
+
+// Résout la dernière version d'un paquet F-Droid (par son nom de paquet) → URL
+// d'APK directe. Générique : sert pour Aurora et pour les installs 1-clic
+// d'outils (Material Files…). Toujours la dernière version, pas d'URL périmée.
+async function fdroidApkUrl(pkg) {
+  const r = await fetch(`https://f-droid.org/api/v1/packages/${pkg}`, { signal: AbortSignal.timeout(15000) })
+  if (!r.ok) throw new Error(`F-Droid : paquet introuvable (HTTP ${r.status})`)
   const { suggestedVersionCode } = await r.json()
-  return `https://f-droid.org/repo/com.aurora.store_${suggestedVersionCode}.apk`
+  if (!suggestedVersionCode) throw new Error('F-Droid : version introuvable')
+  return `https://f-droid.org/repo/${pkg}_${suggestedVersionCode}.apk`
+}
+async function installFdroid(serial, pkg) {
+  return installApk(serial, await fdroidApkUrl(pkg))
 }
 
 // Attend que le téléphone ait fini de booter (jusqu'à ~2 min) puis installe
@@ -270,6 +281,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (parts[2] === 'pushfile' && req.method === 'POST') {
         const out = await pushBuffer(inst.serial, fileBuf)
+        return json(res, 200, { ok: true, output: out })
+      }
+      if (parts[2] === 'installfdroid' && req.method === 'POST') {
+        const out = await installFdroid(inst.serial, String(body.pkg || ''))
         return json(res, 200, { ok: true, output: out })
       }
     }

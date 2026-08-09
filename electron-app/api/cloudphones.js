@@ -21,7 +21,7 @@ async function relay(agentUrl, agentToken, path, method = 'GET', body, timeoutMs
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
 
-  const { op, agentUrl, agentToken, id, name, androidVersion, cmd, timeout, url } = req.body ?? {}
+  const { op, agentUrl, agentToken, id, name, androidVersion, cmd, timeout, url, pkg } = req.body ?? {}
   if (!agentUrl || !agentToken) return res.status(200).json({ ok: false, error: 'Agent non configuré (URL/token manquant)' })
 
   // Garde-fou : n'autorise pas de cibler une IP interne (SSRF) — l'agent doit
@@ -44,6 +44,7 @@ module.exports = async (req, res) => {
       case 'screenshot':  r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/screenshot`); break
       case 'install':      r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/install`, 'POST', { url }, 270000); break
       case 'push':         r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/push`, 'POST', { url }, 270000); break
+      case 'installfdroid': r = await relay(agentUrl, agentToken, `/instances/${encodeURIComponent(id || '')}/installfdroid`, 'POST', { pkg }, 270000); break
       default: return res.status(400).json({ ok: false, error: `op inconnu: ${op}` })
     }
     // Les données de l'agent restent rangées sous `data` (pas dépliées à plat) —

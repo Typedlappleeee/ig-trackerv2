@@ -90,4 +90,6 @@ export const cloudPhones = {
   install: (id: string, url: string) => call<{ output: string }>('install', { id, url }),
   // Dépose une vidéo (URL directe http/https) dans /sdcard/Movies du téléphone.
   pushVideo: (id: string, url: string) => call<{ output: string }>('push', { id, url }),
+  // Installe la dernière version d'un paquet F-Droid (par nom de paquet).
+  installFdroid: (id: string, pkg: string) => call<{ output: string }>('installfdroid', { id, pkg }),
 }
