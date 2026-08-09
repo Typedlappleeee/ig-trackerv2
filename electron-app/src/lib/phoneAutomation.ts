@@ -65,24 +65,42 @@ const norm = (s: string) => s.toLowerCase().trim()
 // coordonnée !). On prend le plus petit nœud sous le doigt, et on choisit le
 // critère le plus stable dispo : texte > description > resource-id. C'est ce qui
 // rend un flow enregistré robuste (il retrouve le bouton par son sens au rejeu).
-// resource-id génériques (conteneurs plein écran) à NE PAS utiliser comme cible :
-// ils ne désignent pas un bouton et cassent le rejeu.
-const GENERIC_IDS = new Set([
-  'action_bar_root', 'content', 'container', 'root', 'decor_content_parent', 'list',
-  'recycler_view', 'main_content', 'coordinator', 'drawer_layout', 'fragment_container', 'navigation_bar_background',
-])
+// resource-id génériques (conteneurs, pas des boutons) → à NE PAS utiliser comme
+// cible : ça casse le rejeu. On détecte aussi les suffixes courants de conteneurs.
+const GENERIC_IDS = new Set(['action_bar_root', 'content', 'list', 'recycler_view', 'main_content', 'navigation_bar_background', 'android:id/content'])
+const isGenericId = (id: string) => {
+  const s = (id.split('/').pop() || '').toLowerCase()
+  if (!s) return true
+  if (GENERIC_IDS.has(s)) return true
+  return /(^|_)(root|parent|container|layout|wrapper|holder|frame|background|decor|coordinator|drawer|fragment|scroll|group)$/.test(s)
+}
+const shortId = (id: string) => id.split('/').pop() || id
+const contains = (n: UiNode, x: number, y: number) => x >= n.x && x <= n.x + n.w && y >= n.y && y <= n.y + n.h
+const within = (outer: UiNode, n: UiNode) => n.x >= outer.x && n.y >= outer.y && n.x + n.w <= outer.x + outer.w && n.y + n.h <= outer.y + outer.h
+
+// Sélecteur d'élément à partir d'un point cliqué. On privilégie le BOUTON
+// cliquable sous le doigt, et on lit le texte/desc À L'INTÉRIEUR (ex : le libellé
+// « Get started » d'un bouton dont le nœud cliquable n'a pas de texte propre).
 export function matcherAt(nodes: UiNode[], x: number, y: number): { matcher: Matcher; label: string } | null {
-  const inside = nodes.filter(n => x >= n.x && x <= n.x + n.w && y >= n.y && y <= n.y + n.h)
+  const inside = nodes.filter(n => contains(n, x, y))
   if (!inside.length) return null
-  const byArea = inside.slice().sort((a, b) => (a.w * a.h) - (b.w * b.h))  // plus petit d'abord (plus précis)
-  const withText = byArea.find(n => n.text.trim())
-  if (withText) return { matcher: { text: withText.text.trim() }, label: `texte « ${withText.text.trim()} »` }
-  const withDesc = byArea.find(n => n.desc.trim())
-  if (withDesc) return { matcher: { desc: withDesc.desc.trim() }, label: `desc « ${withDesc.desc.trim()} »` }
-  // id : on ignore les conteneurs génériques, et on préfère un élément cliquable.
-  const idOk = (n: UiNode) => { const s = n.id.split('/').pop() || ''; return !!s && !GENERIC_IDS.has(s) }
-  const withId = byArea.find(n => idOk(n) && n.clickable) || byArea.find(idOk)
-  if (withId) { const short = withId.id.split('/').pop() || withId.id; return { matcher: { id: short }, label: `id « ${short} »` } }
+
+  // 1) Le plus petit élément CLIQUABLE sous le doigt = le "bouton".
+  const target = inside.filter(n => n.clickable).sort((a, b) => (a.w * a.h) - (b.w * b.h))[0]
+  if (target) {
+    const pool = [target, ...nodes.filter(n => within(target, n))]
+    const t = pool.find(n => n.text.trim())
+    if (t) return { matcher: { text: t.text.trim() }, label: `texte « ${t.text.trim()} »` }
+    const d = pool.find(n => n.desc.trim())
+    if (d) return { matcher: { desc: d.desc.trim() }, label: `desc « ${d.desc.trim()} »` }
+    if (!isGenericId(target.id) && target.id) return { matcher: { id: shortId(target.id) }, label: `id « ${shortId(target.id)} »` }
+  }
+
+  // 2) Repli : plus petit nœud avec texte/desc/id propre.
+  const byArea = inside.slice().sort((a, b) => (a.w * a.h) - (b.w * b.h))
+  const t = byArea.find(n => n.text.trim()); if (t) return { matcher: { text: t.text.trim() }, label: `texte « ${t.text.trim()} »` }
+  const d = byArea.find(n => n.desc.trim()); if (d) return { matcher: { desc: d.desc.trim() }, label: `desc « ${d.desc.trim()} »` }
+  const idc = byArea.find(n => n.id && !isGenericId(n.id)); if (idc) return { matcher: { id: shortId(idc.id) }, label: `id « ${shortId(idc.id)} »` }
   return null
 }
 
