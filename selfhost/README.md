@@ -53,9 +53,9 @@ Si `lsmod | grep binder` n'affiche **rien**, arrête-toi et dis-le moi.
 
 L'agent est le petit service qui permet à ScaleFlow de piloter les téléphones.
 
-> ℹ️ **Image par défaut = Android 16 officiel + Aurora Store**. Par défaut,
+> ℹ️ **Image par défaut = Android 15 officiel + Aurora Store**. Par défaut,
 > l'agent crée les téléphones avec l'image **officielle** redroid
-> (`redroid/redroid:16.0.0-latest`, éditeur officiel, pas de dépendance à une
+> (`redroid/redroid:15.0.0-latest`, éditeur officiel, pas de dépendance à une
 > image tierce). Aurora Store (client Play Store open-source/anonyme,
 > catalogue Google Play complet, pas de compte requis) s'installe tout seul
 > juste après le 1er boot. Pour un vrai Play Store/Gmail (GApps), une variante

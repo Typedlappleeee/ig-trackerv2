@@ -52,7 +52,7 @@ cat >/opt/scaleflow-agent/server.js <<'SFAGENT_EOF'
 //   GET    /instances/:id/screenshot   → capture PNG (base64)
 //   POST   /instances/:id/install { url } → télécharge un APK et l'installe (sideload)
 //
-// Chaque nouveau téléphone (Android 16, image officielle redroid) reçoit
+// Chaque nouveau téléphone (Android 15, image officielle redroid) reçoit
 // automatiquement Aurora Store dès que le boot est fini (voir
 // provisionAuroraStore) — l'équivalent open-source du Play Store, sans compte
 // Google ni image tierce à risque.
@@ -69,12 +69,12 @@ const execFileAsync = promisify(execFile)
 
 const PORT = Number(process.env.PORT || 8787)
 const TOKEN = process.env.AGENT_TOKEN || ''
-// Image officielle redroid (éditeur officiel, pas de GApps intégré). Android 16
+// Image officielle redroid (éditeur officiel, pas de GApps intégré). Android 15
 // par défaut — Play Store remplacé par Aurora Store (open-source, catalogue Play
 // complet, sans compte Google), auto-installé sur chaque nouveau téléphone
-// juste après son 1er boot (voir provisionNewPhone). Pas de dépendance à une
+// juste après son 1er boot (voir provisionAuroraStore). Pas de dépendance à une
 // image tierce inconnue tournant en --privileged.
-const IMAGE_DEFAULT = 'redroid/redroid:16.0.0-latest'
+const IMAGE_DEFAULT = 'redroid/redroid:15.0.0-latest'
 // Variantes GApps (Play Store/Gmail réels) — build tiers (edwardzhouquan), pas
 // l'éditeur officiel ; option explicite via androidVersion pour qui les préfère
 // à Aurora Store. https://hub.docker.com/r/edwardzhouquan/redroid-mindthegapps-arm64

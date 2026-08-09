@@ -158,7 +158,7 @@ Attends ~30 secondes (le certificat se génère), puis :
 curl -H "Authorization: Bearer TON_TOKEN" https://TON_DOMAINE/health
 ```
 
-✅ **Tu dois voir :** `{"ok":true,"image":"redroid/redroid:16.0.0-latest"}`
+✅ **Tu dois voir :** `{"ok":true,"image":"redroid/redroid:15.0.0-latest"}`
 
 ❌ Si erreur de certificat → attends 1 min et réessaie (Let's Encrypt met un peu
 de temps). Si ça persiste, envoie-moi le retour de `journalctl -u caddy -n 30 --no-pager`.
