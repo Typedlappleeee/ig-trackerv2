@@ -43,7 +43,10 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
   const [phase, setPhase] = useState<Phase>('fetching')
   const [errMsg, setErrMsg] = useState('')
   const [snap, setSnap] = useState<string | null>(null)
-  const [fluid, setFluid] = useState(true)
+  // Capture par défaut : image que l'on contrôle à 100 % → remplit parfaitement,
+  // aucune barre d'outils, aucun gris. Le mode Fluide (ws-scrcpy, flux temps
+  // réel) reste dispo mais affiche sa barre native non masquable proprement.
+  const [fluid, setFluid] = useState(false)
   const [installing, setInstalling] = useState(false)
   const [installMsg, setInstallMsg] = useState('')
   const [showApps, setShowApps] = useState(false)
@@ -78,7 +81,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     pollRef.current = window.setInterval(async () => {
       const r = await cloudPhones.screenshot(inst.id)
       if (r.ok && r.data?.dataUrl) setSnap(r.data.dataUrl)
-    }, 2000)
+    }, 1200)
     return () => { if (pollRef.current) window.clearInterval(pollRef.current) }
   }, [phase, fluid, inst.id])
 
@@ -94,8 +97,11 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
   }
 
+  // Réserve de largeur pour la barre scrcpy (mode Fluide uniquement ; en Capture
+  // le corps épouse pile le ratio 9:16).
+  const toolbarReserve = fluid ? CP_TOOLBAR : 0
   // Largeur max pour que la fenêtre (hauteur dérivée) tienne dans l'écran.
-  const maxWidthForViewport = () => Math.round((window.innerHeight * 0.94 - CP_TITLE - CP_ACTION) * 9 / 16 + CP_TOOLBAR)
+  const maxWidthForViewport = () => Math.round((window.innerHeight * 0.94 - CP_TITLE - CP_ACTION) * 9 / 16 + toolbarReserve)
 
   // Redimensionnement par la poignée en bas à droite : on ne pilote QUE la
   // largeur (la hauteur suit le ratio téléphone) → aucun gris possible.
@@ -124,9 +130,11 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     }
   }
 
-  // Dimensions dérivées : la hauteur épouse la vidéo (9:16) + le chrome.
-  const bodyH = Math.round((winW - CP_TOOLBAR) * 16 / 9)
-  const winH = CP_TITLE + bodyH + (phase === 'ready' ? CP_ACTION : 0)
+  // Hauteur du CORPS = ratio téléphone 9:16 sur la largeur utile (hors barre
+  // scrcpy en Fluide). La fenêtre elle-même est en hauteur auto → pas besoin
+  // d'estimer la hauteur exacte de la barre d'actions (fini les calculs de
+  // chrome approximatifs qui laissaient du gris).
+  const bodyH = Math.round((winW - toolbarReserve) * 16 / 9)
 
   const onScreenClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     const img = imgRef.current
@@ -192,7 +200,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
     <div
       onMouseDown={onFocus}
       style={{
-        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: winW, height: winH,
+        position: 'fixed', left: pos.x, top: pos.y, zIndex, width: winW,
         borderRadius: 16, overflow: 'hidden', background: '#0b0c12',
         border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 30px 70px -24px rgba(0,0,0,0.8)',
         display: 'flex', flexDirection: 'column',
@@ -220,7 +228,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
           d'outils comprise, comme GeeLark) et on le laisse remplir tout
           l'espace dispo (flex:1) — la vidéo se redimensionne toute seule en JS
           quand ce conteneur change de taille (fenêtre redimensionnable). */}
-      <div style={{ flex: 1, minHeight: 0, background: '#050609', display: 'grid', placeItems: 'center', position: 'relative' }}>
+      <div style={{ height: bodyH, background: '#050609', display: 'grid', placeItems: 'center', position: 'relative' }}>
         {phase !== 'ready' && phase !== 'error' && (
           <div style={{ textAlign: 'center', padding: 24 }}>
             <div style={{ width: 40, height: 40, margin: '0 auto 16px', borderRadius: '50%', border: '3px solid rgba(129,140,248,0.25)', borderTopColor: '#818CF8', animation: 'cp-spin 0.9s linear infinite' }} />
