@@ -11,18 +11,29 @@
 //   POST   /instances/:id/start|stop   → démarre / arrête
 //   POST   /instances/:id/shell { cmd } → commande ADB (base de l'automatisation)
 //   GET    /instances/:id/screenshot   → capture PNG (base64)
+//   POST   /instances/:id/install { url } → télécharge un APK et l'installe (sideload)
 //
 // Démarrage : AGENT_TOKEN=... node server.js   (voir README.md)
 
 const http = require('http')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const execFileAsync = promisify(execFile)
 
 const PORT = Number(process.env.PORT || 8787)
 const TOKEN = process.env.AGENT_TOKEN || ''
-// Image Redroid ARM (Android natif ARM = bien plus proche d'un vrai téléphone).
-const IMAGE = process.env.REDROID_IMAGE || 'redroid/redroid:13.0.0-latest'
+// Image avec GApps (Play Store, Gmail, Play Services) intégrés — build tiers
+// (edwardzhouquan), pas l'éditeur officiel redroid. Choisie explicitement par
+// l'admin pour avoir un Play Store fonctionnel ; à surveiller (mainteneur
+// inconnu, tourne en --privileged). https://hub.docker.com/r/edwardzhouquan/redroid-mindthegapps-arm64
+const GAPPS_IMAGES = {
+  '13.0.0': 'edwardzhouquan/redroid-mindthegapps-arm64:13.0.0-arm64_only',
+  '14.0.0': 'edwardzhouquan/redroid-mindthegapps-arm64:14.0.0-arm64_only',
+}
+const IMAGE = process.env.REDROID_IMAGE || GAPPS_IMAGES['13.0.0']
 const DATA_ROOT = process.env.DATA_ROOT || '/var/lib/scaleflow-phones'
 const PORT_BASE = Number(process.env.PORT_BASE || 5600)   // port ADB de la 1re instance
 
@@ -73,7 +84,11 @@ async function createInstance({ name, androidVersion }) {
   if (!NAME_RE.test(name || '')) throw new Error('nom invalide (a-z, 0-9, _ et - uniquement)')
   const port = await nextPort()
   const m = rnd(MODELS)
-  const image = androidVersion ? `redroid/redroid:${androidVersion}-latest` : IMAGE
+  // GApps dispo seulement pour certaines versions (build tiers) — sinon on
+  // retombe sur l'image officielle redroid (sans Play Store).
+  const image = androidVersion
+    ? (GAPPS_IMAGES[androidVersion] || `redroid/redroid:${androidVersion}-latest`)
+    : IMAGE
   // Chaque instance a ses propres props → empreinte distincte.
   const props = [
     `ro.product.brand=${m.brand}`, `ro.product.model=${m.model}`, `ro.product.device=${m.device}`,
@@ -92,6 +107,28 @@ async function createInstance({ name, androidVersion }) {
 
 async function connectAdb(serial) {
   try { await adb(['connect', serial], 15000) } catch { /* déjà connecté */ }
+}
+
+const MAX_APK_BYTES = 300 * 1024 * 1024   // 300 Mo
+
+// Télécharge un APK (http/https uniquement) et l'installe en sideload.
+// -g accorde direct toutes les permissions runtime demandées (pas de popup à
+// valider manuellement — indispensable pour de l'automatisation).
+async function installApk(serial, apkUrl) {
+  if (!/^https?:\/\//i.test(apkUrl)) throw new Error('URL APK invalide (http/https uniquement)')
+  const r = await fetch(apkUrl, { signal: AbortSignal.timeout(120000) })
+  if (!r.ok) throw new Error(`téléchargement APK échoué (HTTP ${r.status})`)
+  const len = Number(r.headers.get('content-length') || 0)
+  if (len && len > MAX_APK_BYTES) throw new Error('APK trop volumineux (>300 Mo)')
+  const buf = Buffer.from(await r.arrayBuffer())
+  if (buf.length > MAX_APK_BYTES) throw new Error('APK trop volumineux (>300 Mo)')
+  const tmpFile = path.join(os.tmpdir(), `sf-apk-${Date.now()}-${Math.random().toString(36).slice(2)}.apk`)
+  fs.writeFileSync(tmpFile, buf)
+  try {
+    return await adb(['-s', serial, 'install', '-r', '-g', tmpFile], 180000)
+  } finally {
+    fs.unlink(tmpFile, () => {})
+  }
 }
 
 const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) }
@@ -140,6 +177,10 @@ const server = http.createServer(async (req, res) => {
         const png = await execFileAsync('adb', ['-s', inst.serial, 'exec-out', 'screencap', '-p'],
           { timeout: 30000, maxBuffer: 64 * 1024 * 1024, encoding: 'buffer' })
         return json(res, 200, { ok: true, dataUrl: `data:image/png;base64,${png.stdout.toString('base64')}` })
+      }
+      if (parts[2] === 'install' && req.method === 'POST') {
+        const out = await installApk(inst.serial, String(body.url || ''))
+        return json(res, 200, { ok: true, output: out })
       }
     }
     return json(res, 404, { ok: false, error: 'route inconnue' })
