@@ -93,3 +93,24 @@ export const cloudPhones = {
   // Installe la dernière version d'un paquet F-Droid (par nom de paquet).
   installFdroid: (id: string, pkg: string) => call<{ output: string }>('installfdroid', { id, pkg }),
 }
+
+// Envoie un FICHIER vidéo local directement à l'agent (XHR binaire, progression).
+// Ne passe pas par le proxy serverless (limite de taille). Nécessite l'agent à
+// jour (route pushfile + CORS) et le domaine agent autorisé par la CSP.
+export function uploadVideoFile(id: string, file: File, onProgress?: (pct: number) => void): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    if (!agentUrl || !agentToken) { resolve({ ok: false, error: 'Agent non configuré' }); return }
+    if (typeof location !== 'undefined' && location.protocol === 'https:' && /^http:\/\//i.test(agentUrl)) {
+      resolve({ ok: false, error: 'URL agent en http:// (mets https://)' }); return
+    }
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${agentUrl}/instances/${encodeURIComponent(id)}/pushfile`)
+    xhr.setRequestHeader('Authorization', `Bearer ${agentToken}`)
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100)) }
+    xhr.onload = () => { let err: string | undefined; try { err = JSON.parse(xhr.responseText)?.error } catch { /* non-JSON */ } resolve({ ok: xhr.status >= 200 && xhr.status < 300, error: err ?? (xhr.status ? `HTTP ${xhr.status}` : undefined) }) }
+    xhr.onerror = () => resolve({ ok: false, error: 'agent injoignable' })
+    xhr.timeout = 300000; xhr.ontimeout = () => resolve({ ok: false, error: 'délai dépassé' })
+    xhr.send(file)
+  })
+}

@@ -11,9 +11,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
-import { cloudPhones, loadCloudAgentConfig, getCloudAgent, type CpInstance } from '@/lib/cloudPhones'
+import { cloudPhones, loadCloudAgentConfig, getCloudAgent, uploadVideoFile, type CpInstance } from '@/lib/cloudPhones'
 import { runFlow, type Flow } from '@/lib/flowRunner'
-import { OFFICIAL_FLOWS } from '@/lib/officialFlows'
+import { OFFICIAL_FLOWS, findFlow } from '@/lib/officialFlows'
 import { listMyFlows, listCommunityFlows, bumpInstalls, type StoredFlow } from '@/lib/flowStore'
 import { FlowWorkshop } from '@/components/FlowWorkshop'
 
@@ -25,7 +25,10 @@ export function AutomationLab({ user }: Props) {
   const { currentOrg } = useOrg()
   const [conn, setConn] = useState<Conn>('checking')
   const [instances, setInstances] = useState<CpInstance[]>([])
-  const [tab, setTab] = useState<'run' | 'create'>('run')
+  const [tab, setTab] = useState<'run' | 'post' | 'create'>('run')
+  const [postFile, setPostFile] = useState<File | null>(null)
+  const [postCaption, setPostCaption] = useState('')
+  const [posting, setPosting] = useState(false)
 
   const [myFlows, setMyFlows] = useState<StoredFlow[]>([])
   const [communityFlows, setCommunityFlows] = useState<StoredFlow[]>([])
@@ -82,6 +85,28 @@ export function AutomationLab({ user }: Props) {
     setRunning(false)
   }
 
+  // TOUT-EN-UN : upload la vidéo sur chaque tel sélectionné puis lance « Poster
+  // un Reel » avec la description. En parallèle, journal par tel.
+  const postRun = async () => {
+    const flow = findFlow('ig-post-reel')
+    if (!postFile || !flow || selected.size === 0) return
+    const ids = [...selected]
+    setResults(Object.fromEntries(ids.map(id => [id, { status: 'run', log: ['⏳ En attente…'] } as RunState])))
+    setPosting(true)
+    await Promise.all(ids.map(async id => {
+      const push = (m: string) => setResults(r => ({ ...r, [id]: { ...r[id], log: [...(r[id]?.log ?? []), m] } }))
+      const setOnly = (m: string) => setResults(r => ({ ...r, [id]: { ...r[id], log: [m] } }))
+      setOnly('📤 Upload de la vidéo…')
+      const up = await uploadVideoFile(id, postFile!, pct => setOnly(`📤 Upload ${pct}%`))
+      if (!up.ok) { setResults(r => ({ ...r, [id]: { ...r[id], status: 'fail', failedAt: `upload : ${up.error}` } })); return }
+      push('✓ Vidéo envoyée')
+      await new Promise(res => setTimeout(res, 1800)) // laisse MediaStore indexer
+      const res = await runFlow(id, flow, { vars: { caption: postCaption }, log: push })
+      setResults(r => ({ ...r, [id]: { ...r[id], status: res.ok ? 'ok' : 'fail', failedAt: res.failedAt } }))
+    }))
+    setPosting(false)
+  }
+
   const nameOf = (id: string) => instances.find(i => i.id === id)?.name ?? id
 
   return (
@@ -98,72 +123,52 @@ export function AutomationLab({ user }: Props) {
           {/* Onglets */}
           <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 11, background: 'rgba(0,0,0,0.3)', marginBottom: 18, width: 'fit-content' }}>
             <Tab on={tab === 'run'} onClick={() => setTab('run')}>▶️ Lancer</Tab>
+            <Tab on={tab === 'post'} onClick={() => setTab('post')}>📤 Poster</Tab>
             <Tab on={tab === 'create'} onClick={() => setTab('create')}>🛠️ Créer</Tab>
           </div>
 
-          {tab === 'create'
-            ? <FlowWorkshop phones={runningPhones} userId={user.id} orgId={orgId} onSaved={loadFlows} />
-            : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* 1 · Automatisation (catégorisée) */}
-                <Card title="1 · Automatisation">
-                  <FlowGroup title="⭐ Officielles" flows={OFFICIAL_FLOWS} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} />
-                  <FlowGroup title="👤 Mes automatisations" flows={myFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }}
-                    empty="Rien encore — crée-en dans l’onglet « Créer »." />
-                  <FlowGroup title="🌍 Communauté" flows={communityFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }}
-                    empty="Aucune automatisation communautaire pour l’instant." />
-                  {flow?.inputs?.map(inp => (
-                    <div key={inp.key} style={{ marginTop: 12 }}>
-                      <label style={{ fontSize: 11.5, fontWeight: 700, color: '#c8c8d8', display: 'block', marginBottom: 4 }}>{inp.label}{inp.optional ? ' (optionnel)' : ''}</label>
-                      <input value={inputs[inp.key] ?? ''} onChange={e => setInputs(s => ({ ...s, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />
-                    </div>
-                  ))}
-                </Card>
+          {tab === 'create' && <FlowWorkshop phones={runningPhones} userId={user.id} orgId={orgId} onSaved={loadFlows} />}
 
-                {/* 2 · Téléphones (multi-sélection) */}
-                <Card title={`2 · Téléphones (${selected.size} sélectionné${selected.size > 1 ? 's' : ''})`}>
-                  {runningPhones.length === 0
-                    ? <p style={{ fontSize: 12.5, color: '#FBBF24', margin: 0 }}>Aucun téléphone en ligne. Démarres-en dans <b>Cloud Phones</b>.</p>
-                    : (
-                      <>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, color: '#C7D2FE', cursor: 'pointer', marginBottom: 8 }}>
-                          <input type="checkbox" checked={allSelected} onChange={toggleAll} /> Tout sélectionner
-                        </label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 6 }}>
-                          {runningPhones.map(p => (
-                            <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, cursor: 'pointer', background: selected.has(p.id) ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selected.has(p.id) ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
-                              <input type="checkbox" checked={selected.has(p.id)} onChange={() => togglePhone(p.id)} />
-                              <span style={{ fontSize: 12, fontWeight: 700, color: '#E9E9F2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                </Card>
-
-                <button onClick={run} disabled={running || selected.size === 0 || !flow} style={{ ...runBtn, opacity: (running || selected.size === 0 || !flow) ? 0.55 : 1 }}>
-                  {running ? '⏳ Exécution…' : `▶️ Lancer sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
-                </button>
-
-                {/* Résultats par téléphone */}
-                {Object.keys(results).length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {Object.entries(results).map(([id, r]) => (
-                      <div key={id} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: 13 }}>{r.status === 'run' ? '⏳' : r.status === 'ok' ? '✅' : '❌'}</span>
-                          <span style={{ fontSize: 12.5, fontWeight: 800, color: '#E9E9F2' }}>{nameOf(id)}</span>
-                          {r.status === 'fail' && <span style={{ fontSize: 11, color: '#F87171' }}>bloqué : {r.failedAt}</span>}
-                        </div>
-                        <div style={{ maxHeight: 130, overflowY: 'auto', fontSize: 11, lineHeight: 1.5, fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre-wrap', color: '#c8c8d8' }}>
-                          {r.log.map((l, i) => <div key={i} style={{ color: l.startsWith('✅') ? '#34D399' : l.startsWith('❌') ? '#F87171' : l.startsWith('  ✗') ? '#FBBF24' : '#c8c8d8' }}>{l}</div>)}
-                        </div>
-                      </div>
-                    ))}
+          {tab === 'run' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <Card title="1 · Automatisation">
+                <FlowGroup title="⭐ Officielles" flows={OFFICIAL_FLOWS} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} />
+                <FlowGroup title="👤 Mes automatisations" flows={myFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} empty="Rien encore — crée-en dans l’onglet « Créer »." />
+                <FlowGroup title="🌍 Communauté" flows={communityFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} empty="Aucune automatisation communautaire pour l’instant." />
+                {flow?.inputs?.map(inp => (
+                  <div key={inp.key} style={{ marginTop: 12 }}>
+                    <label style={{ fontSize: 11.5, fontWeight: 700, color: '#c8c8d8', display: 'block', marginBottom: 4 }}>{inp.label}{inp.optional ? ' (optionnel)' : ''}</label>
+                    <input value={inputs[inp.key] ?? ''} onChange={e => setInputs(s => ({ ...s, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />
                   </div>
-                )}
-              </div>
-            )}
+                ))}
+              </Card>
+              <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
+              <button onClick={run} disabled={running || selected.size === 0 || !flow} style={{ ...runBtn, opacity: (running || selected.size === 0 || !flow) ? 0.55 : 1 }}>
+                {running ? '⏳ Exécution…' : `▶️ Lancer sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
+              </button>
+              <ResultsList results={results} nameOf={nameOf} />
+            </div>
+          )}
+
+          {tab === 'post' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <Card title="1 · Vidéo + description">
+                <p style={{ fontSize: 11.5, color: '#8a8a9c', margin: '0 0 10px', lineHeight: 1.5 }}>Choisis une vidéo et une description → elle sera <b>uploadée</b> sur chaque tel sélectionné puis <b>postée en Reel</b> automatiquement.</p>
+                <label style={{ display: 'block', marginBottom: 10 }}>
+                  <input type="file" accept="video/*" onChange={e => setPostFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} id="post-file" />
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: '1.5px dashed rgba(129,140,248,0.5)', background: 'rgba(129,140,248,0.07)', color: '#C7D2FE', cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }} onClick={() => document.getElementById('post-file')?.click()}>
+                    🎬 {postFile ? postFile.name : 'Choisir une vidéo'}
+                  </span>
+                </label>
+                <textarea value={postCaption} onChange={e => setPostCaption(e.target.value)} placeholder="Description / légende (emoji ok)" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+              </Card>
+              <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
+              <button onClick={postRun} disabled={posting || !postFile || selected.size === 0} style={{ ...runBtn, opacity: (posting || !postFile || selected.size === 0) ? 0.55 : 1 }}>
+                {posting ? '⏳ Publication…' : `📤 Poster sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
+              </button>
+              <ResultsList results={results} nameOf={nameOf} />
+            </div>
+          )}
         </>
       )}
     </div>
@@ -175,6 +180,48 @@ const runBtn: React.CSSProperties = { width: '100%', fontSize: 14, fontWeight: 8
 
 function Tab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} style={{ fontSize: 12.5, fontWeight: 800, padding: '7px 16px', borderRadius: 8, border: 'none', background: on ? 'rgba(129,140,248,0.2)' : 'transparent', color: on ? '#C7D2FE' : '#8a8a9c', cursor: 'pointer' }}>{children}</button>
+}
+function PhonePicker({ phones, selected, allSelected, toggleAll, togglePhone }: { phones: CpInstance[]; selected: Set<string>; allSelected: boolean; toggleAll: () => void; togglePhone: (id: string) => void }) {
+  return (
+    <Card title={`Téléphones (${selected.size} sélectionné${selected.size > 1 ? 's' : ''})`}>
+      {phones.length === 0
+        ? <p style={{ fontSize: 12.5, color: '#FBBF24', margin: 0 }}>Aucun téléphone en ligne. Démarres-en dans <b>Cloud Phones</b>.</p>
+        : (
+          <>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, color: '#C7D2FE', cursor: 'pointer', marginBottom: 8 }}>
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} /> Tout sélectionner
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 6 }}>
+              {phones.map(p => (
+                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, cursor: 'pointer', background: selected.has(p.id) ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selected.has(p.id) ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
+                  <input type="checkbox" checked={selected.has(p.id)} onChange={() => togglePhone(p.id)} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#E9E9F2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+    </Card>
+  )
+}
+function ResultsList({ results, nameOf }: { results: Record<string, RunState>; nameOf: (id: string) => string }) {
+  if (Object.keys(results).length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {Object.entries(results).map(([id, r]) => (
+        <div key={id} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span style={{ fontSize: 13 }}>{r.status === 'run' ? '⏳' : r.status === 'ok' ? '✅' : '❌'}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: '#E9E9F2' }}>{nameOf(id)}</span>
+            {r.status === 'fail' && <span style={{ fontSize: 11, color: '#F87171' }}>bloqué : {r.failedAt}</span>}
+          </div>
+          <div style={{ maxHeight: 130, overflowY: 'auto', fontSize: 11, lineHeight: 1.5, fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre-wrap', color: '#c8c8d8' }}>
+            {r.log.map((l, i) => <div key={i} style={{ color: l.startsWith('✅') ? '#34D399' : l.startsWith('❌') ? '#F87171' : l.startsWith('  ✗') ? '#FBBF24' : '#c8c8d8' }}>{l}</div>)}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
