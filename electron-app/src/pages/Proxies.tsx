@@ -4,7 +4,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
-import { cloudPhones, loadCloudAgentConfig, getCloudAgent } from '@/lib/cloudPhones'
+import { loadCloudAgentConfig, getCloudAgent } from '@/lib/cloudPhones'
+import { runProxyCheck } from '@/lib/proxyChecks'
 import {
   listProxies, addProxies, deleteProxy, setProxyGroup,
   listGroups, addGroup, deleteGroup,
@@ -43,9 +44,10 @@ export function Proxies({ user }: Props) {
     if (!getCloudAgent().url) return
     startedRef.current.add(p.id)
     setChecks(c => ({ ...c, [p.id]: { loading: true } }))
-    const r = await cloudPhones.checkProxy({ type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
-    const d = r.data
-    setChecks(c => ({ ...c, [p.id]: r.ok && d?.reachable ? { ip: d.ip, isp: d.isp, country: d.country } : { err: d?.error || r.error || 'endpoint agent manquant ?' } }))
+    // runProxyCheck écrit dans le cache partagé (sf-proxy-checks) → l'IP sortante
+    // apparaît AUSSI sur la ligne du téléphone dans Cloud Phones (même donnée).
+    const chk = await runProxyCheck({ id: p.id, type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
+    setChecks(c => ({ ...c, [p.id]: chk.reachable ? { ip: chk.ip, isp: chk.isp, country: chk.country } : { err: chk.error || 'KO' } }))
   }
   // Teste une liste avec une petite concurrence (4).
   const runChecks = async (list: Proxy[]) => {
