@@ -300,6 +300,7 @@ export function CloudPhones({ user }: Props) {
                     )}
                     {instances.map(inst => {
                       const running = isRunning(inst.state)
+                      const isOpen = openIds.includes(inst.id)
                       const m = meta[inst.id] ?? {}
                       const display = m.name || inst.name
                       return (
@@ -312,6 +313,7 @@ export function CloudPhones({ user }: Props) {
                               <span style={{ width: 7, height: 7, borderRadius: 99, background: running ? 'var(--ok)' : 'var(--text-4)', boxShadow: running ? '0 0 6px var(--ok)' : 'none' }} />
                               {running ? tr('En ligne', 'Online') : tr('Arrêté', 'Stopped')}
                             </span>
+                            {isOpen && <span style={{ display: 'inline-block', marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#818CF8', background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.4)', borderRadius: 99, padding: '1px 8px' }}>● {tr('Ouvert', 'Open')}</span>}
                           </td>
                           <td style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>{display}</td>
                           <td style={{ padding: '10px 16px' }}>
@@ -335,7 +337,9 @@ export function CloudPhones({ user }: Props) {
                           <td style={{ padding: '10px 16px', color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{fmtDate(m.createdAt)}</td>
                           <td style={{ padding: '10px 16px' }}>
                             <div style={{ display: 'flex', gap: 6 }}>
-                              <button onClick={() => openWindow(inst.id)} className="sf-btn sf-btn-primary text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>▶ {tr('Ouvrir', 'Open')}</button>
+                              {isOpen
+                                ? <button onClick={() => closeWindow(inst.id)} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 10px', color: '#818CF8' }}>◉ {tr('Ouvert', 'Open')} · {tr('fermer', 'close')}</button>
+                                : <button onClick={() => openWindow(inst.id)} className="sf-btn sf-btn-primary text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>▶ {tr('Ouvrir', 'Open')}</button>}
                               <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'remove')} className="sf-btn sf-btn-ghost text-[11.5px] text-danger" style={{ height: 28, padding: '0 10px' }}>{tr('Suppr.', 'Del.')}</button>
                               <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
                                 <button onClick={() => setMenuId(menuId === inst.id ? null : inst.id)} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 8px', fontWeight: 800 }}>⋯</button>
