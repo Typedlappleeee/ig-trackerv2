@@ -47,6 +47,28 @@ export async function watchStories(id: string, params: Record<string, unknown>, 
   log(`✓ ${count} stories`)
 }
 
+// ── Regarder des reels (warmup) ─────────────────────────────────────────────
+export async function watchReels(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const count = Number(params.count) || 5
+  const doLike = /^(1|true|oui|yes)$/i.test(String(params.like ?? ''))
+  await dismissPopups(id)
+  // ouvre l'onglet Reels (nav) ; repli sur deep link
+  const opened = await tap(id, { desc: 'Reels' }, { timeoutMs: 5000, retries: 1 }) || await tap(id, { contains: 'Reels' }, { timeoutMs: 3000 })
+  if (!opened) await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://reels_home'`)
+  await sleep(3500); await dismissPopups(id)
+  let liked = 0
+  for (let i = 0; i < count; i++) {
+    await sleep(jitter(3500, 4000))  // on regarde le reel
+    if (doLike && Math.random() < 0.4) {  // like ~40 % des reels (double-tap)
+      await cloudPhones.shell(id, 'input tap 540 950'); await sleep(120); await cloudPhones.shell(id, 'input tap 540 950')
+      liked++; log(`  ❤️ like`)
+    }
+    await cloudPhones.shell(id, 'input swipe 540 1500 540 500 300')  // reel suivant (swipe up)
+    log(`  🎬 reel ${i + 1}/${count}`)
+  }
+  log(`✓ ${count} reels regardés${doLike ? ` · ${liked} like(s)` : ''}`)
+}
+
 // ── Suivre les abonnés d'un compte cible (lead gen / croissance) ────────────
 export async function followFollowers(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
   const target = String(params.target || '').replace(/^@/, '')
@@ -97,6 +119,7 @@ export async function scrapeFollowers(id: string, params: Record<string, unknown
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   like_feed: likeFeed,
   watch_stories: watchStories,
+  watch_reels: watchReels,
   follow_followers: followFollowers,
   scrape_followers: scrapeFollowers,
 }

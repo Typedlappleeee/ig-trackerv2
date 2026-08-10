@@ -86,6 +86,22 @@ export const OFFICIAL_FLOWS: Flow[] = [
     ],
   },
   {
+    id: 'ig-watch-reels',
+    name: 'Regarder des reels (Instagram)',
+    official: true,
+    app: 'com.instagram.android',
+    description: 'Ouvre l’onglet Reels et en regarde plusieurs (swipe), avec like optionnel. Warmup naturel.',
+    inputs: [
+      { key: 'count', label: 'Nombre de reels', placeholder: 'ex : 8', optional: true },
+      { key: 'like', label: 'Liker certains reels ? (oui/non)', placeholder: 'non', optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 2000 }, { do: 'popups' },
+      { do: 'action', name: 'watch_reels', params: { count: '{{count}}', like: '{{like}}' } },
+    ],
+  },
+  {
     id: 'ig-watch-stories',
     name: 'Regarder des stories (Instagram)',
     official: true,
