@@ -328,14 +328,14 @@ export function Subtitles({ user }: SubtitlesProps) {
       if (!src) return
       const a = document.createElement('a')
       a.href = src
-      a.download = videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mp4'
+      a.download = videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mov'
       a.click()
       return
     }
     if (!outputPath) return
     await window.electronAPI.saveFileAs({
       sourcePath:  outputPath,
-      defaultName: videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mp4',
+      defaultName: videoName.replace(/\.[^.]+$/, '') + '_sous-titres.mov',
     })
   }
 

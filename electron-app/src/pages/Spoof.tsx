@@ -855,13 +855,13 @@ function SpoofJobCard({ job, onSave }: { job: SpoofJob; onSave: () => void }) {
       const blob = await res.blob()
       const a    = document.createElement('a')
       a.href     = URL.createObjectURL(new Blob([await blob.arrayBuffer()], { type: 'video/mp4' }))
-      a.download = `spoof_${job.name}`
+      a.download = `spoof_${job.name.replace(/\.[^.]+$/, '')}.mov`
       a.click()
       setTimeout(() => URL.revokeObjectURL(a.href), 10000)
     } catch {
       const a = document.createElement('a')
       a.href = job.outputUrl!
-      a.download = `spoof_${job.name}`
+      a.download = `spoof_${job.name.replace(/\.[^.]+$/, '')}.mov`
       a.click()
     }
   }
