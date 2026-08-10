@@ -133,6 +133,7 @@ phones.tondomaine.com {
     # Agent (API pilotée par ScaleFlow)
     reverse_proxy /health* localhost:8787
     reverse_proxy /instances* localhost:8787
+    reverse_proxy /proxy* localhost:8787
 
     # Écran FLUIDE (ws-scrcpy) — servi À LA RACINE du domaine (ws-scrcpy génère
     # des chemins d'assets absolus ; le monter sous /live/ avec strip_prefix
