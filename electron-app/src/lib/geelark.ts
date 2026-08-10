@@ -2005,6 +2005,7 @@ async function runWarmupActions(
   }
 
   while (Date.now() < endTime && !abortSignal.abort) {
+   try {
     // Scroll the feed
     const swipeY1 = 1400 + Math.floor(Math.random() * 200)
     const swipeY2 = 400  + Math.floor(Math.random() * 200)
@@ -2068,6 +2069,13 @@ async function runWarmupActions(
         await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
         await sleep(3000)
       }
+    }
+   } catch (e) {
+      // Un shell transitoirement « pas prêt » (fréquent quand plusieurs téléphones
+      // tournent en même temps) ne doit PAS interrompre tout le warmup : on log et
+      // on continue à défiler jusqu'à ce que la durée choisie soit écoulée.
+      log(`   ⚠ Action ignorée (${e instanceof Error ? e.message : String(e)})`)
+      await sleep(2000)
     }
   }
 
