@@ -54,17 +54,19 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
 
   useEffect(() => { setPhoneId(p => p || phones[0]?.id || '') }, [phones])
 
+  const inFlightRef = useRef(false)
   const refreshSnap = useCallback(async () => {
-    if (!phoneId) return
-    const r = await cloudPhones.screenshot(phoneId)
-    if (r.ok && r.data?.dataUrl) setSnap(r.data.dataUrl)
+    if (!phoneId || inFlightRef.current) return
+    inFlightRef.current = true
+    try { const r = await cloudPhones.screenshot(phoneId); if (r.ok && r.data?.dataUrl) setSnap(r.data.dataUrl) }
+    finally { inFlightRef.current = false }
   }, [phoneId])
 
   useEffect(() => { refreshSnap() }, [refreshSnap])
-  // Rafraîchit l'aperçu régulièrement (léger, pour voir où on en est).
+  // Rafraîchit l'aperçu régulièrement — pause quand l'onglet est caché.
   useEffect(() => {
     if (!phoneId) return
-    const t = window.setInterval(refreshSnap, 2500)
+    const t = window.setInterval(() => { if (!document.hidden) refreshSnap() }, 2500)
     return () => window.clearInterval(t)
   }, [phoneId, refreshSnap])
 
