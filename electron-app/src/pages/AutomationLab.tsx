@@ -114,13 +114,16 @@ export function AutomationLab({ user }: Props) {
   return (
     <div className="sf-page sf-page-enter">
       <header className="sf-page-header">
-        <div className="sf-page-icon">🤖</div>
-        <div>
-          <h1 className="sf-page-title">Automatisation</h1>
-          <p className="sf-page-sub">Automatisations UI (façon GeeLark) sur tes cloud phones : vise les éléments par leur sens, attend les écrans, ferme les popups, réessaie.</p>
+        <div className="sf-cluster" style={{ gap: 14, minWidth: 0 }}>
+          <div className="sf-page-icon" aria-hidden="true">🤖</div>
+          <div style={{ minWidth: 0 }}>
+            <h1 className="sf-page-title">Automatisation</h1>
+            <p className="sf-page-sub">Automatisations UI (façon GeeLark) sur tes cloud phones.</p>
+          </div>
         </div>
       </header>
       <style>{`.sf-flowcard:hover{ border-color: var(--accent) !important; background: var(--accent-dim) !important; transform: translateY(-2px); }`}</style>
+      <div style={{ maxWidth: 1080, width: '100%', margin: '0 auto', padding: '18px 22px 48px', boxSizing: 'border-box' }}>
 
       {conn === 'unconfigured' && <Notice>Agent non configuré — va d’abord dans <b>Cloud Phones</b>.</Notice>}
       {conn === 'error' && <Notice tone="error">Agent injoignable — vérifie <b>Cloud Phones</b>.</Notice>}
@@ -159,7 +162,7 @@ export function AutomationLab({ user }: Props) {
           )}
 
           {tab === 'run' && openedFlow && flow && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720, width: '100%', margin: '0 auto' }}>
               <button onClick={() => setOpenedFlow(null)} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px 0 12px', borderRadius: 10, border: '1px solid var(--border-md)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-1)', cursor: 'pointer', fontSize: 13.5, fontWeight: 700 }}>
                 <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>‹</span> Retour
               </button>
@@ -200,7 +203,7 @@ export function AutomationLab({ user }: Props) {
           )}
 
           {tab === 'post' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720, width: '100%', margin: '0 auto' }}>
               <Card title="1 · Vidéo + description">
                 <p style={{ fontSize: 11.5, color: '#8a8a9c', margin: '0 0 10px', lineHeight: 1.5 }}>Choisis une vidéo et une description → elle sera <b>uploadée</b> sur chaque tel sélectionné puis <b>postée en Reel</b> automatiquement.</p>
                 <label style={{ display: 'block', marginBottom: 10 }}>
@@ -220,6 +223,7 @@ export function AutomationLab({ user }: Props) {
           )}
         </>
       )}
+      </div>
     </div>
   )
 }
