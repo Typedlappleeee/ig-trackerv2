@@ -75,6 +75,29 @@ export async function addProxies(items: Omit<Proxy, 'id' | 'mine'>[], opts: { us
 export async function deleteProxy(id: string): Promise<void> {
   await supabase.from('cloud_proxies').delete().eq('id', id)
 }
-export async function deleteGroup(group: string, uid: string): Promise<void> {
-  await supabase.from('cloud_proxies').delete().eq('user_id', uid).eq('group_name', group)
+// Range (ou dégroupe si group=null) un proxy.
+export async function setProxyGroup(id: string, group: string | null): Promise<void> {
+  await supabase.from('cloud_proxies').update({ group_name: group }).eq('id', id)
+}
+
+// ── Groupes (créables indépendamment) ───────────────────────────────────────
+export async function listGroups(uid: string): Promise<string[]> {
+  const { data } = await supabase.from('proxy_groups').select('name, user_id').order('created_at', { ascending: true })
+  const names = new Set<string>((data as { name: string; user_id: string }[] | null ?? []).map(r => r.name))
+  // + groupes présents sur des proxies mais sans ligne dédiée (rétrocompat)
+  const { data: px } = await supabase.from('cloud_proxies').select('group_name').eq('user_id', uid)
+  ;(px as { group_name: string | null }[] | null ?? []).forEach(r => { if (r.group_name) names.add(r.group_name) })
+  return [...names]
+}
+export async function addGroup(name: string, opts: { userId: string; orgId: string | null }): Promise<{ ok: boolean; error?: string }> {
+  const n = name.trim()
+  if (!n) return { ok: false, error: 'nom vide' }
+  const id = `pg-${Array.from({ length: 8 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')}`
+  const { error } = await supabase.from('proxy_groups').insert({ id, user_id: opts.userId, org_id: opts.orgId, name: n })
+  return error ? { ok: false, error: error.message } : { ok: true }
+}
+// Supprime le groupe (dégroupe les proxies, ne les supprime pas).
+export async function deleteGroup(name: string, uid: string): Promise<void> {
+  await supabase.from('cloud_proxies').update({ group_name: null }).eq('user_id', uid).eq('group_name', name)
+  await supabase.from('proxy_groups').delete().eq('user_id', uid).eq('name', name)
 }
