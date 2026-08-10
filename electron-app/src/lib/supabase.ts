@@ -159,6 +159,13 @@ export interface Phone {
   account_state?: string | null    // 'ok' | 'banned' | 'shadow'
   remark:       string | null
   link:         string | null
+  // ── Métadonnées gérées dans ScaleFlow (survivent au sync GeeLark) ──────────
+  tags?:        string[]           // labels colorés multiples
+  notes?:       string | null      // note utilisateur (persistante, ≠ remark GeeLark)
+  phone_group?: string | null      // groupe local (override du group_name GeeLark)
+  login?:       string | null      // identifiant du compte (mémorisé)
+  password?:    string | null      // mot de passe du compte (mémorisé)
+  totp_secret?: string | null      // secret 2FA/TOTP (mémorisé)
   synced_at:    string
   created_at:   string
 }

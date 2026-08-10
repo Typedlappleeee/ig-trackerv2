@@ -9,6 +9,7 @@ import {
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
+import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
 import { logActivity } from '@/lib/activityLog'
 import { useT, useLang, useTr } from '@/lib/i18n'
@@ -229,8 +230,32 @@ export function Warmup({ user }: WarmupProps) {
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
       if (!grps.includes(loadLastGroup())) setGroupFilter('Tous')
+      prefillStoredCreds(list)
     } catch (e) { setPhonesError(e instanceof Error ? e.message : String(e)) }
     setLoadingPhones(false)
+  }
+
+  // Pré-remplit l'auto-login avec les identifiants mémorisés sur la page Téléphones
+  // (colonnes login/password/totp_secret de `phones`, clés par geelark_id = phone.id).
+  async function prefillStoredCreds(list: GeelarkPhone[]) {
+    const gids = list.map(p => p.id)
+    if (gids.length === 0) return
+    try {
+      let q = supabase.from('phones').select('geelark_id, login, password, totp_secret').in('geelark_id', gids)
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      const { data, error } = await q
+      if (error || !data) return   // colonnes absentes (migration non appliquée) → ignore
+      setLoginCreds(prev => {
+        const next = { ...prev }
+        for (const row of data as Array<{ geelark_id: string; login: string | null; password: string | null; totp_secret: string | null }>) {
+          if (!row.login && !row.password) continue
+          const cur = next[row.geelark_id]
+          if (cur && (cur.email || cur.password)) continue  // ne pas écraser une saisie en cours
+          next[row.geelark_id] = { email: row.login ?? '', password: row.password ?? '', totpSecret: row.totp_secret ?? '' }
+        }
+        return next
+      })
+    } catch { /* ignore */ }
   }
 
   useEffect(() => { if (bearer && !conns.loading) loadPhones() }, [bearer, conns.loading])
