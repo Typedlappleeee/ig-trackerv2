@@ -8,6 +8,7 @@ export const OFFICIAL_FLOWS: Flow[] = [
     id: 'ig-post-reel',
     name: 'Poster un Reel — Instagram',
     official: true,
+    category: '📤 Publication',
     app: 'com.instagram.android',
     description: 'Poste la 1ʳᵉ vidéo de la galerie en Reel, avec légende optionnelle.',
     inputs: [{ key: 'caption', label: 'Légende', placeholder: 'Légende (emoji ok)', optional: true }],
@@ -37,6 +38,7 @@ export const OFFICIAL_FLOWS: Flow[] = [
     id: 'ig-warmup-browse',
     name: 'Warmup — navigation (Instagram)',
     official: true,
+    category: '🔥 Warmup & engagement',
     app: 'com.instagram.android',
     description: 'Simule une navigation humaine (scroll feed + explorer) pour « chauffer » le compte et l’IP. Sans risque : aucun like/follow, que du défilement.',
     steps: [
@@ -57,6 +59,7 @@ export const OFFICIAL_FLOWS: Flow[] = [
     id: 'ig-follow-profile',
     name: 'Suivre un profil (Instagram)',
     official: true,
+    category: '📈 Croissance',
     app: 'com.instagram.android',
     description: 'Ouvre un profil (par deep link) et clique « Suivre ».',
     inputs: [{ key: 'username', label: 'Compte à suivre', placeholder: 'ex : nike (sans @)' }],
@@ -74,6 +77,7 @@ export const OFFICIAL_FLOWS: Flow[] = [
     id: 'ig-warmup-plus',
     name: 'Warmup + likes & stories (Instagram)',
     official: true,
+    category: '🔥 Warmup & engagement',
     app: 'com.instagram.android',
     description: 'Regarde quelques stories, scroll le feed et like des posts. Rythme humain (pauses aléatoires).',
     inputs: [{ key: 'likes', label: 'Nombre de likes', placeholder: 'ex : 5', optional: true }],
@@ -89,6 +93,7 @@ export const OFFICIAL_FLOWS: Flow[] = [
     id: 'ig-watch-reels',
     name: 'Regarder des reels (Instagram)',
     official: true,
+    category: '🔥 Warmup & engagement',
     app: 'com.instagram.android',
     description: 'Ouvre l’onglet Reels et en regarde plusieurs (swipe), avec like optionnel. Warmup naturel.',
     inputs: [
@@ -105,6 +110,7 @@ export const OFFICIAL_FLOWS: Flow[] = [
     id: 'ig-watch-stories',
     name: 'Regarder des stories (Instagram)',
     official: true,
+    category: '🔥 Warmup & engagement',
     app: 'com.instagram.android',
     description: 'Ouvre et regarde des stories du feed (warmup doux).',
     inputs: [{ key: 'count', label: 'Nombre de stories', placeholder: 'ex : 5', optional: true }],
@@ -118,6 +124,7 @@ export const OFFICIAL_FLOWS: Flow[] = [
     id: 'ig-follow-followers',
     name: 'Suivre les abonnés d’un compte (Instagram)',
     official: true,
+    category: '📈 Croissance',
     app: 'com.instagram.android',
     description: 'Ouvre un compte cible et suit ses abonnés (lead gen / croissance). Rythme humain.',
     inputs: [
@@ -130,23 +137,14 @@ export const OFFICIAL_FLOWS: Flow[] = [
       { do: 'action', name: 'follow_followers', params: { target: '{{target}}', count: '{{count}}' } },
     ],
   },
-  {
-    id: 'ig-scrape-followers',
-    name: 'Scraper les abonnés d’un compte (Instagram)',
-    official: true,
-    app: 'com.instagram.android',
-    description: 'Récupère les pseudos des abonnés d’un compte (affichés dans le journal). UI scraping, sans cookie. Utilise un compte "scraper" dédié.',
-    inputs: [
-      { key: 'target', label: 'Compte cible', placeholder: 'ex : nike (sans @)' },
-      { key: 'max', label: 'Nombre max de pseudos', placeholder: 'ex : 100', optional: true },
-    ],
-    steps: [
-      { do: 'open', pkg: 'com.instagram.android' },
-      { do: 'wait', ms: 1500 }, { do: 'popups' },
-      { do: 'action', name: 'scrape_followers', params: { target: '{{target}}', max: '{{max}}' } },
-    ],
-  },
 ]
+
+// Catégories officielles dans l'ordre d'apparition (pour regrouper l'UI).
+export function officialCategories(): string[] {
+  const seen: string[] = []
+  for (const f of OFFICIAL_FLOWS) { const c = f.category ?? '📦 Autres'; if (!seen.includes(c)) seen.push(c) }
+  return seen
+}
 
 export function findFlow(id: string): Flow | undefined {
   return OFFICIAL_FLOWS.find(f => f.id === id)

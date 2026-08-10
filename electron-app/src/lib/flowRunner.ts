@@ -36,6 +36,7 @@ export interface Flow {
   name: string
   description?: string
   app?: string
+  category?: string      // pour regrouper les flows officiels (Publication, Warmup…)
   inputs?: FlowInput[]
   steps: Step[]
   official?: boolean
