@@ -790,22 +790,11 @@ async function clearAndType(
   }
   await sleep(200)
 
-  // Type new text (spaces → %s, shell chars escaped)
-  const escaped = text
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g,  '\\"')
-    .replace(/'/g,  "\\'")
-    .replace(/&/g,  '\\&')
-    .replace(/</g,  '\\<')
-    .replace(/>/g,  '\\>')
-    .replace(/\|/g, '\\|')
-    .replace(/;/g,  '\\;')
-    .replace(/`/g,  '\\`')
-    .replace(/\$/g, '\\$')
-    .replace(/!/g,  '\\!')
-    .replace(/\n/g, '%s')
-    .replace(/ /g,  '%s')
-  await shellExec(bearer, phoneId, `input text "${escaped}"`)
+  // Saisie robuste : ASCII → `input text` (échappement correct), sinon presse-papier.
+  // (L'ancien code sur-échappait & ; ! < > | → un backslash LITTÉRAL était tapé dans
+  // le champ ; et `input text` supprime silencieusement les accents/emojis. Les deux
+  // corrompaient nom/bio.) On réutilise l'entrée déjà focus (double-tap ci-dessus).
+  await typeIntoFocusedField(bearer, phoneId, text, log)
   await sleep(400)
   log(`   ✏️ "${text.substring(0, 40)}${text.length > 40 ? '…' : ''}"`)
 }
