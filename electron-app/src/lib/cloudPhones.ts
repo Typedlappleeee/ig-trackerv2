@@ -43,7 +43,7 @@ interface CpResult<T = unknown> { ok: boolean; status?: number; error?: string; 
 // L'agent ne stocke que l'id du conteneur : ni nom convivial, ni version Android,
 // ni modèle, ni date de création. On garde ça côté navigateur (localStorage) pour
 // pouvoir l'afficher dans la table. Clé unique par id de téléphone.
-export interface CpMeta { name?: string; android?: string; store?: string; model?: string; createdAt?: number }
+export interface CpMeta { name?: string; android?: string; store?: string; model?: string; createdAt?: number; proxyId?: string }
 const META_KEY = 'sf-cp-meta'
 export function loadAllCpMeta(): Record<string, CpMeta> {
   try { return JSON.parse(localStorage.getItem(META_KEY) || '{}') as Record<string, CpMeta> } catch { return {} }

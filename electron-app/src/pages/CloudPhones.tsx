@@ -14,6 +14,7 @@ import {
   type CpInstance, type CpMeta,
 } from '@/lib/cloudPhones'
 import { CloudPhoneWindow } from '@/components/CloudPhoneWindow'
+import { listProxies, proxyLabel, type Proxy } from '@/lib/proxyStore'
 
 interface Props { user: User }
 
@@ -51,8 +52,25 @@ export function CloudPhones({ user }: Props) {
   const [cName, setCName] = useState('')
   const [cAndroid, setCAndroid] = useState<string>('')
   const [cQty, setCQty] = useState(1)
+  const [cProxy, setCProxy] = useState('')   // '' | proxy:<id> | group:<name>
   const [creating, setCreating] = useState(false)
   const [createMsg, setCreateMsg] = useState('')
+  const [allProxies, setAllProxies] = useState<Proxy[]>([])
+
+  // Proxies (pour l'assignation aux tels).
+  useEffect(() => { listProxies(user.id).then(setAllProxies) }, [user.id])
+  // Proxies déjà pris (1 proxy = 1 tel) → pour piocher un libre dans un groupe.
+  const usedProxyIds = new Set(Object.values(meta).map(mm => mm.proxyId).filter(Boolean) as string[])
+  const proxyGroups = [...new Set(allProxies.map(p => p.group).filter(Boolean) as string[])]
+  const proxyById = (pid?: string) => allProxies.find(p => p.id === pid)
+  // Assigne (ou change) le proxy d'un tel.
+  const setPhoneProxy = (id: string, proxyId: string) => { saveCpMeta(id, { proxyId: proxyId || undefined }); setMeta(loadAllCpMeta()) }
+  // Choisit un proxy pour un nouveau tel selon le sélecteur (proxy précis, ou 1 libre du groupe).
+  const pickProxyForNew = (taken: Set<string>): string | undefined => {
+    if (cProxy.startsWith('proxy:')) { const id = cProxy.slice(6); return taken.has(id) ? undefined : id }
+    if (cProxy.startsWith('group:')) { const g = cProxy.slice(6); return allProxies.find(p => p.group === g && !taken.has(p.id))?.id }
+    return undefined
+  }
 
   // Fenêtres flottantes ouvertes (façon GeeLark) : une par tel, indépendantes.
   const [openIds, setOpenIds] = useState<string[]>([])
@@ -117,6 +135,7 @@ export function CloudPhones({ user }: Props) {
     const opt = ANDROID_OPTS.find(o => o.value === cAndroid) ?? ANDROID_OPTS[0]
     setCreating(true)
     let ok = 0
+    const taken = new Set(usedProxyIds)   // évite d'assigner 2× le même proxy dans le lot
     for (let i = 0; i < cQty; i++) {
       const friendly = cQty > 1 ? `${base} ${i + 1}` : base
       setCreateMsg(tr(`Création ${i + 1}/${cQty}…`, `Creating ${i + 1}/${cQty}…`))
@@ -125,7 +144,9 @@ export function CloudPhones({ user }: Props) {
       if (r.ok) {
         ok++
         const fp = r.data?.instance?.fingerprint
-        const m: CpMeta = { name: friendly, android: opt.android, store: opt.store, model: fp?.name, createdAt: Date.now() }
+        const proxyId = pickProxyForNew(taken)
+        if (proxyId) taken.add(proxyId)
+        const m: CpMeta = { name: friendly, android: opt.android, store: opt.store, model: fp?.name, createdAt: Date.now(), proxyId }
         saveCpMeta(id, m)
         setMeta(loadAllCpMeta())
       } else {
@@ -242,14 +263,14 @@ export function CloudPhones({ user }: Props) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
-                      {[tr('Statut', 'Status'), tr('Téléphone', 'Phone'), 'ID', tr('Modèle', 'Model'), tr('Système', 'System'), tr('Port ADB', 'ADB port'), tr('Créé le', 'Created'), tr('Actions', 'Actions')].map(h => (
+                      {[tr('Statut', 'Status'), tr('Téléphone', 'Phone'), 'ID', tr('Modèle', 'Model'), tr('Système', 'System'), 'Proxy', tr('Port ADB', 'ADB port'), tr('Créé le', 'Created'), tr('Actions', 'Actions')].map(h => (
                         <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-4)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {instances.length === 0 && (
-                      <tr><td colSpan={8} style={{ padding: 36, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>
+                      <tr><td colSpan={9} style={{ padding: 36, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>
                         {tr('Aucun téléphone.', 'No phone yet.')} <button onClick={openCreate} className="sf-link" style={{ fontWeight: 600 }}>{tr('Crée ton premier téléphone', 'Create your first phone')}</button>
                       </td></tr>
                     )}
@@ -280,6 +301,14 @@ export function CloudPhones({ user }: Props) {
                           <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
                             <span style={{ color: 'var(--text-2)' }}>Android {m.android ?? '15'}</span>
                             {m.store && <span style={{ display: 'block', fontSize: 10.5, color: 'var(--text-4)' }}>{m.store}</span>}
+                          </td>
+                          <td style={{ padding: '10px 16px' }} onClick={e => e.stopPropagation()}>
+                            <select value={m.proxyId ?? ''} onChange={e => setPhoneProxy(inst.id, e.target.value)}
+                              title={m.proxyId ? (proxyById(m.proxyId) ? `${proxyById(m.proxyId)!.type}://${proxyLabel(proxyById(m.proxyId)!)}` : 'proxy introuvable') : 'aucun proxy'}
+                              style={{ maxWidth: 150, fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: m.proxyId ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.04)', color: m.proxyId ? 'var(--ok)' : 'var(--text-4)' }}>
+                              <option value="">— {tr('Aucun', 'None')} —</option>
+                              {allProxies.map(p => <option key={p.id} value={p.id}>{p.group ? `[${p.group}] ` : ''}{proxyLabel(p)}</option>)}
+                            </select>
                           </td>
                           <td style={{ padding: '10px 16px', color: 'var(--text-3)', fontFamily: 'monospace', fontSize: 11.5 }}>{inst.adbPort ?? '—'}</td>
                           <td style={{ padding: '10px 16px', color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{fmtDate(m.createdAt)}</td>
@@ -370,6 +399,27 @@ export function CloudPhones({ user }: Props) {
                   <button onClick={() => setCQty(q => Math.min(20, q + 1))} className="sf-btn sf-btn-ghost" style={{ height: 34, width: 34, padding: 0, fontSize: 18 }}>+</button>
                   <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>{tr('téléphone(s) — numérotés automatiquement', 'phone(s) — auto-numbered')}</span>
                 </div>
+              </div>
+
+              {/* Proxy */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>Proxy</label>
+                <select value={cProxy} onChange={e => setCProxy(e.target.value)}
+                  style={{ width: '100%', fontSize: 13, padding: '9px 10px', borderRadius: 9, border: '1px solid var(--border)', background: 'rgba(0,0,0,0.25)', color: 'var(--text-1)' }}>
+                  <option value="">— {tr('Aucun', 'None')} —</option>
+                  {proxyGroups.length > 0 && (
+                    <optgroup label={tr('Groupes (1 proxy libre par tel)', 'Groups (1 free proxy per phone)')}>
+                      {proxyGroups.map(g => {
+                        const free = allProxies.filter(p => p.group === g && !usedProxyIds.has(p.id)).length
+                        return <option key={g} value={`group:${g}`}>{g} — {free} {tr('libre(s)', 'free')}</option>
+                      })}
+                    </optgroup>
+                  )}
+                  <optgroup label={tr('Proxy précis', 'Specific proxy')}>
+                    {allProxies.map(p => <option key={p.id} value={`proxy:${p.id}`} disabled={usedProxyIds.has(p.id)}>{p.group ? `[${p.group}] ` : ''}{proxyLabel(p)}{usedProxyIds.has(p.id) ? ` (${tr('pris', 'taken')})` : ''}</option>)}
+                  </optgroup>
+                </select>
+                {allProxies.length === 0 && <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{tr('Aucun proxy — ajoute-en dans l\'onglet Proxies.', 'No proxy — add some in the Proxies tab.')}</span>}
               </div>
 
               <p style={{ fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.5, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
