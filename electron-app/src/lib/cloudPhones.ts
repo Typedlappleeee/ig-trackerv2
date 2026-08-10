@@ -66,6 +66,17 @@ export function loadAutoInstall(): CpAutoApp[] {
 export function saveAutoInstall(apps: CpAutoApp[]): void {
   localStorage.setItem(AUTOINSTALL_KEY, JSON.stringify(apps))
 }
+
+// ── Groupes de téléphones ─────────────────────────────────────────────────────
+// Liste de noms de groupes gérée par l'utilisateur. Stockée à part pour qu'un
+// groupe puisse exister AVANT d'y ranger le moindre téléphone (créer → assigner).
+const GROUPS_KEY = 'sf-cp-groups'
+export function loadCpGroups(): string[] {
+  try { const a = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]'); return Array.isArray(a) ? a.filter(x => typeof x === 'string') : [] } catch { return [] }
+}
+export function saveCpGroups(groups: string[]): void {
+  localStorage.setItem(GROUPS_KEY, JSON.stringify(Array.from(new Set(groups.map(g => g.trim()).filter(Boolean)))))
+}
 const META_KEY = 'sf-cp-meta'
 export function loadAllCpMeta(): Record<string, CpMeta> {
   try { return JSON.parse(localStorage.getItem(META_KEY) || '{}') as Record<string, CpMeta> } catch { return {} }

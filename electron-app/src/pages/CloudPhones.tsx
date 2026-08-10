@@ -11,7 +11,7 @@ import { useTr } from '@/lib/i18n'
 import {
   cloudPhones, loadCloudAgentConfig, saveCloudAgentConfig, getCloudAgent,
   loadAllCpMeta, saveCpMeta, removeCpMeta, genPhoneId,
-  loadAutoInstall, saveAutoInstall,
+  loadAutoInstall, saveAutoInstall, loadCpGroups, saveCpGroups,
   type CpInstance, type CpMeta, type CpAutoApp,
 } from '@/lib/cloudPhones'
 import { CloudPhoneWindow } from '@/components/CloudPhoneWindow'
@@ -47,6 +47,8 @@ export function CloudPhones({ user }: Props) {
 
   const [instances, setInstances] = useState<CpInstance[]>([])
   const [meta, setMeta] = useState<Record<string, CpMeta>>(() => loadAllCpMeta())
+  const [subTab, setSubTab] = useState<'phones' | 'groups' | 'apps'>('phones')
+  const [cpGroups, setCpGroups] = useState<string[]>(() => loadCpGroups())
   const [busyId, setBusyId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -302,7 +304,27 @@ export function CloudPhones({ user }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const allTags = Array.from(new Set(Object.values(meta).flatMap(m => m.tags ?? []).filter(Boolean))).sort() as string[]
-  const allGroups = Array.from(new Set(Object.values(meta).map(m => m.group).filter(Boolean) as string[])).sort()
+  // Groupes = liste gérée par l'utilisateur ∪ groupes déjà assignés à des téléphones.
+  const allGroups = Array.from(new Set([...cpGroups, ...Object.values(meta).map(m => m.group).filter(Boolean) as string[]])).sort()
+  const groupCount = (g: string) => instances.filter(i => (meta[i.id]?.group ?? '') === g).length
+
+  const createGroup = (name: string) => {
+    const g = name.trim(); if (!g || allGroups.includes(g)) return
+    const next = [...cpGroups, g]; setCpGroups(next); saveCpGroups(next)
+  }
+  const deleteGroup = (name: string) => {
+    Object.entries(meta).forEach(([id, m]) => { if (m.group === name) saveCpMeta(id, { group: undefined }) })
+    setMeta(loadAllCpMeta())
+    const next = cpGroups.filter(g => g !== name); setCpGroups(next); saveCpGroups(next)
+    if (groupFilter === name) setGroupFilter('all')
+  }
+  const renameGroup = (oldName: string, newName: string) => {
+    const g = newName.trim(); if (!g || g === oldName || allGroups.includes(g)) return
+    Object.entries(meta).forEach(([id, m]) => { if (m.group === oldName) saveCpMeta(id, { group: g }) })
+    setMeta(loadAllCpMeta())
+    const next = Array.from(new Set(cpGroups.map(x => x === oldName ? g : x))); setCpGroups(next); saveCpGroups(next)
+    if (groupFilter === oldName) setGroupFilter(g)
+  }
 
   const q = search.trim().toLowerCase()
   const filtered = instances.filter(inst => {
@@ -416,7 +438,28 @@ export function CloudPhones({ user }: Props) {
           <div className="sf-banner is-danger mt-6">{tr('Connexion impossible', 'Connection failed')} : {connMsg}</div>
         )}
 
-        {conn === 'ok' && instances.length > 0 && (
+        {/* Sous-onglets : Téléphones · Groupes · Apps */}
+        {conn === 'ok' && (
+          <div style={{ display: 'flex', gap: 6, margin: '16px 0 4px', borderBottom: '1px solid var(--border)' }}>
+            {([
+              ['phones', tr('Téléphones', 'Phones'), instances.length],
+              ['groups', tr('Groupes', 'Groups'), allGroups.length],
+              ['apps',   tr('Apps', 'Apps'), cAutoApps.length],
+            ] as const).map(([key, label, n]) => (
+              <button key={key} onClick={() => setSubTab(key)}
+                style={{
+                  position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '9px 14px', fontSize: 13, fontWeight: 700,
+                  color: subTab === key ? 'var(--accent)' : 'var(--text-3)',
+                  borderBottom: `2px solid ${subTab === key ? 'var(--accent)' : 'transparent'}`, marginBottom: -1,
+                }}>
+                {label} {n > 0 && <span style={{ fontSize: 11, opacity: 0.7 }}>· {n}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {conn === 'ok' && subTab === 'phones' && instances.length > 0 && (
           <>
             {/* Recherche + filtres de statut */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '4px 0 12px' }}>
@@ -568,13 +611,81 @@ export function CloudPhones({ user }: Props) {
         )}
 
         {/* État vide : aucun téléphone */}
-        {conn === 'ok' && instances.length === 0 && (
+        {conn === 'ok' && subTab === 'phones' && instances.length === 0 && (
           <div className="sf-card" style={{ padding: '48px 24px', textAlign: 'center', marginTop: 16 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📱</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', marginBottom: 6 }}>{tr('Aucun téléphone', 'No phone yet')}</div>
             <div style={{ fontSize: 13, color: 'var(--text-4)', marginBottom: 16 }}>{tr('Crée ton premier cloud phone pour commencer.', 'Create your first cloud phone to get started.')}</div>
             <button onClick={openCreate} className="sf-btn sf-btn-primary">+ {tr('Créer un téléphone', 'Create a phone')}</button>
             {allProxies.length === 0 && <div style={{ fontSize: 11.5, color: 'var(--text-4)', marginTop: 14 }}>{tr('💡 Pense à ajouter des proxys dans l’onglet Proxies.', '💡 Add proxies in the Proxies tab first.')}</div>}
+          </div>
+        )}
+
+        {/* ─── Onglet GROUPES ─────────────────────────────────────────────── */}
+        {conn === 'ok' && subTab === 'groups' && (
+          <div className="sf-card" style={{ marginTop: 14, padding: 20, maxWidth: 720 }}>
+            <p className="sf-section-label" style={{ marginBottom: 4 }}>{tr('Groupes de téléphones', 'Phone groups')}</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+              {tr('Crée un groupe ici, puis range tes téléphones dedans (dans le tableau : sélectionne des téléphones → « Groupe + Entrée », ou via « Modifier le profil »).', 'Create a group here, then put phones in it (in the table: select phones → “Group + Enter”, or via “Edit profile”).')}
+            </p>
+            {/* Créer un groupe */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+              <input id="cp-new-group" placeholder={tr('Nom du nouveau groupe…', 'New group name…')} className="sf-input" style={{ flex: 1, height: 38 }}
+                onKeyDown={e => { if (e.key === 'Enter') { const el = e.target as HTMLInputElement; createGroup(el.value); el.value = '' } }} />
+              <button className="sf-btn sf-btn-primary" style={{ height: 38, flexShrink: 0 }}
+                onClick={() => { const el = document.getElementById('cp-new-group') as HTMLInputElement | null; if (el) { createGroup(el.value); el.value = '' } }}>
+                + {tr('Créer le groupe', 'Create group')}
+              </button>
+            </div>
+            {/* Liste des groupes */}
+            {allGroups.length === 0
+              ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '18px 0', textAlign: 'center' }}>{tr('Aucun groupe pour le moment.', 'No group yet.')}</div>
+              : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {allGroups.map(g => (
+                    <div key={g} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--accent)', fontSize: 13 }}>
+                        <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/></svg>
+                        {g}
+                      </span>
+                      <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>· {groupCount(g)} {tr('téléphone(s)', 'phone(s)')}</span>
+                      <span style={{ flex: 1 }} />
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28 }} onClick={() => { setSubTab('phones'); setGroupFilter(g) }}>{tr('Voir', 'View')}</button>
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28 }} onClick={() => { const n = window.prompt(tr('Renommer le groupe', 'Rename group'), g); if (n) renameGroup(g, n) }}>{tr('Renommer', 'Rename')}</button>
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28, color: 'var(--danger)' }} onClick={() => { if (window.confirm(tr(`Supprimer le groupe « ${g} » ? Les téléphones ne seront pas supprimés, juste retirés du groupe.`, `Delete group "${g}"? Phones are kept, just removed from the group.`))) deleteGroup(g) }}>{tr('Supprimer', 'Delete')}</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+        )}
+
+        {/* ─── Onglet APPS (auto-install) ─────────────────────────────────── */}
+        {conn === 'ok' && subTab === 'apps' && (
+          <div className="sf-card" style={{ marginTop: 14, padding: 20, maxWidth: 720 }}>
+            <p className="sf-section-label" style={{ marginBottom: 4 }}>{tr('Apps à installer automatiquement', 'Apps to auto-install')}</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+              {tr('Ces apps sont poussées sur CHAQUE nouveau téléphone à sa création. Ajoute une URL .apk directe (APKPure/APKMirror ou hébergée), ou un paquet F-Droid (fdroid:com.pkg.name). Le Play Store n’est pas téléchargeable directement.', 'These apps are pushed to EVERY new phone on creation. Add a direct .apk URL (APKPure/APKMirror or self-hosted), or an F-Droid package (fdroid:com.pkg.name). Play Store is not directly downloadable.')}
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input value={cAppInput} onChange={e => setCAppInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAutoApp(cAppInput) } }}
+                placeholder={tr('URL .apk directe, ou fdroid:com.pkg.name', 'Direct .apk URL, or fdroid:com.pkg.name')} className="sf-input" style={{ flex: 1, height: 38 }} />
+              <button onClick={() => addAutoApp(cAppInput)} className="sf-btn sf-btn-primary" style={{ height: 38, flexShrink: 0 }}>+ {tr('Ajouter', 'Add')}</button>
+            </div>
+            {cAutoApps.length === 0
+              ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '18px 0', textAlign: 'center' }}>{tr('Aucune app configurée — les téléphones seront créés vierges.', 'No app configured — phones will be created empty.')}</div>
+              : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {cAutoApps.map(a => (
+                    <div key={a.value} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 7px', borderRadius: 6, color: a.kind === 'fdroid' ? 'var(--ok)' : 'var(--accent)', background: a.kind === 'fdroid' ? 'rgba(52,211,153,0.12)' : 'rgba(129,140,248,0.12)', textTransform: 'uppercase', flexShrink: 0 }}>{a.kind === 'fdroid' ? 'F-Droid' : 'APK'}</span>
+                      <span style={{ fontSize: 12.5, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.value}>{a.label || a.value}</span>
+                      <span style={{ flex: 1 }} />
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28, color: 'var(--danger)' }} onClick={() => removeAutoApp(a.value)}>{tr('Retirer', 'Remove')}</button>
+                    </div>
+                  ))}
+                </div>
+              )}
           </div>
         )}
       </div>
@@ -663,28 +774,18 @@ export function CloudPhones({ user }: Props) {
                 {allProxies.length === 0 && <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{tr('Aucun proxy — ajoute-en dans l\'onglet Proxies.', 'No proxy — add some in the Proxies tab.')}</span>}
               </div>
 
-              {/* Apps à auto-installer sur chaque téléphone créé */}
+              {/* Apps à auto-installer — gérées dans l'onglet Apps */}
               <div className="space-y-2">
                 <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{tr('Apps à installer automatiquement', 'Apps to auto-install')}</label>
-                {cAutoApps.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {cAutoApps.map(a => (
-                      <span key={a.value} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, padding: '4px 9px', borderRadius: 99, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text-2)', maxWidth: '100%' }}>
-                        <span style={{ fontSize: 9, fontWeight: 800, color: a.kind === 'fdroid' ? 'var(--ok)' : 'var(--accent)', textTransform: 'uppercase' }}>{a.kind === 'fdroid' ? 'F-Droid' : 'APK'}</span>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{a.label || a.value}</span>
-                        <button onClick={() => removeAutoApp(a.value)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 0, display: 'flex' }}>
-                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={cAppInput} onChange={e => setCAppInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAutoApp(cAppInput) } }}
-                    placeholder={tr('URL .apk directe, ou fdroid:com.pkg.name', 'Direct .apk URL, or fdroid:com.pkg.name')} style={{ ...fieldInput, flex: 1 }} />
-                  <button onClick={() => addAutoApp(cAppInput)} className="sf-btn sf-btn-secondary" style={{ height: 38, padding: '0 14px', flexShrink: 0 }}>{tr('Ajouter', 'Add')}</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)' }}>
+                  <span style={{ fontSize: 12.5, color: cAutoApps.length ? 'var(--text-2)' : 'var(--text-4)' }}>
+                    {cAutoApps.length > 0
+                      ? tr(`${cAutoApps.length} app(s) seront installées sur chaque téléphone`, `${cAutoApps.length} app(s) will be installed on each phone`)
+                      : tr('Aucune app configurée', 'No app configured')}
+                  </span>
+                  <span style={{ flex: 1 }} />
+                  <button type="button" onClick={() => { setShowCreate(false); setSubTab('apps') }} className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30, flexShrink: 0 }}>{tr('Gérer les apps →', 'Manage apps →')}</button>
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--text-4)', lineHeight: 1.5, display: 'block' }}>{tr('Installées sur CHAQUE téléphone créé. Instagram/TikTok : colle une URL .apk directe (APKPure/APKMirror ou hébergée). Le Play Store n’est pas téléchargeable directement.', 'Installed on EVERY created phone. Instagram/TikTok: paste a direct .apk URL (APKPure/APKMirror or self-hosted). Play Store is not directly downloadable.')}</span>
               </div>
 
               <p style={{ fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.5, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
