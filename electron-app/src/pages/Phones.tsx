@@ -28,41 +28,6 @@ const INTERVALS = [
   { label: '5 min', value: 300 },
 ]
 
-// Groupe effectif : le groupe local ScaleFlow (survit au sync) prime sur le
-// group_name venu de GeeLark (qui est réécrit à chaque synchro).
-const groupOf = (p: Phone): string | null => (p.phone_group?.trim() || p.group_name || null)
-
-// ── Tags : couleur stable dérivée du nom (hash → palette) ─────────────────────
-const TAG_PALETTE = ['#6366F1','#22D3EE','#34D399','#E5C07B','#F0A0AB','#A78BFA','#F59E0B','#10B981','#EC4899','#60A5FA']
-function tagColor(tag: string): string {
-  let h = 0
-  for (let i = 0; i < tag.length; i++) h = tag.charCodeAt(i) + ((h << 5) - h)
-  return TAG_PALETTE[Math.abs(h) % TAG_PALETTE.length]
-}
-
-// Affichage seul des tags (chips colorés). `max` tronque avec « +N ».
-function TagChips({ tags, max }: { tags?: string[] | null; max?: number }) {
-  const list = (tags ?? []).filter(Boolean)
-  if (list.length === 0) return null
-  const shown = max ? list.slice(0, max) : list
-  const extra = max && list.length > max ? list.length - max : 0
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-      {shown.map(tg => {
-        const c = tagColor(tg)
-        return (
-          <span key={tg} style={{
-            display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 600,
-            padding: '2px 7px', borderRadius: 99, whiteSpace: 'nowrap',
-            background: `${c}1e`, color: c, border: `1px solid ${c}44`,
-          }}>{tg}</span>
-        )
-      })}
-      {extra > 0 && <span style={{ fontSize: 10, color: 'rgba(233,234,240,0.4)' }}>+{extra}</span>}
-    </div>
-  )
-}
-
 // ── Status dot ───────────────────────────────────────────────────────────────
 function StatusDot({ status }: { status: string }) {
   const t = useT()
@@ -336,187 +301,17 @@ function PanelLinkField({ phone, onSave }: { phone: Phone; onSave: (id: string, 
   )
 }
 
-// ── Detail panel : Tags · Groupe · Note · Identifiants ────────────────────────
-// Toutes ces métadonnées sont propres à ScaleFlow et survivent au sync GeeLark.
-function PhoneMetaEditor({ phone, allTags, allGroups, onSaveTags, onSaveGroup, onSaveNotes, onSaveCreds }: {
-  phone: Phone
-  allTags: string[]
-  allGroups: string[]
-  onSaveTags:  (id: string, tags: string[]) => Promise<void>
-  onSaveGroup: (id: string, group: string) => Promise<void>
-  onSaveNotes: (id: string, notes: string) => Promise<void>
-  onSaveCreds: (id: string, creds: { login: string; password: string; totp_secret: string }) => Promise<void>
-}) {
-  const tr = useTr()
-  const tags = phone.tags ?? []
-  const [tagInput, setTagInput] = useState('')
-  const [group, setGroup]       = useState(phone.phone_group ?? phone.group_name ?? '')
-  const [notes, setNotes]       = useState(phone.notes ?? phone.remark ?? '')
-  const [login, setLogin]       = useState(phone.login ?? '')
-  const [pwd, setPwd]           = useState(phone.password ?? '')
-  const [totp, setTotp]         = useState(phone.totp_secret ?? '')
-  const [showPwd, setShowPwd]   = useState(false)
-  const [credSaved, setCredSaved] = useState(false)
-
-  // Resync quand on sélectionne un autre téléphone
-  useEffect(() => {
-    setGroup(phone.phone_group ?? phone.group_name ?? '')
-    setNotes(phone.notes ?? phone.remark ?? '')
-    setLogin(phone.login ?? ''); setPwd(phone.password ?? ''); setTotp(phone.totp_secret ?? '')
-    setTagInput(''); setCredSaved(false)
-  }, [phone.id])  // eslint-disable-line react-hooks/exhaustive-deps
-
-  function addTag(raw: string) {
-    const tg = raw.trim().replace(/^#/, '').slice(0, 24)
-    if (!tg || tags.includes(tg)) { setTagInput(''); return }
-    onSaveTags(phone.id, [...tags, tg]); setTagInput('')
-  }
-  function removeTag(tg: string) { onSaveTags(phone.id, tags.filter(x => x !== tg)) }
-
-  const suggestions = allTags.filter(tg => !tags.includes(tg)).slice(0, 8)
-  const section: React.CSSProperties = { padding: '16px 18px', borderBottom: '1px solid rgba(233,234,240,0.055)' }
-  const label: React.CSSProperties = { fontFamily: SANS, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_3, margin: '0 0 10px' }
-  const credDirty = login !== (phone.login ?? '') || pwd !== (phone.password ?? '') || totp !== (phone.totp_secret ?? '')
-
-  return (
-    <>
-      {/* Tags */}
-      <div style={section}>
-        <p style={label}>{tr('Tags', 'Tags')}</p>
-        {tags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 9 }}>
-            {tags.map(tg => {
-              const c = tagColor(tg)
-              return (
-                <span key={tg} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600,
-                  padding: '3px 6px 3px 9px', borderRadius: 99,
-                  background: `${c}1e`, color: c, border: `1px solid ${c}44`,
-                }}>
-                  {tg}
-                  <button onClick={() => removeTag(tg)} title={tr('Retirer', 'Remove')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: c, padding: 0, display: 'flex', opacity: 0.7 }}>
-                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                  </button>
-                </span>
-              )
-            })}
-          </div>
-        )}
-        <input
-          value={tagInput}
-          onChange={e => setTagInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') addTag(tagInput) }}
-          onBlur={() => tagInput.trim() && addTag(tagInput)}
-          placeholder={tr('Ajouter un tag + Entrée…', 'Add a tag + Enter…')}
-          className="sf-input"
-          style={{ width: '100%', boxSizing: 'border-box', padding: '6px 10px', fontSize: 12 }}
-        />
-        {suggestions.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-            {suggestions.map(tg => (
-              <button key={tg} onClick={() => addTag(tg)}
-                style={{
-                  fontSize: 10, padding: '2px 8px', borderRadius: 99, cursor: 'pointer',
-                  background: 'rgba(233,234,240,0.04)', border: `1px dashed ${tagColor(tg)}66`, color: 'rgba(233,234,240,0.6)',
-                }}>+ {tg}</button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Groupe (local) */}
-      <div style={section}>
-        <p style={label}>{tr('Groupe', 'Group')}</p>
-        <input
-          list="sf-phone-groups"
-          value={group}
-          onChange={e => setGroup(e.target.value)}
-          onBlur={() => { if ((group.trim() || null) !== (phone.phone_group ?? null)) onSaveGroup(phone.id, group) }}
-          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-          placeholder={tr('Aucun groupe', 'No group')}
-          className="sf-input"
-          style={{ width: '100%', boxSizing: 'border-box', padding: '6px 10px', fontSize: 12 }}
-        />
-        <datalist id="sf-phone-groups">
-          {allGroups.map(g => <option key={g} value={g} />)}
-        </datalist>
-      </div>
-
-      {/* Note */}
-      <div style={section}>
-        <p style={label}>{tr('Note', 'Note')}</p>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          onBlur={() => { if ((notes.trim() || null) !== (phone.notes ?? null)) onSaveNotes(phone.id, notes) }}
-          placeholder={tr('Note libre sur ce téléphone…', 'Free note about this phone…')}
-          className="sf-input"
-          rows={2}
-          style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', fontSize: 12, resize: 'vertical', minHeight: 44 }}
-        />
-      </div>
-
-      {/* Identifiants du compte */}
-      <div style={section}>
-        <p style={label}>{tr('Identifiants du compte', 'Account credentials')}</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <input
-            value={login} onChange={e => setLogin(e.target.value)}
-            placeholder={tr('Identifiant / e-mail', 'Username / email')}
-            autoComplete="off"
-            className="sf-input" style={{ width: '100%', boxSizing: 'border-box', padding: '6px 10px', fontSize: 12 }}
-          />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input
-              value={pwd} onChange={e => setPwd(e.target.value)}
-              type={showPwd ? 'text' : 'password'}
-              placeholder={tr('Mot de passe', 'Password')}
-              autoComplete="new-password"
-              className="sf-input" style={{ flex: 1, minWidth: 0, padding: '6px 10px', fontSize: 12 }}
-            />
-            <button onClick={() => setShowPwd(v => !v)} className="sf-btn sf-btn-ghost sf-btn-sm"
-              style={{ flexShrink: 0, cursor: 'pointer', padding: '0 9px' }}
-              title={showPwd ? tr('Masquer', 'Hide') : tr('Afficher', 'Show')}>
-              {showPwd ? '🙈' : '👁'}
-            </button>
-          </div>
-          <input
-            value={totp} onChange={e => setTotp(e.target.value)}
-            placeholder={tr('Secret 2FA / TOTP (optionnel)', '2FA / TOTP secret (optional)')}
-            autoComplete="off"
-            className="sf-input" style={{ width: '100%', boxSizing: 'border-box', padding: '6px 10px', fontSize: 12 }}
-          />
-          <button
-            onClick={async () => { await onSaveCreds(phone.id, { login, password: pwd, totp_secret: totp }); setCredSaved(true); setTimeout(() => setCredSaved(false), 1800) }}
-            disabled={!credDirty && !credSaved}
-            className="sf-btn sf-btn-secondary sf-btn-sm"
-            style={{ cursor: credDirty ? 'pointer' : 'default', opacity: credDirty || credSaved ? 1 : 0.5, color: credSaved ? 'var(--ok)' : undefined }}
-          >
-            {credSaved ? tr('✓ Enregistré', '✓ Saved') : tr('Enregistrer les identifiants', 'Save credentials')}
-          </button>
-          <p style={{ fontSize: 10, color: 'rgba(233,234,240,0.35)', margin: '2px 0 0' }}>
-            {tr('Réutilisés par l’auto-login (onglet Warmup).', 'Reused by the auto-login (Warmup tab).')}
-          </p>
-        </div>
-      </div>
-    </>
-  )
-}
-
 // ── Inline note edit ──────────────────────────────────────────────────────────
 function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
   const t = useT()
-  // Note persistante (notes) avec repli sur le remark GeeLark hérité.
-  const current = phone.notes ?? phone.remark ?? ''
   const [editing, setEditing] = useState(false)
-  const [value, setValue]     = useState(current)
+  const [value, setValue]     = useState(phone.remark ?? '')
   const [saving, setSaving]   = useState(false)
   const ref                   = useRef<HTMLInputElement>(null)
   const savedRef              = useRef(false)
 
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
-  useEffect(() => { setValue(phone.notes ?? phone.remark ?? '') }, [phone.notes, phone.remark])
+  useEffect(() => { setValue(phone.remark ?? '') }, [phone.remark])
 
   async function save() {
     if (savedRef.current) return
@@ -528,7 +323,7 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
   }
   function onKey(e: React.KeyboardEvent) {
     if (e.key === 'Enter')  save()
-    if (e.key === 'Escape') { savedRef.current = true; setValue(current); setEditing(false) }
+    if (e.key === 'Escape') { savedRef.current = true; setValue(phone.remark ?? ''); setEditing(false) }
   }
 
   if (editing) return (
@@ -547,8 +342,8 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
       style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, width: '100%', padding: 0 }}
       title={t('phoneClickToEdit')}
     >
-      {current ? (
-        <span style={{ color: 'rgba(99,102,241,0.72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current}</span>
+      {phone.remark ? (
+        <span style={{ color: 'rgba(99,102,241,0.72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.remark}</span>
       ) : (
         <span style={{ color: 'rgba(233,234,240,0.25)', fontStyle: 'normal' }}>{t('phoneNoteCellAdd')}</span>
       )}
@@ -701,21 +496,14 @@ const PhoneRow = memo(function PhoneRow({
 
       {/* Group */}
       <td style={cellStyle}>
-        {groupOf(phone)
+        {phone.group_name
           ? <span style={{
               display: 'inline-block', fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
               background: 'rgba(99,102,241,0.1)', color: ACCENT,
               border: '1px solid rgba(99,102,241,0.18)', whiteSpace: 'nowrap',
-            }}>{groupOf(phone)}</span>
+            }}>{phone.group_name}</span>
           : <span style={{ color: 'rgba(233,234,240,0.2)' }}>—</span>
         }
-      </td>
-
-      {/* Tags */}
-      <td style={cellStyle}>
-        {(phone.tags?.length ?? 0) > 0
-          ? <TagChips tags={phone.tags} max={3} />
-          : <span style={{ color: 'rgba(233,234,240,0.2)' }}>—</span>}
       </td>
 
       {/* Lien OnlyFans / Story */}
@@ -868,9 +656,9 @@ const PhoneCard = memo(function PhoneCard({
         </div>
       </div>
 
-      {/* Group badge + tags */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, minHeight: 22 }}>
-        {groupOf(phone) ? (
+      {/* Group badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 22 }}>
+        {phone.group_name ? (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, padding: '3px 9px',
             borderRadius: 99, fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: ACCENT,
@@ -880,27 +668,12 @@ const PhoneCard = memo(function PhoneCard({
             <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
               <path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/>
             </svg>
-            {groupOf(phone)}
+            {phone.group_name}
           </span>
-        ) : (!phone.tags || phone.tags.length === 0) && (
+        ) : (
           <span style={{ fontSize: 11, color: 'rgba(233,234,240,0.25)' }}>{t('phonesDetailGroup')} —</span>
         )}
-        <TagChips tags={phone.tags} max={4} />
       </div>
-
-      {/* Note */}
-      {(phone.notes ?? phone.remark) && (
-        <p style={{
-          fontSize: 11, color: 'rgba(99,102,241,0.72)', margin: 0,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          display: 'flex', alignItems: 'center', gap: 5,
-        }}>
-          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, opacity: 0.7 }}>
-            <path d="M2 2.5h8v5l-2.5 2.5H2v-7.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
-          </svg>
-          {phone.notes ?? phone.remark}
-        </p>
-      )}
 
       {/* Lien OnlyFans / story */}
       <div style={{
@@ -962,7 +735,6 @@ export function Phones({ user }: PhonesProps) {
   const [contextMenu, setContextMenu]     = useState<{ phone: Phone; x: number; y: number } | null>(null)
   const [selectedPhone, setSelectedPhone] = useState<Phone | null>(null)
   const [groupFilter, setGroupFilter]     = useState<string>('all')
-  const [tagFilter, setTagFilter]         = useState<string>('all')
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -1107,62 +879,14 @@ export function Phones({ user }: PhonesProps) {
     setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: clean } : p))
   }, [toast, fr])
 
-  // Erreur « colonne absente » (migration non encore appliquée) → on ne casse pas
-  // l'UX : l'état local reste, on n'affiche pas d'alarme. Sinon on remonte l'erreur.
-  const isMissingColumn = (msg: string, col: string) =>
-    new RegExp(col, 'i').test(msg) && /column|schema|cache|does not exist/i.test(msg)
-
-  const patchPhone = useCallback((id: string, patch: Partial<Phone>) => {
-    setPhones(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
-    setSelectedPhone(prev => (prev && prev.id === id ? { ...prev, ...patch } : prev))
-  }, [])
-
-  // Note persistante (colonne `notes`, jamais réécrite par le sync GeeLark).
-  const saveNotes = useCallback(async (id: string, notes: string) => {
-    const val = notes.trim() || null
-    patchPhone(id, { notes: val })
-    const { error: err } = await supabase.from('phones').update({ notes: val }).eq('id', id)
-    if (err && !isMissingColumn(err.message, 'notes')) {
+  const saveRemark = useCallback(async (id: string, remark: string) => {
+    const val = remark.trim() || null
+    setPhones(prev => prev.map(p => p.id === id ? { ...p, remark: val } : p))
+    const { error: err } = await supabase.from('phones').update({ remark: val }).eq('id', id)
+    if (err) {
       toast.show({ kind: 'error', title: fr(`Échec de l'enregistrement de la note`, 'Failed to save note'), body: err.message })
     }
-  }, [toast, fr, patchPhone])
-
-  const saveTags = useCallback(async (id: string, tags: string[]) => {
-    const clean = Array.from(new Set(tags.map(t => t.trim()).filter(Boolean)))
-    patchPhone(id, { tags: clean })
-    const { error: err } = await supabase.from('phones').update({ tags: clean }).eq('id', id)
-    if (err && !isMissingColumn(err.message, 'tags')) {
-      toast.show({ kind: 'error', title: fr('Échec de l\'enregistrement des tags', 'Failed to save tags'), body: err.message })
-    }
-  }, [toast, fr, patchPhone])
-
-  const savePhoneGroup = useCallback(async (id: string, group: string) => {
-    const val = group.trim() || null
-    patchPhone(id, { phone_group: val })
-    const { error: err } = await supabase.from('phones').update({ phone_group: val }).eq('id', id)
-    if (err && !isMissingColumn(err.message, 'phone_group')) {
-      toast.show({ kind: 'error', title: fr('Échec du changement de groupe', 'Failed to change group'), body: err.message })
-    }
-  }, [toast, fr, patchPhone])
-
-  const saveCreds = useCallback(async (id: string, creds: { login: string; password: string; totp_secret: string }) => {
-    const patch = {
-      login:       creds.login.trim() || null,
-      password:    creds.password || null,
-      totp_secret: creds.totp_secret.trim() || null,
-    }
-    patchPhone(id, patch)
-    const { error: err } = await supabase.from('phones').update(patch).eq('id', id)
-    if (err) {
-      if (isMissingColumn(err.message, 'login') || isMissingColumn(err.message, 'password') || isMissingColumn(err.message, 'totp_secret')) {
-        toast.show({ kind: 'warn', title: fr('Migration requise', 'Migration required'), body: fr('Applique la migration 20260810_phone_meta.sql pour mémoriser les identifiants.', 'Apply migration 20260810_phone_meta.sql to remember credentials.') })
-      } else {
-        toast.show({ kind: 'error', title: fr('Échec de l\'enregistrement des identifiants', 'Failed to save credentials'), body: err.message })
-      }
-      return
-    }
-    toast.show({ kind: 'ok', title: fr('Identifiants enregistrés', 'Credentials saved') })
-  }, [toast, fr, patchPhone])
+  }, [toast, fr])
 
   // Lien OnlyFans / sticker — source de vérité utilisée par Story & Tâches auto.
   const saveLink = useCallback(async (id: string, link: string) => {
@@ -1273,39 +997,12 @@ export function Phones({ user }: PhonesProps) {
     if (selectedIds.size === 0) return
     setBulkBusy(true)
     const ids = [...selectedIds]
-    const val = group.trim() || null
-    // Groupe LOCAL (phone_group) → survit au sync GeeLark (contrairement à group_name).
-    const { error: err } = await supabase.from('phones').update({ phone_group: val }).in('id', ids)
-    if (err && !isMissingColumn(err.message, 'phone_group')) {
+    const { error: err } = await supabase.from('phones').update({ group_name: group }).in('id', ids)
+    if (err) {
       toast.show({ kind: 'error', title: fr('Échec du changement de groupe', 'Failed to change group'), body: err.message })
     } else {
-      setPhones(prev => prev.map(p => selectedIds.has(p.id) ? { ...p, phone_group: val } : p))
+      setPhones(prev => prev.map(p => selectedIds.has(p.id) ? { ...p, group_name: group } : p))
       toast.show({ kind: 'ok', title: fr(`${ids.length} téléphone(s) déplacé(s) vers « ${group} »`, `${ids.length} phone(s) moved to "${group}"`) })
-      setSelectedIds(new Set())
-    }
-    setBulkBusy(false)
-  }
-
-  // Ajoute un tag à toute la sélection (fusion, sans doublon).
-  async function bulkAddTag(rawTag: string) {
-    const tag = rawTag.trim().replace(/^#/, '').slice(0, 24)
-    if (!tag || selectedIds.size === 0) return
-    setBulkBusy(true)
-    const ids = [...selectedIds]
-    const targets = phones.filter(p => selectedIds.has(p.id))
-    // Une update par téléphone (les tableaux diffèrent d'un tél à l'autre).
-    const results = await Promise.all(targets.map(p => {
-      if ((p.tags ?? []).includes(tag)) return Promise.resolve({ error: null })
-      const next = [...(p.tags ?? []), tag]
-      return supabase.from('phones').update({ tags: next }).eq('id', p.id)
-    }))
-    const err = results.find(r => r.error)?.error
-    if (err && !isMissingColumn(err.message, 'tags')) {
-      toast.show({ kind: 'error', title: fr('Échec de l\'ajout du tag', 'Failed to add tag'), body: err.message })
-    } else {
-      setPhones(prev => prev.map(p => selectedIds.has(p.id) && !(p.tags ?? []).includes(tag)
-        ? { ...p, tags: [...(p.tags ?? []), tag] } : p))
-      toast.show({ kind: 'ok', title: fr(`Tag « ${tag} » ajouté à ${ids.length} téléphone(s)`, `Tag "${tag}" added to ${ids.length} phone(s)`) })
       setSelectedIds(new Set())
     }
     setBulkBusy(false)
@@ -1326,17 +1023,14 @@ export function Phones({ user }: PhonesProps) {
   const visible = phones.filter(p => {
     if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (filter !== 'all' && p.status !== filter) return false
-    if (groupFilter !== 'all' && groupOf(p) !== groupFilter) return false
-    if (tagFilter !== 'all' && !(p.tags ?? []).includes(tagFilter)) return false
+    if (groupFilter !== 'all' && p.group_name !== groupFilter) return false
     if (search) {
       const q = search.toLowerCase()
       return (
         p.phone_name.toLowerCase().includes(q) ||
-        (groupOf(p) ?? '').toLowerCase().includes(q) ||
+        (p.group_name ?? '').toLowerCase().includes(q) ||
         (p.serial_no ?? '').toLowerCase().includes(q) ||
-        (p.notes ?? p.remark ?? '').toLowerCase().includes(q) ||
-        (p.ig_username ?? '').toLowerCase().includes(q) ||
-        (p.tags ?? []).some(tg => tg.toLowerCase().includes(q))
+        (p.remark ?? '').toLowerCase().includes(q)
       )
     }
     return true
@@ -1365,8 +1059,7 @@ export function Phones({ user }: PhonesProps) {
 
   const onlineCount  = phones.filter(p => p.status === 'online').length
   const offlineCount = phones.filter(p => p.status === 'offline').length
-  const groups       = Array.from(new Set(phones.map(groupOf).filter(Boolean))) as string[]
-  const allTags      = Array.from(new Set(phones.flatMap(p => p.tags ?? []).filter(Boolean))).sort() as string[]
+  const groups       = Array.from(new Set(phones.map(p => p.group_name).filter(Boolean))) as string[]
 
   function relativeTime(iso: string): string {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
@@ -1722,24 +1415,6 @@ export function Phones({ user }: PhonesProps) {
                   ))}
                 </select>
 
-                {/* Tag filter — dropdown */}
-                {allTags.length > 0 && (
-                  <select
-                    value={tagFilter}
-                    onChange={e => setTagFilter(e.target.value)}
-                    className="sf-input cursor-pointer"
-                    style={{
-                      width: 'auto', minWidth: 130, maxWidth: 200, height: 32, fontSize: 12,
-                      fontWeight: 600, flexShrink: 0,
-                      color: tagFilter === 'all' ? 'rgba(233,234,240,0.7)' : tagColor(tagFilter),
-                      borderColor: tagFilter === 'all' ? undefined : `${tagColor(tagFilter)}88`,
-                    }}
-                  >
-                    <option value="all">{fr('Tous les tags', 'All tags')}</option>
-                    {allTags.map(tg => <option key={tg} value={tg}>#{tg}</option>)}
-                  </select>
-                )}
-
                 {/* Status filter pills */}
                 <div className="sf-segment" style={{ flexShrink: 0 }}>
                   {(['all', 'online', 'offline'] as const).map(v => (
@@ -1810,7 +1485,6 @@ export function Phones({ user }: PhonesProps) {
                         <th style={{ ...TH_BASE, width: 44 }}></th>
                         <th style={TH_BASE}>{t('phonesDetailModel')}</th>
                         <th style={{ ...TH_BASE, width: 120 }}>{t('phonesDetailGroup')}</th>
-                        <th style={{ ...TH_BASE, width: 150 }}>{fr('Tags', 'Tags')}</th>
                         <th style={{ ...TH_BASE, width: 200 }}>{fr('Lien OnlyFans', 'OnlyFans link')}</th>
                         <th style={{ ...TH_BASE, width: 150 }}>{fr('Note', 'Note')}</th>
                         <th style={{ ...TH_BASE, width: 90 }}></th>
@@ -1831,7 +1505,6 @@ export function Phones({ user }: PhonesProps) {
                             </div>
                           </td>
                           <td><div className="sf-skeleton" style={{ height: 20, width: 65, borderRadius: 99 }} /></td>
-                          <td><div className="sf-skeleton" style={{ height: 20, width: 80, borderRadius: 99 }} /></td>
                           <td><div className="sf-skeleton" style={{ height: 20, width: 100, borderRadius: 4 }} /></td>
                           <td><div className="sf-skeleton" style={{ height: 20, width: 72, borderRadius: 99 }} /></td>
                           <td><div className="sf-skeleton" style={{ height: 11, width: 90, borderRadius: 4 }} /></td>
@@ -1893,7 +1566,7 @@ export function Phones({ user }: PhonesProps) {
                   <p className="sf-empty-title">{t('phonesNoSearchResults')}</p>
                   <p className="sf-empty-desc">{fr(`Essayez d'ajuster votre recherche ou vos filtres.`, 'Try adjusting your search or filters.')}</p>
                   <button
-                    onClick={() => { setSearch(''); setFilter('all'); setGroupFilter('all'); setTagFilter('all') }}
+                    onClick={() => { setSearch(''); setFilter('all'); setGroupFilter('all') }}
                     className="sf-btn sf-btn-secondary"
                   >
                     {fr('Réinitialiser les filtres', 'Reset filters')}
@@ -1945,7 +1618,6 @@ export function Phones({ user }: PhonesProps) {
                         {sortTh(t('phonesDetailModel'), 'name')}
                         {/* Group sort */}
                         {sortTh(t('phonesDetailGroup'), 'group', { width: 120 })}
-                        <th style={{ ...TH_BASE, width: 150 }}>{fr('Tags', 'Tags')}</th>
                         <th style={{ ...TH_BASE, width: 200 }}>{fr('Lien OnlyFans', 'OnlyFans link')}</th>
                         <th style={{ ...TH_BASE, width: 150 }}>{fr('Note', 'Note')}</th>
                         <th style={{ ...TH_BASE, width: 100 }}></th>
@@ -1964,7 +1636,7 @@ export function Phones({ user }: PhonesProps) {
                           setSelectedPhone={setSelectedPhone}
                           setContextMenu={setContextMenu}
                           saveIgUsername={saveIgUsername}
-                          saveRemark={saveNotes}
+                          saveRemark={saveRemark}
                           saveLink={saveLink}
                           requestDelete={requestDelete}
                           toggleSelect={toggleSelect}
@@ -2022,8 +1694,8 @@ export function Phones({ user }: PhonesProps) {
                           <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, margin: 0, lineHeight: 1.2 }}>{p.phone_name}</p>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                             <StatusDot status={p.status ?? 'offline'} />
-                            {groupOf(p) && (
-                              <span className="sf-badge sf-badge-violet">{groupOf(p)}</span>
+                            {p.group_name && (
+                              <span className="sf-badge sf-badge-violet">{p.group_name}</span>
                             )}
                           </div>
                         </div>
@@ -2077,7 +1749,7 @@ export function Phones({ user }: PhonesProps) {
                         { label: t('phonesDetailModel'),     value: p.phone_name },
                         { label: t('phonesDetailSerial'),    value: p.serial_no ?? '—' },
                         { label: t('phonesDetailGeelarkId'), value: p.geelark_id ?? '—' },
-                        { label: t('phonesDetailGroup'),     value: groupOf(p) ?? '—' },
+                        { label: t('phonesDetailGroup'),     value: p.group_name ?? '—' },
                         { label: t('phonesDetailLastSync'),  value: p.synced_at ? relativeTime(p.synced_at) : '—' },
                       ].map(row => (
                         <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -2090,17 +1762,6 @@ export function Phones({ user }: PhonesProps) {
 
                   {/* Lien OnlyFans */}
                   <PanelLinkField phone={p} onSave={saveLink} />
-
-                  {/* Tags · Groupe · Note · Identifiants (métadonnées ScaleFlow) */}
-                  <PhoneMetaEditor
-                    phone={p}
-                    allTags={allTags}
-                    allGroups={groups}
-                    onSaveTags={saveTags}
-                    onSaveGroup={savePhoneGroup}
-                    onSaveNotes={saveNotes}
-                    onSaveCreds={saveCreds}
-                  />
 
                   {/* Instagram section */}
                   {p.ig_username && (
@@ -2231,24 +1892,6 @@ export function Phones({ user }: PhonesProps) {
               </svg>
               {fr('Délier IG', 'Unlink IG')}
             </button>
-
-            {/* Add tag bulk */}
-            <input
-              placeholder={fr('Tag + Entrée', 'Tag + Enter')}
-              disabled={bulkBusy}
-              onKeyDown={e => {
-                if (e.key !== 'Enter') return
-                const el = e.target as HTMLInputElement
-                if (el.value.trim()) { bulkAddTag(el.value); el.value = '' }
-              }}
-              className="sf-input"
-              style={{
-                width: 118, height: 28, fontSize: 12, padding: '5px 10px',
-                background: 'rgba(233,234,240,0.04)', border: `1px solid ${HAIR}`,
-                borderRadius: 8, color: TEXT_1,
-              }}
-              title={fr('Ajouter un tag à la sélection', 'Add a tag to the selection')}
-            />
 
             {/* Change group */}
             {groups.length > 0 && (
