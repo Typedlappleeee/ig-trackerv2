@@ -79,6 +79,7 @@ export type Page =
   | 'activity'
   | 'cloudphones'
   | 'flows'
+  | 'proxies'
 
 interface LayoutProps {
   user:      User
@@ -127,6 +128,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'cloudphones', label: 'Cloud Phones',   icon: '📱' },
+      { id: 'proxies',     label: 'Proxies',         icon: '🌐' },
       { id: 'flows',       label: 'Automatisation',  icon: '🤖' },
     ],
   },
@@ -784,7 +786,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       return true
     }
     // Pages internes / superadmin ScaleFlow uniquement (Tâches inclus).
-    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth' || id === 'cloudphones' || id === 'flows') return effectiveSuperAdmin
+    if (id === 'licences' || id === 'tiktokposting' || id === 'crossposting' || id === 'tasks' || id === 'proxyhealth' || id === 'cloudphones' || id === 'flows' || id === 'proxies') return effectiveSuperAdmin
     // Création de contenu : indisponible en Standard (réservé Pro / Organisation).
     if (CONTENT_CREATION_TABS.has(id) && !hasContentCreation) return false
     // Permissions par membre : un membre/lecteur d'une orga ne voit que les onglets
