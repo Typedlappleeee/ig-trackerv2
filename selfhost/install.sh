@@ -258,7 +258,7 @@ async function checkProxy(p) {
   try {
     const out = await sh('curl', args, 25000)
     let j = null; try { j = JSON.parse(out) } catch { return { ok: true, reachable: false, error: 'réponse invalide : ' + String(out).slice(0, 80) } }
-    if (j && j.status === 'success') return { ok: true, reachable: true, ip: j.query, isp: j.isp, country: j.country, city: j.city }
+    if (j && j.status === 'success') return { ok: true, reachable: true, ip: j.query, isp: j.isp, country: j.country, countryCode: j.countryCode, city: j.city }
     return { ok: true, reachable: false, error: (j && j.message) || 'échec' }
   } catch (e) {
     return { ok: true, reachable: false, error: (e && e.message ? String(e.message) : 'échec').slice(0, 150) }

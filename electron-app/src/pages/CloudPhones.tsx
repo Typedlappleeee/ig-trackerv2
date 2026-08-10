@@ -15,6 +15,8 @@ import {
 } from '@/lib/cloudPhones'
 import { CloudPhoneWindow } from '@/components/CloudPhoneWindow'
 import { listProxies, proxyLabel, type Proxy } from '@/lib/proxyStore'
+import { ExitIpCell } from '@/components/ui/ExitIpCell'
+import { runProxyCheck, runProxyChecks } from '@/lib/proxyChecks'
 
 interface Props { user: User }
 
@@ -81,6 +83,22 @@ export function CloudPhones({ user }: Props) {
   const [epProxyId, setEpProxyId] = useState('')
   const [epCheck, setEpCheck] = useState<{ loading?: boolean; ip?: string; err?: string } | null>(null)
 
+  // Test de l'IP sortante du proxy assigné à un tel (écrit dans le cache partagé
+  // → la cellule ExitIpCell se met à jour toute seule, ici et dans Proxies).
+  const [testingIp, setTestingIp] = useState<Set<string>>(new Set())
+  const testExitIp = async (proxyId?: string) => {
+    const p = proxyById(proxyId); if (!p) return
+    setTestingIp(s => new Set(s).add(p.id))
+    await runProxyCheck({ id: p.id, type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
+    setTestingIp(s => { const n = new Set(s); n.delete(p.id); return n })
+  }
+  const verifyAllIps = async () => {
+    const seen = new Set<string>()
+    const list: Proxy[] = []
+    for (const i of instances) { const p = proxyById(meta[i.id]?.proxyId); if (p && !seen.has(p.id)) { seen.add(p.id); list.push(p) } }
+    if (list.length) await runProxyChecks(list.map(p => ({ id: p.id, type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })))
+  }
+
   const openEdit = (id: string, kind: 'proxy' | 'profile') => {
     const m = meta[id] ?? {}
     setEditId(id); setEditKind(kind); setEpName(m.name ?? ''); setEpAccount(m.account ?? ''); setEpNotes(m.notes ?? '')
@@ -95,8 +113,8 @@ export function CloudPhones({ user }: Props) {
   const epCheckNow = async () => {
     const p = proxyById(epProxyId); if (!p) return
     setEpCheck({ loading: true })
-    const r = await cloudPhones.checkProxy({ type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
-    setEpCheck(r.ok && r.data?.reachable ? { ip: r.data.ip } : { err: r.data?.error || 'KO' })
+    const c = await runProxyCheck({ id: p.id, type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
+    setEpCheck(c.reachable ? { ip: c.ip } : { err: c.error })
   }
   const saveEdit = () => {
     if (!editId) return
@@ -239,7 +257,10 @@ export function CloudPhones({ user }: Props) {
         </div>
         <div className="sf-page-header-actions sf-anim-slide-up sf-d100" style={{ display: 'flex', gap: 8 }}>
           {conn === 'ok' && (
-            <Button onClick={openCreate}>+ {tr('Nouveau téléphone', 'New phone')}</Button>
+            <>
+              <button onClick={verifyAllIps} className="sf-btn sf-btn-ghost" style={{ height: 36 }}>🔎 {tr('Vérifier les IP', 'Check IPs')}</button>
+              <Button onClick={openCreate}>+ {tr('Nouveau téléphone', 'New phone')}</Button>
+            </>
           )}
           <button onClick={() => setShowKey(v => !v)} className="sf-btn sf-btn-secondary" style={{ height: 36 }}>
             ⚙ {tr('Agent', 'Agent')}
@@ -289,14 +310,14 @@ export function CloudPhones({ user }: Props) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
-                      {[tr('Statut', 'Status'), tr('Téléphone', 'Phone'), 'ID', tr('Modèle', 'Model'), tr('Système', 'System'), 'Proxy', tr('Port ADB', 'ADB port'), tr('Créé le', 'Created'), tr('Actions', 'Actions')].map(h => (
+                      {[tr('Statut', 'Status'), tr('Téléphone', 'Phone'), 'ID', tr('Modèle', 'Model'), tr('Système', 'System'), 'Proxy', tr('IP sortante', 'Exit IP'), tr('Port ADB', 'ADB port'), tr('Créé le', 'Created'), tr('Actions', 'Actions')].map(h => (
                         <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-4)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {instances.length === 0 && (
-                      <tr><td colSpan={9} style={{ padding: 36, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>
+                      <tr><td colSpan={10} style={{ padding: 36, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>
                         {tr('Aucun téléphone.', 'No phone yet.')} <button onClick={openCreate} className="sf-link" style={{ fontWeight: 600 }}>{tr('Crée ton premier téléphone', 'Create your first phone')}</button>
                       </td></tr>
                     )}
@@ -333,10 +354,15 @@ export function CloudPhones({ user }: Props) {
                             <span style={{ color: 'var(--text-2)' }}>Android {m.android ?? '15'}</span>
                             {m.store && <span style={{ display: 'block', fontSize: 10.5, color: 'var(--text-4)' }}>{m.store}</span>}
                           </td>
-                          <td style={{ padding: '10px 16px', maxWidth: 160 }}>
-                            {m.proxyId && proxyById(m.proxyId)
-                              ? <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--ok)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyLabel(proxyById(m.proxyId)!)}</span>
+                          <td style={{ padding: '10px 16px', maxWidth: 170 }}>
+                            {m.proxyId
+                              ? (proxyById(m.proxyId)
+                                  ? <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--text-2)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyById(m.proxyId)!.type}://{proxyLabel(proxyById(m.proxyId)!)}</span>
+                                  : <span className="sf-badge sf-badge-warn">proxy introuvable</span>)
                               : <span style={{ color: 'var(--text-4)' }}>—</span>}
+                          </td>
+                          <td style={{ padding: '10px 16px' }}>
+                            <ExitIpCell proxyId={m.proxyId} testing={!!m.proxyId && testingIp.has(m.proxyId)} onTest={() => testExitIp(m.proxyId)} />
                           </td>
                           <td style={{ padding: '10px 16px', color: 'var(--text-3)', fontFamily: 'monospace', fontSize: 11.5 }}>{inst.adbPort ?? '—'}</td>
                           <td style={{ padding: '10px 16px', color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{fmtDate(m.createdAt)}</td>
