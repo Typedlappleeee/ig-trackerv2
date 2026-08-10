@@ -1,7 +1,7 @@
 // Admin — Proxies des cloud phones (façon GeeLark). Réservé au super-admin.
 // Tableau : groupe (réassignable), proxy, IP sortante (bientôt), nb de tels.
 // Les groupes se créent INDÉPENDAMMENT (bouton dédié), pas à l'ajout d'un proxy.
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
 import { cloudPhones, loadCloudAgentConfig, getCloudAgent } from '@/lib/cloudPhones'
@@ -28,6 +28,8 @@ export function Proxies({ user }: Props) {
   const [busy, setBusy] = useState('')
   const [checks, setChecks] = useState<Record<string, Check>>({})
   const [checkingAll, setCheckingAll] = useState(false)
+  const startedRef = useRef<Set<string>>(new Set())   // évite de re-tester en boucle (auto-check)
+  const [agentReady, setAgentReady] = useState(false)
 
   const load = useCallback(async () => {
     const [px, gr] = await Promise.all([listProxies(user.id), listGroups(user.id)])
@@ -35,18 +37,26 @@ export function Proxies({ user }: Props) {
   }, [user.id])
   useEffect(() => { load() }, [load])
   // Charge la config de l'agent (nécessaire pour tester les proxies au travers).
-  useEffect(() => { loadCloudAgentConfig(orgId, user.id) }, [orgId, user.id])
+  useEffect(() => { loadCloudAgentConfig(orgId, user.id).then(() => setAgentReady(!!getCloudAgent().url)) }, [orgId, user.id])
 
   const checkOne = async (p: Proxy) => {
-    if (!getCloudAgent().url) { setBusy('Configure l’agent dans Cloud Phones pour tester'); window.setTimeout(() => setBusy(''), 3000); return }
+    if (!getCloudAgent().url) return
+    startedRef.current.add(p.id)
     setChecks(c => ({ ...c, [p.id]: { loading: true } }))
     const r = await cloudPhones.checkProxy({ type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
     const d = r.data
-    setChecks(c => ({ ...c, [p.id]: r.ok && d?.reachable ? { ip: d.ip, isp: d.isp, country: d.country } : { err: d?.error || r.error || 'KO' } }))
+    setChecks(c => ({ ...c, [p.id]: r.ok && d?.reachable ? { ip: d.ip, isp: d.isp, country: d.country } : { err: d?.error || r.error || 'endpoint agent manquant ?' } }))
+  }
+  // Teste une liste avec une petite concurrence (4).
+  const runChecks = async (list: Proxy[]) => {
+    let i = 0
+    const worker = async () => { while (i < list.length) { await checkOne(list[i++]) } }
+    await Promise.all(Array.from({ length: Math.min(4, list.length) }, worker))
   }
   const checkAll = async () => {
     setCheckingAll(true)
-    for (const p of visible) { await checkOne(p) }   // séquentiel (évite de saturer l'agent)
+    visible.forEach(p => startedRef.current.delete(p.id))   // force re-test
+    await runChecks(visible)
     setCheckingAll(false)
   }
 
@@ -71,6 +81,14 @@ export function Proxies({ user }: Props) {
   const remove = async (id: string) => { await deleteProxy(id); load() }
 
   const visible = proxies.filter(p => filter === 'all' ? true : filter === 'none' ? !p.group : p.group === filter)
+
+  // Auto-test des proxies visibles dès l'affichage (sans clic).
+  useEffect(() => {
+    if (!agentReady) return
+    const pending = visible.filter(p => !startedRef.current.has(p.id))
+    if (pending.length) runChecks(pending)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proxies, filter, agentReady])
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '22px 20px' }}>
@@ -125,7 +143,7 @@ export function Proxies({ user }: Props) {
                         const c = checks[p.id]
                         if (c?.loading) return <span style={{ color: '#8a8a9c' }}>…</span>
                         if (c?.ip) return <span title={`${c.isp ?? ''} ${c.country ?? ''}`.trim()} style={{ color: '#34D399', fontFamily: 'ui-monospace, monospace' }}>{c.ip} {c.country ? `· ${c.country}` : ''}</span>
-                        if (c?.err) return <span title={c.err} style={{ color: '#F87171' }}>KO</span>
+                        if (c?.err) return <span onClick={() => checkOne(p)} title={c.err} style={{ color: '#F87171', cursor: 'pointer' }}>KO ↻</span>
                         return <button onClick={() => checkOne(p)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#8a8a9c', cursor: 'pointer', fontSize: 10.5, padding: '2px 8px' }}>tester</button>
                       })()}
                     </Td>

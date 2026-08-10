@@ -215,13 +215,17 @@ async function provisionAuroraStore(serial) {
 // Teste un proxy : se connecte AU TRAVERS et récupère l'IP sortante + l'ISP
 // (via ip-api.com). curl gère socks5h (résolution DNS côté proxy) et http.
 async function checkProxy(p) {
-  const scheme = (p && p.type === 'http') ? 'http' : 'socks5h'
-  const auth = (p && p.username) ? `${p.username}:${p.password || ''}@` : ''
-  const proxyArg = `${scheme}://${auth}${p.host}:${p.port}`
+  if (!p || !p.host || !p.port) return { ok: true, reachable: false, error: 'proxy incomplet' }
+  const scheme = (p.type === 'http') ? 'http' : 'socks5h'
+  // Auth via -U (pas dans l'URL) → robuste aux caractères spéciaux du mot de passe.
+  const args = ['-s', '--max-time', '20', '-x', `${scheme}://${p.host}:${p.port}`]
+  if (p.username) args.push('-U', `${p.username}:${p.password || ''}`)
+  args.push('http://ip-api.com/json')
   try {
-    const out = await sh('curl', ['-s', '--max-time', '15', '-x', proxyArg, 'http://ip-api.com/json'], 20000)
-    const j = JSON.parse(out)
-    return { ok: true, reachable: j.status === 'success', ip: j.query || null, isp: j.isp || null, country: j.country || null, city: j.city || null }
+    const out = await sh('curl', args, 25000)
+    let j = null; try { j = JSON.parse(out) } catch { return { ok: true, reachable: false, error: 'réponse invalide : ' + String(out).slice(0, 80) } }
+    if (j && j.status === 'success') return { ok: true, reachable: true, ip: j.query, isp: j.isp, country: j.country, city: j.city }
+    return { ok: true, reachable: false, error: (j && j.message) || 'échec' }
   } catch (e) {
     return { ok: true, reachable: false, error: (e && e.message ? String(e.message) : 'échec').slice(0, 150) }
   }
