@@ -212,6 +212,21 @@ async function provisionAuroraStore(serial) {
   await installApk(serial, url)
 }
 
+// Teste un proxy : se connecte AU TRAVERS et récupère l'IP sortante + l'ISP
+// (via ip-api.com). curl gère socks5h (résolution DNS côté proxy) et http.
+async function checkProxy(p) {
+  const scheme = (p && p.type === 'http') ? 'http' : 'socks5h'
+  const auth = (p && p.username) ? `${p.username}:${p.password || ''}@` : ''
+  const proxyArg = `${scheme}://${auth}${p.host}:${p.port}`
+  try {
+    const out = await sh('curl', ['-s', '--max-time', '15', '-x', proxyArg, 'http://ip-api.com/json'], 20000)
+    const j = JSON.parse(out)
+    return { ok: true, reachable: j.status === 'success', ip: j.query || null, isp: j.isp || null, country: j.country || null, city: j.city || null }
+  } catch (e) {
+    return { ok: true, reachable: false, error: (e && e.message ? String(e.message) : 'échec').slice(0, 150) }
+  }
+}
+
 const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) }
 
 const server = http.createServer(async (req, res) => {
@@ -241,6 +256,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (parts[0] === 'health') return json(res, 200, { ok: true, image: IMAGE })
+    if (parts[0] === 'proxy' && parts[1] === 'check' && req.method === 'POST') return json(res, 200, await checkProxy(body))
 
     if (parts[0] === 'instances' && parts.length === 1) {
       if (req.method === 'GET')  return json(res, 200, { ok: true, instances: await listInstances() })

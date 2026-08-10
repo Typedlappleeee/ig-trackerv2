@@ -92,6 +92,9 @@ export const cloudPhones = {
   pushVideo: (id: string, url: string) => call<{ output: string }>('push', { id, url }),
   // Installe la dernière version d'un paquet F-Droid (par nom de paquet).
   installFdroid: (id: string, pkg: string) => call<{ output: string }>('installfdroid', { id, pkg }),
+  // Teste un proxy (IP sortante + ISP), au travers de l'agent.
+  checkProxy: (proxy: { type: string; host: string; port: number; username?: string; password?: string }) =>
+    call<{ reachable: boolean; ip?: string; isp?: string; country?: string; city?: string; error?: string }>('proxycheck', { proxy }),
 }
 
 // Envoie un FICHIER vidéo local directement à l'agent (XHR binaire, progression).
