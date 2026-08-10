@@ -1,18 +1,18 @@
-// Admin — Proxies des cloud phones (façon GeeLark). Réservé au super-admin.
-// Tableau : groupe (réassignable), proxy, IP sortante (bientôt), nb de tels.
-// Les groupes se créent INDÉPENDAMMENT (bouton dédié), pas à l'ajout d'un proxy.
-import { useState, useEffect, useCallback, useRef } from 'react'
+// Admin — Proxies des cloud phones (facon GeeLark). Reserve au super-admin.
+// Tableau dense sur le design system : groupe (reassignable), proxy copiable,
+// statut + latence, IP sortante (cache partage avec Cloud Phones), nb de tels.
+// Les groupes se creent independamment (bouton dedie).
+import { useState, useEffect, useCallback, useRef, useReducer } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
-import { loadCloudAgentConfig, getCloudAgent } from '@/lib/cloudPhones'
-import { runProxyCheck } from '@/lib/proxyChecks'
+import { loadCloudAgentConfig, getCloudAgent, loadAllCpMeta } from '@/lib/cloudPhones'
+import { runProxyCheck, getProxyCheck, isStale } from '@/lib/proxyChecks'
+import { ExitIpCell } from '@/components/ui/ExitIpCell'
 import {
   listProxies, addProxies, deleteProxy, setProxyGroup,
   listGroups, addGroup, deleteGroup,
   parseProxyLine, proxyLabel, type Proxy, type ProxyType,
 } from '@/lib/proxyStore'
-
-interface Check { loading?: boolean; ip?: string; isp?: string; country?: string; err?: string }
 
 interface Props { user: User }
 
@@ -21,49 +21,45 @@ export function Proxies({ user }: Props) {
   const orgId = currentOrg?.id ?? null
   const [proxies, setProxies] = useState<Proxy[]>([])
   const [groups, setGroups] = useState<string[]>([])
-  const [filter, setFilter] = useState<string>('all')   // 'all' | 'none' | nom de groupe
+  const [filter, setFilter] = useState<string>('all')      // 'all' | 'none' | nom de groupe
   const [showAdd, setShowAdd] = useState(false)
   const [raw, setRaw] = useState('')
   const [addToGroup, setAddToGroup] = useState('')
   const [type, setType] = useState<ProxyType>('socks5')
   const [busy, setBusy] = useState('')
-  const [checks, setChecks] = useState<Record<string, Check>>({})
+  const [testing, setTesting] = useState<Set<string>>(new Set())
   const [checkingAll, setCheckingAll] = useState(false)
-  const startedRef = useRef<Set<string>>(new Set())   // évite de re-tester en boucle (auto-check)
   const [agentReady, setAgentReady] = useState(false)
+  const [phoneMeta, setPhoneMeta] = useState<Record<string, { proxyId?: string; name?: string }>>({})
+  const [copied, setCopied] = useState<string | null>(null)
+  const startedRef = useRef<Set<string>>(new Set())
+  const [, bump] = useReducer((x: number) => x + 1, 0)   // re-render quand un check change
 
   const load = useCallback(async () => {
     const [px, gr] = await Promise.all([listProxies(user.id), listGroups(user.id)])
-    setProxies(px); setGroups(gr)
+    setProxies(px); setGroups(gr); setPhoneMeta(loadAllCpMeta())
   }, [user.id])
   useEffect(() => { load() }, [load])
-  // Charge la config de l'agent (nécessaire pour tester les proxies au travers).
   useEffect(() => { loadCloudAgentConfig(orgId, user.id).then(() => setAgentReady(!!getCloudAgent().url)) }, [orgId, user.id])
+  useEffect(() => { const t = setInterval(bump, 4000); return () => clearInterval(t) }, [])   // rafraichit "il y a X min"
 
   const checkOne = async (p: Proxy) => {
-    if (!getCloudAgent().url) return
+    if (!getCloudAgent().url) { setBusy('Configure l’agent dans Cloud Phones pour tester'); window.setTimeout(() => setBusy(''), 3000); return }
     startedRef.current.add(p.id)
-    setChecks(c => ({ ...c, [p.id]: { loading: true } }))
-    // runProxyCheck écrit dans le cache partagé (sf-proxy-checks) → l'IP sortante
-    // apparaît AUSSI sur la ligne du téléphone dans Cloud Phones (même donnée).
-    const chk = await runProxyCheck({ id: p.id, type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
-    setChecks(c => ({ ...c, [p.id]: chk.reachable ? { ip: chk.ip, isp: chk.isp, country: chk.country } : { err: chk.error || 'KO' } }))
+    setTesting(s => new Set(s).add(p.id))
+    await runProxyCheck({ id: p.id, type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
+    setTesting(s => { const n = new Set(s); n.delete(p.id); return n })
   }
-  // Teste une liste avec une petite concurrence (4).
-  const runChecks = async (list: Proxy[]) => {
+  const runList = async (list: Proxy[]) => {
     let i = 0
     const worker = async () => { while (i < list.length) { await checkOne(list[i++]) } }
     await Promise.all(Array.from({ length: Math.min(4, list.length) }, worker))
   }
-  const checkAll = async () => {
-    setCheckingAll(true)
-    visible.forEach(p => startedRef.current.delete(p.id))   // force re-test
-    await runChecks(visible)
-    setCheckingAll(false)
-  }
+  const checkAll = async () => { setCheckingAll(true); startedRef.current.clear(); await runList(visible); setCheckingAll(false) }
 
   const parsed = raw.split('\n').map(l => parseProxyLine(l, type)).filter(Boolean) as Omit<Proxy, 'id'>[]
   const countIn = (g: string) => proxies.filter(p => (p.group ?? '') === g).length
+  const assignedTo = (pid: string) => Object.values(phoneMeta).filter(m => m.proxyId === pid)
 
   const doAdd = async () => {
     if (parsed.length === 0) { setBusy('Aucun proxy valide'); window.setTimeout(() => setBusy(''), 2500); return }
@@ -73,135 +69,153 @@ export function Proxies({ user }: Props) {
     window.setTimeout(() => setBusy(''), 3000)
   }
   const newGroup = async () => {
-    const n = window.prompt('Nom du nouveau groupe :')
-    if (!n?.trim()) return
+    const n = window.prompt('Nom du nouveau groupe :'); if (!n?.trim()) return
     const r = await addGroup(n.trim(), { userId: user.id, orgId })
     if (r.ok) { setFilter(n.trim()); load() } else setBusy(`Échec : ${r.error}`)
   }
   const removeGroup = async (g: string) => { if (window.confirm(`Supprimer le groupe « ${g} » ? (les proxies sont conservés, juste dégroupés)`)) { if (filter === g) setFilter('all'); await deleteGroup(g, user.id); load() } }
   const changeGroup = async (id: string, g: string) => { await setProxyGroup(id, g || null); load() }
   const remove = async (id: string) => { await deleteProxy(id); load() }
+  const copyProxy = (p: Proxy) => { navigator.clipboard?.writeText(`${p.type}://${proxyLabel(p)}`); setCopied(p.id); window.setTimeout(() => setCopied(c => (c === p.id ? null : c)), 1400) }
 
   const visible = proxies.filter(p => filter === 'all' ? true : filter === 'none' ? !p.group : p.group === filter)
 
-  // Auto-test des proxies visibles dès l'affichage (sans clic).
+  // Auto-test des proxies visibles non encore en cache (throttle 4).
   useEffect(() => {
     if (!agentReady) return
-    const pending = visible.filter(p => !startedRef.current.has(p.id))
-    if (pending.length) runChecks(pending)
+    const pending = visible.filter(p => !startedRef.current.has(p.id) && !getProxyCheck(p.id))
+    if (pending.length) runList(pending)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proxies, filter, agentReady])
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '22px 20px' }}>
-      {/* En-tête */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 900, color: '#F0F0F7', margin: 0 }}>🌐 Proxies</h1>
-        <span style={{ fontSize: 12, color: '#8a8a9c', background: 'rgba(255,255,255,0.06)', borderRadius: 99, padding: '2px 10px' }}>{proxies.length} au total</span>
-        <span style={{ flex: 1 }} />
-        <button onClick={checkAll} disabled={checkingAll || visible.length === 0} style={{ ...btnGhost, opacity: checkingAll ? 0.6 : 1 }}>{checkingAll ? '⏳ Test…' : '🔎 Vérifier'}</button>
-        <button onClick={newGroup} style={btnGhost}>＋ Nouveau groupe</button>
-        <button onClick={() => { setAddToGroup(filter !== 'all' && filter !== 'none' ? filter : ''); setShowAdd(true) }} style={btnPrimary}>＋ Ajouter des proxies</button>
-      </div>
-      <p style={{ fontSize: 12.5, color: '#8a8a9c', margin: '4px 0 16px' }}>SOCKS5 recommandé. Crée des groupes, range tes proxies dedans, puis assigne-les aux tels (Cloud Phones).</p>
+    <div className="sf-page sf-page-enter">
+      <header className="sf-page-header">
+        <div className="sf-page-icon">🌐</div>
+        <div>
+          <h1 className="sf-page-title">Proxies</h1>
+          <p className="sf-page-sub">SOCKS5 recommandé. Crée des groupes, teste les IP, puis assigne-les aux tels (Cloud Phones).</p>
+        </div>
+        <div className="sf-page-header-actions" style={{ display: 'flex', gap: 8 }}>
+          <button onClick={checkAll} disabled={checkingAll || visible.length === 0} className="sf-btn sf-btn-ghost" style={{ height: 36 }}>{checkingAll ? '⏳ Test…' : '🔎 Vérifier'}</button>
+          <button onClick={newGroup} className="sf-btn sf-btn-secondary" style={{ height: 36 }}>＋ Nouveau groupe</button>
+          <button onClick={() => { setAddToGroup(filter !== 'all' && filter !== 'none' ? filter : ''); setShowAdd(true) }} className="sf-btn sf-btn-primary" style={{ height: 36 }}>＋ Ajouter des proxies</button>
+        </div>
+      </header>
 
       {/* Filtres par groupe */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
         <Chip on={filter === 'all'} onClick={() => setFilter('all')}>Tous · {proxies.length}</Chip>
         {groups.map(g => (
-          <span key={g} style={{ display: 'inline-flex', alignItems: 'center' }}>
-            <Chip on={filter === g} onClick={() => setFilter(g)}>{g} · {countIn(g)}</Chip>
-            <button onClick={() => removeGroup(g)} title="Supprimer le groupe" style={{ marginLeft: -4, marginRight: 2, background: 'none', border: 'none', color: '#6b6b7c', cursor: 'pointer', fontSize: 12 }}>✕</button>
-          </span>
+          <Chip key={g} on={filter === g} onClick={() => setFilter(g)} onDelete={() => removeGroup(g)}>{g} · {countIn(g)}</Chip>
         ))}
         {countIn('') > 0 && <Chip on={filter === 'none'} onClick={() => setFilter('none')}>Sans groupe · {countIn('')}</Chip>}
       </div>
 
       {/* Tableau */}
-      <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+      <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 760 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 820 }}>
             <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.04)', color: '#8a8a9c', textAlign: 'left' }}>
-                <Th w={40}>#</Th><Th w={170}>Groupe</Th><Th>Proxy</Th><Th w={100}>Type</Th><Th w={130}>IP sortante</Th><Th w={70}>Tels</Th><Th w={50}></Th>
+              <tr>
+                <Th w={44}>#</Th><Th w={150}>Groupe</Th><Th>Proxy</Th><Th w={140}>Statut</Th><Th w={190}>IP sortante</Th><Th w={120}>Tels</Th><Th w={44} />
               </tr>
             </thead>
             <tbody>
               {visible.length === 0
-                ? <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: '#6b6b7c' }}>Aucun proxy{filter !== 'all' ? ' dans ce groupe' : ''}. Clique « Ajouter des proxies ».</td></tr>
-                : visible.map((p, i) => (
-                  <tr key={p.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <Td style={{ color: '#6b6b7c' }}>{i + 1}</Td>
-                    <Td>
-                      <select value={p.group ?? ''} onChange={e => changeGroup(p.id, e.target.value)} style={selMini}>
-                        <option value="">— Aucun —</option>
-                        {groups.map(g => <option key={g} value={g}>{g}</option>)}
-                      </select>
-                    </Td>
-                    <Td style={{ fontFamily: 'ui-monospace, monospace', color: '#E9E9F2' }}>{p.type}://{proxyLabel(p)}</Td>
-                    <Td><span style={{ fontSize: 10, fontWeight: 800, color: '#C7D2FE', background: 'rgba(129,140,248,0.15)', borderRadius: 6, padding: '2px 6px' }}>{p.type.toUpperCase()}</span></Td>
-                    <Td>
-                      {(() => {
-                        const c = checks[p.id]
-                        if (c?.loading) return <span style={{ color: '#8a8a9c' }}>…</span>
-                        if (c?.ip) return <span title={`${c.isp ?? ''} ${c.country ?? ''}`.trim()} style={{ color: '#34D399', fontFamily: 'ui-monospace, monospace' }}>{c.ip} {c.country ? `· ${c.country}` : ''}</span>
-                        if (c?.err) return <span onClick={() => checkOne(p)} title={c.err} style={{ color: '#F87171', cursor: 'pointer' }}>KO ↻</span>
-                        return <button onClick={() => checkOne(p)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#8a8a9c', cursor: 'pointer', fontSize: 10.5, padding: '2px 8px' }}>tester</button>
-                      })()}
-                    </Td>
-                    <Td style={{ color: '#6b6b7c' }}>—</Td>
-                    <Td><button onClick={() => remove(p.id)} style={{ background: 'none', border: 'none', color: '#F87171', cursor: 'pointer', fontSize: 13 }}>✕</button></Td>
-                  </tr>
-                ))}
+                ? <tr><td colSpan={7} style={{ padding: 34, textAlign: 'center', color: 'var(--text-4)' }}>Aucun proxy{filter !== 'all' ? ' dans ce groupe' : ''}. Clique « Ajouter des proxies ».</td></tr>
+                : visible.map((p, i) => {
+                  const used = assignedTo(p.id)
+                  return (
+                    <tr key={p.id} className="cp-row" style={{ borderTop: '1px solid var(--border)' }}>
+                      <Td style={{ color: 'var(--text-4)' }}>{i + 1}</Td>
+                      <Td>
+                        <select value={p.group ?? ''} onChange={e => changeGroup(p.id, e.target.value)} className="sf-input" style={{ height: 30, fontSize: 12, padding: '0 8px', maxWidth: 140 }}>
+                          <option value="">— Aucun —</option>
+                          {groups.map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </Td>
+                      <Td>
+                        <button onClick={() => copyProxy(p)} title="Copier" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'ui-monospace, monospace', fontSize: 12, color: 'var(--text-1)', background: 'var(--surface-2, rgba(255,255,255,0.04))', border: '1px solid var(--border)', borderRadius: 7, padding: '4px 9px', cursor: 'pointer' }}>
+                          {p.type}://{proxyLabel(p)}
+                          <span style={{ color: copied === p.id ? 'var(--ok)' : 'var(--text-4)' }}>{copied === p.id ? '✓' : '⧉'}</span>
+                        </button>
+                      </Td>
+                      <Td><StatusCell id={p.id} testing={testing.has(p.id)} onTest={() => checkOne(p)} /></Td>
+                      <Td><ExitIpCell proxyId={p.id} testing={testing.has(p.id)} onTest={() => checkOne(p)} /></Td>
+                      <Td>
+                        {used.length === 0
+                          ? <span style={{ color: 'var(--text-4)' }}>libre</span>
+                          : used.length === 1
+                            ? <span className="sf-badge sf-badge-ok" title={used[0].name}>● {used[0].name || 'assigné'}</span>
+                            : <span className="sf-badge sf-badge-warn" title={used.map(u => u.name).join(', ')}>partagé ×{used.length}</span>}
+                      </Td>
+                      <Td><button onClick={() => remove(p.id)} title="Supprimer" style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 13 }}>✕</button></Td>
+                    </tr>
+                  )
+                })}
             </tbody>
           </table>
         </div>
       </div>
-      {busy && <div style={{ fontSize: 12.5, marginTop: 10, color: busy.startsWith('✓') ? '#34D399' : busy.startsWith('Échec') || busy.startsWith('Aucun') ? '#F87171' : '#c8c8d8' }}>{busy}</div>}
-      <p style={{ fontSize: 11.5, color: '#6b6b7c', marginTop: 14 }}>ℹ️ IP sortante & nombre de tels : bientôt (Phase 2 — test + routage du trafic).</p>
+      {busy && <div style={{ fontSize: 12.5, marginTop: 10, color: busy.startsWith('✓') ? 'var(--ok)' : busy.startsWith('Échec') || busy.startsWith('Aucun') ? 'var(--danger)' : 'var(--text-2)' }}>{busy}</div>}
 
       {/* Modal ajout */}
       {showAdd && (
-        <div onClick={() => setShowAdd(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'grid', placeItems: 'center', zIndex: 100 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 'min(560px,92vw)', background: '#12131d', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 20 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: '#F0F0F7', marginBottom: 12 }}>Ajouter des proxies</div>
+        <div onClick={() => setShowAdd(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(6,7,12,0.6)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 3000, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(560px,94vw)', padding: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>Ajouter des proxies</h3>
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setShowAdd(false)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', fontSize: 18 }}>×</button>
+            </div>
             <textarea value={raw} onChange={e => setRaw(e.target.value)} rows={7} autoFocus
               placeholder={'Un proxy par ligne :\nhost:port:user:pass\nuser:pass@host:port\nsocks5://user:pass@host:port'}
-              style={{ width: '100%', boxSizing: 'border-box', fontSize: 12, fontFamily: 'ui-monospace, monospace', padding: '10px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(0,0,0,0.4)', color: '#E9E9F2', resize: 'vertical' }} />
+              className="sf-input" style={{ width: '100%', boxSizing: 'border-box', fontSize: 12, fontFamily: 'ui-monospace, monospace', padding: 10, resize: 'vertical' }} />
+            <div style={{ fontSize: 11.5, color: 'var(--text-4)', margin: '6px 2px 0' }}>{parsed.length} valide(s){raw.trim() ? ` / ${raw.split('\n').filter(l => l.trim()).length} ligne(s)` : ''}</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
-              <label style={{ fontSize: 11.5, color: '#8a8a9c' }}>Groupe</label>
-              <select value={addToGroup} onChange={e => setAddToGroup(e.target.value)} style={{ ...selMini, minWidth: 150 }}>
+              <label style={{ fontSize: 11.5, color: 'var(--text-4)' }}>Groupe</label>
+              <select value={addToGroup} onChange={e => setAddToGroup(e.target.value)} className="sf-input" style={{ height: 34, minWidth: 150, fontSize: 12.5 }}>
                 <option value="">— Aucun —</option>
                 {groups.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
-              <label style={{ fontSize: 11.5, color: '#8a8a9c', marginLeft: 6 }}>Type</label>
-              <select value={type} onChange={e => setType(e.target.value as ProxyType)} style={selMini}>
+              <label style={{ fontSize: 11.5, color: 'var(--text-4)', marginLeft: 6 }}>Type</label>
+              <select value={type} onChange={e => setType(e.target.value as ProxyType)} className="sf-input" style={{ height: 34, fontSize: 12.5 }}>
                 <option value="socks5">SOCKS5</option>
                 <option value="http">HTTP</option>
               </select>
               <span style={{ flex: 1 }} />
-              <button onClick={() => setShowAdd(false)} style={btnGhost}>Annuler</button>
-              <button onClick={doAdd} style={btnPrimary}>Ajouter{parsed.length ? ` (${parsed.length})` : ''}</button>
+              <button onClick={() => setShowAdd(false)} className="sf-btn sf-btn-ghost">Annuler</button>
+              <button onClick={doAdd} className="sf-btn sf-btn-primary">Ajouter{parsed.length ? ` (${parsed.length})` : ''}</button>
             </div>
           </div>
         </div>
       )}
+      <style>{`.cp-row:hover { background: var(--accent-dim); }`}</style>
     </div>
   )
 }
 
-const btnPrimary: React.CSSProperties = { fontSize: 12.5, fontWeight: 800, padding: '8px 14px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#818CF8,#6366F1)', color: '#fff', cursor: 'pointer' }
-const btnGhost: React.CSSProperties = { fontSize: 12.5, fontWeight: 700, padding: '8px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: '#d2d2e0', cursor: 'pointer' }
-const selMini: React.CSSProperties = { fontSize: 12, padding: '5px 8px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(0,0,0,0.35)', color: '#E9E9F2' }
-
+function StatusCell({ id, testing, onTest }: { id: string; testing: boolean; onTest: () => void }) {
+  if (testing) return <span style={{ color: 'var(--text-4)' }}>● test…</span>
+  const c = getProxyCheck(id)
+  if (!c) return <button onClick={onTest} style={{ background: 'none', border: '1px solid var(--border-md)', borderRadius: 6, color: 'var(--text-4)', cursor: 'pointer', fontSize: 11, padding: '2px 8px' }}>● non testé</button>
+  if (!c.reachable) return <span onClick={onTest} title={c.error} style={{ color: 'var(--danger)', fontWeight: 700, cursor: 'pointer' }}>● KO ↻</span>
+  return <span style={{ color: isStale(c) ? 'var(--text-4)' : 'var(--ok)', fontWeight: 700 }}>● OK{c.latencyMs ? <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · {c.latencyMs} ms</span> : null}</span>
+}
 function Th({ children, w }: { children?: React.ReactNode; w?: number }) {
-  return <th style={{ padding: '9px 12px', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3, width: w }}>{children}</th>
+  return <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.4, width: w, textAlign: 'left', color: 'var(--text-4)', background: 'rgba(255,255,255,0.02)', whiteSpace: 'nowrap' }}>{children}</th>
 }
 function Td({ children, style }: { children?: React.ReactNode; style?: React.CSSProperties }) {
-  return <td style={{ padding: '8px 12px', ...style }}>{children}</td>
+  return <td style={{ padding: '9px 12px', ...style }}>{children}</td>
 }
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 99, border: `1px solid ${on ? 'rgba(129,140,248,0.5)' : 'rgba(255,255,255,0.1)'}`, background: on ? 'rgba(129,140,248,0.18)' : 'rgba(255,255,255,0.04)', color: on ? '#C7D2FE' : '#a8a8ba', cursor: 'pointer' }}>{children}</button>
+function Chip({ on, onClick, onDelete, children }: { on: boolean; onClick: () => void; onDelete?: () => void; children: React.ReactNode }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 99, border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-lt)' : 'transparent', overflow: 'hidden' }}>
+      <button onClick={onClick} style={{ fontSize: 12, fontWeight: 700, padding: '5px 12px', border: 'none', background: 'transparent', color: on ? 'var(--accent)' : 'var(--text-3)', cursor: 'pointer' }}>{children}</button>
+      {onDelete && <button onClick={onDelete} title="Supprimer le groupe" style={{ border: 'none', background: 'transparent', color: 'var(--text-4)', cursor: 'pointer', fontSize: 11, padding: '0 8px 0 0' }}>✕</button>}
+    </span>
+  )
 }
 
 export default Proxies
