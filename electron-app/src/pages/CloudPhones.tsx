@@ -234,6 +234,39 @@ export function CloudPhones({ user }: Props) {
 
   const isRunning = (s: string) => /running|up/i.test(s)
 
+  // ── Recherche / filtres / multi-sélection (passage à l'échelle) ────────────
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'stopped' | 'open'>('all')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const q = search.trim().toLowerCase()
+  const filtered = instances.filter(inst => {
+    const okStatus = statusFilter === 'all' ? true
+      : statusFilter === 'online' ? isRunning(inst.state)
+      : statusFilter === 'stopped' ? !isRunning(inst.state)
+      : openIds.includes(inst.id)
+    if (!okStatus) return false
+    if (!q) return true
+    const mm = meta[inst.id] ?? {}
+    const px = proxyById(mm.proxyId)
+    return [mm.name || inst.name, inst.id, mm.account, px ? `${px.host}:${px.port}` : ''].filter(Boolean).join(' ').toLowerCase().includes(q)
+  })
+  const toggleSel = (id: string) => setSelectedIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const allFilteredSelected = filtered.length > 0 && filtered.every(i => selectedIds.has(i.id))
+  const toggleAllFiltered = () => setSelectedIds(allFilteredSelected ? new Set() : new Set(filtered.map(i => i.id)))
+  const clearSel = () => setSelectedIds(new Set())
+  const bulkOpen = () => { selectedIds.forEach(openWindow); clearSel() }
+  const bulkVerifyIp = async () => {
+    const seen = new Set<string>(); const list: Proxy[] = []
+    selectedIds.forEach(id => { const p = proxyById(meta[id]?.proxyId); if (p && !seen.has(p.id)) { seen.add(p.id); list.push(p) } })
+    if (list.length) await runProxyChecks(list.map(p => ({ id: p.id, type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })))
+  }
+  const bulkRemove = async () => {
+    if (!window.confirm(`Supprimer ${selectedIds.size} téléphone(s) ? Irréversible.`)) return
+    for (const id of selectedIds) await doAction(id, 'remove')
+    clearSel()
+  }
+
   const fmtDate = (t?: number) => {
     if (!t) return '—'
     try { return new Date(t).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: '2-digit' }) } catch { return '—' }
@@ -302,41 +335,68 @@ export function CloudPhones({ user }: Props) {
           <div className="sf-banner is-danger mt-6">{tr('Connexion impossible', 'Connection failed')} : {connMsg}</div>
         )}
 
-        {conn === 'ok' && (
+        {conn === 'ok' && instances.length > 0 && (
           <>
+            {/* Recherche + filtres de statut */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '4px 0 12px' }}>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher (nom, id, compte, proxy)…', 'Search (name, id, account, proxy)…')} className="sf-input" style={{ height: 34, flex: '0 1 320px', minWidth: 200 }} />
+              <span style={{ flex: 1 }} />
+              <FChip on={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>{tr('Tous', 'All')} · {instances.length}</FChip>
+              <FChip on={statusFilter === 'online'} onClick={() => setStatusFilter('online')}>{tr('En ligne', 'Online')} · {instances.filter(i => isRunning(i.state)).length}</FChip>
+              <FChip on={statusFilter === 'stopped'} onClick={() => setStatusFilter('stopped')}>{tr('Arrêté', 'Stopped')} · {instances.filter(i => !isRunning(i.state)).length}</FChip>
+              <FChip on={statusFilter === 'open'} onClick={() => setStatusFilter('open')}>{tr('Ouvert', 'Open')} · {openIds.length}</FChip>
+            </div>
+
+            {/* Barre d'actions groupées */}
+            {selectedIds.size > 0 && (
+              <div className="sf-card" style={{ padding: '9px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, borderColor: 'var(--accent)' }}>
+                <span style={{ fontWeight: 800, color: 'var(--accent)', fontSize: 13 }}>{selectedIds.size} {tr('sélectionné(s)', 'selected')}</span>
+                <span style={{ flex: 1 }} />
+                <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30 }} onClick={bulkOpen}>▶ {tr('Ouvrir', 'Open')}</button>
+                <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30 }} onClick={bulkVerifyIp}>🔎 {tr('Vérifier IP', 'Check IP')}</button>
+                <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30, color: 'var(--danger)' }} onClick={bulkRemove}>🗑 {tr('Supprimer', 'Delete')}</button>
+                <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30 }} onClick={clearSel}>✕</button>
+              </div>
+            )}
+
             {/* Table façon GeeLark : statut, nom, id de création, modèle, système, port, date */}
-            <div className="sf-card mt-4" style={{ overflow: 'hidden' }}>
+            <div className="sf-card" style={{ overflow: 'hidden' }}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ padding: '11px 8px 11px 16px', width: 34 }}><input type="checkbox" checked={allFilteredSelected} onChange={toggleAllFiltered} style={{ cursor: 'pointer' }} /></th>
                       {[tr('Statut', 'Status'), tr('Téléphone', 'Phone'), 'ID', tr('Modèle', 'Model'), tr('Système', 'System'), 'Proxy', tr('IP sortante', 'Exit IP'), tr('Port ADB', 'ADB port'), tr('Créé le', 'Created'), tr('Actions', 'Actions')].map(h => (
                         <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-4)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {instances.length === 0 && (
-                      <tr><td colSpan={10} style={{ padding: 36, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>
-                        {tr('Aucun téléphone.', 'No phone yet.')} <button onClick={openCreate} className="sf-link" style={{ fontWeight: 600 }}>{tr('Crée ton premier téléphone', 'Create your first phone')}</button>
+                    {filtered.length === 0 && (
+                      <tr><td colSpan={11} style={{ padding: 30, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>
+                        {tr('Aucun résultat pour ce filtre.', 'No match for this filter.')}
                       </td></tr>
                     )}
-                    {instances.map(inst => {
+                    {filtered.map(inst => {
                       const running = isRunning(inst.state)
                       const isOpen = openIds.includes(inst.id)
                       const m = meta[inst.id] ?? {}
                       const display = m.name || inst.name
+                      const sel = selectedIds.has(inst.id)
                       return (
                         <tr key={inst.id} onDoubleClick={() => openWindow(inst.id)}
-                          style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background .15s' }}
+                          style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background .15s', background: sel ? 'var(--accent-dim)' : undefined, borderLeft: isOpen ? '3px solid var(--accent)' : '3px solid transparent' }}
                           className="cp-row"
                         >
+                          <td style={{ padding: '10px 8px 10px 16px' }} onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={sel} onChange={() => toggleSel(inst.id)} style={{ cursor: 'pointer' }} />
+                          </td>
                           <td style={{ padding: '10px 16px' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: running ? 'var(--ok)' : 'var(--text-4)' }}>
                               <span style={{ width: 7, height: 7, borderRadius: 99, background: running ? 'var(--ok)' : 'var(--text-4)', boxShadow: running ? '0 0 6px var(--ok)' : 'none' }} />
                               {running ? tr('En ligne', 'Online') : tr('Arrêté', 'Stopped')}
                             </span>
-                            {isOpen && <span style={{ display: 'inline-block', marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#818CF8', background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.4)', borderRadius: 99, padding: '1px 8px' }}>● {tr('Ouvert', 'Open')}</span>}
+                            {isOpen && <span className="sf-badge sf-badge-accent" style={{ marginLeft: 8 }}>● {tr('Ouvert', 'Open')}</span>}
                           </td>
                           <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
                             <div style={{ fontWeight: 700, color: 'var(--text-1)' }}>{display}</div>
@@ -390,11 +450,22 @@ export function CloudPhones({ user }: Props) {
                 </table>
               </div>
               <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)' }}>
-                <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>{tr('Double-clic sur une ligne pour ouvrir le téléphone', 'Double-click a row to open the phone')}</span>
+                <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>{filtered.length} {tr('téléphone(s)', 'phone(s)')} · {instances.filter(i => isRunning(i.state)).length} {tr('en ligne', 'online')} · {openIds.length} {tr('ouvert(s)', 'open')}</span>
                 <button onClick={loadInstances} className="sf-btn sf-btn-ghost text-[11.5px]">↻ {tr('Rafraîchir', 'Refresh')}</button>
               </div>
             </div>
           </>
+        )}
+
+        {/* État vide : aucun téléphone */}
+        {conn === 'ok' && instances.length === 0 && (
+          <div className="sf-card" style={{ padding: '48px 24px', textAlign: 'center', marginTop: 16 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📱</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', marginBottom: 6 }}>{tr('Aucun téléphone', 'No phone yet')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-4)', marginBottom: 16 }}>{tr('Crée ton premier cloud phone pour commencer.', 'Create your first cloud phone to get started.')}</div>
+            <button onClick={openCreate} className="sf-btn sf-btn-primary">+ {tr('Créer un téléphone', 'Create a phone')}</button>
+            {allProxies.length === 0 && <div style={{ fontSize: 11.5, color: 'var(--text-4)', marginTop: 14 }}>{tr('💡 Pense à ajouter des proxys dans l’onglet Proxies.', '💡 Add proxies in the Proxies tab first.')}</div>}
+          </div>
         )}
       </div>
 
@@ -589,6 +660,9 @@ const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAli
 const fieldInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 13, padding: '9px 11px', borderRadius: 9, border: '1px solid var(--border)', background: 'rgba(0,0,0,0.25)', color: 'var(--text-1)' }
 function FieldLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6, ...style }}>{children}</div>
+}
+function FChip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 99, border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-lt)' : 'transparent', color: on ? 'var(--accent)' : 'var(--text-3)', cursor: 'pointer' }}>{children}</button>
 }
 
 export default CloudPhones
