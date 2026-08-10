@@ -63,13 +63,44 @@ export function CloudPhones({ user }: Props) {
   const usedProxyIds = new Set(Object.values(meta).map(mm => mm.proxyId).filter(Boolean) as string[])
   const proxyGroups = [...new Set(allProxies.map(p => p.group).filter(Boolean) as string[])]
   const proxyById = (pid?: string) => allProxies.find(p => p.id === pid)
-  // Assigne (ou change) le proxy d'un tel.
-  const setPhoneProxy = (id: string, proxyId: string) => { saveCpMeta(id, { proxyId: proxyId || undefined }); setMeta(loadAllCpMeta()) }
   // Choisit un proxy pour un nouveau tel selon le sélecteur (proxy précis, ou 1 libre du groupe).
   const pickProxyForNew = (taken: Set<string>): string | undefined => {
     if (cProxy.startsWith('proxy:')) { const id = cProxy.slice(6); return taken.has(id) ? undefined : id }
     if (cProxy.startsWith('group:')) { const g = cProxy.slice(6); return allProxies.find(p => p.group === g && !taken.has(p.id))?.id }
     return undefined
+  }
+
+  // ── Menu ⋯ + modal d'édition (proxy / profil) ─────────────────────────────
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editKind, setEditKind] = useState<'proxy' | 'profile'>('proxy')
+  const [epName, setEpName] = useState('')
+  const [epGroup, setEpGroup] = useState('')     // '' = tous
+  const [epProxyId, setEpProxyId] = useState('')
+  const [epCheck, setEpCheck] = useState<{ loading?: boolean; ip?: string; err?: string } | null>(null)
+
+  const openEdit = (id: string, kind: 'proxy' | 'profile') => {
+    const m = meta[id] ?? {}
+    setEditId(id); setEditKind(kind); setEpName(m.name ?? '')
+    const px = proxyById(m.proxyId); setEpGroup(px?.group ?? ''); setEpProxyId(m.proxyId ?? ''); setEpCheck(null)
+  }
+  const epProxies = allProxies.filter(p => !epGroup || p.group === epGroup)
+  const epRandom = () => {
+    const free = epProxies.filter(p => !usedProxyIds.has(p.id) || p.id === epProxyId)
+    const pool = free.length ? free : epProxies
+    if (pool.length) { setEpProxyId(pool[Math.floor(Math.random() * pool.length)].id); setEpCheck(null) }
+  }
+  const epCheckNow = async () => {
+    const p = proxyById(epProxyId); if (!p) return
+    setEpCheck({ loading: true })
+    const r = await cloudPhones.checkProxy({ type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
+    setEpCheck(r.ok && r.data?.reachable ? { ip: r.data.ip } : { err: r.data?.error || 'KO' })
+  }
+  const saveEdit = () => {
+    if (!editId) return
+    const patch: CpMeta = { proxyId: epProxyId || undefined }
+    if (editKind === 'profile') patch.name = epName.trim() || undefined
+    saveCpMeta(editId, patch); setMeta(loadAllCpMeta()); setEditId(null)
   }
 
   // Fenêtres flottantes ouvertes (façon GeeLark) : une par tel, indépendantes.
@@ -302,13 +333,10 @@ export function CloudPhones({ user }: Props) {
                             <span style={{ color: 'var(--text-2)' }}>Android {m.android ?? '15'}</span>
                             {m.store && <span style={{ display: 'block', fontSize: 10.5, color: 'var(--text-4)' }}>{m.store}</span>}
                           </td>
-                          <td style={{ padding: '10px 16px' }} onClick={e => e.stopPropagation()}>
-                            <select value={m.proxyId ?? ''} onChange={e => setPhoneProxy(inst.id, e.target.value)}
-                              title={m.proxyId ? (proxyById(m.proxyId) ? `${proxyById(m.proxyId)!.type}://${proxyLabel(proxyById(m.proxyId)!)}` : 'proxy introuvable') : 'aucun proxy'}
-                              style={{ maxWidth: 150, fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: m.proxyId ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.04)', color: m.proxyId ? 'var(--ok)' : 'var(--text-4)' }}>
-                              <option value="">— {tr('Aucun', 'None')} —</option>
-                              {allProxies.map(p => <option key={p.id} value={p.id}>{p.group ? `[${p.group}] ` : ''}{proxyLabel(p)}</option>)}
-                            </select>
+                          <td style={{ padding: '10px 16px', maxWidth: 160 }}>
+                            {m.proxyId && proxyById(m.proxyId)
+                              ? <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--ok)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyLabel(proxyById(m.proxyId)!)}</span>
+                              : <span style={{ color: 'var(--text-4)' }}>—</span>}
                           </td>
                           <td style={{ padding: '10px 16px', color: 'var(--text-3)', fontFamily: 'monospace', fontSize: 11.5 }}>{inst.adbPort ?? '—'}</td>
                           <td style={{ padding: '10px 16px', color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{fmtDate(m.createdAt)}</td>
@@ -321,6 +349,15 @@ export function CloudPhones({ user }: Props) {
                                 <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'start')} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>{tr('Démarrer', 'Start')}</button>
                               )}
                               <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'remove')} className="sf-btn sf-btn-ghost text-[11.5px] text-danger" style={{ height: 28, padding: '0 10px' }}>{tr('Suppr.', 'Del.')}</button>
+                              <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+                                <button onClick={() => setMenuId(menuId === inst.id ? null : inst.id)} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 8px', fontWeight: 800 }}>⋯</button>
+                                {menuId === inst.id && (
+                                  <div style={{ position: 'absolute', right: 0, top: '110%', zIndex: 20, background: '#12131d', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 16px 40px -14px rgba(0,0,0,0.8)', padding: 6, minWidth: 180 }}>
+                                    <button onClick={() => { setMenuId(null); openEdit(inst.id, 'proxy') }} style={menuItem}>🌐 {tr('Modifier le proxy', 'Edit proxy')}</button>
+                                    <button onClick={() => { setMenuId(null); openEdit(inst.id, 'profile') }} style={menuItem}>✏️ {tr('Modifier le profil', 'Edit profile')}</button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -454,9 +491,63 @@ export function CloudPhones({ user }: Props) {
         )
       })}
 
+      {/* Ferme le menu ⋯ au clic ailleurs */}
+      {menuId && <div onClick={() => setMenuId(null)} style={{ position: 'fixed', inset: 0, zIndex: 15 }} />}
+
+      {/* Modal Modifier le proxy / le profil (façon GeeLark) */}
+      {editId && (() => {
+        const inst = instances.find(i => i.id === editId)
+        const m = meta[editId] ?? {}
+        return (
+          <div onClick={() => setEditId(null)} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(6,7,12,0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(520px,94vw)', padding: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{editKind === 'proxy' ? tr('Modifier le proxy', 'Edit proxy') : tr('Modifier le profil', 'Edit profile')}</h3>
+                <span style={{ flex: 1 }} />
+                <button onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', fontSize: 18 }}>×</button>
+              </div>
+
+              <FieldLabel>{tr('Nom', 'Name')}</FieldLabel>
+              {editKind === 'profile'
+                ? <input value={epName} onChange={e => setEpName(e.target.value)} style={fieldInput} />
+                : <div style={{ ...fieldInput, color: 'var(--text-2)' }}>{m.name || inst?.name}</div>}
+              <div style={{ fontSize: 11, color: 'var(--text-4)', margin: '5px 0 16px', fontFamily: 'monospace' }}>{editId}{m.android ? ` · Android ${m.android}` : ''}</div>
+
+              <FieldLabel>{tr('Groupe de proxy', 'Proxy group')}</FieldLabel>
+              <select value={epGroup} onChange={e => { setEpGroup(e.target.value); setEpProxyId(''); setEpCheck(null) }} style={fieldInput}>
+                <option value="">{tr('Tous', 'All')}</option>
+                {proxyGroups.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+
+              <FieldLabel style={{ marginTop: 14 }}>{tr('Proxy', 'Proxy')}</FieldLabel>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <select value={epProxyId} onChange={e => { setEpProxyId(e.target.value); setEpCheck(null) }} style={{ ...fieldInput, flex: 1 }}>
+                  <option value="">— {tr('Aucun', 'None')} —</option>
+                  {epProxies.map(p => <option key={p.id} value={p.id} disabled={usedProxyIds.has(p.id) && p.id !== m.proxyId}>{p.type}://{proxyLabel(p)}{usedProxyIds.has(p.id) && p.id !== m.proxyId ? ` (${tr('pris', 'taken')})` : ''}</option>)}
+                </select>
+                <button onClick={epRandom} title={tr('Aléatoire', 'Random')} className="sf-btn sf-btn-ghost" style={{ height: 38, padding: '0 12px' }}>🔀</button>
+                <button onClick={epCheckNow} disabled={!epProxyId} className="sf-btn sf-btn-ghost" style={{ height: 38, padding: '0 12px' }}>{tr('Vérifier', 'Check')}</button>
+              </div>
+              {epCheck && <div style={{ fontSize: 12, marginTop: 8, color: epCheck.loading ? 'var(--text-4)' : epCheck.ip ? 'var(--ok)' : '#F87171' }}>{epCheck.loading ? tr('Test…', 'Testing…') : epCheck.ip ? `✓ IP : ${epCheck.ip}` : `KO : ${epCheck.err}`}</div>}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 22 }}>
+                <button onClick={() => setEditId(null)} className="sf-btn sf-btn-ghost">{tr('Annuler', 'Cancel')}</button>
+                <button onClick={saveEdit} className="sf-btn sf-btn-primary">OK</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       <style>{`.cp-row:hover { background: rgba(129,140,248,0.06); }`}</style>
     </div>
   )
+}
+
+const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }
+const fieldInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 13, padding: '9px 11px', borderRadius: 9, border: '1px solid var(--border)', background: 'rgba(0,0,0,0.25)', color: 'var(--text-1)' }
+function FieldLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6, ...style }}>{children}</div>
 }
 
 function StatTile({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'ok' | 'muted' }) {
