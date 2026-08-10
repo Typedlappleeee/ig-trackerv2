@@ -161,7 +161,7 @@ export function AutomationLab({ user }: Props) {
           {tab === 'run' && openedFlow && flow && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
               <button onClick={() => setOpenedFlow(null)} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px 0 12px', borderRadius: 10, border: '1px solid var(--border-md)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-1)', cursor: 'pointer', fontSize: 13.5, fontWeight: 700 }}>
-                <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>‹</span> {tr('Retour', 'Back')}
+                <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>‹</span> Retour
               </button>
               {/* En-tête du flow — logo encadré + centré */}
               <div className="sf-card" style={{ padding: 22, display: 'flex', gap: 18, alignItems: 'center' }}>
