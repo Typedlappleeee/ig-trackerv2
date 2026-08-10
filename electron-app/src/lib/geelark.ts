@@ -2099,6 +2099,35 @@ function toAsciiFallback(text: string): string {
     .replace(/[^\x00-\x7F]/g, '')                     // drop emojis / other unicode
 }
 
+// Saisit du texte dans le champ ACTUELLEMENT focus (déjà tapé au préalable).
+// `input text` corrompt / ignore silencieusement les caractères non-ASCII
+// (accents, €, emojis…) et le login échoue alors sans erreur explicite (« toujours
+// sur la page de connexion »). Les mots de passe contiennent souvent ce genre de
+// caractères → on passe par le presse-papier (Unicode-safe), avec repli `input text`.
+async function typeIntoFocusedField(
+  bearer: string,
+  phoneId: string,
+  text: string,
+  log?: (m: string) => void,
+): Promise<void> {
+  // ASCII imprimable pur → chemin éprouvé (identique au reste du code).
+  if (/^[\x20-\x7E]*$/.test(text)) {
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(text)}"`)
+    return
+  }
+  // Sinon : presse-papier + CTRL+V (conserve tous les caractères).
+  const shellSafe = text.replace(/'/g, `'\\''`)
+  try {
+    await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
+    await sleep(300)
+    await shellExec(bearer, phoneId, 'input keycombination 113 50') // CTRL+V
+  } catch {
+    // Dernier recours : version ASCII (accents retirés) via input text.
+    log?.('   ⚠ Presse-papier indisponible — saisie ASCII de secours')
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(toAsciiFallback(text))}"`)
+  }
+}
+
 // ── Instagram login automation ───────────────────────────────────────────────
 // Modern Instagram often redirects the login flow to a Chrome Custom Tab.
 // When Chrome opens, ADB `input text` targets the wrong app and nothing gets typed.
@@ -2221,7 +2250,7 @@ async function _loginInstagramAccountInner(
 
     await shellExec(bearer, phoneId, `input tap ${usernamePt[0]} ${usernamePt[1]}`)
     await sleep(1000)
-    await shellExec(bearer, phoneId, `input text "${escapeForInputText(email)}"`)
+    await typeIntoFocusedField(bearer, phoneId, email, log)
     await sleep(800)
 
     // ── Après l'email : Next ou champ password direct ─────────────────────
@@ -2268,7 +2297,7 @@ async function _loginInstagramAccountInner(
 
     // ── Saisie mot de passe ────────────────────────────────────────────────
     log('🔑 Saisie du mot de passe…')
-    await shellExec(bearer, phoneId, `input text "${escapeForInputText(password)}"`)
+    await typeIntoFocusedField(bearer, phoneId, password, log)
     await sleep(800)
 
     // ── Soumission : bouton Log In ────────────────────────────────────────
