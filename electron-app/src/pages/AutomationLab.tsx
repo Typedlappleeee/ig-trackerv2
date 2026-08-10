@@ -34,6 +34,7 @@ export function AutomationLab({ user }: Props) {
   const [communityFlows, setCommunityFlows] = useState<StoredFlow[]>([])
   const [flowId, setFlowId] = useState(OFFICIAL_FLOWS[0]?.id ?? '')
   const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community'>('official')
+  const [openedFlow, setOpenedFlow] = useState<string | null>(null)   // null = galerie, sinon page détail
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<Record<string, RunState>>({})
@@ -119,6 +120,7 @@ export function AutomationLab({ user }: Props) {
           <p className="sf-page-sub">Automatisations UI (façon GeeLark) sur tes cloud phones : vise les éléments par leur sens, attend les écrans, ferme les popups, réessaie.</p>
         </div>
       </header>
+      <style>{`.sf-flowcard:hover{ border-color: var(--accent) !important; background: var(--accent-dim) !important; transform: translateY(-2px); }`}</style>
 
       {conn === 'unconfigured' && <Notice>Agent non configuré — va d’abord dans <b>Cloud Phones</b>.</Notice>}
       {conn === 'error' && <Notice tone="error">Agent injoignable — vérifie <b>Cloud Phones</b>.</Notice>}
@@ -135,41 +137,55 @@ export function AutomationLab({ user }: Props) {
 
           {tab === 'create' && <FlowWorkshop phones={runningPhones} userId={user.id} orgId={orgId} onSaved={loadFlows} />}
 
-          {tab === 'run' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Galerie de flows façon Power Automate : onglets source + cartes à logo */}
-              <div className="sf-card" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'rgba(0,0,0,0.28)', width: 'fit-content', marginBottom: 14 }}>
-                  <SubTab on={flowTab === 'official'} onClick={() => setFlowTab('official')}>⭐ Officielles · {OFFICIAL_FLOWS.length}</SubTab>
-                  <SubTab on={flowTab === 'mine'} onClick={() => setFlowTab('mine')}>👤 Mes automatisations · {myFlows.length}</SubTab>
-                  <SubTab on={flowTab === 'community'} onClick={() => setFlowTab('community')}>🌍 Communauté · {communityFlows.length}</SubTab>
-                </div>
-
-                {(() => {
-                  const list = flowTab === 'official' ? OFFICIAL_FLOWS : flowTab === 'mine' ? myFlows : communityFlows
-                  const sourceLabel = flowTab === 'official' ? 'ScaleFlow · Officiel' : flowTab === 'mine' ? 'Créé par moi' : 'Communauté'
-                  if (list.length === 0) return <div style={{ padding: '30px 10px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{flowTab === 'mine' ? 'Aucune automatisation perso — crée-en dans l’onglet « Créer ».' : 'Rien pour l’instant.'}</div>
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
-                      {list.map(f => <FlowCard key={f.id} flow={f} source={sourceLabel} selected={flowId === f.id} onPick={() => { setFlowId(f.id); setInputs({}) }} />)}
-                    </div>
-                  )
-                })()}
-
-                {flow?.inputs && flow.inputs.length > 0 && (
-                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>Paramètres · {flow.name}</div>
-                    {flow.inputs.map(inp => (
-                      <div key={inp.key} style={{ marginTop: 10 }}>
-                        <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>{inp.label}{inp.optional ? ' (optionnel)' : ''}</label>
-                        <input value={inputs[inp.key] ?? ''} onChange={e => setInputs(s => ({ ...s, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />
-                      </div>
-                    ))}
-                  </div>
-                )}
+          {/* ── LANCER : galerie de flows OU page détail d'un flow ─────────────── */}
+          {tab === 'run' && !openedFlow && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'rgba(0,0,0,0.28)', width: 'fit-content' }}>
+                <SubTab on={flowTab === 'official'} onClick={() => setFlowTab('official')}>⭐ Officielles · {OFFICIAL_FLOWS.length}</SubTab>
+                <SubTab on={flowTab === 'mine'} onClick={() => setFlowTab('mine')}>👤 Mes automatisations · {myFlows.length}</SubTab>
+                <SubTab on={flowTab === 'community'} onClick={() => setFlowTab('community')}>🌍 Communauté · {communityFlows.length}</SubTab>
               </div>
+              {(() => {
+                const list = flowTab === 'official' ? OFFICIAL_FLOWS : flowTab === 'mine' ? myFlows : communityFlows
+                const src = flowTab === 'official' ? 'Officiel' : flowTab === 'mine' ? 'Perso' : 'Communauté'
+                if (list.length === 0) return <div className="sf-card" style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{flowTab === 'mine' ? 'Aucune automatisation perso — crée-en dans l’onglet « Créer ».' : 'Rien pour l’instant.'}</div>
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+                    {list.map(f => <FlowCard key={f.id} flow={f} source={src} onOpen={() => { setOpenedFlow(f.id); setFlowId(f.id); setInputs({}) }} />)}
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
+          {tab === 'run' && openedFlow && flow && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
+              <button onClick={() => setOpenedFlow(null)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>‹ Retour aux automatisations</button>
+              {/* En-tête du flow */}
+              <div className="sf-card" style={{ padding: 20, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                <BrandLogo pkg={flow.app} size={52} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{flow.name}</h2>
+                    {flow.category && <span className="sf-badge sf-badge-accent">{flow.category}</span>}
+                  </div>
+                  {flow.description && <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 6px', lineHeight: 1.5 }}>{flow.description}</p>}
+                  <div style={{ fontSize: 11, color: 'var(--text-4)' }}>{appOf(flow).label} · {flow.official ? 'ScaleFlow Officiel' : (flow as StoredFlow).mine ? 'Créé par moi' : 'Communauté'}</div>
+                </div>
+              </div>
+
+              {flow.inputs && flow.inputs.length > 0 && (
+                <Card title="Paramètres">
+                  {flow.inputs.map(inp => (
+                    <div key={inp.key} style={{ marginTop: 10 }}>
+                      <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>{inp.label}{inp.optional ? ' (optionnel)' : ''}</label>
+                      <input value={inputs[inp.key] ?? ''} onChange={e => setInputs(s => ({ ...s, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />
+                    </div>
+                  ))}
+                </Card>
+              )}
               <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
-              <button onClick={run} disabled={running || selected.size === 0 || !flow} style={{ ...runBtn, opacity: (running || selected.size === 0 || !flow) ? 0.55 : 1 }}>
+              <button onClick={run} disabled={running || selected.size === 0} style={{ ...runBtn, opacity: (running || selected.size === 0) ? 0.55 : 1 }}>
                 {running ? '⏳ Exécution…' : `▶️ Lancer sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
               </button>
               <ResultsList results={results} nameOf={nameOf} />
@@ -257,39 +273,89 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
     </div>
   )
 }
-// Plateforme d'un flow (logo + couleur) d'après son package Android.
-const APP_META: Record<string, { label: string; icon: string; bg: string }> = {
-  'com.instagram.android': { label: 'Instagram', icon: '📸', bg: 'linear-gradient(135deg,#F58529,#DD2A7B,#8134AF)' },
-  'com.zhiliaoapp.musically': { label: 'TikTok', icon: '🎵', bg: 'linear-gradient(135deg,#25F4EE,#000,#FE2C55)' },
-  'com.instagram.barcelona': { label: 'Threads', icon: '🧵', bg: '#101010' },
-  'com.snapchat.android': { label: 'Snapchat', icon: '👻', bg: '#FFFC00' },
-  'com.facebook.katana': { label: 'Facebook', icon: '📘', bg: '#1877F2' },
-  'com.twitter.android': { label: 'X', icon: '𝕏', bg: '#000' },
+function appOf(f: Flow): { label: string } {
+  const m: Record<string, string> = {
+    'com.instagram.android': 'Instagram', 'com.zhiliaoapp.musically': 'TikTok',
+    'com.instagram.barcelona': 'Threads', 'com.snapchat.android': 'Snapchat',
+    'com.facebook.katana': 'Facebook', 'com.twitter.android': 'X',
+  }
+  return { label: m[f.app ?? ''] ?? 'App' }
 }
-function appOf(f: Flow) { return APP_META[f.app ?? ''] ?? { label: 'App', icon: '📱', bg: 'var(--accent)' } }
+
+// Vrais logos officiels des apps, en SVG inline (épurés, propres en petit).
+function BrandLogo({ pkg, size = 34 }: { pkg?: string; size?: number }) {
+  const box: React.CSSProperties = { width: size, height: size, borderRadius: size * 0.28, display: 'block', flexShrink: 0 }
+  switch (pkg) {
+    case 'com.instagram.android':
+      return (
+        <svg style={box} viewBox="0 0 48 48" aria-label="Instagram">
+          <defs><radialGradient id="ig-g" cx="30%" cy="107%" r="150%"><stop offset="0" stopColor="#fdf497" /><stop offset=".05" stopColor="#fdf497" /><stop offset=".45" stopColor="#fd5949" /><stop offset=".6" stopColor="#d6249f" /><stop offset=".9" stopColor="#285AEB" /></radialGradient></defs>
+          <rect width="48" height="48" rx="13" fill="url(#ig-g)" />
+          <rect x="12" y="12" width="24" height="24" rx="7.5" fill="none" stroke="#fff" strokeWidth="3" />
+          <circle cx="24" cy="24" r="6.2" fill="none" stroke="#fff" strokeWidth="3" />
+          <circle cx="32.4" cy="15.6" r="1.9" fill="#fff" />
+        </svg>
+      )
+    case 'com.zhiliaoapp.musically':
+      return (
+        <svg style={box} viewBox="0 0 48 48" aria-label="TikTok">
+          <rect width="48" height="48" rx="13" fill="#010101" />
+          <path d="M31 12c.7 3.2 2.9 5.2 6 5.5v4.4c-2 0-3.9-.6-5.5-1.7v8.2a8.3 8.3 0 1 1-8.3-8.3c.45 0 .9.04 1.3.1v4.5a3.9 3.9 0 1 0 2.7 3.7V12H31z" fill="#25F4EE" transform="translate(-1.4 1.2)" />
+          <path d="M31 12c.7 3.2 2.9 5.2 6 5.5v4.4c-2 0-3.9-.6-5.5-1.7v8.2a8.3 8.3 0 1 1-8.3-8.3c.45 0 .9.04 1.3.1v4.5a3.9 3.9 0 1 0 2.7 3.7V12H31z" fill="#FE2C55" transform="translate(1.4 -.6)" />
+          <path d="M31 12c.7 3.2 2.9 5.2 6 5.5v4.4c-2 0-3.9-.6-5.5-1.7v8.2a8.3 8.3 0 1 1-8.3-8.3c.45 0 .9.04 1.3.1v4.5a3.9 3.9 0 1 0 2.7 3.7V12H31z" fill="#fff" />
+        </svg>
+      )
+    case 'com.instagram.barcelona':
+      return (
+        <svg style={box} viewBox="0 0 48 48" aria-label="Threads">
+          <rect width="48" height="48" rx="13" fill="#000" />
+          <path d="M24.5 13c-5.9 0-9.6 3.6-9.9 9.9-.02.5.36.92.86.94.5.02.92-.36.94-.86.24-5.2 3-7.9 7.6-7.9 3.1 0 5.3 1.4 6.3 4 .3.8-.8 1.2-1.2.5-.9-1.6-2.5-2.6-5.1-2.6-3.7 0-5 2.2-5 4.3 0 2.6 2.2 4 5 4 2.9 0 4.7-1.4 5.4-3.9.1-.4.5-.6.9-.5s.6.5.5.9c-.9 3.2-3.4 5.3-7.3 5.3-3.9 0-6.8-2.3-6.8-5.8 0-3.1 2.2-6.1 6.8-6.1 2.4 0 4.3.7 5.6 2.1 1.3 1.4 1.9 3.4 1.9 5.8 0 5.6-3.5 9.1-9.5 9.1-.5 0-.9.4-.9.9s.4.9.9.9c7 0 11.3-4.3 11.3-10.9 0-2.9-.8-5.4-2.5-7.2C30.3 14 27.7 13 24.5 13z" fill="#fff" />
+        </svg>
+      )
+    case 'com.snapchat.android':
+      return (
+        <svg style={box} viewBox="0 0 48 48" aria-label="Snapchat">
+          <rect width="48" height="48" rx="13" fill="#FFFC00" />
+          <path d="M24 12c3.9 0 5.9 3 5.9 6.6 0 1 .1 2 .2 2.6.5.3 1.3.3 2 0 .5-.2 1.3.1 1.3.8 0 .9-1.6 1.2-2.1 1.7-.3.9 1.9 3.7 4.2 4.1.5.1.6.5.6.8-.1.8-2 1-2.5 1.3-.2.3-.1 1-.6 1.1-.6.1-1.4-.3-2.4-.1-1 .2-1.9 1.7-4.6 1.7s-3.6-1.5-4.6-1.7c-1-.2-1.8.2-2.4.1-.5-.1-.4-.8-.6-1.1-.5-.3-2.4-.5-2.5-1.3 0-.3.1-.7.6-.8 2.3-.4 4.5-3.2 4.2-4.1-.5-.5-2.1-.8-2.1-1.7 0-.7.8-1 1.3-.8.7.3 1.5.3 2 0 .1-.6.2-1.6.2-2.6C18.1 15 20.1 12 24 12z" fill="#fff" />
+        </svg>
+      )
+    case 'com.facebook.katana':
+      return (
+        <svg style={box} viewBox="0 0 48 48" aria-label="Facebook">
+          <rect width="48" height="48" rx="13" fill="#1877F2" />
+          <path d="M27 24h3l.6-4H27v-2.5c0-1.1.4-1.9 2-1.9h1.7v-3.5c-.3 0-1.4-.1-2.6-.1-2.7 0-4.6 1.6-4.6 4.7V20h-3.1v4H23v11h4V24z" fill="#fff" />
+        </svg>
+      )
+    case 'com.twitter.android':
+      return (
+        <svg style={box} viewBox="0 0 48 48" aria-label="X">
+          <rect width="48" height="48" rx="13" fill="#000" />
+          <path d="M28.9 13h3.6l-7.9 9 9.3 12.3h-7.3l-5.7-7.5-6.5 7.5h-3.6l8.4-9.6L11 13h7.5l5.2 6.9L28.9 13zm-1.3 19.2h2l-12.9-17h-2.1l13 17z" fill="#fff" />
+        </svg>
+      )
+    default:
+      return <div style={{ ...box, background: 'var(--accent)', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: size * 0.4 }}>📱</div>
+  }
+}
 
 function SubTab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 800, padding: '6px 14px', borderRadius: 7, border: 'none', background: on ? 'var(--accent-lt)' : 'transparent', color: on ? 'var(--accent)' : 'var(--text-4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>{children}</button>
 }
 
-function FlowCard({ flow, source, selected, onPick }: { flow: Flow; source: string; selected: boolean; onPick: () => void }) {
-  const app = appOf(flow)
+function FlowCard({ flow, source, onOpen }: { flow: Flow; source: string; onOpen: () => void }) {
   return (
-    <button onClick={onPick} style={{
-      textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 12, cursor: 'pointer',
-      background: selected ? 'var(--accent-dim)' : 'var(--surface, rgba(255,255,255,0.02))',
-      border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`, transition: 'all .12s', minHeight: 120,
+    <button onClick={onOpen} className="sf-flowcard" style={{
+      textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 10, padding: 16, borderRadius: 14, cursor: 'pointer',
+      background: 'rgba(255,255,255,0.025)', border: '1px solid var(--border)', transition: 'border-color .12s, transform .12s, background .12s', minHeight: 132,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ width: 34, height: 34, borderRadius: 9, display: 'grid', placeItems: 'center', fontSize: 17, background: app.bg, flexShrink: 0, boxShadow: '0 2px 8px -2px rgba(0,0,0,0.5)' }}>{app.icon}</span>
-        {flow.category && <span className="sf-badge sf-badge-muted" style={{ fontSize: 9.5 }}>{flow.category}</span>}
-        <span style={{ flex: 1 }} />
-        {selected && <span style={{ color: 'var(--accent)', fontSize: 15 }}>✓</span>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <BrandLogo pkg={flow.app} size={38} />
+        {flow.category && <span className="sf-badge sf-badge-muted" style={{ fontSize: 10 }}>{flow.category}</span>}
       </div>
-      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.25 }}>{flow.name}</div>
-      {flow.description && <div style={{ fontSize: 11, color: 'var(--text-4)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{flow.description}</div>}
+      <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.3 }}>{flow.name}</div>
+      {flow.description && <div style={{ fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{flow.description}</div>}
       <span style={{ flex: 1 }} />
-      <div style={{ fontSize: 10, color: 'var(--text-4)', display: 'flex', alignItems: 'center', gap: 5 }}>{app.label} · {source}</div>
+      <div style={{ fontSize: 10.5, color: 'var(--text-4)' }}>{appOf(flow).label} · {source}</div>
     </button>
   )
 }
