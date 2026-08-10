@@ -75,13 +75,15 @@ export function CloudPhones({ user }: Props) {
   const [editId, setEditId] = useState<string | null>(null)
   const [editKind, setEditKind] = useState<'proxy' | 'profile'>('proxy')
   const [epName, setEpName] = useState('')
+  const [epAccount, setEpAccount] = useState('')
+  const [epNotes, setEpNotes] = useState('')
   const [epGroup, setEpGroup] = useState('')     // '' = tous
   const [epProxyId, setEpProxyId] = useState('')
   const [epCheck, setEpCheck] = useState<{ loading?: boolean; ip?: string; err?: string } | null>(null)
 
   const openEdit = (id: string, kind: 'proxy' | 'profile') => {
     const m = meta[id] ?? {}
-    setEditId(id); setEditKind(kind); setEpName(m.name ?? '')
+    setEditId(id); setEditKind(kind); setEpName(m.name ?? ''); setEpAccount(m.account ?? ''); setEpNotes(m.notes ?? '')
     const px = proxyById(m.proxyId); setEpGroup(px?.group ?? ''); setEpProxyId(m.proxyId ?? ''); setEpCheck(null)
   }
   const epProxies = allProxies.filter(p => !epGroup || p.group === epGroup)
@@ -99,7 +101,7 @@ export function CloudPhones({ user }: Props) {
   const saveEdit = () => {
     if (!editId) return
     const patch: CpMeta = { proxyId: epProxyId || undefined }
-    if (editKind === 'profile') patch.name = epName.trim() || undefined
+    if (editKind === 'profile') { patch.name = epName.trim() || undefined; patch.account = epAccount.trim() || undefined; patch.notes = epNotes.trim() || undefined }
     saveCpMeta(editId, patch); setMeta(loadAllCpMeta()); setEditId(null)
   }
 
@@ -315,7 +317,10 @@ export function CloudPhones({ user }: Props) {
                             </span>
                             {isOpen && <span style={{ display: 'inline-block', marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#818CF8', background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.4)', borderRadius: 99, padding: '1px 8px' }}>● {tr('Ouvert', 'Open')}</span>}
                           </td>
-                          <td style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>{display}</td>
+                          <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text-1)' }}>{display}</div>
+                            {m.account && <div style={{ fontSize: 10.5, color: 'var(--text-4)' }}>{m.account}</div>}
+                          </td>
                           <td style={{ padding: '10px 16px' }}>
                             <button onClick={(e) => { e.stopPropagation(); copyId(inst.id) }} title={tr('Copier l\'ID', 'Copy ID')}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'monospace', fontSize: 11.5, color: 'var(--text-3)', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
@@ -501,9 +506,27 @@ export function CloudPhones({ user }: Props) {
 
               <FieldLabel>{tr('Nom', 'Name')}</FieldLabel>
               {editKind === 'profile'
-                ? <input value={epName} onChange={e => setEpName(e.target.value)} style={fieldInput} />
+                ? <input value={epName} onChange={e => setEpName(e.target.value)} placeholder={tr('Nom du téléphone', 'Phone name')} style={fieldInput} />
                 : <div style={{ ...fieldInput, color: 'var(--text-2)' }}>{m.name || inst?.name}</div>}
-              <div style={{ fontSize: 11, color: 'var(--text-4)', margin: '5px 0 16px', fontFamily: 'monospace' }}>{editId}{m.android ? ` · Android ${m.android}` : ''}</div>
+
+              {editKind === 'profile' && (
+                <>
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Compte associé', 'Linked account')}</FieldLabel>
+                  <input value={epAccount} onChange={e => setEpAccount(e.target.value)} placeholder={tr('@pseudo ou email du compte', '@handle or account email')} style={fieldInput} />
+
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Remarques', 'Notes')}</FieldLabel>
+                  <textarea value={epNotes} onChange={e => setEpNotes(e.target.value)} rows={2} placeholder={tr('Notes libres (identifiants, statut du compte…)', 'Free notes (credentials, account status…)')} style={{ ...fieldInput, resize: 'vertical', fontFamily: 'inherit' }} />
+
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Appareil (non modifiable)', 'Device (read-only)')}</FieldLabel>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {[[tr('Modèle', 'Model'), m.model], ['Android', m.android || '15'], [tr('Store', 'Store'), m.store], ['Port ADB', inst?.adbPort], ['ID', editId]].filter(x => x[1]).map(([k, v]) => (
+                      <span key={String(k)} style={{ fontSize: 11, color: 'var(--text-3)', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 7, padding: '4px 9px' }}><b style={{ color: 'var(--text-4)', fontWeight: 700 }}>{k} :</b> {String(v)}</span>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div style={{ fontSize: 11, color: 'var(--text-4)', margin: '10px 0 16px', fontFamily: 'monospace' }}>{editKind === 'proxy' ? `${editId}${m.android ? ` · Android ${m.android}` : ''}` : ''}</div>
 
               <FieldLabel>{tr('Groupe de proxy', 'Proxy group')}</FieldLabel>
               <select value={epGroup} onChange={e => { setEpGroup(e.target.value); setEpProxyId(''); setEpCheck(null) }} style={fieldInput}>
