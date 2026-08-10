@@ -579,6 +579,7 @@ export function CloudPhones({ user }: Props) {
             key={id} inst={{ ...inst, name: display }}
             zIndex={1000 + zOrder.indexOf(id)}
             offset={openIds.indexOf(id)}
+            proxyId={meta[id]?.proxyId}
             onClose={() => closeWindow(id)}
             onFocus={() => focusWindow(id)}
           />

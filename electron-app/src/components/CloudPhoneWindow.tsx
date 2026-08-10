@@ -5,11 +5,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cloudPhones, getCloudAgent, type CpInstance } from '@/lib/cloudPhones'
 import { postReel } from '@/lib/igFlows'
+import { ExitIpCell } from '@/components/ui/ExitIpCell'
 
 interface Props {
   inst: CpInstance
   zIndex: number
   offset: number          // décale chaque nouvelle fenêtre pour ne pas les empiler pile dessus
+  proxyId?: string        // proxy assigné → affiche l'IP sortante dans la barre de titre
   onClose: () => void
   onFocus: () => void
 }
@@ -47,7 +49,7 @@ const TOOLS_CATALOG: { pkg: string; label: string; icon: string; note: string; a
   { pkg: 'org.fdroid.fdroid',        label: 'F-Droid',       icon: '🤖', apk: 'https://f-droid.org/F-Droid.apk', note: 'store open-source' },
 ]
 
-export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Props) {
+export function CloudPhoneWindow({ inst, zIndex, offset, proxyId, onClose, onFocus }: Props) {
   const [pos, setPos] = useState({ x: 80 + offset * 28, y: 60 + offset * 24 })
   const [winW, setWinW] = useState(340)   // largeur de la VIDÉO ; la hauteur en découle
   const [maximized, setMaximized] = useState(false)
@@ -100,12 +102,17 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
 
   useEffect(() => { connect() }, [connect])
 
-  // Capture en secours (mode non-fluide) : rafraîchit toutes les 1,2s.
+  // Capture en secours (mode non-fluide) : rafraîchit toutes les 1,2s. Garde
+  // « in-flight » (on ne lance pas une capture si la précédente n'est pas revenue,
+  // sinon elles s'empilent > shell ADB saturé) + pause quand l'onglet est caché.
   useEffect(() => {
     if (phase !== 'ready' || fluid) return
+    let inFlight = false
     pollRef.current = window.setInterval(async () => {
-      const r = await cloudPhones.screenshot(inst.id)
-      if (r.ok && r.data?.dataUrl) setSnap(r.data.dataUrl)
+      if (inFlight || document.hidden) return
+      inFlight = true
+      try { const r = await cloudPhones.screenshot(inst.id); if (r.ok && r.data?.dataUrl) setSnap(r.data.dataUrl) }
+      finally { inFlight = false }
     }, 1200)
     return () => { if (pollRef.current) window.clearInterval(pollRef.current) }
   }, [phase, fluid, inst.id])
@@ -414,6 +421,7 @@ export function CloudPhoneWindow({ inst, zIndex, offset, onClose, onFocus }: Pro
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1.2 }}>
           <span style={{ fontSize: 13, fontWeight: 800, color: '#F0F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</span>
           <span style={{ fontSize: 9.5, color: '#8a8a9c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.id}</span>
+          {proxyId && <span style={{ fontSize: 9.5, marginTop: 1 }}><ExitIpCell proxyId={proxyId} compact /></span>}
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: running ? '#34D399' : '#8a8a9c' }}>
             <span style={{ width: 7, height: 7, borderRadius: 99, background: running ? '#34D399' : '#6b6b7c', boxShadow: running ? '0 0 6px #34D399' : 'none' }} />
             {running ? 'En ligne' : 'Arrêté'}
