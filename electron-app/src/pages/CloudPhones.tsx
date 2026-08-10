@@ -1,7 +1,7 @@
 // Admin — Cloud Phones maison (auto-hébergés, voir selfhost/). Réservé au
 // super-admin. Configure l'agent (URL + token), liste les téléphones dans une
 // table façon GeeLark, et ouvre chacun dans sa propre fenêtre flottante.
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -110,7 +110,11 @@ export function CloudPhones({ user }: Props) {
     setOpenIds(o => o.includes(id) ? o : [...o, id])
     setZOrder(z => [...z.filter(x => x !== id), id])
   }
-  const closeWindow = (id: string) => { setOpenIds(o => o.filter(x => x !== id)); setZOrder(z => z.filter(x => x !== id)) }
+  // Fermer la fenêtre = éteindre le tel (il se rallume à la prochaine ouverture).
+  const closeWindow = (id: string) => {
+    setOpenIds(o => o.filter(x => x !== id)); setZOrder(z => z.filter(x => x !== id))
+    cloudPhones.stop(id).finally(() => loadInstances())
+  }
   const focusWindow = (id: string) => setZOrder(z => [...z.filter(x => x !== id), id])
 
   const loadInstances = useCallback(async () => {
@@ -209,10 +213,6 @@ export function CloudPhones({ user }: Props) {
   }
 
   const isRunning = (s: string) => /running|up/i.test(s)
-  const stats = useMemo(() => {
-    const online = instances.filter(i => isRunning(i.state)).length
-    return { total: instances.length, online, offline: instances.length - online }
-  }, [instances])
 
   const fmtDate = (t?: number) => {
     if (!t) return '—'
@@ -281,13 +281,6 @@ export function CloudPhones({ user }: Props) {
 
         {conn === 'ok' && (
           <>
-            {/* Tuiles de synthèse */}
-            <div className="mt-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-              <StatTile label={tr('Téléphones', 'Phones')} value={stats.total} tone="neutral" />
-              <StatTile label={tr('En ligne', 'Online')} value={stats.online} tone="ok" />
-              <StatTile label={tr('Arrêtés', 'Stopped')} value={stats.offline} tone="muted" />
-            </div>
-
             {/* Table façon GeeLark : statut, nom, id de création, modèle, système, port, date */}
             <div className="sf-card mt-4" style={{ overflow: 'hidden' }}>
               <div style={{ overflowX: 'auto' }}>
@@ -343,11 +336,6 @@ export function CloudPhones({ user }: Props) {
                           <td style={{ padding: '10px 16px' }}>
                             <div style={{ display: 'flex', gap: 6 }}>
                               <button onClick={() => openWindow(inst.id)} className="sf-btn sf-btn-primary text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>▶ {tr('Ouvrir', 'Open')}</button>
-                              {running ? (
-                                <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'stop')} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>{tr('Arrêter', 'Stop')}</button>
-                              ) : (
-                                <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'start')} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>{tr('Démarrer', 'Start')}</button>
-                              )}
                               <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'remove')} className="sf-btn sf-btn-ghost text-[11.5px] text-danger" style={{ height: 28, padding: '0 10px' }}>{tr('Suppr.', 'Del.')}</button>
                               <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
                                 <button onClick={() => setMenuId(menuId === inst.id ? null : inst.id)} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 8px', fontWeight: 800 }}>⋯</button>
@@ -548,16 +536,6 @@ const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAli
 const fieldInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 13, padding: '9px 11px', borderRadius: 9, border: '1px solid var(--border)', background: 'rgba(0,0,0,0.25)', color: 'var(--text-1)' }
 function FieldLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6, ...style }}>{children}</div>
-}
-
-function StatTile({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'ok' | 'muted' }) {
-  const color = tone === 'ok' ? 'var(--ok)' : tone === 'muted' ? 'var(--text-4)' : 'var(--text-1)'
-  return (
-    <div className="sf-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-4)' }}>{label}</span>
-      <span style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1 }}>{value}</span>
-    </div>
-  )
 }
 
 export default CloudPhones
