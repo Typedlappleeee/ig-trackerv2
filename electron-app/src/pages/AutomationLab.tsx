@@ -160,17 +160,24 @@ export function AutomationLab({ user }: Props) {
 
           {tab === 'run' && openedFlow && flow && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
-              <button onClick={() => setOpenedFlow(null)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>‹ Retour aux automatisations</button>
-              {/* En-tête du flow */}
-              <div className="sf-card" style={{ padding: 20, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                <BrandLogo pkg={flow.app} size={52} />
+              <button onClick={() => setOpenedFlow(null)} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px 0 12px', borderRadius: 10, border: '1px solid var(--border-md)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-1)', cursor: 'pointer', fontSize: 13.5, fontWeight: 700 }}>
+                <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>‹</span> {tr('Retour', 'Back')}
+              </button>
+              {/* En-tête du flow — logo encadré + centré */}
+              <div className="sf-card" style={{ padding: 22, display: 'flex', gap: 18, alignItems: 'center' }}>
+                <div style={{ width: 78, height: 78, borderRadius: 20, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', flexShrink: 0, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 20px -8px rgba(0,0,0,0.6)' }}>
+                  <BrandLogo pkg={flow.app} size={52} />
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{flow.name}</h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 }}>
+                    <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{flow.name}</h2>
                     {flow.category && <span className="sf-badge sf-badge-accent">{flow.category}</span>}
                   </div>
-                  {flow.description && <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 6px', lineHeight: 1.5 }}>{flow.description}</p>}
-                  <div style={{ fontSize: 11, color: 'var(--text-4)' }}>{appOf(flow).label} · {flow.official ? 'ScaleFlow Officiel' : (flow as StoredFlow).mine ? 'Créé par moi' : 'Communauté'}</div>
+                  {flow.description && <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 8px', lineHeight: 1.5 }}>{flow.description}</p>}
+                  <div style={{ fontSize: 11.5, color: 'var(--text-4)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 99, background: 'var(--ok)' }} />
+                    {appOf(flow).label} · {flow.official ? 'ScaleFlow Officiel' : (flow as StoredFlow).mine ? 'Créé par moi' : 'Communauté'}
+                  </div>
                 </div>
               </div>
 
@@ -221,7 +228,7 @@ const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box'
 const runBtn: React.CSSProperties = { width: '100%', fontSize: 14, fontWeight: 800, padding: '12px', borderRadius: 11, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer' }
 
 function Tab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} style={{ fontSize: 12.5, fontWeight: 800, padding: '7px 16px', borderRadius: 8, border: 'none', background: on ? 'var(--accent-lt)' : 'transparent', color: on ? 'var(--accent)' : 'var(--text-3)', cursor: 'pointer' }}>{children}</button>
+  return <button onClick={onClick} style={{ fontSize: 12.5, fontWeight: 800, padding: '8px 18px', borderRadius: 8, border: 'none', background: on ? 'rgba(255,255,255,0.09)' : 'transparent', color: on ? 'var(--text-1)' : 'var(--text-4)', cursor: 'pointer', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.35)' : 'none', transition: 'all .12s' }}>{children}</button>
 }
 function PhonePicker({ phones, selected, allSelected, toggleAll, togglePhone }: { phones: CpInstance[]; selected: Set<string>; allSelected: boolean; toggleAll: () => void; togglePhone: (id: string) => void }) {
   return (
@@ -339,7 +346,7 @@ function BrandLogo({ pkg, size = 34 }: { pkg?: string; size?: number }) {
 }
 
 function SubTab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 800, padding: '6px 14px', borderRadius: 7, border: 'none', background: on ? 'var(--accent-lt)' : 'transparent', color: on ? 'var(--accent)' : 'var(--text-4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>{children}</button>
+  return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 800, padding: '7px 15px', borderRadius: 7, border: 'none', background: on ? 'rgba(255,255,255,0.09)' : 'transparent', color: on ? 'var(--text-1)' : 'var(--text-4)', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.35)' : 'none', transition: 'all .12s' }}>{children}</button>
 }
 
 function FlowCard({ flow, source, onOpen }: { flow: Flow; source: string; onOpen: () => void }) {
