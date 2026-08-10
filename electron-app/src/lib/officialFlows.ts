@@ -5,6 +5,33 @@ import type { Flow } from './flowRunner'
 
 export const OFFICIAL_FLOWS: Flow[] = [
   {
+    id: 'ig-login',
+    name: 'Connexion à un compte — Instagram',
+    official: true,
+    category: '🔐 Compte',
+    app: 'com.instagram.android',
+    description: 'Ouvre Instagram et saisit identifiant + mot de passe. (2FA/checkpoint non gérés — à venir avec email/SMS.) Nécessite ADBKeyBoard.',
+    inputs: [
+      { key: 'username', label: 'Identifiant (@pseudo ou email)', placeholder: 'ex : mon.compte' },
+      { key: 'password', label: 'Mot de passe', placeholder: '••••••••' },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 1800 }, { do: 'popups' },
+      // écran d'accueil : aller sur l'écran de connexion
+      { do: 'tap', label: 'Écran de connexion', required: false, any: [{ contains: 'J’ai déjà un compte' }, { contains: 'I already have' }, { contains: 'Se connecter' }, { contains: 'Log in' }, { contains: 'Connexion' }] },
+      { do: 'wait', ms: 1800 }, { do: 'popups' },
+      { do: 'tap', label: 'Champ identifiant', any: [{ id: 'login_username' }, { contains: 'Nom d’utilisateur' }, { contains: 'e-mail' }, { contains: 'Username' }, { contains: 'phone' }] },
+      { do: 'type', var: 'username' },
+      { do: 'tap', label: 'Champ mot de passe', any: [{ id: 'password' }, { contains: 'Mot de passe' }, { contains: 'Password' }] },
+      { do: 'type', var: 'password' },
+      { do: 'key', key: 'back' },   // ferme le clavier
+      { do: 'wait', ms: 600 },
+      { do: 'tap', label: 'Bouton Se connecter', any: [{ id: 'button_text' }, { text: 'Se connecter' }, { text: 'Log in' }, { text: 'Connexion' }] },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+    ],
+  },
+  {
     id: 'ig-post-reel',
     name: 'Poster un Reel — Instagram',
     official: true,
