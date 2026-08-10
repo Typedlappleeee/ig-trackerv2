@@ -31,6 +31,24 @@ const ANDROID_OPTS = [
   { value: '13.0.0', android: '13', store: 'Play Store',   title: 'Android 13', desc: 'Google Play Store & services Google intégrés (build tiers).' },
 ] as const
 
+// Catalogue d'apps courantes — l'utilisateur clique au lieu de saisir.
+// `fdroid` s'installe tout seul (open-source). Les apps fermées (Instagram…)
+// ne sont PAS sur F-Droid ni téléchargeables via Play en direct : elles ont
+// besoin d'une URL .apk directe (que l'utilisateur colle une fois).
+const APP_PRESETS: Array<{ label: string; pkg: string; emoji: string; fdroid?: boolean }> = [
+  { label: 'Instagram', pkg: 'com.instagram.android',      emoji: '📸' },
+  { label: 'TikTok',    pkg: 'com.zhiliaoapp.musically',   emoji: '🎵' },
+  { label: 'Threads',   pkg: 'com.instagram.barcelona',    emoji: '🧵' },
+  { label: 'Snapchat',  pkg: 'com.snapchat.android',       emoji: '👻' },
+  { label: 'Facebook',  pkg: 'com.facebook.katana',        emoji: '📘' },
+  { label: 'X',         pkg: 'com.twitter.android',         emoji: '𝕏' },
+  { label: 'YouTube',   pkg: 'com.google.android.youtube', emoji: '▶️' },
+  { label: 'Reddit',    pkg: 'com.reddit.frontpage',       emoji: '👽' },
+  { label: 'WhatsApp',  pkg: 'com.whatsapp',                emoji: '💬' },
+  { label: 'Telegram',  pkg: 'org.telegram.messenger',     emoji: '✈️', fdroid: true },
+  { label: 'NewPipe',   pkg: 'org.schabi.newpipe',         emoji: '🟢', fdroid: true },
+]
+
 export function CloudPhones({ user }: Props) {
   const tr = useTr()
   const license = useLicense()
@@ -47,8 +65,14 @@ export function CloudPhones({ user }: Props) {
 
   const [instances, setInstances] = useState<CpInstance[]>([])
   const [meta, setMeta] = useState<Record<string, CpMeta>>(() => loadAllCpMeta())
-  const [subTab, setSubTab] = useState<'phones' | 'groups' | 'apps'>('phones')
+  const [showGroups, setShowGroups] = useState(false)
+  const [showApps, setShowApps] = useState(false)
   const [cpGroups, setCpGroups] = useState<string[]>(() => loadCpGroups())
+
+  // Change le groupe d'UN téléphone directement depuis la liste.
+  const setPhoneGroup = (id: string, group: string) => {
+    saveCpMeta(id, { group: group.trim() || undefined }); setMeta(loadAllCpMeta())
+  }
   const [busyId, setBusyId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -77,6 +101,20 @@ export function CloudPhones({ user }: Props) {
   const removeAutoApp = (value: string) => {
     const next = cAutoApps.filter(a => a.value !== value)
     setCAutoApps(next); saveAutoInstall(next)
+  }
+  // Ajoute une app du catalogue en un clic. Open-source (F-Droid) → prête ;
+  // app fermée → on demande l'URL .apk une seule fois (pas de source directe légale).
+  const addPresetApp = (p: { label: string; pkg: string; fdroid?: boolean }) => {
+    if (cAutoApps.some(a => a.label === p.label || a.value === p.pkg)) return
+    let entry: CpAutoApp
+    if (p.fdroid) {
+      entry = { kind: 'fdroid', value: p.pkg, label: p.label }
+    } else {
+      const url = window.prompt(tr(`URL .apk directe pour ${p.label} (APKPure/APKMirror ou hébergée) — mémorisée ensuite :`, `Direct .apk URL for ${p.label} (APKPure/APKMirror or self-hosted) — remembered afterwards:`), '')
+      if (!url || !url.trim()) return
+      entry = { kind: 'apk', value: url.trim(), label: p.label }
+    }
+    const next = [...cAutoApps, entry]; setCAutoApps(next); saveAutoInstall(next)
   }
 
   // Proxies (pour l'assignation aux tels).
@@ -438,32 +476,18 @@ export function CloudPhones({ user }: Props) {
           <div className="sf-banner is-danger mt-6">{tr('Connexion impossible', 'Connection failed')} : {connMsg}</div>
         )}
 
-        {/* Sous-onglets : Téléphones · Groupes · Apps */}
-        {conn === 'ok' && (
-          <div style={{ display: 'flex', gap: 6, margin: '16px 0 4px', borderBottom: '1px solid var(--border)' }}>
-            {([
-              ['phones', tr('Téléphones', 'Phones'), instances.length],
-              ['groups', tr('Groupes', 'Groups'), allGroups.length],
-              ['apps',   tr('Apps', 'Apps'), cAutoApps.length],
-            ] as const).map(([key, label, n]) => (
-              <button key={key} onClick={() => setSubTab(key)}
-                style={{
-                  position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
-                  padding: '9px 14px', fontSize: 13, fontWeight: 700,
-                  color: subTab === key ? 'var(--accent)' : 'var(--text-3)',
-                  borderBottom: `2px solid ${subTab === key ? 'var(--accent)' : 'transparent'}`, marginBottom: -1,
-                }}>
-                {label} {n > 0 && <span style={{ fontSize: 11, opacity: 0.7 }}>· {n}</span>}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {conn === 'ok' && subTab === 'phones' && instances.length > 0 && (
+        {conn === 'ok' && instances.length > 0 && (
           <>
             {/* Recherche + filtres de statut */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '4px 0 12px' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 12px' }}>
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher (nom, id, compte, tag, proxy)…', 'Search (name, id, account, tag, proxy)…')} className="sf-input" style={{ height: 34, flex: '0 1 320px', minWidth: 200 }} />
+              <button onClick={() => setShowGroups(true)} className="sf-btn sf-btn-secondary" style={{ height: 34, display: 'flex', alignItems: 'center', gap: 6 }} title={tr('Gérer les groupes', 'Manage groups')}>
+                <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/></svg>
+                {tr('Groupes', 'Groups')}{allGroups.length > 0 && <span style={{ opacity: 0.6 }}>· {allGroups.length}</span>}
+              </button>
+              <button onClick={() => setShowApps(true)} className="sf-btn sf-btn-secondary" style={{ height: 34, display: 'flex', alignItems: 'center', gap: 6 }} title={tr('Apps à auto-installer', 'Auto-install apps')}>
+                📦 {tr('Apps', 'Apps')}{cAutoApps.length > 0 && <span style={{ opacity: 0.6 }}>· {cAutoApps.length}</span>}
+              </button>
               {allGroups.length > 0 && (
                 <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="sf-input" style={{ height: 34, width: 'auto', minWidth: 130, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: groupFilter === 'all' ? 'var(--text-3)' : 'var(--accent)' }}>
                   <option value="all">{tr('Tous les groupes', 'All groups')}</option>
@@ -541,12 +565,22 @@ export function CloudPhones({ user }: Props) {
                           <td style={{ padding: '10px 16px', maxWidth: 260 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                               <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{display}</span>
-                              {m.group && (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(129,140,248,0.12)', color: 'var(--accent)', border: '1px solid rgba(129,140,248,0.25)', whiteSpace: 'nowrap' }}>
-                                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/></svg>
-                                  {m.group}
-                                </span>
-                              )}
+                              {/* Sélecteur de groupe direct (liste des groupes) */}
+                              <select
+                                value={m.group ?? ''}
+                                onClick={e => e.stopPropagation()}
+                                onChange={e => { const v = e.target.value; if (v === '__new') setShowGroups(true); else setPhoneGroup(inst.id, v) }}
+                                title={tr('Changer de groupe', 'Change group')}
+                                style={{
+                                  fontSize: 10.5, fontWeight: 700, padding: '2px 6px', borderRadius: 99, cursor: 'pointer', maxWidth: 150,
+                                  border: `1px solid ${m.group ? 'rgba(129,140,248,0.25)' : 'var(--border)'}`,
+                                  background: m.group ? 'rgba(129,140,248,0.12)' : 'transparent',
+                                  color: m.group ? 'var(--accent)' : 'var(--text-4)',
+                                }}>
+                                <option value="">{tr('— groupe', '— group')}</option>
+                                {allGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                                <option value="__new">+ {tr('nouveau…', 'new…')}</option>
+                              </select>
                             </div>
                             {m.account && <div style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{m.account}</div>}
                             {(m.tags?.length ?? 0) > 0 && <div style={{ marginTop: 4 }}><CpTagChips tags={m.tags} max={4} /></div>}
@@ -611,7 +645,7 @@ export function CloudPhones({ user }: Props) {
         )}
 
         {/* État vide : aucun téléphone */}
-        {conn === 'ok' && subTab === 'phones' && instances.length === 0 && (
+        {conn === 'ok' && instances.length === 0 && (
           <div className="sf-card" style={{ padding: '48px 24px', textAlign: 'center', marginTop: 16 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📱</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', marginBottom: 6 }}>{tr('Aucun téléphone', 'No phone yet')}</div>
@@ -621,73 +655,6 @@ export function CloudPhones({ user }: Props) {
           </div>
         )}
 
-        {/* ─── Onglet GROUPES ─────────────────────────────────────────────── */}
-        {conn === 'ok' && subTab === 'groups' && (
-          <div className="sf-card" style={{ marginTop: 14, padding: 20, maxWidth: 720 }}>
-            <p className="sf-section-label" style={{ marginBottom: 4 }}>{tr('Groupes de téléphones', 'Phone groups')}</p>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
-              {tr('Crée un groupe ici, puis range tes téléphones dedans (dans le tableau : sélectionne des téléphones → « Groupe + Entrée », ou via « Modifier le profil »).', 'Create a group here, then put phones in it (in the table: select phones → “Group + Enter”, or via “Edit profile”).')}
-            </p>
-            {/* Créer un groupe */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-              <input id="cp-new-group" placeholder={tr('Nom du nouveau groupe…', 'New group name…')} className="sf-input" style={{ flex: 1, height: 38 }}
-                onKeyDown={e => { if (e.key === 'Enter') { const el = e.target as HTMLInputElement; createGroup(el.value); el.value = '' } }} />
-              <button className="sf-btn sf-btn-primary" style={{ height: 38, flexShrink: 0 }}
-                onClick={() => { const el = document.getElementById('cp-new-group') as HTMLInputElement | null; if (el) { createGroup(el.value); el.value = '' } }}>
-                + {tr('Créer le groupe', 'Create group')}
-              </button>
-            </div>
-            {/* Liste des groupes */}
-            {allGroups.length === 0
-              ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '18px 0', textAlign: 'center' }}>{tr('Aucun groupe pour le moment.', 'No group yet.')}</div>
-              : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {allGroups.map(g => (
-                    <div key={g} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--accent)', fontSize: 13 }}>
-                        <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/></svg>
-                        {g}
-                      </span>
-                      <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>· {groupCount(g)} {tr('téléphone(s)', 'phone(s)')}</span>
-                      <span style={{ flex: 1 }} />
-                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28 }} onClick={() => { setSubTab('phones'); setGroupFilter(g) }}>{tr('Voir', 'View')}</button>
-                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28 }} onClick={() => { const n = window.prompt(tr('Renommer le groupe', 'Rename group'), g); if (n) renameGroup(g, n) }}>{tr('Renommer', 'Rename')}</button>
-                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28, color: 'var(--danger)' }} onClick={() => { if (window.confirm(tr(`Supprimer le groupe « ${g} » ? Les téléphones ne seront pas supprimés, juste retirés du groupe.`, `Delete group "${g}"? Phones are kept, just removed from the group.`))) deleteGroup(g) }}>{tr('Supprimer', 'Delete')}</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-          </div>
-        )}
-
-        {/* ─── Onglet APPS (auto-install) ─────────────────────────────────── */}
-        {conn === 'ok' && subTab === 'apps' && (
-          <div className="sf-card" style={{ marginTop: 14, padding: 20, maxWidth: 720 }}>
-            <p className="sf-section-label" style={{ marginBottom: 4 }}>{tr('Apps à installer automatiquement', 'Apps to auto-install')}</p>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
-              {tr('Ces apps sont poussées sur CHAQUE nouveau téléphone à sa création. Ajoute une URL .apk directe (APKPure/APKMirror ou hébergée), ou un paquet F-Droid (fdroid:com.pkg.name). Le Play Store n’est pas téléchargeable directement.', 'These apps are pushed to EVERY new phone on creation. Add a direct .apk URL (APKPure/APKMirror or self-hosted), or an F-Droid package (fdroid:com.pkg.name). Play Store is not directly downloadable.')}
-            </p>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              <input value={cAppInput} onChange={e => setCAppInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAutoApp(cAppInput) } }}
-                placeholder={tr('URL .apk directe, ou fdroid:com.pkg.name', 'Direct .apk URL, or fdroid:com.pkg.name')} className="sf-input" style={{ flex: 1, height: 38 }} />
-              <button onClick={() => addAutoApp(cAppInput)} className="sf-btn sf-btn-primary" style={{ height: 38, flexShrink: 0 }}>+ {tr('Ajouter', 'Add')}</button>
-            </div>
-            {cAutoApps.length === 0
-              ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '18px 0', textAlign: 'center' }}>{tr('Aucune app configurée — les téléphones seront créés vierges.', 'No app configured — phones will be created empty.')}</div>
-              : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {cAutoApps.map(a => (
-                    <div key={a.value} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-                      <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 7px', borderRadius: 6, color: a.kind === 'fdroid' ? 'var(--ok)' : 'var(--accent)', background: a.kind === 'fdroid' ? 'rgba(52,211,153,0.12)' : 'rgba(129,140,248,0.12)', textTransform: 'uppercase', flexShrink: 0 }}>{a.kind === 'fdroid' ? 'F-Droid' : 'APK'}</span>
-                      <span style={{ fontSize: 12.5, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.value}>{a.label || a.value}</span>
-                      <span style={{ flex: 1 }} />
-                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28, color: 'var(--danger)' }} onClick={() => removeAutoApp(a.value)}>{tr('Retirer', 'Remove')}</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-          </div>
-        )}
       </div>
 
       {/* ─── Modal de création ─────────────────────────────────────────────── */}
@@ -784,7 +751,7 @@ export function CloudPhones({ user }: Props) {
                       : tr('Aucune app configurée', 'No app configured')}
                   </span>
                   <span style={{ flex: 1 }} />
-                  <button type="button" onClick={() => { setShowCreate(false); setSubTab('apps') }} className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30, flexShrink: 0 }}>{tr('Gérer les apps →', 'Manage apps →')}</button>
+                  <button type="button" onClick={() => { setShowCreate(false); setShowApps(true) }} className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30, flexShrink: 0 }}>{tr('Gérer les apps →', 'Manage apps →')}</button>
                 </div>
               </div>
 
@@ -917,6 +884,85 @@ export function CloudPhones({ user }: Props) {
         )
       })()}
 
+      {/* ─── Modal GROUPES ──────────────────────────────────────────────── */}
+      {showGroups && (
+        <div onClick={() => setShowGroups(false)} style={cpOverlay}>
+          <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(560px,94vw)', maxHeight: '86vh', overflowY: 'auto', padding: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{tr('Groupes', 'Groups')}</h3>
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setShowGroups(false)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', fontSize: 18 }}>×</button>
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.6 }}>{tr('Crée un groupe, puis choisis-le directement sur chaque téléphone (colonne Téléphone) ou en masse.', 'Create a group, then pick it right on each phone (Phone column) or in bulk.')}</p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input id="cp-new-group" placeholder={tr('Nom du nouveau groupe…', 'New group name…')} className="sf-input" style={{ flex: 1, height: 38 }}
+                onKeyDown={e => { if (e.key === 'Enter') { const el = e.target as HTMLInputElement; createGroup(el.value); el.value = '' } }} />
+              <button className="sf-btn sf-btn-primary" style={{ height: 38, flexShrink: 0 }} onClick={() => { const el = document.getElementById('cp-new-group') as HTMLInputElement | null; if (el) { createGroup(el.value); el.value = '' } }}>+ {tr('Créer', 'Create')}</button>
+            </div>
+            {allGroups.length === 0
+              ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '18px 0', textAlign: 'center' }}>{tr('Aucun groupe pour le moment.', 'No group yet.')}</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {allGroups.map(g => (
+                    <div key={g} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--accent)', fontSize: 13 }}>
+                        <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/></svg>{g}</span>
+                      <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>· {groupCount(g)} {tr('tél.', 'ph.')}</span>
+                      <span style={{ flex: 1 }} />
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28 }} onClick={() => { setGroupFilter(g); setShowGroups(false) }}>{tr('Voir', 'View')}</button>
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28 }} onClick={() => { const n = window.prompt(tr('Renommer le groupe', 'Rename group'), g); if (n) renameGroup(g, n) }}>{tr('Renommer', 'Rename')}</button>
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28, color: 'var(--danger)' }} onClick={() => { if (window.confirm(tr(`Supprimer « ${g} » ? Les téléphones sont gardés, juste retirés du groupe.`, `Delete "${g}"? Phones are kept, just removed from the group.`))) deleteGroup(g) }}>{tr('Suppr.', 'Del.')}</button>
+                    </div>
+                  ))}
+                </div>}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal APPS (catalogue + auto-install) ──────────────────────── */}
+      {showApps && (
+        <div onClick={() => setShowApps(false)} style={cpOverlay}>
+          <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(600px,94vw)', maxHeight: '88vh', overflowY: 'auto', padding: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>📦 {tr('Apps à installer automatiquement', 'Apps to auto-install')}</h3>
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setShowApps(false)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', fontSize: 18 }}>×</button>
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.6 }}>{tr('Poussées sur CHAQUE nouveau téléphone. Clique une app pour l’ajouter.', 'Pushed to EVERY new phone. Click an app to add it.')}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+              {APP_PRESETS.map(p => {
+                const added = cAutoApps.some(a => a.label === p.label || a.value === p.pkg)
+                return (
+                  <button key={p.pkg} disabled={added} onClick={() => addPresetApp(p)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, padding: '7px 11px', borderRadius: 10, cursor: added ? 'default' : 'pointer',
+                      border: `1px solid ${added ? 'var(--ok)' : 'var(--border)'}`, background: added ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.03)', color: added ? 'var(--ok)' : 'var(--text-2)' }}>
+                    <span>{p.emoji}</span>{p.label}{p.fdroid && <span style={{ fontSize: 8, fontWeight: 800, color: 'var(--ok)' }}>F-DROID</span>}{added && ' ✓'}
+                  </button>
+                )
+              })}
+            </div>
+            <FieldLabel>{tr('Ou une URL .apk / paquet F-Droid', 'Or a .apk URL / F-Droid package')}</FieldLabel>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input value={cAppInput} onChange={e => setCAppInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAutoApp(cAppInput) } }}
+                placeholder={tr('URL .apk directe, ou fdroid:com.pkg.name', 'Direct .apk URL, or fdroid:com.pkg.name')} style={{ ...fieldInput, flex: 1 }} />
+              <button onClick={() => addAutoApp(cAppInput)} className="sf-btn sf-btn-secondary" style={{ height: 38, padding: '0 14px', flexShrink: 0 }}>{tr('Ajouter', 'Add')}</button>
+            </div>
+            {cAutoApps.length === 0
+              ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '12px 0', textAlign: 'center' }}>{tr('Aucune app configurée — les téléphones seront créés vierges.', 'No app configured — phones created empty.')}</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {cAutoApps.map(a => (
+                    <div key={a.value} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 7px', borderRadius: 6, color: a.kind === 'fdroid' ? 'var(--ok)' : 'var(--accent)', background: a.kind === 'fdroid' ? 'rgba(52,211,153,0.12)' : 'rgba(129,140,248,0.12)', textTransform: 'uppercase', flexShrink: 0 }}>{a.kind === 'fdroid' ? 'F-Droid' : 'APK'}</span>
+                      <span style={{ fontSize: 12.5, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.value}>{a.label || a.value}</span>
+                      <span style={{ flex: 1 }} />
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28, color: 'var(--danger)' }} onClick={() => removeAutoApp(a.value)}>{tr('Retirer', 'Remove')}</button>
+                    </div>
+                  ))}
+                </div>}
+            <p style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 14, lineHeight: 1.5 }}>{tr('Instagram, TikTok… ne sont pas sur F-Droid : la 1ʳᵉ fois, colle une URL .apk directe (elle est mémorisée). Telegram/NewPipe s’installent directement.', 'Instagram, TikTok… aren’t on F-Droid: the first time, paste a direct .apk URL (it is remembered). Telegram/NewPipe install directly.')}</p>
+          </div>
+        </div>
+      )}
+
       {/* Suggestions de groupes (partagées par le modal d'édition + la barre groupée) */}
       <datalist id="sf-cp-groups">
         {allGroups.map(g => <option key={g} value={g} />)}
@@ -927,6 +973,7 @@ export function CloudPhones({ user }: Props) {
   )
 }
 
+const cpOverlay: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(6,7,12,0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }
 const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }
 const fieldInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 13, padding: '9px 11px', borderRadius: 9, border: '1px solid var(--border)', background: 'rgba(0,0,0,0.25)', color: 'var(--text-1)' }
 function FieldLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
