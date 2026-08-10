@@ -75,7 +75,13 @@ export async function runFlow(id: string, flow: Flow, opts: { log?: Logger; vars
   try {
     for (const s of flow.steps) {
       switch (s.do) {
-        case 'open': log('Ouverture de l’app…'); await openApp(id, s.pkg); await wait(5000); await dismissPopups(id); break
+        case 'open':
+          log('Ouverture de l’app…')
+          await openApp(id, s.pkg)
+          // Nav 3 boutons : évite qu'un swipe (scroll/reels) parte en "Accueil"
+          // et ferme l'app (geste système d'Android 15). Idempotent.
+          await cloudPhones.shell(id, 'settings put secure navigation_mode 0').catch(() => {})
+          await wait(5000); await dismissPopups(id); break
         case 'link': { log('Ouvrir un lien'); const u = interp(s.url, vars).replace(/'/g, ''); await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d '${u}'`); await wait(3500); await dismissPopups(id); break }
         case 'wait': await wait(s.ms); break
         case 'popups': await dismissPopups(id); break

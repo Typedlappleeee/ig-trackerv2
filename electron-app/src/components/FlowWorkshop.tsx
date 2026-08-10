@@ -139,7 +139,11 @@ export function FlowWorkshop({ phones, userId, orgId, onSaved }: Props) {
       window.setTimeout(() => setBusy(''), 4000); return
     }
     addStep({ do: 'open', pkg }, `Ouvrir ${label}`)
-    if (phoneId) { await openApp(phoneId, pkg); window.setTimeout(refreshSnap, 1800) }
+    if (phoneId) {
+      await openApp(phoneId, pkg)
+      await cloudPhones.shell(phoneId, 'settings put secure navigation_mode 0').catch(() => {})  // évite home au swipe
+      window.setTimeout(refreshSnap, 1800)
+    }
   }
   const chooseAppOther = () => {
     const p = window.prompt('Package Android de l’app (ex: com.reddit.frontpage) :'); if (!p?.trim()) return
