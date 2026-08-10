@@ -11,7 +11,8 @@ import { useTr } from '@/lib/i18n'
 import {
   cloudPhones, loadCloudAgentConfig, saveCloudAgentConfig, getCloudAgent,
   loadAllCpMeta, saveCpMeta, removeCpMeta, genPhoneId,
-  type CpInstance, type CpMeta,
+  loadAutoInstall, saveAutoInstall,
+  type CpInstance, type CpMeta, type CpAutoApp,
 } from '@/lib/cloudPhones'
 import { CloudPhoneWindow } from '@/components/CloudPhoneWindow'
 import { listProxies, proxyLabel, type Proxy } from '@/lib/proxyStore'
@@ -58,6 +59,23 @@ export function CloudPhones({ user }: Props) {
   const [creating, setCreating] = useState(false)
   const [createMsg, setCreateMsg] = useState('')
   const [allProxies, setAllProxies] = useState<Proxy[]>([])
+  // Apps à pousser automatiquement sur CHAQUE nouveau téléphone (persistées).
+  const [cAutoApps, setCAutoApps] = useState<CpAutoApp[]>(() => loadAutoInstall())
+  const [cAppInput, setCAppInput] = useState('')
+  const addAutoApp = (raw: string) => {
+    const v = raw.trim()
+    if (!v) return
+    const app: CpAutoApp = /^fdroid:/i.test(v)
+      ? { kind: 'fdroid', value: v.replace(/^fdroid:/i, '').trim() }
+      : { kind: 'apk', value: v }
+    if (!app.value || cAutoApps.some(a => a.value === app.value)) { setCAppInput(''); return }
+    const next = [...cAutoApps, app]
+    setCAutoApps(next); saveAutoInstall(next); setCAppInput('')
+  }
+  const removeAutoApp = (value: string) => {
+    const next = cAutoApps.filter(a => a.value !== value)
+    setCAutoApps(next); saveAutoInstall(next)
+  }
 
   // Proxies (pour l'assignation aux tels).
   useEffect(() => { listProxies(user.id).then(setAllProxies) }, [user.id])
@@ -79,9 +97,17 @@ export function CloudPhones({ user }: Props) {
   const [epName, setEpName] = useState('')
   const [epAccount, setEpAccount] = useState('')
   const [epNotes, setEpNotes] = useState('')
-  const [epGroup, setEpGroup] = useState('')     // '' = tous
+  const [epGroup, setEpGroup] = useState('')     // groupe de PROXY (filtre du sélecteur), '' = tous
   const [epProxyId, setEpProxyId] = useState('')
   const [epCheck, setEpCheck] = useState<{ loading?: boolean; ip?: string; err?: string } | null>(null)
+  // Métadonnées d'organisation du téléphone (≠ groupe de proxy ci-dessus).
+  const [epTags, setEpTags] = useState<string[]>([])
+  const [epTagInput, setEpTagInput] = useState('')
+  const [epPhoneGroup, setEpPhoneGroup] = useState('')
+  const [epLogin, setEpLogin] = useState('')
+  const [epPassword, setEpPassword] = useState('')
+  const [epTotp, setEpTotp] = useState('')
+  const [epShowPwd, setEpShowPwd] = useState(false)
 
   // Test de l'IP sortante du proxy assigné à un tel (écrit dans le cache partagé
   // → la cellule ExitIpCell se met à jour toute seule, ici et dans Proxies).
@@ -103,6 +129,13 @@ export function CloudPhones({ user }: Props) {
     const m = meta[id] ?? {}
     setEditId(id); setEditKind(kind); setEpName(m.name ?? ''); setEpAccount(m.account ?? ''); setEpNotes(m.notes ?? '')
     const px = proxyById(m.proxyId); setEpGroup(px?.group ?? ''); setEpProxyId(m.proxyId ?? ''); setEpCheck(null)
+    setEpTags(m.tags ?? []); setEpTagInput(''); setEpPhoneGroup(m.group ?? '')
+    setEpLogin(m.login ?? ''); setEpPassword(m.password ?? ''); setEpTotp(m.totp ?? ''); setEpShowPwd(false)
+  }
+  const epAddTag = (raw: string) => {
+    const tg = raw.trim().replace(/^#/, '').slice(0, 24)
+    if (!tg || epTags.includes(tg)) { setEpTagInput(''); return }
+    setEpTags(t => [...t, tg]); setEpTagInput('')
   }
   const epProxies = allProxies.filter(p => !epGroup || p.group === epGroup)
   const epRandom = () => {
@@ -119,7 +152,16 @@ export function CloudPhones({ user }: Props) {
   const saveEdit = () => {
     if (!editId) return
     const patch: CpMeta = { proxyId: epProxyId || undefined }
-    if (editKind === 'profile') { patch.name = epName.trim() || undefined; patch.account = epAccount.trim() || undefined; patch.notes = epNotes.trim() || undefined }
+    if (editKind === 'profile') {
+      patch.name = epName.trim() || undefined
+      patch.account = epAccount.trim() || undefined
+      patch.notes = epNotes.trim() || undefined
+      patch.tags = epTags.length ? epTags : undefined
+      patch.group = epPhoneGroup.trim() || undefined
+      patch.login = epLogin.trim() || undefined
+      patch.password = epPassword || undefined
+      patch.totp = epTotp.trim() || undefined
+    }
     saveCpMeta(editId, patch); setMeta(loadAllCpMeta()); setEditId(null)
   }
 
@@ -190,6 +232,7 @@ export function CloudPhones({ user }: Props) {
     const opt = ANDROID_OPTS.find(o => o.value === cAndroid) ?? ANDROID_OPTS[0]
     setCreating(true)
     let ok = 0
+    const createdIds: string[] = []
     const taken = new Set(usedProxyIds)   // évite d'assigner 2× le même proxy dans le lot
     for (let i = 0; i < cQty; i++) {
       const friendly = cQty > 1 ? `${base} ${i + 1}` : base
@@ -197,7 +240,7 @@ export function CloudPhones({ user }: Props) {
       const id = genPhoneId(friendly)
       const r = await cloudPhones.create(id, cAndroid || undefined)
       if (r.ok) {
-        ok++
+        ok++; createdIds.push(id)
         const fp = r.data?.instance?.fingerprint
         const proxyId = pickProxyForNew(taken)
         if (proxyId) taken.add(proxyId)
@@ -209,6 +252,23 @@ export function CloudPhones({ user }: Props) {
         break
       }
     }
+
+    // ── Auto-install des apps sur chaque téléphone créé (best-effort) ──────────
+    if (createdIds.length && cAutoApps.length) {
+      for (const id of createdIds) {
+        for (const app of cAutoApps) {
+          const name = app.label || app.value
+          setCreateMsg(tr(`Installation de ${name}…`, `Installing ${name}…`))
+          try {
+            const res = app.kind === 'fdroid'
+              ? await cloudPhones.installFdroid(id, app.value)
+              : await cloudPhones.install(id, app.value)
+            if (!res.ok) setCreateMsg(`${tr('Install échouée', 'Install failed')} (${name}) : ${res.error ?? ''}`)
+          } catch { /* best-effort — on continue les autres apps/téléphones */ }
+        }
+      }
+    }
+
     setCreating(false)
     await loadInstances()
     if (ok === cQty) setShowCreate(false)
@@ -237,7 +297,12 @@ export function CloudPhones({ user }: Props) {
   // ── Recherche / filtres / multi-sélection (passage à l'échelle) ────────────
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'stopped' | 'open'>('all')
+  const [groupFilter, setGroupFilter] = useState<string>('all')
+  const [tagFilter, setTagFilter] = useState<string>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const allTags = Array.from(new Set(Object.values(meta).flatMap(m => m.tags ?? []).filter(Boolean))).sort() as string[]
+  const allGroups = Array.from(new Set(Object.values(meta).map(m => m.group).filter(Boolean) as string[])).sort()
 
   const q = search.trim().toLowerCase()
   const filtered = instances.filter(inst => {
@@ -246,10 +311,13 @@ export function CloudPhones({ user }: Props) {
       : statusFilter === 'stopped' ? !isRunning(inst.state)
       : openIds.includes(inst.id)
     if (!okStatus) return false
-    if (!q) return true
     const mm = meta[inst.id] ?? {}
+    if (groupFilter !== 'all' && (mm.group ?? '') !== groupFilter) return false
+    if (tagFilter !== 'all' && !(mm.tags ?? []).includes(tagFilter)) return false
+    if (!q) return true
     const px = proxyById(mm.proxyId)
-    return [mm.name || inst.name, inst.id, mm.account, px ? `${px.host}:${px.port}` : ''].filter(Boolean).join(' ').toLowerCase().includes(q)
+    return [mm.name || inst.name, inst.id, mm.account, mm.notes, mm.group, mm.login, (mm.tags ?? []).join(' '), px ? `${px.host}:${px.port}` : '']
+      .filter(Boolean).join(' ').toLowerCase().includes(q)
   })
   const toggleSel = (id: string) => setSelectedIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const allFilteredSelected = filtered.length > 0 && filtered.every(i => selectedIds.has(i.id))
@@ -265,6 +333,19 @@ export function CloudPhones({ user }: Props) {
     if (!window.confirm(`Supprimer ${selectedIds.size} téléphone(s) ? Irréversible.`)) return
     for (const id of selectedIds) await doAction(id, 'remove')
     clearSel()
+  }
+  const bulkAddTag = (raw: string) => {
+    const tag = raw.trim().replace(/^#/, '').slice(0, 24)
+    if (!tag) return
+    selectedIds.forEach(id => {
+      const cur = meta[id] ?? {}
+      if (!(cur.tags ?? []).includes(tag)) saveCpMeta(id, { tags: [...(cur.tags ?? []), tag] })
+    })
+    setMeta(loadAllCpMeta()); clearSel()
+  }
+  const bulkSetGroup = (raw: string) => {
+    selectedIds.forEach(id => saveCpMeta(id, { group: raw.trim() || undefined }))
+    setMeta(loadAllCpMeta()); clearSel()
   }
 
   const fmtDate = (t?: number) => {
@@ -339,7 +420,19 @@ export function CloudPhones({ user }: Props) {
           <>
             {/* Recherche + filtres de statut */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '4px 0 12px' }}>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher (nom, id, compte, proxy)…', 'Search (name, id, account, proxy)…')} className="sf-input" style={{ height: 34, flex: '0 1 320px', minWidth: 200 }} />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher (nom, id, compte, tag, proxy)…', 'Search (name, id, account, tag, proxy)…')} className="sf-input" style={{ height: 34, flex: '0 1 320px', minWidth: 200 }} />
+              {allGroups.length > 0 && (
+                <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="sf-input" style={{ height: 34, width: 'auto', minWidth: 130, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: groupFilter === 'all' ? 'var(--text-3)' : 'var(--accent)' }}>
+                  <option value="all">{tr('Tous les groupes', 'All groups')}</option>
+                  {allGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              )}
+              {allTags.length > 0 && (
+                <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} className="sf-input" style={{ height: 34, width: 'auto', minWidth: 120, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: tagFilter === 'all' ? 'var(--text-3)' : cpTagColor(tagFilter) }}>
+                  <option value="all">{tr('Tous les tags', 'All tags')}</option>
+                  {allTags.map(tg => <option key={tg} value={tg}>#{tg}</option>)}
+                </select>
+              )}
               <span style={{ flex: 1 }} />
               <FChip on={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>{tr('Tous', 'All')} · {instances.length}</FChip>
               <FChip on={statusFilter === 'online'} onClick={() => setStatusFilter('online')}>{tr('En ligne', 'Online')} · {instances.filter(i => isRunning(i.state)).length}</FChip>
@@ -352,6 +445,10 @@ export function CloudPhones({ user }: Props) {
               <div className="sf-card" style={{ padding: '9px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, borderColor: 'var(--accent)' }}>
                 <span style={{ fontWeight: 800, color: 'var(--accent)', fontSize: 13 }}>{selectedIds.size} {tr('sélectionné(s)', 'selected')}</span>
                 <span style={{ flex: 1 }} />
+                <input placeholder={tr('Tag + Entrée', 'Tag + Enter')} className="sf-input" style={{ height: 30, width: 120, fontSize: 12 }}
+                  onKeyDown={e => { if (e.key === 'Enter') { const el = e.target as HTMLInputElement; if (el.value.trim()) { bulkAddTag(el.value); el.value = '' } } }} />
+                <input placeholder={tr('Groupe + Entrée', 'Group + Enter')} list="sf-cp-groups" className="sf-input" style={{ height: 30, width: 130, fontSize: 12 }}
+                  onKeyDown={e => { if (e.key === 'Enter') { const el = e.target as HTMLInputElement; bulkSetGroup(el.value); el.value = '' } }} />
                 <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30 }} onClick={bulkOpen}>▶ {tr('Ouvrir', 'Open')}</button>
                 <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30 }} onClick={bulkVerifyIp}>🔎 {tr('Vérifier IP', 'Check IP')}</button>
                 <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30, color: 'var(--danger)' }} onClick={bulkRemove}>🗑 {tr('Supprimer', 'Delete')}</button>
@@ -398,9 +495,22 @@ export function CloudPhones({ user }: Props) {
                             </span>
                             {isOpen && <span className="sf-badge sf-badge-accent" style={{ marginLeft: 8 }}>● {tr('Ouvert', 'Open')}</span>}
                           </td>
-                          <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
-                            <div style={{ fontWeight: 700, color: 'var(--text-1)' }}>{display}</div>
-                            {m.account && <div style={{ fontSize: 10.5, color: 'var(--text-4)' }}>{m.account}</div>}
+                          <td style={{ padding: '10px 16px', maxWidth: 260 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{display}</span>
+                              {m.group && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(129,140,248,0.12)', color: 'var(--accent)', border: '1px solid rgba(129,140,248,0.25)', whiteSpace: 'nowrap' }}>
+                                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/></svg>
+                                  {m.group}
+                                </span>
+                              )}
+                            </div>
+                            {m.account && <div style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{m.account}</div>}
+                            {(m.tags?.length ?? 0) > 0 && <div style={{ marginTop: 4 }}><CpTagChips tags={m.tags} max={4} /></div>}
+                            {m.notes && <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }} title={m.notes}>
+                              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M2 2.5h8v5l-2.5 2.5H2v-7.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
+                              {m.notes}
+                            </div>}
                           </td>
                           <td style={{ padding: '10px 16px' }}>
                             <button onClick={(e) => { e.stopPropagation(); copyId(inst.id) }} title={tr('Copier l\'ID', 'Copy ID')}
@@ -553,6 +663,30 @@ export function CloudPhones({ user }: Props) {
                 {allProxies.length === 0 && <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{tr('Aucun proxy — ajoute-en dans l\'onglet Proxies.', 'No proxy — add some in the Proxies tab.')}</span>}
               </div>
 
+              {/* Apps à auto-installer sur chaque téléphone créé */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{tr('Apps à installer automatiquement', 'Apps to auto-install')}</label>
+                {cAutoApps.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {cAutoApps.map(a => (
+                      <span key={a.value} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, padding: '4px 9px', borderRadius: 99, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text-2)', maxWidth: '100%' }}>
+                        <span style={{ fontSize: 9, fontWeight: 800, color: a.kind === 'fdroid' ? 'var(--ok)' : 'var(--accent)', textTransform: 'uppercase' }}>{a.kind === 'fdroid' ? 'F-Droid' : 'APK'}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{a.label || a.value}</span>
+                        <button onClick={() => removeAutoApp(a.value)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 0, display: 'flex' }}>
+                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={cAppInput} onChange={e => setCAppInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAutoApp(cAppInput) } }}
+                    placeholder={tr('URL .apk directe, ou fdroid:com.pkg.name', 'Direct .apk URL, or fdroid:com.pkg.name')} style={{ ...fieldInput, flex: 1 }} />
+                  <button onClick={() => addAutoApp(cAppInput)} className="sf-btn sf-btn-secondary" style={{ height: 38, padding: '0 14px', flexShrink: 0 }}>{tr('Ajouter', 'Add')}</button>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--text-4)', lineHeight: 1.5, display: 'block' }}>{tr('Installées sur CHAQUE téléphone créé. Instagram/TikTok : colle une URL .apk directe (APKPure/APKMirror ou hébergée). Le Play Store n’est pas téléchargeable directement.', 'Installed on EVERY created phone. Instagram/TikTok: paste a direct .apk URL (APKPure/APKMirror or self-hosted). Play Store is not directly downloadable.')}</span>
+              </div>
+
               <p style={{ fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.5, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
                 {tr('Le boot Android et l\'installation d\'Aurora Store prennent 1-2 min en tâche de fond après la création.', 'Android boot and Aurora Store install take 1-2 min in the background after creation.')}
               </p>
@@ -613,7 +747,37 @@ export function CloudPhones({ user }: Props) {
                   <input value={epAccount} onChange={e => setEpAccount(e.target.value)} placeholder={tr('@pseudo ou email du compte', '@handle or account email')} style={fieldInput} />
 
                   <FieldLabel style={{ marginTop: 14 }}>{tr('Remarques', 'Notes')}</FieldLabel>
-                  <textarea value={epNotes} onChange={e => setEpNotes(e.target.value)} rows={2} placeholder={tr('Notes libres (identifiants, statut du compte…)', 'Free notes (credentials, account status…)')} style={{ ...fieldInput, resize: 'vertical', fontFamily: 'inherit' }} />
+                  <textarea value={epNotes} onChange={e => setEpNotes(e.target.value)} rows={2} placeholder={tr('Notes libres sur ce téléphone…', 'Free notes about this phone…')} style={{ ...fieldInput, resize: 'vertical', fontFamily: 'inherit' }} />
+
+                  {/* Tags */}
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Tags', 'Tags')}</FieldLabel>
+                  {epTags.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}><CpTagChips tags={epTags} onRemove={tg => setEpTags(t => t.filter(x => x !== tg))} /></div>}
+                  <input value={epTagInput} onChange={e => setEpTagInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); epAddTag(epTagInput) } }}
+                    onBlur={() => epTagInput.trim() && epAddTag(epTagInput)}
+                    placeholder={tr('Ajouter un tag + Entrée…', 'Add a tag + Enter…')} style={fieldInput} />
+                  {allTags.filter(tg => !epTags.includes(tg)).length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                      {allTags.filter(tg => !epTags.includes(tg)).slice(0, 8).map(tg => (
+                        <button key={tg} onClick={() => epAddTag(tg)} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px dashed ${cpTagColor(tg)}66`, color: 'var(--text-3)' }}>+ {tg}</button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Groupe */}
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Groupe', 'Group')}</FieldLabel>
+                  <input value={epPhoneGroup} onChange={e => setEpPhoneGroup(e.target.value)} list="sf-cp-groups" placeholder={tr('Aucun groupe', 'No group')} style={fieldInput} />
+
+                  {/* Identifiants du compte */}
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Identifiants du compte', 'Account credentials')}</FieldLabel>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input value={epLogin} onChange={e => setEpLogin(e.target.value)} placeholder={tr('Identifiant / e-mail', 'Username / email')} autoComplete="off" style={fieldInput} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input value={epPassword} onChange={e => setEpPassword(e.target.value)} type={epShowPwd ? 'text' : 'password'} placeholder={tr('Mot de passe', 'Password')} autoComplete="new-password" style={{ ...fieldInput, flex: 1 }} />
+                      <button onClick={() => setEpShowPwd(v => !v)} className="sf-btn sf-btn-ghost" style={{ height: 38, padding: '0 12px' }} title={epShowPwd ? tr('Masquer', 'Hide') : tr('Afficher', 'Show')}>{epShowPwd ? '🙈' : '👁'}</button>
+                    </div>
+                    <input value={epTotp} onChange={e => setEpTotp(e.target.value)} placeholder={tr('Secret 2FA / TOTP (optionnel)', '2FA / TOTP secret (optional)')} autoComplete="off" style={fieldInput} />
+                  </div>
 
                   <FieldLabel style={{ marginTop: 14 }}>{tr('Appareil (non modifiable)', 'Device (read-only)')}</FieldLabel>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -652,6 +816,11 @@ export function CloudPhones({ user }: Props) {
         )
       })()}
 
+      {/* Suggestions de groupes (partagées par le modal d'édition + la barre groupée) */}
+      <datalist id="sf-cp-groups">
+        {allGroups.map(g => <option key={g} value={g} />)}
+      </datalist>
+
       <style>{`.cp-row:hover { background: rgba(129,140,248,0.06); }`}</style>
     </div>
   )
@@ -664,6 +833,38 @@ function FieldLabel({ children, style }: { children: React.ReactNode; style?: Re
 }
 function FChip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 99, border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-lt)' : 'transparent', color: on ? 'var(--accent)' : 'var(--text-3)', cursor: 'pointer' }}>{children}</button>
+}
+
+// ── Tags : couleur stable (hash → palette) + affichage en chips ───────────────
+const CP_TAG_PALETTE = ['#818CF8', '#22D3EE', '#34D399', '#E5C07B', '#F0A0AB', '#A78BFA', '#F59E0B', '#10B981', '#EC4899', '#60A5FA']
+function cpTagColor(tag: string): string {
+  let h = 0
+  for (let i = 0; i < tag.length; i++) h = tag.charCodeAt(i) + ((h << 5) - h)
+  return CP_TAG_PALETTE[Math.abs(h) % CP_TAG_PALETTE.length]
+}
+function CpTagChips({ tags, max, onRemove }: { tags?: string[]; max?: number; onRemove?: (t: string) => void }) {
+  const list = (tags ?? []).filter(Boolean)
+  if (list.length === 0) return null
+  const shown = max ? list.slice(0, max) : list
+  const extra = max && list.length > max ? list.length - max : 0
+  return (
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+      {shown.map(tg => {
+        const c = cpTagColor(tg)
+        return (
+          <span key={tg} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: `${c}1e`, color: c, border: `1px solid ${c}44`, whiteSpace: 'nowrap' }}>
+            {tg}
+            {onRemove && (
+              <button onClick={e => { e.stopPropagation(); onRemove(tg) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: c, padding: 0, display: 'flex', opacity: 0.7 }}>
+                <svg width="7" height="7" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              </button>
+            )}
+          </span>
+        )
+      })}
+      {extra > 0 && <span style={{ fontSize: 10, color: 'var(--text-4)' }}>+{extra}</span>}
+    </span>
+  )
 }
 
 export default CloudPhones
