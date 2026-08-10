@@ -13,7 +13,7 @@ import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
 import { cloudPhones, loadCloudAgentConfig, getCloudAgent, uploadVideoFile, type CpInstance } from '@/lib/cloudPhones'
 import { runFlow, type Flow } from '@/lib/flowRunner'
-import { OFFICIAL_FLOWS, findFlow, officialCategories } from '@/lib/officialFlows'
+import { OFFICIAL_FLOWS, findFlow } from '@/lib/officialFlows'
 import { listMyFlows, listCommunityFlows, bumpInstalls, type StoredFlow } from '@/lib/flowStore'
 import { FlowWorkshop } from '@/components/FlowWorkshop'
 
@@ -33,6 +33,7 @@ export function AutomationLab({ user }: Props) {
   const [myFlows, setMyFlows] = useState<StoredFlow[]>([])
   const [communityFlows, setCommunityFlows] = useState<StoredFlow[]>([])
   const [flowId, setFlowId] = useState(OFFICIAL_FLOWS[0]?.id ?? '')
+  const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community'>('official')
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<Record<string, RunState>>({})
@@ -136,21 +137,37 @@ export function AutomationLab({ user }: Props) {
 
           {tab === 'run' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <Card title="1 · Automatisation">
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#C7D2FE', marginBottom: 8 }}>⭐ Officielles</div>
-                {officialCategories().map(cat => (
-                  <FlowGroup key={cat} title={cat} flows={OFFICIAL_FLOWS.filter(f => (f.category ?? '📦 Autres') === cat)} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} />
-                ))}
-                <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0 12px' }} />
-                <FlowGroup title="👤 Mes automatisations" flows={myFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} empty="Rien encore — crée-en dans l’onglet « Créer »." />
-                <FlowGroup title="🌍 Communauté" flows={communityFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} empty="Aucune automatisation communautaire pour l’instant." />
-                {flow?.inputs?.map(inp => (
-                  <div key={inp.key} style={{ marginTop: 12 }}>
-                    <label style={{ fontSize: 11.5, fontWeight: 700, color: '#c8c8d8', display: 'block', marginBottom: 4 }}>{inp.label}{inp.optional ? ' (optionnel)' : ''}</label>
-                    <input value={inputs[inp.key] ?? ''} onChange={e => setInputs(s => ({ ...s, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />
+              {/* Galerie de flows façon Power Automate : onglets source + cartes à logo */}
+              <div className="sf-card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'rgba(0,0,0,0.28)', width: 'fit-content', marginBottom: 14 }}>
+                  <SubTab on={flowTab === 'official'} onClick={() => setFlowTab('official')}>⭐ Officielles · {OFFICIAL_FLOWS.length}</SubTab>
+                  <SubTab on={flowTab === 'mine'} onClick={() => setFlowTab('mine')}>👤 Mes automatisations · {myFlows.length}</SubTab>
+                  <SubTab on={flowTab === 'community'} onClick={() => setFlowTab('community')}>🌍 Communauté · {communityFlows.length}</SubTab>
+                </div>
+
+                {(() => {
+                  const list = flowTab === 'official' ? OFFICIAL_FLOWS : flowTab === 'mine' ? myFlows : communityFlows
+                  const sourceLabel = flowTab === 'official' ? 'ScaleFlow · Officiel' : flowTab === 'mine' ? 'Créé par moi' : 'Communauté'
+                  if (list.length === 0) return <div style={{ padding: '30px 10px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{flowTab === 'mine' ? 'Aucune automatisation perso — crée-en dans l’onglet « Créer ».' : 'Rien pour l’instant.'}</div>
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                      {list.map(f => <FlowCard key={f.id} flow={f} source={sourceLabel} selected={flowId === f.id} onPick={() => { setFlowId(f.id); setInputs({}) }} />)}
+                    </div>
+                  )
+                })()}
+
+                {flow?.inputs && flow.inputs.length > 0 && (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>Paramètres · {flow.name}</div>
+                    {flow.inputs.map(inp => (
+                      <div key={inp.key} style={{ marginTop: 10 }}>
+                        <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>{inp.label}{inp.optional ? ' (optionnel)' : ''}</label>
+                        <input value={inputs[inp.key] ?? ''} onChange={e => setInputs(s => ({ ...s, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </Card>
+                )}
+              </div>
               <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
               <button onClick={run} disabled={running || selected.size === 0 || !flow} style={{ ...runBtn, opacity: (running || selected.size === 0 || !flow) ? 0.55 : 1 }}>
                 {running ? '⏳ Exécution…' : `▶️ Lancer sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
@@ -240,23 +257,40 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
     </div>
   )
 }
-function FlowGroup({ title, flows, sel, onPick, empty }: { title: string; flows: Flow[]; sel: string; onPick: (id: string) => void; empty?: string }) {
+// Plateforme d'un flow (logo + couleur) d'après son package Android.
+const APP_META: Record<string, { label: string; icon: string; bg: string }> = {
+  'com.instagram.android': { label: 'Instagram', icon: '📸', bg: 'linear-gradient(135deg,#F58529,#DD2A7B,#8134AF)' },
+  'com.zhiliaoapp.musically': { label: 'TikTok', icon: '🎵', bg: 'linear-gradient(135deg,#25F4EE,#000,#FE2C55)' },
+  'com.instagram.barcelona': { label: 'Threads', icon: '🧵', bg: '#101010' },
+  'com.snapchat.android': { label: 'Snapchat', icon: '👻', bg: '#FFFC00' },
+  'com.facebook.katana': { label: 'Facebook', icon: '📘', bg: '#1877F2' },
+  'com.twitter.android': { label: 'X', icon: '𝕏', bg: '#000' },
+}
+function appOf(f: Flow) { return APP_META[f.app ?? ''] ?? { label: 'App', icon: '📱', bg: 'var(--accent)' } }
+
+function SubTab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 800, padding: '6px 14px', borderRadius: 7, border: 'none', background: on ? 'var(--accent-lt)' : 'transparent', color: on ? 'var(--accent)' : 'var(--text-4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>{children}</button>
+}
+
+function FlowCard({ flow, source, selected, onPick }: { flow: Flow; source: string; selected: boolean; onPick: () => void }) {
+  const app = appOf(flow)
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--text-4)', marginBottom: 6 }}>{title}</div>
-      {flows.length === 0
-        ? <p style={{ fontSize: 11.5, color: 'var(--text-4)', margin: 0 }}>{empty}</p>
-        : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {flows.map(f => (
-              <button key={f.id} onClick={() => onPick(f.id)} style={{ textAlign: 'left', padding: '9px 11px', borderRadius: 10, cursor: 'pointer', background: sel === f.id ? 'var(--accent-dim)' : 'rgba(255,255,255,0.04)', border: `1px solid ${sel === f.id ? 'var(--accent)' : 'var(--border)'}` }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)' }}>{f.name}</div>
-                {f.description && <div style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{f.description}</div>}
-              </button>
-            ))}
-          </div>
-        )}
-    </div>
+    <button onClick={onPick} style={{
+      textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 12, cursor: 'pointer',
+      background: selected ? 'var(--accent-dim)' : 'var(--surface, rgba(255,255,255,0.02))',
+      border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`, transition: 'all .12s', minHeight: 120,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 34, height: 34, borderRadius: 9, display: 'grid', placeItems: 'center', fontSize: 17, background: app.bg, flexShrink: 0, boxShadow: '0 2px 8px -2px rgba(0,0,0,0.5)' }}>{app.icon}</span>
+        {flow.category && <span className="sf-badge sf-badge-muted" style={{ fontSize: 9.5 }}>{flow.category}</span>}
+        <span style={{ flex: 1 }} />
+        {selected && <span style={{ color: 'var(--accent)', fontSize: 15 }}>✓</span>}
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.25 }}>{flow.name}</div>
+      {flow.description && <div style={{ fontSize: 11, color: 'var(--text-4)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{flow.description}</div>}
+      <span style={{ flex: 1 }} />
+      <div style={{ fontSize: 10, color: 'var(--text-4)', display: 'flex', alignItems: 'center', gap: 5 }}>{app.label} · {source}</div>
+    </button>
   )
 }
 function Notice({ children, tone }: { children: React.ReactNode; tone?: 'error' }) {
