@@ -15,6 +15,16 @@ const jitter = (base: number, extra: number) => base + Math.floor(Math.random() 
 const openProfile = (id: string, user: string) =>
   cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://user?username=${user.replace(/^@/, '').replace(/'/g, '')}'`)
 
+// ── Préparer le tel : navigation 3 boutons (évite le "home" au swipe du bas)
+// + animations réduites (automatisation plus rapide/stable). Idempotent.
+export async function prepDevice(id: string, _params: Record<string, unknown>, log: Logger): Promise<void> {
+  await cloudPhones.shell(id, 'settings put secure navigation_mode 0').catch(() => {})           // 3 boutons
+  await cloudPhones.shell(id, 'cmd overlay enable com.android.internal.systemui.navbar.threebutton').catch(() => {})
+  await cloudPhones.shell(id, 'settings put global window_animation_scale 0.5').catch(() => {})
+  await cloudPhones.shell(id, 'settings put global transition_animation_scale 0.5').catch(() => {})
+  log('  ⚙️ tel préparé (nav 3 boutons)')
+}
+
 // ── Like du feed ────────────────────────────────────────────────────────────
 export async function likeFeed(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
   const count = Number(params.count) || 5
@@ -117,6 +127,7 @@ export async function scrapeFollowers(id: string, params: Record<string, unknown
 
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
+  prep_device: prepDevice,
   like_feed: likeFeed,
   watch_stories: watchStories,
   watch_reels: watchReels,
