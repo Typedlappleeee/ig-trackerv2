@@ -68,6 +68,68 @@ export const OFFICIAL_FLOWS: Flow[] = [
       { do: 'tap', label: 'Suivre', any: [{ text: 'Suivre' }, { text: 'Follow' }, { id: 'follow_button' }, { id: 'button_text' }] },
     ],
   },
+
+  // ── Engagement (moteur GramAddict : resource-ids IG maintenus) ─────────────
+  {
+    id: 'ig-warmup-plus',
+    name: 'Warmup + likes & stories (Instagram)',
+    official: true,
+    app: 'com.instagram.android',
+    description: 'Regarde quelques stories, scroll le feed et like des posts. Rythme humain (pauses aléatoires).',
+    inputs: [{ key: 'likes', label: 'Nombre de likes', placeholder: 'ex : 5', optional: true }],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 2000 }, { do: 'popups' },
+      { do: 'action', name: 'watch_stories', params: { count: 3 } },
+      { do: 'wait', ms: 1500 },
+      { do: 'action', name: 'like_feed', params: { count: '{{likes}}' } },
+    ],
+  },
+  {
+    id: 'ig-watch-stories',
+    name: 'Regarder des stories (Instagram)',
+    official: true,
+    app: 'com.instagram.android',
+    description: 'Ouvre et regarde des stories du feed (warmup doux).',
+    inputs: [{ key: 'count', label: 'Nombre de stories', placeholder: 'ex : 5', optional: true }],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 2000 }, { do: 'popups' },
+      { do: 'action', name: 'watch_stories', params: { count: '{{count}}' } },
+    ],
+  },
+  {
+    id: 'ig-follow-followers',
+    name: 'Suivre les abonnés d’un compte (Instagram)',
+    official: true,
+    app: 'com.instagram.android',
+    description: 'Ouvre un compte cible et suit ses abonnés (lead gen / croissance). Rythme humain.',
+    inputs: [
+      { key: 'target', label: 'Compte cible', placeholder: 'ex : nike (sans @)' },
+      { key: 'count', label: 'Combien en suivre', placeholder: 'ex : 10', optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 1500 }, { do: 'popups' },
+      { do: 'action', name: 'follow_followers', params: { target: '{{target}}', count: '{{count}}' } },
+    ],
+  },
+  {
+    id: 'ig-scrape-followers',
+    name: 'Scraper les abonnés d’un compte (Instagram)',
+    official: true,
+    app: 'com.instagram.android',
+    description: 'Récupère les pseudos des abonnés d’un compte (affichés dans le journal). UI scraping, sans cookie. Utilise un compte "scraper" dédié.',
+    inputs: [
+      { key: 'target', label: 'Compte cible', placeholder: 'ex : nike (sans @)' },
+      { key: 'max', label: 'Nombre max de pseudos', placeholder: 'ex : 100', optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 1500 }, { do: 'popups' },
+      { do: 'action', name: 'scrape_followers', params: { target: '{{target}}', max: '{{max}}' } },
+    ],
+  },
 ]
 
 export function findFlow(id: string): Flow | undefined {

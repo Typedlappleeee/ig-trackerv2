@@ -11,6 +11,7 @@
 // OÙ (on peut alors capturer l'écran et corriger le sélecteur).
 import { cloudPhones } from './cloudPhones'
 import { dumpUi, tap, typeText, openApp, dismissPopups, keys, type Matcher } from './phoneAutomation'
+import { ACTIONS } from './igActions'
 
 export type Logger = (m: string) => void
 
@@ -28,6 +29,7 @@ export type Step =
   | { do: 'key'; key: 'back' | 'home' | 'enter' }
   | { do: 'pickFirstMedia' }                            // 1re vignette de la galerie
   | { do: 'swipe'; x1: number; y1: number; x2: number; y2: number; ms?: number }
+  | { do: 'action'; name: string; params?: Record<string, string | number> }  // action codée (GramAddict : like, follow, scrape…)
 
 export interface Flow {
   id: string
@@ -89,6 +91,15 @@ export async function runFlow(id: string, flow: Flow, opts: { log?: Logger; vars
         case 'type': {
           const t = s.var ? (vars[s.var] || '') : interp(s.text || '', vars)
           if (t.trim()) { log('Écrire le texte'); await typeText(id, t.trim()); await wait(500) }
+          break
+        }
+        case 'action': {
+          const fn = ACTIONS[s.name]
+          if (!fn) { log(`  ✗ action inconnue : ${s.name}`); break }
+          const p: Record<string, string | number> = {}
+          for (const [k, v] of Object.entries(s.params ?? {})) p[k] = typeof v === 'string' ? interp(v, vars) : v
+          log(`▶ ${s.name}`)
+          await fn(id, p, log)
           break
         }
       }
