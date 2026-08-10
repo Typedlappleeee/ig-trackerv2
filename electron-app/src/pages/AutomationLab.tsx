@@ -35,6 +35,7 @@ export function AutomationLab({ user }: Props) {
   const [flowId, setFlowId] = useState(OFFICIAL_FLOWS[0]?.id ?? '')
   const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community'>('official')
   const [openedFlow, setOpenedFlow] = useState<string | null>(null)   // null = galerie, sinon page détail
+  const [appFilter, setAppFilter] = useState<string>('all')           // filtre par application
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<Record<string, RunState>>({})
@@ -141,25 +142,34 @@ export function AutomationLab({ user }: Props) {
           {tab === 'create' && <FlowWorkshop phones={runningPhones} userId={user.id} orgId={orgId} onSaved={loadFlows} />}
 
           {/* ── LANCER : galerie de flows OU page détail d'un flow ─────────────── */}
-          {tab === 'run' && !openedFlow && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'rgba(0,0,0,0.28)', width: 'fit-content' }}>
-                <SubTab on={flowTab === 'official'} onClick={() => setFlowTab('official')}>⭐ Officielles · {OFFICIAL_FLOWS.length}</SubTab>
-                <SubTab on={flowTab === 'mine'} onClick={() => setFlowTab('mine')}>👤 Mes automatisations · {myFlows.length}</SubTab>
-                <SubTab on={flowTab === 'community'} onClick={() => setFlowTab('community')}>🌍 Communauté · {communityFlows.length}</SubTab>
-              </div>
-              {(() => {
-                const list = flowTab === 'official' ? OFFICIAL_FLOWS : flowTab === 'mine' ? myFlows : communityFlows
-                const src = flowTab === 'official' ? 'Officiel' : flowTab === 'mine' ? 'Perso' : 'Communauté'
-                if (list.length === 0) return <div className="sf-card" style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{flowTab === 'mine' ? 'Aucune automatisation perso — crée-en dans l’onglet « Créer ».' : 'Rien pour l’instant.'}</div>
-                return (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
-                    {list.map(f => <FlowCard key={f.id} flow={f} source={src} onOpen={() => { setOpenedFlow(f.id); setFlowId(f.id); setInputs({}) }} />)}
+          {tab === 'run' && !openedFlow && (() => {
+            const baseList = flowTab === 'official' ? OFFICIAL_FLOWS : flowTab === 'mine' ? myFlows : communityFlows
+            const src = flowTab === 'official' ? 'Officiel' : flowTab === 'mine' ? 'Perso' : 'Communauté'
+            const apps = [...new Set(baseList.map(f => f.app).filter(Boolean) as string[])]
+            const list = appFilter === 'all' ? baseList : baseList.filter(f => f.app === appFilter)
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'rgba(0,0,0,0.28)', width: 'fit-content' }}>
+                  <SubTab on={flowTab === 'official'} onClick={() => { setFlowTab('official'); setAppFilter('all') }}>⭐ Officielles · {OFFICIAL_FLOWS.length}</SubTab>
+                  <SubTab on={flowTab === 'mine'} onClick={() => { setFlowTab('mine'); setAppFilter('all') }}>👤 Mes automatisations · {myFlows.length}</SubTab>
+                  <SubTab on={flowTab === 'community'} onClick={() => { setFlowTab('community'); setAppFilter('all') }}>🌍 Communauté · {communityFlows.length}</SubTab>
+                </div>
+
+                {apps.length > 0 && (
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                    <AppChip on={appFilter === 'all'} onClick={() => setAppFilter('all')} label="Toutes" count={baseList.length} />
+                    {apps.map(a => <AppChip key={a} pkg={a} on={appFilter === a} onClick={() => setAppFilter(a)} count={baseList.filter(f => f.app === a).length} />)}
                   </div>
-                )
-              })()}
-            </div>
-          )}
+                )}
+
+                {list.length === 0
+                  ? <div className="sf-card" style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{flowTab === 'mine' ? 'Aucune automatisation perso — crée-en dans l’onglet « Créer ».' : 'Rien pour l’instant.'}</div>
+                  : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+                      {list.map(f => <FlowCard key={f.id} flow={f} source={src} onOpen={() => { setOpenedFlow(f.id); setFlowId(f.id); setInputs({}) }} />)}
+                    </div>}
+              </div>
+            )
+          })()}
 
           {tab === 'run' && openedFlow && flow && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720, width: '100%', margin: '0 auto' }}>
@@ -349,6 +359,15 @@ function BrandLogo({ pkg, size = 34 }: { pkg?: string; size?: number }) {
   }
 }
 
+function AppChip({ pkg, label, count, on, onClick }: { pkg?: string; label?: string; count?: number; on: boolean; onClick: () => void }) {
+  const name = label ?? appOf({ app: pkg } as Flow).label
+  return (
+    <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 700, padding: pkg ? '4px 12px 4px 5px' : '4px 12px', borderRadius: 99, border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-dim)' : 'transparent', color: on ? 'var(--text-1)' : 'var(--text-3)', cursor: 'pointer' }}>
+      {pkg ? <BrandLogo pkg={pkg} size={20} /> : <span style={{ fontSize: 13 }}>🗂️</span>}
+      {name}{count != null ? ` · ${count}` : ''}
+    </button>
+  )
+}
 function SubTab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 800, padding: '7px 15px', borderRadius: 7, border: 'none', background: on ? 'rgba(255,255,255,0.09)' : 'transparent', color: on ? 'var(--text-1)' : 'var(--text-4)', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.35)' : 'none', transition: 'all .12s' }}>{children}</button>
 }
