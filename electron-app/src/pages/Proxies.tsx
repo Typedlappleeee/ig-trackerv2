@@ -4,11 +4,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
+import { cloudPhones, loadCloudAgentConfig, getCloudAgent } from '@/lib/cloudPhones'
 import {
   listProxies, addProxies, deleteProxy, setProxyGroup,
   listGroups, addGroup, deleteGroup,
   parseProxyLine, proxyLabel, type Proxy, type ProxyType,
 } from '@/lib/proxyStore'
+
+interface Check { loading?: boolean; ip?: string; isp?: string; country?: string; err?: string }
 
 interface Props { user: User }
 
@@ -23,12 +26,29 @@ export function Proxies({ user }: Props) {
   const [addToGroup, setAddToGroup] = useState('')
   const [type, setType] = useState<ProxyType>('socks5')
   const [busy, setBusy] = useState('')
+  const [checks, setChecks] = useState<Record<string, Check>>({})
+  const [checkingAll, setCheckingAll] = useState(false)
 
   const load = useCallback(async () => {
     const [px, gr] = await Promise.all([listProxies(user.id), listGroups(user.id)])
     setProxies(px); setGroups(gr)
   }, [user.id])
   useEffect(() => { load() }, [load])
+  // Charge la config de l'agent (nécessaire pour tester les proxies au travers).
+  useEffect(() => { loadCloudAgentConfig(orgId, user.id) }, [orgId, user.id])
+
+  const checkOne = async (p: Proxy) => {
+    if (!getCloudAgent().url) { setBusy('Configure l’agent dans Cloud Phones pour tester'); window.setTimeout(() => setBusy(''), 3000); return }
+    setChecks(c => ({ ...c, [p.id]: { loading: true } }))
+    const r = await cloudPhones.checkProxy({ type: p.type, host: p.host, port: p.port, username: p.username, password: p.password })
+    const d = r.data
+    setChecks(c => ({ ...c, [p.id]: r.ok && d?.reachable ? { ip: d.ip, isp: d.isp, country: d.country } : { err: d?.error || r.error || 'KO' } }))
+  }
+  const checkAll = async () => {
+    setCheckingAll(true)
+    for (const p of visible) { await checkOne(p) }   // séquentiel (évite de saturer l'agent)
+    setCheckingAll(false)
+  }
 
   const parsed = raw.split('\n').map(l => parseProxyLine(l, type)).filter(Boolean) as Omit<Proxy, 'id'>[]
   const countIn = (g: string) => proxies.filter(p => (p.group ?? '') === g).length
@@ -59,6 +79,7 @@ export function Proxies({ user }: Props) {
         <h1 style={{ fontSize: 22, fontWeight: 900, color: '#F0F0F7', margin: 0 }}>🌐 Proxies</h1>
         <span style={{ fontSize: 12, color: '#8a8a9c', background: 'rgba(255,255,255,0.06)', borderRadius: 99, padding: '2px 10px' }}>{proxies.length} au total</span>
         <span style={{ flex: 1 }} />
+        <button onClick={checkAll} disabled={checkingAll || visible.length === 0} style={{ ...btnGhost, opacity: checkingAll ? 0.6 : 1 }}>{checkingAll ? '⏳ Test…' : '🔎 Vérifier'}</button>
         <button onClick={newGroup} style={btnGhost}>＋ Nouveau groupe</button>
         <button onClick={() => { setAddToGroup(filter !== 'all' && filter !== 'none' ? filter : ''); setShowAdd(true) }} style={btnPrimary}>＋ Ajouter des proxies</button>
       </div>
@@ -99,7 +120,15 @@ export function Proxies({ user }: Props) {
                     </Td>
                     <Td style={{ fontFamily: 'ui-monospace, monospace', color: '#E9E9F2' }}>{p.type}://{proxyLabel(p)}</Td>
                     <Td><span style={{ fontSize: 10, fontWeight: 800, color: '#C7D2FE', background: 'rgba(129,140,248,0.15)', borderRadius: 6, padding: '2px 6px' }}>{p.type.toUpperCase()}</span></Td>
-                    <Td style={{ color: '#6b6b7c' }}>—</Td>
+                    <Td>
+                      {(() => {
+                        const c = checks[p.id]
+                        if (c?.loading) return <span style={{ color: '#8a8a9c' }}>…</span>
+                        if (c?.ip) return <span title={`${c.isp ?? ''} ${c.country ?? ''}`.trim()} style={{ color: '#34D399', fontFamily: 'ui-monospace, monospace' }}>{c.ip} {c.country ? `· ${c.country}` : ''}</span>
+                        if (c?.err) return <span title={c.err} style={{ color: '#F87171' }}>KO</span>
+                        return <button onClick={() => checkOne(p)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#8a8a9c', cursor: 'pointer', fontSize: 10.5, padding: '2px 8px' }}>tester</button>
+                      })()}
+                    </Td>
                     <Td style={{ color: '#6b6b7c' }}>—</Td>
                     <Td><button onClick={() => remove(p.id)} style={{ background: 'none', border: 'none', color: '#F87171', cursor: 'pointer', fontSize: 13 }}>✕</button></Td>
                   </tr>
