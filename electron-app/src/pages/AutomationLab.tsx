@@ -13,7 +13,7 @@ import type { User } from '@supabase/supabase-js'
 import { useOrg } from '@/lib/orgContext'
 import { cloudPhones, loadCloudAgentConfig, getCloudAgent, uploadVideoFile, type CpInstance } from '@/lib/cloudPhones'
 import { runFlow, type Flow } from '@/lib/flowRunner'
-import { OFFICIAL_FLOWS, findFlow } from '@/lib/officialFlows'
+import { OFFICIAL_FLOWS, findFlow, officialCategories } from '@/lib/officialFlows'
 import { listMyFlows, listCommunityFlows, bumpInstalls, type StoredFlow } from '@/lib/flowStore'
 import { FlowWorkshop } from '@/components/FlowWorkshop'
 
@@ -132,7 +132,11 @@ export function AutomationLab({ user }: Props) {
           {tab === 'run' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <Card title="1 · Automatisation">
-                <FlowGroup title="⭐ Officielles" flows={OFFICIAL_FLOWS} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} />
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#C7D2FE', marginBottom: 8 }}>⭐ Officielles</div>
+                {officialCategories().map(cat => (
+                  <FlowGroup key={cat} title={cat} flows={OFFICIAL_FLOWS.filter(f => (f.category ?? '📦 Autres') === cat)} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} />
+                ))}
+                <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0 12px' }} />
                 <FlowGroup title="👤 Mes automatisations" flows={myFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} empty="Rien encore — crée-en dans l’onglet « Créer »." />
                 <FlowGroup title="🌍 Communauté" flows={communityFlows} sel={flowId} onPick={id => { setFlowId(id); setInputs({}) }} empty="Aucune automatisation communautaire pour l’instant." />
                 {flow?.inputs?.map(inp => (
