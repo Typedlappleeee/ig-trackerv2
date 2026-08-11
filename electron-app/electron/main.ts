@@ -1130,7 +1130,7 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
   const totalH = lines.length * lineH
 
   const startY = opts.position === 'bottom'
-    ? VH - totalH - 80
+    ? VH - totalH - 170
     : opts.position === 'top'
       ? 80
       : Math.round((VH - totalH) / 2)

@@ -122,7 +122,7 @@ function buildAssFile(caption, fontSize, fontColor, position) {
   const outColor    = luminance(fontColor) > 0.55 ? '&H00000000' : '&H00FFFFFF'
   const alignMap    = { top: 8, center: 5, middle: 5, bottom: 2 }
   const alignment   = alignMap[position] ?? 2
-  const marginV     = position === 'top' ? 120 : position === 'center' || position === 'middle' ? 0 : 130
+  const marginV     = position === 'top' ? 120 : position === 'center' || position === 'middle' ? 0 : 220
   const safeCaption = String(caption).replace(/[\r\n]+/g, '\\N')
 
   return (
