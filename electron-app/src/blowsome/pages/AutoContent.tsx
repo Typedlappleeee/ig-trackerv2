@@ -9,8 +9,8 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { useTr } from '@/lib/i18n'
 import { logActivity } from '@/lib/activityLog'
-import { resolveContentToLocalPath, uploadVideoFromPath, type UploadScope } from '@/lib/storage'
-import { runRepurposeNative } from '@/lib/ffmpeg-web'
+import { resolveContentToLocalPath, uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
+import { runRepurposeNative, runRepurposeViaServer, runFfmpegRepurposeBatch } from '@/lib/ffmpeg-web'
 import { useBlowCSS, BlowCard, BlowButton, BlowBadge, BlowEmpty, BlowPageHeader, Ico, ICON, INK, MUTED, HAIR, GOLD } from '../ui'
 
 type Intensity = 'subtle' | 'medium' | 'aggressive'
@@ -51,6 +51,8 @@ export function BlowAutoContent({ user }: { user: User }) {
 
   // Formulaire (recette en cours d'édition ou nouvelle)
   const [name, setName] = useState('')
+  const [sourceMode, setSourceMode] = useState<'bank' | 'upload'>('bank')
+  const [uploads, setUploads] = useState<File[]>([])
   const [tag, setTag] = useState('')
   const [count, setCount] = useState(10)
   const [style, setStyle] = useState('')
@@ -100,43 +102,72 @@ export function BlowAutoContent({ user }: { user: User }) {
 
   const setJob = (i: number, patch: Partial<GenJob>) => setJobs(prev => prev.map(j => j.i === i ? { ...j, ...patch } : j))
 
+  // Résout une source (item banque OU fichier uploadé) en { nativePath, url }.
+  async function resolveSource(src: { item?: ContentItem; file?: File }): Promise<{ nativePath: string | null; url: string; revoke?: () => void }> {
+    if (src.file) {
+      const nativePath = hasNative ? ((src.file as unknown as { path?: string }).path ?? null) : null
+      const url = URL.createObjectURL(src.file)
+      return { nativePath, url, revoke: () => URL.revokeObjectURL(url) }
+    }
+    const it = src.item!
+    const nativePath = hasNative ? await resolveContentToLocalPath(it) : null
+    const url = it.storage_path ? await getSignedUrl(it.storage_path) : (it.file_url ?? '')
+    return { nativePath, url }
+  }
+
   // ── Génération ─────────────────────────────────────────────────────────────
   async function generate() {
     if (running) return
-    const pool = poolFor(tag)
-    if (!tag || pool.length === 0) return
+    const srcList: Array<{ title: string; item?: ContentItem; file?: File }> =
+      sourceMode === 'upload'
+        ? uploads.map(f => ({ title: f.name, file: f }))
+        : [...poolFor(tag)].sort(() => Math.random() - 0.5).map(it => ({ title: it.title, item: it }))
+    if (srcList.length === 0) return
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
     const styleLines = style.split('\n').map(s => s.trim()).filter(Boolean)
 
     setRunning(true)
     setJobs(Array.from({ length: count }, (_, i) => ({ i, status: 'queued' as JobStatus })))
 
-    // Ordre mélangé pour varier les sources
-    const shuffled = [...pool].sort(() => Math.random() - 0.5)
-
     for (let i = 0; i < count; i++) {
-      const source = shuffled[i % shuffled.length]
+      const src = srcList[i % srcList.length]
+      let revoke: (() => void) | undefined
       try {
-        setJob(i, { status: 'clip', sourceTitle: source.title })
-        const sourcePath = await resolveContentToLocalPath(source)
+        setJob(i, { status: 'clip', sourceTitle: src.title })
+        const resolved = await resolveSource(src)
+        revoke = resolved.revoke
+        const { nativePath, url } = resolved
 
-        // 1) Recadrage 9:16 + variante unique
+        // 1) Recadrage 9:16 + variante unique (natif desktop, sinon serveur → WASM web)
         setJob(i, { status: 'reframe' })
         const seed = Math.floor(Math.random() * 1_000_000) + i
-        const variants = await runRepurposeNative({ sourcePath, seeds: [seed], intensity, format: '9:16' })
+        let variants
+        if (hasNative && nativePath) {
+          variants = await runRepurposeNative({ sourcePath: nativePath, seeds: [seed], intensity, format: '9:16' })
+        } else {
+          try { variants = await runRepurposeViaServer({ sourceUrl: url, userId: user.id, seeds: [seed], intensity, format: '9:16' }) }
+          catch { variants = await runFfmpegRepurposeBatch({ inputPath: url, seeds: [seed], intensity, format: '9:16' }) }
+        }
         const out = variants[0]
-        if (!out?.ok || !out.localPath) throw new Error(tr('Recadrage échoué', 'Reframe failed'))
-        const outPath = out.localPath
+        const outRef = out?.localPath || out?.outputPath
+        if (!out?.ok || !outRef) throw new Error(tr('Recadrage échoué', 'Reframe failed'))
 
         // 2) Transcription audio (best-effort) — « ce qui est dit »
         let transcript = ''
-        if (useTranscript && conns.groq && window.electronAPI?.groqTranscription && window.electronAPI?.readFileBytes) {
+        if (useTranscript && conns.groq && window.electronAPI?.groqTranscription) {
           setJob(i, { status: 'transcribe' })
           try {
-            const bytesRes = await window.electronAPI.readFileBytes(sourcePath)
-            if (bytesRes?.ok && bytesRes.bytes) {
-              const buf = bytesRes.bytes instanceof Uint8Array ? bytesRes.bytes.buffer : bytesRes.bytes
-              const tRes = await window.electronAPI.groqTranscription({ apiKey: conns.groq, audioBytes: buf as ArrayBuffer, filename: 'clip.mp4' }) as { ok?: boolean; data?: { text?: string } }
+            if (hasNative && nativePath && window.electronAPI.readFileBytes) {
+              const b = await window.electronAPI.readFileBytes(nativePath)
+              if (b?.ok && b.bytes) {
+                const buf = b.bytes instanceof Uint8Array ? b.bytes.buffer : b.bytes
+                const tRes = await window.electronAPI.groqTranscription({ apiKey: conns.groq, audioBytes: buf as ArrayBuffer, filename: 'clip.mp4' }) as { ok?: boolean; data?: { text?: string } }
+                if (tRes?.ok) transcript = String(tRes.data?.text ?? '').trim()
+              }
+            } else {
+              // Web : le proxy récupère la vidéo par URL (marche pour les URL de la banque).
+              const gq = window.electronAPI.groqTranscription as unknown as (o: { apiKey: string; videoUrl: string; filename: string }) => Promise<{ ok?: boolean; data?: { text?: string } }>
+              const tRes = await gq({ apiKey: conns.groq, videoUrl: url, filename: 'clip.mp4' })
               if (tRes?.ok) transcript = String(tRes.data?.text ?? '').trim()
             }
           } catch { /* transcription optionnelle */ }
@@ -147,7 +178,7 @@ export function BlowAutoContent({ user }: { user: User }) {
         let caption = ''
         if (conns.anthropic && window.electronAPI?.extractFrames && window.electronAPI?.anthropicVisionRequest) {
           try {
-            const fr = await window.electronAPI.extractFrames({ filePath: outPath, endTime: 5, fps: 0.5 })
+            const fr = await window.electronAPI.extractFrames({ filePath: outRef, endTime: 5, fps: 0.5 })
             const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
             const images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             const prompt = buildCaptionPrompt(styleLines, transcript, tr)
@@ -161,16 +192,17 @@ export function BlowAutoContent({ user }: { user: User }) {
             }
           } catch { /* caption best-effort */ }
         }
-        if (!caption) caption = styleLines[Math.floor(Math.random() * styleLines.length)] ?? source.title
+        if (!caption) caption = styleLines[Math.floor(Math.random() * styleLines.length)] ?? src.title
 
         // 4) Envoi en banque (description = caption → pré-remplit le post)
         setJob(i, { status: 'saving', caption })
-        const { storagePath, thumbnailPath } = await uploadVideoFromPath(outPath, scope)
-        const title = `${source.title || tag} · auto ${i + 1}`
+        const { storagePath, thumbnailPath } = await uploadVideoFromPath(outRef, scope)
+        const baseTag = sourceMode === 'bank' ? tag : (name.trim() || 'autocontent')
+        const title = `${src.title || baseTag} · auto ${i + 1}`
         const { error } = await supabase.from('content_bank').insert({
           user_id: user.id, org_id: currentOrg?.id ?? null,
           title, file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
-          tags: Array.from(new Set([tag, 'autocontent'])), notes: caption, description: caption,
+          tags: Array.from(new Set([baseTag, 'autocontent'].filter(Boolean))), notes: caption, description: caption,
         })
         if (error) throw new Error(error.message)
         logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'autocontent' } })
@@ -178,6 +210,8 @@ export function BlowAutoContent({ user }: { user: User }) {
         setJob(i, { status: 'done', caption })
       } catch (e) {
         setJob(i, { status: 'error', error: e instanceof Error ? e.message : String(e) })
+      } finally {
+        revoke?.()
       }
     }
     setRunning(false)
@@ -186,7 +220,7 @@ export function BlowAutoContent({ user }: { user: User }) {
   // ── Rendu ──────────────────────────────────────────────────────────────────
   const doneCount = jobs.filter(j => j.status === 'done').length
   const errCount = jobs.filter(j => j.status === 'error').length
-  const canGenerate = hasNative && !!tag && poolFor(tag).length > 0 && count > 0 && !running
+  const canGenerate = !running && count > 0 && (sourceMode === 'bank' ? (!!tag && poolFor(tag).length > 0) : uploads.length > 0)
 
   return (
     <>
@@ -196,9 +230,9 @@ export function BlowAutoContent({ user }: { user: User }) {
         action={<BlowBadge tone="gold">✦ {tr('VIP', 'VIP')}</BlowBadge>}
       />
 
-      {!hasNative && (
-        <BlowCard style={{ padding: 16, marginBottom: 18, borderColor: 'rgba(248,113,113,0.4)' }}>
-          <p style={{ margin: 0, color: '#FCA5A5', fontSize: 13 }}>{tr('L\'Auto-contenu nécessite l\'app desktop (traitement vidéo natif).', 'Auto-content requires the desktop app (native video processing).')}</p>
+      {isWeb && (
+        <BlowCard style={{ padding: 14, marginBottom: 18, borderColor: 'rgba(233,196,106,0.35)' }}>
+          <p style={{ margin: 0, color: GOLD, fontSize: 12.5 }}>{tr('Web : le traitement vidéo passe par le serveur/navigateur (plus lent). Pour la vitesse max, utilise l\'app desktop.', 'Web: video processing runs via server/browser (slower). For max speed use the desktop app.')}</p>
         </BlowCard>
       )}
 
@@ -208,21 +242,54 @@ export function BlowAutoContent({ user }: { user: User }) {
           <SectionLabel>{tr('1 · Type de vidéo (recette)', '1 · Video type (recipe)')}</SectionLabel>
           <input value={name} onChange={e => setName(e.target.value)} placeholder={tr('Nom du type (ex : POV motivation)', 'Type name (e.g. POV motivation)')} style={inp} />
 
-          <SectionLabel style={{ marginTop: 18 }}>{tr('2 · Clips source (tag de la banque)', '2 · Source clips (bank tag)')}</SectionLabel>
-          {allTags.length === 0
-            ? <p style={{ fontSize: 12.5, color: MUTED, margin: '2px 0 0' }}>{tr('Aucun tag dans la banque. Tague d\'abord tes clips bruts.', 'No tags in the bank. Tag your raw clips first.')}</p>
-            : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {allTags.map(t => {
-                  const on = tag === t
-                  return (
-                    <button key={t} onClick={() => setTag(t)} className="blow-tap"
-                      style={{ fontSize: 12, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer',
-                        border: `1px solid ${on ? 'rgba(168,85,247,0.6)' : HAIR}`, background: on ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)', color: on ? '#E9D5FF' : MUTED }}>
-                      #{t} <span style={{ opacity: 0.6 }}>· {poolFor(t).length}</span>
-                    </button>
-                  )
-                })}
-              </div>}
+          <SectionLabel style={{ marginTop: 18 }}>{tr('2 · Clips source', '2 · Source clips')}</SectionLabel>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {(['bank', 'upload'] as const).map(m => (
+              <button key={m} onClick={() => setSourceMode(m)} className="blow-tap"
+                style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 9, cursor: 'pointer',
+                  border: `1px solid ${sourceMode === m ? 'rgba(168,85,247,0.6)' : HAIR}`, background: sourceMode === m ? 'rgba(168,85,247,0.18)' : 'transparent', color: sourceMode === m ? '#E9D5FF' : MUTED }}>
+                {m === 'bank' ? tr('Depuis la banque', 'From bank') : tr('Mes vidéos (upload)', 'My videos (upload)')}
+              </button>
+            ))}
+          </div>
+          {sourceMode === 'bank' ? (
+            allTags.length === 0
+              ? <p style={{ fontSize: 12.5, color: MUTED, margin: '2px 0 0' }}>{tr('Aucun tag dans la banque. Tague tes clips, ou passe en « Mes vidéos ».', 'No tags in the bank. Tag your clips, or switch to "My videos".')}</p>
+              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {allTags.map(t => {
+                    const on = tag === t
+                    return (
+                      <button key={t} onClick={() => setTag(t)} className="blow-tap"
+                        style={{ fontSize: 12, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer',
+                          border: `1px solid ${on ? 'rgba(168,85,247,0.6)' : HAIR}`, background: on ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)', color: on ? '#E9D5FF' : MUTED }}>
+                        #{t} <span style={{ opacity: 0.6 }}>· {poolFor(t).length}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+          ) : (
+            <div>
+              <label className="blow-tap" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 20, borderRadius: 12, border: `1px dashed ${HAIR}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', textAlign: 'center' }}>
+                <input type="file" accept="video/*" multiple style={{ display: 'none' }}
+                  onChange={e => { const fs = Array.from(e.target.files ?? []); if (fs.length) setUploads(u => [...u, ...fs]); e.currentTarget.value = '' }} />
+                <span style={{ fontSize: 22 }}>⬆️</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: INK }}>{tr('Choisis tes vidéos originales', 'Pick your original videos')}</span>
+                <span style={{ fontSize: 11.5, color: MUTED }}>{tr('MP4/MOV — plusieurs à la fois', 'MP4/MOV — multiple at once')}</span>
+              </label>
+              {uploads.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                  {uploads.map((f, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: `1px solid ${HAIR}` }}>
+                      <span style={{ fontSize: 12, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{f.name}</span>
+                      <span style={{ fontSize: 10.5, color: MUTED, whiteSpace: 'nowrap' }}>{(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                      <button onClick={() => setUploads(u => u.filter((_, j) => j !== idx))} style={{ background: 'none', border: 'none', color: '#F87171', cursor: 'pointer', fontSize: 14 }}>×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => setUploads([])} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 11.5 }}>{tr('Tout retirer', 'Clear all')}</button>
+                </div>
+              )}
+            </div>
+          )}
 
           <SectionLabel style={{ marginTop: 18 }}>{tr('3 · Ton style de caption (colle 5-10 exemples qui ont marché — texte, une fois)', '3 · Your caption style (paste 5-10 winning examples — text, once)')}</SectionLabel>
           <textarea value={style} onChange={e => setStyle(e.target.value)} rows={6}
