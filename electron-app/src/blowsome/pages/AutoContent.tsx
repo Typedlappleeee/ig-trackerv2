@@ -188,8 +188,8 @@ export function BlowAutoContent({ user }: { user: User }) {
               const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
               images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             }
-            // « POV : ta coloc » par défaut ; « je » seulement si le mec parle (transcript présent).
-            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, !!transcript.trim(), tr)
+            // Toujours « POV : ta coloc … » (le format signature).
+            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, false, tr)
             const content: unknown[] = images.length > 0 ? [...images, { type: 'text', text: prompt }] : [{ type: 'text', text: prompt }]
             const vRes = await window.electronAPI.anthropicVisionRequest({ apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 200, messages: [{ role: 'user', content }] })
             if (vRes?.ok) {
