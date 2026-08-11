@@ -24,6 +24,7 @@ interface Recipe {
   intensity: Intensity
   burnText?: boolean     // écrire la caption sur la vidéo
   textPos?: 'top' | 'middle' | 'bottom'
+  spice?: 'soft' | 'medium'   // intensité du sous-entendu (contenu suggestif)
 }
 type JobStatus = 'queued' | 'clip' | 'reframe' | 'transcribe' | 'caption' | 'overlay' | 'saving' | 'done' | 'error'
 interface GenJob { i: number; status: JobStatus; sourceTitle?: string; caption?: string; error?: string }
@@ -62,6 +63,7 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [intensity, setIntensity] = useState<Intensity>('medium')
   const [burnText, setBurnText] = useState(true)
   const [textPos, setTextPos] = useState<'top' | 'middle' | 'bottom'>('bottom')
+  const [spice, setSpice] = useState<'soft' | 'medium'>('soft')
 
   const [jobs, setJobs] = useState<GenJob[]>([])
   const [running, setRunning] = useState(false)
@@ -88,14 +90,14 @@ export function BlowAutoContent({ user }: { user: User }) {
   const allTags = useMemo(() => Array.from(new Set(items.flatMap(i => i.tags ?? []).filter(Boolean))).sort(), [items])
   const poolFor = (t: string) => items.filter(i => (i.tags ?? []).includes(t))
 
-  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setIntensity('medium'); setBurnText(true); setTextPos('bottom') }
+  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setIntensity('medium'); setBurnText(true); setTextPos('bottom'); setSpice('soft') }
   function loadRecipe(r: Recipe) {
     setEditingId(r.id); setName(r.name); setTag(r.tag); setCount(r.count); setStyle(r.style)
-    setUseTranscript(r.useTranscript); setIntensity(r.intensity); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'middle')
+    setUseTranscript(r.useTranscript); setIntensity(r.intensity); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'bottom'); setSpice(r.spice ?? 'soft')
   }
   function persistRecipe() {
     if (!name.trim() || !tag) return
-    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, intensity, burnText, textPos }
+    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, intensity, burnText, textPos, spice }
     const next = editingId ? recipes.map(x => x.id === editingId ? r : x) : [...recipes, r]
     setRecipes(next); saveRecipes(next); setEditingId(r.id)
   }
@@ -196,7 +198,7 @@ export function BlowAutoContent({ user }: { user: User }) {
               const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
               images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             }
-            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, tr)
+            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, tr)
             const content: unknown[] = images.length > 0 ? [...images, { type: 'text', text: prompt }] : [{ type: 'text', text: prompt }]
             const vRes = await window.electronAPI.anthropicVisionRequest({ apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 200, messages: [{ role: 'user', content }] })
             if (vRes?.ok) {
@@ -350,6 +352,17 @@ export function BlowAutoContent({ user }: { user: User }) {
               ))}
             </div>
           )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Sous-entendu', 'Innuendo')}</span>
+            {(['soft', 'medium'] as const).map(v => (
+              <button key={v} onClick={() => setSpice(v)} className="blow-tap"
+                style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                  border: `1px solid ${spice === v ? 'rgba(168,85,247,0.6)' : HAIR}`, background: spice === v ? 'rgba(168,85,247,0.18)' : 'transparent', color: spice === v ? '#E9D5FF' : MUTED }}>
+                {v === 'soft' ? tr('Soft', 'Soft') : tr('Medium', 'Medium')}
+              </button>
+            ))}
+            <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('(taquin/ambigu, jamais explicite)', '(teasing/ambiguous, never explicit)')}</span>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Unicité', 'Uniqueness')}</span>
@@ -441,18 +454,24 @@ export function BlowAutoContent({ user }: { user: User }) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, tr: (fr: string, en: string) => string): string {
+function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
+  const spiceLine = spice === 'medium'
+    ? tr('Touche taquine & suggestive ASSUMÉE mais IMPLICITE (double sens, sous-entendu) — jamais explicite, jamais vulgaire, aucun mot cru ni allusion au corps. Le sous-entendu vient de la vidéo, le texte reste ambigu (« elle sait ce qu\'elle fait », « zéro limite », « trop à l\'aise »).',
+         'A clearly teasing & suggestive but IMPLICIT touch (double meaning) — never explicit, never vulgar, no crude words or body references. The innuendo comes from the video; the text stays ambiguous ("she knows what she\'s doing", "zero limits", "too comfortable").')
+    : tr('Légère touche taquine/ambiguë, TRÈS soft — un simple « hmm 👀 ». Jamais explicite, jamais vulgaire, aucun mot cru. Le sous-entendu vient de la vidéo, pas du texte.',
+         'A light teasing/ambiguous touch, VERY soft — just a "hmm 👀". Never explicit, never vulgar, no crude words. The innuendo comes from the video, not the text.')
   return [
     tr('Tu écris UN hook POV COURT à afficher SUR une vidéo (texte à l\'écran). Réponds UNIQUEMENT par le hook, rien d\'autre.', 'Write ONE SHORT POV hook to display ON a video (on-screen text). Reply with ONLY the hook, nothing else.'),
-    tr('Style : réaction VAGUE (question ou remarque), pas descriptif. Exemples du ton exact voulu : « Elle faisait quoi là ? », « Elle est sérieuse là ? », « J\'ai bien vu ce que j\'ai vu ? », « POV : ta coloc est un peu spéciale ».',
-       'Style: VAGUE reaction (a question or remark), not descriptive. Examples of the exact tone: "What was she even doing?", "Is she serious right now?", "Did I really just see that?", "POV: your roommate is a little special".'),
-    tr('Règles STRICTES : très court (≈ 4 à 8 mots, UNE phrase). Reste VAGUE — ne décris PAS ce qui se passe précisément dans la vidéo (ça doit pouvoir coller à plein de situations). Garde le MÊME cadre/personnage que les exemples ci-dessous (ex. « coloc » reste « coloc », jamais « amie »). PAS de hashtags, PAS de guillemets, peu ou pas d\'emoji.',
-       'STRICT rules: very short (≈ 4 to 8 words, ONE sentence). Stay VAGUE — do NOT describe exactly what happens in the video (it must fit many situations). Keep the SAME framing/character as the examples below (e.g. "roommate" stays "roommate", never "friend"). NO hashtags, NO quotes, little or no emoji.'),
+    tr('Style : réaction VAGUE (question ou remarque), pas descriptif. Exemples du ton exact voulu : « Elle fait exprès ou pas ? », « Ma coloc a zéro limite », « Elle sait très bien ce qu\'elle fait », « POV : ta coloc est un peu spéciale ».',
+       'Style: VAGUE reaction (question or remark), not descriptive. Examples of the exact tone: "Is she doing it on purpose?", "My roommate has zero limits", "She knows exactly what she\'s doing", "POV: your roommate is a little special".'),
+    spiceLine,
+    tr('Règles STRICTES : très court (≈ 4 à 8 mots, UNE phrase). Reste VAGUE — ne décris PAS ce qui se passe précisément (ça doit coller à plein de situations). Garde le MÊME cadre/personnage que MES exemples (ex. « coloc » reste « coloc », jamais « amie »). PAS de hashtags, PAS de guillemets.',
+       'STRICT rules: very short (≈ 4 to 8 words, ONE sentence). Stay VAGUE — do NOT describe exactly what happens (must fit many situations). Keep the SAME framing/character as MY examples (e.g. "roommate" stays "roommate", never "friend"). NO hashtags, NO quotes.'),
     tr('Imite le TON et le cadre de MES hooks :', 'Match the TONE and framing of MY hooks:'),
     examples,
     transcript ? tr('Contexte (ambiance seulement, ne le décris pas) — ce qui est dit :', 'Context (mood only, do not describe it) — what is said:') + `\n"""${transcript.slice(0, 500)}"""` : '',
-    tr('Choisis la réaction vague qui colle le mieux à l\'ambiance, dans mon style.', 'Pick the vague reaction that best fits the mood, in my style.'),
+    tr('Choisis la réaction vague et taquine qui colle le mieux à l\'ambiance, dans mon style.', 'Pick the vague, teasing reaction that best fits the mood, in my style.'),
   ].filter(Boolean).join('\n\n')
 }
 
