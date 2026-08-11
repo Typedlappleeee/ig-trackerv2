@@ -61,7 +61,7 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [useTranscript, setUseTranscript] = useState(true)
   const [intensity, setIntensity] = useState<Intensity>('medium')
   const [burnText, setBurnText] = useState(true)
-  const [textPos, setTextPos] = useState<'top' | 'middle' | 'bottom'>('middle')
+  const [textPos, setTextPos] = useState<'top' | 'middle' | 'bottom'>('bottom')
 
   const [jobs, setJobs] = useState<GenJob[]>([])
   const [running, setRunning] = useState(false)
@@ -88,7 +88,7 @@ export function BlowAutoContent({ user }: { user: User }) {
   const allTags = useMemo(() => Array.from(new Set(items.flatMap(i => i.tags ?? []).filter(Boolean))).sort(), [items])
   const poolFor = (t: string) => items.filter(i => (i.tags ?? []).includes(t))
 
-  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setIntensity('medium'); setBurnText(true); setTextPos('middle') }
+  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setIntensity('medium'); setBurnText(true); setTextPos('bottom') }
   function loadRecipe(r: Recipe) {
     setEditingId(r.id); setName(r.name); setTag(r.tag); setCount(r.count); setStyle(r.style)
     setUseTranscript(r.useTranscript); setIntensity(r.intensity); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'middle')
@@ -326,7 +326,7 @@ export function BlowAutoContent({ user }: { user: User }) {
 
           <SectionLabel style={{ marginTop: 18 }}>{tr('3 · Ton style de caption (colle 5-10 exemples qui ont marché — texte, une fois)', '3 · Your caption style (paste 5-10 winning examples — text, once)')}</SectionLabel>
           <textarea value={style} onChange={e => setStyle(e.target.value)} rows={6}
-            placeholder={tr('Une caption par ligne…\nPOV: tu réalises que…\nPersonne te le dira mais…', 'One caption per line…\nPOV: you realize that…\nNobody will tell you but…')}
+            placeholder={tr('Un hook par ligne (vague, réaction)…\nElle faisait quoi là ?\nElle est sérieuse là ?\nPOV : ta coloc est un peu spéciale', 'One hook per line (vague, reaction)…\nWhat was she even doing?\nIs she serious right now?\nPOV: your roommate is a little special')}
             style={{ ...inp, resize: 'vertical', minHeight: 120, fontFamily: 'inherit', lineHeight: 1.6 }} />
 
           <SectionLabel style={{ marginTop: 18 }}>{tr('4 · Options', '4 · Options')}</SectionLabel>
@@ -443,18 +443,16 @@ export function BlowAutoContent({ user }: { user: User }) {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
-  const closing = hasImages
-    ? tr('Regarde les images fournies (ce que la vidéo MONTRE) et écris le hook adapté à CETTE vidéo.', 'Look at the provided images (what the video SHOWS) and write the hook for THIS video.')
-    : transcript
-      ? tr('Base-toi sur la transcription ci-dessus pour écrire le hook adapté à cette vidéo.', 'Base the hook on the transcript above, tailored to this video.')
-      : tr('Écris un hook dans ce style (pas d\'autre info sur la vidéo).', 'Write a hook in this style (no other info about the video).')
   return [
     tr('Tu écris UN hook POV COURT à afficher SUR une vidéo (texte à l\'écran). Réponds UNIQUEMENT par le hook, rien d\'autre.', 'Write ONE SHORT POV hook to display ON a video (on-screen text). Reply with ONLY the hook, nothing else.'),
-    tr('Règles : très court (≈ 4 à 10 mots, une seule phrase), percutant, PAS de hashtags, PAS de guillemets, peu ou pas d\'emoji.', 'Rules: very short (≈ 4 to 10 words, a single sentence), punchy, NO hashtags, NO quotes, little or no emoji.'),
-    tr('Imite le TON de ces hooks qui ont marché :', 'Match the TONE of these winning hooks:'),
+    tr('Style : réaction VAGUE (question ou remarque), pas descriptif. Exemples du ton exact voulu : « Elle faisait quoi là ? », « Elle est sérieuse là ? », « J\'ai bien vu ce que j\'ai vu ? », « POV : ta coloc est un peu spéciale ».',
+       'Style: VAGUE reaction (a question or remark), not descriptive. Examples of the exact tone: "What was she even doing?", "Is she serious right now?", "Did I really just see that?", "POV: your roommate is a little special".'),
+    tr('Règles STRICTES : très court (≈ 4 à 8 mots, UNE phrase). Reste VAGUE — ne décris PAS ce qui se passe précisément dans la vidéo (ça doit pouvoir coller à plein de situations). Garde le MÊME cadre/personnage que les exemples ci-dessous (ex. « coloc » reste « coloc », jamais « amie »). PAS de hashtags, PAS de guillemets, peu ou pas d\'emoji.',
+       'STRICT rules: very short (≈ 4 to 8 words, ONE sentence). Stay VAGUE — do NOT describe exactly what happens in the video (it must fit many situations). Keep the SAME framing/character as the examples below (e.g. "roommate" stays "roommate", never "friend"). NO hashtags, NO quotes, little or no emoji.'),
+    tr('Imite le TON et le cadre de MES hooks :', 'Match the TONE and framing of MY hooks:'),
     examples,
-    transcript ? tr('Ce qui est DIT dans la vidéo :', 'What is SAID in the video:') + `\n"""${transcript.slice(0, 800)}"""` : '',
-    closing,
+    transcript ? tr('Contexte (ambiance seulement, ne le décris pas) — ce qui est dit :', 'Context (mood only, do not describe it) — what is said:') + `\n"""${transcript.slice(0, 500)}"""` : '',
+    tr('Choisis la réaction vague qui colle le mieux à l\'ambiance, dans mon style.', 'Pick the vague reaction that best fits the mood, in my style.'),
   ].filter(Boolean).join('\n\n')
 }
 
