@@ -183,7 +183,9 @@ export function BlowAutoContent({ user }: { user: User }) {
               const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
               images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             }
-            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, tr)
+            // Format imposé par vidéo : ~60% « POV : ta coloc… » (la marque), ~40% « je/ma coloc ».
+            const fmt: 'A' | 'B' = Math.random() < 0.6 ? 'A' : 'B'
+            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, fmt, tr)
             const content: unknown[] = images.length > 0 ? [...images, { type: 'text', text: prompt }] : [{ type: 'text', text: prompt }]
             const vRes = await window.electronAPI.anthropicVisionRequest({ apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 200, messages: [{ role: 'user', content }] })
             if (vRes?.ok) {
@@ -425,24 +427,32 @@ export function BlowAutoContent({ user }: { user: User }) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', tr: (fr: string, en: string) => string): string {
+function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', format: 'A' | 'B', tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
   const spiceLine = spice === 'medium'
     ? tr('Touche taquine & suggestive ASSUMÉE mais IMPLICITE (double sens, sous-entendu) — jamais explicite, jamais vulgaire, aucun mot cru ni allusion au corps. Le sous-entendu vient de la vidéo, le texte reste ambigu (« elle sait ce qu\'elle fait », « zéro limite », « trop à l\'aise »).',
          'A clearly teasing & suggestive but IMPLICIT touch (double meaning) — never explicit, never vulgar, no crude words or body references. The innuendo comes from the video; the text stays ambiguous ("she knows what she\'s doing", "zero limits", "too comfortable").')
     : tr('Légère touche taquine/ambiguë, TRÈS soft — un simple « hmm 👀 ». Jamais explicite, jamais vulgaire, aucun mot cru. Le sous-entendu vient de la vidéo, pas du texte.',
          'A light teasing/ambiguous touch, VERY soft — just a "hmm 👀". Never explicit, never vulgar, no crude words. The innuendo comes from the video, not the text.')
+  // Un SEUL format imposé par hook (tiré au sort en amont) → les deux styles
+  // ressortent sur l'ensemble des vidéos, chacun cohérent, jamais mélangés.
+  const perspective = format === 'A'
+    ? tr('FORMAT IMPOSÉ — commence EXACTEMENT par « POV : ta coloc … » puis décris SON comportement à ELLE (le spectateur est le mec). N\'utilise PAS « je ». Ex : « POV : ta coloc connaît pas la gêne », « POV : ta coloc a zéro limite ».',
+         'REQUIRED FORMAT — start EXACTLY with "POV: your roommate …" then describe HER behavior (the viewer is the guy). Do NOT use "I". E.g. "POV: your roommate has no shame", "POV: your roommate has zero limits".')
+    : tr('FORMAT IMPOSÉ — 1re personne, le mec parle de SA coloc : « ma coloc / elle / j\'ai / je ». N\'utilise PAS « ta coloc » ni « POV : ». Ex : « Ma coloc a zéro limite », « Elle sait très bien ce qu\'elle fait ».',
+         'REQUIRED FORMAT — 1st person, the guy talks about HIS roommate: "my roommate / she / I". Do NOT use "your roommate" or "POV:". E.g. "My roommate has zero limits", "She knows exactly what she\'s doing".')
   return [
     tr('Tu écris UN hook POV COURT à afficher SUR une vidéo (texte à l\'écran). Réponds UNIQUEMENT par le hook, rien d\'autre.', 'Write ONE SHORT POV hook to display ON a video (on-screen text). Reply with ONLY the hook, nothing else.'),
-    tr('PERSPECTIVE : le narrateur est TOUJOURS le mec qui filme (le coloc), qui réagit à sa coloc (une fille). Garde UNE perspective COHÉRENTE par hook — ne CONFONDS pas les deux angles :\n  A) « POV : ta coloc [comportement à ELLE] » — on décrit ELLE, le spectateur est le mec. Ex : « POV : ta coloc connaît pas la gêne ».\n  B) 1re personne — le mec parle : « ma coloc / elle / j\'ai / je ». Ex : « Ma coloc a zéro limite ».\nNE MÉLANGE JAMAIS les deux : pas de « je » + « ta coloc » ensemble, et surtout la fille n\'agit JAMAIS envers le spectateur (interdit : « ta coloc TE remercie », « elle te… »). C\'est le mec qui réagit ; la fille est juste le sujet. Contre-exemple à NE PAS produire : « POV : ta coloc te remercie à sa manière ».',
-       'PERSPECTIVE: the narrator is ALWAYS the guy filming (the roommate), reacting to his female roommate (a girl). Keep ONE COHERENT perspective per hook — do NOT confuse the two angles:\n  A) "POV: your roommate [HER behavior]" — describing HER, viewer = the guy. E.g. "POV: your roommate has no shame".\n  B) 1st person — the guy speaks: "my roommate / she / I". E.g. "My roommate has zero limits".\nNEVER mix the two: no "I" + "your roommate" together, and above all the girl NEVER acts toward the viewer (forbidden: "your roommate THANKS you", "she ... you"). The guy reacts; the girl is just the subject. Counter-example NOT to produce: "POV: your roommate thanks you in her way".'),
+    perspective,
+    tr('RÈGLE : le narrateur est le mec qui filme, il RÉAGIT à sa coloc (une fille). La fille n\'agit JAMAIS envers le spectateur (interdit : « te remercie », « elle te… »). Contre-exemple à NE PAS produire : « POV : ta coloc te remercie à sa manière ».',
+       'RULE: the narrator is the guy filming, REACTING to his female roommate (a girl). The girl NEVER acts toward the viewer (forbidden: "thanks you", "she ... you"). Counter-example NOT to produce: "POV: your roommate thanks you in her way".'),
     spiceLine,
-    tr('Règles STRICTES : très court (≈ 4 à 8 mots, UNE phrase). Reste VAGUE — ne décris PAS ce qui se passe précisément (ça doit coller à plein de situations). Garde le MÊME cadre/personnage que MES exemples (ex. « coloc » reste « coloc », jamais « amie »). PAS de hashtags, PAS de guillemets.',
-       'STRICT rules: very short (≈ 4 to 8 words, ONE sentence). Stay VAGUE — do NOT describe exactly what happens (must fit many situations). Keep the SAME framing/character as MY examples (e.g. "roommate" stays "roommate", never "friend"). NO hashtags, NO quotes.'),
-    tr('Imite le TON et le cadre de MES hooks :', 'Match the TONE and framing of MY hooks:'),
+    tr('Règles STRICTES : très court (≈ 4 à 8 mots, UNE phrase). Reste VAGUE — ne décris PAS ce qui se passe précisément (ça doit coller à plein de situations). PAS de hashtags, PAS de guillemets.',
+       'STRICT rules: very short (≈ 4 to 8 words, ONE sentence). Stay VAGUE — do NOT describe exactly what happens (must fit many situations). NO hashtags, NO quotes.'),
+    tr('Imite le TON de MES hooks :', 'Match the TONE of MY hooks:'),
     examples,
     transcript ? tr('Contexte (ambiance seulement, ne le décris pas) — ce qui est dit :', 'Context (mood only, do not describe it) — what is said:') + `\n"""${transcript.slice(0, 500)}"""` : '',
-    tr('Choisis la réaction vague et taquine qui colle le mieux à l\'ambiance, dans mon style.', 'Pick the vague, teasing reaction that best fits the mood, in my style.'),
+    tr('Écris le hook vague et taquin qui colle le mieux à l\'ambiance, dans le format imposé.', 'Write the vague, teasing hook that best fits the mood, in the required format.'),
   ].filter(Boolean).join('\n\n')
 }
 
