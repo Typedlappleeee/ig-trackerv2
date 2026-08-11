@@ -10,6 +10,7 @@ import { useConnections } from '@/lib/connections'
 import { useTr } from '@/lib/i18n'
 import { logActivity } from '@/lib/activityLog'
 import { resolveContentToLocalPath, uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
+import { BankPicker } from '@/pages/Bank'
 import { useBlowCSS, BlowCard, BlowButton, BlowBadge, BlowEmpty, BlowPageHeader, Ico, ICON, INK, MUTED, HAIR, GOLD } from '../ui'
 
 interface Recipe {
@@ -51,8 +52,10 @@ export function BlowAutoContent({ user }: { user: User }) {
 
   // Formulaire (recette en cours d'édition ou nouvelle)
   const [name, setName] = useState('')
-  const [sourceMode, setSourceMode] = useState<'bank' | 'upload'>('bank')
+  const [sourceMode, setSourceMode] = useState<'bank' | 'pick' | 'upload'>('bank')
   const [uploads, setUploads] = useState<File[]>([])
+  const [pickedItems, setPickedItems] = useState<ContentItem[]>([])
+  const [showPicker, setShowPicker] = useState(false)
   const [tag, setTag] = useState('')
   const [count, setCount] = useState(10)
   const [style, setStyle] = useState('')
@@ -131,7 +134,9 @@ export function BlowAutoContent({ user }: { user: User }) {
     const srcList: Array<{ title: string; item?: ContentItem; file?: File }> =
       sourceMode === 'upload'
         ? uploads.map(f => ({ title: f.name, file: f }))
-        : [...poolFor(tag)].sort(() => Math.random() - 0.5).map(it => ({ title: it.title, item: it }))
+        : sourceMode === 'pick'
+          ? pickedItems.map(it => ({ title: it.title, item: it }))
+          : [...poolFor(tag)].sort(() => Math.random() - 0.5).map(it => ({ title: it.title, item: it }))
     if (srcList.length === 0) return
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
     const styleLines = style.split('\n').map(s => s.trim()).filter(Boolean)
@@ -183,9 +188,8 @@ export function BlowAutoContent({ user }: { user: User }) {
               const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
               images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             }
-            // Format imposé par vidéo : ~60% « POV : ta coloc… » (la marque), ~40% « je/ma coloc ».
-            const fmt: 'A' | 'B' = Math.random() < 0.6 ? 'A' : 'B'
-            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, fmt, tr)
+            // « POV : ta coloc » par défaut ; « je » seulement si le mec parle (transcript présent).
+            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, !!transcript.trim(), tr)
             const content: unknown[] = images.length > 0 ? [...images, { type: 'text', text: prompt }] : [{ type: 'text', text: prompt }]
             const vRes = await window.electronAPI.anthropicVisionRequest({ apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 200, messages: [{ role: 'user', content }] })
             if (vRes?.ok) {
@@ -240,7 +244,10 @@ export function BlowAutoContent({ user }: { user: User }) {
   // ── Rendu ──────────────────────────────────────────────────────────────────
   const doneCount = jobs.filter(j => j.status === 'done').length
   const errCount = jobs.filter(j => j.status === 'error').length
-  const canGenerate = !running && count > 0 && (sourceMode === 'bank' ? (!!tag && poolFor(tag).length > 0) : uploads.length > 0)
+  const canGenerate = !running && count > 0 && (
+    sourceMode === 'bank' ? (!!tag && poolFor(tag).length > 0)
+      : sourceMode === 'pick' ? pickedItems.length > 0
+        : uploads.length > 0)
 
   return (
     <>
@@ -263,12 +270,12 @@ export function BlowAutoContent({ user }: { user: User }) {
           <input value={name} onChange={e => setName(e.target.value)} placeholder={tr('Nom du type (ex : POV motivation)', 'Type name (e.g. POV motivation)')} style={inp} />
 
           <SectionLabel style={{ marginTop: 18 }}>{tr('2 · Clips source', '2 · Source clips')}</SectionLabel>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            {(['bank', 'upload'] as const).map(m => (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            {(['bank', 'pick', 'upload'] as const).map(m => (
               <button key={m} onClick={() => setSourceMode(m)} className="blow-tap"
                 style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 9, cursor: 'pointer',
                   border: `1px solid ${sourceMode === m ? 'rgba(168,85,247,0.6)' : HAIR}`, background: sourceMode === m ? 'rgba(168,85,247,0.18)' : 'transparent', color: sourceMode === m ? '#E9D5FF' : MUTED }}>
-                {m === 'bank' ? tr('Depuis la banque', 'From bank') : tr('Mes vidéos (upload)', 'My videos (upload)')}
+                {m === 'bank' ? tr('Par tag', 'By tag') : m === 'pick' ? tr('Choisir dans la banque', 'Pick from bank') : tr('Mes vidéos (upload)', 'My videos (upload)')}
               </button>
             ))}
           </div>
@@ -287,6 +294,23 @@ export function BlowAutoContent({ user }: { user: User }) {
                     )
                   })}
                 </div>
+          ) : sourceMode === 'pick' ? (
+            <div>
+              <button onClick={() => setShowPicker(true)} className="blow-tap"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 11, cursor: 'pointer', border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 13, fontWeight: 700 }}>
+                <Ico d={ICON.folder} size={15} /> {pickedItems.length > 0 ? tr(`${pickedItems.length} vidéo(s) choisie(s) — modifier`, `${pickedItems.length} video(s) picked — edit`) : tr('Choisir des vidéos…', 'Pick videos…')}
+              </button>
+              {pickedItems.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                  {pickedItems.map(it => (
+                    <span key={it.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, padding: '4px 9px', borderRadius: 99, background: 'rgba(255,255,255,0.05)', border: `1px solid ${HAIR}`, color: MUTED, maxWidth: 220 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</span>
+                      <button onClick={() => setPickedItems(p => p.filter(x => x.id !== it.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F87171', padding: 0, display: 'flex' }}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <div>
               <label className="blow-tap" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 20, borderRadius: 12, border: `1px dashed ${HAIR}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', textAlign: 'center' }}>
@@ -422,25 +446,35 @@ export function BlowAutoContent({ user }: { user: User }) {
           </BlowCard>
         </div>
       </div>
+
+      {showPicker && (
+        <BankPicker
+          user={user}
+          mode="multi"
+          resolveMode="signed-url"
+          onSelect={(_paths, _titles, _descs, items) => { if (items && items.length) setPickedItems(items); setShowPicker(false) }}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
     </>
   )
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', format: 'A' | 'B', tr: (fr: string, en: string) => string): string {
+function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', hasSpeech: boolean, tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
   const spiceLine = spice === 'medium'
     ? tr('Touche taquine & suggestive ASSUMÉE mais IMPLICITE (double sens, sous-entendu) — jamais explicite, jamais vulgaire, aucun mot cru ni allusion au corps. Le sous-entendu vient de la vidéo, le texte reste ambigu (« elle sait ce qu\'elle fait », « zéro limite », « trop à l\'aise »).',
          'A clearly teasing & suggestive but IMPLICIT touch (double meaning) — never explicit, never vulgar, no crude words or body references. The innuendo comes from the video; the text stays ambiguous ("she knows what she\'s doing", "zero limits", "too comfortable").')
     : tr('Légère touche taquine/ambiguë, TRÈS soft — un simple « hmm 👀 ». Jamais explicite, jamais vulgaire, aucun mot cru. Le sous-entendu vient de la vidéo, pas du texte.',
          'A light teasing/ambiguous touch, VERY soft — just a "hmm 👀". Never explicit, never vulgar, no crude words. The innuendo comes from the video, not the text.')
-  // Un SEUL format imposé par hook (tiré au sort en amont) → les deux styles
-  // ressortent sur l'ensemble des vidéos, chacun cohérent, jamais mélangés.
-  const perspective = format === 'A'
-    ? tr('FORMAT IMPOSÉ — commence EXACTEMENT par « POV : ta coloc … » puis décris SON comportement à ELLE (le spectateur est le mec). N\'utilise PAS « je ». Ex : « POV : ta coloc connaît pas la gêne », « POV : ta coloc a zéro limite ».',
-         'REQUIRED FORMAT — start EXACTLY with "POV: your roommate …" then describe HER behavior (the viewer is the guy). Do NOT use "I". E.g. "POV: your roommate has no shame", "POV: your roommate has zero limits".')
-    : tr('FORMAT IMPOSÉ — 1re personne, le mec parle de SA coloc : « ma coloc / elle / j\'ai / je ». N\'utilise PAS « ta coloc » ni « POV : ». Ex : « Ma coloc a zéro limite », « Elle sait très bien ce qu\'elle fait ».',
-         'REQUIRED FORMAT — 1st person, the guy talks about HIS roommate: "my roommate / she / I". Do NOT use "your roommate" or "POV:". E.g. "My roommate has zero limits", "She knows exactly what she\'s doing".')
+  // Format PAR DÉFAUT = « POV : ta coloc … ». Exception « je » UNIQUEMENT si le mec
+  // (voix masculine) parle dans la vidéo → on retranscrit SA réaction en « je ».
+  const perspective = hasSpeech
+    ? tr('FORMAT : par DÉFAUT commence par « POV : ta coloc … » et décris SON comportement à ELLE. EXCEPTION : si la transcription ci-dessous est clairement LE MEC (voix masculine) qui parle/réagit, alors écris plutôt à la 1re personne « je » ce qu\'IL dit/ressent (SANS « POV : ta coloc », SANS « ma coloc »). Pour juger le genre : accords masculins en français (« je suis choqué », « t\'es sérieuse »), un gars qui commente sa coloc. Si c\'est la fille qui parle, ou si c\'est pas clair → « POV : ta coloc … ». Ex « je » : « Je peux plus la calculer », « T\'es sérieuse là ? », « J\'hallucine ».',
+         'FORMAT: by DEFAULT start with "POV: your roommate …" and describe HER behavior. EXCEPTION: if the transcript below is clearly THE GUY (male voice) speaking/reacting, then instead write in the 1st person "I" what HE says/feels (NO "POV: your roommate", NO "my roommate"). To judge gender: French masculine agreement, a guy commenting on his roommate. If it\'s the girl speaking, or unclear → "POV: your roommate …". "I" examples: "I can\'t deal with her anymore", "Are you serious right now?", "I\'m losing it".')
+    : tr('FORMAT : « POV : ta coloc [comportement à ELLE] » — TOUJOURS. Commence par « POV : ta coloc … ». N\'utilise PAS « je » ni « ma coloc ». Ex : « POV : ta coloc connaît pas la gêne », « POV : ta coloc a zéro limite ».',
+         'FORMAT: "POV: your roommate [HER behavior]" — ALWAYS. Start with "POV: your roommate …". Do NOT use "I" or "my roommate". E.g. "POV: your roommate has no shame", "POV: your roommate has zero limits".')
   return [
     tr('Tu écris UN hook POV COURT à afficher SUR une vidéo (texte à l\'écran). Réponds UNIQUEMENT par le hook, rien d\'autre.', 'Write ONE SHORT POV hook to display ON a video (on-screen text). Reply with ONLY the hook, nothing else.'),
     perspective,
