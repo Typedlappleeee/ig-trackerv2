@@ -25,7 +25,7 @@ interface Recipe {
   spice?: 'soft' | 'medium'   // intensité du sous-entendu (contenu suggestif)
 }
 type JobStatus = 'queued' | 'clip' | 'reframe' | 'transcribe' | 'caption' | 'overlay' | 'saving' | 'done' | 'error'
-interface GenJob { i: number; status: JobStatus; sourceTitle?: string; caption?: string; error?: string }
+interface GenJob { i: number; status: JobStatus; sourceTitle?: string; caption?: string; error?: string; noCtx?: boolean }
 
 const RECIPES_KEY = 'sf-blow-autocontent-recipes'
 const loadRecipes = (): Recipe[] => { try { const a = JSON.parse(localStorage.getItem(RECIPES_KEY) || '[]'); return Array.isArray(a) ? a : [] } catch { return [] } }
@@ -180,14 +180,16 @@ export function BlowAutoContent({ user }: { user: User }) {
         // images dans le prompt QUE si on en a (sinon l'IA répond « je ne vois pas »).
         setJob(i, { status: 'caption' })
         let caption = ''
+        let gotFrames = 0
         if (conns.anthropic && window.electronAPI?.anthropicVisionRequest) {
           try {
             let images: Array<{ type: 'image'; source: { type: 'base64'; media_type: 'image/jpeg'; data: string } }> = []
             if (window.electronAPI.extractFrames) {
-              const fr = await window.electronAPI.extractFrames({ filePath: mediaRef, endTime: 5, fps: 0.5 })
-              const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
+              const fr = await window.electronAPI.extractFrames({ filePath: mediaRef, endTime: 10, fps: 0.7 })
+              const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 6) : []
               images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             }
+            gotFrames = images.length
             // Toujours « POV : ta coloc … » ; angle de réaction tiré au sort → évite les
             // formulations répétées (chaque hook est un appel indépendant, sinon ça converge).
             const ANGLES = ['la surprise', 'l\'agacement léger', 'l\'amusement', 'la gêne', 'le défi / la provoc', 'la résignation', 'l\'incrédulité', 'l\'admiration à contrecœur', 'le « j\'y crois pas »', 'la lassitude', 'la jalousie taquine', 'le fatalisme']
@@ -241,7 +243,7 @@ export function BlowAutoContent({ user }: { user: User }) {
         if (error) throw new Error(error.message)
         logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'autocontent' } })
 
-        setJob(i, { status: 'done', caption })
+        setJob(i, { status: 'done', caption, noCtx: gotFrames === 0 && !transcript.trim() })
       } catch (e) {
         setJob(i, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
@@ -441,6 +443,7 @@ export function BlowAutoContent({ user }: { user: User }) {
                           </span>
                         </div>
                         {j.caption && j.status === 'done' && <p style={{ margin: '5px 0 0', fontSize: 11, color: MUTED, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{j.caption}</p>}
+                        {j.noCtx && j.status === 'done' && <p style={{ margin: '3px 0 0', fontSize: 10, color: GOLD }}>{tr('⚠ vidéo non analysée (ni image ni son) — caption générique', '⚠ video not analyzed (no frame/audio) — generic caption')}</p>}
                         {j.error && <p style={{ margin: '5px 0 0', fontSize: 11, color: '#F87171' }}>{j.error}</p>}
                       </div>
                     ))}
@@ -485,15 +488,17 @@ function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages:
          'FORMAT: "POV: your roommate [HER behavior]" — ALWAYS. Start with "POV: your roommate …". Do NOT use "I" or "my roommate". E.g. "POV: your roommate has no shame", "POV: your roommate has zero limits".')
   return [
     tr('Tu écris UN hook POV COURT à afficher SUR une vidéo (texte à l\'écran). Réponds UNIQUEMENT par le hook, rien d\'autre.', 'Write ONE SHORT POV hook to display ON a video (on-screen text). Reply with ONLY the hook, nothing else.'),
+    tr('REGARDE ATTENTIVEMENT les images (et écoute la transcription si fournie), puis réagis à CE QU\'ELLE FAIT dans CETTE vidéo précise. Le hook doit avoir un RAPPORT clair avec la vidéo — chaque vidéo = un hook DIFFÉRENT et pertinent, jamais un hook générique passe-partout.',
+       'LOOK CAREFULLY at the images (and read the transcript if provided), then react to WHAT SHE DOES in THIS specific video. The hook must clearly RELATE to the video — each video = a DIFFERENT, relevant hook, never a generic catch-all.'),
     perspective,
     tr('RÈGLE : le narrateur est le mec qui filme, il RÉAGIT à sa coloc (une fille). La fille n\'agit JAMAIS envers le spectateur (interdit : « te remercie », « elle te… »). Contre-exemple à NE PAS produire : « POV : ta coloc te remercie à sa manière ».',
        'RULE: the narrator is the guy filming, REACTING to his female roommate (a girl). The girl NEVER acts toward the viewer (forbidden: "thanks you", "she ... you"). Counter-example NOT to produce: "POV: your roommate thanks you in her way".'),
     spiceLine,
-    tr('Règles STRICTES : UNE phrase COMPLÈTE et qui a du SENS (ne finis jamais en plein milieu), courte (≈ 4 à 9 mots). Reste VAGUE — ne décris PAS ce qui se passe précisément (ça doit coller à plein de situations). AUCUN emoji. N\'utilise JAMAIS « hmm ». PAS de hashtags, PAS de guillemets.',
-       'STRICT rules: ONE COMPLETE sentence that MAKES SENSE (never cut off mid-way), short (≈ 4 to 9 words). Stay VAGUE — do NOT describe exactly what happens (must fit many situations). NO emoji at all. NEVER use "hmm". NO hashtags, NO quotes.'),
-    tr('Imite le TON de MES hooks :', 'Match the TONE of MY hooks:'),
+    tr('Règles STRICTES : UNE phrase COMPLÈTE et qui a du SENS (jamais coupée), courte (≈ 4 à 9 mots). Le hook doit être PERTINENT pour cette vidéo (réagir à ce qu\'elle fait / l\'ambiance) — surtout PAS un hook générique. Reste taquin et implicite, pas explicite ni vulgaire. AUCUN emoji. Jamais « hmm ». PAS de hashtags, PAS de guillemets.',
+       'STRICT rules: ONE COMPLETE sentence that MAKES SENSE (never cut off), short (≈ 4 to 9 words). The hook must be RELEVANT to this video (react to what she does / the mood) — definitely NOT a generic hook. Keep it teasing and implicit, not explicit or vulgar. NO emoji. Never "hmm". NO hashtags, NO quotes.'),
+    tr('Imite le TON de MES hooks (pas leur sujet) :', 'Match the TONE of MY hooks (not their subject):'),
     examples,
-    transcript ? tr('Contexte (ambiance seulement, ne le décris pas) — ce qui est dit :', 'Context (mood only, do not describe it) — what is said:') + `\n"""${transcript.slice(0, 500)}"""` : '',
+    transcript ? tr('Ce qui est DIT dans la vidéo (sers-t\'en pour coller à la situation) :', 'What is SAID in the video (use it to fit the situation):') + `\n"""${transcript.slice(0, 700)}"""` : '',
     tr(`VARIE la formulation : ne réutilise PAS « sait ce qu'elle fait » ni deux fois la même tournure. Oriente la réaction de CE hook vers : ${angle}.`, `VARY the wording: do NOT reuse "knows what she's doing" or the same phrasing twice. Angle THIS hook's reaction toward: ${angle}.`),
     tr('Écris le hook vague et taquin dans le format imposé.', 'Write the vague, teasing hook in the required format.'),
   ].filter(Boolean).join('\n\n')
