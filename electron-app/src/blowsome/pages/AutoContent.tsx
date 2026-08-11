@@ -22,8 +22,10 @@ interface Recipe {
   style: string          // exemples de captions (texte, une fois)
   useTranscript: boolean
   intensity: Intensity
+  burnText?: boolean     // écrire la caption sur la vidéo
+  textPos?: 'top' | 'middle' | 'bottom'
 }
-type JobStatus = 'queued' | 'clip' | 'reframe' | 'transcribe' | 'caption' | 'saving' | 'done' | 'error'
+type JobStatus = 'queued' | 'clip' | 'reframe' | 'transcribe' | 'caption' | 'overlay' | 'saving' | 'done' | 'error'
 interface GenJob { i: number; status: JobStatus; sourceTitle?: string; caption?: string; error?: string }
 
 const RECIPES_KEY = 'sf-blow-autocontent-recipes'
@@ -34,7 +36,7 @@ const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).sli
 const STATUS_LABEL: Record<JobStatus, [string, string]> = {
   queued: ['En attente', 'Queued'], clip: ['Choix du clip', 'Picking clip'],
   reframe: ['Recadrage 9:16', 'Reframing 9:16'], transcribe: ['Transcription', 'Transcribing'],
-  caption: ['Caption IA', 'AI caption'], saving: ['Envoi banque', 'Saving to bank'],
+  caption: ['Caption IA', 'AI caption'], overlay: ['Texte sur la vidéo', 'Text on video'], saving: ['Envoi banque', 'Saving to bank'],
   done: ['Prêt', 'Ready'], error: ['Erreur', 'Error'],
 }
 
@@ -58,6 +60,8 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [style, setStyle] = useState('')
   const [useTranscript, setUseTranscript] = useState(true)
   const [intensity, setIntensity] = useState<Intensity>('medium')
+  const [burnText, setBurnText] = useState(true)
+  const [textPos, setTextPos] = useState<'top' | 'middle' | 'bottom'>('middle')
 
   const [jobs, setJobs] = useState<GenJob[]>([])
   const [running, setRunning] = useState(false)
@@ -84,14 +88,14 @@ export function BlowAutoContent({ user }: { user: User }) {
   const allTags = useMemo(() => Array.from(new Set(items.flatMap(i => i.tags ?? []).filter(Boolean))).sort(), [items])
   const poolFor = (t: string) => items.filter(i => (i.tags ?? []).includes(t))
 
-  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setIntensity('medium') }
+  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setIntensity('medium'); setBurnText(true); setTextPos('middle') }
   function loadRecipe(r: Recipe) {
     setEditingId(r.id); setName(r.name); setTag(r.tag); setCount(r.count); setStyle(r.style)
-    setUseTranscript(r.useTranscript); setIntensity(r.intensity)
+    setUseTranscript(r.useTranscript); setIntensity(r.intensity); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'middle')
   }
   function persistRecipe() {
     if (!name.trim() || !tag) return
-    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, intensity }
+    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, intensity, burnText, textPos }
     const next = editingId ? recipes.map(x => x.id === editingId ? r : x) : [...recipes, r]
     setRecipes(next); saveRecipes(next); setEditingId(r.id)
   }
@@ -205,9 +209,19 @@ export function BlowAutoContent({ user }: { user: User }) {
         }
         if (!caption) caption = styleLines[Math.floor(Math.random() * styleLines.length)] ?? src.title
 
+        // 3b) Incruste la caption SUR la vidéo (hook POV à l'écran)
+        let finalRef = mediaRef
+        if (burnText && caption && window.electronAPI?.runFfmpegMixOverlay) {
+          setJob(i, { status: 'overlay' })
+          try {
+            const ov = await window.electronAPI.runFfmpegMixOverlay({ sourcePath: mediaRef, caption, position: textPos, fontSize: 54, fontColor: '#FFFFFF' })
+            if (ov?.ok && ov.outputPath) finalRef = ov.storagePath ? await getSignedUrl(ov.storagePath) : ov.outputPath
+          } catch { /* si l'incrustation échoue, on garde la vidéo sans texte */ }
+        }
+
         // 4) Envoi en banque : ré-upload dans l'emplacement permanent (vignette + accès OK)
         setJob(i, { status: 'saving', caption })
-        const up = await uploadVideoFromPath(mediaRef, scope)
+        const up = await uploadVideoFromPath(finalRef, scope)
         const storagePath = up.storagePath
         const thumbnailPath = up.thumbnailPath
         const baseTag = sourceMode === 'bank' ? tag : (name.trim() || 'autocontent')
@@ -314,6 +328,22 @@ export function BlowAutoContent({ user }: { user: User }) {
             <input type="checkbox" checked={useTranscript} onChange={e => setUseTranscript(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16 }} />
             <span style={{ fontSize: 13, color: INK }}>{tr('Transcrire l\'audio (Whisper) pour une caption fidèle à ce qui est dit', 'Transcribe audio (Whisper) for a caption true to what\'s said')}</span>
           </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 10 }}>
+            <input type="checkbox" checked={burnText} onChange={e => setBurnText(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16 }} />
+            <span style={{ fontSize: 13, color: INK }}>{tr('Écrire la caption SUR la vidéo (hook POV à l\'écran)', 'Write the caption ON the video (POV hook on screen)')}</span>
+          </label>
+          {burnText && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingLeft: 25 }}>
+              <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Position', 'Position')}</span>
+              {(['top', 'middle', 'bottom'] as const).map(p => (
+                <button key={p} onClick={() => setTextPos(p)} className="blow-tap"
+                  style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                    border: `1px solid ${textPos === p ? 'rgba(168,85,247,0.6)' : HAIR}`, background: textPos === p ? 'rgba(168,85,247,0.18)' : 'transparent', color: textPos === p ? '#E9D5FF' : MUTED }}>
+                  {p === 'top' ? tr('Haut', 'Top') : p === 'middle' ? tr('Milieu', 'Middle') : tr('Bas', 'Bottom')}
+                </button>
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Unicité', 'Uniqueness')}</span>
@@ -408,16 +438,17 @@ export function BlowAutoContent({ user }: { user: User }) {
 function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
   const closing = hasImages
-    ? tr('Regarde les images fournies (ce que la vidéo MONTRE) et écris la légende adaptée à CETTE vidéo.', 'Look at the provided images (what the video SHOWS) and write the caption tailored to THIS video.')
+    ? tr('Regarde les images fournies (ce que la vidéo MONTRE) et écris le hook adapté à CETTE vidéo.', 'Look at the provided images (what the video SHOWS) and write the hook for THIS video.')
     : transcript
-      ? tr('Base-toi sur la transcription ci-dessus pour écrire la légende adaptée à cette vidéo.', 'Base the caption on the transcript above, tailored to this video.')
-      : tr('Écris une légende dans ce style (pas d\'autre info sur la vidéo disponible).', 'Write a caption in this style (no other info about the video available).')
+      ? tr('Base-toi sur la transcription ci-dessus pour écrire le hook adapté à cette vidéo.', 'Base the hook on the transcript above, tailored to this video.')
+      : tr('Écris un hook dans ce style (pas d\'autre info sur la vidéo).', 'Write a hook in this style (no other info about the video).')
   return [
-    tr('Tu écris UNE légende Instagram pour une vidéo POV courte. Réponds UNIQUEMENT par la légende, rien d\'autre.', 'Write ONE Instagram caption for a short POV video. Reply with ONLY the caption, nothing else.'),
-    tr('Imite le TON, le format, la longueur et l\'usage des emojis de ces exemples qui ont bien marché :', 'Match the TONE, format, length and emoji use of these winning examples:'),
+    tr('Tu écris UN hook POV COURT à afficher SUR une vidéo (texte à l\'écran). Réponds UNIQUEMENT par le hook, rien d\'autre.', 'Write ONE SHORT POV hook to display ON a video (on-screen text). Reply with ONLY the hook, nothing else.'),
+    tr('Règles : très court (≈ 4 à 10 mots, une seule phrase), percutant, PAS de hashtags, PAS de guillemets, peu ou pas d\'emoji.', 'Rules: very short (≈ 4 to 10 words, a single sentence), punchy, NO hashtags, NO quotes, little or no emoji.'),
+    tr('Imite le TON de ces hooks qui ont marché :', 'Match the TONE of these winning hooks:'),
     examples,
-    transcript ? tr('Ce qui est DIT dans la vidéo (transcription audio) :', 'What is SAID in the video (audio transcript):') + `\n"""${transcript.slice(0, 1200)}"""` : '',
-    closing + ' ' + tr('Prête à publier, sans guillemets, sans explication. Termine par 3-5 hashtags pertinents.', 'Ready to post, no quotes, no explanation. End with 3-5 relevant hashtags.'),
+    transcript ? tr('Ce qui est DIT dans la vidéo :', 'What is SAID in the video:') + `\n"""${transcript.slice(0, 800)}"""` : '',
+    closing,
   ].filter(Boolean).join('\n\n')
 }
 
