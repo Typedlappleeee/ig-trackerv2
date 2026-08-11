@@ -149,8 +149,15 @@ export function BlowAutoContent({ user }: { user: User }) {
           catch { variants = await runFfmpegRepurposeBatch({ inputPath: url, seeds: [seed], intensity, format: '9:16' }) }
         }
         const out = variants[0]
-        const outRef = out?.localPath || out?.outputPath
-        if (!out?.ok || !outRef) throw new Error(tr('Recadrage échoué', 'Reframe failed'))
+        if (!out?.ok) throw new Error(tr('Recadrage échoué', 'Reframe failed'))
+        // Référence média FIABLE pour frames / transcription / upload :
+        // desktop → chemin local ; web serveur → URL signée du storagePath (≠ l'URL
+        // publique qui 403) ; fallback WASM → blob. C'est cette réf qu'on ré-uploade
+        // dans l'emplacement permanent de la banque (repurpose-results est transitoire).
+        const mediaRef = (hasNative && out.localPath)
+          ? out.localPath
+          : out.storagePath ? await getSignedUrl(out.storagePath) : (out.outputPath ?? '')
+        if (!mediaRef) throw new Error(tr('Sortie introuvable', 'Missing output'))
 
         // 2) Transcription audio (best-effort) — « ce qui est dit »
         let transcript = ''
@@ -164,50 +171,45 @@ export function BlowAutoContent({ user }: { user: User }) {
                 const tRes = await window.electronAPI.groqTranscription({ apiKey: conns.groq, audioBytes: buf as ArrayBuffer, filename: 'clip.mp4' }) as { ok?: boolean; data?: { text?: string } }
                 if (tRes?.ok) transcript = String(tRes.data?.text ?? '').trim()
               }
-            } else {
-              // Web : le proxy récupère la vidéo par URL (marche pour les URL de la banque).
+            } else if (/^https?:/i.test(mediaRef)) {
+              // Web : le proxy récupère la vidéo par URL signée (marche aussi pour un upload).
               const gq = window.electronAPI.groqTranscription as unknown as (o: { apiKey: string; videoUrl: string; filename: string }) => Promise<{ ok?: boolean; data?: { text?: string } }>
-              const tRes = await gq({ apiKey: conns.groq, videoUrl: url, filename: 'clip.mp4' })
+              const tRes = await gq({ apiKey: conns.groq, videoUrl: mediaRef, filename: 'clip.mp4' })
               if (tRes?.ok) transcript = String(tRes.data?.text ?? '').trim()
             }
           } catch { /* transcription optionnelle */ }
         }
 
-        // 3) Caption IA (frames + transcript + style)
+        // 3) Caption IA — frames SI dispo + transcript + style. On n'évoque les
+        // images dans le prompt QUE si on en a (sinon l'IA répond « je ne vois pas »).
         setJob(i, { status: 'caption' })
         let caption = ''
-        if (conns.anthropic && window.electronAPI?.extractFrames && window.electronAPI?.anthropicVisionRequest) {
+        if (conns.anthropic && window.electronAPI?.anthropicVisionRequest) {
           try {
-            const fr = await window.electronAPI.extractFrames({ filePath: outRef, endTime: 5, fps: 0.5 })
-            const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
-            const images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
-            const prompt = buildCaptionPrompt(styleLines, transcript, tr)
-            const vRes = await window.electronAPI.anthropicVisionRequest({
-              apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 200,
-              messages: [{ role: 'user', content: [...images, { type: 'text', text: prompt }] }],
-            })
+            let images: Array<{ type: 'image'; source: { type: 'base64'; media_type: 'image/jpeg'; data: string } }> = []
+            if (window.electronAPI.extractFrames) {
+              const fr = await window.electronAPI.extractFrames({ filePath: mediaRef, endTime: 5, fps: 0.5 })
+              const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
+              images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
+            }
+            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, tr)
+            const content: unknown[] = images.length > 0 ? [...images, { type: 'text', text: prompt }] : [{ type: 'text', text: prompt }]
+            const vRes = await window.electronAPI.anthropicVisionRequest({ apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 200, messages: [{ role: 'user', content }] })
             if (vRes?.ok) {
               const data = vRes.data as { content?: Array<{ type: string; text?: string }> }
-              caption = (data?.content?.find(b => b.type === 'text')?.text ?? '').trim().replace(/^["'«»\s]+|["'«»\s]+$/g, '')
+              const t = (data?.content?.find(b => b.type === 'text')?.text ?? '').trim().replace(/^["'«»\s]+|["'«»\s]+$/g, '')
+              // Rejette les réponses « méta » (refus faute d'images/contexte).
+              if (t && !/ne vois pas|n'ai pas accès|pas d'accès|peux-tu (partager|me décrire|m'envoyer)|don'?t see|no access|can you (share|describe)|unable to (see|access)|share the (video|image)/i.test(t)) caption = t
             }
           } catch { /* caption best-effort */ }
         }
         if (!caption) caption = styleLines[Math.floor(Math.random() * styleLines.length)] ?? src.title
 
-        // 4) Envoi en banque (description = caption → pré-remplit le post)
+        // 4) Envoi en banque : ré-upload dans l'emplacement permanent (vignette + accès OK)
         setJob(i, { status: 'saving', caption })
-        // Chemin serveur (web) : la variante est DÉJÀ dans le storage → on réutilise
-        // son storagePath. Chemin natif/WASM : on uploade le fichier de sortie.
-        let storagePath: string
-        let thumbnailPath: string | null
-        if (out.storagePath) {
-          storagePath = out.storagePath
-          thumbnailPath = out.thumbnailPath ?? null
-        } else {
-          const up = await uploadVideoFromPath(outRef, scope)
-          storagePath = up.storagePath
-          thumbnailPath = up.thumbnailPath
-        }
+        const up = await uploadVideoFromPath(mediaRef, scope)
+        const storagePath = up.storagePath
+        const thumbnailPath = up.thumbnailPath
         const baseTag = sourceMode === 'bank' ? tag : (name.trim() || 'autocontent')
         const title = `${src.title || baseTag} · auto ${i + 1}`
         const { error } = await supabase.from('content_bank').insert({
@@ -403,14 +405,19 @@ export function BlowAutoContent({ user }: { user: User }) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function buildCaptionPrompt(styleLines: string[], transcript: string, tr: (fr: string, en: string) => string): string {
+function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
+  const closing = hasImages
+    ? tr('Regarde les images fournies (ce que la vidéo MONTRE) et écris la légende adaptée à CETTE vidéo.', 'Look at the provided images (what the video SHOWS) and write the caption tailored to THIS video.')
+    : transcript
+      ? tr('Base-toi sur la transcription ci-dessus pour écrire la légende adaptée à cette vidéo.', 'Base the caption on the transcript above, tailored to this video.')
+      : tr('Écris une légende dans ce style (pas d\'autre info sur la vidéo disponible).', 'Write a caption in this style (no other info about the video available).')
   return [
-    tr('Tu écris UNE légende Instagram pour une vidéo POV courte.', 'Write ONE Instagram caption for a short POV video.'),
+    tr('Tu écris UNE légende Instagram pour une vidéo POV courte. Réponds UNIQUEMENT par la légende, rien d\'autre.', 'Write ONE Instagram caption for a short POV video. Reply with ONLY the caption, nothing else.'),
     tr('Imite le TON, le format, la longueur et l\'usage des emojis de ces exemples qui ont bien marché :', 'Match the TONE, format, length and emoji use of these winning examples:'),
     examples,
     transcript ? tr('Ce qui est DIT dans la vidéo (transcription audio) :', 'What is SAID in the video (audio transcript):') + `\n"""${transcript.slice(0, 1200)}"""` : '',
-    tr('Regarde aussi les images (ce que la vidéo MONTRE). Écris la légende adaptée à CETTE vidéo précise, prête à publier, sans guillemets, sans explication. Termine par 3-5 hashtags pertinents.', 'Also look at the images (what the video SHOWS). Write the caption tailored to THIS specific video, ready to post, no quotes, no explanation. End with 3-5 relevant hashtags.'),
+    closing + ' ' + tr('Prête à publier, sans guillemets, sans explication. Termine par 3-5 hashtags pertinents.', 'Ready to post, no quotes, no explanation. End with 3-5 relevant hashtags.'),
   ].filter(Boolean).join('\n\n')
 }
 
