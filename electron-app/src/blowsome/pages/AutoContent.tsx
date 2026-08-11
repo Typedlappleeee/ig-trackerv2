@@ -196,7 +196,18 @@ export function BlowAutoContent({ user }: { user: User }) {
 
         // 4) Envoi en banque (description = caption → pré-remplit le post)
         setJob(i, { status: 'saving', caption })
-        const { storagePath, thumbnailPath } = await uploadVideoFromPath(outRef, scope)
+        // Chemin serveur (web) : la variante est DÉJÀ dans le storage → on réutilise
+        // son storagePath. Chemin natif/WASM : on uploade le fichier de sortie.
+        let storagePath: string
+        let thumbnailPath: string | null
+        if (out.storagePath) {
+          storagePath = out.storagePath
+          thumbnailPath = out.thumbnailPath ?? null
+        } else {
+          const up = await uploadVideoFromPath(outRef, scope)
+          storagePath = up.storagePath
+          thumbnailPath = up.thumbnailPath
+        }
         const baseTag = sourceMode === 'bank' ? tag : (name.trim() || 'autocontent')
         const title = `${src.title || baseTag} · auto ${i + 1}`
         const { error } = await supabase.from('content_bank').insert({
