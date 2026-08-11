@@ -209,14 +209,20 @@ export function BlowAutoContent({ user }: { user: User }) {
         }
         if (!caption) caption = styleLines[Math.floor(Math.random() * styleLines.length)] ?? src.title
 
-        // 3b) Incruste la caption SUR la vidéo (hook POV à l'écran)
+        // Hook COURT garanti (le texte à l'écran doit rester lisible) : on retire les
+        // hashtags/guillemets et on plafonne à ~10 mots / 1 phrase, quoi que sorte l'IA.
+        caption = caption.replace(/#[^\s#]+/g, '').replace(/["'«»]/g, '').split(/[\n]/)[0].replace(/\s+/g, ' ').trim()
+        { const w = caption.split(' ').filter(Boolean); if (w.length > 10) caption = w.slice(0, 10).join(' ') }
+
+        // 3b) Incruste la caption SUR la vidéo (hook POV à l'écran). Bloquant si activé :
+        // en cas d'échec on remonte l'erreur au lieu de sauver une vidéo sans texte.
         let finalRef = mediaRef
-        if (burnText && caption && window.electronAPI?.runFfmpegMixOverlay) {
+        if (burnText && caption) {
           setJob(i, { status: 'overlay' })
-          try {
-            const ov = await window.electronAPI.runFfmpegMixOverlay({ sourcePath: mediaRef, caption, position: textPos, fontSize: 54, fontColor: '#FFFFFF' })
-            if (ov?.ok && ov.outputPath) finalRef = ov.storagePath ? await getSignedUrl(ov.storagePath) : ov.outputPath
-          } catch { /* si l'incrustation échoue, on garde la vidéo sans texte */ }
+          if (!window.electronAPI?.runFfmpegMixOverlay) throw new Error(tr('Incrustation indisponible (rebuild desktop ?)', 'Overlay unavailable (rebuild desktop?)'))
+          const ov = await window.electronAPI.runFfmpegMixOverlay({ sourcePath: mediaRef, caption, position: textPos, fontSize: 54, fontColor: '#FFFFFF' })
+          if (!ov?.ok || !ov.outputPath) throw new Error(`${tr('Incrustation échouée', 'Overlay failed')} : ${ov?.error ?? '?'}`)
+          finalRef = ov.storagePath ? await getSignedUrl(ov.storagePath) : ov.outputPath
         }
 
         // 4) Envoi en banque : ré-upload dans l'emplacement permanent (vignette + accès OK)
