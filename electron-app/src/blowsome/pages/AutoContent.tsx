@@ -202,15 +202,14 @@ export function BlowAutoContent({ user }: { user: User }) {
         }
         if (!caption) caption = styleLines[Math.floor(Math.random() * styleLines.length)] ?? src.title
 
-        // Hook COURT garanti (le texte à l'écran doit rester lisible) : on retire les
-        // hashtags/guillemets et on plafonne à ~10 mots / 1 phrase, quoi que sorte l'IA.
+        // Nettoyage SANS charcuter la phrase (on garde la 1re ligne ENTIÈRE pour ne
+        // pas couper au milieu et produire un hook qui ne veut rien dire).
         caption = caption
           .replace(/#[^\s#]+/g, '')                    // hashtags
           .replace(/["'«»]/g, '')                       // guillemets
           .replace(/\p{Extended_Pictographic}/gu, '')   // emoji
           .replace(/\bh+m+\b/gi, '')                    // « hmm », « hmmm »
           .split(/[\n]/)[0].replace(/\s+/g, ' ').trim()
-        { const w = caption.split(' ').filter(Boolean); if (w.length > 10) caption = w.slice(0, 10).join(' ') }
 
         // 3b) Incruste la caption SUR la vidéo (hook POV à l'écran). Bloquant si activé :
         // en cas d'échec on remonte l'erreur au lieu de sauver une vidéo sans texte.
@@ -486,8 +485,8 @@ function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages:
     tr('RÈGLE : le narrateur est le mec qui filme, il RÉAGIT à sa coloc (une fille). La fille n\'agit JAMAIS envers le spectateur (interdit : « te remercie », « elle te… »). Contre-exemple à NE PAS produire : « POV : ta coloc te remercie à sa manière ».',
        'RULE: the narrator is the guy filming, REACTING to his female roommate (a girl). The girl NEVER acts toward the viewer (forbidden: "thanks you", "she ... you"). Counter-example NOT to produce: "POV: your roommate thanks you in her way".'),
     spiceLine,
-    tr('Règles STRICTES : très court (≈ 4 à 8 mots, UNE phrase). Reste VAGUE — ne décris PAS ce qui se passe précisément (ça doit coller à plein de situations). AUCUN emoji. N\'utilise JAMAIS « hmm ». PAS de hashtags, PAS de guillemets.',
-       'STRICT rules: very short (≈ 4 to 8 words, ONE sentence). Stay VAGUE — do NOT describe exactly what happens (must fit many situations). NO emoji at all. NEVER use "hmm". NO hashtags, NO quotes.'),
+    tr('Règles STRICTES : UNE phrase COMPLÈTE et qui a du SENS (ne finis jamais en plein milieu), courte (≈ 4 à 9 mots). Reste VAGUE — ne décris PAS ce qui se passe précisément (ça doit coller à plein de situations). AUCUN emoji. N\'utilise JAMAIS « hmm ». PAS de hashtags, PAS de guillemets.',
+       'STRICT rules: ONE COMPLETE sentence that MAKES SENSE (never cut off mid-way), short (≈ 4 to 9 words). Stay VAGUE — do NOT describe exactly what happens (must fit many situations). NO emoji at all. NEVER use "hmm". NO hashtags, NO quotes.'),
     tr('Imite le TON de MES hooks :', 'Match the TONE of MY hooks:'),
     examples,
     transcript ? tr('Contexte (ambiance seulement, ne le décris pas) — ce qui est dit :', 'Context (mood only, do not describe it) — what is said:') + `\n"""${transcript.slice(0, 500)}"""` : '',
