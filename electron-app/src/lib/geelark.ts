@@ -2206,10 +2206,11 @@ async function _loginInstagramAccountInner(
 
     // Some IG builds show a social-login screen first with "Log in with email" link
     // Handle "Join Instagram" onboarding screen (fresh install) — tap "I already have a profile"
+    // (Android 14+ : le libellé varie → on élargit avec un match partiel.)
     const alreadyHavePt = findByText(xml,
       'I already have a profile', 'J\'ai déjà un profil', 'J\'ai déjà un compte',
-      'Already have an account', 'Log in', 'Se connecter',
-    )
+      'Already have an account', 'Log in', 'Se connecter', 'Connexion', 'Sign in',
+    ) ?? findByTextPartial(xml, 'already have', 'déjà un compte', 'déjà un profil', 'se connecter', 'log in', 'sign in', 'connexion')
     if (alreadyHavePt) {
       log('📲 Écran d\'accueil détecté — sélection « J\'ai déjà un compte »…')
       await shellExec(bearer, phoneId, `input tap ${alreadyHavePt[0]} ${alreadyHavePt[1]}`)
@@ -2229,6 +2230,32 @@ async function _loginInstagramAccountInner(
       await shellExec(bearer, phoneId, `input tap ${emailLoginPt[0]} ${emailLoginPt[1]}`)
       await sleep(3000)
       xml = await dumpXml(bearer, phoneId)
+    }
+
+    // ── Garde-fou Android 14+ : ne PAS taper dans un écran d'inscription ─────
+    // Si on n'a pas atteint l'écran de connexion (le lien « J'ai déjà un compte »
+    // est introuvable sur cette version), le premier champ à l'écran est un champ
+    // d'INSCRIPTION. Taper les identifiants dedans donne l'impression que l'outil
+    // « crée » un compte. On s'arrête proprement et on explique.
+    {
+      const xmlLo = xml.toLowerCase()
+      const hasLoginField =
+        findByResourceId(xml, 'login_username', 'email_phone_field', 'password', 'login_password') != null ||
+        findByText(xml,
+          'Phone number, username, or email', 'Username, email or mobile number',
+          'Numéro de téléphone, nom d\'utilisateur ou adresse e-mail',
+          'Username or email', 'Identifiant ou e-mail') != null
+      const signupMarkers = [
+        'create a new account', 'create new account', 'créer un compte', 'crée un compte',
+        'sign up', "s'inscrire", 'inscription', 'create username', 'crée un nom d\'utilisateur',
+        'add your birthday', 'date de naissance', 'quelle est ta date', 'what\'s your birthday',
+        'add your phone number to sign up', 'create a password',
+      ]
+      const looksSignup = signupMarkers.some(m => xmlLo.includes(m))
+      if (!hasLoginField && looksSignup) {
+        log('❌ Écran d\'inscription détecté — écran de connexion non atteint (rien n\'a été saisi)')
+        return { ok: false, error: 'Écran de connexion non atteint : Instagram est resté sur l\'inscription (lien « J\'ai déjà un compte » introuvable sur cette version d\'Android). Aucun identifiant saisi. Envoie une capture pour ajuster.' }
+      }
     }
 
     // ── Saisie identifiant ─────────────────────────────────────────────────
