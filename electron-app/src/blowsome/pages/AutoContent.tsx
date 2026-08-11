@@ -10,10 +10,8 @@ import { useConnections } from '@/lib/connections'
 import { useTr } from '@/lib/i18n'
 import { logActivity } from '@/lib/activityLog'
 import { resolveContentToLocalPath, uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
-import { runRepurposeNative, runRepurposeViaServer, runFfmpegRepurposeBatch } from '@/lib/ffmpeg-web'
 import { useBlowCSS, BlowCard, BlowButton, BlowBadge, BlowEmpty, BlowPageHeader, Ico, ICON, INK, MUTED, HAIR, GOLD } from '../ui'
 
-type Intensity = 'subtle' | 'medium' | 'aggressive'
 interface Recipe {
   id: string
   name: string
@@ -21,7 +19,6 @@ interface Recipe {
   count: number
   style: string          // exemples de captions (texte, une fois)
   useTranscript: boolean
-  intensity: Intensity
   burnText?: boolean     // écrire la caption sur la vidéo
   textPos?: 'top' | 'middle' | 'bottom'
   spice?: 'soft' | 'medium'   // intensité du sous-entendu (contenu suggestif)
@@ -60,7 +57,6 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [count, setCount] = useState(10)
   const [style, setStyle] = useState('')
   const [useTranscript, setUseTranscript] = useState(true)
-  const [intensity, setIntensity] = useState<Intensity>('medium')
   const [burnText, setBurnText] = useState(true)
   const [textPos, setTextPos] = useState<'top' | 'middle' | 'bottom'>('bottom')
   const [spice, setSpice] = useState<'soft' | 'medium'>('soft')
@@ -69,7 +65,7 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [running, setRunning] = useState(false)
 
   const isWeb = typeof window !== 'undefined' && (window as unknown as { __IS_WEB?: boolean }).__IS_WEB === true
-  const hasNative = !isWeb && !!window.electronAPI?.runFfmpegRepurpose
+  const hasNative = !isWeb && !!window.electronAPI
 
   // ── Charge la banque (scopée org/perso) ────────────────────────────────────
   useEffect(() => {
@@ -90,14 +86,14 @@ export function BlowAutoContent({ user }: { user: User }) {
   const allTags = useMemo(() => Array.from(new Set(items.flatMap(i => i.tags ?? []).filter(Boolean))).sort(), [items])
   const poolFor = (t: string) => items.filter(i => (i.tags ?? []).includes(t))
 
-  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setIntensity('medium'); setBurnText(true); setTextPos('bottom'); setSpice('soft') }
+  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setBurnText(true); setTextPos('bottom'); setSpice('soft') }
   function loadRecipe(r: Recipe) {
     setEditingId(r.id); setName(r.name); setTag(r.tag); setCount(r.count); setStyle(r.style)
-    setUseTranscript(r.useTranscript); setIntensity(r.intensity); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'bottom'); setSpice(r.spice ?? 'soft')
+    setUseTranscript(r.useTranscript); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'bottom'); setSpice(r.spice ?? 'soft')
   }
   function persistRecipe() {
     if (!name.trim() || !tag) return
-    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, intensity, burnText, textPos, spice }
+    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, burnText, textPos, spice }
     const next = editingId ? recipes.map(x => x.id === editingId ? r : x) : [...recipes, r]
     setRecipes(next); saveRecipes(next); setEditingId(r.id)
   }
@@ -109,11 +105,19 @@ export function BlowAutoContent({ user }: { user: User }) {
   const setJob = (i: number, patch: Partial<GenJob>) => setJobs(prev => prev.map(j => j.i === i ? { ...j, ...patch } : j))
 
   // Résout une source (item banque OU fichier uploadé) en { nativePath, url }.
-  async function resolveSource(src: { item?: ContentItem; file?: File }): Promise<{ nativePath: string | null; url: string; revoke?: () => void }> {
+  async function resolveSource(src: { item?: ContentItem; file?: File }): Promise<{ nativePath: string | null; url: string }> {
+    const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
     if (src.file) {
-      const nativePath = hasNative ? ((src.file as unknown as { path?: string }).path ?? null) : null
-      const url = URL.createObjectURL(src.file)
-      return { nativePath, url, revoke: () => URL.revokeObjectURL(url) }
+      // Desktop : le chemin natif du fichier suffit (traitement natif local).
+      const p = (src.file as unknown as { path?: string }).path
+      if (hasNative && p) return { nativePath: p, url: '' }
+      // Web : on uploade le fichier pour obtenir une URL SIGNÉE — le serveur
+      // (incrustation / transcription) ne peut pas lire une URL blob locale.
+      const blobUrl = URL.createObjectURL(src.file)
+      try {
+        const up = await uploadVideoFromPath(blobUrl, scope)
+        return { nativePath: null, url: await getSignedUrl(up.storagePath) }
+      } finally { URL.revokeObjectURL(blobUrl) }
     }
     const it = src.item!
     const nativePath = hasNative ? await resolveContentToLocalPath(it) : null
@@ -137,33 +141,14 @@ export function BlowAutoContent({ user }: { user: User }) {
 
     for (let i = 0; i < count; i++) {
       const src = srcList[i % srcList.length]
-      let revoke: (() => void) | undefined
       try {
         setJob(i, { status: 'clip', sourceTitle: src.title })
-        const resolved = await resolveSource(src)
-        revoke = resolved.revoke
-        const { nativePath, url } = resolved
-
-        // 1) Recadrage 9:16 + variante unique (natif desktop, sinon serveur → WASM web)
-        setJob(i, { status: 'reframe' })
-        const seed = Math.floor(Math.random() * 1_000_000) + i
-        let variants
-        if (hasNative && nativePath) {
-          variants = await runRepurposeNative({ sourcePath: nativePath, seeds: [seed], intensity, format: '9:16' })
-        } else {
-          try { variants = await runRepurposeViaServer({ sourceUrl: url, userId: user.id, seeds: [seed], intensity, format: '9:16' }) }
-          catch { variants = await runFfmpegRepurposeBatch({ inputPath: url, seeds: [seed], intensity, format: '9:16' }) }
-        }
-        const out = variants[0]
-        if (!out?.ok) throw new Error(tr('Recadrage échoué', 'Reframe failed'))
-        // Référence média FIABLE pour frames / transcription / upload :
-        // desktop → chemin local ; web serveur → URL signée du storagePath (≠ l'URL
-        // publique qui 403) ; fallback WASM → blob. C'est cette réf qu'on ré-uploade
-        // dans l'emplacement permanent de la banque (repurpose-results est transitoire).
-        const mediaRef = (hasNative && out.localPath)
-          ? out.localPath
-          : out.storagePath ? await getSignedUrl(out.storagePath) : (out.outputPath ?? '')
-        if (!mediaRef) throw new Error(tr('Sortie introuvable', 'Missing output'))
+        const { nativePath, url } = await resolveSource(src)
+        // PAS de spoof : on travaille directement sur la vidéo ORIGINALE (couleurs
+        // intactes). L'unicité vient des clips différents + du hook incrusté.
+        // desktop → chemin local ; web → URL (signée pour la banque, blob pour un upload).
+        const mediaRef = (hasNative && nativePath) ? nativePath : url
+        if (!mediaRef) throw new Error(tr('Source introuvable', 'Source not found'))
 
         // 2) Transcription audio (best-effort) — « ce qui est dit »
         let transcript = ''
@@ -245,8 +230,6 @@ export function BlowAutoContent({ user }: { user: User }) {
         setJob(i, { status: 'done', caption })
       } catch (e) {
         setJob(i, { status: 'error', error: e instanceof Error ? e.message : String(e) })
-      } finally {
-        revoke?.()
       }
     }
     setRunning(false)
@@ -363,21 +346,9 @@ export function BlowAutoContent({ user }: { user: User }) {
             ))}
             <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('(taquin/ambigu, jamais explicite)', '(teasing/ambiguous, never explicit)')}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Unicité', 'Uniqueness')}</span>
-              {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(v => (
-                <button key={v} onClick={() => setIntensity(v)} className="blow-tap"
-                  style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
-                    border: `1px solid ${intensity === v ? 'rgba(168,85,247,0.6)' : HAIR}`, background: intensity === v ? 'rgba(168,85,247,0.18)' : 'transparent', color: intensity === v ? '#E9D5FF' : MUTED }}>
-                  {v === 'subtle' ? tr('Légère', 'Subtle') : v === 'medium' ? tr('Moyenne', 'Medium') : tr('Forte', 'Strong')}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Nombre', 'Count')}</span>
-              <input type="number" min={1} max={50} value={count} onChange={e => setCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} style={{ ...inp, width: 76, textAlign: 'center' }} />
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Nombre de vidéos', 'Number of videos')}</span>
+            <input type="number" min={1} max={50} value={count} onChange={e => setCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} style={{ ...inp, width: 76, textAlign: 'center' }} />
           </div>
 
           {conns.anthropic ? null : (
@@ -408,7 +379,7 @@ export function BlowAutoContent({ user }: { user: User }) {
                       onClick={() => loadRecipe(r)}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: MUTED }}>#{r.tag} · {r.count}× · {r.intensity}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: 11, color: MUTED }}>#{r.tag} · {r.count}× · {r.spice ?? 'soft'}</p>
                       </div>
                       <button onClick={e => { e.stopPropagation(); deleteRecipe(r.id) }} style={{ background: 'none', border: 'none', color: '#F87171', cursor: 'pointer', fontSize: 15, padding: 4 }}>×</button>
                     </div>
