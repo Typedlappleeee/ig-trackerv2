@@ -188,8 +188,11 @@ export function BlowAutoContent({ user }: { user: User }) {
               const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 4) : []
               images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             }
-            // Toujours « POV : ta coloc … » (le format signature).
-            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, false, tr)
+            // Toujours « POV : ta coloc … » ; angle de réaction tiré au sort → évite les
+            // formulations répétées (chaque hook est un appel indépendant, sinon ça converge).
+            const ANGLES = ['la surprise', 'l\'agacement léger', 'l\'amusement', 'la gêne', 'le défi / la provoc', 'la résignation', 'l\'incrédulité', 'l\'admiration à contrecœur', 'le « j\'y crois pas »', 'la lassitude', 'la jalousie taquine', 'le fatalisme']
+            const angle = ANGLES[Math.floor(Math.random() * ANGLES.length)]
+            const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, false, angle, tr)
             const content: unknown[] = images.length > 0 ? [...images, { type: 'text', text: prompt }] : [{ type: 'text', text: prompt }]
             const vRes = await window.electronAPI.anthropicVisionRequest({ apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 200, messages: [{ role: 'user', content }] })
             if (vRes?.ok) {
@@ -206,10 +209,11 @@ export function BlowAutoContent({ user }: { user: User }) {
         // pas couper au milieu et produire un hook qui ne veut rien dire).
         caption = caption
           .replace(/#[^\s#]+/g, '')                    // hashtags
-          .replace(/["'«»]/g, '')                       // guillemets
+          .replace(/["«»]/g, '')                        // guillemets (mais on GARDE les apostrophes : qu'elle, j'ai…)
           .replace(/\p{Extended_Pictographic}/gu, '')   // emoji
           .replace(/\bh+m+\b/gi, '')                    // « hmm », « hmmm »
           .split(/[\n]/)[0].replace(/\s+/g, ' ').trim()
+          .replace(/^['’"]+|['’"]+$/g, '').trim()        // enlève une apostrophe/quote seulement en tout début/fin
 
         // 3b) Incruste la caption SUR la vidéo (hook POV à l'écran). Bloquant si activé :
         // en cas d'échec on remonte l'erreur au lieu de sauver une vidéo sans texte.
@@ -465,7 +469,7 @@ export function BlowAutoContent({ user }: { user: User }) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', hasSpeech: boolean, tr: (fr: string, en: string) => string): string {
+function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', hasSpeech: boolean, angle: string, tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
   const spiceLine = spice === 'medium'
     ? tr('Touche taquine & suggestive ASSUMÉE mais IMPLICITE (double sens, sous-entendu) — jamais explicite, jamais vulgaire, aucun mot cru ni allusion au corps. Le sous-entendu vient de la vidéo, le texte reste ambigu (« elle sait ce qu\'elle fait », « zéro limite », « trop à l\'aise »).',
@@ -490,7 +494,8 @@ function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages:
     tr('Imite le TON de MES hooks :', 'Match the TONE of MY hooks:'),
     examples,
     transcript ? tr('Contexte (ambiance seulement, ne le décris pas) — ce qui est dit :', 'Context (mood only, do not describe it) — what is said:') + `\n"""${transcript.slice(0, 500)}"""` : '',
-    tr('Écris le hook vague et taquin qui colle le mieux à l\'ambiance, dans le format imposé.', 'Write the vague, teasing hook that best fits the mood, in the required format.'),
+    tr(`VARIE la formulation : ne réutilise PAS « sait ce qu'elle fait » ni deux fois la même tournure. Oriente la réaction de CE hook vers : ${angle}.`, `VARY the wording: do NOT reuse "knows what she's doing" or the same phrasing twice. Angle THIS hook's reaction toward: ${angle}.`),
+    tr('Écris le hook vague et taquin dans le format imposé.', 'Write the vague, teasing hook in the required format.'),
   ].filter(Boolean).join('\n\n')
 }
 
