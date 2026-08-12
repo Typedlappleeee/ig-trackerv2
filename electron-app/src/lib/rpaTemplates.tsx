@@ -29,6 +29,7 @@ export const RPA_TEMPLATES: RpaTemplate[] = [
   { title: 'Connexion automatique Instagram (2FA)', desc: 'Simule une connexion d’utilisateur réel avec authentification automatique et validation par 2FA.', author: 'Carlos tec', id: '603260376578003125', platforms: ['instagram'] },
   { title: 'Statistiques d’engagement Instagram', desc: 'Collecte automatique des 7 derniers jours : vues, interactions et abonnés. Nécessite un compte professionnel.', author: 'Carlos', id: '617907879776622023', platforms: ['instagram'] },
   { title: 'Connexion Instagram 2FA 2.0', desc: 'Simule une connexion d’utilisateur réel avec authentification automatique et validation via 2FA.', author: 'Carlos', id: '6271538163152323368', platforms: ['instagram'] },
+  { title: 'Publier un Short sur YouTube', desc: 'Publie la 1ʳᵉ vidéo de la galerie en YouTube Short, avec légende.', author: 'ScaleFlow', id: '500000000000000090', platforms: ['youtube'] },
 ]
 
 export function InstagramLogo({ size = 22 }: { size?: number }) {

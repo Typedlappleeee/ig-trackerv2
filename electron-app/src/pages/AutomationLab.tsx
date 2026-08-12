@@ -28,6 +28,14 @@ const TPL_FLOW_MAP: Record<string, string> = {
   '500000000000000053': 'ig-bulk-follow',   // Abonnement en masse
   '500000000000000034': 'ig-login',         // Connexion automatique
   '500000000000000031': 'ig-post-carousel', // Publier une galerie de Reels
+  '6231190517779904823': 'ig-post-carousel',// Publier un carrousel photo (+ son tendance)
+  '567852161145246224': 'ig-comment-last',  // Commenter le dernier post
+  '622396849117986917': 'ig-switch-pro',    // Passer en compte professionnel (Créateur)
+  '500000000000000022': 'ig-send-dm',       // Envoyer des messages privés
+  '603260376578003125': 'ig-login-2fa',     // Connexion automatique (2FA)
+  '6271538163152323368': 'ig-login-2fa',    // Connexion Instagram 2FA 2.0
+  '617907879776622023': 'ig-insights',      // Statistiques d'engagement
+  '500000000000000090': 'yt-post-short',    // Publier un Short sur YouTube
 }
 
 interface Props { user: User }
