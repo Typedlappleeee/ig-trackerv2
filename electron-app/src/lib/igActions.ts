@@ -331,7 +331,7 @@ export async function login(id: string, params: Record<string, unknown>, log: Lo
   if (!account || !password) throw new Error('identifiant ou mot de passe manquant')
 
   await sleep(jitter(5000, 3000)); await dismissPopups(id)
-  await tap(id, { text: 'I already have an account' }, { timeoutMs: 2000 })         // 1er lancement
+  await tap(id, { contains: 'already have' }, { timeoutMs: 2000 })                  // « I already have an account » OU « a profile »
   await tap(id, { text: 'Use another profile' }, { timeoutMs: 3000 })              // déjà des comptes
   await sleep(jitter(4000, 2000)); await dismissPopups(id)
 
@@ -474,7 +474,7 @@ export async function login2fa(id: string, params: Record<string, unknown>, log:
 
   // Écran d'accueil (1er lancement / plusieurs comptes).
   await sleep(jitter(5000, 3000)); await dismissPopups(id)
-  await tapFirst(id, [{ text: 'I already have an account' }, { text: 'Use another profile' }], 'Écran d’accueil', log, false)
+  await tapFirst(id, [{ contains: 'already have' }, { text: 'I already have a profile' }, { text: 'I already have an account' }, { text: 'Use another profile' }], 'Écran d’accueil', log, false)
   await sleep(jitter(4000, 2000)); await dismissPopups(id)
 
   // Identifiant (par desc, sinon 1re zone de saisie).
