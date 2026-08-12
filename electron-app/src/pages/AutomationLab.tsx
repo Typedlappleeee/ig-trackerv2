@@ -16,6 +16,7 @@ import { runFlow, type Flow } from '@/lib/flowRunner'
 import { OFFICIAL_FLOWS, findFlow } from '@/lib/officialFlows'
 import { listMyFlows, listCommunityFlows, bumpInstalls, type StoredFlow } from '@/lib/flowStore'
 import { FlowWorkshop } from '@/components/FlowWorkshop'
+import { RPA_TEMPLATES, TPL_RECOMMENDED_ID, PlatformLogo, InstagramLogo, type TplPlatform } from '@/lib/rpaTemplates'
 
 interface Props { user: User }
 type Conn = 'checking' | 'ok' | 'unconfigured' | 'error'
@@ -33,9 +34,10 @@ export function AutomationLab({ user }: Props) {
   const [myFlows, setMyFlows] = useState<StoredFlow[]>([])
   const [communityFlows, setCommunityFlows] = useState<StoredFlow[]>([])
   const [flowId, setFlowId] = useState(OFFICIAL_FLOWS[0]?.id ?? '')
-  const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community'>('official')
+  const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community' | 'templates'>('official')
   const [openedFlow, setOpenedFlow] = useState<string | null>(null)   // null = galerie, sinon page détail
   const [appFilter, setAppFilter] = useState<string>('all')           // filtre par application
+  const [tplFilter, setTplFilter] = useState<'all' | TplPlatform>('all') // filtre plateforme du catalogue
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<Record<string, RunState>>({})
@@ -143,18 +145,79 @@ export function AutomationLab({ user }: Props) {
 
           {/* ── LANCER : galerie de flows OU page détail d'un flow ─────────────── */}
           {tab === 'run' && !openedFlow && (() => {
-            const baseList = flowTab === 'official' ? OFFICIAL_FLOWS : flowTab === 'mine' ? myFlows : communityFlows
+            const isTpl = flowTab === 'templates'
+            const baseList = flowTab === 'official' ? OFFICIAL_FLOWS : flowTab === 'mine' ? myFlows : flowTab === 'community' ? communityFlows : []
             const src = flowTab === 'official' ? 'Officiel' : flowTab === 'mine' ? 'Perso' : 'Communauté'
             const apps = [...new Set(baseList.map(f => f.app).filter(Boolean) as string[])]
             const list = appFilter === 'all' ? baseList : baseList.filter(f => f.app === appFilter)
+            // Catalogue de templates (vitrine) filtré par plateforme.
+            const tplList = RPA_TEMPLATES.filter(t => tplFilter === 'all' || t.platforms.includes(tplFilter))
+            const reco = RPA_TEMPLATES.find(t => t.id === TPL_RECOMMENDED_ID)
+            const showReco = reco && (tplFilter === 'all' || reco.platforms.includes(tplFilter))
+            const TPL_FILTERS: Array<{ key: 'all' | TplPlatform; label: string }> = [
+              { key: 'all', label: 'Tous' }, { key: 'instagram', label: 'Instagram' }, { key: 'tiktok', label: 'TikTok' }, { key: 'youtube', label: 'YouTube' },
+            ]
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'rgba(0,0,0,0.28)', width: 'fit-content' }}>
+                <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'rgba(0,0,0,0.28)', width: 'fit-content', flexWrap: 'wrap' }}>
                   <SubTab on={flowTab === 'official'} onClick={() => { setFlowTab('official'); setAppFilter('all') }}>⭐ Officielles · {OFFICIAL_FLOWS.length}</SubTab>
+                  <SubTab on={flowTab === 'templates'} onClick={() => { setFlowTab('templates'); setTplFilter('all') }}>🛒 Templates · {RPA_TEMPLATES.length}</SubTab>
                   <SubTab on={flowTab === 'mine'} onClick={() => { setFlowTab('mine'); setAppFilter('all') }}>👤 Mes automatisations · {myFlows.length}</SubTab>
                   <SubTab on={flowTab === 'community'} onClick={() => { setFlowTab('community'); setAppFilter('all') }}>🌍 Communauté · {communityFlows.length}</SubTab>
                 </div>
 
+                {isTpl ? (
+                  <>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>Catalogue de flux RPA à exécuter sur tes cloud phones. Filtre par plateforme.</p>
+                    {/* Filtres plateforme avec logos */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {TPL_FILTERS.map(f => {
+                        const active = tplFilter === f.key
+                        return (
+                          <button key={f.key} onClick={() => setTplFilter(f.key)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
+                              border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)', color: active ? 'var(--accent)' : 'var(--text-2)' }}>
+                            {f.key !== 'all' && <PlatformLogo platform={f.key} size={16} />}{f.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {/* Recommandé */}
+                    {showReco && reco && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, background: 'var(--accent-dim)', border: '1px solid var(--accent)' }}>
+                        <span style={{ flexShrink: 0 }}><InstagramLogo size={40} /></span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 3 }}>★ Recommandé</div>
+                          <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{reco.title}</p>
+                          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '3px 0 0', lineHeight: 1.5 }}>{reco.desc}</p>
+                          <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '5px 0 0', fontFamily: 'monospace' }}>Par {reco.author} · Template id : {reco.id}</p>
+                        </div>
+                        <button className="sf-btn sf-btn-primary" style={{ height: 34, flexShrink: 0 }} title="Bientôt">Utiliser</button>
+                      </div>
+                    )}
+                    {/* Grille */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+                      {tplList.map(t => (
+                        <div key={t.id} className="sf-card" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                            <span style={{ flexShrink: 0, display: 'flex', gap: 3 }}>{t.platforms.slice(0, 3).map(p => <PlatformLogo key={p} platform={p} size={26} />)}</span>
+                            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.3, margin: 0 }}>{t.title}</p>
+                          </div>
+                          <p style={{ fontSize: 11.5, color: 'var(--text-3)', lineHeight: 1.5, margin: 0, flex: 1 }}>{t.desc}</p>
+                          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <p style={{ fontSize: 10, color: 'var(--text-4)', margin: 0 }}>Par {t.author}</p>
+                              <p style={{ fontSize: 10, color: 'var(--text-4)', margin: 0, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Template id : {t.id}</p>
+                            </div>
+                            <button className="sf-btn sf-btn-ghost" style={{ height: 26, fontSize: 11, flexShrink: 0, color: 'var(--text-4)' }} title="Bientôt : créer une tâche depuis ce template">⋯</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {tplList.length === 0 && <div className="sf-card" style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>Aucun template pour cette plateforme.</div>}
+                  </>
+                ) : (
+                <>
                 {apps.length > 0 && (
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                     <AppChip on={appFilter === 'all'} onClick={() => setAppFilter('all')} label="Toutes" count={baseList.length} />
@@ -167,6 +230,8 @@ export function AutomationLab({ user }: Props) {
                   : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
                       {list.map(f => <FlowCard key={f.id} flow={f} source={src} onOpen={() => { setOpenedFlow(f.id); setFlowId(f.id); setInputs({}) }} />)}
                     </div>}
+                </>
+                )}
               </div>
             )
           })()}
