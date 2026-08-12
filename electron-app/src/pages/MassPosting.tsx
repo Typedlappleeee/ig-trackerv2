@@ -2588,8 +2588,11 @@ export function MassPosting({ user }: MassPostingProps) {
                   <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
                     <div style={{ maxHeight: 340, overflow: 'auto', scrollbarWidth: 'thin', display: 'flex', flexDirection: 'column' }}>
                       {assignments.filter(a => a.videoIndex >= 0).map((a, ri) => {
-                        const sv = a.video!
                         const vi = a.videoIndex
+                        // Lire la vidéo LIVE (selectedVideos), pas la référence figée
+                        // dans `assignments` (mémoïsé sur les IDs) — sinon la description
+                        // tapée n'apparaît pas et le champ semble bloqué.
+                        const sv = selectedVideos[vi] ?? a.video!
                         const fp = sv.localPath ?? sv.item.file_url
                         const cover = covers[vi]
                         const sharedBy = assignments.filter(x => x.videoIndex === vi).length
