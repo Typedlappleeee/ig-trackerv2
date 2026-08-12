@@ -7,7 +7,7 @@
 // ⚠️ Rythme humain volontaire (pauses aléatoires) pour limiter les « action
 // blocked ». Les resource-ids IG peuvent bouger selon la version → fallbacks.
 import { cloudPhones } from './cloudPhones'
-import { dumpUi, tap, dismissPopups } from './phoneAutomation'
+import { dumpUi, tap, dismissPopups, find, typeText, keys, type Matcher } from './phoneAutomation'
 
 type Logger = (m: string) => void
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -125,6 +125,76 @@ export async function scrapeFollowers(id: string, params: Record<string, unknown
   log(list.join(', '))
 }
 
+// ── Édition du profil Instagram (nom, pseudo, bio, lien) ─────────────────────
+// Traduction « cœur » du template GeeLark « Edit Instagram profile » pour les
+// cloud phones. Chaque champ est optionnel : on ne touche qu'à ceux fournis.
+// (Photo de profil = étape +1, nécessite de pousser l'image sur le tel.)
+async function tapFirst(id: string, matchers: Matcher[], label: string, log: Logger, required = true): Promise<boolean> {
+  for (const m of matchers) if (await tap(id, m, { timeoutMs: 5000, retries: 1 })) { log(`  ✓ ${label}`); return true }
+  log(`  ${required ? '✗' : '·'} ${label}${required ? ' introuvable' : ' (sauté)'}`)
+  return false
+}
+// Vide le champ actuellement focalisé (fin de ligne + rafale de suppressions).
+async function clearFocused(id: string): Promise<void> {
+  await cloudPhones.shell(id, 'input keyevent 123')                                  // MOVE_END
+  await cloudPhones.shell(id, 'input keyevent ' + Array(160).fill('67').join(' '))   // 160× DEL
+  await sleep(300)
+}
+// Ouvre un champ (par libellé), le vide, saisit la valeur, enregistre (Done).
+async function editField(id: string, labels: Matcher[], value: string, label: string, log: Logger, confirmChange = false): Promise<void> {
+  await dismissPopups(id)
+  const nodes = await dumpUi(id)
+  const row = labels.map(m => find(nodes, m)).find(Boolean)
+  if (!row) { log(`  · ${label} : champ introuvable`); return }
+  await cloudPhones.shell(id, `input tap ${row.cx} ${row.cy}`)
+  await sleep(1300)
+  const et = (await dumpUi(id)).find(n => /EditText/.test(n.cls))
+  if (!et) { log(`  · ${label} : éditeur introuvable`); return }
+  await cloudPhones.shell(id, `input tap ${et.cx} ${et.cy}`); await sleep(400)
+  await clearFocused(id)
+  await typeText(id, value); await sleep(600)
+  await tapFirst(id, [{ desc: 'Done' }, { text: 'Done' }, { desc: 'Terminé' }, { text: 'OK' }], `${label} enregistré`, log, false)
+  await sleep(1000)
+  if (confirmChange) { await tapFirst(id, [{ text: 'Change name' }, { text: 'Changer le nom' }], 'Confirmation', log, false); await sleep(800) }
+}
+
+export async function editProfile(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const nickname  = String(params.nickname ?? '').trim()
+  const username  = String(params.username ?? '').trim()
+  const biography = String(params.biography ?? '').trim()
+  const linkUrl   = String(params.linkUrl ?? '').trim()
+  const linkTitle = String(params.linkTitle ?? '').trim()
+
+  await dismissPopups(id)
+  // Connecté ? (le template s'arrête si « Log in » est visible)
+  if (find(await dumpUi(id), { desc: 'Log in' }) || find(await dumpUi(id), { text: 'Log in' })) {
+    throw new Error('compte non connecté')
+  }
+  if (!await tapFirst(id, [{ id: 'profile_tab' }, { desc: 'Profile' }, { desc: 'Profil' }], 'Onglet Profil', log)) throw new Error('onglet profil')
+  await sleep(1500); await dismissPopups(id)
+  if (!await tapFirst(id, [{ desc: 'Edit profile' }, { text: 'Edit profile' }, { text: 'Modifier le profil' }, { desc: 'Modifier le profil' }], 'Modifier le profil', log)) throw new Error('bouton « Modifier le profil »')
+  await sleep(1500)
+
+  if (nickname)  await editField(id, [{ text: 'Name' }, { text: 'Nom' }], nickname, 'Nom', log, true)
+  if (username)  await editField(id, [{ text: 'Username' }, { text: "Nom d'utilisateur" }], username, 'Pseudo', log)
+  if (biography) await editField(id, [{ text: 'Bio' }], biography, 'Bio', log)
+  if (linkUrl) {
+    await dismissPopups(id)
+    if (await tapFirst(id, [{ text: 'Add link' }, { text: 'Links' }, { text: 'Liens' }, { text: 'Ajouter un lien' }], 'Section liens', log, false)) {
+      await sleep(1200)
+      await tapFirst(id, [{ text: 'Add link' }, { text: 'Add external link' }, { text: 'Ajouter un lien' }], 'Ajouter un lien', log, false)
+      await sleep(1200)
+      const ets = (await dumpUi(id)).filter(n => /EditText/.test(n.cls))
+      if (ets[0]) { await cloudPhones.shell(id, `input tap ${ets[0].cx} ${ets[0].cy}`); await sleep(300); await clearFocused(id); await typeText(id, linkUrl) }
+      if (linkTitle && ets[1]) { await cloudPhones.shell(id, `input tap ${ets[1].cx} ${ets[1].cy}`); await sleep(300); await clearFocused(id); await typeText(id, linkTitle) }
+      await sleep(500)
+      await tapFirst(id, [{ desc: 'Done' }, { text: 'Done' }, { text: 'OK' }], 'Lien enregistré', log, false)
+      await sleep(1000); await keys.back(id)
+    }
+  }
+  log('✅ Profil mis à jour')
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -133,4 +203,5 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   watch_reels: watchReels,
   follow_followers: followFollowers,
   scrape_followers: scrapeFollowers,
+  edit_profile: editProfile,
 }
