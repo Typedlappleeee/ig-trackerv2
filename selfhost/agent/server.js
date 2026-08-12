@@ -118,6 +118,8 @@ async function createInstance({ name, androidVersion }) {
     `ro.product.manufacturer=${m.brand}`, `ro.serialno=${hex(16)}`,
     'redroid.width=1080', 'redroid.height=1920', 'redroid.dpi=420',
     'redroid.gpu.mode=guest',            // rendu logiciel (pas de GPU requis)
+    'ro.hwui.use_vulkan=0',              // force OpenGL : le Vulkan logiciel (pastel) fait
+                                          // crasher le RenderThread d'Instagram sur le feed.
   ]
   await docker(['run', '-d', '--privileged', '--restart', 'unless-stopped',
     '--name', cname(name),
