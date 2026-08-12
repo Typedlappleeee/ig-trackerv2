@@ -1,5 +1,6 @@
 import { registerStartedPhonesAuto, unregisterPhones } from './phoneWatch'
 import storyFlowDef from './geelarkStoryFlow.json'
+import loginFlowDef from './geelarkLoginFlow.json'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -2550,68 +2551,77 @@ async function _loginInstagramAccountInner(
 }
 
 // ── Login via RPA NATIF GeeLark ──────────────────────────────────────────────
-// Utilise le template officiel « Instagram auto login » (+ « …2FA 2.0 ») s'il est
-// présent dans le compte GeeLark : bien plus fiable que notre pilotage ADB, et
-// piloté côté serveur. On retrouve le flow automatiquement, on mappe identifiant /
-// mot de passe / 2FA sur ses variables (startParamMap), on lance et on poll.
-// Retourne { noFlow:true } si aucun flow login n'est trouvé → l'appelant retombe
-// sur le login ADB. Aucune config manuelle par-téléphone : 100 % automatique une
-// fois le template ajouté (une seule fois) côté GeeLark.
+// Le flow « IG Login Scaleflow » (login IG + 2FA via twofa.co) est importé
+// AUTOMATIQUEMENT dans le compte GeeLark (une seule fois, mis en cache), comme le
+// flow Story. Puis exécuté par téléphone via /task/rpa/add avec paramMap
+// {User, Password, Key}. Détection par éléments côté serveur → bien plus fiable
+// que nos input tap. Retourne { noFlow:true } si l'import échoue → repli ADB.
+const LOGIN_FLOW_VERSION = '1'
+const _loginFlowIdCache = new Map<string, Promise<string | null>>()
+function loginFlowLsKey(bearer: string): string { return `sf-login-flowid:${bearer.slice(-14)}` }
+function loginFlowVerKey(bearer: string): string { return `sf-login-flowver:${bearer.slice(-14)}` }
+export function forgetLoginFlowId(bearer: string): void {
+  try { localStorage.removeItem(loginFlowLsKey(bearer)); localStorage.removeItem(loginFlowVerKey(bearer)) } catch { /* ignore */ }
+  _loginFlowIdCache.delete(bearer)
+}
+async function ensureLoginFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
+  const cached = _loginFlowIdCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, storedVer: string | null = null
+    try { stored = localStorage.getItem(loginFlowLsKey(bearer)); storedVer = localStorage.getItem(loginFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && storedVer === LOGIN_FLOW_VERSION) return stored
+    log?.(stored ? '🔄 Mise à jour du flow « IG Login »…' : '📥 Import du flow de login dans GeeLark…')
+    try {
+      const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(loginFlowDef) }, bearer)
+      if (res['code'] !== 0) { log?.(`⚠ Import du flow login : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(loginFlowLsKey(bearer), id); localStorage.setItem(loginFlowVerKey(bearer), LOGIN_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log?.(`⚠ Import du flow login : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _loginFlowIdCache.set(bearer, p)
+  p.then(v => { if (!v) _loginFlowIdCache.delete(bearer) }).catch(() => _loginFlowIdCache.delete(bearer))
+  return p
+}
+
 export async function loginInstagramViaRpa(
   bearer: string,
   phoneId: string,
   creds: { email: string; password: string; totp?: string },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string; noFlow?: boolean }> {
-  let flows: Record<string, unknown>[]
-  try { flows = await listRpaFlowsRaw(bearer) }
-  catch (e) { return { ok: false, noFlow: true, error: e instanceof Error ? e.message : String(e) } }
+  const flowId = await ensureLoginFlowId(bearer, log)
+  if (!flowId) return { ok: false, noFlow: true, error: 'Flow login RPA indisponible (import GeeLark échoué)' }
 
-  const titleOf = (f: Record<string, unknown>) => String(f['title'] ?? f['name'] ?? '')
-  const isLogin = (t: string) => /instagram.*log\s?in|log\s?in.*instagram|auto[\s-]?login|login.*2fa|connexion.*instagram/i.test(t)
-  const candidates = flows.filter(f => isLogin(titleOf(f)))
-  if (candidates.length === 0) return { ok: false, noFlow: true, error: 'Aucun flow de login GeeLark dans le compte' }
-
-  const wants2fa = !!creds.totp?.trim()
-  const flow =
-    (wants2fa ? candidates.find(f => /2fa/i.test(titleOf(f))) : undefined) ??
-    candidates.find(f => !/2fa/i.test(titleOf(f))) ?? candidates[0]
-  const flowId = String(flow['id'] ?? '')
-  if (!flowId) return { ok: false, noFlow: true, error: 'Flow login sans id' }
-  log(`🔐 Login via RPA GeeLark natif : « ${titleOf(flow)} »`)
-
-  // Mappe les identifiants sur les variables du flow (startParamMap).
-  const spm = (flow['startParamMap'] ?? (flow['content'] as Record<string, unknown> | undefined)?.['startParamMap']) as Array<{ key?: string }> | undefined
-  const keys = Array.isArray(spm) ? spm.map(p => String(p.key ?? '')).filter(Boolean) : []
-  const paramMap: Record<string, unknown> = {}
-  if (keys.length) {
-    log(`   Variables du flow : ${keys.join(', ')}`)
-    const uk = keys.find(k => /user|account|login|email|pseudo|identifiant/i.test(k))
-    const pk = keys.find(k => /pass|pwd|mot.?de.?passe/i.test(k))
-    const tk = keys.find(k => /2fa|otp|totp|code|secret|verif/i.test(k))
-    if (!uk || !pk) return { ok: false, noFlow: true, error: `Variables du flow non reconnues (${keys.join(', ')})` }
-    paramMap[uk] = creds.email
-    paramMap[pk] = creds.password
-    if (tk && creds.totp) paramMap[tk] = creds.totp.trim()
-  } else {
-    // Pas de schéma exposé → clés courantes (ajustables selon le template).
-    paramMap['username'] = creds.email
-    paramMap['password'] = creds.password
-    if (creds.totp) paramMap['2fa'] = creds.totp.trim()
+  // Variables du flow : User (identifiant/email), Password, Key (secret 2FA base32).
+  const paramMap: Record<string, unknown> = {
+    User:     creds.email,
+    Password: creds.password,
+    Key:      creds.totp?.trim() ?? '',
   }
 
-  return withPhoneAutoStop(bearer, phoneId, 10 * 60_000, '10min', log, async () => {
+  return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
-    const res = await geelarkFetch('POST', '/task/rpa/add', {
-      id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 3,
+    log('🔐 Connexion via RPA GeeLark natif…')
+    const addTask = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
+      id: phoneId, flowId: fid, scheduleAt: Math.floor(Date.now() / 1000) + 3,
       name: 'Login Scaleflow', paramMap,
     }, bearer)
+    let res = await addTask(flowId)
+    // Flow mémorisé mais supprimé côté GeeLark (code 48002) → ré-import puis retry.
+    if (res['code'] !== 0 && Number(res['code']) === 48002) {
+      log('   ↻ Flow introuvable — ré-import…')
+      forgetLoginFlowId(bearer)
+      const fresh = await ensureLoginFlowId(bearer, log)
+      if (fresh) res = await addTask(fresh)
+    }
     if (res['code'] !== 0) return { ok: false, error: `GeeLark login RPA : ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log('   Tâche RPA créée — connexion en cours…')
-    return pollRpaTask(bearer, taskId, log, 8 * 60_000)
+    return pollRpaTask(bearer, taskId, log, 10 * 60_000)
   })
 }
 

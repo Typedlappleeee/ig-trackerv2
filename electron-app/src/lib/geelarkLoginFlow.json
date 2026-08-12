@@ -1,0 +1,1775 @@
+{
+  "title": "IG Login Scaleflow",
+  "desc": "Auto-import — Instagram auto login + 2FA (User/Password/Key). Natif GeeLark, detection par elements.",
+  "content": {
+    "startParamMap": [
+      {
+        "id": "93a19f83-43bf-489e-a624-30f9dcb215d0",
+        "key": "User",
+        "tips": "Phone/Email",
+        "type": "string",
+        "value": "",
+        "createFrom": "",
+        "isNotRequired": true
+      },
+      {
+        "id": "ead08cc2-0cef-4483-be2e-3cef92d182d3",
+        "key": "Password",
+        "type": "string",
+        "value": "",
+        "createFrom": "",
+        "isNotRequired": true
+      },
+      {
+        "id": "fda9ba1e-7294-4dca-84b9-8f5dd2453a4b",
+        "key": "Key",
+        "tips": "2fa Key",
+        "type": "string",
+        "value": "",
+        "createFrom": "",
+        "isNotRequired": true
+      }
+    ],
+    "contents": [
+      {
+        "id": "611f6458-8114-4f94-af95-ead4a1645e18",
+        "name": "Run ADB",
+        "type": "executeADB",
+        "config": {
+          "content": "if pm list packages | grep -q com.instagram.android; then echo \"instagram installed\"; else echo \"instagram not installed\"; fi",
+          "timeout": 30000,
+          "variable": "AdbResponse"
+        }
+      },
+      {
+        "id": "f08c53ce-e449-4f12-b533-fe861202a6d2",
+        "name": "Time",
+        "type": "waitTime",
+        "config": {
+          "timeout": 6000,
+          "timeoutType": "fixedValue"
+        }
+      },
+      {
+        "id": "d9048eec-a470-4b0c-bd0e-ccdf6088f0dd",
+        "name": "Statement if",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "a63ed89b-a2a2-4a00-8f3a-b6710f6f15e9",
+              "name": "Throw an exception",
+              "type": "throwException",
+              "config": {
+                "content": "${AdbResponse}"
+              }
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "result": "not installed",
+                "relation": "contain",
+                "probability": 50,
+                "useVariable": "AdbResponse"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "7d0c5431-8159-4066-a726-0acec36d6384",
+        "name": "Logs",
+        "type": "log",
+        "config": {
+          "content": "${AdbResponse}"
+        }
+      },
+      {
+        "id": "136b7915-fddc-4a39-8d6f-2fee0363eede",
+        "name": "Open App",
+        "type": "openApp",
+        "config": {
+          "packgename": "com.instagram.android"
+        }
+      },
+      {
+        "id": "4f5d5c83-b033-451e-a794-477feb12046e",
+        "name": "Run ADB",
+        "type": "executeADB",
+        "config": {
+          "content": "pm grant com.instagram.android android.permission.CAMERA; pm grant com.instagram.android android.permission.RECORD_AUDIO; pm grant com.instagram.android android.permission.READ_CONTACTS; pm grant com.instagram.android android.permission.WRITE_CONTACTS; pm grant com.instagram.android android.permission.ACCESS_FINE_LOCATION; pm grant com.instagram.android android.permission.ACCESS_COARSE_LOCATION; pm grant com.instagram.android android.permission.READ_PHONE_STATE; pm grant com.instagram.android android.permission.READ_MEDIA_IMAGES; pm grant com.instagram.android android.permission.READ_MEDIA_VIDEO; pm grant com.instagram.android android.permission.POST_NOTIFICATIONS; pm grant com.instagram.android android.permission.BLUETOOTH_CONNECT; pm grant com.instagram.android android.permission.BLUETOOTH_SCAN",
+          "timeout": 30000
+        }
+      },
+      {
+        "id": "57c377ad-6b3d-4bdb-b397-f2a49a19f283",
+        "name": "Time",
+        "type": "waitTime",
+        "config": {
+          "timeout": 20000,
+          "timeoutType": "fixedValue"
+        }
+      },
+      {
+        "id": "84e20066-9a8b-4c3a-8991-85e0a17026b1",
+        "name": "For Loop Times",
+        "type": "forTimes",
+        "config": {
+          "times": "4",
+          "remark": "PAGE0 - ALREADY",
+          "children": [
+            {
+              "id": "21fd6877-4f7c-4410-8dd7-f0997033fee4",
+              "name": "Element appears",
+              "type": "waitEle",
+              "config": {
+                "serial": 1,
+                "variable": "ALREADY",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "I already have a profile",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "59eb1651-19e6-4497-8dec-650c3bb9d9fe",
+              "name": "Element appears",
+              "type": "waitEle",
+              "config": {
+                "serial": 1,
+                "variable": "ALREADY2",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "I already have an account",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "e890b5d0-a430-49b6-919c-034068c61132",
+              "name": "Statement if",
+              "type": "ifElse",
+              "config": {
+                "children": [
+                  {
+                    "id": "0554ce35-dda8-40c9-992b-4895a076c91d",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "I already have a profile",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "8ea8c3c5-523c-4686-984d-bcc65f740705",
+                    "name": "Exit Loop",
+                    "type": "breakLoop",
+                    "config": {}
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "relation": "exist",
+                      "probability": 50,
+                      "useVariable": "ALREADY"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "adf93665-b27e-4ac6-913b-7163416f81c9",
+              "name": "Statement if",
+              "type": "ifElse",
+              "config": {
+                "children": [
+                  {
+                    "id": "334402a0-8a2d-490a-a159-b10bce61b924",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "I already have an account",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "58767512-e29a-4012-93e6-f7f56d0a185e",
+                    "name": "Exit Loop",
+                    "type": "breakLoop",
+                    "config": {}
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "relation": "exist",
+                      "probability": 50,
+                      "useVariable": "ALREADY2"
+                    }
+                  ]
+                ]
+              }
+            }
+          ],
+          "serialType": "fixedValue"
+        }
+      },
+      {
+        "id": "77249043-a8c7-4edf-854f-00e2921f3e30",
+        "name": "Time",
+        "type": "waitTime",
+        "config": {
+          "timeout": 5000,
+          "timeoutType": "fixedValue"
+        }
+      },
+      {
+        "id": "83977979-e54d-40c6-8c20-bd588ed9b05f",
+        "name": "For Loop Times",
+        "type": "forTimes",
+        "config": {
+          "times": "8",
+          "remark": "PAGE1 - LOGIN",
+          "children": [
+            {
+              "id": "f2e19000-0d3c-4d85-adb5-2c9e575e1f74",
+              "name": "Element appears",
+              "type": "waitEle",
+              "config": {
+                "serial": 1,
+                "variable": "LOGIN01",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "Log in",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "107be033-db95-42e6-8e5b-0087341bdad7",
+              "name": "Statement if",
+              "type": "ifElse",
+              "config": {
+                "children": [
+                  {
+                    "id": "05d98d0b-a37c-44f6-908a-fd05295fc288",
+                    "name": "Input",
+                    "type": "inputContent",
+                    "config": {
+                      "clear": true,
+                      "serial": 1,
+                      "content": [
+                        "${User}"
+                      ],
+                      "simulate": true,
+                      "waitTime": 300,
+                      "inputType": "taskOrder",
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "hiddenChildren": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Username,",
+                            "filterType": "contain"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "0223905d-6cd2-4d33-9f3d-2945c086b482",
+                    "name": "Input",
+                    "type": "inputContent",
+                    "config": {
+                      "clear": true,
+                      "serial": 1,
+                      "content": [
+                        "${Password}"
+                      ],
+                      "simulate": true,
+                      "waitTime": 300,
+                      "inputType": "taskOrder",
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "hiddenChildren": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Password",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "332458bc-31b3-4893-9b78-c025fd1fc6a2",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Log in",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "49a77a23-e07b-4e51-80fd-d9707166b5a0",
+                    "name": "Exit Loop",
+                    "type": "breakLoop",
+                    "config": {}
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "relation": "exist",
+                      "probability": 50,
+                      "useVariable": "LOGIN01"
+                    }
+                  ]
+                ]
+              }
+            }
+          ],
+          "serialType": "fixedValue"
+        }
+      },
+      {
+        "id": "35561707-7184-4717-bde7-fe35d0860b75",
+        "name": "Time",
+        "type": "waitTime",
+        "config": {
+          "timeout": 15000,
+          "timeoutType": "fixedValue"
+        }
+      },
+      {
+        "id": "4d6c9f9a-355a-41e4-9571-86a8d985bbde",
+        "name": "Elemento aparece",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "variable": "SaveRecent",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "filterCollection": [
+            [
+              {
+                "type": "text",
+                "content": "Save",
+                "filterType": "equal"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "c3f4bc3a-1706-4c5b-b810-d24bd4e5a7cd",
+        "name": "Declaracao se",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "0aafd521-722c-4595-b51e-ebce3c4d8a6e",
+              "name": "Clicar em elemento",
+              "type": "click",
+              "config": {
+                "serial": 1,
+                "useOffset": false,
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "doubleClick": false,
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "text",
+                      "content": "Save",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "ece41ee7-2d7e-4880-990e-6be1de0bc0c3",
+              "name": "Time",
+              "type": "waitTime",
+              "config": {
+                "timeout": 10000,
+                "timeoutType": "fixedValue"
+              }
+            },
+            {
+              "id": "b3b6230a-95b5-44e6-b4e1-ccf51a6e61bf",
+              "name": "Encerrar tarefa",
+              "type": "endTask",
+              "config": {}
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "relation": "exist",
+                "probability": 50,
+                "useVariable": "SaveRecent"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "518bd723-849f-4476-ac77-71e652de11b6",
+        "name": "Element appears",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "variable": "INCORRECT",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "filterCollection": [
+            [
+              {
+                "type": "text",
+                "content": "Incorrect password",
+                "filterType": "equal"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "9c67805d-7ee8-44bb-b396-2597ed14e9a1",
+        "name": "Element appears",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "variable": "ISTHIS",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "filterCollection": [
+            [
+              {
+                "type": "desc",
+                "content": "Is this your account?",
+                "filterType": "equal"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "47d5e553-1170-4533-9b55-e2080ef3a6cd",
+        "name": "Element appears",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "variable": "RECOVERY",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "filterCollection": [
+            [
+              {
+                "type": "text",
+                "content": "Recover your account",
+                "filterType": "equal"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "6d3baf42-05c2-4a22-baf3-0028ce1d902f",
+        "name": "Element appears",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "variable": "GOTO",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "filterCollection": [
+            [
+              {
+                "type": "desc",
+                "content": "Go to your authentication app",
+                "filterType": "equal"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "57aa52c8-90ff-408a-b227-c62267fae287",
+        "name": "Statement if",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "7ec42973-c59f-4fc1-9124-dbcf205cd004",
+              "name": "Get element data",
+              "type": "getEle",
+              "config": {
+                "type": "text",
+                "serial": 1,
+                "variable": "INCORRECTPASS",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "text",
+                      "content": "Incorrect password",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "f6648dab-e366-40bc-97d8-d6df82e5d645",
+              "name": "Throw an exception",
+              "type": "throwException",
+              "config": {
+                "content": "${INCORRECTPASS}"
+              }
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "relation": "exist",
+                "probability": 50,
+                "useVariable": "INCORRECT"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "50fce24c-1ada-4bc6-95b7-ef20c03d57c1",
+        "name": "Statement if",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "36bc3c51-1afc-4906-aa3d-2dc32a25a3f6",
+              "name": "Click",
+              "type": "click",
+              "config": {
+                "serial": 1,
+                "useOffset": false,
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "doubleClick": false,
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "Continue",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "41f4c8fb-7c05-46b3-814b-df3534e07da2",
+              "name": "For Loop Times",
+              "type": "forTimes",
+              "config": {
+                "times": "4",
+                "remark": "SUBPAGE2 - PASS",
+                "children": [
+                  {
+                    "id": "e547bb6c-e7b0-46e4-8eea-7a502f6dc03f",
+                    "name": "Element appears",
+                    "type": "waitEle",
+                    "config": {
+                      "serial": 1,
+                      "variable": "SUBPASS2",
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "hiddenChildren": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Forgot password?",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "bd2716b0-f33a-47ef-9507-fae94493fdcb",
+                    "name": "Statement if",
+                    "type": "ifElse",
+                    "config": {
+                      "children": [
+                        {
+                          "id": "b7439192-5f33-49c0-8629-8bd5d6a778fd",
+                          "name": "Input",
+                          "type": "inputContent",
+                          "config": {
+                            "clear": true,
+                            "serial": 1,
+                            "content": [
+                              "${Password}"
+                            ],
+                            "simulate": true,
+                            "waitTime": 300,
+                            "inputType": "taskOrder",
+                            "searchTime": 3000,
+                            "serialType": "fixedValue",
+                            "hiddenChildren": false,
+                            "filterCollection": [
+                              [
+                                {
+                                  "type": "desc",
+                                  "content": "Password,",
+                                  "filterType": "equal"
+                                }
+                              ]
+                            ]
+                          }
+                        },
+                        {
+                          "id": "93ecc37c-17e0-4a36-8bda-15c0c022fa39",
+                          "name": "Click",
+                          "type": "click",
+                          "config": {
+                            "serial": 1,
+                            "useOffset": false,
+                            "searchTime": 3000,
+                            "serialType": "fixedValue",
+                            "doubleClick": false,
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "filterCollection": [
+                              [
+                                {
+                                  "type": "desc",
+                                  "content": "Log in",
+                                  "filterType": "equal"
+                                }
+                              ]
+                            ]
+                          }
+                        },
+                        {
+                          "id": "14e08bc1-6eae-452f-9a87-a1e7065d8584",
+                          "name": "Exit Loop",
+                          "type": "breakLoop",
+                          "config": {}
+                        }
+                      ],
+                      "conditionV3": [
+                        [
+                          {
+                            "relation": "exist",
+                            "probability": 50,
+                            "useVariable": "SUBPASS2"
+                          }
+                        ]
+                      ]
+                    }
+                  }
+                ],
+                "serialType": "fixedValue"
+              }
+            },
+            {
+              "id": "ba4770cc-d1da-4d52-a509-23777c08cc88",
+              "name": "Time",
+              "type": "waitTime",
+              "config": {
+                "timeout": 15000,
+                "timeoutType": "fixedValue"
+              }
+            },
+            {
+              "id": "2518f36a-a095-46f0-b21f-c62e350fe253",
+              "name": "End Task",
+              "type": "endTask",
+              "config": {}
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "relation": "exist",
+                "probability": 50,
+                "useVariable": "ISTHIS"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "aa3dbadf-006a-43ed-bad6-5f64f0f4aa11",
+        "name": "Statement if",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "a59e261a-0bf1-4ebe-a6c0-35b51b4fee43",
+              "name": "Get element data",
+              "type": "getEle",
+              "config": {
+                "type": "text",
+                "serial": 1,
+                "variable": "RECOVERY1",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "text",
+                      "content": "Recover your account",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "68a86103-9c2c-4fbb-82a2-048318ac9e54",
+              "name": "Throw an exception",
+              "type": "throwException",
+              "config": {
+                "content": "${RECOVERY1}"
+              }
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "relation": "exist",
+                "probability": 50,
+                "useVariable": "RECOVERY"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e2ccbfd8-3166-49f8-b814-338aca444522",
+        "name": "Statement if",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "fccd1414-275d-4750-ae41-a46f1572747a",
+              "name": "HTTP request",
+              "type": "getNetworkRequest",
+              "config": {
+                "url": "https://twofa.co/api/${Key}",
+                "type": "get",
+                "headers": [
+                  {
+                    "name": "",
+                    "value": ""
+                  }
+                ],
+                "timeout": 60,
+                "retryCount": 3,
+                "contentType": "json",
+                "variableMap": [
+                  {
+                    "value": "token",
+                    "variable": "Key2fa2"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "bc994189-4e0a-4381-98ce-af7461283e1a",
+              "name": "Input",
+              "type": "inputContent",
+              "config": {
+                "clear": true,
+                "serial": 1,
+                "content": [
+                  "${Key2fa2}"
+                ],
+                "simulate": true,
+                "waitTime": 300,
+                "inputType": "taskOrder",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "Code",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "c89e9c14-7dbc-4d20-90c3-9c32950cd8fa",
+              "name": "Click",
+              "type": "click",
+              "config": {
+                "serial": 1,
+                "useOffset": false,
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "doubleClick": false,
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "Continue",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "fabc205a-bdcb-4e8a-ad25-55b065b0a3ec",
+              "name": "Time",
+              "type": "waitTime",
+              "config": {
+                "timeout": 20000,
+                "timeoutType": "fixedValue"
+              }
+            },
+            {
+              "id": "d0086d45-d240-4d86-9f71-63a7701899ad",
+              "name": "Element appears",
+              "type": "waitEle",
+              "config": {
+                "serial": 1,
+                "variable": "Save",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "text",
+                      "content": "Save",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "3ba87f42-521b-43d2-a336-7e1d61cf5b02",
+              "name": "Statement if",
+              "type": "ifElse",
+              "config": {
+                "children": [
+                  {
+                    "id": "8be8a392-bbd1-48a7-a517-4b6b48db54fa",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Save",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "relation": "exist",
+                      "probability": 50,
+                      "useVariable": "Save"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "adeca688-6ba5-4c87-bd84-ab09c8340d22",
+              "name": "Time",
+              "type": "waitTime",
+              "config": {
+                "timeout": 10000,
+                "timeoutType": "fixedValue"
+              }
+            },
+            {
+              "id": "6b46b820-68ac-463d-a14e-df9ffed2add5",
+              "name": "Group",
+              "type": "group",
+              "config": {
+                "name": "Save",
+                "children": [
+                  {
+                    "id": "7e434548-c159-42af-8430-2febb0428954",
+                    "name": "Open App",
+                    "type": "openApp",
+                    "config": {
+                      "packgename": "com.instagram.android"
+                    }
+                  },
+                  {
+                    "id": "f7904124-4822-4d33-87a8-3602e3b83f29",
+                    "name": "Time",
+                    "type": "waitTime",
+                    "config": {
+                      "timeout": 10000,
+                      "timeoutType": "fixedValue"
+                    }
+                  },
+                  {
+                    "id": "28143456-dee5-4e03-93bf-227fa6f49343",
+                    "name": "Element appears",
+                    "type": "waitEle",
+                    "config": {
+                      "serial": 1,
+                      "variable": "SAVEP2",
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "hiddenChildren": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Save your login info?",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "f18554c4-d7af-4922-b8cd-4c6fbf604a54",
+                    "name": "Statement if",
+                    "type": "ifElse",
+                    "config": {
+                      "children": [
+                        {
+                          "id": "74926868-d9b4-4de1-8150-48f36e330679",
+                          "name": "Click",
+                          "type": "click",
+                          "config": {
+                            "serial": 1,
+                            "useOffset": false,
+                            "searchTime": 3000,
+                            "serialType": "fixedValue",
+                            "doubleClick": false,
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "filterCollection": [
+                              [
+                                {
+                                  "type": "text",
+                                  "content": "Save",
+                                  "filterType": "equal"
+                                }
+                              ]
+                            ]
+                          }
+                        },
+                        {
+                          "id": "52933c66-211e-41e9-867c-edae6fdcc9f6",
+                          "name": "Time",
+                          "type": "waitTime",
+                          "config": {
+                            "timeout": 10000,
+                            "timeoutType": "fixedValue"
+                          }
+                        }
+                      ],
+                      "conditionV3": [
+                        [
+                          {
+                            "relation": "exist",
+                            "probability": 50,
+                            "useVariable": "SAVEP2"
+                          }
+                        ]
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "a209f741-9354-49a7-b572-6556f825b21a",
+              "name": "End Task",
+              "type": "endTask",
+              "config": {}
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "relation": "exist",
+                "probability": 50,
+                "useVariable": "GOTO"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "4399feda-13e3-42a0-ae13-0b9e3eb7770a",
+        "name": "For Loop Times",
+        "type": "forTimes",
+        "config": {
+          "times": "4",
+          "remark": "PAGE2 - ANOTHERDEVICE",
+          "children": [
+            {
+              "id": "4d5050c6-91c2-42eb-85f6-84583895f421",
+              "name": "Element appears",
+              "type": "waitEle",
+              "config": {
+                "serial": 1,
+                "variable": "TRYANOTHER1",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "Try another way",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "ddda9e6f-961f-47db-b0f0-f26b054fd23d",
+              "name": "Statement if",
+              "type": "ifElse",
+              "config": {
+                "children": [
+                  {
+                    "id": "b75069fa-68aa-48b3-a12f-6131d1b53eb8",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Try another way",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "a5ac37b9-ab8b-4c57-92d0-40ca580374a4",
+                    "name": "Exit Loop",
+                    "type": "breakLoop",
+                    "config": {}
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "relation": "exist",
+                      "probability": 50,
+                      "useVariable": "TRYANOTHER1"
+                    }
+                  ]
+                ]
+              }
+            }
+          ],
+          "serialType": "fixedValue"
+        }
+      },
+      {
+        "id": "cce63ade-88f0-4cf2-b810-23633e57cb4e",
+        "name": "For Loop Times",
+        "type": "forTimes",
+        "config": {
+          "times": "4",
+          "remark": "PAGE3 - AUTHENTICATIONAPP",
+          "children": [
+            {
+              "id": "9b17d29d-f084-4ca5-84be-02c9b1e37081",
+              "name": "Element appears",
+              "type": "waitEle",
+              "config": {
+                "serial": 1,
+                "variable": "AUTHENTICATION",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "Authentication app",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "afff94ba-ee25-47bb-a143-d58d454eb59c",
+              "name": "Statement if",
+              "type": "ifElse",
+              "config": {
+                "children": [
+                  {
+                    "id": "5fc1794d-b3a3-4188-bc44-64db9171098f",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Authentication app",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "4ae9eb84-eff9-4a13-8578-b97ae55b6f8b",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Continue",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "4eb259fc-eb20-4663-a662-54be91e8ab61",
+                    "name": "Exit Loop",
+                    "type": "breakLoop",
+                    "config": {}
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "relation": "exist",
+                      "probability": 50,
+                      "useVariable": "AUTHENTICATION"
+                    }
+                  ]
+                ]
+              }
+            }
+          ],
+          "serialType": "fixedValue"
+        }
+      },
+      {
+        "id": "0582758f-79b8-4c30-8de7-05f3e6fb3fc6",
+        "name": "For Loop Times",
+        "type": "forTimes",
+        "config": {
+          "times": "4",
+          "remark": "PAGE4 - AUTHENTICATIONAPPADD",
+          "children": [
+            {
+              "id": "ab9d5094-8dc7-4ceb-b213-f4153e79e4e9",
+              "name": "Element appears",
+              "type": "waitEle",
+              "config": {
+                "serial": 1,
+                "variable": "AUTHENTICATIONAPPADD",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "Go to your authentication app",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "f5630c40-05ea-4847-a14a-1e9e395e68b7",
+              "name": "Statement if",
+              "type": "ifElse",
+              "config": {
+                "children": [
+                  {
+                    "id": "a7db481a-6c81-4f08-9469-c252bc11d60b",
+                    "name": "HTTP request",
+                    "type": "getNetworkRequest",
+                    "config": {
+                      "url": "https://twofa.co/api/${Key}",
+                      "type": "get",
+                      "headers": [
+                        {
+                          "name": "",
+                          "value": ""
+                        }
+                      ],
+                      "timeout": 60,
+                      "retryCount": 3,
+                      "contentType": "json",
+                      "variableMap": [
+                        {
+                          "value": "token",
+                          "variable": "Key2fa"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "7813be97-a1ff-4d86-b66b-e601ee8a2615",
+                    "name": "Input",
+                    "type": "inputContent",
+                    "config": {
+                      "clear": true,
+                      "serial": 1,
+                      "content": [
+                        "${Key2fa}"
+                      ],
+                      "simulate": true,
+                      "waitTime": 300,
+                      "inputType": "taskOrder",
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "hiddenChildren": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Code",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "0413d9ce-4fb6-477f-90e0-84ab44e5bfa0",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Continue",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "2744e5d5-35ff-4e99-a754-5e32ffafaffd",
+                    "name": "Time",
+                    "type": "waitTime",
+                    "config": {
+                      "timeout": 10000,
+                      "timeoutType": "fixedValue"
+                    }
+                  },
+                  {
+                    "id": "fb941e81-ef12-45cc-aefe-57f139702828",
+                    "name": "Click",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "useOffset": false,
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "doubleClick": false,
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "filterCollection": [
+                        [
+                          {
+                            "type": "desc",
+                            "content": "Save",
+                            "filterType": "equal"
+                          }
+                        ]
+                      ]
+                    }
+                  },
+                  {
+                    "id": "02dc75a4-5d40-46bb-8669-348e70f83ecc",
+                    "name": "Time",
+                    "type": "waitTime",
+                    "config": {
+                      "timeout": 10000,
+                      "timeoutType": "fixedValue"
+                    }
+                  },
+                  {
+                    "id": "4af69d5f-a505-4dc6-aa87-5f701b7e5c06",
+                    "name": "Group",
+                    "type": "group",
+                    "config": {
+                      "name": "Save2",
+                      "children": [
+                        {
+                          "id": "028cf7db-8d42-4bc1-92cd-a7343b01f53e",
+                          "name": "Open App",
+                          "type": "openApp",
+                          "config": {
+                            "packgename": "com.instagram.android"
+                          }
+                        },
+                        {
+                          "id": "5389553b-998f-4a24-bc9c-ea23dfdd6b76",
+                          "name": "Time",
+                          "type": "waitTime",
+                          "config": {
+                            "timeout": 10000,
+                            "timeoutType": "fixedValue"
+                          }
+                        },
+                        {
+                          "id": "e8a06305-9a0f-41ab-b2c6-3e8de3423a21",
+                          "name": "Element appears",
+                          "type": "waitEle",
+                          "config": {
+                            "serial": 1,
+                            "variable": "SAVEP3",
+                            "searchTime": 3000,
+                            "serialType": "fixedValue",
+                            "hiddenChildren": false,
+                            "filterCollection": [
+                              [
+                                {
+                                  "type": "desc",
+                                  "content": "Save your login info?",
+                                  "filterType": "equal"
+                                }
+                              ]
+                            ]
+                          }
+                        },
+                        {
+                          "id": "e7aaa41c-02d0-4381-b506-bd09c7d02320",
+                          "name": "Statement if",
+                          "type": "ifElse",
+                          "config": {
+                            "children": [
+                              {
+                                "id": "919bd436-8e3f-4f76-a757-490ac5feb1ab",
+                                "name": "Click",
+                                "type": "click",
+                                "config": {
+                                  "serial": 1,
+                                  "useOffset": false,
+                                  "searchTime": 3000,
+                                  "serialType": "fixedValue",
+                                  "doubleClick": false,
+                                  "hiddenChildren": false,
+                                  "randomDistance": 0,
+                                  "filterCollection": [
+                                    [
+                                      {
+                                        "type": "text",
+                                        "content": "Save",
+                                        "filterType": "equal"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              },
+                              {
+                                "id": "722c4672-84e2-4bd6-9b1b-1738ec4415a0",
+                                "name": "Time",
+                                "type": "waitTime",
+                                "config": {
+                                  "timeout": 10000,
+                                  "timeoutType": "fixedValue"
+                                }
+                              }
+                            ],
+                            "conditionV3": [
+                              [
+                                {
+                                  "relation": "exist",
+                                  "probability": 50,
+                                  "useVariable": "SAVEP3"
+                                }
+                              ]
+                            ]
+                          }
+                        },
+                        {
+                          "id": "cf4320cd-e101-488a-aa3d-e43e4dcb2e95",
+                          "name": "End Task",
+                          "type": "endTask",
+                          "config": {}
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "relation": "exist",
+                      "probability": 50,
+                      "useVariable": "AUTHENTICATIONAPPADD"
+                    }
+                  ]
+                ]
+              }
+            }
+          ],
+          "serialType": "fixedValue"
+        }
+      },
+      {
+        "id": "1764147a-42fa-43c2-9c9e-27b0dff0dca3",
+        "name": "Element appears",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "variable": "NOTLOG",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "filterCollection": [
+            [
+              {
+                "type": "desc",
+                "content": "Instagram from Meta",
+                "filterType": "equal"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e2749e34-feed-4f03-96ec-a3a83ca405d2",
+        "name": "Statement if",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "afd5a403-0aa4-4f6d-8d5b-cba15e7285bd",
+              "name": "Get element data",
+              "type": "getEle",
+              "config": {
+                "type": "text",
+                "serial": 1,
+                "variable": "NOTLOG1",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "Instagram from Meta",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "a5358d6e-6c28-4a95-8291-f3afc38c2f4a",
+              "name": "Throw an exception",
+              "type": "throwException",
+              "config": {
+                "content": "${NOTLOG1}"
+              }
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "relation": "exist",
+                "probability": 50,
+                "useVariable": "NOTLOG"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "36e8a875-1b02-45fc-9777-76db2e34a7f1",
+        "name": "Element appears",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "variable": "NOTLOG01",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "filterCollection": [
+            [
+              {
+                "type": "desc",
+                "content": "I already have a profile",
+                "filterType": "equal"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "4bcd82f5-1697-4c86-85c1-c3d7532e8977",
+        "name": "Statement if",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "e44f1144-315c-40e8-9cca-a5219de08d25",
+              "name": "Get element data",
+              "type": "getEle",
+              "config": {
+                "type": "text",
+                "serial": 1,
+                "variable": "NOTLOG2",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "I already have a profile",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "66aa89f9-5959-46d8-9f05-496754aff998",
+              "name": "Throw an exception",
+              "type": "throwException",
+              "config": {
+                "content": "${NOTLOG2}"
+              }
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "relation": "exist",
+                "probability": 50,
+                "useVariable": "NOTLOG1"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "7dc7e47e-e5c9-4d5e-8f31-e72ec7244157",
+        "name": "Element appears",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "variable": "NOTLOG03",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "filterCollection": [
+            [
+              {
+                "type": "desc",
+                "content": "I already have an account",
+                "filterType": "equal"
+              }
+            ]
+          ]
+        }
+      },
+      {
+        "id": "b9faae88-f331-447a-a13c-2e1c583730b1",
+        "name": "Statement if",
+        "type": "ifElse",
+        "config": {
+          "children": [
+            {
+              "id": "7b538566-f1e7-48fe-aabd-eead6512d6cb",
+              "name": "Get element data",
+              "type": "getEle",
+              "config": {
+                "type": "text",
+                "serial": 1,
+                "variable": "NOTLOG4",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "filterCollection": [
+                  [
+                    {
+                      "type": "desc",
+                      "content": "I already have a profile",
+                      "filterType": "equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": "b70a22cc-e79c-4423-aec5-02b32c870a84",
+              "name": "Throw an exception",
+              "type": "throwException",
+              "config": {
+                "content": "${NOTLOG4}"
+              }
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "relation": "exist",
+                "probability": 50,
+                "useVariable": "NOTLOG03"
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    "contentType": "phone",
+    "errorType": "skip",
+    "isDebug": false
+  }
+}
