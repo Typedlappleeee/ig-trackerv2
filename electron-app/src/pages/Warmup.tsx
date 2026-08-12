@@ -284,8 +284,12 @@ export function Warmup({ user }: WarmupProps) {
         const rest  = parts.slice(1)
         let totpSecret = ''
         let password = ''
-        if (rest.length >= 2 && /^[A-Z2-7]{16,}$/i.test(rest[rest.length - 1])) {
-          totpSecret = rest[rest.length - 1]
+        // Le 2FA est reconnu si le DERNIER champ ressemble à un secret TOTP base32.
+        // On retire les espaces AVANT le test : Instagram donne souvent la clé par
+        // blocs (« JBSW Y3DP EHPK 3PXP ») — sinon elle était prise pour un mot de passe.
+        const lastClean = (rest[rest.length - 1] ?? '').replace(/\s+/g, '')
+        if (rest.length >= 2 && /^[A-Z2-7]{16,}$/i.test(lastClean)) {
+          totpSecret = lastClean
           password   = rest.slice(0, -1).join(':')
         } else {
           password = rest.join(':')

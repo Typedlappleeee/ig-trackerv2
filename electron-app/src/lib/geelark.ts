@@ -2597,10 +2597,15 @@ export async function loginInstagramViaRpa(
   if (!flowId) return { ok: false, noFlow: true, error: 'Flow login RPA indisponible (import GeeLark échoué)' }
 
   // Variables du flow : User (identifiant/email), Password, Key (secret 2FA base32).
+  // ⚠ Le secret DOIT être nettoyé (espaces + '=' retirés, majuscules) : Instagram
+  // affiche souvent la clé par blocs (« JBSW Y3DP EHPK 3PXP »). Non nettoyé, il
+  // casse l'URL https://twofa.co/api/${Key} du flow → aucun code récupéré, jamais
+  // tapé. (Le chemin ADB, lui, normalisait déjà via totp.ts — d'où « avant ça marchait ».)
+  const cleanTotp = creds.totp?.replace(/[\s=]/g, '').toUpperCase() ?? ''
   const paramMap: Record<string, unknown> = {
     User:     creds.email,
     Password: creds.password,
-    Key:      creds.totp?.trim() ?? '',
+    Key:      cleanTotp,
   }
 
   return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
