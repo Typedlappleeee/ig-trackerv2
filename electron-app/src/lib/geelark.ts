@@ -1896,11 +1896,20 @@ async function runWarmupActions(
   let likeCount = 0
   let followCount = 0
 
+  // Résolution RÉELLE → coordonnées proportionnelles. Sans ça, les swipes en dur
+  // (540/1400…) tombent hors écran sur d'autres résolutions → aucun défilement
+  // (le warmup reste bloqué sur le même reel/post pendant toute la durée).
+  const { output: _wmSize } = await shellExec(bearer, phoneId, 'wm size')
+  const _wm = _wmSize.match(/(\d+)x(\d+)/)
+  const sw = _wm ? parseInt(_wm[1]) : 1080
+  const sh = _wm ? parseInt(_wm[2]) : 2340
+  const cx = Math.floor(sw / 2)
+
   // ── Wake + unlock — sans ça, tous les taps/swipes partent dans le vide ─────
   log('📱 Réveil de l\'écran…')
   await shellExec(bearer, phoneId, 'input keyevent 224')
   await sleep(800)
-  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400')
+  await shellExec(bearer, phoneId, `input swipe ${cx} ${Math.floor(sh * 0.82)} ${cx} ${Math.floor(sh * 0.42)} 400`)
   await sleep(1000)
 
   // Dismiss permission / "Not now" popups that block all interaction
@@ -1941,10 +1950,6 @@ async function runWarmupActions(
     const kw = config.keyword.trim()
     log(`🔎 Recherche du mot-clé « ${kw} »…`)
     try {
-      const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
-      const sm = sizeOut.match(/(\d+)x(\d+)/)
-      const sw = sm ? parseInt(sm[1]) : 1080
-      const sh = sm ? parseInt(sm[2]) : 2340
       // 1. Onglet Recherche / Explorer
       let xml = await dumpXml(bearer, phoneId)
       const searchTab =
@@ -1995,11 +2000,11 @@ async function runWarmupActions(
 
   while (Date.now() < endTime && !abortSignal.abort) {
    try {
-    // Scroll the feed
-    const swipeY1 = 1400 + Math.floor(Math.random() * 200)
-    const swipeY2 = 400  + Math.floor(Math.random() * 200)
-    const swipeDuration = 600 + Math.floor(Math.random() * 400)
-    await shellExec(bearer, phoneId, `input swipe 540 ${swipeY1} 540 ${swipeY2} ${swipeDuration}`)
+    // Scroll the feed (coords proportionnelles à l'écran réel)
+    const swipeY1 = Math.floor(sh * 0.72 + Math.random() * sh * 0.06)
+    const swipeY2 = Math.floor(sh * 0.22 + Math.random() * sh * 0.06)
+    const swipeDuration = 500 + Math.floor(Math.random() * 350)
+    await shellExec(bearer, phoneId, `input swipe ${cx} ${swipeY1} ${cx} ${swipeY2} ${swipeDuration}`)
     await sleep(1500 + Math.floor(Math.random() * 2000))
 
     if (abortSignal.abort) break
@@ -2020,7 +2025,7 @@ async function runWarmupActions(
         // Fallback humain : double-tap au centre du média = like Instagram.
         // Les deux taps dans UNE commande shell (un aller-retour HTTP entre
         // deux taps serait trop lent pour compter comme double-tap).
-        await shellExec(bearer, phoneId, 'input tap 540 760 && input tap 540 760')
+        await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.4)} && input tap ${cx} ${Math.floor(sh * 0.4)}`)
         likeCount++
         log(`❤️ Like (double-tap) (${likeCount})`)
       }
@@ -2052,7 +2057,8 @@ async function runWarmupActions(
         const reelCount = 3 + Math.floor(Math.random() * 3)
         for (let r = 0; r < reelCount && !abortSignal.abort; r++) {
           await sleep(4000 + Math.floor(Math.random() * 4000))
-          await shellExec(bearer, phoneId, 'input swipe 540 1400 540 400 500')
+          // Flick vertical ample et rapide → passe fiablement au reel suivant.
+          await shellExec(bearer, phoneId, `input swipe ${cx} ${Math.floor(sh * 0.8)} ${cx} ${Math.floor(sh * 0.2)} 250`)
         }
         // Go back to feed
         await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
