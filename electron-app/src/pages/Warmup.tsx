@@ -273,10 +273,21 @@ export function Warmup({ user }: WarmupProps) {
       targets.forEach((phone, i) => {
         const line = lines[i]
         if (!line) return
-        const parts = line.split(':')
-        const email      = (parts[0] ?? '').trim()
-        const totpSecret = parts.length >= 3 ? (parts[parts.length - 1] ?? '').trim() : ''
-        const password   = (parts.length >= 3 ? parts.slice(1, -1).join(':') : parts.slice(1).join(':')).trim()
+        // Séparateur = « : ». 1er champ = identifiant (username OU email).
+        // Le 2FA n'est reconnu que si le DERNIER champ ressemble à un vrai secret
+        // TOTP (base32, ≥ 16 car.) — sinon tout ce qui suit le 1er « : » est le mot
+        // de passe (gère les mots de passe contenant « : » et les comptes sans 2FA).
+        const parts = line.split(':').map(s => s.trim())
+        const email = parts[0] ?? ''
+        const rest  = parts.slice(1)
+        let totpSecret = ''
+        let password = ''
+        if (rest.length >= 2 && /^[A-Z2-7]{16,}$/i.test(rest[rest.length - 1])) {
+          totpSecret = rest[rest.length - 1]
+          password   = rest.slice(0, -1).join(':')
+        } else {
+          password = rest.join(':')
+        }
         if (!email || !password) return
         next[phone.id] = { email, password, totpSecret }
       })
@@ -1001,7 +1012,7 @@ export function Warmup({ user }: WarmupProps) {
                     <div>
                       <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>{tr('Import en masse', 'Bulk import')}</p>
                       <p style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 1 }}>
-                        {tr("email:password:2fa par ligne — appliqué aux téléphones sélectionnés dans l'ordre", 'email:password:2fa per line — applied to the selected phones in order')}
+                        {tr("identifiant:mot_de_passe:2fa par ligne (identifiant = username OU email ; 2fa optionnel) — appliqué aux téléphones sélectionnés dans l'ordre", 'username_or_email:password:2fa per line (2fa optional) — applied to the selected phones in order')}
                       </p>
                     </div>
                   </div>
