@@ -274,6 +274,10 @@ const server = http.createServer(async (req, res) => {
 
       if (req.method === 'DELETE') {
         await docker(['rm', '-f', cname(id)], 60000).catch(() => {})
+        // Le container part, mais son /data monté (${DATA_ROOT}/${id}) reste sur
+        // le disque et pèse plusieurs Go. On le supprime aussi, sinon l'espace
+        // n'est jamais libéré. (id est déjà validé par NAME_RE → pas d'injection.)
+        await sh('rm', ['-rf', `${DATA_ROOT}/${id}`], 60000).catch(() => {})
         return json(res, 200, { ok: true })
       }
       if (parts[2] === 'start') { await docker(['start', cname(id)], 60000); return json(res, 200, { ok: true }) }
