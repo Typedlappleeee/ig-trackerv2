@@ -96,6 +96,21 @@ export const OFFICIAL_FLOWS: Flow[] = [
   },
 
   {
+    id: 'ig-insights',
+    name: 'Lire les statistiques — Instagram',
+    official: true,
+    category: '📈 Croissance',
+    app: 'com.instagram.android',
+    description: 'Ouvre le tableau de bord Insights et lit les chiffres clés (vues, interactions, nouveaux abonnés) dans le journal. Lecture seule. Nécessite un compte pro/créateur.',
+    inputs: [],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 2000 }, { do: 'popups' },
+      { do: 'action', name: 'read_insights' },
+    ],
+  },
+
+  {
     id: 'ig-set-privacy',
     name: 'Confidentialité du compte — Instagram',
     official: true,

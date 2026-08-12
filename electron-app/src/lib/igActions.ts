@@ -570,6 +570,44 @@ export async function youtubeShort(id: string, params: Record<string, unknown>, 
   log('✅ Short envoyé — la mise en ligne peut prendre 1-2 min')
 }
 
+// ── Lire les statistiques (Insights) d'un compte Instagram ──────────────────
+// Port « cœur » du template GeeLark « Instagram insights ». Ouvre le tableau de
+// bord Insights, ferme les popups, puis lit et journalise les chiffres clés
+// (vues, interactions, nouveaux abonnés). Lecture seule — aucune action risquée.
+// La mise en page Insights bouge selon la version → lecture par libellé + récap
+// brut de secours. Nécessite un compte pro/créateur.
+export async function readInsights(id: string, _params: Record<string, unknown>, log: Logger): Promise<void> {
+  await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://insights'`).catch(() => {})
+  await sleep(jitter(9000, 3000)); await dismissPopups(id)
+
+  // Popups fréquents du dashboard.
+  for (const lbl of ['View insights', 'Close', 'Not now', 'OK']) {
+    await tapFirst(id, [{ text: lbl }], `popup ${lbl}`, log, false)
+  }
+  await sleep(2000)
+
+  const nodes = await dumpUi(id)
+  const numeric = (t: string) => /^[\d.,]+[KMB]?$/.test(t.trim())
+  // Lit le nombre le plus proche (même colonne) d'un libellé connu.
+  const readMetric = (labels: RegExp): string | null => {
+    const label = nodes.find(n => labels.test(n.text.trim()))
+    if (!label) return null
+    const near = nodes
+      .filter(n => n !== label && numeric(n.text) && Math.abs(n.cx - label.cx) < 220)
+      .sort((a, b) => Math.abs(a.cy - label.cy) - Math.abs(b.cy - label.cy))[0]
+    return near?.text.trim() ?? null
+  }
+
+  const views = readMetric(/^Views$/i)
+  const interactions = readMetric(/^Interactions$/i)
+  const followers = readMetric(/followers?/i)
+  log(`📊 Insights — Vues : ${views ?? '?'} · Interactions : ${interactions ?? '?'} · Nouveaux abonnés : ${followers ?? '?'}`)
+
+  // Récap brut de secours si la mise en page a changé.
+  const allNums = nodes.filter(n => numeric(n.text)).map(n => n.text.trim())
+  if (allNums.length) log(`  (valeurs détectées : ${allNums.slice(0, 12).join(', ')})`)
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -584,6 +622,7 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   bulk_follow: bulkFollow,
   send_dm: sendDm,
   youtube_short: youtubeShort,
+  read_insights: readInsights,
   login: login,
   login_2fa: login2fa,
   post_carousel: postCarousel,
