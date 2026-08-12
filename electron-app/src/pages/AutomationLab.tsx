@@ -18,6 +18,12 @@ import { listMyFlows, listCommunityFlows, bumpInstalls, type StoredFlow } from '
 import { FlowWorkshop } from '@/components/FlowWorkshop'
 import { RPA_TEMPLATES, TPL_RECOMMENDED_ID, PlatformLogo, InstagramLogo, type TplPlatform } from '@/lib/rpaTemplates'
 
+// Correspondance template (catalogue) → flux INTERNE qui tourne sur les cloud
+// phones. Au fur et à mesure qu'on traduit un template, on l'ajoute ici.
+const TPL_FLOW_MAP: Record<string, string> = {
+  '500000000000000016': 'ig-post-reel',   // Publier une vidéo Reels
+}
+
 interface Props { user: User }
 type Conn = 'checking' | 'ok' | 'unconfigured' | 'error'
 type RunState = { status: 'run' | 'ok' | 'fail'; log: string[]; failedAt?: string }
@@ -36,6 +42,7 @@ export function AutomationLab({ user }: Props) {
   const [flowId, setFlowId] = useState(OFFICIAL_FLOWS[0]?.id ?? '')
   const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community'>('official')
   const [openedFlow, setOpenedFlow] = useState<string | null>(null)   // null = galerie, sinon page détail
+  const [openedTpl, setOpenedTpl] = useState<string | null>(null)     // template ouvert (écran « Utiliser »)
   const [appFilter, setAppFilter] = useState<string>('all')           // filtre par application
   const [tplFilter, setTplFilter] = useState<'all' | TplPlatform>('all') // filtre plateforme du catalogue
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -144,7 +151,7 @@ export function AutomationLab({ user }: Props) {
           {tab === 'create' && <FlowWorkshop phones={runningPhones} userId={user.id} orgId={orgId} onSaved={loadFlows} />}
 
           {/* ── LANCER : galerie de flows OU page détail d'un flow ─────────────── */}
-          {tab === 'run' && !openedFlow && (() => {
+          {tab === 'run' && !openedFlow && !openedTpl && (() => {
             // « Officielles » affiche désormais le catalogue de templates RPA.
             const isTpl = flowTab === 'official'
             const baseList = flowTab === 'mine' ? myFlows : flowTab === 'community' ? communityFlows : []
@@ -192,13 +199,15 @@ export function AutomationLab({ user }: Props) {
                           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '3px 0 0', lineHeight: 1.5 }}>{reco.desc}</p>
                           <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '5px 0 0', fontFamily: 'monospace' }}>Par {reco.author} · Template id : {reco.id}</p>
                         </div>
-                        <button className="sf-btn sf-btn-primary" style={{ height: 34, flexShrink: 0 }} title="Bientôt">Utiliser</button>
+                        <button onClick={() => setOpenedTpl(reco.id)} className="sf-btn sf-btn-primary" style={{ height: 34, flexShrink: 0 }}>Utiliser</button>
                       </div>
                     )}
                     {/* Grille */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
-                      {tplList.map(t => (
-                        <div key={t.id} className="sf-card" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14 }}>
+                      {tplList.map(t => {
+                        const ready = !!TPL_FLOW_MAP[t.id]
+                        return (
+                        <div key={t.id} onClick={() => setOpenedTpl(t.id)} className="sf-card sf-flowcard" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14, cursor: 'pointer', transition: 'all .14s' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                             <span style={{ flexShrink: 0, display: 'flex', gap: 3 }}>{t.platforms.slice(0, 3).map(p => <PlatformLogo key={p} platform={p} size={26} />)}</span>
                             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.3, margin: 0 }}>{t.title}</p>
@@ -209,10 +218,11 @@ export function AutomationLab({ user }: Props) {
                               <p style={{ fontSize: 10, color: 'var(--text-4)', margin: 0 }}>Par {t.author}</p>
                               <p style={{ fontSize: 10, color: 'var(--text-4)', margin: 0, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Template id : {t.id}</p>
                             </div>
-                            <button className="sf-btn sf-btn-ghost" style={{ height: 26, fontSize: 11, flexShrink: 0, color: 'var(--text-4)' }} title="Bientôt : créer une tâche depuis ce template">⋯</button>
+                            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, padding: '3px 9px', borderRadius: 99, color: ready ? 'var(--accent)' : 'var(--text-4)', background: ready ? 'var(--accent-dim)' : 'rgba(255,255,255,0.04)', border: `1px solid ${ready ? 'var(--accent)' : 'var(--border)'}` }}>{ready ? 'Utiliser →' : 'Bientôt'}</span>
                           </div>
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     {tplList.length === 0 && <div className="sf-card" style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>Aucun template pour cette plateforme.</div>}
                   </>
@@ -231,6 +241,55 @@ export function AutomationLab({ user }: Props) {
                       {list.map(f => <FlowCard key={f.id} flow={f} source={src} onOpen={() => { setOpenedFlow(f.id); setFlowId(f.id); setInputs({}) }} />)}
                     </div>}
                 </>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ── Écran « Utiliser » d'un TEMPLATE (config + lancement) ──────────── */}
+          {tab === 'run' && openedTpl && (() => {
+            const t = RPA_TEMPLATES.find(x => x.id === openedTpl)
+            if (!t) return null
+            const mappedFlow = TPL_FLOW_MAP[openedTpl]
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720, width: '100%', margin: '0 auto' }}>
+                <button onClick={() => setOpenedTpl(null)} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px 0 12px', borderRadius: 10, border: '1px solid var(--border-md)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-1)', cursor: 'pointer', fontSize: 13.5, fontWeight: 700 }}>
+                  <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>‹</span> Retour
+                </button>
+                {/* En-tête */}
+                <div className="sf-card" style={{ padding: 20, display: 'flex', gap: 16, alignItems: 'center' }}>
+                  <div style={{ width: 60, height: 60, borderRadius: 16, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', flexShrink: 0 }}>
+                    <PlatformLogo platform={t.platforms[0]} size={40} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{t.title}</h2>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '4px 0 0', lineHeight: 1.5 }}>{t.desc}</p>
+                  </div>
+                </div>
+
+                {mappedFlow === 'ig-post-reel' ? (
+                  <>
+                    <Card title="Vidéo & légende">
+                      <p style={{ fontSize: 11.5, color: '#8a8a9c', margin: '0 0 10px', lineHeight: 1.5 }}>La vidéo est <b>envoyée</b> sur chaque téléphone sélectionné puis <b>postée en Reel</b> avec la légende.</p>
+                      <label style={{ display: 'block', marginBottom: 10 }}>
+                        <input type="file" accept="video/*" onChange={e => setPostFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} id="tpl-post-file" />
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: '1.5px dashed rgba(129,140,248,0.5)', background: 'rgba(129,140,248,0.07)', color: '#C7D2FE', cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }} onClick={() => document.getElementById('tpl-post-file')?.click()}>
+                          🎬 {postFile ? postFile.name : 'Choisir une vidéo'}
+                        </span>
+                      </label>
+                      <textarea value={postCaption} onChange={e => setPostCaption(e.target.value)} placeholder="Description / légende (emoji ok)" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                    </Card>
+                    <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
+                    <button onClick={postRun} disabled={posting || !postFile || selected.size === 0} style={{ ...runBtn, opacity: (posting || !postFile || selected.size === 0) ? 0.55 : 1 }}>
+                      {posting ? '⏳ Publication…' : `📤 Publier sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
+                    </button>
+                    <ResultsList results={results} nameOf={nameOf} />
+                  </>
+                ) : (
+                  <div className="sf-card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', fontSize: 13, lineHeight: 1.6 }}>
+                    🚧 Ce template n'est <b>pas encore branché</b> sur tes cloud phones.<br />
+                    Envoie-moi son <b>JSON</b> et je le traduis pour qu'il tourne ici (comme le Reels).
+                  </div>
                 )}
               </div>
             )
