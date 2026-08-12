@@ -69,10 +69,6 @@ export function CloudPhones({ user }: Props) {
   const [showApps, setShowApps] = useState(false)
   const [cpGroups, setCpGroups] = useState<string[]>(() => loadCpGroups())
 
-  // Change le groupe d'UN téléphone directement depuis la liste.
-  const setPhoneGroup = (id: string, group: string) => {
-    saveCpMeta(id, { group: group.trim() || undefined }); setMeta(loadAllCpMeta())
-  }
   const [busyId, setBusyId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -135,7 +131,6 @@ export function CloudPhones({ user }: Props) {
   const [editId, setEditId] = useState<string | null>(null)
   const [editKind, setEditKind] = useState<'proxy' | 'profile'>('proxy')
   const [epName, setEpName] = useState('')
-  const [epAccount, setEpAccount] = useState('')
   const [epNotes, setEpNotes] = useState('')
   const [epGroup, setEpGroup] = useState('')     // groupe de PROXY (filtre du sélecteur), '' = tous
   const [epProxyId, setEpProxyId] = useState('')
@@ -167,7 +162,7 @@ export function CloudPhones({ user }: Props) {
 
   const openEdit = (id: string, kind: 'proxy' | 'profile') => {
     const m = meta[id] ?? {}
-    setEditId(id); setEditKind(kind); setEpName(m.name ?? ''); setEpAccount(m.account ?? ''); setEpNotes(m.notes ?? '')
+    setEditId(id); setEditKind(kind); setEpName(m.name ?? ''); setEpNotes(m.notes ?? '')
     const px = proxyById(m.proxyId); setEpGroup(px?.group ?? ''); setEpProxyId(m.proxyId ?? ''); setEpCheck(null)
     setEpTags(m.tags ?? []); setEpTagInput(''); setEpPhoneGroup(m.group ?? '')
     setEpLogin(m.login ?? ''); setEpPassword(m.password ?? ''); setEpTotp(m.totp ?? ''); setEpShowPwd(false)
@@ -194,7 +189,6 @@ export function CloudPhones({ user }: Props) {
     const patch: CpMeta = { proxyId: epProxyId || undefined }
     if (editKind === 'profile') {
       patch.name = epName.trim() || undefined
-      patch.account = epAccount.trim() || undefined
       patch.notes = epNotes.trim() || undefined
       patch.tags = epTags.length ? epTags : undefined
       patch.group = epPhoneGroup.trim() || undefined
@@ -565,24 +559,15 @@ export function CloudPhones({ user }: Props) {
                           <td style={{ padding: '10px 16px', maxWidth: 260 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                               <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{display}</span>
-                              {/* Sélecteur de groupe direct (liste des groupes) */}
-                              <select
-                                value={m.group ?? ''}
-                                onClick={e => e.stopPropagation()}
-                                onChange={e => { const v = e.target.value; if (v === '__new') setShowGroups(true); else setPhoneGroup(inst.id, v) }}
-                                title={tr('Changer de groupe', 'Change group')}
-                                style={{
-                                  fontSize: 10.5, fontWeight: 700, padding: '2px 6px', borderRadius: 99, cursor: 'pointer', maxWidth: 150,
-                                  border: `1px solid ${m.group ? 'rgba(129,140,248,0.25)' : 'var(--border)'}`,
-                                  background: m.group ? 'rgba(129,140,248,0.12)' : 'transparent',
-                                  color: m.group ? 'var(--accent)' : 'var(--text-4)',
-                                }}>
-                                <option value="">{tr('— groupe', '— group')}</option>
-                                {allGroups.map(g => <option key={g} value={g}>{g}</option>)}
-                                <option value="__new">+ {tr('nouveau…', 'new…')}</option>
-                              </select>
+                              {/* Groupe : lecture seule ici — se modifie dans « Modifier le profil ». */}
+                              {m.group && (
+                                <span style={{
+                                  fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 99, maxWidth: 150,
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  border: '1px solid rgba(129,140,248,0.25)', background: 'rgba(129,140,248,0.12)', color: 'var(--accent)',
+                                }}>{m.group}</span>
+                              )}
                             </div>
-                            {m.account && <div style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{m.account}</div>}
                             {(m.tags?.length ?? 0) > 0 && <div style={{ marginTop: 4 }}><CpTagChips tags={m.tags} max={4} /></div>}
                             {m.notes && <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }} title={m.notes}>
                               <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M2 2.5h8v5l-2.5 2.5H2v-7.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
@@ -616,8 +601,20 @@ export function CloudPhones({ user }: Props) {
                           <td style={{ padding: '10px 16px' }}>
                             <div style={{ display: 'flex', gap: 6 }}>
                               {isOpen
-                                ? <button onClick={() => closeWindow(inst.id)} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 10px', color: '#818CF8' }}>◉ {tr('Ouvert', 'Open')} · {tr('fermer', 'close')}</button>
-                                : <button onClick={() => openWindow(inst.id)} className="sf-btn sf-btn-primary text-[11.5px]" style={{ height: 28, padding: '0 10px' }}>▶ {tr('Ouvrir', 'Open')}</button>}
+                                ? <button onClick={() => closeWindow(inst.id)}
+                                    style={{ height: 28, padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                                      border: '1px solid rgba(129,140,248,0.4)', background: 'rgba(129,140,248,0.14)', color: '#818CF8', transition: 'all 0.16s ease' }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(129,140,248,0.22)' }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(129,140,248,0.14)' }}>
+                                    <span style={{ width: 7, height: 7, borderRadius: 99, background: '#818CF8', boxShadow: '0 0 6px #818CF8' }} /> {tr('Ouvert', 'Open')} · {tr('fermer', 'close')}
+                                  </button>
+                                : <button onClick={() => openWindow(inst.id)}
+                                    style={{ height: 28, padding: '0 14px', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5, fontWeight: 700, borderRadius: 8, cursor: 'pointer', color: '#fff', border: 'none',
+                                      background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', boxShadow: '0 6px 16px -8px rgba(99,102,241,0.9), inset 0 1px 0 rgba(255,255,255,0.25)', transition: 'transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease' }}
+                                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 10px 22px -8px rgba(99,102,241,1), inset 0 1px 0 rgba(255,255,255,0.3)'; e.currentTarget.style.filter = 'brightness(1.06)' }}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 6px 16px -8px rgba(99,102,241,0.9), inset 0 1px 0 rgba(255,255,255,0.25)'; e.currentTarget.style.filter = 'none' }}>
+                                    <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor"><polygon points="2.5 1.5 10.5 6 2.5 10.5"/></svg> {tr('Ouvrir', 'Open')}
+                                  </button>}
                               <button disabled={busyId === inst.id} onClick={() => doAction(inst.id, 'remove')} className="sf-btn sf-btn-ghost text-[11.5px] text-danger" style={{ height: 28, padding: '0 10px' }}>{tr('Suppr.', 'Del.')}</button>
                               <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
                                 <button onClick={() => setMenuId(menuId === inst.id ? null : inst.id)} className="sf-btn sf-btn-ghost text-[11.5px]" style={{ height: 28, padding: '0 8px', fontWeight: 800 }}>⋯</button>
@@ -811,10 +808,7 @@ export function CloudPhones({ user }: Props) {
 
               {editKind === 'profile' && (
                 <>
-                  <FieldLabel style={{ marginTop: 14 }}>{tr('Compte associé', 'Linked account')}</FieldLabel>
-                  <input value={epAccount} onChange={e => setEpAccount(e.target.value)} placeholder={tr('@pseudo ou email du compte', '@handle or account email')} style={fieldInput} />
-
-                  <FieldLabel style={{ marginTop: 14 }}>{tr('Remarques', 'Notes')}</FieldLabel>
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Notes', 'Notes')}</FieldLabel>
                   <textarea value={epNotes} onChange={e => setEpNotes(e.target.value)} rows={2} placeholder={tr('Notes libres sur ce téléphone…', 'Free notes about this phone…')} style={{ ...fieldInput, resize: 'vertical', fontFamily: 'inherit' }} />
 
                   {/* Tags */}
@@ -837,7 +831,8 @@ export function CloudPhones({ user }: Props) {
                   <input value={epPhoneGroup} onChange={e => setEpPhoneGroup(e.target.value)} list="sf-cp-groups" placeholder={tr('Aucun groupe', 'No group')} style={fieldInput} />
 
                   {/* Identifiants du compte */}
-                  <FieldLabel style={{ marginTop: 14 }}>{tr('Identifiants du compte', 'Account credentials')}</FieldLabel>
+                  <div style={{ height: 1, background: 'var(--border)', margin: '18px 0 4px' }} />
+                  <FieldLabel style={{ marginTop: 10 }}>{tr('Identifiants du compte', 'Account credentials')}</FieldLabel>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input value={epLogin} onChange={e => setEpLogin(e.target.value)} placeholder={tr('Identifiant / e-mail', 'Username / email')} autoComplete="off" style={fieldInput} />
                     <div style={{ display: 'flex', gap: 8 }}>
