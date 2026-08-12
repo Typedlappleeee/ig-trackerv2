@@ -98,6 +98,24 @@ export const OFFICIAL_FLOWS: Flow[] = [
   },
 
   {
+    id: 'ig-comment-last',
+    name: 'Commenter le dernier post — Instagram',
+    official: true,
+    category: '🔥 Warmup & engagement',
+    app: 'com.instagram.android',
+    description: 'Commente le dernier post d’une liste de comptes (un pseudo par ligne). Même commentaire pour tous. Ignore les profils privés / sans post.',
+    inputs: [
+      { key: 'usernames', label: 'Comptes à commenter', placeholder: 'un pseudo par ligne (sans @)', type: 'textarea', optional: false },
+      { key: 'content',   label: 'Commentaire',         placeholder: 'Le commentaire à poster',       type: 'textarea', optional: false },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'comment_last_post', params: { usernames: '{{usernames}}', content: '{{content}}' } },
+    ],
+  },
+
+  {
     id: 'ig-insights',
     name: 'Lire les statistiques — Instagram',
     official: true,

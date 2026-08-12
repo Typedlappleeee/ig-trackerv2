@@ -631,6 +631,43 @@ export async function readInsights(id: string, _params: Record<string, unknown>,
   if (allNums.length) log(`  (valeurs détectées : ${allNums.slice(0, 12).join(', ')})`)
 }
 
+// ── Commenter le dernier post d'une liste de comptes ────────────────────────
+// Port « cœur » du template GeeLark « send comment on last post ». Pour chaque
+// compte : ouvre le profil (deep link), ouvre le 1er post de la grille, poste le
+// commentaire. Même commentaire pour tous, rythme humain entre chaque envoi.
+export async function commentLastPost(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const raw = String(params.usernames ?? '').trim()
+  const users = raw ? raw.split(/[\n,]+/).map(s => s.trim().replace(/^@/, '')).filter(Boolean) : []
+  const content = String(params.content ?? '').trim()
+  if (!users.length) { log('  · aucun compte fourni'); return }
+  if (!content) { log('  · aucun commentaire fourni'); return }
+  await dismissPopups(id)
+  if (find(await dumpUi(id), { desc: 'Log in' }) || find(await dumpUi(id), { desc: 'Login' })) throw new Error('compte non connecté')
+
+  let done = 0
+  for (const u of users) {
+    await openProfile(id, u)
+    await sleep(jitter(3500, 1500)); await dismissPopups(id)
+    // 1er post de la grille du profil.
+    const post = (await dumpUi(id)).find(n => n.clickable && n.id.endsWith('image_button'))
+    if (!post) { log(`  · ${u} : aucun post trouvé (privé ?)`); await sleep(jitter(2000, 1500)); continue }
+    await cloudPhones.shell(id, `input tap ${post.cx} ${post.cy}`); await sleep(jitter(3000, 1500)); await dismissPopups(id)
+    // Ouvre le composer de commentaire.
+    if (!await tapFirst(id, [{ id: 'row_feed_button_comment' }, { desc: 'Comment' }, { desc: 'Commenter' }], `Commentaire → ${u}`, log, false)) {
+      log(`  · ${u} : bouton commentaire introuvable`); await sleep(jitter(2000, 1500)); continue
+    }
+    await sleep(1500)
+    const box = (await dumpUi(id)).find(n => /EditText/.test(n.cls))
+    if (!box) { log(`  · ${u} : champ commentaire introuvable`); await sleep(jitter(2000, 1500)); continue }
+    await cloudPhones.shell(id, `input tap ${box.cx} ${box.cy}`); await sleep(600)
+    await typeText(id, content); await sleep(700)
+    await tapFirst(id, [{ id: 'send_button' }, { desc: 'Send' }, { text: 'Post' }, { text: 'Publier' }], 'Envoyer', log, false)
+    done++; log(`  💬 ${u} : commentaire posté (${done})`)
+    await sleep(jitter(4500, 3000))  // rythme humain entre chaque commentaire
+  }
+  log(`✅ ${done}/${users.length} commentaire(s) posté(s)`)
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -644,6 +681,7 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   set_privacy: setPrivacy,
   bulk_follow: bulkFollow,
   send_dm: sendDm,
+  comment_last_post: commentLastPost,
   youtube_short: youtubeShort,
   read_insights: readInsights,
   login: login,
