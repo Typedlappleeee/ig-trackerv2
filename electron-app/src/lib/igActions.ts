@@ -8,6 +8,7 @@
 // blocked ». Les resource-ids IG peuvent bouger selon la version → fallbacks.
 import { cloudPhones } from './cloudPhones'
 import { dumpUi, tap, dismissPopups, find, typeText, keys, type Matcher } from './phoneAutomation'
+import { generateTOTP } from './totp'
 
 type Logger = (m: string) => void
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -437,6 +438,79 @@ export async function sendDm(id: string, params: Record<string, unknown>, log: L
   log(`✅ ${sent}/${users.length} message(s) envoyé(s)`)
 }
 
+// ── Connexion Instagram AVEC 2FA (app d'authentification) ───────────────────
+// Port « cœur » du template GeeLark « auto login 2FA ». Comme `login`, mais gère
+// l'étape « Go to your authentication app » : le code TOTP est calculé EN LOCAL
+// depuis le secret 2FA (base32) — pas de dépendance à un service tiers. Les
+// challenges e-mail / captcha / appel ne sont pas franchissables → échec clair.
+export async function login2fa(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const account = String(params.account ?? '').trim()
+  const password = String(params.password ?? '')
+  const totpKey = String(params.totpKey ?? params.key ?? '').replace(/\s/g, '').trim()
+  if (!account || !password) throw new Error('identifiant ou mot de passe manquant')
+
+  // Écran d'accueil (1er lancement / plusieurs comptes).
+  await sleep(jitter(5000, 3000)); await dismissPopups(id)
+  await tapFirst(id, [{ text: 'I already have an account' }, { text: 'Use another profile' }], 'Écran d’accueil', log, false)
+  await sleep(jitter(4000, 2000)); await dismissPopups(id)
+
+  // Identifiant (par desc, sinon 1re zone de saisie).
+  let nodes = await dumpUi(id)
+  const userField = nodes.find(n => /EditText/.test(n.cls) && /username|email|mobile|identifiant/i.test(`${n.desc} ${n.text}`))
+    || nodes.filter(n => /EditText/.test(n.cls)).sort((a, b) => a.y - b.y)[0]
+  if (!userField) throw new Error('champ identifiant introuvable')
+  await cloudPhones.shell(id, `input tap ${userField.cx} ${userField.cy}`); await sleep(500)
+  await clearFocused(id); await typeText(id, account); await sleep(800)
+
+  // Mot de passe (par desc, sinon 2e zone de saisie).
+  nodes = await dumpUi(id)
+  const passField = nodes.find(n => /EditText/.test(n.cls) && /password|mot de passe/i.test(`${n.desc} ${n.text}`))
+    || nodes.filter(n => /EditText/.test(n.cls)).sort((a, b) => a.y - b.y)[1]
+  if (!passField) throw new Error('champ mot de passe introuvable')
+  await cloudPhones.shell(id, `input tap ${passField.cx} ${passField.cy}`); await sleep(500)
+  await clearFocused(id); await typeText(id, password); await sleep(800)
+
+  if (!await tapFirst(id, [{ text: 'Log in' }, { text: 'Se connecter' }, { desc: 'Log in' }], 'Connexion', log, false)) await keys.enter(id)
+  await sleep(jitter(9000, 3000)); await dismissPopups(id)
+
+  // Challenge e-mail : non géré (pas d'accès à la boîte mail).
+  if (find(await dumpUi(id), { contains: 'Request new code' }) || find(await dumpUi(id), { contains: 'We sent a code' }))
+    throw new Error('vérification par e-mail requise (non gérée)')
+
+  // 2FA : si l'écran d'authentification apparaît, saisir le code TOTP.
+  const on2fa = () => find(nodes, { contains: 'authentication app' }) || find(nodes, { contains: 'security code' })
+    || find(nodes, { contains: 'Check your notifications' }) || find(nodes, { contains: 'Try another way' })
+  nodes = await dumpUi(id)
+  if (totpKey && (on2fa() || find(nodes, { contains: 'Code' }))) {
+    // Basculer vers « Authentication app » si Instagram propose une autre méthode.
+    if (find(nodes, { contains: 'Check your notifications' }) || find(nodes, { contains: 'Try another way' })) {
+      await tapFirst(id, [{ text: 'Try another way' }], 'Autre méthode', log, false); await sleep(2000)
+      await tapFirst(id, [{ text: 'Authentication app' }, { contains: 'authentication app' }], 'App d’authentification', log, false); await sleep(1500)
+      await tapFirst(id, [{ text: 'Continue' }], 'Continuer', log, false); await sleep(2500)
+    }
+    // Saisir le code (2 tentatives : un nouveau code toutes les 30 s).
+    let done = false
+    for (let attempt = 0; attempt < 2 && !done; attempt++) {
+      const cur = await dumpUi(id)
+      const codeField = cur.find(n => /EditText/.test(n.cls))
+      if (codeField) {
+        const code = await generateTOTP(totpKey)
+        await cloudPhones.shell(id, `input tap ${codeField.cx} ${codeField.cy}`); await sleep(400)
+        await clearFocused(id); await typeText(id, code); await sleep(600)
+        log(`  🔐 code 2FA saisi`)
+        await tapFirst(id, [{ text: 'Continue' }, { text: 'Confirm' }, { desc: 'Continue' }, { text: 'Log in' }], 'Valider 2FA', log, false)
+        await sleep(jitter(7000, 3000)); await dismissPopups(id)
+        // Si le champ code a disparu → réussi.
+        done = !(await dumpUi(id)).some(n => /EditText/.test(n.cls))
+      } else { await sleep(2500) }
+    }
+  }
+
+  // Enregistrer les infos de connexion (ou passer).
+  await tapFirst(id, [{ text: 'Save' }, { text: 'Save info' }, { text: 'Not now' }, { text: 'Not Now' }, { text: 'Pas maintenant' }], 'Popup enregistrer', log, false)
+  log('✅ Connexion 2FA tentée — vérifie l’état du compte')
+}
+
 // ── Publier une vidéo en YouTube Short ──────────────────────────────────────
 // Port « cœur » du template GeeLark « Post video (YouTube Short) ». La vidéo est
 // déjà dans la galerie du tel (poussée avant le flow). Version épurée : pas de
@@ -511,5 +585,6 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   send_dm: sendDm,
   youtube_short: youtubeShort,
   login: login,
+  login_2fa: login2fa,
   post_carousel: postCarousel,
 }

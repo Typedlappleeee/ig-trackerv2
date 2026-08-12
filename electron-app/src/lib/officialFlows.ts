@@ -41,6 +41,26 @@ export const OFFICIAL_FLOWS: Flow[] = [
   },
 
   {
+    id: 'ig-login-2fa',
+    name: 'Connexion automatique + 2FA — Instagram',
+    official: true,
+    category: '👤 Profil',
+    app: 'com.instagram.android',
+    description: 'Connecte chaque téléphone à son compte AVEC 2FA (app d’authentification). Le code est généré en local depuis le secret 2FA (base32) — aucun service tiers. Les défis e-mail / captcha ne sont pas franchissables.',
+    perAccount: true,
+    inputs: [
+      { key: 'account',  label: 'Identifiant / e-mail', placeholder: 'pseudo ou email',              optional: false },
+      { key: 'password', label: 'Mot de passe',         placeholder: 'mot de passe',                 type: 'password', optional: false },
+      { key: 'totpKey',  label: 'Clé 2FA (base32)',     placeholder: 'ex : RJK3CWRDDVSOMGWSXHZ6…',   type: 'password', optional: false },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 4000 }, { do: 'popups' },
+      { do: 'action', name: 'login_2fa', params: { account: '{{account}}', password: '{{password}}', totpKey: '{{totpKey}}' } },
+    ],
+  },
+
+  {
     id: 'ig-bulk-follow',
     name: 'Abonnement en masse — Instagram',
     official: true,
