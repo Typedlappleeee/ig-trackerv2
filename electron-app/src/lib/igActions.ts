@@ -437,6 +437,65 @@ export async function sendDm(id: string, params: Record<string, unknown>, log: L
   log(`✅ ${sent}/${users.length} message(s) envoyé(s)`)
 }
 
+// ── Publier une vidéo en YouTube Short ──────────────────────────────────────
+// Port « cœur » du template GeeLark « Post video (YouTube Short) ». La vidéo est
+// déjà dans la galerie du tel (poussée avant le flow). Version épurée : pas de
+// son-template, réglage de volume ni OCR (spécifiques GeeLark, fragiles).
+export async function youtubeShort(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const YT = 'com.google.android.youtube'
+  const title = String(params.title ?? '').trim()
+
+  // Permissions média (évite les popups d'accès galerie).
+  await cloudPhones.shell(id, `pm grant ${YT} android.permission.READ_MEDIA_VIDEO`).catch(() => {})
+  await cloudPhones.shell(id, `pm grant ${YT} android.permission.READ_EXTERNAL_STORAGE`).catch(() => {})
+  await dismissPopups(id)
+
+  // Ouvrir « Créer » puis « Short ».
+  await tapFirst(id, [{ desc: 'Create' }, { desc: 'Créer' }, { text: 'Create' }], 'Créer', log, false)
+  await sleep(1500)
+  if (!await tapFirst(id, [{ text: 'Short' }, { desc: 'Short' }, { contains: 'Short' }], 'Short', log)) throw new Error('bouton « Short » introuvable')
+  await sleep(2500); await dismissPopups(id)
+
+  // Popups permissions caméra/micro (best-effort, ordre variable).
+  for (const lbl of ['Allow access', 'ALLOW', 'While using the app', 'WHILE USING THE APP', 'OK', 'Start over', 'Start again']) {
+    await tapFirst(id, [{ text: lbl }], `popup ${lbl}`, log, false)
+  }
+
+  // Ajouter depuis la galerie.
+  await tapFirst(id, [{ text: 'Add from Gallery' }, { id: 'reel_camera_gallery_button' }], 'Galerie', log, false)
+  await sleep(1500); await dismissPopups(id)
+  await tapFirst(id, [{ id: 'allow_access_button' }, { text: 'ALLOW' }, { text: 'OK' }], 'Autoriser galerie', log, false)
+  await sleep(1200)
+
+  // 1re vidéo de la galerie.
+  const thumbs = (await dumpUi(id)).filter(n => n.clickable && /thumb_image_view|gallery/i.test(n.id)).sort((a, b) => (a.y - b.y) || (a.x - b.x))
+  if (thumbs[0]) { await cloudPhones.shell(id, `input tap ${thumbs[0].cx} ${thumbs[0].cy}`); await sleep(1500) }
+  else log('  · aucune vidéo trouvée dans la galerie')
+  await tapFirst(id, [{ text: 'OK' }, { id: 'multi_select_next_button' }], 'Confirmer sélection', log, false)
+  await sleep(1500)
+  await tapFirst(id, [{ id: 'shorts_trim_finish_trim_button' }, { text: 'Done' }, { text: 'Terminé' }], 'Trim terminé', log, false)
+  await sleep(1500)
+
+  // Avancer jusqu'à l'écran d'upload (bouton Next de la caméra Shorts).
+  for (let i = 0; i < 5; i++) {
+    if (find(await dumpUi(id), { text: 'Upload Short' }) || find(await dumpUi(id), { contains: 'Caption your Short' })) break
+    await tapFirst(id, [{ id: 'shorts_camera_next_button' }, { desc: 'Next' }, { text: 'Next' }, { text: 'Suivant' }], `Suivant (${i + 1})`, log, false)
+    await sleep(2500); await dismissPopups(id)
+  }
+
+  // Légende.
+  if (title) {
+    const nodes = await dumpUi(id)
+    const cap = nodes.find(n => /EditText/.test(n.cls) && /caption/i.test(`${n.text} ${n.desc}`)) || nodes.find(n => /EditText/.test(n.cls))
+    if (cap) { await cloudPhones.shell(id, `input tap ${cap.cx} ${cap.cy}`); await sleep(600); await typeText(id, title); await sleep(700); await keys.back(id); await sleep(600) }
+  }
+
+  // Publier.
+  if (!await tapFirst(id, [{ text: 'Upload Short' }, { id: 'shorts_post_bottom_button' }], 'Upload Short', log)) throw new Error('bouton « Upload Short » introuvable')
+  await sleep(4000)
+  log('✅ Short envoyé — la mise en ligne peut prendre 1-2 min')
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -450,6 +509,7 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   set_privacy: setPrivacy,
   bulk_follow: bulkFollow,
   send_dm: sendDm,
+  youtube_short: youtubeShort,
   login: login,
   post_carousel: postCarousel,
 }

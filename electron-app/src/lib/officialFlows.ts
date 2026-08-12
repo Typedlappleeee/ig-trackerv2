@@ -162,6 +162,21 @@ export const OFFICIAL_FLOWS: Flow[] = [
   },
 
   {
+    id: 'yt-post-short',
+    name: 'Publier un Short — YouTube',
+    official: true,
+    category: '📤 Publication',
+    app: 'com.google.android.youtube',
+    description: 'Publie la 1ʳᵉ vidéo de la galerie en YouTube Short, avec légende optionnelle. La vidéo doit déjà être sur le téléphone.',
+    inputs: [{ key: 'title', label: 'Légende / titre', placeholder: 'Titre du Short', type: 'textarea', optional: true }],
+    steps: [
+      { do: 'open', pkg: 'com.google.android.youtube' },
+      { do: 'wait', ms: 4000 }, { do: 'popups' },
+      { do: 'action', name: 'youtube_short', params: { title: '{{title}}' } },
+    ],
+  },
+
+  {
     id: 'ig-warmup-browse',
     name: 'Warmup — navigation (Instagram)',
     official: true,

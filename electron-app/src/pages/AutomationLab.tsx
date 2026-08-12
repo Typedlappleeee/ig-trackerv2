@@ -591,6 +591,7 @@ function appOf(f: Flow): { label: string } {
     'com.instagram.android': 'Instagram', 'com.zhiliaoapp.musically': 'TikTok',
     'com.instagram.barcelona': 'Threads', 'com.snapchat.android': 'Snapchat',
     'com.facebook.katana': 'Facebook', 'com.twitter.android': 'X',
+    'com.google.android.youtube': 'YouTube',
   }
   return { label: m[f.app ?? ''] ?? 'App' }
 }
