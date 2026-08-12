@@ -2210,13 +2210,26 @@ async function _loginInstagramAccountInner(
       xml = await dumpXml(bearer, phoneId)
     }
 
-    // Some IG builds show a social-login screen first with "Log in with email" link
-    // Handle "Join Instagram" onboarding screen (fresh install) — tap "I already have a profile"
-    // (Android 14+ : le libellé varie → on élargit avec un match partiel.)
-    const alreadyHavePt = findByText(xml,
+    // Écran d'accueil « Join Instagram » (installation fraîche) → aller sur LOGIN
+    // en tapant « I already have a profile ». NE JAMAIS taper « Get started »
+    // (= inscription — c'est ce qui donnait l'impression que l'outil « crée un compte »).
+    let alreadyHavePt = findByText(xml,
       'I already have a profile', 'J\'ai déjà un profil', 'J\'ai déjà un compte',
-      'Already have an account', 'Log in', 'Se connecter', 'Connexion', 'Sign in',
+      'Already have an account', 'I already have an account', 'Log in', 'Se connecter', 'Connexion', 'Sign in',
     ) ?? findByTextPartial(xml, 'already have', 'déjà un compte', 'déjà un profil', 'se connecter', 'log in', 'sign in', 'connexion')
+
+    // La nouvelle UI d'Instagram (Compose) expose mal le texte → l'automation ne
+    // trouve pas le bouton. Repli par POSITION : « I already have a profile » est le
+    // bouton juste EN DESSOUS de « Get started ». On tape sous « Get started »
+    // (surtout pas dessus). Sinon, repli bas-centre de l'écran (~90 % de hauteur).
+    if (!alreadyHavePt) {
+      const getStarted = findByText(xml, 'Get started', 'Commencer', 'Créer un compte', 'Create new account')
+        ?? findByTextPartial(xml, 'get started', 'commencer')
+      const isJoinScreen = /join instagram|get started|i already have|j'ai déjà|créer un compte|commencer|welcome to instagram/i.test(xml)
+      if (getStarted) alreadyHavePt = [getStarted[0], Math.min(sh - 60, getStarted[1] + Math.floor(sh * 0.07))]
+      else if (isJoinScreen) alreadyHavePt = [Math.floor(sw / 2), Math.floor(sh * 0.9)]
+    }
+
     if (alreadyHavePt) {
       log('📲 Écran d\'accueil détecté — sélection « J\'ai déjà un compte »…')
       await shellExec(bearer, phoneId, `input tap ${alreadyHavePt[0]} ${alreadyHavePt[1]}`)
