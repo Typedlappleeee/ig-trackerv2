@@ -23,6 +23,7 @@ import { RPA_TEMPLATES, TPL_RECOMMENDED_ID, PlatformLogo, InstagramLogo, type Tp
 const TPL_FLOW_MAP: Record<string, string> = {
   '500000000000000016': 'ig-post-reel',     // Publier une vidéo Reels
   '500000000000000043': 'ig-edit-profile',  // Modifier le profil Instagram
+  '500000000000000020': 'ig-warmup',        // Warmup de compte (IA)
 }
 
 interface Props { user: User }
@@ -312,7 +313,7 @@ export function AutomationLab({ user }: Props) {
                           {(f.inputs ?? []).map(inp => (
                             <label key={inp.key} style={{ display: 'block' }}>
                               <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>{inp.label}{inp.optional && <span style={{ color: 'var(--text-4)', fontWeight: 500 }}> · optionnel</span>}</span>
-                              {inp.key === 'biography'
+                              {inp.key === 'biography' || inp.key === 'keywords'
                                 ? <textarea value={tplVars[inp.key] ?? ''} onChange={e => setTplVars(v => ({ ...v, [inp.key]: e.target.value }))} placeholder={inp.placeholder} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
                                 : <input value={tplVars[inp.key] ?? ''} onChange={e => setTplVars(v => ({ ...v, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />}
                             </label>
