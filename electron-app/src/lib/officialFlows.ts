@@ -5,6 +5,27 @@ import type { Flow } from './flowRunner'
 
 export const OFFICIAL_FLOWS: Flow[] = [
   {
+    id: 'ig-edit-profile',
+    name: 'Modifier le profil — Instagram',
+    official: true,
+    category: '👤 Profil',
+    app: 'com.instagram.android',
+    description: 'Modifie le nom, le pseudo, la bio et le lien du profil (les champs laissés vides ne sont pas touchés).',
+    inputs: [
+      { key: 'nickname',  label: 'Nom',           placeholder: 'Nom affiché',              optional: true },
+      { key: 'username',  label: 'Pseudo',        placeholder: '@pseudo (sans @)',         optional: true },
+      { key: 'biography', label: 'Bio',           placeholder: 'Bio du profil',            optional: true },
+      { key: 'linkUrl',   label: 'Lien (URL)',    placeholder: 'https://…',                optional: true },
+      { key: 'linkTitle', label: 'Titre du lien', placeholder: 'Titre affiché (optionnel)',optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'edit_profile', params: { nickname: '{{nickname}}', username: '{{username}}', biography: '{{biography}}', linkUrl: '{{linkUrl}}', linkTitle: '{{linkTitle}}' } },
+    ],
+  },
+
+  {
     id: 'ig-post-reel',
     name: 'Poster un Reel — Instagram',
     official: true,

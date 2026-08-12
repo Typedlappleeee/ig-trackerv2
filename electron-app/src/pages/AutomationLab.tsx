@@ -21,7 +21,8 @@ import { RPA_TEMPLATES, TPL_RECOMMENDED_ID, PlatformLogo, InstagramLogo, type Tp
 // Correspondance template (catalogue) → flux INTERNE qui tourne sur les cloud
 // phones. Au fur et à mesure qu'on traduit un template, on l'ajoute ici.
 const TPL_FLOW_MAP: Record<string, string> = {
-  '500000000000000016': 'ig-post-reel',   // Publier une vidéo Reels
+  '500000000000000016': 'ig-post-reel',     // Publier une vidéo Reels
+  '500000000000000043': 'ig-edit-profile',  // Modifier le profil Instagram
 }
 
 interface Props { user: User }
@@ -43,6 +44,7 @@ export function AutomationLab({ user }: Props) {
   const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community'>('official')
   const [openedFlow, setOpenedFlow] = useState<string | null>(null)   // null = galerie, sinon page détail
   const [openedTpl, setOpenedTpl] = useState<string | null>(null)     // template ouvert (écran « Utiliser »)
+  const [tplVars, setTplVars] = useState<Record<string, string>>({})  // champs saisis pour un template texte
   const [appFilter, setAppFilter] = useState<string>('all')           // filtre par application
   const [tplFilter, setTplFilter] = useState<'all' | TplPlatform>('all') // filtre plateforme du catalogue
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -114,6 +116,21 @@ export function AutomationLab({ user }: Props) {
       push('✓ Vidéo envoyée')
       await new Promise(res => setTimeout(res, 1800)) // laisse MediaStore indexer
       const res = await runFlow(id, flow, { vars: { caption: postCaption }, log: push })
+      setResults(r => ({ ...r, [id]: { ...r[id], status: res.ok ? 'ok' : 'fail', failedAt: res.failedAt } }))
+    }))
+    setPosting(false)
+  }
+
+  // Runner générique (flux SANS upload de média — ex : édition de profil).
+  const flowRun = async (flowId: string, vars: Record<string, string>) => {
+    const flow = findFlow(flowId)
+    if (!flow || selected.size === 0) return
+    const ids = [...selected]
+    setResults(Object.fromEntries(ids.map(id => [id, { status: 'run', log: ['⏳ En attente…'] } as RunState])))
+    setPosting(true)
+    await Promise.all(ids.map(async id => {
+      const push = (m: string) => setResults(r => ({ ...r, [id]: { ...r[id], log: [...(r[id]?.log ?? []), m] } }))
+      const res = await runFlow(id, flow, { vars, log: push })
       setResults(r => ({ ...r, [id]: { ...r[id], status: res.ok ? 'ok' : 'fail', failedAt: res.failedAt } }))
     }))
     setPosting(false)
@@ -285,7 +302,31 @@ export function AutomationLab({ user }: Props) {
                     </button>
                     <ResultsList results={results} nameOf={nameOf} />
                   </>
-                ) : (
+                ) : mappedFlow && findFlow(mappedFlow) ? (() => {
+                  const f = findFlow(mappedFlow)!
+                  const filled = (f.inputs ?? []).some(inp => (tplVars[inp.key] ?? '').trim())
+                  return (
+                    <>
+                      <Card title="Champs">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {(f.inputs ?? []).map(inp => (
+                            <label key={inp.key} style={{ display: 'block' }}>
+                              <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>{inp.label}{inp.optional && <span style={{ color: 'var(--text-4)', fontWeight: 500 }}> · optionnel</span>}</span>
+                              {inp.key === 'biography'
+                                ? <textarea value={tplVars[inp.key] ?? ''} onChange={e => setTplVars(v => ({ ...v, [inp.key]: e.target.value }))} placeholder={inp.placeholder} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                                : <input value={tplVars[inp.key] ?? ''} onChange={e => setTplVars(v => ({ ...v, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />}
+                            </label>
+                          ))}
+                        </div>
+                      </Card>
+                      <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
+                      <button onClick={() => flowRun(mappedFlow, tplVars)} disabled={posting || !filled || selected.size === 0} style={{ ...runBtn, opacity: (posting || !filled || selected.size === 0) ? 0.55 : 1 }}>
+                        {posting ? '⏳ En cours…' : `▶ Lancer sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
+                      </button>
+                      <ResultsList results={results} nameOf={nameOf} />
+                    </>
+                  )
+                })() : (
                   <div className="sf-card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', fontSize: 13, lineHeight: 1.6 }}>
                     🚧 Ce template n'est <b>pas encore branché</b> sur tes cloud phones.<br />
                     Envoie-moi son <b>JSON</b> et je le traduis pour qu'il tourne ici (comme le Reels).
