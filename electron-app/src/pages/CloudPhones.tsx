@@ -14,7 +14,7 @@ import {
   loadAutoInstall, saveAutoInstall, loadCpGroups, saveCpGroups,
   type CpInstance, type CpMeta, type CpAutoApp,
 } from '@/lib/cloudPhones'
-import { CloudPhoneWindow } from '@/components/CloudPhoneWindow'
+import { openCpWindow, closeCpWindow, dropCpWindow, useCpWindows } from '@/lib/cpWindowStore'
 import { listProxies, proxyLabel, type Proxy } from '@/lib/proxyStore'
 import { ExitIpCell } from '@/components/ui/ExitIpCell'
 import { runProxyCheck, runProxyChecks } from '@/lib/proxyChecks'
@@ -199,19 +199,18 @@ export function CloudPhones({ user }: Props) {
     saveCpMeta(editId, patch); setMeta(loadAllCpMeta()); setEditId(null)
   }
 
-  // Fenêtres flottantes ouvertes (façon GeeLark) : une par tel, indépendantes.
-  const [openIds, setOpenIds] = useState<string[]>([])
-  const [zOrder, setZOrder] = useState<string[]>([])   // ordre d'empilement (dernier = au-dessus)
+  // Fenêtres flottantes : gérées par le store GLOBAL (cpWindowStore) → elles
+  // restent ouvertes même quand on quitte cet onglet et flottent par-dessus
+  // toute l'app (rendues par <CpWindowsLayer/> dans Layout). Ici on ne fait que
+  // (dé)clencher l'ouverture et lire la liste des tel ouverts.
+  const { openIds } = useCpWindows()
   const openWindow = (id: string) => {
-    setOpenIds(o => o.includes(id) ? o : [...o, id])
-    setZOrder(z => [...z.filter(x => x !== id), id])
+    const inst = instances.find(i => i.id === id)
+    if (!inst) return
+    openCpWindow({ id, inst, name: meta[id]?.name || inst.name, proxyId: meta[id]?.proxyId })
   }
   // Fermer la fenêtre = éteindre le tel (il se rallume à la prochaine ouverture).
-  const closeWindow = (id: string) => {
-    setOpenIds(o => o.filter(x => x !== id)); setZOrder(z => z.filter(x => x !== id))
-    cloudPhones.stop(id).finally(() => loadInstances())
-  }
-  const focusWindow = (id: string) => setZOrder(z => [...z.filter(x => x !== id), id])
+  const closeWindow = (id: string) => { closeCpWindow(id).finally(() => loadInstances()) }
 
   const loadInstances = useCallback(async () => {
     const r = await cloudPhones.list()
@@ -315,7 +314,7 @@ export function CloudPhones({ user }: Props) {
     const r = await fn(id)
     setBusyId(null)
     if (r.ok) {
-      if (action === 'remove') { closeWindow(id); removeCpMeta(id); setMeta(loadAllCpMeta()) }
+      if (action === 'remove') { dropCpWindow(id); removeCpMeta(id); setMeta(loadAllCpMeta()) }
       loadInstances()
     }
   }
@@ -768,22 +767,8 @@ export function CloudPhones({ user }: Props) {
         </div>
       )}
 
-      {/* Fenêtres flottantes — une par tel ouvert, façon GeeLark */}
-      {openIds.map(id => {
-        const inst = instances.find(i => i.id === id)
-        if (!inst) return null
-        const display = meta[id]?.name || inst.name
-        return (
-          <CloudPhoneWindow
-            key={id} inst={{ ...inst, name: display }}
-            zIndex={1000 + zOrder.indexOf(id)}
-            offset={openIds.indexOf(id)}
-            proxyId={meta[id]?.proxyId}
-            onClose={() => closeWindow(id)}
-            onFocus={() => focusWindow(id)}
-          />
-        )
-      })}
+      {/* Les fenêtres flottantes sont rendues globalement par <CpWindowsLayer/>
+          (dans Layout) pour survivre au changement d'onglet. */}
 
       {/* Ferme le menu ⋯ au clic ailleurs */}
       {menuId && <div onClick={() => setMenuId(null)} style={{ position: 'fixed', inset: 0, zIndex: 15 }} />}

@@ -5,6 +5,7 @@ import type { PageKey } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
 import { ActivePostingsWidget } from '@/components/ActivePostingsWidget'
+import { CpWindowsLayer } from '@/components/CpWindowsLayer'
 import { CommandPalette, type CommandItem } from '@/components/CommandPalette'
 import { useT, useTr, tr as trStatic } from '@/lib/i18n'
 import { useToast }  from '@/components/Toast'
@@ -1772,6 +1773,9 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
       {/* Suivi global des postings en cours (visible partout, survit au refresh) */}
       <ActivePostingsWidget onOpen={p => onNavigate(p as Page)} orgId={currentOrg?.id ?? null} userId={user.id} />
+
+      {/* Fenêtres de téléphone globales : restent ouvertes en changeant d'onglet */}
+      <CpWindowsLayer />
 
       {/* Palette de commandes — Cmd/Ctrl+K, navigation instantanée */}
       <CommandPalette items={paletteItems} onSelect={id => onNavigate(id as Page)} />
