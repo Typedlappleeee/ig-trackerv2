@@ -249,6 +249,44 @@ export async function warmupReels(id: string, params: Record<string, unknown>, l
   }
 }
 
+// ── Confidentialité du compte (public ↔ privé) ──────────────────────────────
+// Traduction « cœur » du template GeeLark « Instagram account privacy settings ».
+// public = true → compte public ; false → privé. Ne bascule que si nécessaire.
+export async function setPrivacy(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const wantPublic = /^(1|true|oui|yes|public)$/i.test(String(params.public ?? ''))
+  await dismissPopups(id)
+  if (find(await dumpUi(id), { desc: 'Log in' }) || find(await dumpUi(id), { text: 'Log in' })) throw new Error('compte non connecté')
+  if (!await tapFirst(id, [{ id: 'profile_tab' }, { desc: 'Profile' }, { desc: 'Profil' }], 'Onglet Profil', log)) throw new Error('onglet profil')
+  await sleep(2500); await dismissPopups(id)
+  if (!await tapFirst(id, [{ desc: 'Options' }, { desc: 'Menu' }, { desc: 'Settings and privacy' }, { desc: 'Paramètres' }], 'Menu Options', log)) throw new Error('menu options')
+  await sleep(2000)
+  // Descend jusqu'à « Account privacy » (max ~12 swipes).
+  let row = null
+  for (let i = 0; i < 12; i++) {
+    row = find(await dumpUi(id), { contains: 'Account privacy' }) || find(await dumpUi(id), { contains: 'Confidentialité du compte' })
+    if (row) break
+    await cloudPhones.shell(id, 'input swipe 540 1400 540 700 300'); await sleep(900)
+  }
+  if (!row) { throw new Error('« Account privacy » introuvable') }
+  // Déjà dans l'état voulu ? (le libellé montre l'état courant)
+  const cur = `${row.desc} ${row.text}`.toLowerCase()
+  if ((wantPublic && cur.includes('public')) || (!wantPublic && (cur.includes('private') || cur.includes('privé')))) {
+    log(`  ✓ déjà ${wantPublic ? 'public' : 'privé'}`); return
+  }
+  await cloudPhones.shell(id, `input tap ${row.cx} ${row.cy}`)
+  await sleep(3000); await dismissPopups(id)
+  // Bascule l'interrupteur « Private account » (à droite de la ligne).
+  const n2 = await dumpUi(id)
+  const toggleRow = n2.find(n => /private account|compte privé/i.test(`${n.text} ${n.desc}`))
+  const width = Math.max(...n2.map(n => n.x + n.w), 1080)
+  if (!toggleRow) { throw new Error('interrupteur « Private account » introuvable') }
+  await cloudPhones.shell(id, `input tap ${width - 80} ${toggleRow.cy}`)
+  await sleep(2500); await dismissPopups(id)
+  await tapFirst(id, [{ contains: 'Switch to' }, { contains: 'Passer en' }], 'Confirmer', log, false)
+  await sleep(3000)
+  log(`✅ Compte passé en ${wantPublic ? 'public' : 'privé'}`)
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -259,4 +297,5 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   scrape_followers: scrapeFollowers,
   edit_profile: editProfile,
   warmup_reels: warmupReels,
+  set_privacy: setPrivacy,
 }

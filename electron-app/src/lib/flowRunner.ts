@@ -16,7 +16,7 @@ import { ACTIONS } from './igActions'
 export type Logger = (m: string) => void
 
 // Champ saisi par l'utilisateur avant de lancer le flow (ex: la légende).
-export interface FlowInput { key: string; label: string; placeholder?: string; optional?: boolean }
+export interface FlowInput { key: string; label: string; placeholder?: string; optional?: boolean; type?: 'text' | 'textarea' | 'boolean' }
 
 // Étapes possibles d'un flow (le « vocabulaire » du workshop).
 export type Step =
