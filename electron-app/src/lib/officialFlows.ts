@@ -5,6 +5,23 @@ import type { Flow } from './flowRunner'
 
 export const OFFICIAL_FLOWS: Flow[] = [
   {
+    id: 'ig-bulk-follow',
+    name: 'Abonnement en masse — Instagram',
+    official: true,
+    category: '🔥 Warmup & engagement',
+    app: 'com.instagram.android',
+    description: 'S’abonne à une liste de comptes (un pseudo par ligne). Ne re-clique jamais un compte déjà suivi.',
+    inputs: [
+      { key: 'usernames', label: 'Comptes à suivre', placeholder: 'un pseudo par ligne (sans @)', type: 'textarea', optional: false },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'bulk_follow', params: { usernames: '{{usernames}}' } },
+    ],
+  },
+
+  {
     id: 'ig-set-privacy',
     name: 'Confidentialité du compte — Instagram',
     official: true,
