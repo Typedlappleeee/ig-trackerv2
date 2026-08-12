@@ -34,7 +34,7 @@ export function AutomationLab({ user }: Props) {
   const [myFlows, setMyFlows] = useState<StoredFlow[]>([])
   const [communityFlows, setCommunityFlows] = useState<StoredFlow[]>([])
   const [flowId, setFlowId] = useState(OFFICIAL_FLOWS[0]?.id ?? '')
-  const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community' | 'templates'>('official')
+  const [flowTab, setFlowTab] = useState<'official' | 'mine' | 'community'>('official')
   const [openedFlow, setOpenedFlow] = useState<string | null>(null)   // null = galerie, sinon page détail
   const [appFilter, setAppFilter] = useState<string>('all')           // filtre par application
   const [tplFilter, setTplFilter] = useState<'all' | TplPlatform>('all') // filtre plateforme du catalogue
@@ -145,9 +145,10 @@ export function AutomationLab({ user }: Props) {
 
           {/* ── LANCER : galerie de flows OU page détail d'un flow ─────────────── */}
           {tab === 'run' && !openedFlow && (() => {
-            const isTpl = flowTab === 'templates'
-            const baseList = flowTab === 'official' ? OFFICIAL_FLOWS : flowTab === 'mine' ? myFlows : flowTab === 'community' ? communityFlows : []
-            const src = flowTab === 'official' ? 'Officiel' : flowTab === 'mine' ? 'Perso' : 'Communauté'
+            // « Officielles » affiche désormais le catalogue de templates RPA.
+            const isTpl = flowTab === 'official'
+            const baseList = flowTab === 'mine' ? myFlows : flowTab === 'community' ? communityFlows : []
+            const src = flowTab === 'mine' ? 'Perso' : 'Communauté'
             const apps = [...new Set(baseList.map(f => f.app).filter(Boolean) as string[])]
             const list = appFilter === 'all' ? baseList : baseList.filter(f => f.app === appFilter)
             // Catalogue de templates (vitrine) filtré par plateforme.
@@ -160,8 +161,7 @@ export function AutomationLab({ user }: Props) {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'rgba(0,0,0,0.28)', width: 'fit-content', flexWrap: 'wrap' }}>
-                  <SubTab on={flowTab === 'official'} onClick={() => { setFlowTab('official'); setAppFilter('all') }}>⭐ Officielles · {OFFICIAL_FLOWS.length}</SubTab>
-                  <SubTab on={flowTab === 'templates'} onClick={() => { setFlowTab('templates'); setTplFilter('all') }}>🛒 Templates · {RPA_TEMPLATES.length}</SubTab>
+                  <SubTab on={flowTab === 'official'} onClick={() => { setFlowTab('official'); setTplFilter('all') }}>⭐ Officielles · {RPA_TEMPLATES.length}</SubTab>
                   <SubTab on={flowTab === 'mine'} onClick={() => { setFlowTab('mine'); setAppFilter('all') }}>👤 Mes automatisations · {myFlows.length}</SubTab>
                   <SubTab on={flowTab === 'community'} onClick={() => { setFlowTab('community'); setAppFilter('all') }}>🌍 Communauté · {communityFlows.length}</SubTab>
                 </div>
