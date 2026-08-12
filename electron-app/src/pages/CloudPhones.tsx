@@ -11,7 +11,8 @@ import { useTr } from '@/lib/i18n'
 import {
   cloudPhones, loadCloudAgentConfig, saveCloudAgentConfig, getCloudAgent,
   loadAllCpMeta, saveCpMeta, removeCpMeta, genPhoneId,
-  type CpInstance, type CpMeta,
+  loadAutoInstall, saveAutoInstall, loadCpGroups, saveCpGroups,
+  type CpInstance, type CpMeta, type CpAutoApp,
 } from '@/lib/cloudPhones'
 import { CloudPhoneWindow } from '@/components/CloudPhoneWindow'
 import { listProxies, proxyLabel, type Proxy } from '@/lib/proxyStore'
@@ -26,9 +27,89 @@ type Conn = 'checking' | 'ok' | 'unconfigured' | 'error'
 // Aurora Store ; '13/14' = builds tiers avec Play Store & services Google.
 const ANDROID_OPTS = [
   { value: '',       android: '15', store: 'Aurora Store', title: 'Android 15', desc: 'Image officielle redroid + Aurora Store. Recommandé, sans compte Google.', recommended: true },
-  { value: '14.0.0', android: '14', store: 'Play Store',   title: 'Android 14', desc: 'Google Play Store & services Google intégrés (build tiers).' },
-  { value: '13.0.0', android: '13', store: 'Play Store',   title: 'Android 13', desc: 'Google Play Store & services Google intégrés (build tiers).' },
+  { value: '14.0.0', android: '14', store: 'Play Store',   title: 'Android 14', desc: 'Google Play Store & services Google intégrés (build tiers).', recommended: false },
+  { value: '13.0.0', android: '13', store: 'Play Store',   title: 'Android 13', desc: 'Google Play Store & services Google intégrés (build tiers).', recommended: false },
 ] as const
+
+// Catalogue d'apps courantes — l'utilisateur clique au lieu de saisir.
+// `fdroid` s'installe tout seul (open-source). Les apps fermées (Instagram…)
+// ne sont PAS sur F-Droid ni téléchargeables via Play en direct : elles ont
+// besoin d'une URL .apk directe (que l'utilisateur colle une fois).
+const APP_PRESETS: Array<{ label: string; pkg: string; emoji: string; fdroid?: boolean }> = [
+  { label: 'Instagram', pkg: 'com.instagram.android',      emoji: '📸' },
+  { label: 'TikTok',    pkg: 'com.zhiliaoapp.musically',   emoji: '🎵' },
+  { label: 'Threads',   pkg: 'com.instagram.barcelona',    emoji: '🧵' },
+  { label: 'Snapchat',  pkg: 'com.snapchat.android',       emoji: '👻' },
+  { label: 'Facebook',  pkg: 'com.facebook.katana',        emoji: '📘' },
+  { label: 'X',         pkg: 'com.twitter.android',         emoji: '𝕏' },
+  { label: 'YouTube',   pkg: 'com.google.android.youtube', emoji: '▶️' },
+  { label: 'Reddit',    pkg: 'com.reddit.frontpage',       emoji: '👽' },
+  { label: 'WhatsApp',  pkg: 'com.whatsapp',                emoji: '💬' },
+  { label: 'Telegram',  pkg: 'org.telegram.messenger',     emoji: '✈️', fdroid: true },
+  { label: 'NewPipe',   pkg: 'org.schabi.newpipe',         emoji: '🟢', fdroid: true },
+]
+
+// ── Catalogue de templates RPA (façon store GeeLark) ─────────────────────────
+type TplPlatform = 'instagram' | 'tiktok' | 'youtube'
+interface RpaTemplate { title: string; desc: string; author: string; id: string; platforms: TplPlatform[] }
+
+const TPL_RECOMMENDED_ID = '500000000000000016'
+const RPA_TEMPLATES: RpaTemplate[] = [
+  { title: 'Post Reels video on Instagram', desc: 'Publish short Reels videos with one click on Instagram to improve operational efficiency', author: 'Ted', id: '500000000000000016', platforms: ['instagram'] },
+  { title: 'Post Carousel photo on Instagram', desc: 'Post Instagram photo carousels with just a few clicks and streamline your workflow.', author: 'Carlos', id: '6231190517779904823', platforms: ['instagram'] },
+  { title: 'Send comment on Latest Instagram Post', desc: 'Search for usernames and send comment on Latest Instagram Post', author: 'sird****@gmail.com', id: '567852161145246224', platforms: ['instagram'] },
+  { title: 'Switch to Professional Instagram Account (Content Creator)', desc: 'Automatically converts your personal account to a professional account in content creator mode.', author: 'Carlos', id: '622396849117986917', platforms: ['instagram'] },
+  { title: 'Edit Instagram profile', desc: 'Bulk edit profile details: avatars, usernames, handles, bios, and URLs.', author: 'Ted', id: '500000000000000043', platforms: ['instagram'] },
+  { title: 'Instagram AI account warmup', desc: 'Simulate how real users browse and like to increase engagement and get more followers.', author: 'Ted', id: '500000000000000020', platforms: ['instagram'] },
+  { title: 'Instagram account privacy settings', desc: 'Switch Instagram accounts between public and private for easier privacy management', author: 'Mandarin', id: '500000000000000049', platforms: ['instagram'] },
+  { title: 'Instagram auto login', desc: 'Quickly log in to your Instagram account for more efficient account management and content posting', author: 'Mandarin', id: '500000000000000034', platforms: ['instagram'] },
+  { title: 'Instagram bulk follow', desc: 'Search for usernames to follow multiple accounts in bulk.', author: 'Mandarin', id: '500000000000000053', platforms: ['instagram'] },
+  { title: 'Instagram publish Reels gallery', desc: 'One-click publish Reels gallery via Instagram to improve operational efficiency', author: 'Ted', id: '500000000000000031', platforms: ['instagram'] },
+  { title: 'Send private messages on Instagram', desc: 'Search for usernames and send private messages in bulk.', author: 'Ted', id: '500000000000000022', platforms: ['instagram'] },
+  { title: 'Post videos on TikTok/Instagram Reels/YouTube Shorts', desc: 'Post videos on TikTok, Instagram Reels and YouTube Shorts at the same time for maximum engagement.', author: 'Ted', id: '500000000000000017', platforms: ['tiktok', 'instagram', 'youtube'] },
+  { title: 'Instagram AutoLogin 2FA', desc: 'Simula o processo de login de um usuário real, realizando a autenticação automaticamente e validando o acesso por meio de 2FA', author: 'Carlos tec', id: '603260376578003125', platforms: ['instagram'] },
+  { title: 'Instagram Engagement', desc: 'Automatic collection of the last 7 days: views, interactions, and followers. Use the API to collect data via logs. Requires a professional Instagram account.', author: 'Carlos', id: '617907879776622023', platforms: ['instagram'] },
+  { title: 'Instagram Login 2FA 2.0', desc: 'Simulate the login process of a real user, performing authentication automatically and validating access through 2FA.', author: 'Carlos', id: '6271538163152323368', platforms: ['instagram'] },
+]
+
+function InstagramLogo({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <radialGradient id="ig-grad" cx="0.3" cy="1" r="1.1">
+          <stop offset="0" stopColor="#FED576" /><stop offset="0.25" stopColor="#F47133" />
+          <stop offset="0.5" stopColor="#BC3081" /><stop offset="0.8" stopColor="#4C63D2" />
+        </radialGradient>
+      </defs>
+      <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="url(#ig-grad)" />
+      <rect x="6.2" y="6.2" width="11.6" height="11.6" rx="3.6" fill="none" stroke="#fff" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="3" fill="none" stroke="#fff" strokeWidth="1.5" />
+      <circle cx="16.4" cy="7.6" r="1.05" fill="#fff" />
+    </svg>
+  )
+}
+function TikTokLogo({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="#010101" />
+      <path d="M15.9 6.2c.35 1.55 1.28 2.63 2.85 2.86v2.02c-1.05.06-1.98-.24-2.9-.83v3.86c0 3.06-2.6 5.05-5.32 4.07-2-.72-2.7-3.2-1.5-4.94.72-1.05 2-1.52 3.4-1.32v2.1c-.28-.05-.55-.08-.82-.03-.9.16-1.36 1.05-1 1.86.36.82 1.5 1.02 2.16.37.3-.3.42-.66.42-1.08V6.2h2.71z" fill="#fff" />
+      <path d="M15.9 6.2c.35 1.55 1.28 2.63 2.85 2.86v2.02c-1.05.06-1.98-.24-2.9-.83" fill="none" stroke="#25F4EE" strokeWidth="0.6" opacity="0.7" />
+    </svg>
+  )
+}
+function YouTubeLogo({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="1.5" y="4.5" width="21" height="15" rx="4.5" fill="#FF0000" />
+      <path d="M10 8.6l5.2 3.4L10 15.4z" fill="#fff" />
+    </svg>
+  )
+}
+function PlatformLogo({ platform, size }: { platform: TplPlatform; size?: number }) {
+  if (platform === 'tiktok') return <TikTokLogo size={size} />
+  if (platform === 'youtube') return <YouTubeLogo size={size} />
+  return <InstagramLogo size={size} />
+}
 
 export function CloudPhones({ user }: Props) {
   const tr = useTr()
@@ -46,6 +127,16 @@ export function CloudPhones({ user }: Props) {
 
   const [instances, setInstances] = useState<CpInstance[]>([])
   const [meta, setMeta] = useState<Record<string, CpMeta>>(() => loadAllCpMeta())
+  const [showGroups, setShowGroups] = useState(false)
+  const [showApps, setShowApps] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [tplFilter, setTplFilter] = useState<'all' | TplPlatform>('all')
+  const [cpGroups, setCpGroups] = useState<string[]>(() => loadCpGroups())
+
+  // Change le groupe d'UN téléphone directement depuis la liste.
+  const setPhoneGroup = (id: string, group: string) => {
+    saveCpMeta(id, { group: group.trim() || undefined }); setMeta(loadAllCpMeta())
+  }
   const [busyId, setBusyId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -58,6 +149,37 @@ export function CloudPhones({ user }: Props) {
   const [creating, setCreating] = useState(false)
   const [createMsg, setCreateMsg] = useState('')
   const [allProxies, setAllProxies] = useState<Proxy[]>([])
+  // Apps à pousser automatiquement sur CHAQUE nouveau téléphone (persistées).
+  const [cAutoApps, setCAutoApps] = useState<CpAutoApp[]>(() => loadAutoInstall())
+  const [cAppInput, setCAppInput] = useState('')
+  const addAutoApp = (raw: string) => {
+    const v = raw.trim()
+    if (!v) return
+    const app: CpAutoApp = /^fdroid:/i.test(v)
+      ? { kind: 'fdroid', value: v.replace(/^fdroid:/i, '').trim() }
+      : { kind: 'apk', value: v }
+    if (!app.value || cAutoApps.some(a => a.value === app.value)) { setCAppInput(''); return }
+    const next = [...cAutoApps, app]
+    setCAutoApps(next); saveAutoInstall(next); setCAppInput('')
+  }
+  const removeAutoApp = (value: string) => {
+    const next = cAutoApps.filter(a => a.value !== value)
+    setCAutoApps(next); saveAutoInstall(next)
+  }
+  // Ajoute une app du catalogue en un clic. Open-source (F-Droid) → prête ;
+  // app fermée → on demande l'URL .apk une seule fois (pas de source directe légale).
+  const addPresetApp = (p: { label: string; pkg: string; fdroid?: boolean }) => {
+    if (cAutoApps.some(a => a.label === p.label || a.value === p.pkg)) return
+    let entry: CpAutoApp
+    if (p.fdroid) {
+      entry = { kind: 'fdroid', value: p.pkg, label: p.label }
+    } else {
+      const url = window.prompt(tr(`URL .apk directe pour ${p.label} (APKPure/APKMirror ou hébergée) — mémorisée ensuite :`, `Direct .apk URL for ${p.label} (APKPure/APKMirror or self-hosted) — remembered afterwards:`), '')
+      if (!url || !url.trim()) return
+      entry = { kind: 'apk', value: url.trim(), label: p.label }
+    }
+    const next = [...cAutoApps, entry]; setCAutoApps(next); saveAutoInstall(next)
+  }
 
   // Proxies (pour l'assignation aux tels).
   useEffect(() => { listProxies(user.id).then(setAllProxies) }, [user.id])
@@ -79,9 +201,17 @@ export function CloudPhones({ user }: Props) {
   const [epName, setEpName] = useState('')
   const [epAccount, setEpAccount] = useState('')
   const [epNotes, setEpNotes] = useState('')
-  const [epGroup, setEpGroup] = useState('')     // '' = tous
+  const [epGroup, setEpGroup] = useState('')     // groupe de PROXY (filtre du sélecteur), '' = tous
   const [epProxyId, setEpProxyId] = useState('')
   const [epCheck, setEpCheck] = useState<{ loading?: boolean; ip?: string; err?: string } | null>(null)
+  // Métadonnées d'organisation du téléphone (≠ groupe de proxy ci-dessus).
+  const [epTags, setEpTags] = useState<string[]>([])
+  const [epTagInput, setEpTagInput] = useState('')
+  const [epPhoneGroup, setEpPhoneGroup] = useState('')
+  const [epLogin, setEpLogin] = useState('')
+  const [epPassword, setEpPassword] = useState('')
+  const [epTotp, setEpTotp] = useState('')
+  const [epShowPwd, setEpShowPwd] = useState(false)
 
   // Test de l'IP sortante du proxy assigné à un tel (écrit dans le cache partagé
   // → la cellule ExitIpCell se met à jour toute seule, ici et dans Proxies).
@@ -103,6 +233,13 @@ export function CloudPhones({ user }: Props) {
     const m = meta[id] ?? {}
     setEditId(id); setEditKind(kind); setEpName(m.name ?? ''); setEpAccount(m.account ?? ''); setEpNotes(m.notes ?? '')
     const px = proxyById(m.proxyId); setEpGroup(px?.group ?? ''); setEpProxyId(m.proxyId ?? ''); setEpCheck(null)
+    setEpTags(m.tags ?? []); setEpTagInput(''); setEpPhoneGroup(m.group ?? '')
+    setEpLogin(m.login ?? ''); setEpPassword(m.password ?? ''); setEpTotp(m.totp ?? ''); setEpShowPwd(false)
+  }
+  const epAddTag = (raw: string) => {
+    const tg = raw.trim().replace(/^#/, '').slice(0, 24)
+    if (!tg || epTags.includes(tg)) { setEpTagInput(''); return }
+    setEpTags(t => [...t, tg]); setEpTagInput('')
   }
   const epProxies = allProxies.filter(p => !epGroup || p.group === epGroup)
   const epRandom = () => {
@@ -119,7 +256,16 @@ export function CloudPhones({ user }: Props) {
   const saveEdit = () => {
     if (!editId) return
     const patch: CpMeta = { proxyId: epProxyId || undefined }
-    if (editKind === 'profile') { patch.name = epName.trim() || undefined; patch.account = epAccount.trim() || undefined; patch.notes = epNotes.trim() || undefined }
+    if (editKind === 'profile') {
+      patch.name = epName.trim() || undefined
+      patch.account = epAccount.trim() || undefined
+      patch.notes = epNotes.trim() || undefined
+      patch.tags = epTags.length ? epTags : undefined
+      patch.group = epPhoneGroup.trim() || undefined
+      patch.login = epLogin.trim() || undefined
+      patch.password = epPassword || undefined
+      patch.totp = epTotp.trim() || undefined
+    }
     saveCpMeta(editId, patch); setMeta(loadAllCpMeta()); setEditId(null)
   }
 
@@ -190,6 +336,7 @@ export function CloudPhones({ user }: Props) {
     const opt = ANDROID_OPTS.find(o => o.value === cAndroid) ?? ANDROID_OPTS[0]
     setCreating(true)
     let ok = 0
+    const createdIds: string[] = []
     const taken = new Set(usedProxyIds)   // évite d'assigner 2× le même proxy dans le lot
     for (let i = 0; i < cQty; i++) {
       const friendly = cQty > 1 ? `${base} ${i + 1}` : base
@@ -197,7 +344,7 @@ export function CloudPhones({ user }: Props) {
       const id = genPhoneId(friendly)
       const r = await cloudPhones.create(id, cAndroid || undefined)
       if (r.ok) {
-        ok++
+        ok++; createdIds.push(id)
         const fp = r.data?.instance?.fingerprint
         const proxyId = pickProxyForNew(taken)
         if (proxyId) taken.add(proxyId)
@@ -209,6 +356,23 @@ export function CloudPhones({ user }: Props) {
         break
       }
     }
+
+    // ── Auto-install des apps sur chaque téléphone créé (best-effort) ──────────
+    if (createdIds.length && cAutoApps.length) {
+      for (const id of createdIds) {
+        for (const app of cAutoApps) {
+          const name = app.label || app.value
+          setCreateMsg(tr(`Installation de ${name}…`, `Installing ${name}…`))
+          try {
+            const res = app.kind === 'fdroid'
+              ? await cloudPhones.installFdroid(id, app.value)
+              : await cloudPhones.install(id, app.value)
+            if (!res.ok) setCreateMsg(`${tr('Install échouée', 'Install failed')} (${name}) : ${res.error ?? ''}`)
+          } catch { /* best-effort — on continue les autres apps/téléphones */ }
+        }
+      }
+    }
+
     setCreating(false)
     await loadInstances()
     if (ok === cQty) setShowCreate(false)
@@ -237,7 +401,32 @@ export function CloudPhones({ user }: Props) {
   // ── Recherche / filtres / multi-sélection (passage à l'échelle) ────────────
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'stopped' | 'open'>('all')
+  const [groupFilter, setGroupFilter] = useState<string>('all')
+  const [tagFilter, setTagFilter] = useState<string>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const allTags = Array.from(new Set(Object.values(meta).flatMap(m => m.tags ?? []).filter(Boolean))).sort() as string[]
+  // Groupes = liste gérée par l'utilisateur ∪ groupes déjà assignés à des téléphones.
+  const allGroups = Array.from(new Set([...cpGroups, ...Object.values(meta).map(m => m.group).filter(Boolean) as string[]])).sort()
+  const groupCount = (g: string) => instances.filter(i => (meta[i.id]?.group ?? '') === g).length
+
+  const createGroup = (name: string) => {
+    const g = name.trim(); if (!g || allGroups.includes(g)) return
+    const next = [...cpGroups, g]; setCpGroups(next); saveCpGroups(next)
+  }
+  const deleteGroup = (name: string) => {
+    Object.entries(meta).forEach(([id, m]) => { if (m.group === name) saveCpMeta(id, { group: undefined }) })
+    setMeta(loadAllCpMeta())
+    const next = cpGroups.filter(g => g !== name); setCpGroups(next); saveCpGroups(next)
+    if (groupFilter === name) setGroupFilter('all')
+  }
+  const renameGroup = (oldName: string, newName: string) => {
+    const g = newName.trim(); if (!g || g === oldName || allGroups.includes(g)) return
+    Object.entries(meta).forEach(([id, m]) => { if (m.group === oldName) saveCpMeta(id, { group: g }) })
+    setMeta(loadAllCpMeta())
+    const next = Array.from(new Set(cpGroups.map(x => x === oldName ? g : x))); setCpGroups(next); saveCpGroups(next)
+    if (groupFilter === oldName) setGroupFilter(g)
+  }
 
   const q = search.trim().toLowerCase()
   const filtered = instances.filter(inst => {
@@ -246,10 +435,13 @@ export function CloudPhones({ user }: Props) {
       : statusFilter === 'stopped' ? !isRunning(inst.state)
       : openIds.includes(inst.id)
     if (!okStatus) return false
-    if (!q) return true
     const mm = meta[inst.id] ?? {}
+    if (groupFilter !== 'all' && (mm.group ?? '') !== groupFilter) return false
+    if (tagFilter !== 'all' && !(mm.tags ?? []).includes(tagFilter)) return false
+    if (!q) return true
     const px = proxyById(mm.proxyId)
-    return [mm.name || inst.name, inst.id, mm.account, px ? `${px.host}:${px.port}` : ''].filter(Boolean).join(' ').toLowerCase().includes(q)
+    return [mm.name || inst.name, inst.id, mm.account, mm.notes, mm.group, mm.login, (mm.tags ?? []).join(' '), px ? `${px.host}:${px.port}` : '']
+      .filter(Boolean).join(' ').toLowerCase().includes(q)
   })
   const toggleSel = (id: string) => setSelectedIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const allFilteredSelected = filtered.length > 0 && filtered.every(i => selectedIds.has(i.id))
@@ -265,6 +457,19 @@ export function CloudPhones({ user }: Props) {
     if (!window.confirm(`Supprimer ${selectedIds.size} téléphone(s) ? Irréversible.`)) return
     for (const id of selectedIds) await doAction(id, 'remove')
     clearSel()
+  }
+  const bulkAddTag = (raw: string) => {
+    const tag = raw.trim().replace(/^#/, '').slice(0, 24)
+    if (!tag) return
+    selectedIds.forEach(id => {
+      const cur = meta[id] ?? {}
+      if (!(cur.tags ?? []).includes(tag)) saveCpMeta(id, { tags: [...(cur.tags ?? []), tag] })
+    })
+    setMeta(loadAllCpMeta()); clearSel()
+  }
+  const bulkSetGroup = (raw: string) => {
+    selectedIds.forEach(id => saveCpMeta(id, { group: raw.trim() || undefined }))
+    setMeta(loadAllCpMeta()); clearSel()
   }
 
   const fmtDate = (t?: number) => {
@@ -338,8 +543,31 @@ export function CloudPhones({ user }: Props) {
         {conn === 'ok' && instances.length > 0 && (
           <>
             {/* Recherche + filtres de statut */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '4px 0 12px' }}>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher (nom, id, compte, proxy)…', 'Search (name, id, account, proxy)…')} className="sf-input" style={{ height: 34, flex: '0 1 320px', minWidth: 200 }} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '16px 0 12px' }}>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher (nom, id, compte, tag, proxy)…', 'Search (name, id, account, tag, proxy)…')} className="sf-input" style={{ height: 34, flex: '0 1 320px', minWidth: 200 }} />
+              <button onClick={() => setShowGroups(true)} className="sf-btn sf-btn-secondary" style={{ height: 34, display: 'flex', alignItems: 'center', gap: 6 }} title={tr('Gérer les groupes', 'Manage groups')}>
+                <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/></svg>
+                {tr('Groupes', 'Groups')}{allGroups.length > 0 && <span style={{ opacity: 0.6 }}>· {allGroups.length}</span>}
+              </button>
+              <button onClick={() => setShowApps(true)} className="sf-btn sf-btn-secondary" style={{ height: 34, display: 'flex', alignItems: 'center', gap: 6 }} title={tr('Apps à auto-installer', 'Auto-install apps')}>
+                📦 {tr('Apps', 'Apps')}{cAutoApps.length > 0 && <span style={{ opacity: 0.6 }}>· {cAutoApps.length}</span>}
+              </button>
+              <button onClick={() => setShowTemplates(true)} className="sf-btn sf-btn-secondary" style={{ height: 34, display: 'flex', alignItems: 'center', gap: 6 }} title={tr('Catalogue de templates RPA', 'RPA template catalog')}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                {tr('Templates', 'Templates')}<span style={{ opacity: 0.6 }}>· {RPA_TEMPLATES.length}</span>
+              </button>
+              {allGroups.length > 0 && (
+                <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="sf-input" style={{ height: 34, width: 'auto', minWidth: 130, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: groupFilter === 'all' ? 'var(--text-3)' : 'var(--accent)' }}>
+                  <option value="all">{tr('Tous les groupes', 'All groups')}</option>
+                  {allGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              )}
+              {allTags.length > 0 && (
+                <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} className="sf-input" style={{ height: 34, width: 'auto', minWidth: 120, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: tagFilter === 'all' ? 'var(--text-3)' : cpTagColor(tagFilter) }}>
+                  <option value="all">{tr('Tous les tags', 'All tags')}</option>
+                  {allTags.map(tg => <option key={tg} value={tg}>#{tg}</option>)}
+                </select>
+              )}
               <span style={{ flex: 1 }} />
               <FChip on={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>{tr('Tous', 'All')} · {instances.length}</FChip>
               <FChip on={statusFilter === 'online'} onClick={() => setStatusFilter('online')}>{tr('En ligne', 'Online')} · {instances.filter(i => isRunning(i.state)).length}</FChip>
@@ -352,6 +580,10 @@ export function CloudPhones({ user }: Props) {
               <div className="sf-card" style={{ padding: '9px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, borderColor: 'var(--accent)' }}>
                 <span style={{ fontWeight: 800, color: 'var(--accent)', fontSize: 13 }}>{selectedIds.size} {tr('sélectionné(s)', 'selected')}</span>
                 <span style={{ flex: 1 }} />
+                <input placeholder={tr('Tag + Entrée', 'Tag + Enter')} className="sf-input" style={{ height: 30, width: 120, fontSize: 12 }}
+                  onKeyDown={e => { if (e.key === 'Enter') { const el = e.target as HTMLInputElement; if (el.value.trim()) { bulkAddTag(el.value); el.value = '' } } }} />
+                <input placeholder={tr('Groupe + Entrée', 'Group + Enter')} list="sf-cp-groups" className="sf-input" style={{ height: 30, width: 130, fontSize: 12 }}
+                  onKeyDown={e => { if (e.key === 'Enter') { const el = e.target as HTMLInputElement; bulkSetGroup(el.value); el.value = '' } }} />
                 <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30 }} onClick={bulkOpen}>▶ {tr('Ouvrir', 'Open')}</button>
                 <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30 }} onClick={bulkVerifyIp}>🔎 {tr('Vérifier IP', 'Check IP')}</button>
                 <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30, color: 'var(--danger)' }} onClick={bulkRemove}>🗑 {tr('Supprimer', 'Delete')}</button>
@@ -398,9 +630,32 @@ export function CloudPhones({ user }: Props) {
                             </span>
                             {isOpen && <span className="sf-badge sf-badge-accent" style={{ marginLeft: 8 }}>● {tr('Ouvert', 'Open')}</span>}
                           </td>
-                          <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
-                            <div style={{ fontWeight: 700, color: 'var(--text-1)' }}>{display}</div>
-                            {m.account && <div style={{ fontSize: 10.5, color: 'var(--text-4)' }}>{m.account}</div>}
+                          <td style={{ padding: '10px 16px', maxWidth: 260 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{display}</span>
+                              {/* Sélecteur de groupe direct (liste des groupes) */}
+                              <select
+                                value={m.group ?? ''}
+                                onClick={e => e.stopPropagation()}
+                                onChange={e => { const v = e.target.value; if (v === '__new') setShowGroups(true); else setPhoneGroup(inst.id, v) }}
+                                title={tr('Changer de groupe', 'Change group')}
+                                style={{
+                                  fontSize: 10.5, fontWeight: 700, padding: '2px 6px', borderRadius: 99, cursor: 'pointer', maxWidth: 150,
+                                  border: `1px solid ${m.group ? 'rgba(129,140,248,0.25)' : 'var(--border)'}`,
+                                  background: m.group ? 'rgba(129,140,248,0.12)' : 'transparent',
+                                  color: m.group ? 'var(--accent)' : 'var(--text-4)',
+                                }}>
+                                <option value="">{tr('— groupe', '— group')}</option>
+                                {allGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                                <option value="__new">+ {tr('nouveau…', 'new…')}</option>
+                              </select>
+                            </div>
+                            {m.account && <div style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}>{m.account}</div>}
+                            {(m.tags?.length ?? 0) > 0 && <div style={{ marginTop: 4 }}><CpTagChips tags={m.tags} max={4} /></div>}
+                            {m.notes && <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }} title={m.notes}>
+                              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, opacity: 0.6 }}><path d="M2 2.5h8v5l-2.5 2.5H2v-7.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
+                              {m.notes}
+                            </div>}
                           </td>
                           <td style={{ padding: '10px 16px' }}>
                             <button onClick={(e) => { e.stopPropagation(); copyId(inst.id) }} title={tr('Copier l\'ID', 'Copy ID')}
@@ -467,6 +722,7 @@ export function CloudPhones({ user }: Props) {
             {allProxies.length === 0 && <div style={{ fontSize: 11.5, color: 'var(--text-4)', marginTop: 14 }}>{tr('💡 Pense à ajouter des proxys dans l’onglet Proxies.', '💡 Add proxies in the Proxies tab first.')}</div>}
           </div>
         )}
+
       </div>
 
       {/* ─── Modal de création ─────────────────────────────────────────────── */}
@@ -553,6 +809,20 @@ export function CloudPhones({ user }: Props) {
                 {allProxies.length === 0 && <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{tr('Aucun proxy — ajoute-en dans l\'onglet Proxies.', 'No proxy — add some in the Proxies tab.')}</span>}
               </div>
 
+              {/* Apps à auto-installer — gérées dans l'onglet Apps */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-semibold text-text2 uppercase" style={{ letterSpacing: '0.04em' }}>{tr('Apps à installer automatiquement', 'Apps to auto-install')}</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)' }}>
+                  <span style={{ fontSize: 12.5, color: cAutoApps.length ? 'var(--text-2)' : 'var(--text-4)' }}>
+                    {cAutoApps.length > 0
+                      ? tr(`${cAutoApps.length} app(s) seront installées sur chaque téléphone`, `${cAutoApps.length} app(s) will be installed on each phone`)
+                      : tr('Aucune app configurée', 'No app configured')}
+                  </span>
+                  <span style={{ flex: 1 }} />
+                  <button type="button" onClick={() => { setShowCreate(false); setShowApps(true) }} className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 30, flexShrink: 0 }}>{tr('Gérer les apps →', 'Manage apps →')}</button>
+                </div>
+              </div>
+
               <p style={{ fontSize: 11.5, color: 'var(--text-4)', lineHeight: 1.5, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
                 {tr('Le boot Android et l\'installation d\'Aurora Store prennent 1-2 min en tâche de fond après la création.', 'Android boot and Aurora Store install take 1-2 min in the background after creation.')}
               </p>
@@ -613,7 +883,37 @@ export function CloudPhones({ user }: Props) {
                   <input value={epAccount} onChange={e => setEpAccount(e.target.value)} placeholder={tr('@pseudo ou email du compte', '@handle or account email')} style={fieldInput} />
 
                   <FieldLabel style={{ marginTop: 14 }}>{tr('Remarques', 'Notes')}</FieldLabel>
-                  <textarea value={epNotes} onChange={e => setEpNotes(e.target.value)} rows={2} placeholder={tr('Notes libres (identifiants, statut du compte…)', 'Free notes (credentials, account status…)')} style={{ ...fieldInput, resize: 'vertical', fontFamily: 'inherit' }} />
+                  <textarea value={epNotes} onChange={e => setEpNotes(e.target.value)} rows={2} placeholder={tr('Notes libres sur ce téléphone…', 'Free notes about this phone…')} style={{ ...fieldInput, resize: 'vertical', fontFamily: 'inherit' }} />
+
+                  {/* Tags */}
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Tags', 'Tags')}</FieldLabel>
+                  {epTags.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}><CpTagChips tags={epTags} onRemove={tg => setEpTags(t => t.filter(x => x !== tg))} /></div>}
+                  <input value={epTagInput} onChange={e => setEpTagInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); epAddTag(epTagInput) } }}
+                    onBlur={() => epTagInput.trim() && epAddTag(epTagInput)}
+                    placeholder={tr('Ajouter un tag + Entrée…', 'Add a tag + Enter…')} style={fieldInput} />
+                  {allTags.filter(tg => !epTags.includes(tg)).length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                      {allTags.filter(tg => !epTags.includes(tg)).slice(0, 8).map(tg => (
+                        <button key={tg} onClick={() => epAddTag(tg)} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px dashed ${cpTagColor(tg)}66`, color: 'var(--text-3)' }}>+ {tg}</button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Groupe */}
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Groupe', 'Group')}</FieldLabel>
+                  <input value={epPhoneGroup} onChange={e => setEpPhoneGroup(e.target.value)} list="sf-cp-groups" placeholder={tr('Aucun groupe', 'No group')} style={fieldInput} />
+
+                  {/* Identifiants du compte */}
+                  <FieldLabel style={{ marginTop: 14 }}>{tr('Identifiants du compte', 'Account credentials')}</FieldLabel>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input value={epLogin} onChange={e => setEpLogin(e.target.value)} placeholder={tr('Identifiant / e-mail', 'Username / email')} autoComplete="off" style={fieldInput} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input value={epPassword} onChange={e => setEpPassword(e.target.value)} type={epShowPwd ? 'text' : 'password'} placeholder={tr('Mot de passe', 'Password')} autoComplete="new-password" style={{ ...fieldInput, flex: 1 }} />
+                      <button onClick={() => setEpShowPwd(v => !v)} className="sf-btn sf-btn-ghost" style={{ height: 38, padding: '0 12px' }} title={epShowPwd ? tr('Masquer', 'Hide') : tr('Afficher', 'Show')}>{epShowPwd ? '🙈' : '👁'}</button>
+                    </div>
+                    <input value={epTotp} onChange={e => setEpTotp(e.target.value)} placeholder={tr('Secret 2FA / TOTP (optionnel)', '2FA / TOTP secret (optional)')} autoComplete="off" style={fieldInput} />
+                  </div>
 
                   <FieldLabel style={{ marginTop: 14 }}>{tr('Appareil (non modifiable)', 'Device (read-only)')}</FieldLabel>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -652,11 +952,175 @@ export function CloudPhones({ user }: Props) {
         )
       })()}
 
+      {/* ─── Modal GROUPES ──────────────────────────────────────────────── */}
+      {showGroups && (
+        <div onClick={() => setShowGroups(false)} style={cpOverlay}>
+          <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(560px,94vw)', maxHeight: '86vh', overflowY: 'auto', padding: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{tr('Groupes', 'Groups')}</h3>
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setShowGroups(false)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', fontSize: 18 }}>×</button>
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.6 }}>{tr('Crée un groupe, puis choisis-le directement sur chaque téléphone (colonne Téléphone) ou en masse.', 'Create a group, then pick it right on each phone (Phone column) or in bulk.')}</p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input id="cp-new-group" placeholder={tr('Nom du nouveau groupe…', 'New group name…')} className="sf-input" style={{ flex: 1, height: 38 }}
+                onKeyDown={e => { if (e.key === 'Enter') { const el = e.target as HTMLInputElement; createGroup(el.value); el.value = '' } }} />
+              <button className="sf-btn sf-btn-primary" style={{ height: 38, flexShrink: 0 }} onClick={() => { const el = document.getElementById('cp-new-group') as HTMLInputElement | null; if (el) { createGroup(el.value); el.value = '' } }}>+ {tr('Créer', 'Create')}</button>
+            </div>
+            {allGroups.length === 0
+              ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '18px 0', textAlign: 'center' }}>{tr('Aucun groupe pour le moment.', 'No group yet.')}</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {allGroups.map(g => (
+                    <div key={g} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--accent)', fontSize: 13 }}>
+                        <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h3l1 1.5h5v4.5a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V3.5z" stroke="currentColor" strokeWidth="1.1"/></svg>{g}</span>
+                      <span style={{ fontSize: 11.5, color: 'var(--text-4)' }}>· {groupCount(g)} {tr('tél.', 'ph.')}</span>
+                      <span style={{ flex: 1 }} />
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28 }} onClick={() => { setGroupFilter(g); setShowGroups(false) }}>{tr('Voir', 'View')}</button>
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28 }} onClick={() => { const n = window.prompt(tr('Renommer le groupe', 'Rename group'), g); if (n) renameGroup(g, n) }}>{tr('Renommer', 'Rename')}</button>
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28, color: 'var(--danger)' }} onClick={() => { if (window.confirm(tr(`Supprimer « ${g} » ? Les téléphones sont gardés, juste retirés du groupe.`, `Delete "${g}"? Phones are kept, just removed from the group.`))) deleteGroup(g) }}>{tr('Suppr.', 'Del.')}</button>
+                    </div>
+                  ))}
+                </div>}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal APPS (catalogue + auto-install) ──────────────────────── */}
+      {showApps && (
+        <div onClick={() => setShowApps(false)} style={cpOverlay}>
+          <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(600px,94vw)', maxHeight: '88vh', overflowY: 'auto', padding: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>📦 {tr('Apps à installer automatiquement', 'Apps to auto-install')}</h3>
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setShowApps(false)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', fontSize: 18 }}>×</button>
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.6 }}>{tr('Poussées sur CHAQUE nouveau téléphone. Clique une app pour l’ajouter.', 'Pushed to EVERY new phone. Click an app to add it.')}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+              {APP_PRESETS.map(p => {
+                const added = cAutoApps.some(a => a.label === p.label || a.value === p.pkg)
+                return (
+                  <button key={p.pkg} disabled={added} onClick={() => addPresetApp(p)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, padding: '7px 11px', borderRadius: 10, cursor: added ? 'default' : 'pointer',
+                      border: `1px solid ${added ? 'var(--ok)' : 'var(--border)'}`, background: added ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.03)', color: added ? 'var(--ok)' : 'var(--text-2)' }}>
+                    <span>{p.emoji}</span>{p.label}{p.fdroid && <span style={{ fontSize: 8, fontWeight: 800, color: 'var(--ok)' }}>F-DROID</span>}{added && ' ✓'}
+                  </button>
+                )
+              })}
+            </div>
+            <FieldLabel>{tr('Ou une URL .apk / paquet F-Droid', 'Or a .apk URL / F-Droid package')}</FieldLabel>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input value={cAppInput} onChange={e => setCAppInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAutoApp(cAppInput) } }}
+                placeholder={tr('URL .apk directe, ou fdroid:com.pkg.name', 'Direct .apk URL, or fdroid:com.pkg.name')} style={{ ...fieldInput, flex: 1 }} />
+              <button onClick={() => addAutoApp(cAppInput)} className="sf-btn sf-btn-secondary" style={{ height: 38, padding: '0 14px', flexShrink: 0 }}>{tr('Ajouter', 'Add')}</button>
+            </div>
+            {cAutoApps.length === 0
+              ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '12px 0', textAlign: 'center' }}>{tr('Aucune app configurée — les téléphones seront créés vierges.', 'No app configured — phones created empty.')}</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {cAutoApps.map(a => (
+                    <div key={a.value} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 7px', borderRadius: 6, color: a.kind === 'fdroid' ? 'var(--ok)' : 'var(--accent)', background: a.kind === 'fdroid' ? 'rgba(52,211,153,0.12)' : 'rgba(129,140,248,0.12)', textTransform: 'uppercase', flexShrink: 0 }}>{a.kind === 'fdroid' ? 'F-Droid' : 'APK'}</span>
+                      <span style={{ fontSize: 12.5, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.value}>{a.label || a.value}</span>
+                      <span style={{ flex: 1 }} />
+                      <button className="sf-btn sf-btn-ghost text-[12px]" style={{ height: 28, color: 'var(--danger)' }} onClick={() => removeAutoApp(a.value)}>{tr('Retirer', 'Remove')}</button>
+                    </div>
+                  ))}
+                </div>}
+            <p style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 14, lineHeight: 1.5 }}>{tr('Instagram, TikTok… ne sont pas sur F-Droid : la 1ʳᵉ fois, colle une URL .apk directe (elle est mémorisée). Telegram/NewPipe s’installent directement.', 'Instagram, TikTok… aren’t on F-Droid: the first time, paste a direct .apk URL (it is remembered). Telegram/NewPipe install directly.')}</p>
+          </div>
+        </div>
+      )}
+
+      {showTemplates && (() => {
+        const filtered = RPA_TEMPLATES.filter(t => tplFilter === 'all' || t.platforms.includes(tplFilter))
+        const reco = RPA_TEMPLATES.find(t => t.id === TPL_RECOMMENDED_ID)
+        const showReco = reco && (tplFilter === 'all' || reco.platforms.includes(tplFilter))
+        const FILTERS: Array<{ key: 'all' | TplPlatform; label: string }> = [
+          { key: 'all', label: tr('Tous', 'All') },
+          { key: 'instagram', label: 'Instagram' },
+          { key: 'tiktok', label: 'TikTok' },
+          { key: 'youtube', label: 'YouTube' },
+        ]
+        const Card = ({ t }: { t: RpaTemplate }) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <span style={{ flexShrink: 0, display: 'flex', gap: 3 }}>
+                {t.platforms.slice(0, 3).map(p => <PlatformLogo key={p} platform={p} size={26} />)}
+              </span>
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.3, margin: 0 }}>{t.title}</p>
+            </div>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', lineHeight: 1.5, margin: 0, flex: 1 }}>{t.desc}</p>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 10, color: 'var(--text-4)', margin: 0 }}>{tr('Par', 'By')} {t.author}</p>
+                <p style={{ fontSize: 10, color: 'var(--text-4)', margin: 0, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Template id: {t.id}</p>
+              </div>
+              <button className="sf-btn sf-btn-ghost" style={{ height: 26, fontSize: 11, flexShrink: 0, color: 'var(--text-4)' }} title={tr('Bientôt : créer une tâche depuis ce template', 'Soon: create a task from this template')}>⋯</button>
+            </div>
+          </div>
+        )
+        return (
+          <div onClick={() => setShowTemplates(false)} style={cpOverlay}>
+            <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(1080px,96vw)', maxHeight: '90vh', overflowY: 'auto', padding: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{tr('Templates d\'automatisation', 'Automation templates')}</h3>
+                <span style={{ flex: 1 }} />
+                <button onClick={() => setShowTemplates(false)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', fontSize: 18 }}>×</button>
+              </div>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.6 }}>{tr('Flux RPA à exécuter sur tes cloud phones. Filtre par plateforme.', 'RPA flows to run on your cloud phones. Filter by platform.')}</p>
+
+              {/* Filtres plateforme avec logos */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+                {FILTERS.map(f => {
+                  const active = tplFilter === f.key
+                  return (
+                    <button key={f.key} onClick={() => setTplFilter(f.key)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
+                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'rgba(129,140,248,0.14)' : 'rgba(255,255,255,0.03)', color: active ? 'var(--accent-l)' : 'var(--text-2)' }}>
+                      {f.key !== 'all' && <PlatformLogo platform={f.key} size={16} />}{f.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Recommandé */}
+              {showReco && reco && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>★ {tr('Recommandé', 'Recommended')}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, marginBottom: 20, background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.35)' }}>
+                    <span style={{ flexShrink: 0 }}><InstagramLogo size={40} /></span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{reco.title}</p>
+                      <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '3px 0 0', lineHeight: 1.5 }}>{reco.desc}</p>
+                      <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '5px 0 0', fontFamily: 'monospace' }}>{tr('Par', 'By')} {reco.author} · Template id: {reco.id}</p>
+                    </div>
+                    <button className="sf-btn sf-btn-primary" style={{ height: 34, flexShrink: 0 }} title={tr('Bientôt', 'Soon')}>{tr('Utiliser', 'Use')}</button>
+                  </div>
+                </>
+              )}
+
+              {/* Tous les templates */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>▤ {tr('Tous les templates', 'All templates')} <span style={{ opacity: 0.6 }}>· {filtered.length}</span></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+                {filtered.map(t => <Card key={t.id} t={t} />)}
+              </div>
+              {filtered.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '24px 0', textAlign: 'center' }}>{tr('Aucun template pour cette plateforme.', 'No template for this platform.')}</div>}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Suggestions de groupes (partagées par le modal d'édition + la barre groupée) */}
+      <datalist id="sf-cp-groups">
+        {allGroups.map(g => <option key={g} value={g} />)}
+      </datalist>
+
       <style>{`.cp-row:hover { background: rgba(129,140,248,0.06); }`}</style>
     </div>
   )
 }
 
+const cpOverlay: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(6,7,12,0.6)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }
 const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }
 const fieldInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 13, padding: '9px 11px', borderRadius: 9, border: '1px solid var(--border)', background: 'rgba(0,0,0,0.25)', color: 'var(--text-1)' }
 function FieldLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -664,6 +1128,38 @@ function FieldLabel({ children, style }: { children: React.ReactNode; style?: Re
 }
 function FChip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 99, border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-lt)' : 'transparent', color: on ? 'var(--accent)' : 'var(--text-3)', cursor: 'pointer' }}>{children}</button>
+}
+
+// ── Tags : couleur stable (hash → palette) + affichage en chips ───────────────
+const CP_TAG_PALETTE = ['#818CF8', '#22D3EE', '#34D399', '#E5C07B', '#F0A0AB', '#A78BFA', '#F59E0B', '#10B981', '#EC4899', '#60A5FA']
+function cpTagColor(tag: string): string {
+  let h = 0
+  for (let i = 0; i < tag.length; i++) h = tag.charCodeAt(i) + ((h << 5) - h)
+  return CP_TAG_PALETTE[Math.abs(h) % CP_TAG_PALETTE.length]
+}
+function CpTagChips({ tags, max, onRemove }: { tags?: string[]; max?: number; onRemove?: (t: string) => void }) {
+  const list = (tags ?? []).filter(Boolean)
+  if (list.length === 0) return null
+  const shown = max ? list.slice(0, max) : list
+  const extra = max && list.length > max ? list.length - max : 0
+  return (
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+      {shown.map(tg => {
+        const c = cpTagColor(tg)
+        return (
+          <span key={tg} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: `${c}1e`, color: c, border: `1px solid ${c}44`, whiteSpace: 'nowrap' }}>
+            {tg}
+            {onRemove && (
+              <button onClick={e => { e.stopPropagation(); onRemove(tg) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: c, padding: 0, display: 'flex', opacity: 0.7 }}>
+                <svg width="7" height="7" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              </button>
+            )}
+          </span>
+        )
+      })}
+      {extra > 0 && <span style={{ fontSize: 10, color: 'var(--text-4)' }}>+{extra}</span>}
+    </span>
+  )
 }
 
 export default CloudPhones

@@ -625,7 +625,10 @@ export function Montage({ user }: MontageProps) {
 
     // Montage is free — no credit deduction
 
-    const out = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mp4` })
+    // Export en .mov (QuickTime) — le handler FFmpeg déduit le conteneur de
+    // l'extension et la boîte d'enregistrement filtre déjà sur « mov ». Codecs
+    // H.264 + AAC + faststart : identiques au Mixer/Sous-titres qui sortent déjà en .mov.
+    const out = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mov` })
     if (!out) { setExporting(false); return }
     try {
       const { resolveContentToLocalPath } = await import('@/lib/storage')

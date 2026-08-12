@@ -477,7 +477,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                     {job.status === 'done' && exportMode === 'download' && job.outputPath && (
                       <a
                         href={job.outputPath}
-                        download={`textcopy_${String(job.id + 1).padStart(3, '0')}.mp4`}
+                        download={`textcopy_${String(job.id + 1).padStart(3, '0')}.mov`}
                         className="sf-badge sf-badge-green hover:opacity-80 transition-opacity sf-anim-slide-up"
                       >
                         Download

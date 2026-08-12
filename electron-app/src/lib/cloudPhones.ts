@@ -43,7 +43,40 @@ interface CpResult<T = unknown> { ok: boolean; status?: number; error?: string; 
 // L'agent ne stocke que l'id du conteneur : ni nom convivial, ni version Android,
 // ni modèle, ni date de création. On garde ça côté navigateur (localStorage) pour
 // pouvoir l'afficher dans la table. Clé unique par id de téléphone.
-export interface CpMeta { name?: string; android?: string; store?: string; model?: string; createdAt?: number; proxyId?: string; account?: string; notes?: string }
+export interface CpMeta {
+  name?: string; android?: string; store?: string; model?: string
+  createdAt?: number; proxyId?: string; account?: string; notes?: string
+  // ── Organisation & identifiants (gérés dans ScaleFlow) ──────────────────────
+  tags?: string[]          // labels colorés multiples (filtrage/tri)
+  group?: string           // groupe libre (1 par téléphone)
+  login?: string           // identifiant du compte (mémorisé)
+  password?: string        // mot de passe du compte (mémorisé)
+  totp?: string            // secret 2FA/TOTP (mémorisé)
+}
+
+// ── Liste d'apps à auto-installer à la création d'un téléphone ────────────────
+// Persistée globalement (pas par téléphone) : ce sont les apps qu'on pousse
+// automatiquement sur CHAQUE nouveau cloud phone. `apk` = URL directe .apk ;
+// `fdroid` = nom de paquet (dernière version F-Droid).
+export interface CpAutoApp { kind: 'apk' | 'fdroid'; value: string; label?: string }
+const AUTOINSTALL_KEY = 'sf-cp-autoinstall'
+export function loadAutoInstall(): CpAutoApp[] {
+  try { const a = JSON.parse(localStorage.getItem(AUTOINSTALL_KEY) || '[]'); return Array.isArray(a) ? a : [] } catch { return [] }
+}
+export function saveAutoInstall(apps: CpAutoApp[]): void {
+  localStorage.setItem(AUTOINSTALL_KEY, JSON.stringify(apps))
+}
+
+// ── Groupes de téléphones ─────────────────────────────────────────────────────
+// Liste de noms de groupes gérée par l'utilisateur. Stockée à part pour qu'un
+// groupe puisse exister AVANT d'y ranger le moindre téléphone (créer → assigner).
+const GROUPS_KEY = 'sf-cp-groups'
+export function loadCpGroups(): string[] {
+  try { const a = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]'); return Array.isArray(a) ? a.filter(x => typeof x === 'string') : [] } catch { return [] }
+}
+export function saveCpGroups(groups: string[]): void {
+  localStorage.setItem(GROUPS_KEY, JSON.stringify(Array.from(new Set(groups.map(g => g.trim()).filter(Boolean)))))
+}
 const META_KEY = 'sf-cp-meta'
 export function loadAllCpMeta(): Record<string, CpMeta> {
   try { return JSON.parse(localStorage.getItem(META_KEY) || '{}') as Record<string, CpMeta> } catch { return {} }

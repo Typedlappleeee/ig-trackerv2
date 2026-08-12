@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, warmupAccountNative, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, stopPhone,
+  fetchAllPhones, warmupAccount, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, loginInstagramViaRpa, warmupInstagramViaRpa, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -177,6 +177,8 @@ export function Warmup({ user }: WarmupProps) {
   const [editPicUrl,   setEditPicUrl]   = useState('')
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [editPicFile,  setEditPicFile]  = useState<string | null>(null)
+  const [editLinkUrl,   setEditLinkUrl]   = useState('')
+  const [editLinkTitle, setEditLinkTitle] = useState('')
 
   // ── WARMUP state ──────────────────────────────────────────────────────────
   const [browseMinutes,   setBrowseMinutes]   = useState(() => Number(localStorage.getItem('sf-wu-browse') ?? '15'))
@@ -273,10 +275,25 @@ export function Warmup({ user }: WarmupProps) {
       targets.forEach((phone, i) => {
         const line = lines[i]
         if (!line) return
-        const parts = line.split(':')
-        const email      = (parts[0] ?? '').trim()
-        const totpSecret = parts.length >= 3 ? (parts[parts.length - 1] ?? '').trim() : ''
-        const password   = (parts.length >= 3 ? parts.slice(1, -1).join(':') : parts.slice(1).join(':')).trim()
+        // Séparateur = « : ». 1er champ = identifiant (username OU email).
+        // Le 2FA n'est reconnu que si le DERNIER champ ressemble à un vrai secret
+        // TOTP (base32, ≥ 16 car.) — sinon tout ce qui suit le 1er « : » est le mot
+        // de passe (gère les mots de passe contenant « : » et les comptes sans 2FA).
+        const parts = line.split(':').map(s => s.trim())
+        const email = parts[0] ?? ''
+        const rest  = parts.slice(1)
+        let totpSecret = ''
+        let password = ''
+        // Le 2FA est reconnu si le DERNIER champ ressemble à un secret TOTP base32.
+        // On retire les espaces AVANT le test : Instagram donne souvent la clé par
+        // blocs (« JBSW Y3DP EHPK 3PXP ») — sinon elle était prise pour un mot de passe.
+        const lastClean = (rest[rest.length - 1] ?? '').replace(/\s+/g, '')
+        if (rest.length >= 2 && /^[A-Z2-7]{16,}$/i.test(lastClean)) {
+          totpSecret = lastClean
+          password   = rest.slice(0, -1).join(':')
+        } else {
+          password = rest.join(':')
+        }
         if (!email || !password) return
         next[phone.id] = { email, password, totpSecret }
       })
@@ -335,12 +352,23 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      const result = await loginInstagramAccount(
-        bearer, phone.id, cred.email, cred.password,
+      // 1) Login RPA NATIF GeeLark (template « Instagram auto login ») s'il est présent
+      //    dans le compte → fiable, piloté côté serveur.
+      let result: { ok: boolean; error?: string; noFlow?: boolean } = await loginInstagramViaRpa(
+        bearer, phone.id,
+        { email: cred.email, password: cred.password, totp: cred.totpSecret },
         msg => addLog(phone.id, msg),
-        abortRef.current,
-        cred.totpSecret || undefined,
       )
+      // 2) Repli automatique sur le login ADB si aucun flow natif n'est trouvé.
+      if (result.noFlow) {
+        addLog(phone.id, tr('Pas de flow login GeeLark → connexion ADB de secours…', 'No GeeLark login flow → ADB login fallback…'))
+        result = await loginInstagramAccount(
+          bearer, phone.id, cred.email, cred.password,
+          msg => addLog(phone.id, msg),
+          abortRef.current,
+          cred.totpSecret || undefined,
+        )
+      }
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
@@ -365,6 +393,8 @@ export function Warmup({ user }: WarmupProps) {
       username:      editUsername.trim() || undefined,
       bio:           editBio.trim().slice(0, 150) || undefined,
       profilePicUrl: editPicUrl.trim() || undefined,
+      linkURL:       editLinkUrl.trim() || undefined,
+      linkTitle:     editLinkTitle.trim() || undefined,
     }
 
     // Proxy rotatif : rotation d'IP avant chaque téléphone → série (1 par 1).
@@ -387,7 +417,8 @@ export function Warmup({ user }: WarmupProps) {
             }, msg => addLog(phone.id, msg))
           // Changement de pseudo Instagram : on passe par le chemin ADB, qui EFFACE
           // le champ (select-all + suppr) avant de taper — le RPA natif, lui,
-          // n'efface pas l'ancien username. Sinon (nom/bio/photo seuls) → natif.
+          // n'efface pas l'ancien username. Sinon (nom/bio/photo/lien) → natif
+          // (une seule tâche gère nom + bio + photo + lien).
           : config.username
             ? await updateInstagramProfile(bearer, phone.id, {
                 profileName:   config.profileName,
@@ -395,11 +426,22 @@ export function Warmup({ user }: WarmupProps) {
                 bio:           config.bio,
                 profilePicUrl: config.profilePicUrl,
                 rotationUrls,
-              }, msg => addLog(phone.id, msg)).then(() => ({ ok: true as const }))
+              }, msg => addLog(phone.id, msg)).then(async () => {
+                // Le lien bio n'est pas géré par le chemin ADB → on l'applique via
+                // le RPA natif juste après (petite tâche dédiée) si demandé.
+                if (config.linkURL) {
+                  return editInstagramProfileNative(bearer, phone.id, {
+                    linkURL: config.linkURL, linkTitle: config.linkTitle, rotationUrls,
+                  }, msg => addLog(phone.id, msg))
+                }
+                return { ok: true as const }
+              })
             : await editInstagramProfileNative(bearer, phone.id, {
                 nickname:  config.profileName,
                 biography: config.bio,
                 avatarUrl: config.profilePicUrl,
+                linkURL:   config.linkURL,
+                linkTitle: config.linkTitle,
                 rotationUrls,
               }, msg => addLog(phone.id, msg))
         updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
@@ -435,13 +477,20 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      const result = warmupPlatform === 'tiktok'
+      let result: { ok: boolean; error?: string; noFlow?: boolean }
+      if (warmupPlatform === 'tiktok') {
         // TikTok : warmup natif (recherche/parcours) + engagement (like/follow/commentaire IA)
-        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment, rotationUrls }, msg => addLog(phone.id, msg))
-        // Instagram : mot-clé → recherche ADB ; sinon → warmup IA natif général
-        : warmupKeyword.trim()
-          ? await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
-          : await warmupAccountNative(bearer, phone.id, { browseVideo: Math.max(1, Math.min(100, browseMinutes)), rotationUrls }, msg => addLog(phone.id, msg))
+        result = await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment, rotationUrls }, msg => addLog(phone.id, msg))
+      } else {
+        // Instagram : RPA NATIF GeeLark (reels + like/commentaire/follow aléatoires,
+        // recherche par mot-clé). Le nombre saisi = NB DE VIDÉOS regardées.
+        result = await warmupInstagramViaRpa(bearer, phone.id, { videos: browseMinutes, keyword: warmupKeyword.trim() || undefined, rotationUrls }, msg => addLog(phone.id, msg))
+        // Repli automatique sur le warmup ADB (durée) si aucun flow natif.
+        if (result.noFlow) {
+          addLog(phone.id, tr('Pas de flow warmup GeeLark → warmup ADB de secours…', 'No GeeLark warmup flow → ADB warmup fallback…'))
+          result = await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
+        }
+      }
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
@@ -999,7 +1048,7 @@ export function Warmup({ user }: WarmupProps) {
                     <div>
                       <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>{tr('Import en masse', 'Bulk import')}</p>
                       <p style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'monospace', marginTop: 1 }}>
-                        {tr("email:password:2fa par ligne — appliqué aux téléphones sélectionnés dans l'ordre", 'email:password:2fa per line — applied to the selected phones in order')}
+                        {tr("identifiant:mot_de_passe:2fa par ligne (identifiant = username OU email ; 2fa optionnel) — appliqué aux téléphones sélectionnés dans l'ordre", 'username_or_email:password:2fa per line (2fa optional) — applied to the selected phones in order')}
                       </p>
                     </div>
                   </div>
@@ -1010,7 +1059,12 @@ export function Warmup({ user }: WarmupProps) {
                       value={bulkCreds}
                       onChange={e => setBulkCreds(e.target.value)}
                       className="sf-input sf-textarea"
-                      style={{ fontSize: 11, fontFamily: 'monospace', resize: 'vertical' }}
+                      // pas de retour à la ligne auto : une ligne = un compte. Un long
+                      // identifiant:mdp défile horizontalement au lieu de « passer » sur
+                      // 2 lignes visuelles (ce qui ne casse rien au parsing — on ne
+                      // découpe que sur les vrais retours à la ligne — mais prête à confusion).
+                      wrap="off"
+                      style={{ fontSize: 11, fontFamily: 'monospace', resize: 'vertical', whiteSpace: 'pre', overflowX: 'auto' }}
                     />
                     <button
                       onClick={applyBulkCreds}
@@ -1225,6 +1279,26 @@ export function Warmup({ user }: WarmupProps) {
                       )}
                       <p style={{ fontSize: 10, marginTop: 3, color: 'var(--text-4)', fontFamily: 'monospace' }}>{t('warmupDirectLink')}</p>
                     </div>
+
+                    {/* Lien bio (URL + titre) */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', marginBottom: 6, fontFamily: 'monospace' }}>
+                        {tr('Lien bio', 'Bio link')}
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <input type="url" placeholder="https://linktr.ee/moncompte"
+                          value={editLinkUrl} onChange={e => setEditLinkUrl(e.target.value)}
+                          className="sf-input" style={{ fontSize: 12, fontFamily: 'monospace' }}
+                        />
+                        <input type="text" placeholder={tr('Titre du lien (optionnel) — ex: Mes offres', 'Link title (optional) — e.g. My deals')}
+                          value={editLinkTitle} onChange={e => setEditLinkTitle(e.target.value)}
+                          className="sf-input" style={{ fontSize: 12 }}
+                        />
+                      </div>
+                      <p style={{ fontSize: 10, marginTop: 3, color: 'var(--text-4)', fontFamily: 'monospace' }}>
+                        {tr('Ajouté aux liens du profil Instagram.', 'Added to the Instagram profile links.')}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -1235,11 +1309,11 @@ export function Warmup({ user }: WarmupProps) {
                   style={{ height: 44, fontSize: 13, fontWeight: 600, borderRadius: 10 }}
                   title={
                     selectedPhones.length === 0 ? tr('Sélectionne au moins un compte à gauche', 'Select at least one account on the left')
-                    : (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim()) ? tr('Remplis au moins un champ à modifier (nom, pseudo, bio ou photo)', 'Fill at least one field to change (name, username, bio or picture)')
+                    : (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim() && !editLinkUrl.trim()) ? tr('Remplis au moins un champ à modifier (nom, pseudo, bio, photo ou lien)', 'Fill at least one field to change (name, username, bio, picture or link)')
                     : tr('Appliquer les modifications aux comptes sélectionnés', 'Apply the edits to the selected accounts')
                   }
                   disabled={selectedPhones.length === 0 || running ||
-                    (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim())}
+                    (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim() && !editLinkUrl.trim())}
                   loading={running}
                   onClick={launchMassEdit}
                 >

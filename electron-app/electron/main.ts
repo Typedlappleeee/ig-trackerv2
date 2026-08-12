@@ -846,7 +846,11 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
     // dans la resourceUrl) ; une VIDÉO force 'mp4' — les templates RPA Insta/TikTok/
     // Threads rejettent 'mov'/'webm'. (Doit rester aligné sur webAPI.ts.)
     const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heif', 'heic']
-    const realExt = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+    // Cover capturée (data:image/jpeg;base64,…) → pas d'extension : on lit le MIME.
+    const dataMime = opts.filePath.startsWith('data:') ? (opts.filePath.match(/^data:([^;,]+)/)?.[1] || '').toLowerCase() : ''
+    const realExt = dataMime
+      ? (dataMime.split('/')[1] || 'jpg')
+      : (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
     const ext = IMAGE_EXTS.includes(realExt) ? realExt : 'mp4'
     const urlRes = await net.fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
@@ -867,9 +871,12 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
     const resourceUrl = data['resourceUrl'] as string | undefined
     if (!uploadUrl || !resourceUrl) return { ok: false, error: 'Réponse upload GéeLark invalide' }
 
-    // Step 2: read file bytes — local path or Supabase signed URL
+    // Step 2: read file bytes — data URL (cover), local path, or signed URL
     let fileBytes: Buffer
-    if (opts.filePath.startsWith('https://') || opts.filePath.startsWith('http://')) {
+    if (opts.filePath.startsWith('data:')) {
+      const b64 = opts.filePath.slice(opts.filePath.indexOf(',') + 1)
+      fileBytes = Buffer.from(b64, 'base64')
+    } else if (opts.filePath.startsWith('https://') || opts.filePath.startsWith('http://')) {
       const dlRes = await net.fetch(opts.filePath, { signal: abort.signal })
       if (!dlRes.ok) return { ok: false, error: `Téléchargement vidéo échoué: ${dlRes.status}` }
       fileBytes = Buffer.from(await dlRes.arrayBuffer())
@@ -1130,7 +1137,7 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
   const totalH = lines.length * lineH
 
   const startY = opts.position === 'bottom'
-    ? VH - totalH - 80
+    ? VH - totalH - 170
     : opts.position === 'top'
       ? 80
       : Math.round((VH - totalH) / 2)

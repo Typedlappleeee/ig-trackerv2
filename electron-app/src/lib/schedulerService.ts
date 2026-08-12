@@ -523,12 +523,13 @@ async function executeScheduledPostInner(
           const ip = await getPhonePublicIp(bearer, phone.geelark_id)
           if (ip) onLog(`🌍 IP actuelle (${nameOf(phone)}) : ${ip}`)
         }
-        const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
-          id:          phone.geelark_id,
+        const { postReelsTask } = await import('./geelark')
+        const res = await postReelsTask(bearer, {
+          phoneId:     phone.geelark_id,
           scheduleAt:  Math.floor(Date.now() / 1000),
           description: (videos[videoIdx].desc?.trim() || caption),
           video:       [videos[videoIdx].token],
-          ...(reels_trial ? { shareType: 2 } : {}),
+          reelsTrial:  reels_trial,
         }) as any
         const taskId = res.data?.id ?? res.data?.taskId ?? res.taskId ?? res.id ?? null
         if (res.code === 0) {

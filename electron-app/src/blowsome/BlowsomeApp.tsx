@@ -11,10 +11,11 @@ import { BlowDashboard } from './pages/Dashboard'
 import { BlowPosting } from './pages/Posting'
 import { BlowTools } from './pages/ToolsManager'
 import { BlowPhoneFarm } from './pages/PhoneFarm'
+import { BlowAutoContent } from './pages/AutoContent'
 
 const Publish = lazy(() => import('@/pages/Publish').then(m => ({ default: m.Publish })))
 
-type Tab = 'dashboard' | 'posting' | 'bank' | 'tools' | 'phonefarm'
+type Tab = 'dashboard' | 'posting' | 'autocontent' | 'bank' | 'tools' | 'phonefarm'
 
 export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }) {
   useBlowCSS()
@@ -22,6 +23,7 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
   const NAV: { id: Tab; label: string; icon: string }[] = [
     { id: 'dashboard', label: tr('Dashboard', 'Dashboard'),   icon: ICON.grid },
     { id: 'posting',   label: tr('Posting', 'Posting'),     icon: ICON.send },
+    { id: 'autocontent', label: tr('Auto-contenu', 'Auto-content'), icon: ICON.bolt },
     { id: 'bank',      label: tr('Banque', 'Bank'),      icon: ICON.folder },
     { id: 'tools',     label: tr('Gestionnaire de tool', 'Tool Manager'), icon: ICON.wrench },
     { id: 'phonefarm', label: tr('Phone Farm', 'Phone Farm'),  icon: ICON.phone },
@@ -115,6 +117,7 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
           <div style={{ padding: '30px 30px 80px', maxWidth: 1120, margin: '0 auto' }}>
             {tab === 'dashboard' && <BlowDashboard user={user} onGo={setTab} onPublish={() => setShowPublish(true)} />}
             {tab === 'posting'   && <BlowPosting user={user} />}
+            {tab === 'autocontent' && <BlowAutoContent user={user} />}
             {tab === 'phonefarm' && <BlowPhoneFarm user={user} />}
           </div>
         )}

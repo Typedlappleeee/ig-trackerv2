@@ -9,7 +9,7 @@ import { canAccessPhoneGroup, filterAccessiblePhones, accessibleGroupNames } fro
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp, fetchPhoneProxies } from '@/lib/geelark'
+import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp, fetchPhoneProxies, postReelsTask } from '@/lib/geelark'
 import { startRun, updateRun, endRun, setRunPhase, finishRun, findOrphanRun, adoptRun, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { resolveRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
@@ -194,6 +194,96 @@ const PhoneRow = memo(function PhoneRow({ phone, checked, videoIndex, videoTitle
   )
 })
 
+// ── Sélecteur de cover : scrub la vidéo et capture une frame comme miniature ──
+// La frame capturée (data:image/jpeg) sera uploadée chez GeeLark au moment de
+// poster et passée en `Cover` au flow RPA Reels.
+function CoverPicker({ resolveSrc, initialTime, onCancel, onPick }: {
+  resolveSrc: () => Promise<string | null>
+  initialTime: number
+  onCancel: () => void
+  onPick: (time: number, dataUrl: string) => void
+}) {
+  const tr = useTr()
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [src, setSrc]   = useState<string | null>(null)
+  const [dur, setDur]   = useState(0)
+  const [time, setTime] = useState(initialTime)
+  const [err, setErr]   = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    resolveSrc().then(s => { if (!alive) return; setSrc(s); if (!s) setErr(tr('Vidéo introuvable', 'Video not found')) })
+    return () => { alive = false }
+  }, [])
+
+  function seek(t: number) {
+    setTime(t)
+    const v = videoRef.current
+    if (v && isFinite(t)) v.currentTime = t
+  }
+
+  function capture() {
+    const v = videoRef.current
+    if (!v) return
+    setBusy(true)
+    try {
+      const c = document.createElement('canvas')
+      c.width  = v.videoWidth  || 720
+      c.height = v.videoHeight || 1280
+      const ctx = c.getContext('2d')
+      if (!ctx) throw new Error('no ctx')
+      ctx.drawImage(v, 0, 0, c.width, c.height)
+      const dataUrl = c.toDataURL('image/jpeg', 0.82)
+      onPick(time, dataUrl)
+    } catch {
+      setErr(tr('Capture impossible (protection CORS de la source vidéo).', 'Capture failed (video source CORS protection).'))
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div onClick={onCancel} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} className="sf-card" style={{ width: 'min(420px,94vw)', padding: 18, display: 'flex', flexDirection: 'column', gap: 14, background: 'rgba(18,18,28,0.98)' }}>
+        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#E9EAF0' }}>{tr('Choisir la cover', 'Choose the cover')}</div>
+        {err ? (
+          <div style={{ fontSize: 12, color: '#F87171', lineHeight: 1.5 }}>{err}</div>
+        ) : (
+          <>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '9 / 16', maxHeight: '54vh', margin: '0 auto', background: '#000', borderRadius: 10, overflow: 'hidden' }}>
+              {src && (
+                <video
+                  ref={videoRef}
+                  src={src}
+                  crossOrigin="anonymous"
+                  muted
+                  playsInline
+                  preload="auto"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  onLoadedMetadata={e => { const d = e.currentTarget.duration; if (isFinite(d)) { setDur(d); const t0 = Math.min(initialTime, d); e.currentTarget.currentTime = t0; setTime(t0) } }}
+                />
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="range" min={0} max={dur || 0} step={0.05} value={time}
+                onChange={e => seek(Number(e.target.value))}
+                style={{ flex: 1, accentColor: '#8B5CF6' }} />
+              <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: '#9CA0AD', minWidth: 42, textAlign: 'right' }}>{time.toFixed(1)}s</span>
+            </div>
+          </>
+        )}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} className="sf-btn sf-btn-ghost cursor-pointer" style={{ fontSize: 12 }}>{tr('Annuler', 'Cancel')}</button>
+          {!err && (
+            <button onClick={capture} disabled={!src || busy} className="sf-btn sf-btn-secondary cursor-pointer" style={{ fontSize: 12, opacity: (!src || busy) ? 0.5 : 1 }}>
+              {tr('Utiliser cette frame', 'Use this frame')}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MassPosting({ user }: MassPostingProps) {
   const t = useT()
   const tr = useTr()
@@ -246,6 +336,11 @@ export function MassPosting({ user }: MassPostingProps) {
   const [addingFolder, setAddingFolder]     = useState<string | null>(null)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [randomSeed, setRandomSeed]               = useState(0)
+  // Cover perso par vidéo (frame capturée) : videoIndex → { time, dataUrl }.
+  // Non persisté (localStorage) : ne compte qu'au moment du premier post.
+  const [covers, setCovers]                       = useState<Record<number, { time: number; dataUrl: string }>>({})
+  const [coverPickerFor, setCoverPickerFor]       = useState<number | null>(null)
+  const [showFinalize, setShowFinalize]           = useState(false)
   const stopRef                           = useRef(false)
   const runActiveRef                      = useRef(false)  // ce session pilote un run
   const activePhonesRef                   = useRef<string[]>([])
@@ -455,9 +550,9 @@ export function MassPosting({ user }: MassPostingProps) {
             let taskRes: Record<string, unknown> | null = null
             let outcome: TaskOutcome = 'unknown'
             for (let attempt = 0; attempt < 3; attempt++) {
-              taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-                id: rp.geelarkId, scheduleAt: Math.floor(Date.now() / 1000),
-                description: rp.caption ?? '', video: [rp.token!], ...(persisted.reelsTrial ? { shareType: 2 } : {}),
+              taskRes = await postReelsTask(bearer, {
+                phoneId: rp.geelarkId, scheduleAt: Math.floor(Date.now() / 1000),
+                description: rp.caption ?? '', video: [rp.token!], reelsTrial: persisted.reelsTrial,
               })
               outcome = classifyTaskRes(taskRes)
               if (outcome === 'ok') break
@@ -1065,6 +1160,21 @@ export function MassPosting({ user }: MassPostingProps) {
         log(tr(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, `Video ${vi + 1} uploaded (${sv.item.title.slice(0, 30)}…)`), 'ok')
       }
 
+      // ── Covers perso : upload des frames choisies (image) → resourceUrl GeeLark.
+      // Best-effort : un échec de cover ne bloque pas le post (repli cover auto IG).
+      const coverMap = new Map<number, string>() // videoIndex → resourceUrl cover
+      const coverIdx = usedIndices.filter(vi => covers[vi]?.dataUrl && tokenMap.has(vi))
+      if (coverIdx.length) {
+        log(tr(`Upload de ${coverIdx.length} cover(s)…`, `Uploading ${coverIdx.length} cover(s)…`))
+        for (const vi of coverIdx) {
+          try {
+            const cu = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: covers[vi].dataUrl })
+            if (cu.ok && cu.token) { coverMap.set(vi, cu.token); log(tr(`Cover vidéo ${vi + 1} prête`, `Cover for video ${vi + 1} ready`), 'ok') }
+            else log(tr(`Cover vidéo ${vi + 1} ignorée (${cu.error ?? 'échec'})`, `Cover for video ${vi + 1} skipped (${cu.error ?? 'failed'})`), 'warn')
+          } catch { log(tr(`Cover vidéo ${vi + 1} ignorée`, `Cover for video ${vi + 1} skipped`), 'warn') }
+        }
+      }
+
       // Persiste le média + légende PAR téléphone (+ options) : après un refresh,
       // la reprise pourra RELANCER les téléphones jamais partis sans ré-upload ni
       // nouveau débit (crédits déjà pris ici, tâches déjà envoyées exclues).
@@ -1187,9 +1297,10 @@ export function MassPosting({ user }: MassPostingProps) {
             postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
             let taskRes: Record<string, unknown> | null = null
             for (let attempt = 0; attempt < 3; attempt++) {
-              taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-                id: asgn.phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
-                description: capFor(asgn.video), video: [token], ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
+              taskRes = await postReelsTask(bearer, {
+                phoneId: asgn.phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
+                description: capFor(asgn.video), video: [token], reelsTrial: postingOpts.reelsTrial,
+                cover: coverMap.get(asgn.videoIndex) ? [coverMap.get(asgn.videoIndex)!] : undefined,
               })
               if (taskRes['code'] === 0) break
               if (attempt < 2) { log(tr(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, `  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? 'post rejected'} — retrying…`), 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
@@ -1348,12 +1459,13 @@ export function MassPosting({ user }: MassPostingProps) {
           let taskRes: Record<string, unknown> | null = null
           let outcome: TaskOutcome = 'unknown'
           for (let attempt = 0; attempt < 3; attempt++) {
-            taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-              id:          asgn.phone.geelark_id,
+            taskRes = await postReelsTask(bearer, {
+              phoneId:     asgn.phone.geelark_id,
               scheduleAt:  scheduleTimes[ai],
               description: capFor(asgn.video),
               video:       [token],
-              ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
+              reelsTrial:  postingOpts.reelsTrial,
+              cover:       coverMap.get(asgn.videoIndex) ? [coverMap.get(asgn.videoIndex)!] : undefined,
             })
             outcome = classifyTaskRes(taskRes)
             if (outcome === 'ok') break
@@ -1921,7 +2033,7 @@ export function MassPosting({ user }: MassPostingProps) {
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
 
         {/* ── LEFT: phone targets ───────────────────────────────────────────── */}
-        <aside style={{
+        <aside id="mp-step-phones" style={{
           width: 292, flexShrink: 0, display: 'flex', flexDirection: 'column',
           borderRight: '1px solid rgba(233,234,240,0.07)',
           background: 'var(--surface-2)',
@@ -2210,7 +2322,7 @@ export function MassPosting({ user }: MassPostingProps) {
               )}
 
               {/* ── 02 — Contenu ─────────────────────────────────────────────── */}
-              <section className="sf-anim-slide-up sf-d50">
+              <section id="mp-step-videos" className="sf-anim-slide-up sf-d50">
                 {/* Section header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, fontFamily: SANS, fontStyle: 'normal', fontSize: 11.5, fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#818CF8,#8B5CF6)', boxShadow: '0 6px 14px -7px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.32)' }}>02</span>
@@ -2462,6 +2574,11 @@ export function MassPosting({ user }: MassPostingProps) {
                 </section>
               )}
 
+              {/* ── Récap par compte : vidéo · description · cover ───────────── */}
+              {/* Le récap par compte (description + cover par vidéo) a été déplacé
+                  dans l'écran de Finalisation (bouton « Finaliser & lancer ») pour
+                  garder cette page épurée. */}
+
               {/* ── Journal ──────────────────────────────────────────────────── */}
               {logs.length > 0 && (
                 <section className="sf-anim-slide-up">
@@ -2561,9 +2678,9 @@ export function MassPosting({ user }: MassPostingProps) {
                 {t('schedule')}
               </button>
               <button
-                onClick={post}
+                onClick={() => setShowFinalize(true)}
                 disabled={!canLaunch}
-                title={canLaunch ? tr('Poste maintenant (garde l\'app ouverte). Tu peux en lancer plusieurs en parallèle. Pour PC éteint : utilise Programmer.', 'Post now (keep the app open). You can launch several in parallel. For PC off: use Schedule.')
+                title={canLaunch ? tr('Ouvre l\'écran de finalisation (description + cover par vidéo) puis lance. Pour PC éteint : utilise Programmer.', 'Open the finalization screen (description + cover per video) then launch. For PC off: use Schedule.')
                   : !bearer ? tr('Connecte GéeLark dans les Paramètres', 'Connect GeeLark in Settings')
                   : phoneList.length === 0 ? tr('Sélectionne au moins un téléphone', 'Select at least one phone')
                   : tr('Sélectionne des vidéos dans la banque', 'Select videos from the bank')}
@@ -2646,6 +2763,133 @@ export function MassPosting({ user }: MassPostingProps) {
       )}
 
       {/* Bank picker modal */}
+      {/* ── Écran de FINALISATION ─────────────────────────────────────────────
+          Une seule page propre : description de base + description/cover par
+          vidéo, puis lancement. Ouvert par « Finaliser & lancer ». */}
+      {showFinalize && (
+        <div onClick={() => setShowFinalize(false)} style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(780px,96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--surface)', padding: 0, overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '16px 22px', borderBottom: '1px solid rgba(233,234,240,0.08)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 9, color: 'var(--accent-l)', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)' }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: IVORY }}>{tr('Finalisation', 'Finalize')}</div>
+                <div style={{ fontSize: 11.5, color: FAINT }}>{tr('Vérifie et ajuste description & cover, puis lance.', 'Review & adjust description & cover, then launch.')}</div>
+              </div>
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setShowFinalize(false)} style={{ background: 'none', border: 'none', color: FAINT, cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+            </div>
+
+            {/* Corps */}
+            <div style={{ padding: 22, overflowY: 'auto', scrollbarWidth: 'thin', display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {/* Description de base */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent-l)' }}>{tr('Description de base', 'Base description')}</span>
+                  <span style={{ fontSize: 10, color: FAINT }}>{tr('— pour toutes les vidéos sans description propre', '— for every video without its own description')}</span>
+                </div>
+                <textarea
+                  rows={2}
+                  value={caption}
+                  onChange={e => setCaption(e.target.value)}
+                  placeholder={tr('Ex : POV : ta coloc… (laisse vide = aucune légende par défaut)', 'e.g. POV: your roommate… (leave empty = no default caption)')}
+                  className="sf-input sf-textarea"
+                  style={{ fontSize: 12.5, resize: 'none', width: '100%' }} />
+                <p style={{ fontSize: 10.5, marginTop: 5, color: caption.trim() ? FAINT : WARN, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {caption.trim()
+                    ? tr('Utilisée pour chaque compte dont la description ci-dessous est vide.', 'Used for every account whose description below is empty.')
+                    : tr('⚠ Vide : les vidéos sans description propre seront publiées sans légende.', '⚠ Empty: videos without their own description will be posted with no caption.')}
+                </p>
+              </div>
+
+              {/* Par compte */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: IVORY }}>{tr('Par compte', 'Per account')}</span>
+                  <span className="sf-badge sf-badge-muted" style={{ fontSize: 9 }}>{assignments.filter(a => a.videoIndex >= 0).length}</span>
+                  <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
+                  <span style={{ fontSize: 10, color: FAINT }}>{tr('Description & cover par vidéo', 'Description & cover per video')}</span>
+                </div>
+                <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {assignments.filter(a => a.videoIndex >= 0).map((a, ri) => {
+                      const vi = a.videoIndex
+                      const sv = selectedVideos[vi] ?? a.video!
+                      const fp = sv.localPath ?? sv.item.file_url
+                      const cover = covers[vi]
+                      const sharedBy = assignments.filter(x => x.videoIndex === vi).length
+                      return (
+                        <div key={a.phone.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderTop: ri === 0 ? 'none' : '1px solid rgba(233,234,240,0.05)' }}>
+                          <div style={{ position: 'relative', width: 38, height: 60, flexShrink: 0, borderRadius: 6, overflow: 'hidden', background: 'var(--surface-2)' }}>
+                            <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
+                            <span style={{ position: 'absolute', bottom: 2, left: 2, fontSize: 9, fontWeight: 800, color: '#fff', background: 'rgba(99,102,241,0.9)', borderRadius: 3, padding: '0 3px', lineHeight: '13px' }}>#{vi + 1}</span>
+                          </div>
+                          <div style={{ minWidth: 90, maxWidth: 130, flexShrink: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: IVORY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.phone.ig_username ?? a.phone.phone_name}</div>
+                            {sharedBy > 1 && <div style={{ fontSize: 9, color: FAINT }}>{tr(`partagé ×${sharedBy}`, `shared ×${sharedBy}`)}</div>}
+                          </div>
+                          <input
+                            value={sv.caption ?? ''}
+                            onChange={e => { const val = e.target.value; setSelVideos(prev => prev.map((v, i) => i === vi ? { ...v, caption: val } : v)) }}
+                            placeholder={caption.trim() ? tr('↳ description de base', '↳ base description') : tr('sans légende', 'no caption')}
+                            className="sf-input"
+                            style={{ flex: 1, minWidth: 0, fontSize: 12, padding: '7px 9px' }} />
+                          {cover ? (
+                            <div style={{ position: 'relative', width: 30, height: 48, flexShrink: 0, borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(139,92,246,0.5)' }}>
+                              <img src={cover.dataUrl} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <button onClick={() => setCoverPickerFor(vi)} title={tr('Changer la cover', 'Change cover')} className="cursor-pointer" style={{ position: 'absolute', inset: 0, background: 'transparent', border: 'none' }} />
+                              <button onClick={() => setCovers(prev => { const n = { ...prev }; delete n[vi]; return n })} title={tr('Retirer', 'Remove')} className="cursor-pointer" style={{ position: 'absolute', top: 1, right: 1, width: 13, height: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(6,6,8,0.85)', borderRadius: 3, border: 'none', color: ERR }}>
+                                <svg width="6" height="6" viewBox="0 0 8 8" fill="none"><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setCoverPickerFor(vi)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ flexShrink: 0, fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 5, color: FAINT }}
+                              onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-l)' }}
+                              onMouseLeave={e => { e.currentTarget.style.color = FAINT }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                              {tr('Cover', 'Cover')}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '14px 22px', borderTop: '1px solid rgba(233,234,240,0.08)', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 18, fontWeight: 800, color: 'var(--accent-l)', lineHeight: 1 }}>{phoneList.length * CREDIT_COSTS.mass_posting}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: FAINT }}>{tr('crédits', 'credits')}</span>
+              </div>
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setShowFinalize(false)} className="sf-btn sf-btn-ghost cursor-pointer">{tr('Retour', 'Back')}</button>
+              <button
+                onClick={() => { setShowFinalize(false); post() }}
+                disabled={!canLaunch}
+                className="sf-btn sf-btn-lg cursor-pointer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', color: '#fff', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', opacity: canLaunch ? 1 : 0.4, boxShadow: canLaunch ? '0 10px 24px -10px rgba(99,102,241,0.7)' : 'none' }}>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><polygon points="2.5 1.5 10.5 6 2.5 10.5"/></svg>
+                {tr('Poster maintenant', 'Post now')} ({assignments.filter(a => a.videoIndex >= 0).length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {coverPickerFor !== null && selectedVideos[coverPickerFor] && (
+        <CoverPicker
+          resolveSrc={() => resolveVideoPath(selectedVideos[coverPickerFor])}
+          initialTime={covers[coverPickerFor]?.time ?? 0.5}
+          onCancel={() => setCoverPickerFor(null)}
+          onPick={(time, dataUrl) => { setCovers(prev => ({ ...prev, [coverPickerFor]: { time, dataUrl } })); setCoverPickerFor(null) }}
+        />
+      )}
+
       {showBankPicker && (
         <BankPicker
           user={user}

@@ -1,5 +1,8 @@
 import { registerStartedPhonesAuto, unregisterPhones } from './phoneWatch'
 import storyFlowDef from './geelarkStoryFlow.json'
+import loginFlowDef from './geelarkLoginFlow.json'
+import warmupFlowDef from './geelarkWarmupFlow.json'
+import reelsFlowDef from './geelarkReelsFlow.json'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -245,6 +248,24 @@ export async function listRpaFlows(bearer: string): Promise<RpaFlow[]> {
     if (d['code'] !== 0) throw new Error(`GéeLark: ${d['msg'] ?? d['message'] ?? d['code']}`)
     const batch = ((d['data'] as Record<string, unknown>)?.['items'] ?? []) as RpaFlow[]
     const total = ((d['data'] as Record<string, unknown>)?.['total'] ?? 0) as number
+    items.push(...batch)
+    if (items.length >= total || batch.length === 0) break
+    page++
+  }
+  return items
+}
+
+// Liste BRUTE des flows RPA (objets complets — pour lire leurs variables/startParamMap
+// et retrouver un flow de login natif sans supposer sa forme exacte).
+export async function listRpaFlowsRaw(bearer: string): Promise<Record<string, unknown>[]> {
+  const items: Record<string, unknown>[] = []
+  let page = 1
+  while (true) {
+    const d = await geelarkFetch('POST', '/task/rpa/flow/list', { page, pageSize: 50 }, bearer)
+    if (d['code'] !== 0) throw new Error(`GéeLark: ${d['msg'] ?? d['message'] ?? d['code']}`)
+    const data = (d['data'] as Record<string, unknown>) ?? {}
+    const batch = (data['items'] ?? []) as Record<string, unknown>[]
+    const total = (data['total'] ?? 0) as number
     items.push(...batch)
     if (items.length >= total || batch.length === 0) break
     page++
@@ -790,22 +811,11 @@ async function clearAndType(
   }
   await sleep(200)
 
-  // Type new text (spaces → %s, shell chars escaped)
-  const escaped = text
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g,  '\\"')
-    .replace(/'/g,  "\\'")
-    .replace(/&/g,  '\\&')
-    .replace(/</g,  '\\<')
-    .replace(/>/g,  '\\>')
-    .replace(/\|/g, '\\|')
-    .replace(/;/g,  '\\;')
-    .replace(/`/g,  '\\`')
-    .replace(/\$/g, '\\$')
-    .replace(/!/g,  '\\!')
-    .replace(/\n/g, '%s')
-    .replace(/ /g,  '%s')
-  await shellExec(bearer, phoneId, `input text "${escaped}"`)
+  // Saisie robuste : ASCII → `input text` (échappement correct), sinon presse-papier.
+  // (L'ancien code sur-échappait & ; ! < > | → un backslash LITTÉRAL était tapé dans
+  // le champ ; et `input text` supprime silencieusement les accents/emojis. Les deux
+  // corrompaient nom/bio.) On réutilise l'entrée déjà focus (double-tap ci-dessus).
+  await typeIntoFocusedField(bearer, phoneId, text, log)
   await sleep(400)
   log(`   ✏️ "${text.substring(0, 40)}${text.length > 40 ? '…' : ''}"`)
 }
@@ -1907,11 +1917,20 @@ async function runWarmupActions(
   let likeCount = 0
   let followCount = 0
 
+  // Résolution RÉELLE → coordonnées proportionnelles. Sans ça, les swipes en dur
+  // (540/1400…) tombent hors écran sur d'autres résolutions → aucun défilement
+  // (le warmup reste bloqué sur le même reel/post pendant toute la durée).
+  const { output: _wmSize } = await shellExec(bearer, phoneId, 'wm size')
+  const _wm = _wmSize.match(/(\d+)x(\d+)/)
+  const sw = _wm ? parseInt(_wm[1]) : 1080
+  const sh = _wm ? parseInt(_wm[2]) : 2340
+  const cx = Math.floor(sw / 2)
+
   // ── Wake + unlock — sans ça, tous les taps/swipes partent dans le vide ─────
   log('📱 Réveil de l\'écran…')
   await shellExec(bearer, phoneId, 'input keyevent 224')
   await sleep(800)
-  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400')
+  await shellExec(bearer, phoneId, `input swipe ${cx} ${Math.floor(sh * 0.82)} ${cx} ${Math.floor(sh * 0.42)} 400`)
   await sleep(1000)
 
   // Dismiss permission / "Not now" popups that block all interaction
@@ -1952,10 +1971,6 @@ async function runWarmupActions(
     const kw = config.keyword.trim()
     log(`🔎 Recherche du mot-clé « ${kw} »…`)
     try {
-      const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
-      const sm = sizeOut.match(/(\d+)x(\d+)/)
-      const sw = sm ? parseInt(sm[1]) : 1080
-      const sh = sm ? parseInt(sm[2]) : 2340
       // 1. Onglet Recherche / Explorer
       let xml = await dumpXml(bearer, phoneId)
       const searchTab =
@@ -2005,11 +2020,12 @@ async function runWarmupActions(
   }
 
   while (Date.now() < endTime && !abortSignal.abort) {
-    // Scroll the feed
-    const swipeY1 = 1400 + Math.floor(Math.random() * 200)
-    const swipeY2 = 400  + Math.floor(Math.random() * 200)
-    const swipeDuration = 600 + Math.floor(Math.random() * 400)
-    await shellExec(bearer, phoneId, `input swipe 540 ${swipeY1} 540 ${swipeY2} ${swipeDuration}`)
+   try {
+    // Scroll the feed (coords proportionnelles à l'écran réel)
+    const swipeY1 = Math.floor(sh * 0.72 + Math.random() * sh * 0.06)
+    const swipeY2 = Math.floor(sh * 0.22 + Math.random() * sh * 0.06)
+    const swipeDuration = 500 + Math.floor(Math.random() * 350)
+    await shellExec(bearer, phoneId, `input swipe ${cx} ${swipeY1} ${cx} ${swipeY2} ${swipeDuration}`)
     await sleep(1500 + Math.floor(Math.random() * 2000))
 
     if (abortSignal.abort) break
@@ -2030,7 +2046,7 @@ async function runWarmupActions(
         // Fallback humain : double-tap au centre du média = like Instagram.
         // Les deux taps dans UNE commande shell (un aller-retour HTTP entre
         // deux taps serait trop lent pour compter comme double-tap).
-        await shellExec(bearer, phoneId, 'input tap 540 760 && input tap 540 760')
+        await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.4)} && input tap ${cx} ${Math.floor(sh * 0.4)}`)
         likeCount++
         log(`❤️ Like (double-tap) (${likeCount})`)
       }
@@ -2062,12 +2078,20 @@ async function runWarmupActions(
         const reelCount = 3 + Math.floor(Math.random() * 3)
         for (let r = 0; r < reelCount && !abortSignal.abort; r++) {
           await sleep(4000 + Math.floor(Math.random() * 4000))
-          await shellExec(bearer, phoneId, 'input swipe 540 1400 540 400 500')
+          // Flick vertical ample et rapide → passe fiablement au reel suivant.
+          await shellExec(bearer, phoneId, `input swipe ${cx} ${Math.floor(sh * 0.8)} ${cx} ${Math.floor(sh * 0.2)} 250`)
         }
         // Go back to feed
         await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
         await sleep(3000)
       }
+    }
+   } catch (e) {
+      // Un shell transitoirement « pas prêt » (fréquent quand plusieurs téléphones
+      // tournent en même temps) ne doit PAS interrompre tout le warmup : on log et
+      // on continue à défiler jusqu'à ce que la durée choisie soit écoulée.
+      log(`   ⚠ Action ignorée (${e instanceof Error ? e.message : String(e)})`)
+      await sleep(2000)
     }
   }
 
@@ -2097,6 +2121,35 @@ function toAsciiFallback(text: string): string {
   return text
     .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove accents
     .replace(/[^\x00-\x7F]/g, '')                     // drop emojis / other unicode
+}
+
+// Saisit du texte dans le champ ACTUELLEMENT focus (déjà tapé au préalable).
+// `input text` corrompt / ignore silencieusement les caractères non-ASCII
+// (accents, €, emojis…) et le login échoue alors sans erreur explicite (« toujours
+// sur la page de connexion »). Les mots de passe contiennent souvent ce genre de
+// caractères → on passe par le presse-papier (Unicode-safe), avec repli `input text`.
+async function typeIntoFocusedField(
+  bearer: string,
+  phoneId: string,
+  text: string,
+  log?: (m: string) => void,
+): Promise<void> {
+  // ASCII imprimable pur → chemin éprouvé (identique au reste du code).
+  if (/^[\x20-\x7E]*$/.test(text)) {
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(text)}"`)
+    return
+  }
+  // Sinon : presse-papier + CTRL+V (conserve tous les caractères).
+  const shellSafe = text.replace(/'/g, `'\\''`)
+  try {
+    await shellExec(bearer, phoneId, `cmd clipboard set-text '${shellSafe}'`)
+    await sleep(300)
+    await shellExec(bearer, phoneId, 'input keycombination 113 50') // CTRL+V
+  } catch {
+    // Dernier recours : version ASCII (accents retirés) via input text.
+    log?.('   ⚠ Presse-papier indisponible — saisie ASCII de secours')
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(toAsciiFallback(text))}"`)
+  }
 }
 
 // ── Instagram login automation ───────────────────────────────────────────────
@@ -2178,12 +2231,26 @@ async function _loginInstagramAccountInner(
       xml = await dumpXml(bearer, phoneId)
     }
 
-    // Some IG builds show a social-login screen first with "Log in with email" link
-    // Handle "Join Instagram" onboarding screen (fresh install) — tap "I already have a profile"
-    const alreadyHavePt = findByText(xml,
+    // Écran d'accueil « Join Instagram » (installation fraîche) → aller sur LOGIN
+    // en tapant « I already have a profile ». NE JAMAIS taper « Get started »
+    // (= inscription — c'est ce qui donnait l'impression que l'outil « crée un compte »).
+    let alreadyHavePt = findByText(xml,
       'I already have a profile', 'J\'ai déjà un profil', 'J\'ai déjà un compte',
-      'Already have an account', 'Log in', 'Se connecter',
-    )
+      'Already have an account', 'I already have an account', 'Log in', 'Se connecter', 'Connexion', 'Sign in',
+    ) ?? findByTextPartial(xml, 'already have', 'déjà un compte', 'déjà un profil', 'se connecter', 'log in', 'sign in', 'connexion')
+
+    // La nouvelle UI d'Instagram (Compose) expose mal le texte → l'automation ne
+    // trouve pas le bouton. Repli par POSITION : « I already have a profile » est le
+    // bouton juste EN DESSOUS de « Get started ». On tape sous « Get started »
+    // (surtout pas dessus). Sinon, repli bas-centre de l'écran (~90 % de hauteur).
+    if (!alreadyHavePt) {
+      const getStarted = findByText(xml, 'Get started', 'Commencer', 'Créer un compte', 'Create new account')
+        ?? findByTextPartial(xml, 'get started', 'commencer')
+      const isJoinScreen = /join instagram|get started|i already have|j'ai déjà|créer un compte|commencer|welcome to instagram/i.test(xml)
+      if (getStarted) alreadyHavePt = [getStarted[0], Math.min(sh - 60, getStarted[1] + Math.floor(sh * 0.07))]
+      else if (isJoinScreen) alreadyHavePt = [Math.floor(sw / 2), Math.floor(sh * 0.9)]
+    }
+
     if (alreadyHavePt) {
       log('📲 Écran d\'accueil détecté — sélection « J\'ai déjà un compte »…')
       await shellExec(bearer, phoneId, `input tap ${alreadyHavePt[0]} ${alreadyHavePt[1]}`)
@@ -2205,6 +2272,32 @@ async function _loginInstagramAccountInner(
       xml = await dumpXml(bearer, phoneId)
     }
 
+    // ── Garde-fou Android 14+ : ne PAS taper dans un écran d'inscription ─────
+    // Si on n'a pas atteint l'écran de connexion (le lien « J'ai déjà un compte »
+    // est introuvable sur cette version), le premier champ à l'écran est un champ
+    // d'INSCRIPTION. Taper les identifiants dedans donne l'impression que l'outil
+    // « crée » un compte. On s'arrête proprement et on explique.
+    {
+      const xmlLo = xml.toLowerCase()
+      const hasLoginField =
+        findByResourceId(xml, 'login_username', 'email_phone_field', 'password', 'login_password') != null ||
+        findByText(xml,
+          'Phone number, username, or email', 'Username, email or mobile number',
+          'Numéro de téléphone, nom d\'utilisateur ou adresse e-mail',
+          'Username or email', 'Identifiant ou e-mail') != null
+      const signupMarkers = [
+        'create a new account', 'create new account', 'créer un compte', 'crée un compte',
+        'sign up', "s'inscrire", 'inscription', 'create username', 'crée un nom d\'utilisateur',
+        'add your birthday', 'date de naissance', 'quelle est ta date', 'what\'s your birthday',
+        'add your phone number to sign up', 'create a password',
+      ]
+      const looksSignup = signupMarkers.some(m => xmlLo.includes(m))
+      if (!hasLoginField && looksSignup) {
+        log('❌ Écran d\'inscription détecté — écran de connexion non atteint (rien n\'a été saisi)')
+        return { ok: false, error: 'Écran de connexion non atteint : Instagram est resté sur l\'inscription (lien « J\'ai déjà un compte » introuvable sur cette version d\'Android). Aucun identifiant saisi. Envoie une capture pour ajuster.' }
+      }
+    }
+
     // ── Saisie identifiant ─────────────────────────────────────────────────
     log('📧 Saisie de l\'identifiant…')
     const usernamePt: [number, number] =
@@ -2221,7 +2314,7 @@ async function _loginInstagramAccountInner(
 
     await shellExec(bearer, phoneId, `input tap ${usernamePt[0]} ${usernamePt[1]}`)
     await sleep(1000)
-    await shellExec(bearer, phoneId, `input text "${escapeForInputText(email)}"`)
+    await typeIntoFocusedField(bearer, phoneId, email, log)
     await sleep(800)
 
     // ── Après l'email : Next ou champ password direct ─────────────────────
@@ -2243,32 +2336,28 @@ async function _loginInstagramAccountInner(
       xml = await dumpXml(bearer, phoneId)
     }
 
-    // Find password field in updated XML
-    const passwordPt: [number, number] | null =
+    // Trouve le champ mot de passe — résilient Android 14 : resource-id, puis texte
+    // exact, sinon repli sur la POSITION (juste SOUS le champ identifiant) au lieu
+    // d'une tabulation clavier peu fiable qui laissait le mot de passe VIDE.
+    const passwordPt: [number, number] =
       findByResourceId(xml,
         'password', 'login_password', 'com.instagram.android:id/password',
         'com.instagram.android:id/login_password') ??
-      findByText(xml, 'Password', 'Mot de passe', 'Enter password') ??
+      findByText(xml, 'Password', 'Mot de passe', 'Enter password', 'Mot de passe') ??
       (nextAfterEmail
-        ? [Math.floor(sw / 2), Math.floor(sh * 0.42)] as [number, number]
-        : null)
+        ? [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+        : [usernamePt[0], Math.min(sh - 120, usernamePt[1] + Math.floor(sh * 0.08))])
 
-    if (passwordPt) {
-      log('🔑 Champ mot de passe détecté…')
-      await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
-      await sleep(400)
-      await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
-      await sleep(600)
-    } else {
-      // Single-screen fallback: TAB from email field
-      log('🔑 Champ mot de passe non détecté — navigation au clavier…')
-      await shellExec(bearer, phoneId, 'input keyevent 61')
-      await sleep(700)
-    }
+    log('🔑 Champ mot de passe…')
+    // Double-tap pour garantir le focus (le 1er tap peut juste fermer une suggestion).
+    await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
+    await sleep(400)
+    await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
+    await sleep(600)
 
     // ── Saisie mot de passe ────────────────────────────────────────────────
     log('🔑 Saisie du mot de passe…')
-    await shellExec(bearer, phoneId, `input text "${escapeForInputText(password)}"`)
+    await typeIntoFocusedField(bearer, phoneId, password, log)
     await sleep(800)
 
     // ── Soumission : bouton Log In ────────────────────────────────────────
@@ -2461,6 +2550,256 @@ async function _loginInstagramAccountInner(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+// ── Login via RPA NATIF GeeLark ──────────────────────────────────────────────
+// Le flow « IG Login Scaleflow » (login IG + 2FA via twofa.co) est importé
+// AUTOMATIQUEMENT dans le compte GeeLark (une seule fois, mis en cache), comme le
+// flow Story. Puis exécuté par téléphone via /task/rpa/add avec paramMap
+// {User, Password, Key}. Détection par éléments côté serveur → bien plus fiable
+// que nos input tap. Retourne { noFlow:true } si l'import échoue → repli ADB.
+const LOGIN_FLOW_VERSION = '1'
+const _loginFlowIdCache = new Map<string, Promise<string | null>>()
+function loginFlowLsKey(bearer: string): string { return `sf-login-flowid:${bearer.slice(-14)}` }
+function loginFlowVerKey(bearer: string): string { return `sf-login-flowver:${bearer.slice(-14)}` }
+export function forgetLoginFlowId(bearer: string): void {
+  try { localStorage.removeItem(loginFlowLsKey(bearer)); localStorage.removeItem(loginFlowVerKey(bearer)) } catch { /* ignore */ }
+  _loginFlowIdCache.delete(bearer)
+}
+async function ensureLoginFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
+  const cached = _loginFlowIdCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, storedVer: string | null = null
+    try { stored = localStorage.getItem(loginFlowLsKey(bearer)); storedVer = localStorage.getItem(loginFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && storedVer === LOGIN_FLOW_VERSION) return stored
+    log?.(stored ? '🔄 Mise à jour du flow « IG Login »…' : '📥 Import du flow de login dans GeeLark…')
+    try {
+      const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(loginFlowDef) }, bearer)
+      if (res['code'] !== 0) { log?.(`⚠ Import du flow login : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(loginFlowLsKey(bearer), id); localStorage.setItem(loginFlowVerKey(bearer), LOGIN_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log?.(`⚠ Import du flow login : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _loginFlowIdCache.set(bearer, p)
+  p.then(v => { if (!v) _loginFlowIdCache.delete(bearer) }).catch(() => _loginFlowIdCache.delete(bearer))
+  return p
+}
+
+export async function loginInstagramViaRpa(
+  bearer: string,
+  phoneId: string,
+  creds: { email: string; password: string; totp?: string },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string; noFlow?: boolean }> {
+  const flowId = await ensureLoginFlowId(bearer, log)
+  if (!flowId) return { ok: false, noFlow: true, error: 'Flow login RPA indisponible (import GeeLark échoué)' }
+
+  // Variables du flow : User (identifiant/email), Password, Key (secret 2FA base32).
+  // ⚠ Le secret DOIT être nettoyé (espaces + '=' retirés, majuscules) : Instagram
+  // affiche souvent la clé par blocs (« JBSW Y3DP EHPK 3PXP »). Non nettoyé, il
+  // casse l'URL https://twofa.co/api/${Key} du flow → aucun code récupéré, jamais
+  // tapé. (Le chemin ADB, lui, normalisait déjà via totp.ts — d'où « avant ça marchait ».)
+  const cleanTotp = creds.totp?.replace(/[\s=]/g, '').toUpperCase() ?? ''
+  const paramMap: Record<string, unknown> = {
+    User:     creds.email,
+    Password: creds.password,
+    Key:      cleanTotp,
+  }
+
+  return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('🔐 Connexion via RPA GeeLark natif…')
+    const addTask = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
+      id: phoneId, flowId: fid, scheduleAt: Math.floor(Date.now() / 1000) + 3,
+      name: 'Login Scaleflow', paramMap,
+    }, bearer)
+    let res = await addTask(flowId)
+    // Flow mémorisé mais supprimé côté GeeLark (code 48002) → ré-import puis retry.
+    if (res['code'] !== 0 && Number(res['code']) === 48002) {
+      log('   ↻ Flow introuvable — ré-import…')
+      forgetLoginFlowId(bearer)
+      const fresh = await ensureLoginFlowId(bearer, log)
+      if (fresh) res = await addTask(fresh)
+    }
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark login RPA : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log('   Tâche RPA créée — connexion en cours…')
+    return pollRpaTask(bearer, taskId, log, 10 * 60_000)
+  })
+}
+
+// ── Warmup via RPA NATIF GeeLark ─────────────────────────────────────────────
+// Flow « IG Warmup Scaleflow » auto-importé (comme le login). Regarde N reels
+// (recherche par mot-clé optionnelle) avec like/commentaire/follow aléatoires,
+// rythme humain. paramMap {NumberOfVideosViewed, SearchKeyword[]}.
+const WARMUP_FLOW_VERSION = '1'
+const _warmupFlowIdCache = new Map<string, Promise<string | null>>()
+function warmupFlowLsKey(bearer: string): string { return `sf-warmup-flowid:${bearer.slice(-14)}` }
+function warmupFlowVerKey(bearer: string): string { return `sf-warmup-flowver:${bearer.slice(-14)}` }
+export function forgetWarmupFlowId(bearer: string): void {
+  try { localStorage.removeItem(warmupFlowLsKey(bearer)); localStorage.removeItem(warmupFlowVerKey(bearer)) } catch { /* ignore */ }
+  _warmupFlowIdCache.delete(bearer)
+}
+async function ensureWarmupFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
+  const cached = _warmupFlowIdCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, storedVer: string | null = null
+    try { stored = localStorage.getItem(warmupFlowLsKey(bearer)); storedVer = localStorage.getItem(warmupFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && storedVer === WARMUP_FLOW_VERSION) return stored
+    log?.(stored ? '🔄 Mise à jour du flow « IG Warmup »…' : '📥 Import du flow de warmup dans GeeLark…')
+    try {
+      const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(warmupFlowDef) }, bearer)
+      if (res['code'] !== 0) { log?.(`⚠ Import du flow warmup : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(warmupFlowLsKey(bearer), id); localStorage.setItem(warmupFlowVerKey(bearer), WARMUP_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log?.(`⚠ Import du flow warmup : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _warmupFlowIdCache.set(bearer, p)
+  p.then(v => { if (!v) _warmupFlowIdCache.delete(bearer) }).catch(() => _warmupFlowIdCache.delete(bearer))
+  return p
+}
+
+export async function warmupInstagramViaRpa(
+  bearer: string,
+  phoneId: string,
+  config: { videos: number; keyword?: string; rotationUrls?: string[] },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string; noFlow?: boolean }> {
+  const flowId = await ensureWarmupFlowId(bearer, log)
+  if (!flowId) return { ok: false, noFlow: true, error: 'Flow warmup RPA indisponible (import GeeLark échoué)' }
+
+  const kw = config.keyword?.trim()
+  const paramMap: Record<string, unknown> = {
+    NumberOfVideosViewed: Math.max(1, Math.round(config.videos)),
+    SearchKeyword: kw ? [kw] : [],
+  }
+  return withPhoneAutoStop(bearer, phoneId, 40 * 60_000, '40min', log, async () => {
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log(`🔥 Warmup via RPA GeeLark natif (${paramMap.NumberOfVideosViewed} vidéos${kw ? `, mot-clé « ${kw} »` : ''})…`)
+    const addTask = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
+      id: phoneId, flowId: fid, scheduleAt: Math.floor(Date.now() / 1000) + 3,
+      name: 'Warmup Scaleflow', paramMap,
+    }, bearer)
+    let res = await addTask(flowId)
+    if (res['code'] !== 0 && Number(res['code']) === 48002) {
+      log('   ↻ Flow introuvable — ré-import…')
+      forgetWarmupFlowId(bearer)
+      const fresh = await ensureWarmupFlowId(bearer, log)
+      if (fresh) res = await addTask(fresh)
+    }
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark warmup RPA : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log('   Tâche RPA créée — warmup en cours…')
+    return pollRpaTask(bearer, taskId, log, 35 * 60_000)
+  })
+}
+
+// ── Publication Reels via RPA NATIF GeeLark (flow custom auto-importé) ────────
+// Flow « IG Reels Scaleflow » auto-importé. Ajoute par rapport à la native
+// instagramPubReels : cover perso, tags IA, synchro audio tendance, et sa
+// propre gestion des popups. paramMap {Caption, Video[], SameURL, SameVolume,
+// AcousticVolume, AITags, Cover[]}.
+const REELS_FLOW_VERSION = '1'
+const _reelsFlowIdCache = new Map<string, Promise<string | null>>()
+function reelsFlowLsKey(bearer: string): string { return `sf-reels-flowid:${bearer.slice(-14)}` }
+function reelsFlowVerKey(bearer: string): string { return `sf-reels-flowver:${bearer.slice(-14)}` }
+export function forgetReelsFlowId(bearer: string): void {
+  try { localStorage.removeItem(reelsFlowLsKey(bearer)); localStorage.removeItem(reelsFlowVerKey(bearer)) } catch { /* ignore */ }
+  _reelsFlowIdCache.delete(bearer)
+}
+async function ensureReelsFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
+  const cached = _reelsFlowIdCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, storedVer: string | null = null
+    try { stored = localStorage.getItem(reelsFlowLsKey(bearer)); storedVer = localStorage.getItem(reelsFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && storedVer === REELS_FLOW_VERSION) return stored
+    log?.(stored ? '🔄 Mise à jour du flow « IG Reels »…' : '📥 Import du flow de publication Reels dans GeeLark…')
+    try {
+      const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(reelsFlowDef) }, bearer)
+      if (res['code'] !== 0) { log?.(`⚠ Import du flow Reels : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(reelsFlowLsKey(bearer), id); localStorage.setItem(reelsFlowVerKey(bearer), REELS_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log?.(`⚠ Import du flow Reels : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _reelsFlowIdCache.set(bearer, p)
+  p.then(v => { if (!v) _reelsFlowIdCache.delete(bearer) }).catch(() => _reelsFlowIdCache.delete(bearer))
+  return p
+}
+
+export interface ReelsPostParams {
+  phoneId:        string
+  scheduleAt:     number
+  description?:   string
+  video:          string[]   // resourceUrl(s) GeeLark de la vidéo
+  cover?:         string[]   // resourceUrl GeeLark de la cover (miniature du Reel) — optionnel
+  sameUrl?:       string     // URL du son tendance à synchroniser — optionnel
+  sameVolume?:    number
+  acousticVolume?: number
+  aiTags?:        boolean
+  reelsTrial?:    boolean    // "reels d'essai" (native shareType:2) — non géré par le flow custom
+}
+
+// Publie un Reel. Par défaut, utilise le flow RPA custom (cover / tags IA / audio
+// tendance / popups). Repli AUTOMATIQUE sur la native instagramPubReels si le flow
+// est indisponible (import échoué) ou refuse proprement la tâche — donc zéro
+// régression. Renvoie TOUJOURS la forme native {code,msg,data:{id}} pour que les
+// appelants gardent leur logique anti-double/retry inchangée. Ne throw jamais :
+// réseau perdu → {} (interprété "unknown" par classifyTaskRes → pas de retry).
+export async function postReelsTask(bearer: string, p: ReelsPostParams): Promise<Record<string, unknown>> {
+  const native = () => geelarkFetch('POST', '/rpa/task/instagramPubReels', {
+    id: p.phoneId, scheduleAt: p.scheduleAt, description: p.description ?? '',
+    video: p.video, ...(p.reelsTrial ? { shareType: 2 } : {}),
+  }, bearer).catch(() => ({} as Record<string, unknown>))
+
+  // "Reels d'essai" (shareType:2) n'existe pas dans le flow custom → on garde la
+  // native qui, elle, le supporte.
+  if (p.reelsTrial) return native()
+
+  let flowId: string | null = null
+  try { flowId = await ensureReelsFlowId(bearer) } catch { flowId = null }
+  if (!flowId) return native()
+
+  const paramMap: Record<string, unknown> = {
+    Caption: p.description ?? '',
+    Video:   p.video,
+    SameURL: p.sameUrl ?? '',
+    ...(p.sameVolume != null ? { SameVolume: p.sameVolume } : {}),
+    ...(p.acousticVolume != null ? { AcousticVolume: p.acousticVolume } : {}),
+    AITags:  !!p.aiTags,
+    Cover:   p.cover ?? [],
+  }
+  const addFlow = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
+    id: p.phoneId, flowId: fid, scheduleAt: p.scheduleAt, name: 'Reels Scaleflow', paramMap,
+  }, bearer)
+
+  let res: Record<string, unknown>
+  try { res = await addFlow(flowId) }
+  catch { return {} }   // réseau perdu → "unknown", PAS de repli (anti-double)
+
+  // Flow mémorisé mais supprimé côté GeeLark (code EXACT 48002) → ré-import + retry.
+  if (res['code'] !== 0 && Number(res['code']) === 48002) {
+    forgetReelsFlowId(bearer)
+    let fresh: string | null = null
+    try { fresh = await ensureReelsFlowId(bearer) } catch { fresh = null }
+    if (fresh) { try { res = await addFlow(fresh) } catch { return {} } }
+  }
+  if (res['code'] === 0) {
+    const d = res['data'] as Record<string, unknown> | undefined
+    return { code: 0, msg: 'success', data: { id: d?.['taskId'] ?? d?.['id'] } }
+  }
+  // Refus PROPRE du flow (tâche non créée) → repli sur la native pour publier
+  // quand même. Aucun double : le flow n'a rien créé (code ≠ 0).
+  return native()
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────

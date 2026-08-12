@@ -1,0 +1,1093 @@
+{
+  "title": "IG Warmup Scaleflow",
+  "desc": "Auto-import — Instagram warmup (reels + like/comment/follow, recherche par mot-cle). Natif GeeLark.",
+  "content": {
+    "startParamMap": [
+      {
+        "id": "9d33555d-cd14-4e8f-8491-0eab01868fb7",
+        "isNotRequired": false,
+        "key": "NumberOfVideosViewed",
+        "restrict": {
+          "min": 1
+        },
+        "type": "number",
+        "value": null
+      },
+      {
+        "id": "4c07504c-40b2-43f3-8896-2c8309da2001",
+        "isNotRequired": true,
+        "key": "SearchKeyword",
+        "type": "textarea",
+        "value": []
+      }
+    ],
+    "contents": [
+      {
+        "config": {
+          "packgename": "com.instagram.android"
+        },
+        "id": "cd2a40f1-055a-462d-8416-014165707732",
+        "name": "Open App",
+        "type": "openApp"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "Log in",
+              "type": "desc"
+            }
+          ],
+          "hiddenChildren": false,
+          "searchTime": 10000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "isNotLogin"
+        },
+        "id": "2b49b4cf-cbdc-44e2-b419-2b9b4c2ad8aa",
+        "name": "waitEle",
+        "type": "waitEle"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "content": "Not logged in"
+              },
+              "id": "dfc6bece-aa47-4c79-ac37-916c36b6b2d7",
+              "name": "throwException",
+              "type": "throwException"
+            }
+          ],
+          "conditionList": [
+            {
+              "probability": 50,
+              "relation": "exist",
+              "useVariable": "isNotLogin"
+            }
+          ]
+        },
+        "id": "ed4162c7-6fb1-4e11-a285-84b70212d7a6",
+        "name": "IF",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "filterType": "contain",
+          "filters": [
+            {
+              "content": "ALLOW",
+              "type": "text"
+            }
+          ],
+          "hiddenChildren": false,
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "afb841dc-a248-423f-a02f-baece6d8efe5",
+        "name": "click",
+        "type": "click"
+      },
+      {
+        "config": {
+          "timeout": 2000,
+          "timeoutType": "fixedValue"
+        },
+        "enabled": true,
+        "id": "5445685d-0dd3-4a45-9571-394ec9f55523",
+        "name": "wait",
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "com.instagram.android:id/search_tab",
+                "filterType": "equal",
+                "type": "id"
+              },
+              {
+                "content": "Search and explore",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ]
+          ],
+          "hiddenChildren": false,
+          "searchTime": 3000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "hasSearch"
+        },
+        "id": "ff66a3b7-195b-4f43-810d-5eaa4d75e44e",
+        "name": "waitEle",
+        "type": "waitEle"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "content": "Not logged in"
+              },
+              "id": "31167a5f-f9f8-4f7c-b164-eaa7c94ed574",
+              "name": "throwException",
+              "type": "throwException"
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "probability": 50,
+                "relation": "notExist",
+                "useVariable": "hasSearch"
+              }
+            ]
+          ]
+        },
+        "id": "d063d471-399b-4162-9355-de9934c0af7a",
+        "name": "IF",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "com.instagram.android:id/search_tab",
+                    "type": "id"
+                  },
+                  {
+                    "content": "Search and explore",
+                    "type": "desc"
+                  }
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "4d2c22a9-9c2b-4b47-8a77-a0779ed7b202",
+              "name": "click",
+              "type": "click"
+            },
+            {
+              "config": {
+                "injectVariables": [
+                  "SearchKeyword",
+                  "NumberOfVideosViewed"
+                ],
+                "script": "async function main({ SearchKeyword, NumberOfVideosViewed }) {\n    const length = SearchKeyword.length;\n    const base = Math.floor(NumberOfVideosViewed / length);\n    const remainder = NumberOfVideosViewed % length;\n\n    return { base, remainder };\n}",
+                "type": "js",
+                "variableMap": [
+                  {
+                    "value": "base",
+                    "variable": "base"
+                  },
+                  {
+                    "value": "remainder",
+                    "variable": "remainder"
+                  }
+                ]
+              },
+              "id": "a1032d8f-0001-449a-84be-a06015a4c182",
+              "name": "script",
+              "type": "script"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "injectVariables": [
+                        "base",
+                        "remainder",
+                        "index"
+                      ],
+                      "script": "async function main({ base, remainder, index }) {\n    return { number: base + (index <= remainder ? 1 : 0) }\n}",
+                      "type": "js",
+                      "variableMap": [
+                        {
+                          "value": "number",
+                          "variable": "number"
+                        }
+                      ]
+                    },
+                    "id": "2ab065ca-398c-402d-9063-226f0ce8efbe",
+                    "name": "script",
+                    "type": "script"
+                  },
+                  {
+                    "config": {
+                      "apposition": "and",
+                      "children": [
+                        {
+                          "config": {},
+                          "id": "b2b08ed1-3d8c-43ee-839a-bd6e858cbfe5",
+                          "name": "breakLoop",
+                          "type": "breakLoop"
+                        }
+                      ],
+                      "conditionList": [
+                        {
+                          "probability": 50,
+                          "relation": "equal",
+                          "result": "0",
+                          "useVariable": "number"
+                        }
+                      ]
+                    },
+                    "id": "e245bccc-64e9-479f-956c-2b6a1374821e",
+                    "name": "IF",
+                    "type": "ifElse"
+                  },
+                  {
+                    "config": {
+                      "timeout": 2000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "6dd23715-0e6b-4340-b165-9af12646adc7",
+                    "name": "wait",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "content": [
+                        "${keyword}"
+                      ],
+                      "filterType": "equal",
+                      "filters": [
+                        {
+                          "content": "com.instagram.android:id/action_bar_search_edit_text",
+                          "type": "id"
+                        }
+                      ],
+                      "hiddenChildren": false,
+                      "inputType": "taskOrder",
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue"
+                    },
+                    "id": "b6666a36-ad7e-43f3-8306-bc06b445fc4b",
+                    "name": "inputContent",
+                    "type": "inputContent"
+                  },
+                  {
+                    "config": {
+                      "timeout": 2000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "9a8786ca-456b-47c7-9002-799db4d5d23c",
+                    "name": "wait",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "keyType": "enter"
+                    },
+                    "id": "4414dbdb-bfe9-488c-a2e6-56d870f1cb4d",
+                    "name": "keyOption",
+                    "type": "keyOption"
+                  },
+                  {
+                    "config": {
+                      "timeout": 2000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "e81b0006-dae6-43cd-acbb-d6adcea076d2",
+                    "name": "wait",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "isBase64": false,
+                      "isScope": false
+                    },
+                    "id": "56eeb7e9-f278-43d0-ab9f-e1b695765636",
+                    "name": "screenshot",
+                    "type": "screenshotPage"
+                  },
+                  {
+                    "config": {
+                      "filterType": "equal",
+                      "filters": [
+                        {
+                          "content": "Reels",
+                          "type": "text"
+                        }
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "3079cd13-719c-4d25-8dff-cda52f7d99c6",
+                    "name": "click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "timeout": 2000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "64ba7bcc-502e-489b-8cc7-62478f064e85",
+                    "name": "wait",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "_a": 150,
+                      "_b": 200,
+                      "direction": "top",
+                      "distanceMax": "600",
+                      "distanceMin": "400",
+                      "position": [
+                        260,
+                        "800"
+                      ],
+                      "randomDistance": 0,
+                      "randomWheelSleepTime": [
+                        150,
+                        200
+                      ]
+                    },
+                    "id": "b050aeb6-4d22-4971-92d4-a5aee3f1153f",
+                    "name": "Scroll",
+                    "type": "scrollPage"
+                  },
+                  {
+                    "config": {
+                      "timeout": 1000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "b45081f4-27aa-43c9-8b5f-8cbe9611ace5",
+                    "name": "wait",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "_a": 150,
+                      "_b": 200,
+                      "direction": "top",
+                      "distanceMax": "600",
+                      "distanceMin": "400",
+                      "position": [
+                        260,
+                        "800"
+                      ],
+                      "randomDistance": 0,
+                      "randomWheelSleepTime": [
+                        150,
+                        200
+                      ]
+                    },
+                    "id": "b6bc43a7-a12a-409a-90b2-e73b0b7f9f2b",
+                    "name": "Scroll",
+                    "type": "scrollPage"
+                  },
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "com.instagram.android:id/layout_container",
+                            "filterType": "equal",
+                            "type": "id"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serialMax": 6,
+                      "serialMin": 1,
+                      "serialType": "randomInterval",
+                      "useOffset": false,
+                      "variable": "inVideo"
+                    },
+                    "id": "cbfca59a-68d2-4639-bce3-0dcefa9f6fe3",
+                    "name": "click",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "apposition": "and",
+                      "children": [
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "com.instagram.android:id/layout_container",
+                                  "filterType": "equal",
+                                  "type": "id"
+                                }
+                              ],
+                              [
+                                {
+                                  "content": "com.instagram.android:id/grid_card_layout_container",
+                                  "filterType": "equal",
+                                  "type": "id"
+                                },
+                                {
+                                  "content": "Reel by",
+                                  "filterType": "equal",
+                                  "type": "id"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": "1",
+                            "serialType": "fixedValue",
+                            "useOffset": false,
+                            "variable": ""
+                          },
+                          "id": "e7b881e2-e597-4321-b4c3-5d7806b87587",
+                          "name": "click",
+                          "type": "click"
+                        }
+                      ],
+                      "conditionList": [
+                        {
+                          "relation": "notExist",
+                          "useVariable": "inVideo"
+                        }
+                      ]
+                    },
+                    "id": "70e9460e-77cc-4c1b-a3f1-289449e9178f",
+                    "name": "IF",
+                    "type": "ifElse"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "timeoutMax": 10009,
+                            "timeoutMin": 6312,
+                            "timeoutType": "randomInterval"
+                          },
+                          "id": "8c608bcd-be42-41d5-a95c-c1a88882204d",
+                          "name": "wait",
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "apposition": "and",
+                            "children": [
+                              {
+                                "config": {
+                                  "filterType": "equal",
+                                  "filters": [
+                                    {
+                                      "content": "com.instagram.android:id/like_button",
+                                      "type": "id"
+                                    }
+                                  ],
+                                  "hiddenChildren": false,
+                                  "searchTime": 3000,
+                                  "serial": 1,
+                                  "serialType": "fixedValue",
+                                  "useOffset": false
+                                },
+                                "id": "56b371d8-0d9d-4c27-bc79-41e7b08ab176",
+                                "name": "click",
+                                "parentEnabled": true,
+                                "type": "click"
+                              },
+                              {
+                                "config": {
+                                  "timeout": 2000,
+                                  "timeoutType": "fixedValue"
+                                },
+                                "id": "4515a556-b2df-4b6d-bb9b-e1dff10adbf4",
+                                "name": "wait",
+                                "type": "waitTime"
+                              }
+                            ],
+                            "conditionList": [
+                              {
+                                "probability": 30,
+                                "relation": "random"
+                              }
+                            ]
+                          },
+                          "id": "d0a37ab6-f867-4671-95a7-7c0f060663d0",
+                          "name": "IF",
+                          "parentEnabled": true,
+                          "type": "ifElse"
+                        },
+                        {
+                          "config": {
+                            "apposition": "and",
+                            "children": [
+                              {
+                                "config": {
+                                  "filterType": "equal",
+                                  "filters": [
+                                    {
+                                      "content": "com.instagram.android:id/comment_button",
+                                      "type": "id"
+                                    }
+                                  ],
+                                  "hiddenChildren": false,
+                                  "randomDistance": 0,
+                                  "searchTime": 3000,
+                                  "serial": 1,
+                                  "serialType": "fixedValue",
+                                  "useOffset": false
+                                },
+                                "id": "f6b8eac1-7c90-44e9-a22c-b445d835a3dc",
+                                "name": "click",
+                                "parentEnabled": true,
+                                "type": "click"
+                              },
+                              {
+                                "config": {
+                                  "timeout": 2000,
+                                  "timeoutType": "fixedValue"
+                                },
+                                "id": "0a2a779b-79a4-4c08-9dcd-5ef520326371",
+                                "name": "wait",
+                                "type": "waitTime"
+                              },
+                              {
+                                "config": {
+                                  "children": [
+                                    {
+                                      "config": {
+                                        "_a": 200,
+                                        "_b": 300,
+                                        "direction": "top",
+                                        "distanceMax": 150,
+                                        "distanceMin": 100,
+                                        "position": [
+                                          260,
+                                          "800"
+                                        ],
+                                        "randomDistance": 0,
+                                        "randomWheelSleepTime": [
+                                          200,
+                                          300
+                                        ]
+                                      },
+                                      "id": "40152202-ff9a-4d84-ac41-38b4dcc489d7",
+                                      "name": "scroll",
+                                      "type": "scrollPage"
+                                    },
+                                    {
+                                      "config": {
+                                        "timeoutMax": 3000,
+                                        "timeoutMin": 2000,
+                                        "timeoutType": "randomInterval"
+                                      },
+                                      "id": "5ab5c11b-cf6d-46cc-9a2c-aa961dae5cc1",
+                                      "name": "wait",
+                                      "type": "waitTime"
+                                    }
+                                  ],
+                                  "maxTimes": 5,
+                                  "minTimes": 3,
+                                  "serialType": "randomInterval"
+                                },
+                                "id": "a3582b89-e9b3-41e5-bb02-c7f010632e10",
+                                "name": "forTimes",
+                                "type": "forTimes"
+                              },
+                              {
+                                "config": {
+                                  "_a": 200,
+                                  "_b": 300,
+                                  "direction": "top",
+                                  "distanceMax": "300",
+                                  "distanceMin": "200",
+                                  "position": [
+                                    260,
+                                    "600"
+                                  ],
+                                  "randomDistance": 0,
+                                  "randomWheelSleepTime": [
+                                    200,
+                                    300
+                                  ]
+                                },
+                                "id": "6068bf54-33b3-47f0-87fc-527f83117bdd",
+                                "name": "scroll",
+                                "type": "scrollPage"
+                              },
+                              {
+                                "config": {},
+                                "id": "7a4ac762-ff73-449d-bf15-c99db92ec6d4",
+                                "name": "goBack",
+                                "type": "goBack"
+                              }
+                            ],
+                            "conditionList": [
+                              {
+                                "probability": 30,
+                                "relation": "random"
+                              }
+                            ]
+                          },
+                          "id": "1c40d401-ddbc-46d4-bd17-d2f1b160cf31",
+                          "name": "IF",
+                          "parentEnabled": true,
+                          "type": "ifElse"
+                        },
+                        {
+                          "config": {
+                            "apposition": "and",
+                            "children": [
+                              {
+                                "config": {
+                                  "filterCollection": [
+                                    [
+                                      {
+                                        "content": "Follow",
+                                        "filterType": "equal",
+                                        "type": "text"
+                                      }
+                                    ]
+                                  ],
+                                  "hiddenChildren": false,
+                                  "randomDistance": 0,
+                                  "searchTime": 3000,
+                                  "serial": 1,
+                                  "serialType": "fixedValue",
+                                  "useOffset": false
+                                },
+                                "id": "04a5e80d-6d5d-4f71-afdc-f8f88d259193",
+                                "name": "click",
+                                "parentEnabled": true,
+                                "type": "click"
+                              },
+                              {
+                                "config": {
+                                  "timeout": 2000,
+                                  "timeoutType": "fixedValue"
+                                },
+                                "id": "d991fe45-dcdf-442b-b3e0-c3b9c8ebc054",
+                                "name": "wait",
+                                "type": "waitTime"
+                              }
+                            ],
+                            "conditionList": [
+                              {
+                                "probability": 10,
+                                "relation": "random"
+                              }
+                            ]
+                          },
+                          "id": "685b9979-d515-43bb-8555-def5c2ae4dad",
+                          "name": "IF",
+                          "parentEnabled": true,
+                          "type": "ifElse"
+                        },
+                        {
+                          "config": {
+                            "isBase64": false,
+                            "isScope": false
+                          },
+                          "id": "eddcbd51-d2e9-4b9c-838c-4e77ddde0f5f",
+                          "name": "screenshot",
+                          "type": "screenshotPage"
+                        },
+                        {
+                          "config": {
+                            "_a": 200,
+                            "_b": 300,
+                            "direction": "top",
+                            "distanceMax": 150,
+                            "distanceMin": 100,
+                            "position": [
+                              260,
+                              400
+                            ],
+                            "randomDistance": 0,
+                            "randomWheelSleepTime": [
+                              200,
+                              300
+                            ]
+                          },
+                          "id": "10f6ee8a-1850-4f47-b572-54df9685209a",
+                          "name": "Scroll",
+                          "type": "scrollPage"
+                        }
+                      ],
+                      "serialType": "fixedValue",
+                      "times": "${number}",
+                      "variableIndex": ""
+                    },
+                    "enabled": true,
+                    "id": "d2d559a3-c71c-482c-a54a-a1bfa1a770e5",
+                    "name": "forTimes",
+                    "type": "forTimes"
+                  },
+                  {
+                    "config": {},
+                    "id": "792d49fc-9197-45ea-aec7-e58ab60be473",
+                    "name": "goBack",
+                    "type": "goBack"
+                  },
+                  {
+                    "config": {},
+                    "id": "1a3daab8-0ea2-49e6-9482-043fabfe339b",
+                    "name": "goBack",
+                    "type": "goBack"
+                  }
+                ],
+                "content": [
+                  "${SearchKeyword}"
+                ],
+                "reversal": false,
+                "variable": "keyword",
+                "variableIndex": "index"
+              },
+              "id": "655f817c-1386-4daa-8362-2b3be1dc6b00",
+              "name": "forData",
+              "type": "forData"
+            },
+            {
+              "config": {},
+              "id": "bfdb4c73-2daa-4797-9d20-a85ef55915e8",
+              "name": "End task",
+              "type": "endTask"
+            }
+          ],
+          "conditionList": [
+            {
+              "probability": 50,
+              "relation": "exist",
+              "useVariable": "SearchKeyword"
+            }
+          ],
+          "other": [
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "com.instagram.android:id/clips_tab",
+                    "type": "id"
+                  },
+                  {
+                    "content": "Reels",
+                    "type": "desc"
+                  }
+                ],
+                "hiddenChildren": false,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "992823ed-d2ba-465e-b464-014d1d585c88",
+              "name": "click",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Try it",
+                    "type": "desc"
+                  }
+                ],
+                "hiddenChildren": false,
+                "searchTime": 10000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "996051a1-39ee-496a-a19d-99b43478122e",
+              "name": "click",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeout": 3000,
+                "timeoutMax": 8000,
+                "timeoutMin": 3000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "f62a89d6-070c-413a-a8ff-977aed40c495",
+              "name": "wait",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "_a": 200,
+                      "_b": 300,
+                      "direction": "top",
+                      "distanceMax": "300",
+                      "distanceMin": 100,
+                      "position": [
+                        260,
+                        400
+                      ],
+                      "randomDistance": 0,
+                      "randomWheelSleepTime": [
+                        200,
+                        300
+                      ]
+                    },
+                    "id": "a0f984b7-8ff6-411b-989e-c81696078fb7",
+                    "name": "scroll",
+                    "type": "scrollPage"
+                  },
+                  {
+                    "config": {
+                      "timeout": 3000,
+                      "timeoutMax": 15000,
+                      "timeoutMin": 8000,
+                      "timeoutType": "randomInterval"
+                    },
+                    "id": "d129aade-9c38-4f9d-a34e-f3cf13782947",
+                    "name": "wait",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "apposition": "and",
+                      "children": [
+                        {
+                          "config": {
+                            "filterType": "equal",
+                            "filters": [
+                              {
+                                "content": "com.instagram.android:id/like_button",
+                                "type": "id"
+                              }
+                            ],
+                            "hiddenChildren": false,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false
+                          },
+                          "id": "9f5c084d-3290-4191-818b-d4f880a25eb0",
+                          "name": "click",
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "timeout": 2000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "f5bbe68c-4195-438a-b4df-77f2426df5c5",
+                          "name": "wait",
+                          "type": "waitTime"
+                        }
+                      ],
+                      "conditionList": [
+                        {
+                          "probability": 30,
+                          "relation": "random"
+                        }
+                      ]
+                    },
+                    "id": "23d6cbd9-6435-4d81-a70e-831cb368aeeb",
+                    "name": "IF",
+                    "type": "ifElse"
+                  },
+                  {
+                    "config": {
+                      "apposition": "and",
+                      "children": [
+                        {
+                          "config": {
+                            "filterType": "equal",
+                            "filters": [
+                              {
+                                "content": "com.instagram.android:id/comment_button",
+                                "type": "id"
+                              }
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false
+                          },
+                          "id": "f2f9fbed-2965-4e46-9845-00f99761e694",
+                          "name": "click",
+                          "parentEnabled": true,
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "timeout": 2000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "5285255c-bc65-419d-ac72-6811ab76111c",
+                          "name": "wait",
+                          "parentEnabled": true,
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "children": [
+                              {
+                                "config": {
+                                  "_a": 200,
+                                  "_b": 300,
+                                  "direction": "top",
+                                  "distanceMax": 150,
+                                  "distanceMin": 100,
+                                  "position": [
+                                    260,
+                                    "800"
+                                  ],
+                                  "randomDistance": 0,
+                                  "randomWheelSleepTime": [
+                                    200,
+                                    300
+                                  ]
+                                },
+                                "id": "3f297fea-9fb6-4de8-bb06-d3ce666e23a9",
+                                "name": "scroll",
+                                "parentEnabled": true,
+                                "type": "scrollPage"
+                              },
+                              {
+                                "config": {
+                                  "timeoutMax": 3000,
+                                  "timeoutMin": 2000,
+                                  "timeoutType": "randomInterval"
+                                },
+                                "id": "cd95fb4b-5966-4b6b-b644-35b953ee77f3",
+                                "name": "wait",
+                                "parentEnabled": true,
+                                "type": "waitTime"
+                              }
+                            ],
+                            "maxTimes": 5,
+                            "minTimes": 3,
+                            "serialType": "randomInterval"
+                          },
+                          "id": "4148f124-5ed2-4d35-8b55-4e5d73d8f210",
+                          "name": "forTimes",
+                          "parentEnabled": true,
+                          "type": "forTimes"
+                        },
+                        {
+                          "config": {},
+                          "id": "8eb1f8a2-951b-45c5-a129-2c9f0ac97248",
+                          "name": "goBack",
+                          "parentEnabled": true,
+                          "type": "goBack"
+                        }
+                      ],
+                      "conditionList": [
+                        {
+                          "probability": 30,
+                          "relation": "random"
+                        }
+                      ]
+                    },
+                    "id": "c978a316-fb9f-4480-ae06-a46684e44f74",
+                    "name": "IF",
+                    "parentEnabled": true,
+                    "type": "ifElse"
+                  },
+                  {
+                    "config": {
+                      "apposition": "and",
+                      "children": [
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Follow",
+                                  "filterType": "equal",
+                                  "type": "text"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false
+                          },
+                          "id": "35db071d-e789-447f-820b-fb80cfe03d84",
+                          "name": "click",
+                          "parentEnabled": true,
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "timeout": 2000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "44a899ab-8e62-4996-9df5-7dd4653db400",
+                          "name": "wait",
+                          "type": "waitTime"
+                        }
+                      ],
+                      "conditionList": [
+                        {
+                          "probability": 10,
+                          "relation": "random"
+                        }
+                      ]
+                    },
+                    "id": "62e27b20-73db-4099-9260-129e5edae698",
+                    "name": "IF",
+                    "parentEnabled": true,
+                    "type": "ifElse"
+                  },
+                  {
+                    "config": {
+                      "isBase64": false,
+                      "isScope": false
+                    },
+                    "id": "832d5b30-cbb0-4207-9dea-c8f0d6f69581",
+                    "name": "screenshot",
+                    "parentEnabled": true,
+                    "type": "screenshotPage"
+                  }
+                ],
+                "serialType": "fixedValue",
+                "times": "${NumberOfVideosViewed}"
+              },
+              "id": "3c5b4c01-f323-40df-a811-565cbdbfeeea",
+              "name": "forTimes",
+              "type": "forTimes"
+            }
+          ]
+        },
+        "id": "cf3786f8-76c1-490c-b675-a36b220e0c10",
+        "name": "IF",
+        "type": "ifElse"
+      }
+    ],
+    "contentType": "phone",
+    "errorType": "skip",
+    "isDebug": false
+  }
+}

@@ -293,7 +293,12 @@ export function buildWebAPI() {
       // veut dans la resourceUrl). Pour une VIDÉO on force 'mp4' : les templates RPA
       // Insta/TikTok/Threads exigent du mp4 — envoyer 'mov'/'webm' casse le posting.
       const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'heif', 'heic']
-      const realExt = (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
+      // Cover capturée depuis une frame vidéo → data:image/jpeg;base64,… : pas
+      // d'extension dans l'URL, on lit le type MIME. Sinon on lit l'extension.
+      const dataMime = /^data:/.test(opts.filePath) ? (opts.filePath.match(/^data:([^;,]+)/)?.[1] || '').toLowerCase() : ''
+      const realExt = dataMime
+        ? (dataMime.split('/')[1] || 'jpg')
+        : (opts.filePath.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'mp4').toLowerCase()
       const isImage = IMAGE_EXTS.includes(realExt)
       const fileType = isImage ? realExt : 'mp4'
       const putCT = isImage

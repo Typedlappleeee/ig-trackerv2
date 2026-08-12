@@ -37,7 +37,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup, filterAccessiblePhones, accessibleGroupNames } from '@/lib/permissions'
 import { BankPicker } from '@/pages/Bank'
-import { postInstagramStory, stopPhone } from '@/lib/geelark'
+import { postInstagramStory, stopPhone, postReelsTask } from '@/lib/geelark'
 import { registerStartedPhones } from '@/lib/phoneWatch'
 import { pushNotification } from '@/lib/notificationStore'
 import { TaskWizard } from '@/components/TaskWizard'
@@ -518,12 +518,12 @@ async function executeUnit(
       const useTrialReels = task.reels_trial && !trialUnsupported
       if (task.reels_trial && trialUnsupported)
         log(tr(`⚠ Trial Reels désactivé pour ${name} (compte non éligible)`, `⚠ Trial Reels disabled for ${name} (account not eligible)`))
-      const res = await glPost(bearer, '/rpa/task/instagramPubReels', {
-        id:          phone.geelark_id,
+      const res = await postReelsTask(bearer, {
+        phoneId:     phone.geelark_id,
         scheduleAt:  baseTs + i * (unit.delay_minutes ?? 0) * 60,
         description: unit.caption,
         video:       [validTokens[vidIdx]],
-        ...(unit.reels_trial ? { shareType: 2 } : {}),
+        reelsTrial:  unit.reels_trial,
       })
       if (res['code'] === 0) {
         rpaCreated++
