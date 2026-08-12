@@ -2302,28 +2302,24 @@ async function _loginInstagramAccountInner(
       xml = await dumpXml(bearer, phoneId)
     }
 
-    // Find password field in updated XML
-    const passwordPt: [number, number] | null =
+    // Trouve le champ mot de passe — résilient Android 14 : resource-id, puis texte
+    // exact, sinon repli sur la POSITION (juste SOUS le champ identifiant) au lieu
+    // d'une tabulation clavier peu fiable qui laissait le mot de passe VIDE.
+    const passwordPt: [number, number] =
       findByResourceId(xml,
         'password', 'login_password', 'com.instagram.android:id/password',
         'com.instagram.android:id/login_password') ??
-      findByText(xml, 'Password', 'Mot de passe', 'Enter password') ??
+      findByText(xml, 'Password', 'Mot de passe', 'Enter password', 'Mot de passe') ??
       (nextAfterEmail
-        ? [Math.floor(sw / 2), Math.floor(sh * 0.42)] as [number, number]
-        : null)
+        ? [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+        : [usernamePt[0], Math.min(sh - 120, usernamePt[1] + Math.floor(sh * 0.08))])
 
-    if (passwordPt) {
-      log('🔑 Champ mot de passe détecté…')
-      await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
-      await sleep(400)
-      await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
-      await sleep(600)
-    } else {
-      // Single-screen fallback: TAB from email field
-      log('🔑 Champ mot de passe non détecté — navigation au clavier…')
-      await shellExec(bearer, phoneId, 'input keyevent 61')
-      await sleep(700)
-    }
+    log('🔑 Champ mot de passe…')
+    // Double-tap pour garantir le focus (le 1er tap peut juste fermer une suggestion).
+    await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
+    await sleep(400)
+    await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
+    await sleep(600)
 
     // ── Saisie mot de passe ────────────────────────────────────────────────
     log('🔑 Saisie du mot de passe…')
