@@ -356,6 +356,48 @@ export async function login(id: string, params: Record<string, unknown>, log: Lo
   log('✅ Connexion tentée — vérifie l’état du compte')
 }
 
+// ── Publier un carrousel photo (feed) ───────────────────────────────────────
+// Traduction « cœur » du template GeeLark « Post Carousel photo ». Les images
+// sont déjà poussées sur le tel (les N plus récentes de la galerie). count = nb
+// d'images à sélectionner. Version épurée (sans tags IA / audio / lien).
+export async function postCarousel(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const caption = String(params.caption ?? '')
+  const count = Math.max(1, Number(params.count) || 1)
+  await dismissPopups(id)
+
+  if (!await tapFirst(id, [{ id: 'creation_tab' }, { desc: 'Create' }, { desc: 'Créer' }, { desc: 'New post' }], 'Créer', log)) throw new Error('bouton Créer introuvable')
+  await sleep(2500); await dismissPopups(id)
+  // Onglet POST (fil), pas Reel.
+  await tapFirst(id, [{ id: 'cam_dest_feed' }, { desc: 'POST' }, { text: 'POST' }], 'Onglet POST', log, false)
+  await sleep(1500); await dismissPopups(id)
+  // Active la sélection multiple si dispo.
+  await tapFirst(id, [{ desc: 'Select multiple button' }, { contains: 'Select multiple' }], 'Sélection multiple', log, false)
+  await sleep(1200)
+  // Sélectionne les N vignettes les plus récentes.
+  let picked = 0
+  for (let i = 0; i < count; i++) {
+    const thumbs = (await dumpUi(id)).filter(n => n.clickable && /gallery_grid_item_thumbnail|gallery_grid_item/.test(n.id))
+      .sort((a, b) => (a.y - b.y) || (a.x - b.x))
+    const t = thumbs[i]
+    if (t) { await cloudPhones.shell(id, `input tap ${t.cx} ${t.cy}`); picked++; await sleep(700) }
+  }
+  log(`  🖼️ ${picked} image(s) sélectionnée(s)`)
+  await sleep(1000)
+  if (!await tapFirst(id, [{ desc: 'Next' }, { text: 'Next' }, { text: 'Suivant' }], 'Suivant', log)) throw new Error('bouton Suivant introuvable')
+  await sleep(2500); await dismissPopups(id)
+  await tapFirst(id, [{ desc: 'Next' }, { text: 'Next' }, { text: 'Suivant' }], 'Suivant (filtres)', log, false)
+  await sleep(2500); await dismissPopups(id)
+  // Légende.
+  if (caption.trim()) {
+    const nodes = await dumpUi(id)
+    const cap = nodes.find(n => n.id.endsWith('caption_input_text_view')) || nodes.find(n => /EditText/.test(n.cls))
+    if (cap) { await cloudPhones.shell(id, `input tap ${cap.cx} ${cap.cy}`); await sleep(500); await typeText(id, caption.trim()); await sleep(600); await keys.back(id); await sleep(600) }
+  }
+  await tapFirst(id, [{ desc: 'Share' }, { text: 'Share' }, { text: 'Partager' }, { desc: 'OK' }, { text: 'OK' }], 'Partager', log, false)
+  await sleep(4000)
+  log('✅ Carrousel publié — vérifie le profil')
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -369,4 +411,5 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   set_privacy: setPrivacy,
   bulk_follow: bulkFollow,
   login: login,
+  post_carousel: postCarousel,
 }

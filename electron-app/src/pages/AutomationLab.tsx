@@ -27,6 +27,7 @@ const TPL_FLOW_MAP: Record<string, string> = {
   '500000000000000049': 'ig-set-privacy',   // Confidentialité public/privé
   '500000000000000053': 'ig-bulk-follow',   // Abonnement en masse
   '500000000000000034': 'ig-login',         // Connexion automatique
+  '500000000000000031': 'ig-post-carousel', // Publier une galerie de Reels
 }
 
 interface Props { user: User }
@@ -51,6 +52,7 @@ export function AutomationLab({ user }: Props) {
   const [tplVars, setTplVars] = useState<Record<string, string>>({})  // champs saisis pour un template texte
   const [perPhoneVars, setPerPhoneVars] = useState<Record<string, Record<string, string>>>({})  // champs PAR téléphone (templates perAccount)
   const [bulkCreds, setBulkCreds] = useState('')
+  const [carouselImages, setCarouselImages] = useState<File[]>([])
   const [appFilter, setAppFilter] = useState<string>('all')           // filtre par application
   const [tplFilter, setTplFilter] = useState<'all' | TplPlatform>('all') // filtre plateforme du catalogue
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -171,6 +173,29 @@ export function AutomationLab({ user }: Props) {
       return next
     })
     setBulkCreds('')
+  }
+
+  // Runner CARROUSEL : pousse N images sur chaque tel puis publie.
+  const carouselRun = async () => {
+    const flow = findFlow('ig-post-carousel')
+    if (!flow || carouselImages.length === 0 || selected.size === 0) return
+    const ids = [...selected]
+    setResults(Object.fromEntries(ids.map(id => [id, { status: 'run', log: ['⏳ En attente…'] } as RunState])))
+    setPosting(true)
+    await Promise.all(ids.map(async id => {
+      const push = (m: string) => setResults(r => ({ ...r, [id]: { ...r[id], log: [...(r[id]?.log ?? []), m] } }))
+      const setOnly = (m: string) => setResults(r => ({ ...r, [id]: { ...r[id], log: [m] } }))
+      for (let k = 0; k < carouselImages.length; k++) {
+        setOnly(`📤 Image ${k + 1}/${carouselImages.length}…`)
+        const up = await uploadVideoFile(id, carouselImages[k], pct => setOnly(`📤 Image ${k + 1}/${carouselImages.length} · ${pct}%`))
+        if (!up.ok) { setResults(r => ({ ...r, [id]: { ...r[id], status: 'fail', failedAt: `envoi image : ${up.error}` } })); return }
+      }
+      push('✓ Images envoyées')
+      await new Promise(res => setTimeout(res, 2200))
+      const res = await runFlow(id, flow, { vars: { caption: postCaption, count: String(carouselImages.length) }, log: push })
+      setResults(r => ({ ...r, [id]: { ...r[id], status: res.ok ? 'ok' : 'fail', failedAt: res.failedAt } }))
+    }))
+    setPosting(false)
   }
 
   const nameOf = (id: string) => instances.find(i => i.id === id)?.name ?? id
@@ -335,6 +360,24 @@ export function AutomationLab({ user }: Props) {
                     </Card>
                     <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
                     <button onClick={postRun} disabled={posting || !postFile || selected.size === 0} style={{ ...runBtn, opacity: (posting || !postFile || selected.size === 0) ? 0.55 : 1 }}>
+                      {posting ? '⏳ Publication…' : `📤 Publier sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
+                    </button>
+                    <ResultsList results={results} nameOf={nameOf} />
+                  </>
+                ) : mappedFlow === 'ig-post-carousel' ? (
+                  <>
+                    <Card title="Photos & légende">
+                      <p style={{ fontSize: 11.5, color: '#8a8a9c', margin: '0 0 10px', lineHeight: 1.5 }}>Les photos sont <b>envoyées</b> sur chaque téléphone puis publiées en <b>carrousel</b> dans le fil.</p>
+                      <label style={{ display: 'block', marginBottom: 10 }}>
+                        <input type="file" accept="image/*" multiple onChange={e => setCarouselImages(Array.from(e.target.files ?? []))} style={{ display: 'none' }} id="tpl-carousel-files" />
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: '1.5px dashed rgba(129,140,248,0.5)', background: 'rgba(129,140,248,0.07)', color: '#C7D2FE', cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }} onClick={() => document.getElementById('tpl-carousel-files')?.click()}>
+                          🖼️ {carouselImages.length ? `${carouselImages.length} photo${carouselImages.length > 1 ? 's' : ''}` : 'Choisir des photos'}
+                        </span>
+                      </label>
+                      <textarea value={postCaption} onChange={e => setPostCaption(e.target.value)} placeholder="Légende (emoji ok)" rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                    </Card>
+                    <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
+                    <button onClick={carouselRun} disabled={posting || carouselImages.length === 0 || selected.size === 0} style={{ ...runBtn, opacity: (posting || carouselImages.length === 0 || selected.size === 0) ? 0.55 : 1 }}>
                       {posting ? '⏳ Publication…' : `📤 Publier sur ${selected.size} téléphone${selected.size > 1 ? 's' : ''}`}
                     </button>
                     <ResultsList results={results} nameOf={nameOf} />

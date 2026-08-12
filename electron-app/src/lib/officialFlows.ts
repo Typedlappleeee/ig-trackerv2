@@ -5,6 +5,23 @@ import type { Flow } from './flowRunner'
 
 export const OFFICIAL_FLOWS: Flow[] = [
   {
+    id: 'ig-post-carousel',
+    name: 'Publier une galerie — Instagram',
+    official: true,
+    category: '📤 Publication',
+    app: 'com.instagram.android',
+    description: 'Publie plusieurs photos en galerie/carrousel, avec légende. (Version cœur : sans tags IA ni audio.)',
+    inputs: [
+      { key: 'caption', label: 'Légende', placeholder: 'Légende (emoji ok)', optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'post_carousel', params: { caption: '{{caption}}', count: '{{count}}' } },
+    ],
+  },
+
+  {
     id: 'ig-login',
     name: 'Connexion automatique — Instagram',
     official: true,
