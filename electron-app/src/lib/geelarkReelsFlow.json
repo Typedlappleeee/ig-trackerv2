@@ -3175,7 +3175,14 @@
                 "useVariable": "Cover"
               }
             ]
-          ]
+          ],
+          "conditionList": [
+            {
+              "relation": "exist",
+              "useVariable": "Cover"
+            }
+          ],
+          "apposition": "and"
         },
         "id": "6a0ef557-65b3-43a6-beac-40db84105e8d",
         "name": "IF条件",
