@@ -5,6 +5,23 @@ import type { Flow } from './flowRunner'
 
 export const OFFICIAL_FLOWS: Flow[] = [
   {
+    id: 'ig-set-privacy',
+    name: 'Confidentialité du compte — Instagram',
+    official: true,
+    category: '👤 Profil',
+    app: 'com.instagram.android',
+    description: 'Bascule le compte en public ou en privé (ne change rien s’il est déjà dans l’état voulu).',
+    inputs: [
+      { key: 'public', label: 'Compte public (sinon privé)', type: 'boolean', optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'set_privacy', params: { public: '{{public}}' } },
+    ],
+  },
+
+  {
     id: 'ig-warmup',
     name: 'Warmup de compte — Instagram',
     official: true,

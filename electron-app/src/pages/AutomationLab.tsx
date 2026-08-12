@@ -24,6 +24,7 @@ const TPL_FLOW_MAP: Record<string, string> = {
   '500000000000000016': 'ig-post-reel',     // Publier une vidéo Reels
   '500000000000000043': 'ig-edit-profile',  // Modifier le profil Instagram
   '500000000000000020': 'ig-warmup',        // Warmup de compte (IA)
+  '500000000000000049': 'ig-set-privacy',   // Confidentialité public/privé
 }
 
 interface Props { user: User }
@@ -305,15 +306,26 @@ export function AutomationLab({ user }: Props) {
                   </>
                 ) : mappedFlow && findFlow(mappedFlow) ? (() => {
                   const f = findFlow(mappedFlow)!
-                  const filled = (f.inputs ?? []).some(inp => (tplVars[inp.key] ?? '').trim())
+                  const filled = (f.inputs ?? []).some(inp => inp.type === 'boolean' || (tplVars[inp.key] ?? '').trim())
                   return (
                     <>
                       <Card title="Champs">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                           {(f.inputs ?? []).map(inp => (
                             <label key={inp.key} style={{ display: 'block' }}>
-                              <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>{inp.label}{inp.optional && <span style={{ color: 'var(--text-4)', fontWeight: 500 }}> · optionnel</span>}</span>
-                              {inp.key === 'biography' || inp.key === 'keywords'
+                              <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>{inp.label}{inp.optional && inp.type !== 'boolean' && <span style={{ color: 'var(--text-4)', fontWeight: 500 }}> · optionnel</span>}</span>
+                              {inp.type === 'boolean'
+                                ? (() => { const on = tplVars[inp.key] === 'true'; return (
+                                    <button type="button" onClick={() => setTplVars(v => ({ ...v, [inp.key]: on ? 'false' : 'true' }))}
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '8px 14px', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                                        border: `1px solid ${on ? 'var(--accent)' : 'var(--border-md)'}`, background: on ? 'var(--accent-dim)' : 'rgba(0,0,0,0.25)', color: on ? 'var(--accent)' : 'var(--text-2)' }}>
+                                      <span style={{ width: 34, height: 20, borderRadius: 99, background: on ? 'var(--accent)' : 'rgba(255,255,255,0.15)', position: 'relative', transition: 'all .15s' }}>
+                                        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: 99, background: '#fff', transition: 'all .15s' }} />
+                                      </span>
+                                      {on ? '🌐 Public' : '🔒 Privé'}
+                                    </button>
+                                  ) })()
+                                : inp.key === 'biography' || inp.key === 'keywords'
                                 ? <textarea value={tplVars[inp.key] ?? ''} onChange={e => setTplVars(v => ({ ...v, [inp.key]: e.target.value }))} placeholder={inp.placeholder} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
                                 : <input value={tplVars[inp.key] ?? ''} onChange={e => setTplVars(v => ({ ...v, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />}
                             </label>
