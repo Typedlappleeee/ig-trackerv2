@@ -9,7 +9,7 @@ import { canAccessPhoneGroup, filterAccessiblePhones, accessibleGroupNames } fro
 import { logActivity } from '@/lib/activityLog'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
-import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp, fetchPhoneProxies } from '@/lib/geelark'
+import { takeScreenshot, waitForPhoneConnectivity, rotateAllProxies, getPhonePublicIp, fetchPhoneProxies, postReelsTask } from '@/lib/geelark'
 import { startRun, updateRun, endRun, setRunPhase, finishRun, findOrphanRun, adoptRun, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { resolveRotationUrls, useProxyRotation } from '@/lib/proxyRotation'
 import { registerStartedPhones, unregisterPhones, setPhoneTaskId } from '@/lib/phoneWatch'
@@ -455,9 +455,9 @@ export function MassPosting({ user }: MassPostingProps) {
             let taskRes: Record<string, unknown> | null = null
             let outcome: TaskOutcome = 'unknown'
             for (let attempt = 0; attempt < 3; attempt++) {
-              taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-                id: rp.geelarkId, scheduleAt: Math.floor(Date.now() / 1000),
-                description: rp.caption ?? '', video: [rp.token!], ...(persisted.reelsTrial ? { shareType: 2 } : {}),
+              taskRes = await postReelsTask(bearer, {
+                phoneId: rp.geelarkId, scheduleAt: Math.floor(Date.now() / 1000),
+                description: rp.caption ?? '', video: [rp.token!], reelsTrial: persisted.reelsTrial,
               })
               outcome = classifyTaskRes(taskRes)
               if (outcome === 'ok') break
@@ -1187,9 +1187,9 @@ export function MassPosting({ user }: MassPostingProps) {
             postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
             let taskRes: Record<string, unknown> | null = null
             for (let attempt = 0; attempt < 3; attempt++) {
-              taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-                id: asgn.phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
-                description: capFor(asgn.video), video: [token], ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
+              taskRes = await postReelsTask(bearer, {
+                phoneId: asgn.phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
+                description: capFor(asgn.video), video: [token], reelsTrial: postingOpts.reelsTrial,
               })
               if (taskRes['code'] === 0) break
               if (attempt < 2) { log(tr(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, `  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? 'post rejected'} — retrying…`), 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
@@ -1348,12 +1348,12 @@ export function MassPosting({ user }: MassPostingProps) {
           let taskRes: Record<string, unknown> | null = null
           let outcome: TaskOutcome = 'unknown'
           for (let attempt = 0; attempt < 3; attempt++) {
-            taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-              id:          asgn.phone.geelark_id,
+            taskRes = await postReelsTask(bearer, {
+              phoneId:     asgn.phone.geelark_id,
               scheduleAt:  scheduleTimes[ai],
               description: capFor(asgn.video),
               video:       [token],
-              ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
+              reelsTrial:  postingOpts.reelsTrial,
             })
             outcome = classifyTaskRes(taskRes)
             if (outcome === 'ok') break

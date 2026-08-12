@@ -2,6 +2,7 @@ import { registerStartedPhonesAuto, unregisterPhones } from './phoneWatch'
 import storyFlowDef from './geelarkStoryFlow.json'
 import loginFlowDef from './geelarkLoginFlow.json'
 import warmupFlowDef from './geelarkWarmupFlow.json'
+import reelsFlowDef from './geelarkReelsFlow.json'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -2694,6 +2695,106 @@ export async function warmupInstagramViaRpa(
     log('   Tâche RPA créée — warmup en cours…')
     return pollRpaTask(bearer, taskId, log, 35 * 60_000)
   })
+}
+
+// ── Publication Reels via RPA NATIF GeeLark (flow custom auto-importé) ────────
+// Flow « IG Reels Scaleflow » auto-importé. Ajoute par rapport à la native
+// instagramPubReels : cover perso, tags IA, synchro audio tendance, et sa
+// propre gestion des popups. paramMap {Caption, Video[], SameURL, SameVolume,
+// AcousticVolume, AITags, Cover[]}.
+const REELS_FLOW_VERSION = '1'
+const _reelsFlowIdCache = new Map<string, Promise<string | null>>()
+function reelsFlowLsKey(bearer: string): string { return `sf-reels-flowid:${bearer.slice(-14)}` }
+function reelsFlowVerKey(bearer: string): string { return `sf-reels-flowver:${bearer.slice(-14)}` }
+export function forgetReelsFlowId(bearer: string): void {
+  try { localStorage.removeItem(reelsFlowLsKey(bearer)); localStorage.removeItem(reelsFlowVerKey(bearer)) } catch { /* ignore */ }
+  _reelsFlowIdCache.delete(bearer)
+}
+async function ensureReelsFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
+  const cached = _reelsFlowIdCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, storedVer: string | null = null
+    try { stored = localStorage.getItem(reelsFlowLsKey(bearer)); storedVer = localStorage.getItem(reelsFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && storedVer === REELS_FLOW_VERSION) return stored
+    log?.(stored ? '🔄 Mise à jour du flow « IG Reels »…' : '📥 Import du flow de publication Reels dans GeeLark…')
+    try {
+      const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(reelsFlowDef) }, bearer)
+      if (res['code'] !== 0) { log?.(`⚠ Import du flow Reels : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(reelsFlowLsKey(bearer), id); localStorage.setItem(reelsFlowVerKey(bearer), REELS_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log?.(`⚠ Import du flow Reels : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _reelsFlowIdCache.set(bearer, p)
+  p.then(v => { if (!v) _reelsFlowIdCache.delete(bearer) }).catch(() => _reelsFlowIdCache.delete(bearer))
+  return p
+}
+
+export interface ReelsPostParams {
+  phoneId:        string
+  scheduleAt:     number
+  description?:   string
+  video:          string[]   // resourceUrl(s) GeeLark de la vidéo
+  cover?:         string[]   // resourceUrl GeeLark de la cover (miniature du Reel) — optionnel
+  sameUrl?:       string     // URL du son tendance à synchroniser — optionnel
+  sameVolume?:    number
+  acousticVolume?: number
+  aiTags?:        boolean
+  reelsTrial?:    boolean    // "reels d'essai" (native shareType:2) — non géré par le flow custom
+}
+
+// Publie un Reel. Par défaut, utilise le flow RPA custom (cover / tags IA / audio
+// tendance / popups). Repli AUTOMATIQUE sur la native instagramPubReels si le flow
+// est indisponible (import échoué) ou refuse proprement la tâche — donc zéro
+// régression. Renvoie TOUJOURS la forme native {code,msg,data:{id}} pour que les
+// appelants gardent leur logique anti-double/retry inchangée. Ne throw jamais :
+// réseau perdu → {} (interprété "unknown" par classifyTaskRes → pas de retry).
+export async function postReelsTask(bearer: string, p: ReelsPostParams): Promise<Record<string, unknown>> {
+  const native = () => geelarkFetch('POST', '/rpa/task/instagramPubReels', {
+    id: p.phoneId, scheduleAt: p.scheduleAt, description: p.description ?? '',
+    video: p.video, ...(p.reelsTrial ? { shareType: 2 } : {}),
+  }, bearer).catch(() => ({} as Record<string, unknown>))
+
+  // "Reels d'essai" (shareType:2) n'existe pas dans le flow custom → on garde la
+  // native qui, elle, le supporte.
+  if (p.reelsTrial) return native()
+
+  let flowId: string | null = null
+  try { flowId = await ensureReelsFlowId(bearer) } catch { flowId = null }
+  if (!flowId) return native()
+
+  const paramMap: Record<string, unknown> = {
+    Caption: p.description ?? '',
+    Video:   p.video,
+    SameURL: p.sameUrl ?? '',
+    ...(p.sameVolume != null ? { SameVolume: p.sameVolume } : {}),
+    ...(p.acousticVolume != null ? { AcousticVolume: p.acousticVolume } : {}),
+    AITags:  !!p.aiTags,
+    Cover:   p.cover ?? [],
+  }
+  const addFlow = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
+    id: p.phoneId, flowId: fid, scheduleAt: p.scheduleAt, name: 'Reels Scaleflow', paramMap,
+  }, bearer)
+
+  let res: Record<string, unknown>
+  try { res = await addFlow(flowId) }
+  catch { return {} }   // réseau perdu → "unknown", PAS de repli (anti-double)
+
+  // Flow mémorisé mais supprimé côté GeeLark (code EXACT 48002) → ré-import + retry.
+  if (res['code'] !== 0 && Number(res['code']) === 48002) {
+    forgetReelsFlowId(bearer)
+    let fresh: string | null = null
+    try { fresh = await ensureReelsFlowId(bearer) } catch { fresh = null }
+    if (fresh) { try { res = await addFlow(fresh) } catch { return {} } }
+  }
+  if (res['code'] === 0) {
+    const d = res['data'] as Record<string, unknown> | undefined
+    return { code: 0, msg: 'success', data: { id: d?.['taskId'] ?? d?.['id'] } }
+  }
+  // Refus PROPRE du flow (tâche non créée) → repli sur la native pour publier
+  // quand même. Aucun double : le flow n'a rien créé (code ≠ 0).
+  return native()
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
