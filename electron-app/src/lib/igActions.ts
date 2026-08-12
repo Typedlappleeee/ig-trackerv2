@@ -322,6 +322,40 @@ export async function bulkFollow(id: string, params: Record<string, unknown>, lo
   log(`✅ ${followed}/${users.length} compte(s) suivi(s)`)
 }
 
+// ── Connexion Instagram (identifiant + mot de passe, sans 2FA) ───────────────
+// Traduction « cœur » du template GeeLark « Instagram auto login ».
+export async function login(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const account = String(params.account ?? '').trim()
+  const password = String(params.password ?? '')
+  if (!account || !password) throw new Error('identifiant ou mot de passe manquant')
+
+  await sleep(jitter(5000, 3000)); await dismissPopups(id)
+  await tap(id, { text: 'I already have an account' }, { timeoutMs: 2000 })         // 1er lancement
+  await tap(id, { text: 'Use another profile' }, { timeoutMs: 3000 })              // déjà des comptes
+  await sleep(jitter(4000, 2000)); await dismissPopups(id)
+
+  // Champ identifiant : par desc, sinon 1re zone de saisie.
+  let nodes = await dumpUi(id)
+  const userField = nodes.find(n => /EditText/.test(n.cls) && /username|email|mobile|identifiant/i.test(n.desc))
+    || nodes.filter(n => /EditText/.test(n.cls)).sort((a, b) => a.y - b.y)[0]
+  if (!userField) throw new Error('champ identifiant introuvable')
+  await cloudPhones.shell(id, `input tap ${userField.cx} ${userField.cy}`); await sleep(500)
+  await clearFocused(id); await typeText(id, account); await sleep(800)
+
+  // Champ mot de passe : par desc, sinon 2e zone de saisie.
+  nodes = await dumpUi(id)
+  const passField = nodes.find(n => /EditText/.test(n.cls) && /password|mot de passe/i.test(n.desc))
+    || nodes.filter(n => /EditText/.test(n.cls)).sort((a, b) => a.y - b.y)[1]
+  if (!passField) throw new Error('champ mot de passe introuvable')
+  await cloudPhones.shell(id, `input tap ${passField.cx} ${passField.cy}`); await sleep(500)
+  await clearFocused(id); await typeText(id, password); await sleep(800)
+
+  if (!await tapFirst(id, [{ text: 'Log in' }, { text: 'Se connecter' }, { desc: 'Log in' }], 'Connexion', log, false)) await keys.enter(id)
+  await sleep(jitter(7000, 3000)); await dismissPopups(id)
+  await tapFirst(id, [{ text: 'Not now' }, { text: 'Not Now' }, { text: 'Pas maintenant' }, { text: 'Save' }], 'Popup infos de connexion', log, false)
+  log('✅ Connexion tentée — vérifie l’état du compte')
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -334,4 +368,5 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   warmup_reels: warmupReels,
   set_privacy: setPrivacy,
   bulk_follow: bulkFollow,
+  login: login,
 }
