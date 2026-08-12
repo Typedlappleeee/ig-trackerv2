@@ -287,6 +287,41 @@ export async function setPrivacy(id: string, params: Record<string, unknown>, lo
   log(`✅ Compte passé en ${wantPublic ? 'public' : 'privé'}`)
 }
 
+// ── Abonnement en masse (bulk follow) ───────────────────────────────────────
+// Traduction « cœur » du template GeeLark « Instagram bulk follow ». Pour chaque
+// pseudo : ouvre le profil, et clique « Follow » UNIQUEMENT s'il n'est pas déjà
+// suivi (on ne clique jamais « Following » → pas de désabonnement accidentel).
+export async function bulkFollow(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const raw = String(params.usernames ?? '').trim()
+  const users = raw ? raw.split(/[\n,]+/).map(s => s.trim().replace(/^@/, '')).filter(Boolean) : []
+  if (!users.length) { log('  · aucun compte fourni'); return }
+  await dismissPopups(id)
+  if (find(await dumpUi(id), { desc: 'Log in' }) || find(await dumpUi(id), { desc: 'Login' })) throw new Error('compte non connecté')
+
+  let followed = 0
+  for (const u of users) {
+    await openProfile(id, u)
+    await sleep(jitter(3000, 1500)); await dismissPopups(id)
+    const nodes = await dumpUi(id)
+    // Cible : un bouton cliquable dont le libellé est exactement « Follow »/« Suivre ».
+    let target = nodes.find(n => n.clickable && /^(follow|suivre)$/i.test(n.text.trim())) || null
+    if (!target) {
+      const idBtn = nodes.find(n => n.id.endsWith('profile_header_follow_button'))
+      if (idBtn) {
+        const child = nodes.find(c => c !== idBtn && c.text.trim() && c.x >= idBtn.x && c.y >= idBtn.y && c.x + c.w <= idBtn.x + idBtn.w && c.y + c.h <= idBtn.y + idBtn.h)
+        const label = (idBtn.text || child?.text || '').trim().toLowerCase()
+        if (/^(follow|suivre)$/.test(label) || label === '') target = idBtn
+        else { log(`  · ${u} : ${label || 'déjà suivi'}`); await sleep(jitter(2500, 1500)); continue }
+      }
+    }
+    if (!target) { log(`  · ${u} : bouton « Follow » introuvable`); await sleep(jitter(2000, 1500)); continue }
+    await cloudPhones.shell(id, `input tap ${target.cx} ${target.cy}`)
+    followed++; log(`  ➕ ${u} suivi (${followed})`)
+    await sleep(jitter(4000, 2500))  // rythme humain entre chaque follow
+  }
+  log(`✅ ${followed}/${users.length} compte(s) suivi(s)`)
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -298,4 +333,5 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   edit_profile: editProfile,
   warmup_reels: warmupReels,
   set_privacy: setPrivacy,
+  bulk_follow: bulkFollow,
 }

@@ -25,6 +25,7 @@ const TPL_FLOW_MAP: Record<string, string> = {
   '500000000000000043': 'ig-edit-profile',  // Modifier le profil Instagram
   '500000000000000020': 'ig-warmup',        // Warmup de compte (IA)
   '500000000000000049': 'ig-set-privacy',   // Confidentialité public/privé
+  '500000000000000053': 'ig-bulk-follow',   // Abonnement en masse
 }
 
 interface Props { user: User }
@@ -325,7 +326,7 @@ export function AutomationLab({ user }: Props) {
                                       {on ? '🌐 Public' : '🔒 Privé'}
                                     </button>
                                   ) })()
-                                : inp.key === 'biography' || inp.key === 'keywords'
+                                : inp.type === 'textarea' || inp.key === 'biography' || inp.key === 'keywords'
                                 ? <textarea value={tplVars[inp.key] ?? ''} onChange={e => setTplVars(v => ({ ...v, [inp.key]: e.target.value }))} placeholder={inp.placeholder} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
                                 : <input value={tplVars[inp.key] ?? ''} onChange={e => setTplVars(v => ({ ...v, [inp.key]: e.target.value }))} placeholder={inp.placeholder} style={inputStyle} />}
                             </label>
