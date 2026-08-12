@@ -668,6 +668,42 @@ export async function commentLastPost(id: string, params: Record<string, unknown
   log(`✅ ${done}/${users.length} commentaire(s) posté(s)`)
 }
 
+// ── Passer un compte en professionnel (Créateur / Business) ─────────────────
+// Port « cœur » du template GeeLark « switch professional account ». Assistant
+// multi-écrans (fragile) → best-effort : ouvre l'édition du profil, lance « Switch
+// to professional account », enchaîne les « Next », choisit Créateur/Business et
+// confirme. Les libellés/écrans bougent selon la version → ciblage tolérant.
+export async function switchProfessional(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const wantCreator = String(params.accountType ?? 'creator').toLowerCase() !== 'business'
+  await dismissPopups(id)
+  await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://editprofile'`).catch(() => {})
+  await sleep(jitter(9000, 3000)); await dismissPopups(id)
+
+  // Faire défiler pour révéler l'option (souvent en bas de l'écran).
+  await cloudPhones.shell(id, 'input swipe 540 1500 540 400 300'); await sleep(1500)
+  if (!await tapFirst(id, [{ text: 'Switch to professional account' }, { contains: 'professional account' }, { contains: 'compte professionnel' }], 'Passer en compte pro', log))
+    throw new Error('option « compte professionnel » introuvable')
+  await sleep(jitter(3000, 1500)); await dismissPopups(id)
+
+  // Écrans d'intro : « Next » jusqu'à l'écran de choix de catégorie/type.
+  for (let i = 0; i < 5; i++) {
+    if (find(await dumpUi(id), { text: 'Creator' }) || find(await dumpUi(id), { text: 'Digital creator' }) || find(await dumpUi(id), { contains: 'category' })) break
+    if (!await tapFirst(id, [{ text: 'Next' }, { text: 'Continue' }, { desc: 'Next' }], `Next (${i + 1})`, log, false)) break
+    await sleep(2500); await dismissPopups(id)
+  }
+
+  // Choix du type (Créateur par défaut, sinon Business).
+  await tapFirst(id, [{ text: wantCreator ? 'Creator' : 'Business' }, { text: 'Digital creator' }], wantCreator ? 'Type Créateur' : 'Type Business', log, false)
+  await sleep(jitter(3000, 1500)); await dismissPopups(id)
+
+  // Avancer / confirmer à travers les écrans restants (catégorie, contact, etc.).
+  for (let i = 0; i < 8; i++) {
+    if (!await tapFirst(id, [{ text: 'Next' }, { text: 'Done' }, { text: 'Switch to professional account' }, { text: 'OK' }, { text: 'Skip' }, { text: 'Not now' }, { desc: 'Close' }, { text: 'Close' }], `Confirmer (${i + 1})`, log, false)) break
+    await sleep(2500); await dismissPopups(id)
+  }
+  log('✅ Passage en compte professionnel tenté — vérifie le profil')
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -684,6 +720,7 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   comment_last_post: commentLastPost,
   youtube_short: youtubeShort,
   read_insights: readInsights,
+  switch_professional: switchProfessional,
   login: login,
   login_2fa: login2fa,
   post_carousel: postCarousel,

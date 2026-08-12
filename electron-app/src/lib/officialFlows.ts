@@ -187,6 +187,23 @@ export const OFFICIAL_FLOWS: Flow[] = [
   },
 
   {
+    id: 'ig-switch-pro',
+    name: 'Passer en compte professionnel — Instagram',
+    official: true,
+    category: '👤 Profil',
+    app: 'com.instagram.android',
+    description: 'Bascule le compte en professionnel (Créateur par défaut, ou Business). Nécessaire pour accéder aux Insights. Assistant multi-écrans : best-effort, à vérifier après coup.',
+    inputs: [
+      { key: 'accountType', label: 'Type de compte', placeholder: 'creator (défaut) ou business', optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'switch_professional', params: { accountType: '{{accountType}}' } },
+    ],
+  },
+
+  {
     id: 'ig-post-reel',
     name: 'Poster un Reel — Instagram',
     official: true,
