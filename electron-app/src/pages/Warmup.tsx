@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, loginInstagramViaRpa, stopPhone,
+  fetchAllPhones, warmupAccount, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, loginInstagramViaRpa, warmupInstagramViaRpa, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -457,15 +457,20 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      const result = warmupPlatform === 'tiktok'
+      let result: { ok: boolean; error?: string; noFlow?: boolean }
+      if (warmupPlatform === 'tiktok') {
         // TikTok : warmup natif (recherche/parcours) + engagement (like/follow/commentaire IA)
-        ? await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment, rotationUrls }, msg => addLog(phone.id, msg))
-        // Instagram : boucle ADB pilotée par le TEMPS → la durée choisie est
-        // respectée à la minute. (L'ancien warmup natif prenait un NOMBRE de
-        // vidéos : « 30 min » était interprété comme 30 vidéos ≈ 10 min réelles,
-        // et ignorait les toggles like/reels/follow.) runWarmupActions gère aussi
-        // le mot-clé (recherche) et les actions like/reels/follow.
-        : await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
+        result = await warmupTikTokNative(bearer, phone.id, { keyword: warmupKeyword, durationMin: browseMinutes, like: ttLike, follow: ttFollow, comment: ttComment, rotationUrls }, msg => addLog(phone.id, msg))
+      } else {
+        // Instagram : RPA NATIF GeeLark (reels + like/commentaire/follow aléatoires,
+        // recherche par mot-clé). Le nombre saisi = NB DE VIDÉOS regardées.
+        result = await warmupInstagramViaRpa(bearer, phone.id, { videos: browseMinutes, keyword: warmupKeyword.trim() || undefined, rotationUrls }, msg => addLog(phone.id, msg))
+        // Repli automatique sur le warmup ADB (durée) si aucun flow natif.
+        if (result.noFlow) {
+          addLog(phone.id, tr('Pas de flow warmup GeeLark → warmup ADB de secours…', 'No GeeLark warmup flow → ADB warmup fallback…'))
+          result = await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
+        }
+      }
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)

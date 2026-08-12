@@ -1,6 +1,7 @@
 import { registerStartedPhonesAuto, unregisterPhones } from './phoneWatch'
 import storyFlowDef from './geelarkStoryFlow.json'
 import loginFlowDef from './geelarkLoginFlow.json'
+import warmupFlowDef from './geelarkWarmupFlow.json'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -2622,6 +2623,76 @@ export async function loginInstagramViaRpa(
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log('   Tâche RPA créée — connexion en cours…')
     return pollRpaTask(bearer, taskId, log, 10 * 60_000)
+  })
+}
+
+// ── Warmup via RPA NATIF GeeLark ─────────────────────────────────────────────
+// Flow « IG Warmup Scaleflow » auto-importé (comme le login). Regarde N reels
+// (recherche par mot-clé optionnelle) avec like/commentaire/follow aléatoires,
+// rythme humain. paramMap {NumberOfVideosViewed, SearchKeyword[]}.
+const WARMUP_FLOW_VERSION = '1'
+const _warmupFlowIdCache = new Map<string, Promise<string | null>>()
+function warmupFlowLsKey(bearer: string): string { return `sf-warmup-flowid:${bearer.slice(-14)}` }
+function warmupFlowVerKey(bearer: string): string { return `sf-warmup-flowver:${bearer.slice(-14)}` }
+export function forgetWarmupFlowId(bearer: string): void {
+  try { localStorage.removeItem(warmupFlowLsKey(bearer)); localStorage.removeItem(warmupFlowVerKey(bearer)) } catch { /* ignore */ }
+  _warmupFlowIdCache.delete(bearer)
+}
+async function ensureWarmupFlowId(bearer: string, log?: (m: string) => void): Promise<string | null> {
+  const cached = _warmupFlowIdCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, storedVer: string | null = null
+    try { stored = localStorage.getItem(warmupFlowLsKey(bearer)); storedVer = localStorage.getItem(warmupFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && storedVer === WARMUP_FLOW_VERSION) return stored
+    log?.(stored ? '🔄 Mise à jour du flow « IG Warmup »…' : '📥 Import du flow de warmup dans GeeLark…')
+    try {
+      const res = await geelarkFetch('POST', '/task/flow/import', { gal: JSON.stringify(warmupFlowDef) }, bearer)
+      if (res['code'] !== 0) { log?.(`⚠ Import du flow warmup : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(warmupFlowLsKey(bearer), id); localStorage.setItem(warmupFlowVerKey(bearer), WARMUP_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log?.(`⚠ Import du flow warmup : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _warmupFlowIdCache.set(bearer, p)
+  p.then(v => { if (!v) _warmupFlowIdCache.delete(bearer) }).catch(() => _warmupFlowIdCache.delete(bearer))
+  return p
+}
+
+export async function warmupInstagramViaRpa(
+  bearer: string,
+  phoneId: string,
+  config: { videos: number; keyword?: string; rotationUrls?: string[] },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string; noFlow?: boolean }> {
+  const flowId = await ensureWarmupFlowId(bearer, log)
+  if (!flowId) return { ok: false, noFlow: true, error: 'Flow warmup RPA indisponible (import GeeLark échoué)' }
+
+  const kw = config.keyword?.trim()
+  const paramMap: Record<string, unknown> = {
+    NumberOfVideosViewed: Math.max(1, Math.round(config.videos)),
+    SearchKeyword: kw ? [kw] : [],
+  }
+  return withPhoneAutoStop(bearer, phoneId, 40 * 60_000, '40min', log, async () => {
+    const ready = await rotateThenEnsureRunning(bearer, phoneId, config.rotationUrls, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log(`🔥 Warmup via RPA GeeLark natif (${paramMap.NumberOfVideosViewed} vidéos${kw ? `, mot-clé « ${kw} »` : ''})…`)
+    const addTask = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
+      id: phoneId, flowId: fid, scheduleAt: Math.floor(Date.now() / 1000) + 3,
+      name: 'Warmup Scaleflow', paramMap,
+    }, bearer)
+    let res = await addTask(flowId)
+    if (res['code'] !== 0 && Number(res['code']) === 48002) {
+      log('   ↻ Flow introuvable — ré-import…')
+      forgetWarmupFlowId(bearer)
+      const fresh = await ensureWarmupFlowId(bearer, log)
+      if (fresh) res = await addTask(fresh)
+    }
+    if (res['code'] !== 0) return { ok: false, error: `GeeLark warmup RPA : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log('   Tâche RPA créée — warmup en cours…')
+    return pollRpaTask(bearer, taskId, log, 35 * 60_000)
   })
 }
 
