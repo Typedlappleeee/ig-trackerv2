@@ -5,6 +5,24 @@ import type { Flow } from './flowRunner'
 
 export const OFFICIAL_FLOWS: Flow[] = [
   {
+    id: 'ig-warmup',
+    name: 'Warmup de compte — Instagram',
+    official: true,
+    category: '🔥 Warmup & engagement',
+    app: 'com.instagram.android',
+    description: 'Regarde des Reels avec un engagement humain aléatoire (like / follow) pour chauffer le compte. Mots-clés optionnels pour cibler des thématiques.',
+    inputs: [
+      { key: 'count',    label: 'Nombre de vidéos à regarder', placeholder: 'ex : 15',                          optional: false },
+      { key: 'keywords', label: 'Mots-clés (optionnel)',       placeholder: 'un par ligne (ex : fitness, mode)', optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'warmup_reels', params: { count: '{{count}}', keywords: '{{keywords}}' } },
+    ],
+  },
+
+  {
     id: 'ig-edit-profile',
     name: 'Modifier le profil — Instagram',
     official: true,

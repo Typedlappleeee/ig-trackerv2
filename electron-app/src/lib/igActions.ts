@@ -195,6 +195,60 @@ export async function editProfile(id: string, params: Record<string, unknown>, l
   log('✅ Profil mis à jour')
 }
 
+// ── Warmup Instagram (regarde des Reels + like/follow aléatoires) ────────────
+// Traduction « cœur » du template GeeLark « Instagram AI account warmup ».
+// count = nb de reels regardés ; keywords (optionnel) = recherche par mot-clé
+// (réparti sur les mots-clés), sinon fil Reels direct. Engagement humain aléa.
+export async function warmupReels(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const count = Math.max(1, Number(params.count) || 10)
+  const kwRaw = String(params.keywords ?? '').trim()
+  const keywords = kwRaw ? kwRaw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean) : []
+
+  await dismissPopups(id)
+  if (find(await dumpUi(id), { desc: 'Log in' }) || find(await dumpUi(id), { text: 'Log in' })) throw new Error('compte non connecté')
+
+  // Regarde 1 reel : pause « humaine », engagement aléatoire, puis reel suivant.
+  const watchOne = async (i: number, total: number) => {
+    await sleep(jitter(4000, 4500))
+    const r = Math.random()
+    if (r < 0.30) {                                   // ~30 % : like (double-tap centre)
+      await cloudPhones.shell(id, 'input tap 540 950'); await sleep(140); await cloudPhones.shell(id, 'input tap 540 950'); log('  ❤️ like')
+    } else if (r < 0.40) {                            // ~10 % : follow
+      if (await tap(id, { text: 'Follow' }, { timeoutMs: 2000 })) log('  ➕ follow')
+    }
+    await cloudPhones.shell(id, 'input swipe 540 1500 540 500 300')  // reel suivant
+    log(`  🎬 reel ${i + 1}/${total}`)
+  }
+
+  if (keywords.length) {
+    const per = Math.max(1, Math.floor(count / keywords.length))
+    let done = 0
+    for (const kw of keywords) {
+      if (done >= count) break
+      log(`🔎 recherche « ${kw} »`)
+      await dismissPopups(id)
+      if (!(await tap(id, { id: 'search_tab' }, { timeoutMs: 4000 }) || await tap(id, { desc: 'Search and explore' }, { timeoutMs: 3000 }))) { log('  · onglet recherche introuvable'); continue }
+      await sleep(1500)
+      await tap(id, { id: 'action_bar_search_edit_text' }, { timeoutMs: 3000 })
+      await sleep(600); await typeText(id, kw); await sleep(1000)
+      await keys.enter(id); await sleep(2500); await dismissPopups(id)
+      await tap(id, { text: 'Reels' }, { timeoutMs: 3000 }); await sleep(2000)
+      if (!await tap(id, { id: 'layout_container' }, { timeoutMs: 3000 })) await cloudPhones.shell(id, 'input tap 260 800')
+      await sleep(3000); await dismissPopups(id)
+      const n = Math.min(per, count - done)
+      for (let i = 0; i < n; i++) { await watchOne(done, count); done++ }
+      await keys.back(id); await sleep(1000); await keys.back(id); await sleep(1500)
+    }
+    log(`✅ Warmup terminé (${done} reels)`)
+  } else {
+    const opened = await tap(id, { desc: 'Reels' }, { timeoutMs: 5000 }) || await tap(id, { id: 'clips_tab' }, { timeoutMs: 3000 })
+    if (!opened) await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://reels_home'`)
+    await sleep(3500); await dismissPopups(id)
+    for (let i = 0; i < count; i++) await watchOne(i, count)
+    log(`✅ Warmup terminé (${count} reels)`)
+  }
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -204,4 +258,5 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   follow_followers: followFollowers,
   scrape_followers: scrapeFollowers,
   edit_profile: editProfile,
+  warmup_reels: warmupReels,
 }
