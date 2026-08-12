@@ -49,68 +49,6 @@ const APP_PRESETS: Array<{ label: string; pkg: string; emoji: string; fdroid?: b
   { label: 'NewPipe',   pkg: 'org.schabi.newpipe',         emoji: '🟢', fdroid: true },
 ]
 
-// ── Catalogue de templates RPA (façon store GeeLark) ─────────────────────────
-type TplPlatform = 'instagram' | 'tiktok' | 'youtube'
-interface RpaTemplate { title: string; desc: string; author: string; id: string; platforms: TplPlatform[] }
-
-const TPL_RECOMMENDED_ID = '500000000000000016'
-const RPA_TEMPLATES: RpaTemplate[] = [
-  { title: 'Post Reels video on Instagram', desc: 'Publish short Reels videos with one click on Instagram to improve operational efficiency', author: 'Ted', id: '500000000000000016', platforms: ['instagram'] },
-  { title: 'Post Carousel photo on Instagram', desc: 'Post Instagram photo carousels with just a few clicks and streamline your workflow.', author: 'Carlos', id: '6231190517779904823', platforms: ['instagram'] },
-  { title: 'Send comment on Latest Instagram Post', desc: 'Search for usernames and send comment on Latest Instagram Post', author: 'sird****@gmail.com', id: '567852161145246224', platforms: ['instagram'] },
-  { title: 'Switch to Professional Instagram Account (Content Creator)', desc: 'Automatically converts your personal account to a professional account in content creator mode.', author: 'Carlos', id: '622396849117986917', platforms: ['instagram'] },
-  { title: 'Edit Instagram profile', desc: 'Bulk edit profile details: avatars, usernames, handles, bios, and URLs.', author: 'Ted', id: '500000000000000043', platforms: ['instagram'] },
-  { title: 'Instagram AI account warmup', desc: 'Simulate how real users browse and like to increase engagement and get more followers.', author: 'Ted', id: '500000000000000020', platforms: ['instagram'] },
-  { title: 'Instagram account privacy settings', desc: 'Switch Instagram accounts between public and private for easier privacy management', author: 'Mandarin', id: '500000000000000049', platforms: ['instagram'] },
-  { title: 'Instagram auto login', desc: 'Quickly log in to your Instagram account for more efficient account management and content posting', author: 'Mandarin', id: '500000000000000034', platforms: ['instagram'] },
-  { title: 'Instagram bulk follow', desc: 'Search for usernames to follow multiple accounts in bulk.', author: 'Mandarin', id: '500000000000000053', platforms: ['instagram'] },
-  { title: 'Instagram publish Reels gallery', desc: 'One-click publish Reels gallery via Instagram to improve operational efficiency', author: 'Ted', id: '500000000000000031', platforms: ['instagram'] },
-  { title: 'Send private messages on Instagram', desc: 'Search for usernames and send private messages in bulk.', author: 'Ted', id: '500000000000000022', platforms: ['instagram'] },
-  { title: 'Post videos on TikTok/Instagram Reels/YouTube Shorts', desc: 'Post videos on TikTok, Instagram Reels and YouTube Shorts at the same time for maximum engagement.', author: 'Ted', id: '500000000000000017', platforms: ['tiktok', 'instagram', 'youtube'] },
-  { title: 'Instagram AutoLogin 2FA', desc: 'Simula o processo de login de um usuário real, realizando a autenticação automaticamente e validando o acesso por meio de 2FA', author: 'Carlos tec', id: '603260376578003125', platforms: ['instagram'] },
-  { title: 'Instagram Engagement', desc: 'Automatic collection of the last 7 days: views, interactions, and followers. Use the API to collect data via logs. Requires a professional Instagram account.', author: 'Carlos', id: '617907879776622023', platforms: ['instagram'] },
-  { title: 'Instagram Login 2FA 2.0', desc: 'Simulate the login process of a real user, performing authentication automatically and validating access through 2FA.', author: 'Carlos', id: '6271538163152323368', platforms: ['instagram'] },
-]
-
-function InstagramLogo({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <defs>
-        <radialGradient id="ig-grad" cx="0.3" cy="1" r="1.1">
-          <stop offset="0" stopColor="#FED576" /><stop offset="0.25" stopColor="#F47133" />
-          <stop offset="0.5" stopColor="#BC3081" /><stop offset="0.8" stopColor="#4C63D2" />
-        </radialGradient>
-      </defs>
-      <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="url(#ig-grad)" />
-      <rect x="6.2" y="6.2" width="11.6" height="11.6" rx="3.6" fill="none" stroke="#fff" strokeWidth="1.5" />
-      <circle cx="12" cy="12" r="3" fill="none" stroke="#fff" strokeWidth="1.5" />
-      <circle cx="16.4" cy="7.6" r="1.05" fill="#fff" />
-    </svg>
-  )
-}
-function TikTokLogo({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="#010101" />
-      <path d="M15.9 6.2c.35 1.55 1.28 2.63 2.85 2.86v2.02c-1.05.06-1.98-.24-2.9-.83v3.86c0 3.06-2.6 5.05-5.32 4.07-2-.72-2.7-3.2-1.5-4.94.72-1.05 2-1.52 3.4-1.32v2.1c-.28-.05-.55-.08-.82-.03-.9.16-1.36 1.05-1 1.86.36.82 1.5 1.02 2.16.37.3-.3.42-.66.42-1.08V6.2h2.71z" fill="#fff" />
-      <path d="M15.9 6.2c.35 1.55 1.28 2.63 2.85 2.86v2.02c-1.05.06-1.98-.24-2.9-.83" fill="none" stroke="#25F4EE" strokeWidth="0.6" opacity="0.7" />
-    </svg>
-  )
-}
-function YouTubeLogo({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="1.5" y="4.5" width="21" height="15" rx="4.5" fill="#FF0000" />
-      <path d="M10 8.6l5.2 3.4L10 15.4z" fill="#fff" />
-    </svg>
-  )
-}
-function PlatformLogo({ platform, size }: { platform: TplPlatform; size?: number }) {
-  if (platform === 'tiktok') return <TikTokLogo size={size} />
-  if (platform === 'youtube') return <YouTubeLogo size={size} />
-  return <InstagramLogo size={size} />
-}
-
 export function CloudPhones({ user }: Props) {
   const tr = useTr()
   const license = useLicense()
@@ -129,8 +67,6 @@ export function CloudPhones({ user }: Props) {
   const [meta, setMeta] = useState<Record<string, CpMeta>>(() => loadAllCpMeta())
   const [showGroups, setShowGroups] = useState(false)
   const [showApps, setShowApps] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(false)
-  const [tplFilter, setTplFilter] = useState<'all' | TplPlatform>('all')
   const [cpGroups, setCpGroups] = useState<string[]>(() => loadCpGroups())
 
   // Change le groupe d'UN téléphone directement depuis la liste.
@@ -551,10 +487,6 @@ export function CloudPhones({ user }: Props) {
               </button>
               <button onClick={() => setShowApps(true)} className="sf-btn sf-btn-secondary" style={{ height: 34, display: 'flex', alignItems: 'center', gap: 6 }} title={tr('Apps à auto-installer', 'Auto-install apps')}>
                 📦 {tr('Apps', 'Apps')}{cAutoApps.length > 0 && <span style={{ opacity: 0.6 }}>· {cAutoApps.length}</span>}
-              </button>
-              <button onClick={() => setShowTemplates(true)} className="sf-btn sf-btn-secondary" style={{ height: 34, display: 'flex', alignItems: 'center', gap: 6 }} title={tr('Catalogue de templates RPA', 'RPA template catalog')}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                {tr('Templates', 'Templates')}<span style={{ opacity: 0.6 }}>· {RPA_TEMPLATES.length}</span>
               </button>
               {allGroups.length > 0 && (
                 <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="sf-input" style={{ height: 34, width: 'auto', minWidth: 130, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: groupFilter === 'all' ? 'var(--text-3)' : 'var(--accent)' }}>
@@ -1031,84 +963,6 @@ export function CloudPhones({ user }: Props) {
         </div>
       )}
 
-      {showTemplates && (() => {
-        const filtered = RPA_TEMPLATES.filter(t => tplFilter === 'all' || t.platforms.includes(tplFilter))
-        const reco = RPA_TEMPLATES.find(t => t.id === TPL_RECOMMENDED_ID)
-        const showReco = reco && (tplFilter === 'all' || reco.platforms.includes(tplFilter))
-        const FILTERS: Array<{ key: 'all' | TplPlatform; label: string }> = [
-          { key: 'all', label: tr('Tous', 'All') },
-          { key: 'instagram', label: 'Instagram' },
-          { key: 'tiktok', label: 'TikTok' },
-          { key: 'youtube', label: 'YouTube' },
-        ]
-        const Card = ({ t }: { t: RpaTemplate }) => (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <span style={{ flexShrink: 0, display: 'flex', gap: 3 }}>
-                {t.platforms.slice(0, 3).map(p => <PlatformLogo key={p} platform={p} size={26} />)}
-              </span>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.3, margin: 0 }}>{t.title}</p>
-            </div>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', lineHeight: 1.5, margin: 0, flex: 1 }}>{t.desc}</p>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: 10, color: 'var(--text-4)', margin: 0 }}>{tr('Par', 'By')} {t.author}</p>
-                <p style={{ fontSize: 10, color: 'var(--text-4)', margin: 0, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Template id: {t.id}</p>
-              </div>
-              <button className="sf-btn sf-btn-ghost" style={{ height: 26, fontSize: 11, flexShrink: 0, color: 'var(--text-4)' }} title={tr('Bientôt : créer une tâche depuis ce template', 'Soon: create a task from this template')}>⋯</button>
-            </div>
-          </div>
-        )
-        return (
-          <div onClick={() => setShowTemplates(false)} style={cpOverlay}>
-            <div onClick={e => e.stopPropagation()} className="sf-card sf-anim-scale-spring" style={{ width: 'min(1080px,96vw)', maxHeight: '90vh', overflowY: 'auto', padding: 22 }}>
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-                <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{tr('Templates d\'automatisation', 'Automation templates')}</h3>
-                <span style={{ flex: 1 }} />
-                <button onClick={() => setShowTemplates(false)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', fontSize: 18 }}>×</button>
-              </div>
-              <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.6 }}>{tr('Flux RPA à exécuter sur tes cloud phones. Filtre par plateforme.', 'RPA flows to run on your cloud phones. Filter by platform.')}</p>
-
-              {/* Filtres plateforme avec logos */}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-                {FILTERS.map(f => {
-                  const active = tplFilter === f.key
-                  return (
-                    <button key={f.key} onClick={() => setTplFilter(f.key)}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
-                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: active ? 'rgba(129,140,248,0.14)' : 'rgba(255,255,255,0.03)', color: active ? 'var(--accent-l)' : 'var(--text-2)' }}>
-                      {f.key !== 'all' && <PlatformLogo platform={f.key} size={16} />}{f.label}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Recommandé */}
-              {showReco && reco && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>★ {tr('Recommandé', 'Recommended')}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, marginBottom: 20, background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.35)' }}>
-                    <span style={{ flexShrink: 0 }}><InstagramLogo size={40} /></span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)', margin: 0 }}>{reco.title}</p>
-                      <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '3px 0 0', lineHeight: 1.5 }}>{reco.desc}</p>
-                      <p style={{ fontSize: 10, color: 'var(--text-4)', margin: '5px 0 0', fontFamily: 'monospace' }}>{tr('Par', 'By')} {reco.author} · Template id: {reco.id}</p>
-                    </div>
-                    <button className="sf-btn sf-btn-primary" style={{ height: 34, flexShrink: 0 }} title={tr('Bientôt', 'Soon')}>{tr('Utiliser', 'Use')}</button>
-                  </div>
-                </>
-              )}
-
-              {/* Tous les templates */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>▤ {tr('Tous les templates', 'All templates')} <span style={{ opacity: 0.6 }}>· {filtered.length}</span></div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-                {filtered.map(t => <Card key={t.id} t={t} />)}
-              </div>
-              {filtered.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '24px 0', textAlign: 'center' }}>{tr('Aucun template pour cette plateforme.', 'No template for this platform.')}</div>}
-            </div>
-          </div>
-        )
-      })()}
 
       {/* Suggestions de groupes (partagées par le modal d'édition + la barre groupée) */}
       <datalist id="sf-cp-groups">
