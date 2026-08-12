@@ -52,14 +52,22 @@ export function focusCpWindow(id: string): void {
   set({ zOrder: [...state.zOrder.filter(x => x !== id), id] })
 }
 
-// Ferme la fenêtre = éteint le tel (il se rallume à la prochaine ouverture).
-// Renvoie la promesse du stop pour que l'appelant puisse rafraîchir sa liste.
-export function closeCpWindow(id: string): Promise<void> {
+// Ferme la fenêtre = cache SEULEMENT la vue. Le tel CONTINUE de tourner
+// (choix utilisateur : téléphones allumés 24h/24, plus aucune déconnexion à la
+// fermeture). Pour vraiment éteindre un tel : action « Arrêter » (stopCpPhone)
+// ou le bouton Suppr dans la liste CloudPhones.
+export function closeCpWindow(id: string): void {
   set({
     openIds: state.openIds.filter(x => x !== id),
     zOrder: state.zOrder.filter(x => x !== id),
     entries: Object.fromEntries(Object.entries(state.entries).filter(([k]) => k !== id)),
   })
+}
+
+// Éteint EXPLICITEMENT le tel (arrête le container) et ferme sa fenêtre.
+// À n'appeler que sur action volontaire de l'utilisateur.
+export function stopCpPhone(id: string): Promise<void> {
+  closeCpWindow(id)
   return cloudPhones.stop(id).then(() => undefined).catch(() => undefined)
 }
 
