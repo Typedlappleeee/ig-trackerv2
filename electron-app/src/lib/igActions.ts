@@ -8,6 +8,7 @@
 // blocked ». Les resource-ids IG peuvent bouger selon la version → fallbacks.
 import { cloudPhones } from './cloudPhones'
 import { dumpUi, tap, dismissPopups, find, typeText, keys, type Matcher } from './phoneAutomation'
+import { generateTOTP } from './totp'
 
 type Logger = (m: string) => void
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -363,7 +364,19 @@ export async function login(id: string, params: Record<string, unknown>, log: Lo
 export async function postCarousel(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
   const caption = String(params.caption ?? '')
   const count = Math.max(1, Number(params.count) || 1)
+  const musicId = String(params.musicId ?? '').trim()
   await dismissPopups(id)
+
+  // Son tendance optionnel : on l'enregistre d'abord (Saved audio) via le deep
+  // link, pour pouvoir l'attacher pendant l'édition du post.
+  if (musicId) {
+    await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'https://www.instagram.com/reels/audio/${musicId}/'`).catch(() => {})
+    await sleep(jitter(5000, 2000)); await dismissPopups(id)
+    await tapFirst(id, [{ desc: 'Save audio' }, { text: 'Save audio' }], 'Enregistrer le son', log, false)
+    await sleep(1500)
+    await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://share'`).catch(() => {})
+    await sleep(jitter(4000, 2000)); await dismissPopups(id)
+  }
 
   if (!await tapFirst(id, [{ id: 'creation_tab' }, { desc: 'Create' }, { desc: 'Créer' }, { desc: 'New post' }], 'Créer', log)) throw new Error('bouton Créer introuvable')
   await sleep(2500); await dismissPopups(id)
@@ -385,6 +398,17 @@ export async function postCarousel(id: string, params: Record<string, unknown>, 
   await sleep(1000)
   if (!await tapFirst(id, [{ desc: 'Next' }, { text: 'Next' }, { text: 'Suivant' }], 'Suivant', log)) throw new Error('bouton Suivant introuvable')
   await sleep(2500); await dismissPopups(id)
+  // Attacher le son enregistré (best-effort) : Audio → Saved → 1er son.
+  if (musicId) {
+    if (await tapFirst(id, [{ desc: 'Audio' }, { text: 'Audio' }, { contains: 'Add audio' }], 'Ouvrir Audio', log, false)) {
+      await sleep(2500); await dismissPopups(id)
+      await tapFirst(id, [{ text: 'Saved' }, { desc: 'Saved' }], 'Onglet Saved', log, false); await sleep(1500)
+      const track = (await dumpUi(id)).find(n => n.clickable && n.id.endsWith('album_art'))
+      if (track) { await cloudPhones.shell(id, `input tap ${track.cx} ${track.cy}`); await sleep(2500) }
+      await tapFirst(id, [{ text: 'Done' }, { desc: 'Done' }, { text: 'OK' }], 'Valider le son', log, false); await sleep(1500)
+      await dismissPopups(id)
+    } else { log('  · écran Audio non trouvé (son ignoré)') }
+  }
   await tapFirst(id, [{ desc: 'Next' }, { text: 'Next' }, { text: 'Suivant' }], 'Suivant (filtres)', log, false)
   await sleep(2500); await dismissPopups(id)
   // Légende.
@@ -396,6 +420,288 @@ export async function postCarousel(id: string, params: Record<string, unknown>, 
   await tapFirst(id, [{ desc: 'Share' }, { text: 'Share' }, { text: 'Partager' }, { desc: 'OK' }, { text: 'OK' }], 'Partager', log, false)
   await sleep(4000)
   log('✅ Carrousel publié — vérifie le profil')
+}
+
+// ── Envoyer un message privé (DM) à une liste de comptes ────────────────────
+// Traduction « cœur » du template GeeLark « Send private message ». Pour chaque
+// compte : ouvre le profil (deep link, plus robuste que la recherche), tape
+// « Message », saisit le texte dans le composer, envoie. Ignore proprement les
+// profils sans bouton « Message » (privés/bloqués).
+export async function sendDm(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const raw = String(params.usernames ?? '').trim()
+  const users = raw ? raw.split(/[\n,]+/).map(s => s.trim().replace(/^@/, '')).filter(Boolean) : []
+  const content = String(params.content ?? '').trim()
+  if (!users.length) { log('  · aucun compte fourni'); return }
+  if (!content) { log('  · aucun message fourni'); return }
+  await dismissPopups(id)
+  if (find(await dumpUi(id), { desc: 'Log in' }) || find(await dumpUi(id), { desc: 'Login' })) throw new Error('compte non connecté')
+
+  let sent = 0
+  for (const u of users) {
+    await openProfile(id, u)
+    await sleep(jitter(3500, 1500)); await dismissPopups(id)
+    // Bouton « Message » du profil.
+    if (!await tapFirst(id, [{ desc: 'Message' }, { text: 'Message' }, { text: 'Envoyer un message' }], `Message → ${u}`, log, false)) {
+      log(`  · ${u} : bouton « Message » introuvable (profil privé/bloqué ?)`); await sleep(jitter(2500, 1500)); continue
+    }
+    await sleep(jitter(3000, 1500)); await dismissPopups(id)
+    // Champ de saisie du fil de discussion.
+    const nodes = await dumpUi(id)
+    const box = nodes.find(n => n.id.endsWith('row_thread_composer_edittext')) || nodes.find(n => /EditText/.test(n.cls))
+    if (!box) { log(`  · ${u} : champ message introuvable`); await sleep(jitter(2000, 1500)); continue }
+    await cloudPhones.shell(id, `input tap ${box.cx} ${box.cy}`); await sleep(600)
+    await typeText(id, content); await sleep(700)
+    // Envoyer (bouton dédié par id, sinon libellé Send/Envoyer).
+    const sendNode = (await dumpUi(id)).find(n => n.id.endsWith('row_thread_composer_send_button_container') && n.clickable)
+    if (sendNode) await cloudPhones.shell(id, `input tap ${sendNode.cx} ${sendNode.cy}`)
+    else await tapFirst(id, [{ desc: 'Send' }, { text: 'Send' }, { text: 'Envoyer' }], 'Envoyer', log, false)
+    sent++; log(`  ✉️ ${u} : message envoyé (${sent})`)
+    await sleep(jitter(4500, 3000))  // rythme humain entre chaque DM
+  }
+  log(`✅ ${sent}/${users.length} message(s) envoyé(s)`)
+}
+
+// ── Connexion Instagram AVEC 2FA (app d'authentification) ───────────────────
+// Port « cœur » du template GeeLark « auto login 2FA ». Comme `login`, mais gère
+// l'étape « Go to your authentication app » : le code TOTP est calculé EN LOCAL
+// depuis le secret 2FA (base32) — pas de dépendance à un service tiers. Les
+// challenges e-mail / captcha / appel ne sont pas franchissables → échec clair.
+export async function login2fa(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const account = String(params.account ?? '').trim()
+  const password = String(params.password ?? '')
+  const totpKey = String(params.totpKey ?? params.key ?? '').replace(/\s/g, '').trim()
+  if (!account || !password) throw new Error('identifiant ou mot de passe manquant')
+
+  // Écran d'accueil (1er lancement / plusieurs comptes).
+  await sleep(jitter(5000, 3000)); await dismissPopups(id)
+  await tapFirst(id, [{ text: 'I already have an account' }, { text: 'Use another profile' }], 'Écran d’accueil', log, false)
+  await sleep(jitter(4000, 2000)); await dismissPopups(id)
+
+  // Identifiant (par desc, sinon 1re zone de saisie).
+  let nodes = await dumpUi(id)
+  const userField = nodes.find(n => /EditText/.test(n.cls) && /username|email|mobile|identifiant/i.test(`${n.desc} ${n.text}`))
+    || nodes.filter(n => /EditText/.test(n.cls)).sort((a, b) => a.y - b.y)[0]
+  if (!userField) throw new Error('champ identifiant introuvable')
+  await cloudPhones.shell(id, `input tap ${userField.cx} ${userField.cy}`); await sleep(500)
+  await clearFocused(id); await typeText(id, account); await sleep(800)
+
+  // Mot de passe (par desc, sinon 2e zone de saisie).
+  nodes = await dumpUi(id)
+  const passField = nodes.find(n => /EditText/.test(n.cls) && /password|mot de passe/i.test(`${n.desc} ${n.text}`))
+    || nodes.filter(n => /EditText/.test(n.cls)).sort((a, b) => a.y - b.y)[1]
+  if (!passField) throw new Error('champ mot de passe introuvable')
+  await cloudPhones.shell(id, `input tap ${passField.cx} ${passField.cy}`); await sleep(500)
+  await clearFocused(id); await typeText(id, password); await sleep(800)
+
+  if (!await tapFirst(id, [{ text: 'Log in' }, { text: 'Se connecter' }, { desc: 'Log in' }], 'Connexion', log, false)) await keys.enter(id)
+  await sleep(jitter(9000, 3000)); await dismissPopups(id)
+
+  // Challenge e-mail : non géré (pas d'accès à la boîte mail).
+  if (find(await dumpUi(id), { contains: 'Request new code' }) || find(await dumpUi(id), { contains: 'We sent a code' }))
+    throw new Error('vérification par e-mail requise (non gérée)')
+
+  // 2FA : si l'écran d'authentification apparaît, saisir le code TOTP.
+  const on2fa = () => find(nodes, { contains: 'authentication app' }) || find(nodes, { contains: 'security code' })
+    || find(nodes, { contains: 'Check your notifications' }) || find(nodes, { contains: 'Try another way' })
+  nodes = await dumpUi(id)
+  if (totpKey && (on2fa() || find(nodes, { contains: 'Code' }))) {
+    // Basculer vers « Authentication app » si Instagram propose une autre méthode.
+    if (find(nodes, { contains: 'Check your notifications' }) || find(nodes, { contains: 'Try another way' })) {
+      await tapFirst(id, [{ text: 'Try another way' }], 'Autre méthode', log, false); await sleep(2000)
+      await tapFirst(id, [{ text: 'Authentication app' }, { contains: 'authentication app' }], 'App d’authentification', log, false); await sleep(1500)
+      await tapFirst(id, [{ text: 'Continue' }], 'Continuer', log, false); await sleep(2500)
+    }
+    // Saisir le code (2 tentatives : un nouveau code toutes les 30 s).
+    let done = false
+    for (let attempt = 0; attempt < 2 && !done; attempt++) {
+      const cur = await dumpUi(id)
+      const codeField = cur.find(n => /EditText/.test(n.cls))
+      if (codeField) {
+        const code = await generateTOTP(totpKey)
+        await cloudPhones.shell(id, `input tap ${codeField.cx} ${codeField.cy}`); await sleep(400)
+        await clearFocused(id); await typeText(id, code); await sleep(600)
+        log(`  🔐 code 2FA saisi`)
+        await tapFirst(id, [{ text: 'Continue' }, { text: 'Confirm' }, { desc: 'Continue' }, { text: 'Log in' }], 'Valider 2FA', log, false)
+        await sleep(jitter(7000, 3000)); await dismissPopups(id)
+        // Si le champ code a disparu → réussi.
+        done = !(await dumpUi(id)).some(n => /EditText/.test(n.cls))
+      } else { await sleep(2500) }
+    }
+  }
+
+  // Enregistrer les infos de connexion (ou passer).
+  await tapFirst(id, [{ text: 'Save' }, { text: 'Save info' }, { text: 'Not now' }, { text: 'Not Now' }, { text: 'Pas maintenant' }], 'Popup enregistrer', log, false)
+  log('✅ Connexion 2FA tentée — vérifie l’état du compte')
+}
+
+// ── Publier une vidéo en YouTube Short ──────────────────────────────────────
+// Port « cœur » du template GeeLark « Post video (YouTube Short) ». La vidéo est
+// déjà dans la galerie du tel (poussée avant le flow). Version épurée : pas de
+// son-template, réglage de volume ni OCR (spécifiques GeeLark, fragiles).
+export async function youtubeShort(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const YT = 'com.google.android.youtube'
+  const title = String(params.title ?? '').trim()
+
+  // Permissions média (évite les popups d'accès galerie).
+  await cloudPhones.shell(id, `pm grant ${YT} android.permission.READ_MEDIA_VIDEO`).catch(() => {})
+  await cloudPhones.shell(id, `pm grant ${YT} android.permission.READ_EXTERNAL_STORAGE`).catch(() => {})
+  await dismissPopups(id)
+
+  // Ouvrir « Créer » puis « Short ».
+  await tapFirst(id, [{ desc: 'Create' }, { desc: 'Créer' }, { text: 'Create' }], 'Créer', log, false)
+  await sleep(1500)
+  if (!await tapFirst(id, [{ text: 'Short' }, { desc: 'Short' }, { contains: 'Short' }], 'Short', log)) throw new Error('bouton « Short » introuvable')
+  await sleep(2500); await dismissPopups(id)
+
+  // Popups permissions caméra/micro (best-effort, ordre variable).
+  for (const lbl of ['Allow access', 'ALLOW', 'While using the app', 'WHILE USING THE APP', 'OK', 'Start over', 'Start again']) {
+    await tapFirst(id, [{ text: lbl }], `popup ${lbl}`, log, false)
+  }
+
+  // Ajouter depuis la galerie.
+  await tapFirst(id, [{ text: 'Add from Gallery' }, { id: 'reel_camera_gallery_button' }], 'Galerie', log, false)
+  await sleep(1500); await dismissPopups(id)
+  await tapFirst(id, [{ id: 'allow_access_button' }, { text: 'ALLOW' }, { text: 'OK' }], 'Autoriser galerie', log, false)
+  await sleep(1200)
+
+  // 1re vidéo de la galerie.
+  const thumbs = (await dumpUi(id)).filter(n => n.clickable && /thumb_image_view|gallery/i.test(n.id)).sort((a, b) => (a.y - b.y) || (a.x - b.x))
+  if (thumbs[0]) { await cloudPhones.shell(id, `input tap ${thumbs[0].cx} ${thumbs[0].cy}`); await sleep(1500) }
+  else log('  · aucune vidéo trouvée dans la galerie')
+  await tapFirst(id, [{ text: 'OK' }, { id: 'multi_select_next_button' }], 'Confirmer sélection', log, false)
+  await sleep(1500)
+  await tapFirst(id, [{ id: 'shorts_trim_finish_trim_button' }, { text: 'Done' }, { text: 'Terminé' }], 'Trim terminé', log, false)
+  await sleep(1500)
+
+  // Avancer jusqu'à l'écran d'upload (bouton Next de la caméra Shorts).
+  for (let i = 0; i < 5; i++) {
+    if (find(await dumpUi(id), { text: 'Upload Short' }) || find(await dumpUi(id), { contains: 'Caption your Short' })) break
+    await tapFirst(id, [{ id: 'shorts_camera_next_button' }, { desc: 'Next' }, { text: 'Next' }, { text: 'Suivant' }], `Suivant (${i + 1})`, log, false)
+    await sleep(2500); await dismissPopups(id)
+  }
+
+  // Légende.
+  if (title) {
+    const nodes = await dumpUi(id)
+    const cap = nodes.find(n => /EditText/.test(n.cls) && /caption/i.test(`${n.text} ${n.desc}`)) || nodes.find(n => /EditText/.test(n.cls))
+    if (cap) { await cloudPhones.shell(id, `input tap ${cap.cx} ${cap.cy}`); await sleep(600); await typeText(id, title); await sleep(700); await keys.back(id); await sleep(600) }
+  }
+
+  // Publier.
+  if (!await tapFirst(id, [{ text: 'Upload Short' }, { id: 'shorts_post_bottom_button' }], 'Upload Short', log)) throw new Error('bouton « Upload Short » introuvable')
+  await sleep(4000)
+  log('✅ Short envoyé — la mise en ligne peut prendre 1-2 min')
+}
+
+// ── Lire les statistiques (Insights) d'un compte Instagram ──────────────────
+// Port « cœur » du template GeeLark « Instagram insights ». Ouvre le tableau de
+// bord Insights, ferme les popups, puis lit et journalise les chiffres clés
+// (vues, interactions, nouveaux abonnés). Lecture seule — aucune action risquée.
+// La mise en page Insights bouge selon la version → lecture par libellé + récap
+// brut de secours. Nécessite un compte pro/créateur.
+export async function readInsights(id: string, _params: Record<string, unknown>, log: Logger): Promise<void> {
+  await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://insights'`).catch(() => {})
+  await sleep(jitter(9000, 3000)); await dismissPopups(id)
+
+  // Popups fréquents du dashboard.
+  for (const lbl of ['View insights', 'Close', 'Not now', 'OK']) {
+    await tapFirst(id, [{ text: lbl }], `popup ${lbl}`, log, false)
+  }
+  await sleep(2000)
+
+  const nodes = await dumpUi(id)
+  const numeric = (t: string) => /^[\d.,]+[KMB]?$/.test(t.trim())
+  // Lit le nombre le plus proche (même colonne) d'un libellé connu.
+  const readMetric = (labels: RegExp): string | null => {
+    const label = nodes.find(n => labels.test(n.text.trim()))
+    if (!label) return null
+    const near = nodes
+      .filter(n => n !== label && numeric(n.text) && Math.abs(n.cx - label.cx) < 220)
+      .sort((a, b) => Math.abs(a.cy - label.cy) - Math.abs(b.cy - label.cy))[0]
+    return near?.text.trim() ?? null
+  }
+
+  const views = readMetric(/^Views$/i)
+  const interactions = readMetric(/^Interactions$/i)
+  const followers = readMetric(/followers?/i)
+  log(`📊 Insights — Vues : ${views ?? '?'} · Interactions : ${interactions ?? '?'} · Nouveaux abonnés : ${followers ?? '?'}`)
+
+  // Récap brut de secours si la mise en page a changé.
+  const allNums = nodes.filter(n => numeric(n.text)).map(n => n.text.trim())
+  if (allNums.length) log(`  (valeurs détectées : ${allNums.slice(0, 12).join(', ')})`)
+}
+
+// ── Commenter le dernier post d'une liste de comptes ────────────────────────
+// Port « cœur » du template GeeLark « send comment on last post ». Pour chaque
+// compte : ouvre le profil (deep link), ouvre le 1er post de la grille, poste le
+// commentaire. Même commentaire pour tous, rythme humain entre chaque envoi.
+export async function commentLastPost(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const raw = String(params.usernames ?? '').trim()
+  const users = raw ? raw.split(/[\n,]+/).map(s => s.trim().replace(/^@/, '')).filter(Boolean) : []
+  const content = String(params.content ?? '').trim()
+  if (!users.length) { log('  · aucun compte fourni'); return }
+  if (!content) { log('  · aucun commentaire fourni'); return }
+  await dismissPopups(id)
+  if (find(await dumpUi(id), { desc: 'Log in' }) || find(await dumpUi(id), { desc: 'Login' })) throw new Error('compte non connecté')
+
+  let done = 0
+  for (const u of users) {
+    await openProfile(id, u)
+    await sleep(jitter(3500, 1500)); await dismissPopups(id)
+    // 1er post de la grille du profil.
+    const post = (await dumpUi(id)).find(n => n.clickable && n.id.endsWith('image_button'))
+    if (!post) { log(`  · ${u} : aucun post trouvé (privé ?)`); await sleep(jitter(2000, 1500)); continue }
+    await cloudPhones.shell(id, `input tap ${post.cx} ${post.cy}`); await sleep(jitter(3000, 1500)); await dismissPopups(id)
+    // Ouvre le composer de commentaire.
+    if (!await tapFirst(id, [{ id: 'row_feed_button_comment' }, { desc: 'Comment' }, { desc: 'Commenter' }], `Commentaire → ${u}`, log, false)) {
+      log(`  · ${u} : bouton commentaire introuvable`); await sleep(jitter(2000, 1500)); continue
+    }
+    await sleep(1500)
+    const box = (await dumpUi(id)).find(n => /EditText/.test(n.cls))
+    if (!box) { log(`  · ${u} : champ commentaire introuvable`); await sleep(jitter(2000, 1500)); continue }
+    await cloudPhones.shell(id, `input tap ${box.cx} ${box.cy}`); await sleep(600)
+    await typeText(id, content); await sleep(700)
+    await tapFirst(id, [{ id: 'send_button' }, { desc: 'Send' }, { text: 'Post' }, { text: 'Publier' }], 'Envoyer', log, false)
+    done++; log(`  💬 ${u} : commentaire posté (${done})`)
+    await sleep(jitter(4500, 3000))  // rythme humain entre chaque commentaire
+  }
+  log(`✅ ${done}/${users.length} commentaire(s) posté(s)`)
+}
+
+// ── Passer un compte en professionnel (Créateur / Business) ─────────────────
+// Port « cœur » du template GeeLark « switch professional account ». Assistant
+// multi-écrans (fragile) → best-effort : ouvre l'édition du profil, lance « Switch
+// to professional account », enchaîne les « Next », choisit Créateur/Business et
+// confirme. Les libellés/écrans bougent selon la version → ciblage tolérant.
+export async function switchProfessional(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const wantCreator = String(params.accountType ?? 'creator').toLowerCase() !== 'business'
+  await dismissPopups(id)
+  await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://editprofile'`).catch(() => {})
+  await sleep(jitter(9000, 3000)); await dismissPopups(id)
+
+  // Faire défiler pour révéler l'option (souvent en bas de l'écran).
+  await cloudPhones.shell(id, 'input swipe 540 1500 540 400 300'); await sleep(1500)
+  if (!await tapFirst(id, [{ text: 'Switch to professional account' }, { contains: 'professional account' }, { contains: 'compte professionnel' }], 'Passer en compte pro', log))
+    throw new Error('option « compte professionnel » introuvable')
+  await sleep(jitter(3000, 1500)); await dismissPopups(id)
+
+  // Écrans d'intro : « Next » jusqu'à l'écran de choix de catégorie/type.
+  for (let i = 0; i < 5; i++) {
+    if (find(await dumpUi(id), { text: 'Creator' }) || find(await dumpUi(id), { text: 'Digital creator' }) || find(await dumpUi(id), { contains: 'category' })) break
+    if (!await tapFirst(id, [{ text: 'Next' }, { text: 'Continue' }, { desc: 'Next' }], `Next (${i + 1})`, log, false)) break
+    await sleep(2500); await dismissPopups(id)
+  }
+
+  // Choix du type (Créateur par défaut, sinon Business).
+  await tapFirst(id, [{ text: wantCreator ? 'Creator' : 'Business' }, { text: 'Digital creator' }], wantCreator ? 'Type Créateur' : 'Type Business', log, false)
+  await sleep(jitter(3000, 1500)); await dismissPopups(id)
+
+  // Avancer / confirmer à travers les écrans restants (catégorie, contact, etc.).
+  for (let i = 0; i < 8; i++) {
+    if (!await tapFirst(id, [{ text: 'Next' }, { text: 'Done' }, { text: 'Switch to professional account' }, { text: 'OK' }, { text: 'Skip' }, { text: 'Not now' }, { desc: 'Close' }, { text: 'Close' }], `Confirmer (${i + 1})`, log, false)) break
+    await sleep(2500); await dismissPopups(id)
+  }
+  log('✅ Passage en compte professionnel tenté — vérifie le profil')
 }
 
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
@@ -410,6 +716,12 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   warmup_reels: warmupReels,
   set_privacy: setPrivacy,
   bulk_follow: bulkFollow,
+  send_dm: sendDm,
+  comment_last_post: commentLastPost,
+  youtube_short: youtubeShort,
+  read_insights: readInsights,
+  switch_professional: switchProfessional,
   login: login,
+  login_2fa: login2fa,
   post_carousel: postCarousel,
 }

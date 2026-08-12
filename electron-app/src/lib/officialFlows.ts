@@ -10,14 +10,16 @@ export const OFFICIAL_FLOWS: Flow[] = [
     official: true,
     category: '📤 Publication',
     app: 'com.instagram.android',
-    description: 'Publie plusieurs photos en galerie/carrousel, avec légende. (Version cœur : sans tags IA ni audio.)',
+    description: 'Publie une ou plusieurs photos (galerie/carrousel) avec légende, et un son tendance optionnel (ID audio Reels). Les photos doivent déjà être sur le téléphone.',
     inputs: [
-      { key: 'caption', label: 'Légende', placeholder: 'Légende (emoji ok)', optional: true },
+      { key: 'caption', label: 'Légende',            placeholder: 'Légende (emoji ok)',           optional: true },
+      { key: 'count',   label: 'Nombre de photos',   placeholder: 'ex : 3 (défaut 1)',            optional: true },
+      { key: 'musicId', label: 'Son tendance (ID)',  placeholder: 'ID audio Reels (optionnel)',   optional: true },
     ],
     steps: [
       { do: 'open', pkg: 'com.instagram.android' },
       { do: 'wait', ms: 3000 }, { do: 'popups' },
-      { do: 'action', name: 'post_carousel', params: { caption: '{{caption}}', count: '{{count}}' } },
+      { do: 'action', name: 'post_carousel', params: { caption: '{{caption}}', count: '{{count}}', musicId: '{{musicId}}' } },
     ],
   },
 
@@ -41,6 +43,26 @@ export const OFFICIAL_FLOWS: Flow[] = [
   },
 
   {
+    id: 'ig-login-2fa',
+    name: 'Connexion automatique + 2FA — Instagram',
+    official: true,
+    category: '👤 Profil',
+    app: 'com.instagram.android',
+    description: 'Connecte chaque téléphone à son compte AVEC 2FA (app d’authentification). Le code est généré en local depuis le secret 2FA (base32) — aucun service tiers. Les défis e-mail / captcha ne sont pas franchissables.',
+    perAccount: true,
+    inputs: [
+      { key: 'account',  label: 'Identifiant / e-mail', placeholder: 'pseudo ou email',              optional: false },
+      { key: 'password', label: 'Mot de passe',         placeholder: 'mot de passe',                 type: 'password', optional: false },
+      { key: 'totpKey',  label: 'Clé 2FA (base32)',     placeholder: 'ex : RJK3CWRDDVSOMGWSXHZ6…',   type: 'password', optional: false },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 4000 }, { do: 'popups' },
+      { do: 'action', name: 'login_2fa', params: { account: '{{account}}', password: '{{password}}', totpKey: '{{totpKey}}' } },
+    ],
+  },
+
+  {
     id: 'ig-bulk-follow',
     name: 'Abonnement en masse — Instagram',
     official: true,
@@ -54,6 +76,57 @@ export const OFFICIAL_FLOWS: Flow[] = [
       { do: 'open', pkg: 'com.instagram.android' },
       { do: 'wait', ms: 3000 }, { do: 'popups' },
       { do: 'action', name: 'bulk_follow', params: { usernames: '{{usernames}}' } },
+    ],
+  },
+
+  {
+    id: 'ig-send-dm',
+    name: 'Message privé en masse — Instagram',
+    official: true,
+    category: '📈 Croissance',
+    app: 'com.instagram.android',
+    description: 'Envoie le même message privé (DM) à une liste de comptes (un pseudo par ligne). Ignore les profils sans bouton « Message ».',
+    inputs: [
+      { key: 'usernames', label: 'Comptes à contacter', placeholder: 'un pseudo par ligne (sans @)', type: 'textarea', optional: false },
+      { key: 'content',   label: 'Message',             placeholder: 'Le message à envoyer',          type: 'textarea', optional: false },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'send_dm', params: { usernames: '{{usernames}}', content: '{{content}}' } },
+    ],
+  },
+
+  {
+    id: 'ig-comment-last',
+    name: 'Commenter le dernier post — Instagram',
+    official: true,
+    category: '🔥 Warmup & engagement',
+    app: 'com.instagram.android',
+    description: 'Commente le dernier post d’une liste de comptes (un pseudo par ligne). Même commentaire pour tous. Ignore les profils privés / sans post.',
+    inputs: [
+      { key: 'usernames', label: 'Comptes à commenter', placeholder: 'un pseudo par ligne (sans @)', type: 'textarea', optional: false },
+      { key: 'content',   label: 'Commentaire',         placeholder: 'Le commentaire à poster',       type: 'textarea', optional: false },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'comment_last_post', params: { usernames: '{{usernames}}', content: '{{content}}' } },
+    ],
+  },
+
+  {
+    id: 'ig-insights',
+    name: 'Lire les statistiques — Instagram',
+    official: true,
+    category: '📈 Croissance',
+    app: 'com.instagram.android',
+    description: 'Ouvre le tableau de bord Insights et lit les chiffres clés (vues, interactions, nouveaux abonnés) dans le journal. Lecture seule. Nécessite un compte pro/créateur.',
+    inputs: [],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 2000 }, { do: 'popups' },
+      { do: 'action', name: 'read_insights' },
     ],
   },
 
@@ -114,6 +187,23 @@ export const OFFICIAL_FLOWS: Flow[] = [
   },
 
   {
+    id: 'ig-switch-pro',
+    name: 'Passer en compte professionnel — Instagram',
+    official: true,
+    category: '👤 Profil',
+    app: 'com.instagram.android',
+    description: 'Bascule le compte en professionnel (Créateur par défaut, ou Business). Nécessaire pour accéder aux Insights. Assistant multi-écrans : best-effort, à vérifier après coup.',
+    inputs: [
+      { key: 'accountType', label: 'Type de compte', placeholder: 'creator (défaut) ou business', optional: true },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'switch_professional', params: { accountType: '{{accountType}}' } },
+    ],
+  },
+
+  {
     id: 'ig-post-reel',
     name: 'Poster un Reel — Instagram',
     official: true,
@@ -140,6 +230,21 @@ export const OFFICIAL_FLOWS: Flow[] = [
       { do: 'key', key: 'back' },
       { do: 'wait', ms: 800 },
       { do: 'tap', label: 'Partager', any: [{ id: 'share_footer_button' }, { id: 'share_button' }, { text: 'Partager' }, { text: 'Share' }] },
+    ],
+  },
+
+  {
+    id: 'yt-post-short',
+    name: 'Publier un Short — YouTube',
+    official: true,
+    category: '📤 Publication',
+    app: 'com.google.android.youtube',
+    description: 'Publie la 1ʳᵉ vidéo de la galerie en YouTube Short, avec légende optionnelle. La vidéo doit déjà être sur le téléphone.',
+    inputs: [{ key: 'title', label: 'Légende / titre', placeholder: 'Titre du Short', type: 'textarea', optional: true }],
+    steps: [
+      { do: 'open', pkg: 'com.google.android.youtube' },
+      { do: 'wait', ms: 4000 }, { do: 'popups' },
+      { do: 'action', name: 'youtube_short', params: { title: '{{title}}' } },
     ],
   },
 
