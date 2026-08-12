@@ -26,6 +26,7 @@ const TPL_FLOW_MAP: Record<string, string> = {
   '500000000000000020': 'ig-warmup',        // Warmup de compte (IA)
   '500000000000000049': 'ig-set-privacy',   // Confidentialité public/privé
   '500000000000000053': 'ig-bulk-follow',   // Abonnement en masse
+  '500000000000000034': 'ig-login',         // Connexion automatique
 }
 
 interface Props { user: User }
@@ -48,6 +49,8 @@ export function AutomationLab({ user }: Props) {
   const [openedFlow, setOpenedFlow] = useState<string | null>(null)   // null = galerie, sinon page détail
   const [openedTpl, setOpenedTpl] = useState<string | null>(null)     // template ouvert (écran « Utiliser »)
   const [tplVars, setTplVars] = useState<Record<string, string>>({})  // champs saisis pour un template texte
+  const [perPhoneVars, setPerPhoneVars] = useState<Record<string, Record<string, string>>>({})  // champs PAR téléphone (templates perAccount)
+  const [bulkCreds, setBulkCreds] = useState('')
   const [appFilter, setAppFilter] = useState<string>('all')           // filtre par application
   const [tplFilter, setTplFilter] = useState<'all' | TplPlatform>('all') // filtre plateforme du catalogue
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -137,6 +140,37 @@ export function AutomationLab({ user }: Props) {
       setResults(r => ({ ...r, [id]: { ...r[id], status: res.ok ? 'ok' : 'fail', failedAt: res.failedAt } }))
     }))
     setPosting(false)
+  }
+
+  // Runner PAR COMPTE : chaque téléphone reçoit ses propres variables (ex : login).
+  const flowRunPerPhone = async (flowId: string) => {
+    const flow = findFlow(flowId)
+    if (!flow || selected.size === 0) return
+    const ids = [...selected]
+    setResults(Object.fromEntries(ids.map(id => [id, { status: 'run', log: ['⏳ En attente…'] } as RunState])))
+    setPosting(true)
+    await Promise.all(ids.map(async id => {
+      const push = (m: string) => setResults(r => ({ ...r, [id]: { ...r[id], log: [...(r[id]?.log ?? []), m] } }))
+      const res = await runFlow(id, flow, { vars: perPhoneVars[id] ?? {}, log: push })
+      setResults(r => ({ ...r, [id]: { ...r[id], status: res.ok ? 'ok' : 'fail', failedAt: res.failedAt } }))
+    }))
+    setPosting(false)
+  }
+  // Répartit un collage « identifiant:mot_de_passe » (1 par ligne) sur les tél sélectionnés.
+  const spreadBulkCreds = () => {
+    const lines = bulkCreds.split('\n').map(l => l.trim()).filter(Boolean)
+    const ids = [...selected]
+    setPerPhoneVars(prev => {
+      const next = { ...prev }
+      ids.forEach((id, i) => {
+        const line = lines[i]; if (!line) return
+        const idx = line.indexOf(':')
+        if (idx < 0) return
+        next[id] = { account: line.slice(0, idx).trim(), password: line.slice(idx + 1).trim() }
+      })
+      return next
+    })
+    setBulkCreds('')
   }
 
   const nameOf = (id: string) => instances.find(i => i.id === id)?.name ?? id
@@ -307,6 +341,42 @@ export function AutomationLab({ user }: Props) {
                   </>
                 ) : mappedFlow && findFlow(mappedFlow) ? (() => {
                   const f = findFlow(mappedFlow)!
+                  // ── Template PAR COMPTE (ex : connexion) : un jeu de champs / téléphone.
+                  if (f.perAccount) {
+                    const ids = [...selected]
+                    const setPP = (id: string, key: string, val: string) => setPerPhoneVars(v => ({ ...v, [id]: { ...(v[id] ?? {}), [key]: val } }))
+                    const ready = ids.length > 0 && ids.every(id => (f.inputs ?? []).every(inp => inp.optional || (perPhoneVars[id]?.[inp.key] ?? '').trim()))
+                    return (
+                      <>
+                        <PhonePicker phones={runningPhones} selected={selected} allSelected={allSelected} toggleAll={toggleAll} togglePhone={togglePhone} />
+                        <Card title="Coller en masse (optionnel)">
+                          <p style={{ fontSize: 11.5, color: '#8a8a9c', margin: '0 0 8px', lineHeight: 1.5 }}>Un <b>identifiant:mot_de_passe</b> par ligne — réparti dans l'ordre des téléphones sélectionnés.</p>
+                          <textarea value={bulkCreds} onChange={e => setBulkCreds(e.target.value)} placeholder={'compte1:motdepasse1\ncompte2:motdepasse2'} rows={3} wrap="off" style={{ ...inputStyle, resize: 'vertical', fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre', overflowX: 'auto' }} />
+                          <button onClick={spreadBulkCreds} disabled={!bulkCreds.trim() || selected.size === 0} style={{ marginTop: 8, fontSize: 12, fontWeight: 700, padding: '7px 14px', borderRadius: 9, border: '1px solid var(--border-md)', background: 'rgba(255,255,255,0.05)', color: 'var(--text-1)', cursor: 'pointer', opacity: (!bulkCreds.trim() || selected.size === 0) ? 0.5 : 1 }}>Répartir</button>
+                        </Card>
+                        {ids.length > 0 && (
+                          <Card title={`Identifiants par téléphone (${ids.length})`}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                              {ids.map(id => (
+                                <div key={id} style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+                                  <span style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--accent)' }}>{nameOf(id)}</span>
+                                  {(f.inputs ?? []).map(inp => (
+                                    <input key={inp.key} type={inp.type === 'password' ? 'password' : 'text'} autoComplete="off"
+                                      value={perPhoneVars[id]?.[inp.key] ?? ''} onChange={e => setPP(id, inp.key, e.target.value)}
+                                      placeholder={inp.label} style={inputStyle} />
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          </Card>
+                        )}
+                        <button onClick={() => flowRunPerPhone(mappedFlow)} disabled={posting || !ready} style={{ ...runBtn, opacity: (posting || !ready) ? 0.55 : 1 }}>
+                          {posting ? '⏳ En cours…' : `▶ Lancer sur ${ids.length} téléphone${ids.length > 1 ? 's' : ''}`}
+                        </button>
+                        <ResultsList results={results} nameOf={nameOf} />
+                      </>
+                    )
+                  }
                   const filled = (f.inputs ?? []).some(inp => inp.type === 'boolean' || (tplVars[inp.key] ?? '').trim())
                   return (
                     <>

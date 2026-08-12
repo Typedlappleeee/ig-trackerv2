@@ -5,6 +5,25 @@ import type { Flow } from './flowRunner'
 
 export const OFFICIAL_FLOWS: Flow[] = [
   {
+    id: 'ig-login',
+    name: 'Connexion automatique — Instagram',
+    official: true,
+    category: '👤 Profil',
+    app: 'com.instagram.android',
+    description: 'Connecte chaque téléphone à son compte (identifiant + mot de passe). Sans 2FA.',
+    perAccount: true,
+    inputs: [
+      { key: 'account',  label: 'Identifiant / e-mail', placeholder: 'pseudo ou email', optional: false },
+      { key: 'password', label: 'Mot de passe',         placeholder: 'mot de passe',    type: 'password', optional: false },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 4000 }, { do: 'popups' },
+      { do: 'action', name: 'login', params: { account: '{{account}}', password: '{{password}}' } },
+    ],
+  },
+
+  {
     id: 'ig-bulk-follow',
     name: 'Abonnement en masse — Instagram',
     official: true,

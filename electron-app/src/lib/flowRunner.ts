@@ -16,7 +16,7 @@ import { ACTIONS } from './igActions'
 export type Logger = (m: string) => void
 
 // Champ saisi par l'utilisateur avant de lancer le flow (ex: la légende).
-export interface FlowInput { key: string; label: string; placeholder?: string; optional?: boolean; type?: 'text' | 'textarea' | 'boolean' }
+export interface FlowInput { key: string; label: string; placeholder?: string; optional?: boolean; type?: 'text' | 'textarea' | 'boolean' | 'password' }
 
 // Étapes possibles d'un flow (le « vocabulaire » du workshop).
 export type Step =
@@ -40,6 +40,7 @@ export interface Flow {
   inputs?: FlowInput[]
   steps: Step[]
   official?: boolean
+  perAccount?: boolean   // les `inputs` sont saisis PAR téléphone (ex : identifiants de connexion)
 }
 export interface FlowResult { ok: boolean; failedAt?: string }
 
