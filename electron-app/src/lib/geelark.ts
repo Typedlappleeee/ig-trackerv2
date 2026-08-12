@@ -2707,7 +2707,7 @@ export async function warmupInstagramViaRpa(
 // instagramPubReels : cover perso, tags IA, synchro audio tendance, et sa
 // propre gestion des popups. paramMap {Caption, Video[], SameURL, SameVolume,
 // AcousticVolume, AITags, Cover[]}.
-const REELS_FLOW_VERSION = '1'
+const REELS_FLOW_VERSION = '2'
 const _reelsFlowIdCache = new Map<string, Promise<string | null>>()
 function reelsFlowLsKey(bearer: string): string { return `sf-reels-flowid:${bearer.slice(-14)}` }
 function reelsFlowVerKey(bearer: string): string { return `sf-reels-flowver:${bearer.slice(-14)}` }
