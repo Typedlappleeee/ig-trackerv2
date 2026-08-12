@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, stopPhone,
+  fetchAllPhones, warmupAccount, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, loginInstagramViaRpa, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -346,12 +346,23 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      const result = await loginInstagramAccount(
-        bearer, phone.id, cred.email, cred.password,
+      // 1) Login RPA NATIF GeeLark (template « Instagram auto login ») s'il est présent
+      //    dans le compte → fiable, piloté côté serveur.
+      let result: { ok: boolean; error?: string; noFlow?: boolean } = await loginInstagramViaRpa(
+        bearer, phone.id,
+        { email: cred.email, password: cred.password, totp: cred.totpSecret },
         msg => addLog(phone.id, msg),
-        abortRef.current,
-        cred.totpSecret || undefined,
       )
+      // 2) Repli automatique sur le login ADB si aucun flow natif n'est trouvé.
+      if (result.noFlow) {
+        addLog(phone.id, tr('Pas de flow login GeeLark → connexion ADB de secours…', 'No GeeLark login flow → ADB login fallback…'))
+        result = await loginInstagramAccount(
+          bearer, phone.id, cred.email, cred.password,
+          msg => addLog(phone.id, msg),
+          abortRef.current,
+          cred.totpSecret || undefined,
+        )
+      }
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
       await stopPhone(bearer, phone.id)
